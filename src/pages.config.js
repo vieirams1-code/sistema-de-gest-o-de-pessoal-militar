@@ -7,6 +7,7 @@ import VerAtestado from './pages/VerAtestado';
 import PeriodosAquisitivos from './pages/PeriodosAquisitivos';
 import CadastrarFerias from './pages/CadastrarFerias';
 import Ferias from './pages/Ferias';
+import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import __Layout from './Layout.jsx';
 
 
@@ -20,6 +21,7 @@ export const PAGES = {
     "PeriodosAquisitivos": PeriodosAquisitivos,
     "CadastrarFerias": CadastrarFerias,
     "Ferias": Ferias,
+    "PlanoAnualFerias": PlanoAnualFerias,
 }
 
 export const pagesConfig = {
