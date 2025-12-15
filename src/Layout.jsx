@@ -20,6 +20,7 @@ const navItems = [
   { name: 'Férias', page: 'Ferias', icon: Menu },
   { name: 'Períodos Aquisitivos', page: 'PeriodosAquisitivos', icon: ChevronRight },
   { name: 'Cadastrar Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
+  { name: 'Publicações', page: 'Publicacoes', icon: Shield },
 ];
 
 export default function Layout({ children, currentPageName }) {

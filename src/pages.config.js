@@ -9,6 +9,7 @@ import CadastrarFerias from './pages/CadastrarFerias';
 import Ferias from './pages/Ferias';
 import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
+import Publicacoes from './pages/Publicacoes';
 import __Layout from './Layout.jsx';
 
 
@@ -24,6 +25,7 @@ export const PAGES = {
     "Ferias": Ferias,
     "PlanoAnualFerias": PlanoAnualFerias,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
+    "Publicacoes": Publicacoes,
 }
 
 export const pagesConfig = {
