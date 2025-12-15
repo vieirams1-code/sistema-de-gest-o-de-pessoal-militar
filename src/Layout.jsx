@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const navItems = [
   { name: 'Efetivo', page: 'Militares', icon: Users },
-  { name: 'Cadastrar Militar', page: 'CadastrarMilitar', icon: UserPlus },
+  { name: 'Atestados', page: 'Atestados', icon: Shield },
 ];
 
 export default function Layout({ children, currentPageName }) {
