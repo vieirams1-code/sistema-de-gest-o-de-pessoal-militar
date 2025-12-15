@@ -154,7 +154,16 @@ export default function CadastrarRegistroLivro() {
               <div className="md:col-span-2">
                 <MilitarSelector
                   value={formData.militar_id}
-                  onChange={handleMilitarSelect}
+                  onChange={(name, value) => handleChange(name, value)}
+                  onMilitarSelect={(data) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      militar_id: data.id || prev.militar_id,
+                      militar_nome: data.militar_nome || data.nome_completo,
+                      militar_posto: data.militar_posto || data.posto_graduacao,
+                      militar_matricula: data.militar_matricula || data.matricula
+                    }));
+                  }}
                 />
               </div>
               <div>

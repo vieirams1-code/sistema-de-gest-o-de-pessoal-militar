@@ -47,9 +47,13 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
     onChange('militar_id', militar.id);
     if (onMilitarSelect) {
       onMilitarSelect({
+        id: militar.id,
         militar_nome: militar.nome_completo,
         militar_posto: militar.posto_graduacao,
-        militar_matricula: militar.matricula
+        militar_matricula: militar.matricula,
+        nome_completo: militar.nome_completo,
+        posto_graduacao: militar.posto_graduacao,
+        matricula: militar.matricula
       });
     }
     setOpen(false);
