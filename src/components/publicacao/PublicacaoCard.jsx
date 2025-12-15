@@ -26,7 +26,16 @@ export default function PublicacaoCard({ registro, onUpdate }) {
   });
 
   const handleSave = () => {
-    onUpdate(registro.id, editData);
+    // Determinar status automaticamente
+    let novoStatus = 'Aguardando Nota';
+    
+    if (editData.numero_bg && editData.data_bg) {
+      novoStatus = 'Publicado';
+    } else if (editData.nota_para_bg) {
+      novoStatus = 'Aguardando Publicação';
+    }
+    
+    onUpdate(registro.id, { ...editData, status: novoStatus });
     setIsEditing(false);
   };
 
@@ -107,31 +116,14 @@ export default function PublicacaoCard({ registro, onUpdate }) {
           {isEditing ? (
             <div className="space-y-4 mt-4">
               <div>
-                <Label className="text-sm font-medium">Status</Label>
-                <Select 
-                  value={editData.status} 
-                  onValueChange={(v) => setEditData({...editData, status: v})}
-                >
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                    <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                    <SelectItem value="Publicado">Publicado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">Nota para BG</Label>
-                <Textarea
+                <Label className="text-sm font-medium">Número da Nota para BG</Label>
+                <Input
                   value={editData.nota_para_bg}
                   onChange={(e) => setEditData({...editData, nota_para_bg: e.target.value})}
                   className="mt-1.5"
-                  rows={3}
-                  placeholder="Digite a nota para o Boletim Geral..."
+                  placeholder="Ex: 001/2025"
                 />
+                <p className="text-xs text-slate-500 mt-1">Ao preencher, status mudará para "Aguardando Publicação"</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -154,6 +146,7 @@ export default function PublicacaoCard({ registro, onUpdate }) {
                   />
                 </div>
               </div>
+              <p className="text-xs text-slate-500">Ao preencher ambos, status mudará para "Publicado"</p>
 
               <div className="flex gap-2 pt-2">
                 <Button onClick={handleSave} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
@@ -177,16 +170,11 @@ export default function PublicacaoCard({ registro, onUpdate }) {
                 </div>
               )}
 
-              {registro.nota_para_bg && (
+              <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <Label className="text-sm font-medium text-slate-700">Nota para BG</Label>
-                  <div className="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-700">
-                    {registro.nota_para_bg}
-                  </div>
+                  <Label className="text-xs text-slate-500">Número da Nota</Label>
+                  <p className="font-medium mt-1">{registro.nota_para_bg || '-'}</p>
                 </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <Label className="text-xs text-slate-500">Número do BG</Label>
                   <p className="font-medium mt-1">{registro.numero_bg || '-'}</p>
