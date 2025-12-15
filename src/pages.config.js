@@ -4,6 +4,8 @@ import VerMilitar from './pages/VerMilitar';
 import CadastrarAtestado from './pages/CadastrarAtestado';
 import Atestados from './pages/Atestados';
 import VerAtestado from './pages/VerAtestado';
+import PeriodosAquisitivos from './pages/PeriodosAquisitivos';
+import CadastrarFerias from './pages/CadastrarFerias';
 import __Layout from './Layout.jsx';
 
 
@@ -14,6 +16,8 @@ export const PAGES = {
     "CadastrarAtestado": CadastrarAtestado,
     "Atestados": Atestados,
     "VerAtestado": VerAtestado,
+    "PeriodosAquisitivos": PeriodosAquisitivos,
+    "CadastrarFerias": CadastrarFerias,
 }
 
 export const pagesConfig = {

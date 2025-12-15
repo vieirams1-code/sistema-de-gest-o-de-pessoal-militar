@@ -16,6 +16,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 const navItems = [
   { name: 'Efetivo', page: 'Militares', icon: Users },
   { name: 'Atestados', page: 'Atestados', icon: Shield },
+  { name: 'Férias', page: 'Ferias', icon: Home },
+  { name: 'Períodos Aquisitivos', page: 'PeriodosAquisitivos', icon: ChevronRight },
 ];
 
 export default function Layout({ children, currentPageName }) {
