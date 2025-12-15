@@ -14,14 +14,20 @@ import { Calendar, AlertCircle } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 
-export default function FeriasSelector({ militarId, value, onChange }) {
+export default function FeriasSelector({ militarId, value, onChange, tipoRegistro }) {
   const { data: feriasList = [], isLoading } = useQuery({
-    queryKey: ['ferias-militar', militarId],
+    queryKey: ['ferias-militar', militarId, tipoRegistro],
     queryFn: async () => {
       if (!militarId) return [];
       const ferias = await base44.entities.Ferias.filter({ militar_id: militarId });
-      // Filtrar apenas férias previstas ou autorizadas
-      return ferias.filter(f => f.status === 'Prevista' || f.status === 'Autorizada');
+      
+      // Se for retorno, mostrar apenas férias em curso
+      // Se for saída, mostrar apenas previstas/autorizadas
+      if (tipoRegistro === 'Retorno Férias') {
+        return ferias.filter(f => f.status === 'Em Curso');
+      } else {
+        return ferias.filter(f => f.status === 'Prevista' || f.status === 'Autorizada');
+      }
     },
     enabled: !!militarId
   });

@@ -57,26 +57,60 @@ export default function CadastrarRegistroLivro() {
 
   const handleFeriasSelect = (ferias) => {
     setSelectedFerias(ferias);
+    const dataRegistro = formData.tipo_registro === 'Retorno Férias' ? ferias.data_retorno : ferias.data_inicio;
     setFormData(prev => ({
       ...prev,
       ferias_id: ferias.id,
-      data_registro: ferias.data_inicio
+      data_registro: dataRegistro
     }));
     
     // Gerar texto automático
-    gerarTextoPublicacao(ferias, formData);
+    gerarTextoPublicacao(ferias, { ...formData, data_registro: dataRegistro });
+  };
+
+  const formatarDataExtenso = (dataString) => {
+    if (!dataString) return '';
+    const data = new Date(dataString + 'T00:00:00');
+    const dia = data.getDate();
+    const mes = data.getMonth() + 1;
+    const ano = data.getFullYear();
+    return `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${ano}`;
+  };
+
+  const numeroPorExtenso = (num) => {
+    const numeros = {
+      1: 'um', 2: 'dois', 3: 'três', 4: 'quatro', 5: 'cinco',
+      6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove', 10: 'dez',
+      11: 'onze', 12: 'doze', 13: 'treze', 14: 'quatorze', 15: 'quinze',
+      16: 'dezesseis', 17: 'dezessete', 18: 'dezoito', 19: 'dezenove', 20: 'vinte',
+      21: 'vinte e um', 22: 'vinte e dois', 23: 'vinte e três', 24: 'vinte e quatro',
+      25: 'vinte e cinco', 26: 'vinte e seis', 27: 'vinte e sete', 28: 'vinte e oito',
+      29: 'vinte e nove', 30: 'trinta'
+    };
+    return numeros[num] || num.toString();
   };
 
   const gerarTextoPublicacao = (ferias, dados) => {
     const postoNome = ferias.militar_posto ? `${ferias.militar_posto} QOBM` : '';
     const nomeCompleto = ferias.militar_nome || '';
     const matricula = ferias.militar_matricula || '';
-    const dataInicio = ferias.data_inicio ? format(new Date(ferias.data_inicio + 'T00:00:00'), 'dd/MM/yyyy') : '';
-    const dataRetorno = ferias.data_retorno ? format(new Date(ferias.data_retorno + 'T00:00:00'), 'dd/MM/yyyy') : '';
     const dias = ferias.dias || 0;
+    const diasExtenso = numeroPorExtenso(dias);
     const periodoRef = ferias.periodo_aquisitivo_ref || '';
+    const fracionamento = ferias.fracionamento || '';
 
-    const texto = `Torno público o Livro de Férias e outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${dataInicio} entrará em gozo de férias regulamentares, 30 (trinta) dias, referente ao período aquisitivo ${periodoRef}.`;
+    let texto = '';
+    
+    if (formData.tipo_registro === 'Retorno Férias') {
+      const dataRetorno = formatarDataExtenso(dados.data_registro || ferias.data_retorno);
+      const tipoFeriaTexto = fracionamento ? `${fracionamento} de férias regulamentares` : 'férias regulamentares';
+      
+      texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${dataRetorno}, por término do gozo da ${tipoFeriaTexto}, ${dias} (${diasExtenso}) dias, referente ao período aquisitivo ${periodoRef}.`;
+    } else {
+      const dataInicio = formatarDataExtenso(ferias.data_inicio);
+      
+      texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${dataInicio} entrará em gozo de férias regulamentares, ${dias} (${diasExtenso}) dias, referente ao período aquisitivo ${periodoRef}.`;
+    }
 
     setTextoPublicacao(texto);
   };
@@ -94,12 +128,21 @@ export default function CadastrarRegistroLivro() {
       
       await base44.entities.RegistroLivro.create(registroData);
 
-      // Atualizar status das férias para "Em Curso"
+      // Atualizar status das férias
       if (formData.ferias_id) {
-        await base44.entities.Ferias.update(formData.ferias_id, {
-          status: 'Em Curso',
-          data_saida_registrada: new Date().toISOString()
-        });
+        if (formData.tipo_registro === 'Retorno Férias') {
+          // Retorno de férias - marcar como Gozada
+          await base44.entities.Ferias.update(formData.ferias_id, {
+            status: 'Gozada',
+            data_retorno_registrada: new Date().toISOString()
+          });
+        } else if (formData.tipo_registro === 'Saída Férias') {
+          // Saída de férias - marcar como Em Curso
+          await base44.entities.Ferias.update(formData.ferias_id, {
+            status: 'Em Curso',
+            data_saida_registrada: new Date().toISOString()
+          });
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
@@ -168,13 +211,21 @@ export default function CadastrarRegistroLivro() {
               </div>
               <div>
                 <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
-                <Select value={formData.tipo_registro} onValueChange={(v) => handleChange('tipo_registro', v)}>
+                <Select value={formData.tipo_registro} onValueChange={(v) => {
+                  handleChange('tipo_registro', v);
+                  // Regerar texto se já tiver férias selecionada
+                  if (selectedFerias) {
+                    const dataRegistro = v === 'Retorno Férias' ? selectedFerias.data_retorno : selectedFerias.data_inicio;
+                    setFormData(prev => ({ ...prev, tipo_registro: v, data_registro: dataRegistro }));
+                    gerarTextoPublicacao(selectedFerias, { ...formData, tipo_registro: v, data_registro: dataRegistro });
+                  }
+                }}>
                   <SelectTrigger className="mt-1.5">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Saída Férias">Férias</SelectItem>
-                    <SelectItem value="Retorno Férias">Retorno Férias</SelectItem>
+                    <SelectItem value="Retorno Férias">Retorno de Férias</SelectItem>
                     <SelectItem value="Saída Licença">Saída Licença</SelectItem>
                     <SelectItem value="Retorno Licença">Retorno Licença</SelectItem>
                     <SelectItem value="Apresentação">Apresentação</SelectItem>
@@ -198,10 +249,32 @@ export default function CadastrarRegistroLivro() {
           {formData.militar_id && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Férias</h3>
+              
+              <div className="mb-4">
+                <Label className="text-sm font-medium text-slate-700">Tipo - Férias</Label>
+                <Select value={formData.tipo_registro} onValueChange={(v) => {
+                  handleChange('tipo_registro', v);
+                  if (selectedFerias) {
+                    const dataRegistro = v === 'Retorno Férias' ? selectedFerias.data_retorno : selectedFerias.data_inicio;
+                    setFormData(prev => ({ ...prev, tipo_registro: v, data_registro: dataRegistro }));
+                    gerarTextoPublicacao(selectedFerias, { ...formData, tipo_registro: v, data_registro: dataRegistro });
+                  }
+                }}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Saída Férias">Início de Férias</SelectItem>
+                    <SelectItem value="Retorno Férias">Retorno de Férias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <FeriasSelector
                 militarId={formData.militar_id}
                 value={formData.ferias_id}
                 onChange={handleFeriasSelect}
+                tipoRegistro={formData.tipo_registro}
               />
 
               {selectedFerias && (
@@ -236,7 +309,7 @@ export default function CadastrarRegistroLivro() {
                       </Label>
                       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-sm text-slate-700 leading-relaxed">
-                          A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: {selectedFerias.militar_posto ? `${selectedFerias.militar_posto} QOBM ` : ''}{selectedFerias.militar_nome}, matrícula {selectedFerias.militar_matricula}, em {selectedFerias.data_inicio ? format(new Date(selectedFerias.data_inicio + 'T00:00:00'), 'dd/MM/yyyy') : ''} entrará em gozo de férias regulamentares, {selectedFerias.dias} ({selectedFerias.dias === 30 ? 'trinta' : selectedFerias.dias}) dias, referente ao período aquisitivo {selectedFerias.periodo_aquisitivo_ref}.
+                          {textoPublicacao}
                         </p>
                       </div>
                     </div>
