@@ -22,6 +22,7 @@ const navItems = [
   { name: 'Atestados', page: 'Atestados', icon: Shield },
   { name: 'Férias', page: 'Ferias', icon: Menu },
   { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
+  { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
   { name: 'Publicações', page: 'Publicacoes', icon: Shield },
   { name: 'Configurações', page: 'Configuracoes', icon: Menu },
 ];

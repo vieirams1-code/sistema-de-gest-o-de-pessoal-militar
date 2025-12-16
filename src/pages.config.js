@@ -20,6 +20,7 @@ import TiposMedalha from './pages/TiposMedalha';
 import Armamentos from './pages/Armamentos';
 import CadastrarArmamento from './pages/CadastrarArmamento';
 import CadastrarPublicacao from './pages/CadastrarPublicacao';
+import AgendarJISO from './pages/AgendarJISO';
 import __Layout from './Layout.jsx';
 
 
@@ -46,6 +47,7 @@ export const PAGES = {
     "Armamentos": Armamentos,
     "CadastrarArmamento": CadastrarArmamento,
     "CadastrarPublicacao": CadastrarPublicacao,
+    "AgendarJISO": AgendarJISO,
 }
 
 export const pagesConfig = {
