@@ -148,9 +148,10 @@ export default function CadastrarPunicao() {
               </Button>
             )}
             <Button onClick={handleSubmit} disabled={loading || !formData.militar_id} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
-            {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
-            Salvar
-          </Button>
+              {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
+              Salvar
+            </Button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
