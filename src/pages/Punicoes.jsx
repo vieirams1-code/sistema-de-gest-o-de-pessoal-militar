@@ -1,0 +1,153 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { createPageUrl } from '@/utils';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Shield, Plus, Search, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+export default function Punicoes() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
+
+  const { data: punicoes = [], isLoading } = useQuery({
+    queryKey: ['punicoes'],
+    queryFn: () => base44.entities.Punicao.list('-data_aplicacao')
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Punicao.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['punicoes'] });
+      setDeleteDialog({ open: false, id: null });
+    }
+  });
+
+  const filteredPunicoes = punicoes.filter(p =>
+    p.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const tipoColors = {
+    'Advertência Verbal': 'bg-blue-100 text-blue-700',
+    'Repreensão': 'bg-yellow-100 text-yellow-700',
+    'Detenção': 'bg-orange-100 text-orange-700',
+    'Prisão': 'bg-red-100 text-red-700'
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Shield className="w-8 h-8 text-[#1e3a5f]" />
+            <div>
+              <h1 className="text-3xl font-bold text-[#1e3a5f]">Punições</h1>
+              <p className="text-slate-500">Gerenciar punições disciplinares</p>
+            </div>
+          </div>
+          <Button
+            onClick={() => navigate(createPageUrl('CadastrarPunicao'))}
+            className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Nova Punição
+          </Button>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Input
+              placeholder="Buscar por nome ou matrícula..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : filteredPunicoes.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+            <Shield className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhuma punição encontrada</h3>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredPunicoes.map((punicao) => (
+              <div key={punicao.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-semibold text-slate-900">
+                        {punicao.militar_posto} {punicao.militar_nome}
+                      </h3>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${tipoColors[punicao.tipo]}`}>
+                        {punicao.tipo}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-1">Mat: {punicao.militar_matricula}</p>
+                    <p className="text-sm text-slate-600">
+                      Data: {format(new Date(punicao.data_aplicacao + 'T00:00:00'), 'dd/MM/yyyy')}
+                    </p>
+                    {punicao.motivo && (
+                      <p className="text-sm text-slate-600 mt-2">{punicao.motivo}</p>
+                    )}
+                    {(punicao.data_inicio || punicao.data_termino) && (
+                      <p className="text-sm text-slate-500 mt-2">
+                        Período: {punicao.data_inicio ? format(new Date(punicao.data_inicio + 'T00:00:00'), 'dd/MM/yyyy') : '-'} até {punicao.data_termino ? format(new Date(punicao.data_termino + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeleteDialog({ open: true, id: punicao.id })}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir esta punição? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deleteMutation.mutate(deleteDialog.id)} className="bg-red-600 hover:bg-red-700">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </div>
+  );
+}

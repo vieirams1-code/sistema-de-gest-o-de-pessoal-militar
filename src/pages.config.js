@@ -11,6 +11,14 @@ import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import Publicacoes from './pages/Publicacoes';
 import Configuracoes from './pages/Configuracoes';
+import Home from './pages/Home';
+import Punicoes from './pages/Punicoes';
+import CadastrarPunicao from './pages/CadastrarPunicao';
+import Medalhas from './pages/Medalhas';
+import CadastrarMedalha from './pages/CadastrarMedalha';
+import TiposMedalha from './pages/TiposMedalha';
+import Armamentos from './pages/Armamentos';
+import CadastrarArmamento from './pages/CadastrarArmamento';
 import __Layout from './Layout.jsx';
 
 
@@ -28,6 +36,14 @@ export const PAGES = {
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "Publicacoes": Publicacoes,
     "Configuracoes": Configuracoes,
+    "Home": Home,
+    "Punicoes": Punicoes,
+    "CadastrarPunicao": CadastrarPunicao,
+    "Medalhas": Medalhas,
+    "CadastrarMedalha": CadastrarMedalha,
+    "TiposMedalha": TiposMedalha,
+    "Armamentos": Armamentos,
+    "CadastrarArmamento": CadastrarArmamento,
 }
 
 export const pagesConfig = {

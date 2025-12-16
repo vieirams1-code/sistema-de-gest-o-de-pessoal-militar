@@ -14,12 +14,14 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
 
 const navItems = [
+  { name: 'Dashboard', page: 'Home', icon: Home },
   { name: 'Efetivo', page: 'Militares', icon: Users },
+  { name: 'Punições', page: 'Punicoes', icon: Shield },
+  { name: 'Medalhas', page: 'Medalhas', icon: Shield },
+  { name: 'Armamentos', page: 'Armamentos', icon: Shield },
   { name: 'Atestados', page: 'Atestados', icon: Shield },
-  { name: 'Plano Anual Férias', page: 'PlanoAnualFerias', icon: Home },
   { name: 'Férias', page: 'Ferias', icon: Menu },
-  { name: 'Períodos Aquisitivos', page: 'PeriodosAquisitivos', icon: ChevronRight },
-  { name: 'Cadastrar Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
+  { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
   { name: 'Publicações', page: 'Publicacoes', icon: Shield },
   { name: 'Configurações', page: 'Configuracoes', icon: Menu },
 ];
