@@ -15,6 +15,7 @@ const initialFormData = {
   nome_completo: '',
   foto: '',
   status_cadastro: 'Ativo',
+  situacao_militar: 'Ativa',
   funcoes: [],
   lotacao: '',
   condicao: '',
@@ -185,7 +186,15 @@ export default function CadastrarMilitar() {
                   value={formData.status_cadastro}
                   onChange={handleChange}
                   type="select"
-                  options={['Ativo', 'Inativo', 'Reserva', 'Reforma', 'Falecido']}
+                  options={['Ativo', 'Inativo']}
+                />
+                <FormField
+                  label="Situação Militar"
+                  name="situacao_militar"
+                  value={formData.situacao_militar}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Ativa', 'Reserva Remunerada', 'Reformado', 'Designado', 'Convocado']}
                 />
                 <FormField
                   label="Lotação"
