@@ -296,6 +296,37 @@ export default function VerAtestado() {
             </Section>
           )}
 
+          {/* JISO */}
+          {atestado.necessita_jiso && (
+            <Section title="JISO - Junta de Inspeção de Saúde" icon={ClipboardList}>
+              <div className="space-y-2">
+                {atestado.finalidade_jiso && (
+                  <InfoItem label="Finalidade" value={atestado.finalidade_jiso} />
+                )}
+                {atestado.data_jiso && (
+                  <InfoItem label="Data Agendada" value={formatShortDate(atestado.data_jiso)} icon={Calendar} />
+                )}
+                {atestado.resultado_jiso && (
+                  <InfoItem label="Resultado" value={atestado.resultado_jiso} />
+                )}
+                {atestado.dias_jiso && (
+                  <InfoItem label="Dias Definidos pela JISO" value={`${atestado.dias_jiso} dias`} />
+                )}
+                {atestado.ata_jiso && (
+                  <InfoItem label="Número da Ata" value={atestado.ata_jiso} />
+                )}
+                {atestado.parecer_jiso && (
+                  <div className="mt-3">
+                    <p className="text-xs text-slate-500 mb-1">Parecer</p>
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-slate-700">{atestado.parecer_jiso}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+          )}
+
           {/* Controle BG */}
           {(atestado.bg || atestado.data_bg || atestado.publicacao_nota) && (
             <Section title="Controle de Publicação" icon={ClipboardList}>
