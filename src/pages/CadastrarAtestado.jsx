@@ -110,7 +110,8 @@ export default function CadastrarAtestado() {
 
     const dataToSave = {
       ...formData,
-      dias: formData.dias ? parseInt(formData.dias) : 0
+      dias: formData.dias ? parseInt(formData.dias) : 0,
+      dias_jiso: formData.dias_jiso ? parseInt(formData.dias_jiso) : undefined
     };
 
     if (editId) {
