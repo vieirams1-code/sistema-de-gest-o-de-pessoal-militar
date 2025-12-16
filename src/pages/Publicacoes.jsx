@@ -21,15 +21,31 @@ export default function Publicacoes() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: registros = [], isLoading } = useQuery({
+  const { data: registrosLivro = [], isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
     queryFn: () => base44.entities.RegistroLivro.list('-created_date')
   });
 
+  const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
+    queryKey: ['publicacoes-ex-officio'],
+    queryFn: () => base44.entities.PublicacaoExOfficio.list('-created_date')
+  });
+
+  const isLoading = loadingLivro || loadingExOfficio;
+  const registros = [...registrosLivro, ...publicacoesExOfficio].sort((a, b) => 
+    new Date(b.created_date) - new Date(a.created_date)
+  );
+
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.RegistroLivro.update(id, data),
+    mutationFn: ({ id, data, tipo }) => {
+      if (tipo === 'ex-officio') {
+        return base44.entities.PublicacaoExOfficio.update(id, data);
+      }
+      return base44.entities.RegistroLivro.update(id, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
     }
   });
 
@@ -49,8 +65,8 @@ export default function Publicacoes() {
     publicados: registros.filter(r => r.status === 'Publicado').length
   };
 
-  const handleUpdate = (id, data) => {
-    updateMutation.mutate({ id, data });
+  const handleUpdate = (id, data, tipo) => {
+    updateMutation.mutate({ id, data, tipo });
   };
 
   return (
