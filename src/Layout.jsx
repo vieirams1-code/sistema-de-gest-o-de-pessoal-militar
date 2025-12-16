@@ -21,6 +21,7 @@ const navItems = [
   { name: 'Períodos Aquisitivos', page: 'PeriodosAquisitivos', icon: ChevronRight },
   { name: 'Cadastrar Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
   { name: 'Publicações', page: 'Publicacoes', icon: Shield },
+  { name: 'Configurações', page: 'Configuracoes', icon: Menu },
 ];
 
 export default function Layout({ children, currentPageName }) {

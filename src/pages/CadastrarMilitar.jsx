@@ -10,17 +10,18 @@ import FormSection from '@/components/militar/FormSection';
 import FormField from '@/components/militar/FormField';
 import PhotoUpload from '@/components/militar/PhotoUpload';
 import TagInput from '@/components/militar/TagInput';
+import LotacaoSelector from '@/components/militar/LotacaoSelector';
+import FuncaoSelector from '@/components/militar/FuncaoSelector';
 
 const initialFormData = {
   nome_completo: '',
   foto: '',
   status_cadastro: 'Ativo',
   situacao_militar: 'Ativa',
-  funcoes: [],
+  funcao: '',
   lotacao: '',
   condicao: '',
-  cedencia: '',
-  origem_destino: '',
+  destino: '',
   nome_guerra: '',
   matricula: '',
   posto_graduacao: '',
@@ -33,6 +34,10 @@ const initialFormData = {
   tipo_sanguineo: '',
   religiao: '',
   escolaridade: '',
+  curso_superior: '',
+  pos_graduacao: [],
+  mestrado: '',
+  doutorado: '',
   naturalidade: '',
   naturalidade_uf: '',
   nome_pai: '',
@@ -60,7 +65,6 @@ const initialFormData = {
   cidade: '',
   uf: '',
   complemento: '',
-  cursos: [],
   habilidades: []
 };
 
@@ -97,7 +101,23 @@ export default function CadastrarMilitar() {
   }, [editingMilitar]);
 
   const handleChange = (name, value) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      
+      // Lógica de comportamento - praças começam com BOM
+      if (name === 'posto_graduacao') {
+        const pracas = ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente', 'Aspirante'];
+        const oficiais = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente'];
+        
+        if (pracas.includes(value)) {
+          updated.comportamento = 'Bom';
+        } else if (oficiais.includes(value)) {
+          updated.comportamento = '';
+        }
+      }
+      
+      return updated;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -196,11 +216,15 @@ export default function CadastrarMilitar() {
                   type="select"
                   options={['Ativa', 'Reserva Remunerada', 'Reformado', 'Designado', 'Convocado']}
                 />
-                <FormField
-                  label="Lotação"
-                  name="lotacao"
+                <LotacaoSelector
                   value={formData.lotacao}
                   onChange={handleChange}
+                  name="lotacao"
+                />
+                <FuncaoSelector
+                  value={formData.funcao}
+                  onChange={handleChange}
+                  name="funcao"
                 />
                 <FormField
                   label="Condição"
@@ -210,27 +234,15 @@ export default function CadastrarMilitar() {
                   type="select"
                   options={['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição']}
                 />
-                <FormField
-                  label="Cedência"
-                  name="cedencia"
-                  value={formData.cedencia}
-                  onChange={handleChange}
-                />
-                <FormField
-                  label="Origem ou Destino"
-                  name="origem_destino"
-                  value={formData.origem_destino}
-                  onChange={handleChange}
-                />
-                <div className="md:col-span-2 lg:col-span-3">
-                  <TagInput
-                    label="Funções"
-                    name="funcoes"
-                    value={formData.funcoes}
+                {['Adido', 'Agregado', 'Cedido', 'À Disposição'].includes(formData.condicao) && (
+                  <FormField
+                    label="Destino"
+                    name="destino"
+                    value={formData.destino}
                     onChange={handleChange}
-                    placeholder="Adicionar função..."
+                    className="md:col-span-2"
                   />
-                </div>
+                )}
               </div>
             </div>
           </FormSection>
@@ -257,7 +269,7 @@ export default function CadastrarMilitar() {
                 value={formData.posto_graduacao}
                 onChange={handleChange}
                 type="select"
-                options={['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente', 'Aspirante', '2º Tenente', '1º Tenente', 'Capitão', 'Major', 'Tenente-Coronel', 'Coronel']}
+                options={['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante', 'Subtenente', '1º Sargento', '2º Sargento', '3º Sargento', 'Cabo', 'Soldado']}
               />
               <FormField
                 label="Quadro"
@@ -265,7 +277,7 @@ export default function CadastrarMilitar() {
                 value={formData.quadro}
                 onChange={handleChange}
                 type="select"
-                options={['QOBM', 'QOPM', 'QPM', 'QPBM', 'QOC', 'QPCPM']}
+                options={['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QBMPT']}
               />
               <FormField
                 label="Data de Inclusão"
@@ -274,14 +286,16 @@ export default function CadastrarMilitar() {
                 onChange={handleChange}
                 type="date"
               />
-              <FormField
-                label="Comportamento"
-                name="comportamento"
-                value={formData.comportamento}
-                onChange={handleChange}
-                type="select"
-                options={['Excepcional', 'Ótimo', 'Bom', 'Regular', 'Insuficiente']}
-              />
+              {formData.posto_graduacao && ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente', 'Aspirante'].includes(formData.posto_graduacao) && (
+                <FormField
+                  label="Comportamento (Praças)"
+                  name="comportamento"
+                  value={formData.comportamento}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
+                />
+              )}
             </div>
           </FormSection>
 
@@ -333,6 +347,44 @@ export default function CadastrarMilitar() {
                 type="select"
                 options={['Ensino Fundamental Incompleto', 'Ensino Fundamental Completo', 'Ensino Médio Incompleto', 'Ensino Médio Completo', 'Ensino Superior Incompleto', 'Ensino Superior Completo', 'Pós-Graduação', 'Mestrado', 'Doutorado']}
               />
+              {['Ensino Superior Completo', 'Pós-Graduação', 'Mestrado', 'Doutorado'].includes(formData.escolaridade) && (
+                <>
+                  <FormField
+                    label="Curso Superior"
+                    name="curso_superior"
+                    value={formData.curso_superior}
+                    onChange={handleChange}
+                    placeholder="Ex: Engenharia Civil"
+                  />
+                  <div className="md:col-span-2">
+                    <TagInput
+                      label="Pós-Graduações"
+                      name="pos_graduacao"
+                      value={formData.pos_graduacao}
+                      onChange={handleChange}
+                      placeholder="Adicionar pós-graduação..."
+                    />
+                  </div>
+                  {['Mestrado', 'Doutorado'].includes(formData.escolaridade) && (
+                    <FormField
+                      label="Mestrado"
+                      name="mestrado"
+                      value={formData.mestrado}
+                      onChange={handleChange}
+                      placeholder="Área do mestrado"
+                    />
+                  )}
+                  {formData.escolaridade === 'Doutorado' && (
+                    <FormField
+                      label="Doutorado"
+                      name="doutorado"
+                      value={formData.doutorado}
+                      onChange={handleChange}
+                      placeholder="Área do doutorado"
+                    />
+                  )}
+                </>
+              )}
               <FormField
                 label="Naturalidade"
                 name="naturalidade"
@@ -553,24 +605,15 @@ export default function CadastrarMilitar() {
             </div>
           </FormSection>
 
-          {/* Habilidades e Cursos */}
-          <FormSection title="Habilidades e Cursos" icon={GraduationCap}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <TagInput
-                label="Habilidades"
-                name="habilidades"
-                value={formData.habilidades}
-                onChange={handleChange}
-                placeholder="Adicionar habilidade..."
-              />
-              <TagInput
-                label="Cursos"
-                name="cursos"
-                value={formData.cursos}
-                onChange={handleChange}
-                placeholder="Adicionar curso..."
-              />
-            </div>
+          {/* Habilidades */}
+          <FormSection title="Habilidades" icon={GraduationCap}>
+            <TagInput
+              label="Habilidades"
+              name="habilidades"
+              value={formData.habilidades}
+              onChange={handleChange}
+              placeholder="Adicionar habilidade..."
+            />
           </FormSection>
 
           {/* Submit Button Mobile */}
