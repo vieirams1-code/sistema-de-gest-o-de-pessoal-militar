@@ -27,6 +27,7 @@ const initialFormData = {
   dias: 0,
   data_inicio: '',
   data_termino: '',
+  data_retorno: '',
   conjuge_nome: '',
   inicio_termino: 'Início',
   falecido_nome: '',
@@ -37,6 +38,13 @@ const initialFormData = {
   data_cedencia: '',
   obs_cedencia: '',
   tipo_transferencia: 'A pedido',
+  motivo_dispensa: '',
+  periodo_aquisitivo: '',
+  dias_restantes: '',
+  curso_nome: '',
+  curso_local: '',
+  edicao_ano: '',
+  missao_descricao: '',
   documento_referencia: '',
   documento_texto: '',
   data_transferencia: '',
@@ -133,6 +141,10 @@ export default function CadastrarRegistroLivro() {
       setFormData(prev => ({ ...prev, dias: 120 }));
     } else if (formData.tipo_registro === 'Licença Paternidade') {
       setFormData(prev => ({ ...prev, dias: 5 }));
+    } else if (formData.tipo_registro === 'Dispensa Recompensa') {
+      setFormData(prev => ({ ...prev, dias: 4 }));
+    } else if (formData.tipo_registro === 'Dispensa Desconto Férias') {
+      setFormData(prev => ({ ...prev, dias: 6 }));
     }
   }, [formData.tipo_registro]);
 
@@ -197,13 +209,13 @@ export default function CadastrarRegistroLivro() {
 
       case 'Cedência':
         if (formData.origem && formData.destino && formData.data_cedencia) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do Militar; 3º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido cedido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_cedencia)}.`;
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do Militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido cedido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_cedencia)}.`;
         }
         break;
 
       case 'Transferência para RR':
         if (formData.tipo_transferencia && formData.documento_referencia && formData.data_transferencia) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido transferido, ${formData.tipo_transferencia}, para a reserva remunerada, conforme ${formData.documento_referencia}, a contar de ${formatarDataExtenso(formData.data_transferencia)}.`;
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido transferido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_transferencia)}, conforme ${formData.documento_referencia}.`;
         }
         break;
 
@@ -216,6 +228,33 @@ export default function CadastrarRegistroLivro() {
       case 'Instalação':
         if (formData.origem && formData.destino && dataInicio) {
           texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 10 (dez) dias de instalação, por ter sido movimentado do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${dataInicio}.`;
+        }
+        break;
+
+      case 'Dispensa Recompensa':
+        if (formData.motivo_dispensa && dataInicio) {
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de dispensa total do serviço e expediente, a título de recompensa, a contar de ${dataInicio}.`;
+        }
+        break;
+
+      case 'Dispensa Desconto Férias':
+        if (formData.periodo_aquisitivo && dataInicio) {
+          const diasRestantes = formData.dias_restantes || '';
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de Dispensa para Desconto em Férias a contar de ${dataInicio}, referentes ao período aquisitivo de ${formData.periodo_aquisitivo}, restando ${diasRestantes} dias.`;
+        }
+        break;
+
+      case 'Deslocamento Missão':
+        if (formData.missao_descricao && formData.destino && dataInicio && formData.data_retorno) {
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.missao_descricao}, conforme ${formData.documento_referencia}, a contar de ${dataInicio} ${formData.inicio_termino === 'Início' ? 'a ' + formatarDataExtenso(formData.data_retorno) : ''} em ${formData.destino}.`;
+        }
+        break;
+
+      case 'Curso/Estágio':
+        if (formData.curso_nome && formData.inicio_termino && dataInicio) {
+          const eventoOuAno = formData.edicao_ano ? `, conforme ${formData.documento_referencia}, a contar de ${dataInicio}` : '';
+          const localTexto = formData.curso_local ? ` em ${formData.curso_local}` : '';
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º Ten ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.curso_nome}${localTexto}${eventoOuAno}.`;
         }
         break;
     }
@@ -624,6 +663,230 @@ export default function CadastrarRegistroLivro() {
           </div>
         );
 
+      case 'Dispensa Recompensa':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa como Recompensa</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Início / Término"
+                  name="inicio_termino"
+                  value={formData.inicio_termino}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Início', 'Término']}
+                  required
+                />
+                <FormField
+                  label="Dias"
+                  name="dias"
+                  value={formData.dias}
+                  onChange={handleChange}
+                  type="number"
+                  required
+                />
+              </div>
+              <FormField
+                label="Data de Início"
+                name="data_inicio"
+                value={formData.data_inicio}
+                onChange={handleChange}
+                type="date"
+                required
+              />
+              <div>
+                <Label>Motivo</Label>
+                <Textarea
+                  value={formData.motivo_dispensa}
+                  onChange={(e) => handleChange('motivo_dispensa', e.target.value)}
+                  className="mt-1.5"
+                  rows={2}
+                  placeholder="Motivo da dispensa..."
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Dispensa Desconto Férias':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa com Desconto em Férias</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Início / Término"
+                  name="inicio_termino"
+                  value={formData.inicio_termino}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Início', 'Término']}
+                  required
+                />
+                <FormField
+                  label="Período Aquisitivo"
+                  name="periodo_aquisitivo"
+                  value={formData.periodo_aquisitivo}
+                  onChange={handleChange}
+                  placeholder="Ex: 2023/2024"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  label="Data de Início"
+                  name="data_inicio"
+                  value={formData.data_inicio}
+                  onChange={handleChange}
+                  type="date"
+                  required
+                />
+                <FormField
+                  label="Dias"
+                  name="dias"
+                  value={formData.dias}
+                  onChange={handleChange}
+                  type="number"
+                  required
+                />
+                <FormField
+                  label="Dias Restantes"
+                  name="dias_restantes"
+                  value={formData.dias_restantes}
+                  onChange={handleChange}
+                  type="number"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Deslocamento Missão':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Deslocamento para Missões</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Deslocamento / Retorno"
+                  name="inicio_termino"
+                  value={formData.inicio_termino}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Início', 'Término']}
+                  required
+                />
+                <FormField
+                  label="Destino"
+                  name="destino"
+                  value={formData.destino}
+                  onChange={handleChange}
+                  placeholder="Local do deslocamento"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Data de Início"
+                  name="data_inicio"
+                  value={formData.data_inicio}
+                  onChange={handleChange}
+                  type="date"
+                  required
+                />
+                <FormField
+                  label="Data de Retorno"
+                  name="data_retorno"
+                  value={formData.data_retorno}
+                  onChange={handleChange}
+                  type="date"
+                />
+              </div>
+              <div>
+                <Label>Descrição da Missão</Label>
+                <Textarea
+                  value={formData.missao_descricao}
+                  onChange={(e) => handleChange('missao_descricao', e.target.value)}
+                  className="mt-1.5"
+                  rows={2}
+                  placeholder="Ex: CMAUT/2025"
+                  required
+                />
+              </div>
+              <FormField
+                label="Nota ou OS"
+                name="documento_referencia"
+                value={formData.documento_referencia}
+                onChange={handleChange}
+                placeholder="Ex: 001/2024"
+              />
+            </div>
+          </div>
+        );
+
+      case 'Curso/Estágio':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cursos / Estágios / Capacitações</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Início / Término / Desligamento"
+                  name="inicio_termino"
+                  value={formData.inicio_termino}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Início', 'Término', 'Desligamento']}
+                  required
+                />
+                <FormField
+                  label="Data de Início"
+                  name="data_inicio"
+                  value={formData.data_inicio}
+                  onChange={handleChange}
+                  type="date"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Cursos"
+                  name="curso_nome"
+                  value={formData.curso_nome}
+                  onChange={handleChange}
+                  placeholder="Ex: CMAUT/2025"
+                  required
+                />
+                <FormField
+                  label="Edição ou Ano"
+                  name="edicao_ano"
+                  value={formData.edicao_ano}
+                  onChange={handleChange}
+                  placeholder="Ex: 2025"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Nota ou OS"
+                  name="documento_referencia"
+                  value={formData.documento_referencia}
+                  onChange={handleChange}
+                  placeholder="Ex: 001/2024"
+                />
+                <FormField
+                  label="Localidade de Realização"
+                  name="curso_local"
+                  value={formData.curso_local}
+                  onChange={handleChange}
+                  placeholder="Ex: Manaus"
+                />
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -638,9 +901,13 @@ export default function CadastrarRegistroLivro() {
       { value: 'Núpcias', label: 'Núpcias', sexo: null },
       { value: 'Luto', label: 'Luto', sexo: null },
       { value: 'Cedência', label: 'Cedência', sexo: null },
-      { value: 'Transferência para RR', label: 'Transferência para RR', sexo: null },
+      { value: 'Transferência para RR', label: 'Transferência', sexo: null },
       { value: 'Trânsito', label: 'Trânsito', sexo: null },
-      { value: 'Instalação', label: 'Instalação', sexo: null }
+      { value: 'Instalação', label: 'Instalação', sexo: null },
+      { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
+      { value: 'Dispensa Desconto Férias', label: 'Dispensa com Desconto em Férias', sexo: null },
+      { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
+      { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações, etc...', sexo: null }
     ];
 
     return tipos.filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
