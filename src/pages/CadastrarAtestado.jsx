@@ -25,6 +25,7 @@ const initialFormData = {
   medico: '',
   arquivo_atestado: '',
   tipo: 'Médico',
+  tipo_afastamento: 'Afastamento Total',
   cid_10: '',
   cid_descricao: '',
   acompanhado: false,
@@ -34,6 +35,15 @@ const initialFormData = {
   data_termino: '',
   data_retorno: '',
   status: 'Ativo',
+  necessita_jiso: false,
+  homologado_comandante: false,
+  encaminhado_jiso: false,
+  data_jiso: '',
+  finalidade_jiso: '',
+  resultado_jiso: '',
+  dias_jiso: '',
+  ata_jiso: '',
+  parecer_jiso: '',
   bg: '',
   data_bg: '',
   publicacao_nota: false,
@@ -271,6 +281,119 @@ export default function CadastrarAtestado() {
               dataRetorno={formData.data_retorno}
               onChange={handleChange}
             />
+          </FormSection>
+
+          {/* JISO */}
+          <FormSection title="JISO - Junta de Inspeção de Saúde" icon={Clipboard}>
+            <div className="space-y-4">
+              <FormField
+                label="Tipo de Afastamento"
+                name="tipo_afastamento"
+                value={formData.tipo_afastamento}
+                onChange={handleChange}
+                type="select"
+                options={['Afastamento Total', 'Esforço Físico']}
+              />
+
+              <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-lg">
+                <Checkbox
+                  id="necessita_jiso"
+                  checked={formData.necessita_jiso}
+                  onCheckedChange={(checked) => handleChange('necessita_jiso', checked)}
+                />
+                <Label htmlFor="necessita_jiso" className="text-sm cursor-pointer">
+                  Necessita encaminhamento para JISO (mais de 15 dias ou decisão do comandante)
+                </Label>
+              </div>
+
+              {!formData.necessita_jiso && (
+                <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-lg">
+                  <Checkbox
+                    id="homologado_comandante"
+                    checked={formData.homologado_comandante}
+                    onCheckedChange={(checked) => handleChange('homologado_comandante', checked)}
+                  />
+                  <Label htmlFor="homologado_comandante" className="text-sm cursor-pointer">
+                    Homologado pelo Comandante (menos de 15 dias)
+                  </Label>
+                </div>
+              )}
+
+              {formData.necessita_jiso && (
+                <>
+                  <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg">
+                    <Checkbox
+                      id="encaminhado_jiso"
+                      checked={formData.encaminhado_jiso}
+                      onCheckedChange={(checked) => handleChange('encaminhado_jiso', checked)}
+                    />
+                    <Label htmlFor="encaminhado_jiso" className="text-sm cursor-pointer">
+                      Encaminhado para JISO
+                    </Label>
+                  </div>
+
+                  {formData.encaminhado_jiso && (
+                    <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          label="Data da JISO"
+                          name="data_jiso"
+                          value={formData.data_jiso}
+                          onChange={handleChange}
+                          type="date"
+                        />
+                        <FormField
+                          label="Finalidade"
+                          name="finalidade_jiso"
+                          value={formData.finalidade_jiso}
+                          onChange={handleChange}
+                          type="select"
+                          options={['V.A.F', 'LTS', 'Reserva Remunerada', 'Atestado de Origem']}
+                        />
+                      </div>
+
+                      <FormField
+                        label="Resultado da JISO"
+                        name="resultado_jiso"
+                        value={formData.resultado_jiso}
+                        onChange={handleChange}
+                        type="select"
+                        options={['Homologado', 'Diminuído', 'Prorrogado']}
+                      />
+
+                      {formData.resultado_jiso && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            label="Dias definidos pela JISO"
+                            name="dias_jiso"
+                            value={formData.dias_jiso}
+                            onChange={handleChange}
+                            type="number"
+                          />
+                          <FormField
+                            label="Número da Ata"
+                            name="ata_jiso"
+                            value={formData.ata_jiso}
+                            onChange={handleChange}
+                            placeholder="Ex: 001/2025"
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-medium text-slate-700">Parecer da JISO</Label>
+                        <Textarea
+                          value={formData.parecer_jiso}
+                          onChange={(e) => handleChange('parecer_jiso', e.target.value)}
+                          placeholder="Parecer da junta..."
+                          className="min-h-20 border-slate-200"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </FormSection>
 
           {/* Status e Controle */}

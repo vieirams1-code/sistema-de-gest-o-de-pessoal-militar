@@ -20,6 +20,7 @@ const navItems = [
   { name: 'Medalhas', page: 'Medalhas', icon: Shield },
   { name: 'Armamentos', page: 'Armamentos', icon: Shield },
   { name: 'Atestados', page: 'Atestados', icon: Shield },
+  { name: 'Agenda JISO', page: 'AgendarJISO', icon: Calendar },
   { name: 'Férias', page: 'Ferias', icon: Menu },
   { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
   { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
