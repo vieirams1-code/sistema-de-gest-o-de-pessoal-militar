@@ -11,6 +11,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
+import { calcularComportamento } from '@/components/utils/comportamentoCalculator';
 
 export default function CadastrarPunicao() {
   const navigate = useNavigate();
@@ -39,8 +40,31 @@ export default function CadastrarPunicao() {
     setLoading(true);
 
     try {
+      // Criar punição
       await base44.entities.Punicao.create(formData);
+      
+      // Buscar militar e todas as suas punições
+      const militarList = await base44.entities.Militar.filter({ id: formData.militar_id });
+      const militar = militarList[0];
+      
+      // Verificar se é praça
+      const pracas = ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente', 'Aspirante'];
+      if (militar && pracas.includes(militar.posto_graduacao)) {
+        // Buscar todas as punições do militar (incluindo a recém-criada)
+        const punicoesMilitar = await base44.entities.Punicao.filter({ militar_id: formData.militar_id });
+        
+        // Calcular novo comportamento
+        const resultado = calcularComportamento(punicoesMilitar, militar.data_inclusao);
+        
+        // Atualizar comportamento do militar
+        await base44.entities.Militar.update(militar.id, {
+          comportamento: resultado.comportamento
+        });
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['punicoes'] });
+      queryClient.invalidateQueries({ queryKey: ['militares'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
       navigate(createPageUrl('Punicoes'));
     } catch (error) {
       console.error('Erro ao salvar:', error);

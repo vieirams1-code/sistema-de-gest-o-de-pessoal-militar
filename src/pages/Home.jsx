@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Users, Award, Shield, ChevronRight } from 'lucide-react';
-import { differenceInYears } from 'date-fns';
+import { calcularComportamento } from '@/components/utils/comportamentoCalculator';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -29,49 +29,20 @@ export default function Home() {
       if (!pracas.includes(militar.posto_graduacao)) return;
 
       const punicoesMilitar = todasPunicoes.filter(p => p.militar_id === militar.id);
-      const hoje = new Date();
-
-      // Filtrar punições por período
-      const punicoesUltimos8Anos = punicoesMilitar.filter(p => {
-        const diff = differenceInYears(hoje, new Date(p.data_aplicacao));
-        return diff < 8;
-      });
-
-      const punicoesUltimos4Anos = punicoesMilitar.filter(p => {
-        const diff = differenceInYears(hoje, new Date(p.data_aplicacao));
-        return diff < 4;
-      });
-
-      // Excepcional: 8 anos sem punição
-      if (punicoesUltimos8Anos.length === 0 && militar.comportamento !== 'Excepcional') {
-        if (militar.data_inclusao) {
-          const anosServico = differenceInYears(hoje, new Date(militar.data_inclusao));
-          if (anosServico >= 8) {
-            alertas.push({
-              militar_id: militar.id,
-              militar_nome: militar.nome_completo,
-              posto: militar.posto_graduacao,
-              comportamentoAtual: militar.comportamento,
-              comportamentoSugerido: 'Excepcional',
-              motivo: '8 anos de serviço sem punições'
-            });
-          }
-        }
-      }
-
-      // Ótimo: 4 anos com até 1 detenção
-      if (punicoesUltimos4Anos.length <= 1 && militar.comportamento !== 'Ótimo' && punicoesUltimos4Anos.length > 0) {
-        const temApenasDetencao = punicoesUltimos4Anos.every(p => p.tipo === 'Detenção' || p.tipo === 'Repreensão');
-        if (temApenasDetencao) {
-          alertas.push({
-            militar_id: militar.id,
-            militar_nome: militar.nome_completo,
-            posto: militar.posto_graduacao,
-            comportamentoAtual: militar.comportamento,
-            comportamentoSugerido: 'Ótimo',
-            motivo: '4 anos com até 1 detenção'
-          });
-        }
+      
+      // Calcular comportamento sugerido
+      const resultado = calcularComportamento(punicoesMilitar, militar.data_inclusao);
+      
+      // Se o comportamento atual é diferente do sugerido, criar alerta
+      if (militar.comportamento !== resultado.comportamento) {
+        alertas.push({
+          militar_id: militar.id,
+          militar_nome: militar.nome_completo,
+          posto: militar.posto_graduacao,
+          comportamentoAtual: militar.comportamento || 'Não definido',
+          comportamentoSugerido: resultado.comportamento,
+          motivo: resultado.motivo
+        });
       }
     });
 
