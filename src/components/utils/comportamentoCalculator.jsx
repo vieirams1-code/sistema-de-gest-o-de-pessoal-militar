@@ -1,103 +1,93 @@
 import { differenceInYears } from 'date-fns';
 
 /**
- * Calcula o comportamento automático baseado nas punições
- * Regras:
- * - Excepcional: 8 anos sem punição
- * - Ótimo: 4 anos com até 1 detenção (2 repreensões = 1 detenção)
- * - Bom: 2 anos com até 2 prisões (4 repreensões = 1 prisão, 2 detenções = 1 prisão)
- * - Insuficiente: 1 ano com até 2 prisões
- * - MAU: 1 ano com mais de 2 prisões
+ * Sistema de pontuação:
+ * - Repreensão: 0,25 pontos
+ * - Detenção: 0,5 pontos
+ * - Prisão: 1 ponto
+ * 
+ * Regras (em ordem):
+ * 1. Último ano: > 2 pontos = MAU, exatamente 2 = Insuficiente
+ * 2. Últimos 2 anos: até 2 pontos = BOM, > 2 = Insuficiente
+ * 3. Últimos 4 anos: até 0,5 pontos = Ótimo
+ * 4. Últimos 8 anos: 0 pontos = Excepcional
+ * 
+ * OBS: Só conta punições após a data de inclusão do militar
  */
 export function calcularComportamento(punicoes, dataInclusao) {
   const hoje = new Date();
   
-  // Se não tem punições
-  if (!punicoes || punicoes.length === 0) {
-    if (dataInclusao) {
-      const anosServico = differenceInYears(hoje, new Date(dataInclusao + 'T00:00:00'));
-      if (anosServico >= 8) {
-        return { comportamento: 'Excepcional', motivo: '8 anos de serviço sem punições' };
-      }
-    }
-    return { comportamento: 'Bom', motivo: 'Sem punições' };
-  }
-
+  // Data limite: punições só contam após a inclusão
+  const dataLimite = dataInclusao ? new Date(dataInclusao + 'T00:00:00') : null;
+  
+  // Filtrar apenas punições válidas (após inclusão)
+  const punicoesValidas = (punicoes || []).filter(p => {
+    if (!dataLimite) return true;
+    const dataPunicao = new Date(p.data_aplicacao + 'T00:00:00');
+    return dataPunicao >= dataLimite;
+  });
+  
+  // Calcular pontos de uma lista de punições
+  const calcularPontos = (listaPunicoes) => {
+    return listaPunicoes.reduce((total, p) => {
+      if (p.tipo === 'Repreensão') return total + 0.25;
+      if (p.tipo === 'Detenção') return total + 0.5;
+      if (p.tipo === 'Prisão') return total + 1;
+      return total; // Advertência Verbal não conta
+    }, 0);
+  };
+  
   // Filtrar punições por período
-  const punicoesUltimoAno = punicoes.filter(p => {
+  const punicoesUltimoAno = punicoesValidas.filter(p => {
     const diff = differenceInYears(hoje, new Date(p.data_aplicacao + 'T00:00:00'));
     return diff < 1;
   });
 
-  const punicoesUltimos2Anos = punicoes.filter(p => {
+  const punicoesUltimos2Anos = punicoesValidas.filter(p => {
     const diff = differenceInYears(hoje, new Date(p.data_aplicacao + 'T00:00:00'));
     return diff < 2;
   });
 
-  const punicoesUltimos4Anos = punicoes.filter(p => {
+  const punicoesUltimos4Anos = punicoesValidas.filter(p => {
     const diff = differenceInYears(hoje, new Date(p.data_aplicacao + 'T00:00:00'));
     return diff < 4;
   });
 
-  const punicoesUltimos8Anos = punicoes.filter(p => {
+  const punicoesUltimos8Anos = punicoesValidas.filter(p => {
     const diff = differenceInYears(hoje, new Date(p.data_aplicacao + 'T00:00:00'));
     return diff < 8;
   });
 
-  // Converter punições em equivalente
-  const converterParaPrisoes = (listaPunicoes) => {
-    let repreensoes = 0;
-    let detencoes = 0;
-    let prisoes = 0;
-
-    listaPunicoes.forEach(p => {
-      if (p.tipo === 'Repreensão' || p.tipo === 'Advertência Verbal') repreensoes++;
-      else if (p.tipo === 'Detenção') detencoes++;
-      else if (p.tipo === 'Prisão') prisoes++;
-    });
-
-    // Converter: 4 repreensões = 1 prisão
-    prisoes += Math.floor(repreensoes / 4);
-    repreensoes = repreensoes % 4;
-
-    // Converter: 2 repreensões = 1 detenção
-    detencoes += Math.floor(repreensoes / 2);
-    
-    // Converter: 2 detenções = 1 prisão
-    prisoes += Math.floor(detencoes / 2);
-    detencoes = detencoes % 2;
-
-    return { repreensoes, detencoes, prisoes };
-  };
-
-  // Regra MAU: mais de 2 prisões no último ano
-  const equivalenteUltimoAno = converterParaPrisoes(punicoesUltimoAno);
-  if (equivalenteUltimoAno.prisoes > 2) {
-    return { comportamento: 'MAU', motivo: 'Mais de 2 prisões (equivalentes) no último ano' };
+  // Passo 1: Último ano
+  const pontosUltimoAno = calcularPontos(punicoesUltimoAno);
+  if (pontosUltimoAno > 2) {
+    return { comportamento: 'MAU', motivo: `${pontosUltimoAno.toFixed(2)} pontos no último ano (> 2)` };
   }
-
-  // Regra Insuficiente: até 2 prisões no último ano
-  if (equivalenteUltimoAno.prisoes >= 1 && equivalenteUltimoAno.prisoes <= 2) {
-    return { comportamento: 'Insuficiente', motivo: `${equivalenteUltimoAno.prisoes} prisão(ões) no último ano` };
+  if (pontosUltimoAno === 2) {
+    return { comportamento: 'Insuficiente', motivo: '2 pontos no último ano' };
   }
-
-  // Regra Bom: até 2 prisões nos últimos 2 anos
-  const equivalenteUltimos2Anos = converterParaPrisoes(punicoesUltimos2Anos);
-  if (equivalenteUltimos2Anos.prisoes <= 2) {
-    return { comportamento: 'Bom', motivo: 'Até 2 prisões nos últimos 2 anos' };
+  
+  // Passo 2: Últimos 2 anos
+  const pontosUltimos2Anos = calcularPontos(punicoesUltimos2Anos);
+  if (pontosUltimos2Anos <= 2) {
+    return { comportamento: 'Bom', motivo: `${pontosUltimos2Anos.toFixed(2)} pontos nos últimos 2 anos (≤ 2)` };
   }
-
-  // Regra Ótimo: até 1 detenção nos últimos 4 anos (sem prisões)
-  const equivalenteUltimos4Anos = converterParaPrisoes(punicoesUltimos4Anos);
-  if (equivalenteUltimos4Anos.prisoes === 0 && equivalenteUltimos4Anos.detencoes <= 1) {
-    return { comportamento: 'Ótimo', motivo: 'Até 1 detenção nos últimos 4 anos' };
+  if (pontosUltimos2Anos > 2) {
+    return { comportamento: 'Insuficiente', motivo: `${pontosUltimos2Anos.toFixed(2)} pontos nos últimos 2 anos (> 2)` };
   }
-
-  // Regra Excepcional: sem punições nos últimos 8 anos
-  if (punicoesUltimos8Anos.length === 0) {
-    return { comportamento: 'Excepcional', motivo: '8 anos sem punições' };
+  
+  // Passo 3: Últimos 4 anos
+  const pontosUltimos4Anos = calcularPontos(punicoesUltimos4Anos);
+  if (pontosUltimos4Anos <= 0.5) {
+    return { comportamento: 'Ótimo', motivo: `${pontosUltimos4Anos.toFixed(2)} pontos nos últimos 4 anos (≤ 0,5)` };
   }
-
-  // Default
-  return { comportamento: 'Bom', motivo: 'Análise padrão' };
+  
+  // Passo 4: Últimos 8 anos
+  const pontosUltimos8Anos = calcularPontos(punicoesUltimos8Anos);
+  if (pontosUltimos8Anos === 0) {
+    return { comportamento: 'Excepcional', motivo: '0 pontos nos últimos 8 anos' };
+  }
+  
+  // Default: Bom
+  return { comportamento: 'Bom', motivo: 'Sem enquadramento específico - padrão Bom' };
 }
