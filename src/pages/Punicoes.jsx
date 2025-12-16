@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Shield, Plus, Search, Trash2 } from 'lucide-react';
+import { Shield, Plus, Search, Trash2, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   AlertDialog,
@@ -117,14 +117,24 @@ export default function Punicoes() {
                       </p>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeleteDialog({ open: true, id: punicao.id })}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => navigate(createPageUrl('CadastrarPunicao') + `?id=${punicao.id}`)}
+                      className="text-[#1e3a5f] hover:text-[#2d4a6f]"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeleteDialog({ open: true, id: punicao.id })}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

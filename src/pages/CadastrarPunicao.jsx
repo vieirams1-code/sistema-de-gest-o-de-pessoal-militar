@@ -1,13 +1,23 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
@@ -16,7 +26,10 @@ import { calcularComportamento } from '@/components/utils/comportamentoCalculato
 export default function CadastrarPunicao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const punicaoId = searchParams.get('id');
   const [loading, setLoading] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [formData, setFormData] = useState({
     militar_id: '',
     militar_nome: '',
@@ -31,17 +44,44 @@ export default function CadastrarPunicao() {
     observacoes: ''
   });
 
+  const { data: punicaoExistente, isLoading: loadingPunicao } = useQuery({
+    queryKey: ['punicao', punicaoId],
+    queryFn: async () => {
+      const result = await base44.entities.Punicao.filter({ id: punicaoId });
+      return result[0];
+    },
+    enabled: !!punicaoId
+  });
+
+  useEffect(() => {
+    if (punicaoExistente) {
+      setFormData(punicaoExistente);
+    }
+  }, [punicaoExistente]);
+
   const handleChange = (name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Punicao.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['punicoes'] });
+      navigate(createPageUrl('Punicoes'));
+    }
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Criar punição
-      await base44.entities.Punicao.create(formData);
+      // Criar ou atualizar punição
+      if (punicaoId) {
+        await base44.entities.Punicao.update(punicaoId, formData);
+      } else {
+        await base44.entities.Punicao.create(formData);
+      }
       
       // Buscar militar e todas as suas punições
       const militarList = await base44.entities.Militar.filter({ id: formData.militar_id });
@@ -75,6 +115,14 @@ export default function CadastrarPunicao() {
 
   const necessitaPeriodo = ['Detenção', 'Prisão'].includes(formData.tipo);
 
+  if (loadingPunicao) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-3xl mx-auto px-4 py-8">
@@ -84,11 +132,22 @@ export default function CadastrarPunicao() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">Cadastrar Punição</h1>
-              <p className="text-slate-500 text-sm">Registrar punição disciplinar</p>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">{punicaoId ? 'Editar' : 'Cadastrar'} Punição</h1>
+              <p className="text-slate-500 text-sm">{punicaoId ? 'Editar punição disciplinar' : 'Registrar punição disciplinar'}</p>
             </div>
           </div>
-          <Button onClick={handleSubmit} disabled={loading || !formData.militar_id} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+          <div className="flex gap-2">
+            {punicaoId && (
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-red-600 border-red-300 hover:bg-red-50"
+              >
+                <Trash2 className="w-5 h-5 mr-2" />
+                Excluir
+              </Button>
+            )}
+            <Button onClick={handleSubmit} disabled={loading || !formData.militar_id} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
             {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
             Salvar
           </Button>
@@ -188,6 +247,23 @@ export default function CadastrarPunicao() {
             </div>
           </div>
         </form>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir esta punição? Esta ação não pode ser desfeita e pode afetar o cálculo de comportamento do militar.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deleteMutation.mutate(punicaoId)} className="bg-red-600 hover:bg-red-700">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

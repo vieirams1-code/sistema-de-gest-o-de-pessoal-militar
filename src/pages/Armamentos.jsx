@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Shield, Plus, Search } from 'lucide-react';
+import { Shield, Plus, Search, Edit } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 
 export default function Armamentos() {
@@ -20,7 +20,8 @@ export default function Armamentos() {
   const filteredArmamentos = armamentos.filter(a =>
     a.tipo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.numero_serie?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.cad_bm?.toLowerCase().includes(searchTerm.toLowerCase())
+    a.cad_bm?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const statusColors = {
@@ -55,7 +56,7 @@ export default function Armamentos() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
-              placeholder="Buscar por tipo, número de série ou CAD BM..."
+              placeholder="Buscar por militar, tipo, número de série ou CAD BM..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -75,12 +76,15 @@ export default function Armamentos() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredArmamentos.map((arma) => (
-              <div key={arma.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow">
+              <div key={arma.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(createPageUrl('CadastrarArmamento') + `?id=${arma.id}`)}>
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="font-semibold text-slate-900">{arma.tipo}</h3>
                   <Badge className={statusColors[arma.status]}>{arma.status}</Badge>
                 </div>
                 <div className="space-y-1 text-sm text-slate-600">
+                  {arma.militar_nome && (
+                    <p><span className="font-medium">Militar:</span> {arma.militar_posto} {arma.militar_nome}</p>
+                  )}
                   <p><span className="font-medium">Calibre:</span> {arma.calibre}</p>
                   <p><span className="font-medium">Marca:</span> {arma.marca}</p>
                   <p><span className="font-medium">N° Série:</span> {arma.numero_serie}</p>

@@ -14,6 +14,8 @@ import MilitarSelector from '@/components/atestado/MilitarSelector';
 export default function CadastrarArmamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const armamentoId = searchParams.get('id');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     militar_id: '',
@@ -33,6 +35,21 @@ export default function CadastrarArmamento() {
     observacoes: ''
   });
 
+  const { data: armamentoExistente, isLoading: loadingArmamento } = useQuery({
+    queryKey: ['armamento', armamentoId],
+    queryFn: async () => {
+      const result = await base44.entities.Armamento.filter({ id: armamentoId });
+      return result[0];
+    },
+    enabled: !!armamentoId
+  });
+
+  useEffect(() => {
+    if (armamentoExistente) {
+      setFormData(armamentoExistente);
+    }
+  }, [armamentoExistente]);
+
   const handleChange = (name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -42,7 +59,11 @@ export default function CadastrarArmamento() {
     setLoading(true);
 
     try {
-      await base44.entities.Armamento.create(formData);
+      if (armamentoId) {
+        await base44.entities.Armamento.update(armamentoId, formData);
+      } else {
+        await base44.entities.Armamento.create(formData);
+      }
       queryClient.invalidateQueries({ queryKey: ['armamentos'] });
       navigate(createPageUrl('Armamentos'));
     } catch (error) {
@@ -54,6 +75,14 @@ export default function CadastrarArmamento() {
 
   const necessitaBaixa = ['Vendido', 'Extraviado', 'Furtado', 'Baixado'].includes(formData.status);
 
+  if (loadingArmamento) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-3xl mx-auto px-4 py-8">
@@ -63,8 +92,8 @@ export default function CadastrarArmamento() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">Cadastrar Armamento</h1>
-              <p className="text-slate-500 text-sm">Registrar novo armamento</p>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">{armamentoId ? 'Editar' : 'Cadastrar'} Armamento</h1>
+              <p className="text-slate-500 text-sm">{armamentoId ? 'Editar registro de armamento' : 'Registrar novo armamento'}</p>
             </div>
           </div>
           <Button onClick={handleSubmit} disabled={loading || !formData.militar_id || !formData.tipo || !formData.numero_serie} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">

@@ -5,23 +5,40 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Award, Plus, Search, Settings } from 'lucide-react';
+import { Award, Plus, Search, Settings, Edit } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 
 export default function Medalhas() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [tipoFilter, setTipoFilter] = useState('all');
+  const [anoFilter, setAnoFilter] = useState('all');
 
   const { data: medalhas = [], isLoading } = useQuery({
     queryKey: ['medalhas'],
     queryFn: () => base44.entities.Medalha.list('-created_date')
   });
 
-  const filteredMedalhas = medalhas.filter(m =>
-    m.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.tipo_medalha_nome?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const { data: tiposMedalha = [] } = useQuery({
+    queryKey: ['tipos-medalha'],
+    queryFn: () => base44.entities.TipoMedalha.filter({ ativa: true }, 'nome')
+  });
+
+  const anosDisponiveis = [...new Set(
+    medalhas
+      .filter(m => m.data_concessao)
+      .map(m => new Date(m.data_concessao + 'T00:00:00').getFullYear())
+  )].sort((a, b) => b - a);
+
+  const filteredMedalhas = medalhas.filter(m => {
+    const matchSearch = m.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.tipo_medalha_nome?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchTipo = tipoFilter === 'all' || m.tipo_medalha_id === tipoFilter;
+    const matchAno = anoFilter === 'all' || (m.data_concessao && new Date(m.data_concessao + 'T00:00:00').getFullYear().toString() === anoFilter);
+    return matchSearch && matchTipo && matchAno;
+  });
 
   const statusColors = {
     'Indicado': 'bg-blue-100 text-blue-700',
@@ -59,14 +76,38 @@ export default function Medalhas() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <Input
-              placeholder="Buscar por nome ou tipo de medalha..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                placeholder="Buscar por nome..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={tipoFilter} onValueChange={setTipoFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tipo de medalha" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                {tiposMedalha.map(tipo => (
+                  <SelectItem key={tipo.id} value={tipo.id}>{tipo.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={anoFilter} onValueChange={setAnoFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Ano de concessão" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os anos</SelectItem>
+                {anosDisponiveis.map(ano => (
+                  <SelectItem key={ano} value={ano.toString()}>{ano}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -102,6 +143,14 @@ export default function Medalhas() {
                       </p>
                     )}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => navigate(createPageUrl('CadastrarMedalha') + `?id=${medalha.id}`)}
+                    className="text-[#1e3a5f] hover:text-[#2d4a6f]"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
             ))}
