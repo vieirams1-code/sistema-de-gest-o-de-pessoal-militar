@@ -35,7 +35,8 @@ export default function PublicacaoCard({ registro, onUpdate }) {
       novoStatus = 'Aguardando Publicação';
     }
     
-    onUpdate(registro.id, { ...editData, status: novoStatus });
+    const tipo = registro.tipo ? 'ex-officio' : 'livro';
+    onUpdate(registro.id, { ...editData, status: novoStatus }, tipo);
     setIsEditing(false);
   };
 
@@ -75,11 +76,11 @@ export default function PublicacaoCard({ registro, onUpdate }) {
               </div>
               <div className="flex items-center gap-1">
                 <FileText className="w-4 h-4" />
-                <span>{registro.tipo_registro}</span>
+                <span>{registro.tipo_registro || registro.tipo}</span>
               </div>
               <div className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
-                <span>{formatDate(registro.data_registro)}</span>
+                <span>{formatDate(registro.data_registro || registro.data_publicacao)}</span>
               </div>
               {registro.numero_bg && (
                 <div className="flex items-center gap-1">
