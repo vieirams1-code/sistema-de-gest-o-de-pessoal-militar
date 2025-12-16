@@ -9,12 +9,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import FormField from '@/components/militar/FormField';
+import MilitarSelector from '@/components/atestado/MilitarSelector';
 
 export default function CadastrarArmamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
+    militar_id: '',
+    militar_nome: '',
+    militar_posto: '',
+    militar_matricula: '',
     tipo: '',
     calibre: '',
     cad_bm: '',
@@ -62,7 +67,7 @@ export default function CadastrarArmamento() {
               <p className="text-slate-500 text-sm">Registrar novo armamento</p>
             </div>
           </div>
-          <Button onClick={handleSubmit} disabled={loading || !formData.tipo || !formData.numero_serie} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+          <Button onClick={handleSubmit} disabled={loading || !formData.militar_id || !formData.tipo || !formData.numero_serie} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
             {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
             Salvar
           </Button>
@@ -70,7 +75,24 @@ export default function CadastrarArmamento() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Identificação</h3>
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Militar</h3>
+            <MilitarSelector
+              value={formData.militar_id}
+              onChange={handleChange}
+              onMilitarSelect={(data) => {
+                setFormData(prev => ({
+                  ...prev,
+                  militar_id: data.id || prev.militar_id,
+                  militar_nome: data.militar_nome || data.nome_completo,
+                  militar_posto: data.militar_posto || data.posto_graduacao,
+                  militar_matricula: data.militar_matricula || data.matricula
+                }));
+              }}
+            />
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Identificação da Arma</h3>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Tipo" name="tipo" value={formData.tipo} onChange={handleChange} required />
               <FormField label="Calibre" name="calibre" value={formData.calibre} onChange={handleChange} />
