@@ -24,7 +24,6 @@ const initialFormData = {
   militar_matricula: '',
   medico: '',
   arquivo_atestado: '',
-  tipo: 'Médico',
   tipo_afastamento: 'Afastamento Total',
   cid_10: '',
   cid_descricao: '',
@@ -39,19 +38,18 @@ const initialFormData = {
   homologado_comandante: false,
   encaminhado_jiso: false,
   data_jiso: '',
+  secao_jiso: '',
   finalidade_jiso: '',
+  nup: '',
   resultado_jiso: '',
   dias_jiso: '',
   ata_jiso: '',
   parecer_jiso: '',
-  bg: '',
-  data_bg: '',
-  publicacao_nota: false,
-  nota_para_bg: '',
   texto_publicacao: '',
-  das_escusas: '',
-  retorno: '',
-  ocultos: '',
+  nota_para_bg: '',
+  numero_bg: '',
+  data_bg: '',
+  status_publicacao: 'Aguardando Nota',
   observacoes: ''
 };
 
@@ -103,6 +101,61 @@ export default function CadastrarAtestado() {
       setUploading(false);
     }
   };
+
+  const gerarTextoPublicacao = () => {
+    const postoNome = formData.militar_posto ? `${formData.militar_posto} QOBM` : '';
+    const nomeCompleto = formData.militar_nome || '';
+    const matricula = formData.militar_matricula || '';
+    
+    const formatarData = (dataStr) => {
+      if (!dataStr) return '';
+      const [ano, mes, dia] = dataStr.split('-');
+      return `${dia}/${mes}/${ano}`;
+    };
+
+    if (formData.necessita_jiso && formData.encaminhado_jiso && formData.ata_jiso) {
+      // Texto da Ata JISO
+      return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o seguinte: JISO ${formData.secao_jiso || ''}, realizada em ${formatarData(formData.data_jiso)}, com finalidade de ${formData.finalidade_jiso || ''}, NUP: ${formData.nup || ''}, Ata n° ${formData.ata_jiso}. Parecer: ${formData.parecer_jiso || ''}. ${postoNome} ${nomeCompleto}, matrícula ${matricula}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
+    } else if (formData.homologado_comandante) {
+      // Texto de Homologação do Comandante
+      const diasExtenso = {
+        1: 'um', 2: 'dois', 3: 'três', 4: 'quatro', 5: 'cinco',
+        6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove', 10: 'dez',
+        11: 'onze', 12: 'doze', 13: 'treze', 14: 'quatorze', 15: 'quinze'
+      };
+      const diasTexto = diasExtenso[formData.dias] || formData.dias;
+      
+      return `A Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, homologa o afastamento médico do ${postoNome} ${nomeCompleto}, matrícula ${matricula}, pelo período de ${formData.dias} (${diasTexto}) dias, ${formData.tipo_afastamento.toLowerCase()}, a contar de ${formatarData(formData.data_inicio)}, com término em ${formatarData(formData.data_termino)}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
+    }
+    
+    return '';
+  };
+
+  React.useEffect(() => {
+    if (formData.militar_nome && formData.data_inicio && formData.dias) {
+      const textoGerado = gerarTextoPublicacao();
+      if (textoGerado && textoGerado !== formData.texto_publicacao) {
+        setFormData(prev => ({ ...prev, texto_publicacao: textoGerado }));
+      }
+    }
+  }, [
+    formData.militar_nome,
+    formData.militar_posto,
+    formData.militar_matricula,
+    formData.data_inicio,
+    formData.dias,
+    formData.data_termino,
+    formData.tipo_afastamento,
+    formData.necessita_jiso,
+    formData.encaminhado_jiso,
+    formData.homologado_comandante,
+    formData.ata_jiso,
+    formData.data_jiso,
+    formData.secao_jiso,
+    formData.finalidade_jiso,
+    formData.nup,
+    formData.parecer_jiso
+  ]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -183,23 +236,13 @@ export default function CadastrarAtestado() {
           {/* Dados do Atestado */}
           <FormSection title="Dados do Atestado" icon={FileText}>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  label="Tipo de Atestado"
-                  name="tipo"
-                  value={formData.tipo}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Médico', 'Odontológico', 'Psicológico', 'Acompanhamento', 'Outro']}
-                />
-                <FormField
-                  label="Nome do Médico"
-                  name="medico"
-                  value={formData.medico}
-                  onChange={handleChange}
-                  placeholder="Dr(a)..."
-                />
-              </div>
+              <FormField
+                label="Nome do Médico"
+                name="medico"
+                value={formData.medico}
+                onChange={handleChange}
+                placeholder="Dr(a)..."
+              />
 
               <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-lg">
                 <Checkbox
@@ -335,6 +378,8 @@ export default function CadastrarAtestado() {
 
                   {formData.encaminhado_jiso && (
                     <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-semibold text-sm text-blue-900">Dados da Ata da JISO</h4>
+                      
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                           label="Data da JISO"
@@ -342,7 +387,18 @@ export default function CadastrarAtestado() {
                           value={formData.data_jiso}
                           onChange={handleChange}
                           type="date"
+                          required
                         />
+                        <FormField
+                          label="Seção JISO"
+                          name="secao_jiso"
+                          value={formData.secao_jiso}
+                          onChange={handleChange}
+                          placeholder="Ex: qwe"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
                           label="Finalidade"
                           name="finalidade_jiso"
@@ -350,44 +406,54 @@ export default function CadastrarAtestado() {
                           onChange={handleChange}
                           type="select"
                           options={['V.A.F', 'LTS', 'Reserva Remunerada', 'Atestado de Origem']}
+                          required
+                        />
+                        <FormField
+                          label="NUP"
+                          name="nup"
+                          value={formData.nup}
+                          onChange={handleChange}
+                          placeholder="Número do NUP"
                         />
                       </div>
 
-                      <FormField
-                        label="Resultado da JISO"
-                        name="resultado_jiso"
-                        value={formData.resultado_jiso}
-                        onChange={handleChange}
-                        type="select"
-                        options={['Homologado', 'Diminuído', 'Prorrogado']}
-                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          label="Número da Ata"
+                          name="ata_jiso"
+                          value={formData.ata_jiso}
+                          onChange={handleChange}
+                          placeholder="Ex: 001/2025"
+                          required
+                        />
+                        <FormField
+                          label="Resultado da JISO"
+                          name="resultado_jiso"
+                          value={formData.resultado_jiso}
+                          onChange={handleChange}
+                          type="select"
+                          options={['Homologado', 'Diminuído', 'Prorrogado']}
+                        />
+                      </div>
 
                       {formData.resultado_jiso && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            label="Dias definidos pela JISO"
-                            name="dias_jiso"
-                            value={formData.dias_jiso}
-                            onChange={handleChange}
-                            type="number"
-                          />
-                          <FormField
-                            label="Número da Ata"
-                            name="ata_jiso"
-                            value={formData.ata_jiso}
-                            onChange={handleChange}
-                            placeholder="Ex: 001/2025"
-                          />
-                        </div>
+                        <FormField
+                          label="Dias definidos pela JISO"
+                          name="dias_jiso"
+                          value={formData.dias_jiso}
+                          onChange={handleChange}
+                          type="number"
+                        />
                       )}
 
                       <div className="space-y-1.5">
-                        <Label className="text-sm font-medium text-slate-700">Parecer da JISO</Label>
+                        <Label className="text-sm font-medium text-slate-700">Parecer da JISO <span className="text-red-500">*</span></Label>
                         <Textarea
                           value={formData.parecer_jiso}
                           onChange={(e) => handleChange('parecer_jiso', e.target.value)}
                           placeholder="Parecer da junta..."
                           className="min-h-20 border-slate-200"
+                          required
                         />
                       </div>
                     </div>
@@ -397,8 +463,19 @@ export default function CadastrarAtestado() {
             </div>
           </FormSection>
 
-          {/* Status e Controle */}
-          <FormSection title="Status e Controle" icon={Clipboard}>
+          {/* Controle de Publicação */}
+          <FormSection title="Controle de Publicação" icon={Clipboard}>
+            {formData.texto_publicacao && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <Label className="text-sm font-semibold text-blue-900 mb-2 block">
+                  Texto Gerado para Publicação
+                </Label>
+                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {formData.texto_publicacao}
+                </p>
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 label="Status"
@@ -409,9 +486,24 @@ export default function CadastrarAtestado() {
                 options={['Ativo', 'Encerrado', 'Cancelado', 'Prorrogado']}
               />
               <FormField
-                label="BG"
-                name="bg"
-                value={formData.bg}
+                label="Status da Publicação"
+                name="status_publicacao"
+                value={formData.status_publicacao}
+                onChange={handleChange}
+                type="select"
+                options={['Aguardando Nota', 'Aguardando Publicação', 'Publicado']}
+              />
+              <FormField
+                label="Nota para BG"
+                name="nota_para_bg"
+                value={formData.nota_para_bg}
+                onChange={handleChange}
+                placeholder="Ex: 001/2025"
+              />
+              <FormField
+                label="Número do BG"
+                name="numero_bg"
+                value={formData.numero_bg}
                 onChange={handleChange}
                 placeholder="Número do Boletim Geral"
               />
@@ -423,73 +515,18 @@ export default function CadastrarAtestado() {
                 type="date"
               />
             </div>
-
-            <div className="flex items-center space-x-2 mt-4 p-3 bg-slate-50 rounded-lg">
-              <Checkbox
-                id="publicacao_nota"
-                checked={formData.publicacao_nota}
-                onCheckedChange={(checked) => handleChange('publicacao_nota', checked)}
-              />
-              <Label htmlFor="publicacao_nota" className="text-sm cursor-pointer">
-                Publicado em nota
-              </Label>
-            </div>
           </FormSection>
 
-          {/* Informações Adicionais */}
-          <FormSection title="Informações Adicionais" icon={FileText}>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-slate-700">Nota para BG</Label>
-                <Textarea
-                  value={formData.nota_para_bg}
-                  onChange={(e) => handleChange('nota_para_bg', e.target.value)}
-                  placeholder="Nota para publicação no Boletim Geral..."
-                  className="min-h-24 border-slate-200"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
-                <Textarea
-                  value={formData.texto_publicacao}
-                  onChange={(e) => handleChange('texto_publicacao', e.target.value)}
-                  placeholder="Texto completo da publicação..."
-                  className="min-h-24 border-slate-200"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-slate-700">Das Escusas</Label>
-                  <Textarea
-                    value={formData.das_escusas}
-                    onChange={(e) => handleChange('das_escusas', e.target.value)}
-                    placeholder="Informações sobre escusas..."
-                    className="min-h-20 border-slate-200"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-slate-700">Retorno</Label>
-                  <Textarea
-                    value={formData.retorno}
-                    onChange={(e) => handleChange('retorno', e.target.value)}
-                    placeholder="Informações sobre o retorno..."
-                    className="min-h-20 border-slate-200"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-slate-700">Observações</Label>
-                <Textarea
-                  value={formData.observacoes}
-                  onChange={(e) => handleChange('observacoes', e.target.value)}
-                  placeholder="Observações gerais..."
-                  className="min-h-24 border-slate-200"
-                />
-              </div>
+          {/* Observações */}
+          <FormSection title="Observações" icon={FileText}>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">Observações</Label>
+              <Textarea
+                value={formData.observacoes}
+                onChange={(e) => handleChange('observacoes', e.target.value)}
+                placeholder="Observações gerais..."
+                className="min-h-24 border-slate-200"
+              />
             </div>
           </FormSection>
 
