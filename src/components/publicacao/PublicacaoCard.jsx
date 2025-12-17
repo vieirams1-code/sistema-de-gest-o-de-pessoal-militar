@@ -22,7 +22,7 @@ export default function PublicacaoCard({ registro, onUpdate }) {
     nota_para_bg: registro.nota_para_bg || '',
     numero_bg: registro.numero_bg || '',
     data_bg: registro.data_bg || '',
-    status: registro.status || 'Aguardando Nota'
+    status: registro.status_publicacao || registro.status || 'Aguardando Nota'
   });
 
   const handleSave = () => {
@@ -35,8 +35,19 @@ export default function PublicacaoCard({ registro, onUpdate }) {
       novoStatus = 'Aguardando Publicação';
     }
     
-    const tipo = registro.tipo ? 'ex-officio' : 'livro';
-    onUpdate(registro.id, { ...editData, status: novoStatus }, tipo);
+    // Determinar tipo de registro
+    let tipo = 'livro';
+    if (registro.tipo) {
+      tipo = 'ex-officio';
+    } else if (registro.medico || registro.cid_10) {
+      tipo = 'atestado';
+    }
+    
+    const updateData = tipo === 'atestado' 
+      ? { ...editData, status_publicacao: novoStatus }
+      : { ...editData, status: novoStatus };
+    
+    onUpdate(registro.id, updateData, tipo);
     setIsEditing(false);
   };
 
@@ -45,7 +56,7 @@ export default function PublicacaoCard({ registro, onUpdate }) {
       nota_para_bg: registro.nota_para_bg || '',
       numero_bg: registro.numero_bg || '',
       data_bg: registro.data_bg || '',
-      status: registro.status || 'Aguardando Nota'
+      status: registro.status_publicacao || registro.status || 'Aguardando Nota'
     });
     setIsEditing(false);
   };
@@ -65,8 +76,8 @@ export default function PublicacaoCard({ registro, onUpdate }) {
                 {registro.militar_posto && `${registro.militar_posto} `}
                 {registro.militar_nome}
               </h3>
-              <Badge className={statusColors[registro.status]}>
-                {registro.status}
+              <Badge className={statusColors[registro.status_publicacao || registro.status]}>
+                {registro.status_publicacao || registro.status}
               </Badge>
             </div>
             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
@@ -76,7 +87,12 @@ export default function PublicacaoCard({ registro, onUpdate }) {
               </div>
               <div className="flex items-center gap-1">
                 <FileText className="w-4 h-4" />
-                <span>{registro.tipo_registro || registro.tipo}</span>
+                <span>
+                  {registro.tipo_registro || registro.tipo || 
+                   (registro.medico || registro.cid_10 ? 
+                     (registro.necessita_jiso ? 'Atestado - JISO' : 'Atestado - Homologação') 
+                     : '')}
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
