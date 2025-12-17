@@ -31,8 +31,16 @@ export default function Publicacoes() {
     queryFn: () => base44.entities.PublicacaoExOfficio.list('-created_date')
   });
 
-  const isLoading = loadingLivro || loadingExOfficio;
-  const registros = [...registrosLivro, ...publicacoesExOfficio].sort((a, b) => 
+  const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
+    queryKey: ['atestados-publicacao'],
+    queryFn: async () => {
+      const all = await base44.entities.Atestado.list('-created_date');
+      return all.filter(a => a.homologado_comandante || a.encaminhado_jiso);
+    }
+  });
+
+  const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
+  const registros = [...registrosLivro, ...publicacoesExOfficio, ...atestados].sort((a, b) => 
     new Date(b.created_date) - new Date(a.created_date)
   );
 
@@ -40,17 +48,22 @@ export default function Publicacoes() {
     mutationFn: ({ id, data, tipo }) => {
       if (tipo === 'ex-officio') {
         return base44.entities.PublicacaoExOfficio.update(id, data);
+      } else if (tipo === 'atestado') {
+        return base44.entities.Atestado.update(id, data);
       }
       return base44.entities.RegistroLivro.update(id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados'] });
     }
   });
 
   const filteredRegistros = registros.filter(r => {
-    const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+    const status = r.status_publicacao || r.status;
+    const matchesStatus = statusFilter === 'all' || status === statusFilter;
     const matchesSearch = 
       r.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -60,9 +73,9 @@ export default function Publicacoes() {
 
   const stats = {
     total: registros.length,
-    aguardandoNota: registros.filter(r => r.status === 'Aguardando Nota').length,
-    aguardandoPublicacao: registros.filter(r => r.status === 'Aguardando Publicação').length,
-    publicados: registros.filter(r => r.status === 'Publicado').length
+    aguardandoNota: registros.filter(r => (r.status_publicacao || r.status) === 'Aguardando Nota').length,
+    aguardandoPublicacao: registros.filter(r => (r.status_publicacao || r.status) === 'Aguardando Publicação').length,
+    publicados: registros.filter(r => (r.status_publicacao || r.status) === 'Publicado').length
   };
 
   const handleUpdate = (id, data, tipo) => {
