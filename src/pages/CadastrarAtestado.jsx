@@ -132,6 +132,13 @@ export default function CadastrarAtestado() {
   };
 
   React.useEffect(() => {
+    // Auto-marcar homologado_comandante quando necessita_jiso for false
+    if (!formData.necessita_jiso && !formData.homologado_comandante && formData.dias > 0) {
+      setFormData(prev => ({ ...prev, homologado_comandante: true }));
+    }
+  }, [formData.necessita_jiso, formData.dias]);
+
+  React.useEffect(() => {
     if (formData.militar_nome && formData.data_inicio && formData.dias) {
       const textoGerado = gerarTextoPublicacao();
       if (textoGerado && textoGerado !== formData.texto_publicacao) {
@@ -351,14 +358,14 @@ export default function CadastrarAtestado() {
               </div>
 
               {!formData.necessita_jiso && (
-                <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-lg">
+                <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <Checkbox
                     id="homologado_comandante"
                     checked={formData.homologado_comandante}
                     onCheckedChange={(checked) => handleChange('homologado_comandante', checked)}
                   />
-                  <Label htmlFor="homologado_comandante" className="text-sm cursor-pointer">
-                    Homologado pelo Comandante (menos de 15 dias)
+                  <Label htmlFor="homologado_comandante" className="text-sm cursor-pointer font-medium text-green-900">
+                    ✓ Homologado pelo Comandante (menos de 15 dias)
                   </Label>
                 </div>
               )}
