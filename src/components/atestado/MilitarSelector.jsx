@@ -23,8 +23,11 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const { data: militares = [] } = useQuery({
-    queryKey: ['militares-ativos'],
-    queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }, '-nome_completo')
+    queryKey: ['militares-ativos-selector'],
+    queryFn: async () => {
+      const all = await base44.entities.Militar.list('-nome_completo');
+      return all.filter(m => m.status_cadastro !== 'Inativo');
+    }
   });
 
   const { data: selectedMilitar } = useQuery({

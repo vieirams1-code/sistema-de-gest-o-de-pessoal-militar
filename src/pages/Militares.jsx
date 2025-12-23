@@ -22,10 +22,11 @@ import MilitarCard from '@/components/militar/MilitarCard';
 export default function Militares() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [postoFilter, setPostoFilter] = useState('all');
+  const [mostrarInativos, setMostrarInativos] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
