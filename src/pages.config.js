@@ -10,6 +10,7 @@ import CadastrarPublicacao from './pages/CadastrarPublicacao';
 import CadastrarPunicao from './pages/CadastrarPunicao';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import Configuracoes from './pages/Configuracoes';
+import DashboardAtestados from './pages/DashboardAtestados';
 import Ferias from './pages/Ferias';
 import Home from './pages/Home';
 import Medalhas from './pages/Medalhas';
@@ -21,7 +22,6 @@ import Punicoes from './pages/Punicoes';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
-import DashboardAtestados from './pages/DashboardAtestados';
 import __Layout from './Layout.jsx';
 
 
@@ -38,6 +38,7 @@ export const PAGES = {
     "CadastrarPunicao": CadastrarPunicao,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "Configuracoes": Configuracoes,
+    "DashboardAtestados": DashboardAtestados,
     "Ferias": Ferias,
     "Home": Home,
     "Medalhas": Medalhas,
@@ -49,7 +50,6 @@ export const PAGES = {
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
-    "DashboardAtestados": DashboardAtestados,
 }
 
 export const pagesConfig = {

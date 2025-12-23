@@ -334,8 +334,8 @@ export default function CadastrarAtestado() {
             />
           </FormSection>
 
-          {/* JISO */}
-          <FormSection title="JISO - Junta de Inspeção de Saúde" icon={Clipboard}>
+          {/* Afastamento e JISO */}
+          <FormSection title="Tipo de Afastamento e JISO" icon={Clipboard}>
             <div className="space-y-4">
               <FormField
                 label="Tipo de Afastamento"
@@ -350,179 +350,97 @@ export default function CadastrarAtestado() {
                 <Checkbox
                   id="necessita_jiso"
                   checked={formData.necessita_jiso}
-                  onCheckedChange={(checked) => handleChange('necessita_jiso', checked)}
+                  onCheckedChange={(checked) => {
+                    handleChange('necessita_jiso', checked);
+                    if (!checked) handleChange('homologado_comandante', true);
+                  }}
                 />
                 <Label htmlFor="necessita_jiso" className="text-sm cursor-pointer">
-                  Necessita encaminhamento para JISO (mais de 15 dias ou decisão do comandante)
+                  Encaminhar para JISO (mais de 15 dias ou decisão do comandante)
                 </Label>
               </div>
 
-              {!formData.necessita_jiso && (
-                <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <Checkbox
-                    id="homologado_comandante"
-                    checked={formData.homologado_comandante}
-                    onCheckedChange={(checked) => handleChange('homologado_comandante', checked)}
-                  />
-                  <Label htmlFor="homologado_comandante" className="text-sm cursor-pointer font-medium text-green-900">
-                    ✓ Homologado pelo Comandante (menos de 15 dias)
-                  </Label>
-                </div>
-              )}
-
               {formData.necessita_jiso && (
-                <>
-                  <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg">
-                    <Checkbox
-                      id="encaminhado_jiso"
-                      checked={formData.encaminhado_jiso}
-                      onCheckedChange={(checked) => handleChange('encaminhado_jiso', checked)}
-                    />
-                    <Label htmlFor="encaminhado_jiso" className="text-sm cursor-pointer">
-                      Encaminhado para JISO
-                    </Label>
-                  </div>
-
-                  {formData.encaminhado_jiso && (
-                    <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h4 className="font-semibold text-sm text-blue-900">Dados da Ata da JISO</h4>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          label="Data da JISO"
-                          name="data_jiso"
-                          value={formData.data_jiso}
-                          onChange={handleChange}
-                          type="date"
-                          required
-                        />
-                        <FormField
-                          label="Seção JISO"
-                          name="secao_jiso"
-                          value={formData.secao_jiso}
-                          onChange={handleChange}
-                          placeholder="Ex: qwe"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          label="Finalidade"
-                          name="finalidade_jiso"
-                          value={formData.finalidade_jiso}
-                          onChange={handleChange}
-                          type="select"
-                          options={['V.A.F', 'LTS', 'Reserva Remunerada', 'Atestado de Origem']}
-                          required
-                        />
-                        <FormField
-                          label="NUP"
-                          name="nup"
-                          value={formData.nup}
-                          onChange={handleChange}
-                          placeholder="Número do NUP"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          label="Número da Ata"
-                          name="ata_jiso"
-                          value={formData.ata_jiso}
-                          onChange={handleChange}
-                          placeholder="Ex: 001/2025"
-                          required
-                        />
-                        <FormField
-                          label="Resultado da JISO"
-                          name="resultado_jiso"
-                          value={formData.resultado_jiso}
-                          onChange={handleChange}
-                          type="select"
-                          options={['Homologado', 'Diminuído', 'Prorrogado']}
-                        />
-                      </div>
-
-                      {formData.resultado_jiso && (
-                        <FormField
-                          label="Dias definidos pela JISO"
-                          name="dias_jiso"
-                          value={formData.dias_jiso}
-                          onChange={handleChange}
-                          type="number"
-                        />
-                      )}
-
-                      <div className="space-y-1.5">
-                        <Label className="text-sm font-medium text-slate-700">Parecer da JISO <span className="text-red-500">*</span></Label>
-                        <Textarea
-                          value={formData.parecer_jiso}
-                          onChange={(e) => handleChange('parecer_jiso', e.target.value)}
-                          placeholder="Parecer da junta..."
-                          className="min-h-20 border-slate-200"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-                </>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-900">
+                    ℹ️ Este atestado será encaminhado para JISO. Os dados da junta devem ser preenchidos na agenda JISO.
+                  </p>
+                </div>
               )}
             </div>
           </FormSection>
 
-          {/* Controle de Publicação */}
-          <FormSection title="Controle de Publicação" icon={Clipboard}>
-            {formData.texto_publicacao && (
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <Label className="text-sm font-semibold text-blue-900 mb-2 block">
-                  Texto Gerado para Publicação
-                </Label>
-                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                  {formData.texto_publicacao}
-                </p>
+          {/* Publicação e Status - Apenas para atestados sem JISO */}
+          {!formData.necessita_jiso && (
+            <FormSection title="Publicação e Status" icon={Clipboard}>
+              {formData.texto_publicacao && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Label className="text-sm font-semibold text-blue-900 mb-2 block">
+                    Texto Gerado para Publicação
+                  </Label>
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {formData.texto_publicacao}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  label="Status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Ativo', 'Encerrado', 'Cancelado', 'Prorrogado']}
+                />
+                <FormField
+                  label="Status da Publicação"
+                  name="status_publicacao"
+                  value={formData.status_publicacao}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Aguardando Nota', 'Aguardando Publicação', 'Publicado']}
+                />
+                <FormField
+                  label="Nota para BG"
+                  name="nota_para_bg"
+                  value={formData.nota_para_bg}
+                  onChange={handleChange}
+                  placeholder="Ex: 001/2025"
+                />
+                <FormField
+                  label="Número do BG"
+                  name="numero_bg"
+                  value={formData.numero_bg}
+                  onChange={handleChange}
+                  placeholder="Número do Boletim Geral"
+                />
+                <FormField
+                  label="Data do BG"
+                  name="data_bg"
+                  value={formData.data_bg}
+                  onChange={handleChange}
+                  type="date"
+                />
               </div>
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            </FormSection>
+          )}
+
+          {formData.necessita_jiso && (
+            <FormSection title="Status" icon={Clipboard}>
               <FormField
-                label="Status"
+                label="Status do Atestado"
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
                 type="select"
                 options={['Ativo', 'Encerrado', 'Cancelado', 'Prorrogado']}
               />
-              <FormField
-                label="Status da Publicação"
-                name="status_publicacao"
-                value={formData.status_publicacao}
-                onChange={handleChange}
-                type="select"
-                options={['Aguardando Nota', 'Aguardando Publicação', 'Publicado']}
-              />
-              <FormField
-                label="Nota para BG"
-                name="nota_para_bg"
-                value={formData.nota_para_bg}
-                onChange={handleChange}
-                placeholder="Ex: 001/2025"
-              />
-              <FormField
-                label="Número do BG"
-                name="numero_bg"
-                value={formData.numero_bg}
-                onChange={handleChange}
-                placeholder="Número do Boletim Geral"
-              />
-              <FormField
-                label="Data do BG"
-                name="data_bg"
-                value={formData.data_bg}
-                onChange={handleChange}
-                type="date"
-              />
-            </div>
-          </FormSection>
+              <p className="text-sm text-slate-500 mt-2">
+                A publicação deste atestado será gerenciada através da JISO.
+              </p>
+            </FormSection>
+          )}
 
           {/* Observações */}
           <FormSection title="Observações" icon={FileText}>

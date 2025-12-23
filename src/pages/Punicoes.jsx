@@ -42,6 +42,42 @@ export default function Punicoes() {
     p.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Ordenar
+  const sortedPunicoes = [...filteredPunicoes].sort((a, b) => {
+    if (ordenarPor === 'data') {
+      return new Date(b.data_aplicacao) - new Date(a.data_aplicacao);
+    } else if (ordenarPor === 'militar') {
+      return (a.militar_nome || '').localeCompare(b.militar_nome || '');
+    }
+    return 0;
+  });
+
+  // Agrupar
+  const punicoesAgrupadas = sortedPunicoes.reduce((acc, p) => {
+    if (agruparPor === 'ano') {
+      const ano = p.data_aplicacao ? new Date(p.data_aplicacao + 'T00:00:00').getFullYear() : 'Sem Data';
+      if (!acc[ano]) acc[ano] = [];
+      acc[ano].push(p);
+    } else if (agruparPor === 'militar') {
+      const militar = p.militar_nome || 'Sem Nome';
+      if (!acc[militar]) acc[militar] = [];
+      acc[militar].push(p);
+    } else {
+      if (!acc['todas']) acc['todas'] = [];
+      acc['todas'].push(p);
+    }
+    return acc;
+  }, {});
+
+  const gruposOrdenados = Object.keys(punicoesAgrupadas).sort((a, b) => {
+    if (agruparPor === 'ano') {
+      if (a === 'Sem Data') return 1;
+      if (b === 'Sem Data') return -1;
+      return b - a;
+    }
+    return a.localeCompare(b);
+  });
+
   const tipoColors = {
     'Advertência Verbal': 'bg-blue-100 text-blue-700',
     'Repreensão': 'bg-yellow-100 text-yellow-700',
@@ -85,14 +121,22 @@ export default function Punicoes() {
           <div className="flex justify-center py-20">
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : filteredPunicoes.length === 0 ? (
+        ) : sortedPunicoes.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
             <Shield className="w-16 h-16 mx-auto text-slate-300 mb-4" />
             <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhuma punição encontrada</h3>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredPunicoes.map((punicao) => (
+          <div className="space-y-6">
+            {gruposOrdenados.map((grupo) => (
+              <div key={grupo}>
+                {agruparPor !== 'nenhum' && (
+                  <h3 className="text-lg font-bold text-[#1e3a5f] mb-3 pb-2 border-b-2 border-[#1e3a5f]">
+                    {grupo} ({punicoesAgrupadas[grupo].length})
+                  </h3>
+                )}
+                <div className="space-y-3">
+                  {punicoesAgrupadas[grupo].map((punicao) => (
               <div key={punicao.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -135,6 +179,9 @@ export default function Punicoes() {
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
+                </div>
+                  </div>
+                ))}
                 </div>
               </div>
             ))}
