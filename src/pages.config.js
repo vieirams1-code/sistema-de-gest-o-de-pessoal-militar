@@ -22,6 +22,7 @@ import Punicoes from './pages/Punicoes';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
+import EditarJISO from './pages/EditarJISO';
 import __Layout from './Layout.jsx';
 
 
@@ -50,6 +51,7 @@ export const PAGES = {
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
+    "EditarJISO": EditarJISO,
 }
 
 export const pagesConfig = {

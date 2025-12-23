@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar, Plus, Search, Clock } from 'lucide-react';
+import { Calendar, Search, Clock, ArrowRight, Edit } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,15 @@ export default function AgendarJISO() {
 
   const { data: atestados = [], isLoading } = useQuery({
     queryKey: ['atestados-jiso'],
-    queryFn: () => base44.entities.Atestado.filter({ necessita_jiso: true }, '-created_date')
+    queryFn: async () => {
+      const all = await base44.entities.Atestado.list('-created_date');
+      return all.filter(a => a.necessita_jiso);
+    }
+  });
+
+  const { data: jisos = [] } = useQuery({
+    queryKey: ['jisos'],
+    queryFn: () => base44.entities.JISO.list('-created_date')
   });
 
   const filteredAtestados = atestados.filter(a =>
@@ -23,10 +31,14 @@ export default function AgendarJISO() {
     a.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const getJISOForAtestado = (atestadoId) => {
+    return jisos.find(j => j.atestado_id === atestadoId);
+  };
+
   const statusColors = {
-    'Ativo': 'bg-blue-100 text-blue-700',
-    'Encaminhado para JISO': 'bg-yellow-100 text-yellow-700',
-    'JISO Realizada': 'bg-green-100 text-green-700'
+    'Aguardando Realização': 'bg-yellow-100 text-yellow-700',
+    'Realizada': 'bg-green-100 text-green-700',
+    'Cancelada': 'bg-red-100 text-red-700'
   };
 
   return (
@@ -37,7 +49,7 @@ export default function AgendarJISO() {
             <Calendar className="w-8 h-8 text-[#1e3a5f]" />
             <div>
               <h1 className="text-3xl font-bold text-[#1e3a5f]">Agenda JISO</h1>
-              <p className="text-slate-500">Junta de Inspeção de Saúde</p>
+              <p className="text-slate-500">Junta de Inspeção de Saúde - Gestão e Pareceres</p>
             </div>
           </div>
         </div>
@@ -61,38 +73,102 @@ export default function AgendarJISO() {
         ) : filteredAtestados.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
             <Clock className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhum atestado para JISO</h3>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhum atestado encaminhado para JISO</h3>
+            <p className="text-slate-500">Atestados marcados para JISO aparecerão aqui</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredAtestados.map((atestado) => (
-              <div key={atestado.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-slate-900">
-                        {atestado.militar_posto} {atestado.militar_nome}
-                      </h3>
-                      <Badge className={statusColors[atestado.status]}>
-                        {atestado.status}
-                      </Badge>
+            {filteredAtestados.map((atestado) => {
+              const jiso = getJISOForAtestado(atestado.id);
+              
+              return (
+                <div 
+                  key={atestado.id} 
+                  className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-slate-900">
+                          {atestado.militar_posto} {atestado.militar_nome}
+                        </h3>
+                        {jiso && (
+                          <Badge className={statusColors[jiso.status]}>
+                            {jiso.status}
+                          </Badge>
+                        )}
+                        {!jiso && (
+                          <Badge className="bg-amber-100 text-amber-700">
+                            Aguardando Registro
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-slate-600">
+                        <div>
+                          <p className="text-xs text-slate-500">Matrícula</p>
+                          <p className="font-medium">{atestado.militar_matricula}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Tipo</p>
+                          <p className="font-medium">{atestado.tipo_afastamento}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Dias Originais</p>
+                          <p className="font-medium">{atestado.dias} dias</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Início</p>
+                          <p className="font-medium">
+                            {atestado.data_inicio ? format(new Date(atestado.data_inicio + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
+                          </p>
+                        </div>
+                      </div>
+                      {jiso && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs text-slate-500">Data JISO</p>
+                              <p className="font-medium text-blue-600">
+                                {jiso.data_jiso ? format(new Date(jiso.data_jiso + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500">Finalidade</p>
+                              <p className="font-medium">{jiso.finalidade_jiso || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500">Resultado</p>
+                              <p className="font-medium">{jiso.resultado_jiso || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500">Dias JISO</p>
+                              <p className="font-medium text-green-600">{jiso.dias_jiso || '-'} dias</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm text-slate-600 mb-1">Mat: {atestado.militar_matricula}</p>
-                    <p className="text-sm text-slate-600">Tipo: {atestado.tipo_afastamento}</p>
-                    <p className="text-sm text-slate-600">Dias: {atestado.dias}</p>
-                    {atestado.data_jiso && (
-                      <p className="text-sm text-green-600 font-medium mt-2">
-                        JISO agendada para: {format(new Date(atestado.data_jiso + 'T00:00:00'), 'dd/MM/yyyy')}
-                      </p>
-                    )}
-                    {atestado.finalidade_jiso && (
-                      <p className="text-sm text-slate-600">Finalidade: {atestado.finalidade_jiso}</p>
-                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`)}
+                      >
+                        <Edit className="w-4 h-4 mr-1" />
+                        {jiso ? 'Editar JISO' : 'Registrar JISO'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`)}
+                      >
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
