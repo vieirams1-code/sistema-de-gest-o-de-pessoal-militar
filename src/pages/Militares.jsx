@@ -53,9 +53,23 @@ export default function Militares() {
     
     const matchesStatus = statusFilter === 'all' || m.status_cadastro === statusFilter;
     const matchesPosto = postoFilter === 'all' || m.posto_graduacao === postoFilter;
+    const matchesAtivo = mostrarInativos || m.status_cadastro !== 'Inativo';
     
-    return matchesSearch && matchesStatus && matchesPosto;
+    return matchesSearch && matchesStatus && matchesPosto && matchesAtivo;
   });
+
+  // Agrupar por posto/graduação
+  const militaresAgrupados = filteredMilitares.reduce((acc, m) => {
+    const posto = m.posto_graduacao || 'Sem Posto';
+    if (!acc[posto]) acc[posto] = [];
+    acc[posto].push(m);
+    return acc;
+  }, {});
+
+  const orderedPostos = [
+    'Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante',
+    'Subtenente', '1º Sargento', '2º Sargento', '3º Sargento', 'Cabo', 'Soldado', 'Sem Posto'
+  ];
 
   const handleEdit = (militar) => {
     navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`);
@@ -76,11 +90,14 @@ export default function Militares() {
     }
   };
 
+  const militaresAtivos = militares.filter(m => m.status_cadastro !== 'Inativo');
+  
   const stats = {
-    total: militares.length,
-    ativos: militares.filter(m => m.status_cadastro === 'Ativo' || !m.status_cadastro).length,
-    oficiais: militares.filter(m => ['2º Tenente', '1º Tenente', 'Capitão', 'Major', 'Tenente-Coronel', 'Coronel', 'Aspirante'].includes(m.posto_graduacao)).length,
-    pracas: militares.filter(m => ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente'].includes(m.posto_graduacao)).length
+    total: militaresAtivos.length,
+    ativos: militaresAtivos.filter(m => m.status_cadastro === 'Ativo' || !m.status_cadastro).length,
+    oficiais: militaresAtivos.filter(m => ['2º Tenente', '1º Tenente', 'Capitão', 'Major', 'Tenente-Coronel', 'Coronel', 'Aspirante'].includes(m.posto_graduacao)).length,
+    pracas: militaresAtivos.filter(m => ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente'].includes(m.posto_graduacao)).length,
+    inativos: militares.filter(m => m.status_cadastro === 'Inativo').length
   };
 
   return (
@@ -216,6 +233,17 @@ export default function Militares() {
               </div>
             </div>
           </div>
+          <div className="flex items-center gap-2 mt-4">
+            <Button
+              variant={mostrarInativos ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMostrarInativos(!mostrarInativos)}
+              className={mostrarInativos ? "bg-slate-600" : ""}
+            >
+              {mostrarInativos ? 'Ocultar Inativos' : 'Mostrar Inativos'}
+              {stats.inativos > 0 && ` (${stats.inativos})`}
+            </Button>
+          </div>
         </div>
 
         {/* Results count */}
@@ -250,20 +278,31 @@ export default function Militares() {
             )}
           </div>
         ) : (
-          <div className={
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-              : 'space-y-3'
-          }>
-            {filteredMilitares.map((militar) => (
-              <MilitarCard
-                key={militar.id}
-                militar={militar}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onView={handleView}
-              />
-            ))}
+          <div className="space-y-6">
+            {orderedPostos
+              .filter(posto => militaresAgrupados[posto] && militaresAgrupados[posto].length > 0)
+              .map(posto => (
+                <div key={posto}>
+                  <h3 className="text-lg font-bold text-[#1e3a5f] mb-3 pb-2 border-b-2 border-[#1e3a5f]">
+                    {posto} ({militaresAgrupados[posto].length})
+                  </h3>
+                  <div className={
+                    viewMode === 'grid'
+                      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
+                      : 'space-y-3'
+                  }>
+                    {militaresAgrupados[posto].map((militar) => (
+                      <MilitarCard
+                        key={militar.id}
+                        militar={militar}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onView={handleView}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
           </div>
         )}
       </div>
