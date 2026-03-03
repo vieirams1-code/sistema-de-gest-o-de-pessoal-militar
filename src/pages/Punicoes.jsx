@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, Plus, Search, Trash2, Edit } from 'lucide-react';
 import { format } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +23,8 @@ export default function Punicoes() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [agruparPor, setAgruparPor] = useState('ano');
+  const [ordenarPor, setOrdenarPor] = useState('data');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
   const { data: punicoes = [], isLoading } = useQuery({
@@ -106,14 +109,35 @@ export default function Punicoes() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <Input
-              placeholder="Buscar por nome ou matrícula..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                placeholder="Buscar por nome ou matrícula..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={agruparPor} onValueChange={setAgruparPor}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Agrupar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nenhum">Sem Agrupamento</SelectItem>
+                <SelectItem value="ano">Agrupar por Ano</SelectItem>
+                <SelectItem value="militar">Agrupar por Militar</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={ordenarPor} onValueChange={setOrdenarPor}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="data">Ordenar por Data</SelectItem>
+                <SelectItem value="militar">Ordenar por Militar</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
