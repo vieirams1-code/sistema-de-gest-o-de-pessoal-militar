@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -13,7 +13,8 @@ import {
   Activity,
   ArrowRight,
   Clock,
-  Shield
+  Shield,
+  Pencil
 } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 
