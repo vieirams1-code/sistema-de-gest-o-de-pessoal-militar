@@ -6,7 +6,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Calendar, Users, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, Calendar, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
@@ -52,19 +52,19 @@ export default function PeriodosAquisitivos() {
     }).length
   };
 
-  const handleCardClick = (periodo) => {
-    // Futuramente abrir modal com detalhes
-    console.log('Período clicado:', periodo);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-[#1e3a5f]">Períodos Aquisitivos</h1>
-            <p className="text-slate-500">Controle de períodos e direitos de férias</p>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('Ferias'))} className="hover:bg-slate-200">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-[#1e3a5f]">Períodos Aquisitivos</h1>
+              <p className="text-slate-500">Controle e habilitação/inabilitação de períodos</p>
+            </div>
           </div>
           <div className="flex gap-3">
             <PeriodoAquisitivoGenerator />
@@ -143,6 +143,7 @@ export default function PeriodosAquisitivos() {
                 <SelectItem value="Parcialmente Gozado">Parcialmente Gozado</SelectItem>
                 <SelectItem value="Gozado">Gozado</SelectItem>
                 <SelectItem value="Vencido">Vencido</SelectItem>
+                <SelectItem value="Inativo">Inativo</SelectItem>
               </SelectContent>
             </Select>
           </div>
