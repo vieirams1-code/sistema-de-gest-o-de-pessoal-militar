@@ -3,8 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
-import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap } from 'lucide-react';
+import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, History } from 'lucide-react';
 import { createPageUrl } from '@/utils';
+import { Button } from "@/components/ui/button";
 
 import FormSection from '@/components/militar/FormSection';
 import FormField from '@/components/militar/FormField';
@@ -12,6 +13,7 @@ import PhotoUpload from '@/components/militar/PhotoUpload';
 import TagInput from '@/components/militar/TagInput';
 import LotacaoSelector from '@/components/militar/LotacaoSelector';
 import FuncaoSelector from '@/components/militar/FuncaoSelector';
+import HistoricoComportamentoModal from '@/components/militar/HistoricoComportamentoModal';
 
 const initialFormData = {
   nome_completo: '',
@@ -78,6 +80,8 @@ export default function CadastrarMilitar() {
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
+  const [historicoOpen, setHistoricoOpen] = useState(false);
+  const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
 
   const { data: editingMilitar, isLoading: loadingEdit } = useQuery({
     queryKey: ['militar', editId],
@@ -97,27 +101,12 @@ export default function CadastrarMilitar() {
   React.useEffect(() => {
     if (editingMilitar) {
       setFormData({ ...initialFormData, ...editingMilitar });
+      setComportamentoOriginal(editingMilitar.comportamento || null);
     }
   }, [editingMilitar]);
 
   const handleChange = (name, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [name]: value };
-      
-      // Lógica de comportamento - praças começam com BOM
-      if (name === 'posto_graduacao') {
-        const pracas = ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente', 'Aspirante'];
-        const oficiais = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente'];
-        
-        if (pracas.includes(value)) {
-          updated.comportamento = 'Bom';
-        } else if (oficiais.includes(value)) {
-          updated.comportamento = '';
-        }
-      }
-      
-      return updated;
-    });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -130,10 +119,29 @@ export default function CadastrarMilitar() {
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
 
+    let militarId = editId;
     if (editId) {
       await base44.entities.Militar.update(editId, dataToSave);
     } else {
-      await base44.entities.Militar.create(dataToSave);
+      const criado = await base44.entities.Militar.create(dataToSave);
+      militarId = criado.id;
+    }
+
+    // Registrar alteração manual de comportamento
+    const comportamentoMudou = editId
+      ? formData.comportamento !== comportamentoOriginal
+      : formData.comportamento; // novo cadastro com comportamento definido
+
+    if (comportamentoMudou && militarId) {
+      await base44.entities.HistoricoComportamento.create({
+        militar_id: militarId,
+        militar_nome: formData.nome_completo,
+        comportamento_anterior: comportamentoOriginal || null,
+        comportamento_novo: formData.comportamento,
+        motivo: 'Manual',
+        data_alteracao: new Date().toISOString().split('T')[0],
+        observacoes: editId ? 'Alteração manual no cadastro' : 'Definição inicial no cadastro'
+      });
     }
     
     queryClient.invalidateQueries({ queryKey: ['militares'] });
@@ -287,14 +295,33 @@ export default function CadastrarMilitar() {
                 type="date"
               />
               {formData.posto_graduacao && ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente', 'Aspirante'].includes(formData.posto_graduacao) && (
-                <FormField
-                  label="Comportamento (Praças)"
-                  name="comportamento"
-                  value={formData.comportamento}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
-                />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-700">Comportamento (Praças)</label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <FormField
+                        label=""
+                        name="comportamento"
+                        value={formData.comportamento}
+                        onChange={handleChange}
+                        type="select"
+                        options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
+                      />
+                    </div>
+                    {editId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setHistoricoOpen(true)}
+                        className="flex-shrink-0 self-end h-10 w-10"
+                        title="Ver histórico de comportamento"
+                      >
+                        <History className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </FormSection>
@@ -615,6 +642,13 @@ export default function CadastrarMilitar() {
               placeholder="Adicionar habilidade..."
             />
           </FormSection>
+
+          {/* Histórico de Comportamento */}
+          <HistoricoComportamentoModal
+            militarId={editId}
+            open={historicoOpen}
+            onClose={() => setHistoricoOpen(false)}
+          />
 
           {/* Submit Button Mobile */}
           <div className="md:hidden">
