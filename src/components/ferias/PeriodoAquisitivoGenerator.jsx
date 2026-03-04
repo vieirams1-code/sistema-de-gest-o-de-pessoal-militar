@@ -42,48 +42,45 @@ export default function PeriodoAquisitivoGenerator() {
         if (!militar.data_inclusao) continue;
 
         const dataInclusao = new Date(militar.data_inclusao + 'T00:00:00');
-        
-        // Verificar se já existe período para este militar
         const periodosDoMilitar = periodosExistentes.filter(p => p.militar_id === militar.id);
         
-        // Calcular quantos períodos já deveriam existir
-        let anoCorrente = 0;
+        // Encontrar o período atual: o aniversário de inclusão que já passou neste ano
         let dataInicio = new Date(dataInclusao);
         
-        while (dataInicio <= hoje) {
-          const dataFim = addYears(dataInicio, 1);
-          dataFim.setDate(dataFim.getDate() - 1); // Um dia antes de completar o ano
-          
-          // Verificar se já existe este período
+        // Avançar até o período corrente (onde hoje está dentro ou é o próximo)
+        while (addYears(dataInicio, 1) <= hoje) {
+          dataInicio = addYears(dataInicio, 1);
+        }
+
+        // Gerar período corrente + próximo (2 períodos futuros/atuais)
+        for (let i = 0; i < 2; i++) {
+          const dataFimPeriodo = new Date(addYears(dataInicio, 1));
+          dataFimPeriodo.setDate(dataFimPeriodo.getDate() - 1);
+
           const periodoExiste = periodosDoMilitar.some(p => {
             const inicioExistente = new Date(p.inicio_aquisitivo + 'T00:00:00');
             return inicioExistente.getTime() === dataInicio.getTime();
           });
 
-          if (!periodoExiste && dataFim <= hoje) {
-            // Criar novo período aquisitivo
-            const dataLimiteGozo = addMonths(dataFim, 24);
-            
-            const novoPeriodo = {
+          if (!periodoExiste) {
+            const dataLimiteGozo = addMonths(dataFimPeriodo, 24);
+            novosPeríodos.push({
               militar_id: militar.id,
               militar_nome: militar.nome_completo,
               militar_posto: militar.posto_graduacao,
               militar_matricula: militar.matricula,
               inicio_aquisitivo: format(dataInicio, 'yyyy-MM-dd'),
-              fim_aquisitivo: format(dataFim, 'yyyy-MM-dd'),
+              fim_aquisitivo: format(dataFimPeriodo, 'yyyy-MM-dd'),
               data_limite_gozo: format(dataLimiteGozo, 'yyyy-MM-dd'),
               dias_direito: 30,
               dias_gozados: 0,
               dias_previstos: 0,
               status: 'Disponível',
-              ano_referencia: `${format(dataInicio, 'yyyy')}/${format(dataFim, 'yyyy')}`
-            };
-            
-            novosPeríodos.push(novoPeriodo);
+              ano_referencia: `${format(dataInicio, 'yyyy')}/${format(dataFimPeriodo, 'yyyy')}`
+            });
           }
 
           dataInicio = addYears(dataInicio, 1);
-          anoCorrente++;
         }
       }
 
