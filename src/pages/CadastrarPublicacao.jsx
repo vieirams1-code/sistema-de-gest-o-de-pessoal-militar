@@ -538,7 +538,7 @@ export default function CadastrarPublicacao() {
       }
 
       case 'Homologação de Atestado': {
-        const atestadosCurtos = atestadosMilitar.filter(a => a.dias <= 15 && a.status === 'Ativo' && !a.homologado_comandante);
+        const atestadosCurtos = atestadosMilitar.filter(a => a.dias <= 15 && !a.homologado_comandante);
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Homologação de Atestado Médico</h3>

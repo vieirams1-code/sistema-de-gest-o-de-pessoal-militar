@@ -111,6 +111,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 <Pencil className="w-4 h-4 mr-2" />
                 Editar
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowJisoModal(true)}>
+                <History className="w-4 h-4 mr-2" />
+                Ver registros de decisões
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDelete(atestado)} className="text-red-600">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Excluir

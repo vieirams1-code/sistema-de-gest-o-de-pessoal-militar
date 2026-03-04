@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
-import { format, addDays, parseISO } from 'date-fns';
-import { PlusCircle, History } from 'lucide-react';
+import { format, addDays, parseISO, subDays } from 'date-fns';
+import { PlusCircle, History, Trash2 } from 'lucide-react';
 
 export default function JisoHistoricoModal({ atestado, open, onClose }) {
   const queryClient = useQueryClient();

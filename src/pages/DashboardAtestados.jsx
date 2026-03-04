@@ -14,9 +14,11 @@ import {
   ArrowRight,
   Clock,
   Shield,
-  Pencil
+  Pencil,
+  History
 } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
+import JisoHistoricoModal from '@/components/atestado/JisoHistoricoModal';
 
 export default function DashboardAtestados() {
   const navigate = useNavigate();
