@@ -726,7 +726,6 @@ export default function CadastrarPublicacao() {
                   <SelectItem value="Geral">Geral</SelectItem>
                   <SelectItem value="Designação / Dispensa de Função">Designação / Dispensa de Função</SelectItem>
                   <SelectItem value="Ata JISO">Ata JISO</SelectItem>
-                  <SelectItem value="Homologação de Atestado">Homologação de Atestado Médico</SelectItem>
                   <SelectItem value="Transcrição de Documentos">Transcrição de Documentos</SelectItem>
                 </SelectContent>
               </Select>
@@ -760,16 +759,9 @@ export default function CadastrarPublicacao() {
               />
               <div>
                 <Label className="text-sm font-medium text-slate-700">Status</Label>
-                <Select value={formData.status} onValueChange={(v) => handleChange('status', v)}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                    <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                    <SelectItem value="Publicado">Publicado</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
+                  {formData.status || 'Aguardando Nota'}
+                </div>
               </div>
               <FormField
                 label="Número do BG"

@@ -16,14 +16,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 const navItems = [
   { name: 'Dashboard', page: 'Home', icon: Home },
   { name: 'Efetivo', page: 'Militares', icon: Users },
-  { name: 'Punições', page: 'Punicoes', icon: Shield },
+
   { name: 'Medalhas', page: 'Medalhas', icon: Shield },
   { name: 'Armamentos', page: 'Armamentos', icon: Shield },
   { name: 'Atestados', page: 'DashboardAtestados', icon: Shield },
   { name: 'Férias', page: 'Ferias', icon: Menu },
   { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
   { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
-  { name: 'Publicações', page: 'Publicacoes', icon: Shield },
+  { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
   { name: 'Ficha Militar', page: 'FichaMilitar', icon: Shield },
   { name: 'Configurações', page: 'Configuracoes', icon: Menu },
 ];

@@ -237,7 +237,7 @@ export default function FichaMilitar() {
       ]
     }));
 
-    historico.forEach(h => lista.push({
+    historico.filter(h => h.motivo !== 'Manual').forEach(h => lista.push({
       tipo: 'comportamento', data: h.data_alteracao, id: h.id, raw: h,
       titulo: `Comportamento: ${h.comportamento_anterior || 'N/D'} → ${h.comportamento_novo}`,
       resumo: `Motivo: ${h.motivo}`, subtipo: h.motivo,

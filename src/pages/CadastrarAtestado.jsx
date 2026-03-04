@@ -80,7 +80,19 @@ export default function CadastrarAtestado() {
   }, [editingAtestado]);
 
   const handleChange = (name, value) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      // Status automático da publicação
+      if (name === 'nota_para_bg' || name === 'numero_bg' || name === 'data_bg') {
+        const nota = name === 'nota_para_bg' ? value : updated.nota_para_bg;
+        const numBg = name === 'numero_bg' ? value : updated.numero_bg;
+        const dataBg = name === 'data_bg' ? value : updated.data_bg;
+        if (numBg && dataBg) updated.status_publicacao = 'Publicado';
+        else if (nota) updated.status_publicacao = 'Aguardando Publicação';
+        else updated.status_publicacao = 'Aguardando Nota';
+      }
+      return updated;
+    });
   };
 
   const handleMilitarSelect = (militarData) => {
@@ -403,15 +415,13 @@ export default function CadastrarAtestado() {
                   onChange={handleChange}
                   type="select"
                   options={['Ativo', 'Encerrado']}
-                  />
-                  <FormField
-                     label="Status da Publicação"
-                  name="status_publicacao"
-                  value={formData.status_publicacao}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Aguardando Nota', 'Aguardando Publicação', 'Publicado']}
                 />
+                <div>
+                  <label className="text-sm font-medium text-slate-700">Status da Publicação</label>
+                  <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
+                    {formData.status_publicacao || 'Aguardando Nota'}
+                  </div>
+                </div>
                 <FormField
                   label="Nota para BG"
                   name="nota_para_bg"
