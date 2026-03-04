@@ -339,6 +339,15 @@ export default function DashboardAtestados() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal prorrogação/cassação */}
+      {atestadoParaModal && (
+        <JisoHistoricoModal
+          atestado={atestadoParaModal}
+          open={!!atestadoParaModal}
+          onClose={() => setJisoModalAtestado(null)}
+        />
+      )}
     </div>
   );
 }
