@@ -279,7 +279,9 @@ export default function CadastrarRegistroLivro() {
 
     const registroData = {
       ...formData,
-      texto_publicacao: textoPublicacao
+      texto_publicacao: textoPublicacao,
+      dias: formData.dias !== '' && formData.dias !== undefined ? Number(formData.dias) : undefined,
+      dias_restantes: formData.dias_restantes !== '' && formData.dias_restantes !== undefined ? Number(formData.dias_restantes) : undefined,
     };
     
     await base44.entities.RegistroLivro.create(registroData);
