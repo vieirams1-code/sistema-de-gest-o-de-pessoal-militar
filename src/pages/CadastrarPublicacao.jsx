@@ -201,11 +201,18 @@ export default function CadastrarPublicacao() {
     e.preventDefault();
     setLoading(true);
 
+    const dataToSave = {
+      ...formData,
+      dias_punicao: formData.dias_punicao !== '' && formData.dias_punicao !== undefined && formData.dias_punicao !== null
+        ? Number(formData.dias_punicao)
+        : undefined,
+    };
+
     let savedId = publicacaoId;
     if (publicacaoId) {
-      await base44.entities.PublicacaoExOfficio.update(publicacaoId, formData);
+      await base44.entities.PublicacaoExOfficio.update(publicacaoId, dataToSave);
     } else {
-      const saved = await base44.entities.PublicacaoExOfficio.create(formData);
+      const saved = await base44.entities.PublicacaoExOfficio.create(dataToSave);
       savedId = saved.id;
     }
 
