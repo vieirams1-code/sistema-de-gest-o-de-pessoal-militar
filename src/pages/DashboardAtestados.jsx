@@ -27,6 +27,7 @@ export default function DashboardAtestados() {
   const [editingJisoId, setEditingJisoId] = useState(null);
   const [jisoDateEdit, setJisoDateEdit] = useState('');
   const [savingJiso, setSavingJiso] = useState(false);
+  const [jisoModalAtestado, setJisoModalAtestado] = useState(null);
 
   const { data: atestados = [], isLoading } = useQuery({
     queryKey: ['atestados-dashboard'],
@@ -80,6 +81,11 @@ export default function DashboardAtestados() {
     if (!dateString) return '-';
     return format(parseISO(dateString + 'T00:00:00'), 'dd/MM/yyyy');
   };
+
+  // Refresh atestado para o modal quando dados mudam
+  const atestadoParaModal = jisoModalAtestado 
+    ? atestados.find(a => a.id === jisoModalAtestado.id) || jisoModalAtestado 
+    : null;
 
   if (isLoading) {
     return (
@@ -270,6 +276,17 @@ export default function DashboardAtestados() {
                             style={{ width: `${progresso}%` }}
                           />
                         </div>
+                      </div>
+
+                      {/* Botão registrar decisão (adicionar/cassar dias) */}
+                      <div className="pt-2 border-t border-slate-100 mt-2 flex items-center justify-between" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => setJisoModalAtestado(atestado)}
+                        className="flex items-center gap-1.5 text-xs text-[#1e3a5f] hover:text-[#2d4a6f] font-medium"
+                      >
+                        <History className="w-3.5 h-3.5" />
+                        Adicionar/Cassar dias
+                      </button>
                       </div>
 
                       {/* JISO Agendada inline edit */}
