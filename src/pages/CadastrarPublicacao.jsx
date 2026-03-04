@@ -80,6 +80,24 @@ export default function CadastrarPublicacao() {
   const comandante = militaresAll.find(m => m.id === comandanteConfig?.valor);
   const artigo = comandante?.sexo === 'Feminino' ? 'A' : 'O';
 
+  // Militar selecionado para puxar comportamento
+  const { data: militarSelecionado } = useQuery({
+    queryKey: ['militar-pub', formData.militar_id],
+    queryFn: async () => { const r = await base44.entities.Militar.filter({ id: formData.militar_id }); return r[0]; },
+    enabled: !!formData.militar_id
+  });
+
+  // Quando selecionar militar, puxar comportamento atual para os campos de comportamento
+  useEffect(() => {
+    if (!militarSelecionado) return;
+    const comp = militarSelecionado.comportamento || '';
+    setFormData(prev => ({
+      ...prev,
+      comportamento_inicial: comp,
+      comportamento_atual: comp,
+    }));
+  }, [militarSelecionado?.id]);
+
   // Atestados do militar para JISO / homologação
   const { data: atestadosMilitar = [] } = useQuery({
     queryKey: ['atestados-militar-pub', formData.militar_id],
@@ -103,7 +121,23 @@ export default function CadastrarPublicacao() {
   }, [publicacaoExistente]);
 
   const handleChange = (name, value) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      // Status automático baseado nos campos de publicação
+      if (name === 'nota_para_bg' || name === 'numero_bg' || name === 'data_bg') {
+        const nota = name === 'nota_para_bg' ? value : updated.nota_para_bg;
+        const numBg = name === 'numero_bg' ? value : updated.numero_bg;
+        const dataBg = name === 'data_bg' ? value : updated.data_bg;
+        if (numBg && dataBg) {
+          updated.status = 'Publicado';
+        } else if (nota) {
+          updated.status = 'Aguardando Publicação';
+        } else {
+          updated.status = 'Aguardando Nota';
+        }
+      }
+      return updated;
+    });
   };
 
   const formatarDataExtenso = (dataString) => {
