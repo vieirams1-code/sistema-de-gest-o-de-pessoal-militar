@@ -96,6 +96,23 @@ export default function JisoHistoricoModal({ atestado, open, onClose }) {
   };
 
   return (
+    <>
+    <AlertDialog open={confirmDeleteIdx !== null} onOpenChange={() => setConfirmDeleteIdx(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja excluir este registro de decisão? As datas do atestado serão recalculadas automaticamente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => handleDelete(confirmDeleteIdx)}>
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -202,5 +219,6 @@ export default function JisoHistoricoModal({ atestado, open, onClose }) {
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
