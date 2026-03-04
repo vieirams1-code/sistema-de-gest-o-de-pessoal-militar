@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -6,31 +6,14 @@ import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  ArrowLeft, 
-  Pencil, 
-  User, 
-  Briefcase, 
-  FileText, 
-  Building, 
-  Phone, 
-  Heart, 
-  MapPin, 
-  GraduationCap,
-  Calendar,
-  Mail,
-  CreditCard
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ArrowLeft, Pencil, User, Briefcase, FileText, Building,
+  Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
+  Shield, Award, Activity, BookOpen
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-const statusColors = {
-  'Ativo': 'bg-emerald-100 text-emerald-700',
-  'Inativo': 'bg-slate-100 text-slate-700',
-  'Reserva': 'bg-amber-100 text-amber-700',
-  'Reforma': 'bg-blue-100 text-blue-700',
-  'Falecido': 'bg-red-100 text-red-700'
-};
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
@@ -54,11 +37,14 @@ function Section({ title, icon: Icon, children }) {
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        {children}
-      </CardContent>
+      <CardContent className="pt-0">{children}</CardContent>
     </Card>
   );
+}
+
+function formatDate(date) {
+  if (!date) return null;
+  try { return format(new Date(date + 'T00:00:00'), "dd/MM/yyyy"); } catch { return date; }
 }
 
 export default function VerMilitar() {
@@ -68,10 +54,37 @@ export default function VerMilitar() {
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
-    queryFn: async () => {
-      const list = await base44.entities.Militar.filter({ id });
-      return list[0] || null;
-    },
+    queryFn: async () => { const list = await base44.entities.Militar.filter({ id }); return list[0] || null; },
+    enabled: !!id
+  });
+
+  const { data: ferias = [] } = useQuery({
+    queryKey: ['ver-ferias', id],
+    queryFn: () => base44.entities.Ferias.filter({ militar_id: id }, '-data_inicio'),
+    enabled: !!id
+  });
+
+  const { data: atestados = [] } = useQuery({
+    queryKey: ['ver-atestados', id],
+    queryFn: () => base44.entities.Atestado.filter({ militar_id: id }, '-data_inicio'),
+    enabled: !!id
+  });
+
+  const { data: medalhas = [] } = useQuery({
+    queryKey: ['ver-medalhas', id],
+    queryFn: () => base44.entities.Medalha.filter({ militar_id: id }, '-data_indicacao'),
+    enabled: !!id
+  });
+
+  const { data: armamentos = [] } = useQuery({
+    queryKey: ['ver-armamentos', id],
+    queryFn: () => base44.entities.Armamento.filter({ militar_id: id }),
+    enabled: !!id
+  });
+
+  const { data: periodos = [] } = useQuery({
+    queryKey: ['ver-periodos', id],
+    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
     enabled: !!id
   });
 
@@ -88,31 +101,23 @@ export default function VerMilitar() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-slate-500 mb-4">Militar não encontrado</p>
-          <Button onClick={() => navigate(createPageUrl('Militares'))}>
-            Voltar
-          </Button>
+          <Button onClick={() => navigate(createPageUrl('Militares'))}>Voltar</Button>
         </div>
       </div>
     );
   }
 
-  const formatDate = (date) => {
-    if (!date) return null;
-    return format(new Date(date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-  };
+  const statusColors = { 'Ativo': 'bg-emerald-100 text-emerald-700', 'Inativo': 'bg-slate-100 text-slate-700' };
+  const medalhaStatusColor = { 'Indicado': 'bg-yellow-100 text-yellow-700', 'Concedido': 'bg-green-100 text-green-700', 'Negado': 'bg-red-100 text-red-700' };
+  const armStatusColor = { 'Ativo': 'bg-green-100 text-green-700', 'Vendido': 'bg-blue-100 text-blue-700', 'Extraviado': 'bg-orange-100 text-orange-700', 'Furtado': 'bg-red-100 text-red-700', 'Baixado': 'bg-slate-100 text-slate-700' };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(createPageUrl('Militares'))}
-              className="hover:bg-slate-200"
-            >
+            <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('Militares'))} className="hover:bg-slate-200">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
@@ -120,12 +125,8 @@ export default function VerMilitar() {
               <p className="text-slate-500 text-sm">Visualização completa dos dados</p>
             </div>
           </div>
-          <Button
-            onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)}
-            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-          >
-            <Pencil className="w-4 h-4 mr-2" />
-            Editar
+          <Button onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+            <Pencil className="w-4 h-4 mr-2" />Editar
           </Button>
         </div>
 
@@ -133,7 +134,7 @@ export default function VerMilitar() {
         <Card className="shadow-sm mb-6 overflow-hidden">
           <div className="bg-gradient-to-r from-[#1e3a5f] to-[#2d4a6f] p-6 text-white">
             <div className="flex flex-col md:flex-row gap-6 items-start">
-              <div className="w-32 h-40 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
+              <div className="w-28 h-36 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
                 {militar.foto ? (
                   <img src={militar.foto} alt={militar.nome_completo} className="w-full h-full object-cover" />
                 ) : (
@@ -144,34 +145,25 @@ export default function VerMilitar() {
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <Badge className={statusColors[militar.status_cadastro] || statusColors['Ativo']}>
+                  <Badge className={statusColors[militar.status_cadastro] || 'bg-emerald-100 text-emerald-700'}>
                     {militar.status_cadastro || 'Ativo'}
                   </Badge>
-                  {militar.condicao && (
-                    <Badge variant="outline" className="border-white/30 text-white">
-                      {militar.condicao}
-                    </Badge>
-                  )}
+                  {militar.condicao && <Badge variant="outline" className="border-white/30 text-white">{militar.condicao}</Badge>}
                 </div>
                 <h2 className="text-2xl font-bold mb-1">
                   {militar.posto_graduacao && `${militar.posto_graduacao} `}
                   {militar.nome_guerra || militar.nome_completo}
                 </h2>
-                {militar.nome_guerra && (
-                  <p className="text-white/80">{militar.nome_completo}</p>
-                )}
-                <div className="flex flex-wrap gap-4 mt-4 text-sm text-white/80">
-                  {militar.matricula && <span>Matrícula: {militar.matricula}</span>}
+                {militar.nome_guerra && <p className="text-white/80">{militar.nome_completo}</p>}
+                <div className="flex flex-wrap gap-4 mt-3 text-sm text-white/80">
+                  {militar.matricula && <span>Mat: {militar.matricula}</span>}
                   {militar.quadro && <span>Quadro: {militar.quadro}</span>}
                   {militar.lotacao && <span>Lotação: {militar.lotacao}</span>}
+                  {militar.funcao && <span>Função: {militar.funcao}</span>}
                 </div>
-                {militar.funcoes && militar.funcoes.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {militar.funcoes.map((funcao, idx) => (
-                      <Badge key={idx} className="bg-white/20 text-white hover:bg-white/30">
-                        {funcao}
-                      </Badge>
-                    ))}
+                {militar.comportamento && !['Coronel','Tenente Coronel','Major','Capitão','1º Tenente','2º Tenente','Aspirante'].includes(militar.posto_graduacao) && (
+                  <div className="mt-2">
+                    <Badge className="bg-white/20 text-white border border-white/30">Comportamento: {militar.comportamento}</Badge>
                   </div>
                 )}
               </div>
@@ -179,132 +171,202 @@ export default function VerMilitar() {
           </div>
         </Card>
 
-        {/* Content Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Dados Funcionais */}
-          <Section title="Dados Funcionais" icon={Briefcase}>
-            <div className="grid grid-cols-2 gap-x-4">
-              <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
-              <InfoItem label="Matrícula" value={militar.matricula} />
-              <InfoItem label="Posto/Graduação" value={militar.posto_graduacao} />
-              <InfoItem label="Quadro" value={militar.quadro} />
-              <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
-              <InfoItem label="Comportamento" value={militar.comportamento} />
-              <InfoItem label="Condição" value={militar.condicao} />
-              <InfoItem label="Cedência" value={militar.cedencia} />
-              <InfoItem label="Origem/Destino" value={militar.origem_destino} />
-            </div>
-          </Section>
+        {/* Tabs */}
+        <Tabs defaultValue="dados">
+          <TabsList className="w-full flex-wrap h-auto gap-1 mb-6">
+            <TabsTrigger value="dados"><User className="w-4 h-4 mr-1" />Dados Pessoais</TabsTrigger>
+            <TabsTrigger value="ferias"><Calendar className="w-4 h-4 mr-1" />Férias</TabsTrigger>
+            <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
+            <TabsTrigger value="medalhas"><Award className="w-4 h-4 mr-1" />Medalhas</TabsTrigger>
+            <TabsTrigger value="armamentos"><Shield className="w-4 h-4 mr-1" />Armamentos</TabsTrigger>
+          </TabsList>
 
           {/* Dados Pessoais */}
-          <Section title="Dados Pessoais" icon={User}>
-            <div className="grid grid-cols-2 gap-x-4">
-              <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
-              <InfoItem label="Sexo" value={militar.sexo} />
-              <InfoItem label="Estado Civil" value={militar.estado_civil} />
-              <InfoItem label="Tipo Sanguíneo" value={militar.tipo_sanguineo} />
-              <InfoItem label="Religião" value={militar.religiao} />
-              <InfoItem label="Escolaridade" value={militar.escolaridade} />
-              <InfoItem label="Naturalidade" value={militar.naturalidade} />
-              <InfoItem label="UF Naturalidade" value={militar.naturalidade_uf} />
-              <InfoItem label="Etnia" value={militar.etnia} />
-            </div>
-          </Section>
-
-          {/* Filiação */}
-          <Section title="Filiação" icon={Heart}>
-            <div className="grid grid-cols-2 gap-x-4">
-              <InfoItem label="Nome do Pai" value={militar.nome_pai} />
-              <InfoItem label="Nome da Mãe" value={militar.nome_mae} />
-            </div>
-          </Section>
-
-          {/* Documentos */}
-          <Section title="Documentos" icon={FileText}>
-            <div className="grid grid-cols-2 gap-x-4">
-              <InfoItem label="CPF" value={militar.cpf} />
-              <InfoItem label="RG" value={militar.rg} />
-              <InfoItem label="Órgão Expedidor" value={militar.orgao_expedidor_rg} />
-              <InfoItem label="UF RG" value={militar.uf_rg} />
-              <InfoItem label="CNH Categoria" value={militar.cnh_categoria} />
-              <InfoItem label="CNH Número" value={militar.cnh_numero} />
-              <InfoItem label="Validade CNH" value={formatDate(militar.cnh_validade)} icon={Calendar} />
-            </div>
-          </Section>
-
-          {/* Dados Bancários */}
-          <Section title="Dados Bancários" icon={CreditCard}>
-            <div className="grid grid-cols-3 gap-x-4">
-              <InfoItem label="Banco" value={militar.banco} />
-              <InfoItem label="Agência" value={militar.agencia} />
-              <InfoItem label="Conta" value={militar.conta} />
-            </div>
-          </Section>
-
-          {/* Contatos */}
-          <Section title="Contatos" icon={Phone}>
-            <div className="grid grid-cols-2 gap-x-4">
-              <InfoItem label="Telefone" value={militar.telefone} icon={Phone} />
-              <InfoItem label="Email Particular" value={militar.email_particular} icon={Mail} />
-              <InfoItem label="Email Funcional" value={militar.email_funcional} icon={Mail} />
-            </div>
-          </Section>
-
-          {/* Dados Antropométricos */}
-          <Section title="Dados Antropométricos" icon={User}>
-            <div className="grid grid-cols-3 gap-x-4">
-              <InfoItem label="Altura" value={militar.altura ? `${militar.altura} m` : null} />
-              <InfoItem label="Peso" value={militar.peso ? `${militar.peso} kg` : null} />
-              <InfoItem label="Etnia" value={militar.etnia} />
-            </div>
-          </Section>
-
-          {/* Endereço */}
-          <Section title="Endereço" icon={MapPin}>
-            <div className="grid grid-cols-2 gap-x-4">
-              <InfoItem 
-                label="Endereço" 
-                value={militar.logradouro ? `${militar.logradouro}, ${militar.numero_endereco || 'S/N'}` : null} 
-                icon={MapPin} 
-              />
-              <InfoItem label="Complemento" value={militar.complemento} />
-              <InfoItem label="Bairro" value={militar.bairro} />
-              <InfoItem label="CEP" value={militar.cep} />
-              <InfoItem label="Cidade" value={militar.cidade} />
-              <InfoItem label="UF" value={militar.uf} />
-            </div>
-          </Section>
-
-          {/* Habilidades e Cursos */}
-          {(militar.habilidades?.length > 0 || militar.cursos?.length > 0) && (
-            <Section title="Habilidades e Cursos" icon={GraduationCap}>
+          <TabsContent value="dados">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Section title="Dados Funcionais" icon={Briefcase}>
+                <div className="grid grid-cols-2 gap-x-4">
+                  <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
+                  <InfoItem label="Matrícula" value={militar.matricula} />
+                  <InfoItem label="Posto/Graduação" value={militar.posto_graduacao} />
+                  <InfoItem label="Quadro" value={militar.quadro} />
+                  <InfoItem label="Situação" value={militar.situacao_militar} />
+                  <InfoItem label="Condição" value={militar.condicao} />
+                  <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
+                  {militar.destino && <InfoItem label="Destino/Cedência" value={militar.destino} />}
+                </div>
+              </Section>
+              <Section title="Dados Pessoais" icon={User}>
+                <div className="grid grid-cols-2 gap-x-4">
+                  <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
+                  <InfoItem label="Sexo" value={militar.sexo} />
+                  <InfoItem label="Estado Civil" value={militar.estado_civil} />
+                  <InfoItem label="Tipo Sanguíneo" value={militar.tipo_sanguineo} />
+                  <InfoItem label="Religião" value={militar.religiao} />
+                  <InfoItem label="Escolaridade" value={militar.escolaridade} />
+                  <InfoItem label="Naturalidade" value={militar.naturalidade} />
+                  <InfoItem label="UF Naturalidade" value={militar.naturalidade_uf} />
+                </div>
+              </Section>
+              <Section title="Filiação" icon={Heart}>
+                <div className="grid grid-cols-2 gap-x-4">
+                  <InfoItem label="Nome do Pai" value={militar.nome_pai} />
+                  <InfoItem label="Nome da Mãe" value={militar.nome_mae} />
+                </div>
+              </Section>
+              <Section title="Documentos" icon={FileText}>
+                <div className="grid grid-cols-2 gap-x-4">
+                  <InfoItem label="CPF" value={militar.cpf} />
+                  <InfoItem label="RG" value={militar.rg} />
+                  <InfoItem label="Órgão Expedidor" value={militar.orgao_expedidor_rg} />
+                  <InfoItem label="UF RG" value={militar.uf_rg} />
+                  <InfoItem label="CNH Categoria" value={militar.cnh_categoria} />
+                  <InfoItem label="Validade CNH" value={formatDate(militar.cnh_validade)} icon={Calendar} />
+                </div>
+              </Section>
+              <Section title="Contatos" icon={Phone}>
+                <div className="grid grid-cols-2 gap-x-4">
+                  <InfoItem label="Telefone" value={militar.telefone} icon={Phone} />
+                  <InfoItem label="Email Particular" value={militar.email_particular} icon={Mail} />
+                  <InfoItem label="Email Funcional" value={militar.email_funcional} icon={Mail} />
+                </div>
+              </Section>
+              <Section title="Dados Bancários" icon={CreditCard}>
+                <div className="grid grid-cols-3 gap-x-4">
+                  <InfoItem label="Banco" value={militar.banco} />
+                  <InfoItem label="Agência" value={militar.agencia} />
+                  <InfoItem label="Conta" value={militar.conta} />
+                </div>
+              </Section>
+              <Section title="Endereço" icon={MapPin}>
+                <div className="grid grid-cols-2 gap-x-4">
+                  <InfoItem label="Endereço" value={militar.logradouro ? `${militar.logradouro}, ${militar.numero_endereco || 'S/N'}` : null} icon={MapPin} />
+                  <InfoItem label="Bairro" value={militar.bairro} />
+                  <InfoItem label="CEP" value={militar.cep} />
+                  <InfoItem label="Cidade/UF" value={militar.cidade ? `${militar.cidade}/${militar.uf}` : null} />
+                </div>
+              </Section>
               {militar.habilidades?.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs text-slate-500 mb-2">Habilidades</p>
+                <Section title="Habilidades" icon={GraduationCap}>
                   <div className="flex flex-wrap gap-2">
-                    {militar.habilidades.map((h, idx) => (
-                      <Badge key={idx} variant="secondary" className="bg-[#1e3a5f]/10 text-[#1e3a5f]">
-                        {h}
-                      </Badge>
+                    {militar.habilidades.map((h, i) => (
+                      <Badge key={i} className="bg-[#1e3a5f]/10 text-[#1e3a5f]">{h}</Badge>
                     ))}
                   </div>
-                </div>
+                </Section>
               )}
-              {militar.cursos?.length > 0 && (
-                <div>
-                  <p className="text-xs text-slate-500 mb-2">Cursos</p>
-                  <div className="flex flex-wrap gap-2">
-                    {militar.cursos.map((c, idx) => (
-                      <Badge key={idx} variant="outline">
-                        {c}
-                      </Badge>
-                    ))}
+            </div>
+          </TabsContent>
+
+          {/* Férias */}
+          <TabsContent value="ferias">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-slate-700">Períodos Aquisitivos e Férias</h3>
+              </div>
+              {periodos.length === 0 && ferias.length === 0 ? (
+                <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+                  <Calendar className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                  <p className="text-slate-500">Nenhum registro de férias</p>
+                </div>
+              ) : (
+                <>
+                  {periodos.filter(p => p.status !== 'Inativo').map(p => (
+                    <div key={p.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-slate-800">{p.ano_referencia}</span>
+                        <Badge className={p.status === 'Gozado' ? 'bg-green-100 text-green-700' : p.status === 'Vencido' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}>
+                          {p.status}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        {formatDate(p.inicio_aquisitivo)} a {formatDate(p.fim_aquisitivo)} · Limite: {formatDate(p.data_limite_gozo)} · {p.dias_gozados || 0}/{p.dias_direito || 30} dias gozados
+                      </p>
+                      {ferias.filter(f => f.periodo_aquisitivo_id === p.id).map(f => (
+                        <div key={f.id} className="mt-2 ml-4 p-2 bg-slate-50 rounded-lg text-xs">
+                          <span className="font-medium">Fração: {f.dias} dias</span> — {formatDate(f.data_inicio)} a {formatDate(f.data_fim)}
+                          {f.fracionamento && <span className="text-slate-500 ml-2">({f.fracionamento})</span>}
+                          <Badge className="ml-2 text-xs" variant="outline">{f.status}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Atestados */}
+          <TabsContent value="atestados">
+            <div className="space-y-3">
+              {atestados.length === 0 ? (
+                <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+                  <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                  <p className="text-slate-500">Nenhum atestado registrado</p>
+                </div>
+              ) : atestados.map(a => (
+                <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium text-slate-800">{a.tipo_afastamento}</span>
+                      {a.cid_10 && <span className="text-xs text-slate-500 ml-2">CID: {a.cid_10}</span>}
+                    </div>
+                    <Badge className={a.status === 'Ativo' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}>{a.status}</Badge>
                   </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {formatDate(a.data_inicio)} — {a.dias} dias — Dr(a). {a.medico || '—'}
+                  </p>
                 </div>
-              )}
-            </Section>
-          )}
-        </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Medalhas */}
+          <TabsContent value="medalhas">
+            <div className="space-y-3">
+              {medalhas.length === 0 ? (
+                <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+                  <Award className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                  <p className="text-slate-500">Nenhuma medalha registrada</p>
+                </div>
+              ) : medalhas.filter(m => m.status === 'Concedido').map(m => (
+                <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-800">{m.tipo_medalha_nome}</span>
+                    <Badge className={medalhaStatusColor[m.status] || ''}>{m.status}</Badge>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Indicação: {formatDate(m.data_indicacao)} · Concessão: {formatDate(m.data_concessao) || '—'}
+                    {m.documento_referencia && ` · ${m.documento_referencia}`}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Armamentos */}
+          <TabsContent value="armamentos">
+            <div className="space-y-3">
+              {armamentos.length === 0 ? (
+                <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+                  <Shield className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                  <p className="text-slate-500">Nenhum armamento registrado</p>
+                </div>
+              ) : armamentos.map(a => (
+                <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-800">{a.tipo} — {a.marca || ''} {a.calibre}</span>
+                    <Badge className={armStatusColor[a.status] || ''}>{a.status}</Badge>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Série: {a.numero_serie} {a.numero_sigma ? `· SIGMA: ${a.numero_sigma}` : ''}
+                    {a.data_expedicao ? ` · Expedição: ${formatDate(a.data_expedicao)}` : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

@@ -1,40 +1,53 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Save, ArrowLeft, Calendar, User as UserIcon, FileText } from 'lucide-react';
+import { Save, ArrowLeft, Calendar, User as UserIcon, Plus, Trash2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
-import { addDays, format } from 'date-fns';
+import { addDays, format, addYears } from 'date-fns';
 
 import FormSection from '@/components/militar/FormSection';
 import FormField from '@/components/militar/FormField';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
-import DateCalculator from '@/components/atestado/DateCalculator';
+
+// Gera opções de período aquisitivo: ano corrente + 1 próximo
+const gerarOpcoesAnos = () => {
+  const anoAtual = new Date().getFullYear();
+  const opcoes = [];
+  for (let ano = anoAtual - 15; ano <= anoAtual + 1; ano++) {
+    opcoes.push(`${ano}/${ano + 1}`);
+  }
+  return opcoes.reverse();
+};
+
+// Fracoes válidas: 10 ou 20 dias, soma = 30
+const OPCOES_FRACOES = [
+  { label: '1 fração de 30 dias', fracoes: [30] },
+  { label: '2 frações: 20 + 10', fracoes: [20, 10] },
+  { label: '2 frações: 10 + 20', fracoes: [10, 20] },
+  { label: '3 frações: 10 + 10 + 10', fracoes: [10, 10, 10] },
+];
+
+const calcularFim = (inicio, dias) => {
+  if (!inicio || !dias) return '';
+  const d = addDays(new Date(inicio + 'T00:00:00'), dias - 1);
+  return format(d, 'yyyy-MM-dd');
+};
+const calcularRetorno = (inicio, dias) => {
+  if (!inicio || !dias) return '';
+  const d = addDays(new Date(inicio + 'T00:00:00'), dias);
+  return format(d, 'yyyy-MM-dd');
+};
 
 const initialFormData = {
-  militar_id: '',
-  militar_nome: '',
-  militar_posto: '',
-  militar_matricula: '',
-  periodo_aquisitivo_id: '',
-  periodo_aquisitivo_ref: '',
-  plano_ferias_id: '',
-  tipo: 'Férias Regulares',
-  data_inicio: '',
-  data_fim: '',
-  data_retorno: '',
-  dias: 30,
-  fracionamento: '',
-  status: 'Prevista',
-  bg_publicacao: '',
-  data_bg: '',
-  substituto_id: '',
-  substituto_nome: '',
-  observacoes: ''
+  militar_id: '', militar_nome: '', militar_posto: '', militar_matricula: '',
+  periodo_aquisitivo_id: '', periodo_aquisitivo_ref: '',
+  status: 'Prevista', observacoes: ''
 };
 
 export default function CadastrarFerias() {
@@ -45,20 +58,24 @@ export default function CadastrarFerias() {
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
+  const [opcaoFracao, setOpcaoFracao] = useState(0);
+  const [fracoes, setFracoes] = useState([{ dias: 30, data_inicio: '', data_fim: '', data_retorno: '' }]);
 
-  // Carregar períodos aquisitivos disponíveis do militar selecionado
-  const { data: periodosDisponiveis = [] } = useQuery({
-    queryKey: ['periodos-disponiveis', formData.militar_id],
-    queryFn: async () => {
-      if (!formData.militar_id) return [];
-      const periodos = await base44.entities.PeriodoAquisitivo.filter({ 
-        militar_id: formData.militar_id 
-      }, '-inicio_aquisitivo');
-      return periodos.filter(p => p.status !== 'Gozado' && p.status !== 'Vencido');
-    },
+  // Carregar férias existentes do militar para validação
+  const { data: feriasExistentes = [] } = useQuery({
+    queryKey: ['ferias-existentes', formData.militar_id],
+    queryFn: () => base44.entities.Ferias.filter({ militar_id: formData.militar_id }),
     enabled: !!formData.militar_id
   });
 
+  // Períodos aquisitivos existentes do militar
+  const { data: periodosExistentes = [] } = useQuery({
+    queryKey: ['periodos-existentes', formData.militar_id],
+    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: formData.militar_id }),
+    enabled: !!formData.militar_id
+  });
+
+  // Carregar férias para edição
   const { data: editingFerias, isLoading: loadingEdit } = useQuery({
     queryKey: ['ferias', editId],
     queryFn: async () => {
@@ -72,63 +89,118 @@ export default function CadastrarFerias() {
   React.useEffect(() => {
     if (editingFerias) {
       setFormData({ ...initialFormData, ...editingFerias });
+      setFracoes([{
+        dias: editingFerias.dias || 30,
+        data_inicio: editingFerias.data_inicio || '',
+        data_fim: editingFerias.data_fim || '',
+        data_retorno: editingFerias.data_retorno || ''
+      }]);
     }
   }, [editingFerias]);
 
-  // Calcular datas automaticamente
-  React.useEffect(() => {
-    if (formData.data_inicio && formData.dias && formData.dias > 0) {
-      const inicio = new Date(formData.data_inicio + 'T00:00:00');
-      const fim = addDays(inicio, formData.dias - 1);
-      const retorno = addDays(inicio, formData.dias);
-      
-      setFormData(prev => ({
-        ...prev,
-        data_fim: format(fim, 'yyyy-MM-dd'),
-        data_retorno: format(retorno, 'yyyy-MM-dd')
-      }));
-    }
-  }, [formData.data_inicio, formData.dias]);
-
-  const handleChange = (name, value) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const handleChange = (name, value) => setFormData(prev => ({ ...prev, [name]: value }));
 
   const handleMilitarSelect = (militarData) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      ...militarData,
-      periodo_aquisitivo_id: '', // Reset período quando trocar militar
-      periodo_aquisitivo_ref: ''
+    setFormData(prev => ({ ...prev, ...militarData, periodo_aquisitivo_id: '', periodo_aquisitivo_ref: '' }));
+  };
+
+  const handleOpcaoFracao = (idx) => {
+    setOpcaoFracao(idx);
+    const novasFracoes = OPCOES_FRACOES[idx].fracoes.map(d => ({ dias: d, data_inicio: '', data_fim: '', data_retorno: '' }));
+    setFracoes(novasFracoes);
+  };
+
+  const handleFracaoChange = (i, field, value) => {
+    setFracoes(prev => {
+      const updated = [...prev];
+      updated[i] = { ...updated[i], [field]: value };
+      if (field === 'data_inicio' || field === 'dias') {
+        const inicio = field === 'data_inicio' ? value : updated[i].data_inicio;
+        const dias = field === 'dias' ? value : updated[i].dias;
+        updated[i].data_fim = calcularFim(inicio, dias);
+        updated[i].data_retorno = calcularRetorno(inicio, dias);
+      }
+      return updated;
+    });
+  };
+
+  const handlePeriodoChange = (ref) => {
+    const periodoExistente = periodosExistentes.find(p => p.ano_referencia === ref);
+    setFormData(prev => ({
+      ...prev,
+      periodo_aquisitivo_ref: ref,
+      periodo_aquisitivo_id: periodoExistente?.id || ''
     }));
   };
 
-  const handlePeriodoChange = (periodoId) => {
-    const periodo = periodosDisponiveis.find(p => p.id === periodoId);
-    if (periodo) {
-      setFormData(prev => ({
-        ...prev,
-        periodo_aquisitivo_id: periodoId,
-        periodo_aquisitivo_ref: periodo.ano_referencia
-      }));
-    }
-  };
+  // Verificar duplicidade de período
+  const periodosJaCadastrados = feriasExistentes
+    .filter(f => !editId || f.id !== editId)
+    .map(f => f.periodo_aquisitivo_ref);
+
+  const opcaoAnos = gerarOpcoesAnos().filter(ano => !periodosJaCadastrados.includes(ano));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.militar_id || !formData.periodo_aquisitivo_ref) return;
     setLoading(true);
 
-    const dataToSave = {
-      ...formData,
-      dias: formData.dias ? parseInt(formData.dias) : 0
-    };
-
+    // Se é edição, atualizar registro único
     if (editId) {
-      await base44.entities.Ferias.update(editId, dataToSave);
+      const f = fracoes[0];
+      await base44.entities.Ferias.update(editId, {
+        ...formData,
+        dias: f.dias,
+        data_inicio: f.data_inicio,
+        data_fim: f.data_fim,
+        data_retorno: f.data_retorno,
+        fracionamento: fracoes.length > 1 ? `${fracoes.indexOf(f) + 1}ª fração de ${f.dias} dias` : ''
+      });
     } else {
-      await base44.entities.Ferias.create(dataToSave);
+      // Criar uma fração por registro
+      for (let i = 0; i < fracoes.length; i++) {
+        const f = fracoes[i];
+        const fracionamento = fracoes.length > 1 ? `${i + 1}ª fração de ${f.dias} dias` : '';
+        await base44.entities.Ferias.create({
+          ...formData,
+          dias: f.dias,
+          data_inicio: f.data_inicio,
+          data_fim: f.data_fim,
+          data_retorno: f.data_retorno,
+          fracionamento
+        });
+      }
+
+      // Criar ou atualizar período aquisitivo se não existir
+      if (!formData.periodo_aquisitivo_id) {
+        const partes = formData.periodo_aquisitivo_ref.split('/');
+        const anoInicio = parseInt(partes[0]);
+        const anoFim = parseInt(partes[1]);
+        const militar = await base44.entities.Militar.filter({ id: formData.militar_id });
+        const m = militar[0];
+        if (m) {
+          const dataInclusao = new Date((m.data_inclusao || `${anoInicio}-01-01`) + 'T00:00:00');
+          const diaAniversario = format(dataInclusao, 'MM-dd');
+          const inicio = `${anoInicio}-${diaAniversario}`;
+          const fim = format(addDays(new Date(`${anoFim}-${diaAniversario}T00:00:00`), -1), 'yyyy-MM-dd');
+          const limite = format(addYears(new Date(fim + 'T00:00:00'), 2), 'yyyy-MM-dd');
+          await base44.entities.PeriodoAquisitivo.create({
+            militar_id: formData.militar_id,
+            militar_nome: formData.militar_nome,
+            militar_posto: formData.militar_posto,
+            militar_matricula: formData.militar_matricula,
+            inicio_aquisitivo: inicio,
+            fim_aquisitivo: fim,
+            data_limite_gozo: limite,
+            dias_direito: 30,
+            dias_gozados: 0,
+            status: 'Disponível',
+            ano_referencia: formData.periodo_aquisitivo_ref
+          });
+        }
+      }
     }
-    
+
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
     setLoading(false);
@@ -145,178 +217,125 @@ export default function CadastrarFerias() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Header */}
+      <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(createPageUrl('Ferias'))}
-              className="hover:bg-slate-200"
-            >
+            <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('Ferias'))} className="hover:bg-slate-200">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">
-                {editId ? 'Editar Férias' : 'Cadastrar Férias'}
-              </h1>
-              <p className="text-slate-500 text-sm">
-                Registrar concessão de férias
-              </p>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">{editId ? 'Editar Férias' : 'Cadastrar Férias'}</h1>
+              <p className="text-slate-500 text-sm">Registrar concessão de férias</p>
             </div>
           </div>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !formData.militar_id || !formData.periodo_aquisitivo_id || !formData.data_inicio}
+            disabled={loading || !formData.militar_id || !formData.periodo_aquisitivo_ref || fracoes.some(f => !f.data_inicio)}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-6"
           >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-            ) : (
-              <Save className="w-5 h-5 mr-2" />
-            )}
+            {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
             Salvar
           </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Militar */}
           <FormSection title="Militar" icon={UserIcon} defaultOpen={true}>
-            <MilitarSelector
-              value={formData.militar_id}
-              onChange={handleChange}
-              onMilitarSelect={handleMilitarSelect}
-            />
+            <MilitarSelector value={formData.militar_id} onChange={handleChange} onMilitarSelect={handleMilitarSelect} />
           </FormSection>
 
-          {/* Período Aquisitivo */}
           {formData.militar_id && (
-            <FormSection title="Período Aquisitivo" icon={Calendar}>
-              <div className="space-y-4">
-                {periodosDisponiveis.length > 0 ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-slate-700">
-                        Selecione o Período <span className="text-red-500">*</span>
-                      </Label>
-                      <Select value={formData.periodo_aquisitivo_id} onValueChange={handlePeriodoChange}>
-                        <SelectTrigger className="h-10 border-slate-200">
-                          <SelectValue placeholder="Escolha o período aquisitivo..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {periodosDisponiveis.map((periodo) => (
-                            <SelectItem key={periodo.id} value={periodo.id}>
-                              {periodo.ano_referencia} - {periodo.dias_direito - (periodo.dias_gozados || 0)} dias disponíveis
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <p className="text-sm text-slate-500">
-                      💡 Selecionado automaticamente o período aquisitivo mais antigo disponível
-                    </p>
-                  </>
-                ) : (
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-sm text-amber-700">
-                      Nenhum período aquisitivo disponível para este militar.
-                    </p>
-                  </div>
+            <FormSection title="Período Aquisitivo" icon={Calendar} defaultOpen={true}>
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-slate-700">Selecione o Período <span className="text-red-500">*</span></Label>
+                <Select value={formData.periodo_aquisitivo_ref} onValueChange={handlePeriodoChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Escolha o período aquisitivo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {opcaoAnos.map(ano => (
+                      <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.periodo_aquisitivo_ref && periodosJaCadastrados.includes(formData.periodo_aquisitivo_ref) && (
+                  <p className="text-xs text-red-500">⚠ Já existe férias cadastradas para este período.</p>
                 )}
               </div>
             </FormSection>
           )}
 
-          {/* Dados das Férias */}
-          <FormSection title="Dados das Férias" icon={FileText}>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  label="Tipo"
-                  name="tipo"
-                  value={formData.tipo}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Férias Regulares', 'Férias Prêmio', 'Recesso', 'Abono Pecuniário']}
-                />
-                <FormField
-                  label="Status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Prevista', 'Autorizada', 'Em Curso', 'Gozada', 'Interrompida', 'Cancelada']}
-                />
-              </div>
+          {formData.militar_id && formData.periodo_aquisitivo_ref && (
+            <>
+              {!editId && (
+                <FormSection title="Fracionamento" icon={Calendar} defaultOpen={true}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {OPCOES_FRACOES.map((op, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleOpcaoFracao(i)}
+                        className={`p-3 rounded-lg border text-sm text-left transition-all ${opcaoFracao === i ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 text-[#1e3a5f] font-medium' : 'border-slate-200 hover:border-slate-300'}`}
+                      >
+                        {op.label}
+                      </button>
+                    ))}
+                  </div>
+                </FormSection>
+              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <FormField
-                  label="Data de Início"
-                  name="data_inicio"
-                  value={formData.data_inicio}
-                  onChange={handleChange}
-                  type="date"
-                  required
-                />
-                <FormField
-                  label="Quantidade de Dias"
-                  name="dias"
-                  value={formData.dias}
-                  onChange={handleChange}
-                  type="number"
-                  required
-                />
-                <FormField
-                  label="Data de Retorno"
-                  name="data_retorno"
-                  value={formData.data_retorno}
-                  onChange={handleChange}
-                  type="date"
-                />
-              </div>
+              {fracoes.map((f, i) => (
+                <div key={i} className="bg-white rounded-xl border border-slate-200 p-6">
+                  <h3 className="text-base font-semibold text-[#1e3a5f] mb-4">
+                    {fracoes.length > 1 ? `${i + 1}ª Fração — ${f.dias} dias` : `Férias — ${f.dias} dias`}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">Data de Início <span className="text-red-500">*</span></Label>
+                      <Input
+                        type="date"
+                        value={f.data_inicio}
+                        onChange={e => handleFracaoChange(i, 'data_inicio', e.target.value)}
+                        className="mt-1.5"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">Data de Fim</Label>
+                      <Input type="date" value={f.data_fim} disabled className="mt-1.5 bg-slate-50" />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700">Data de Retorno</Label>
+                      <Input type="date" value={f.data_retorno} disabled className="mt-1.5 bg-slate-50" />
+                    </div>
+                  </div>
+                </div>
+              ))}
 
-              <FormField
-                label="Fracionamento"
-                name="fracionamento"
-                value={formData.fracionamento}
-                onChange={handleChange}
-                placeholder="Ex: 1ª parcela de 20 dias"
-              />
-            </div>
-          </FormSection>
-
-          {/* Controle */}
-          <FormSection title="Controle e Publicação" icon={FileText}>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  label="BG"
-                  name="bg_publicacao"
-                  value={formData.bg_publicacao}
-                  onChange={handleChange}
-                  placeholder="Número do Boletim Geral"
-                />
-                <FormField
-                  label="Data do BG"
-                  name="data_bg"
-                  value={formData.data_bg}
-                  onChange={handleChange}
-                  type="date"
-                />
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-slate-700">Status</Label>
+                  <Select value={formData.status} onValueChange={v => handleChange('status', v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Prevista">Prevista</SelectItem>
+                      <SelectItem value="Em Curso">Em Curso</SelectItem>
+                      <SelectItem value="Gozada">Gozada</SelectItem>
+                      <SelectItem value="Interrompida">Interrompida</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Label className="text-sm font-medium text-slate-700 block mt-3">Observações</Label>
+                  <Textarea
+                    value={formData.observacoes}
+                    onChange={e => handleChange('observacoes', e.target.value)}
+                    placeholder="Observações sobre as férias..."
+                    className="min-h-20 border-slate-200"
+                  />
+                </div>
               </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-slate-700">Observações</Label>
-                <Textarea
-                  value={formData.observacoes}
-                  onChange={(e) => handleChange('observacoes', e.target.value)}
-                  placeholder="Observações sobre as férias..."
-                  className="min-h-24 border-slate-200"
-                />
-              </div>
-            </div>
-          </FormSection>
+            </>
+          )}
         </form>
       </div>
     </div>
