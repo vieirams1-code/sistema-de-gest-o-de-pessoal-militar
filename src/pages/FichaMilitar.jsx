@@ -109,12 +109,6 @@ export default function FichaMilitar() {
     enabled: !!militarId
   });
 
-  const { data: ferias = [] } = useQuery({
-    queryKey: ['ficha-ferias', militarId],
-    queryFn: () => base44.entities.Ferias.filter({ militar_id: militarId }),
-    enabled: !!militarId
-  });
-
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['ficha-livro', militarId],
     queryFn: () => base44.entities.RegistroLivro.filter({ militar_id: militarId }),
@@ -170,21 +164,6 @@ export default function FichaMilitar() {
         { label: 'CID-10', valor: a.cid_10 },
         { label: 'Status', valor: a.status },
         { label: 'Necessita JISO', valor: a.necessita_jiso ? 'Sim' : 'Não' },
-      ]
-    }));
-
-    ferias.forEach(f => lista.push({
-      tipo: 'ferias', data: f.data_inicio,
-      titulo: `Férias — ${f.tipo || 'Regulares'}`,
-      resumo: `${f.dias} dias • ${formatDate(f.data_inicio)} a ${formatDate(f.data_fim)}`,
-      subtipo: f.tipo,
-      detalhes: [
-        { label: 'Início', valor: formatDate(f.data_inicio) },
-        { label: 'Fim', valor: formatDate(f.data_fim) },
-        { label: 'Retorno', valor: formatDate(f.data_retorno) },
-        { label: 'Dias', valor: f.dias ? `${f.dias} dias` : null },
-        { label: 'Período', valor: f.periodo_aquisitivo_ref },
-        { label: 'Status', valor: f.status },
       ]
     }));
 
@@ -254,7 +233,7 @@ export default function FichaMilitar() {
       if (!b.data) return -1;
       return new Date(b.data) - new Date(a.data);
     });
-  }, [punicoes, atestados, ferias, registrosLivro, publicacoes, medalhas, historico]);
+  }, [punicoes, atestados, registrosLivro, publicacoes, medalhas, historico]);
 
   const eventosFiltrados = useMemo(() => {
     return eventos.filter(e => {

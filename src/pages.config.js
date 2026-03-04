@@ -62,6 +62,7 @@ import Configuracoes from './pages/Configuracoes';
 import DashboardAtestados from './pages/DashboardAtestados';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
+import FichaMilitar from './pages/FichaMilitar';
 import Home from './pages/Home';
 import Medalhas from './pages/Medalhas';
 import Militares from './pages/Militares';
@@ -72,7 +73,6 @@ import Punicoes from './pages/Punicoes';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
-import FichaMilitar from './pages/FichaMilitar';
 import __Layout from './Layout.jsx';
 
 
@@ -92,6 +92,7 @@ export const PAGES = {
     "DashboardAtestados": DashboardAtestados,
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
+    "FichaMilitar": FichaMilitar,
     "Home": Home,
     "Medalhas": Medalhas,
     "Militares": Militares,
@@ -102,7 +103,6 @@ export const PAGES = {
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
-    "FichaMilitar": FichaMilitar,
 }
 
 export const pagesConfig = {
