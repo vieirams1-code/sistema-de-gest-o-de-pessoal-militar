@@ -345,6 +345,31 @@ export default function VerAtestado() {
           )}
         </div>
 
+        {/* Histórico de Decisões JISO */}
+        {atestado.historico_jiso?.length > 0 && (
+          <div className="mt-6">
+            <Section title="Histórico de Decisões (Prorrogações / Cassações)" icon={History}>
+              <div className="space-y-3">
+                {atestado.historico_jiso.map((h, idx) => (
+                  <div key={idx} className={`p-3 rounded-lg border text-sm ${h.tipo === 'Prorrogação' ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`font-semibold ${h.tipo === 'Prorrogação' ? 'text-blue-700' : 'text-red-700'}`}>
+                        {h.tipo} de {h.dias_alterados} {h.dias_alterados === 1 ? 'dia' : 'dias'}
+                      </span>
+                      <span className="text-slate-500 text-xs">{formatShortDate(h.data_registro)}</span>
+                    </div>
+                    <p className="text-slate-700">{h.motivo}</p>
+                    <p className="text-slate-500 text-xs mt-1">
+                      Novo término: <span className="font-medium">{formatShortDate(h.nova_data_termino)}</span>
+                      {' · '}Novo retorno: <span className="font-medium">{formatShortDate(h.nova_data_retorno)}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          </div>
+        )}
+
         {/* Notas e Observações */}
         {(atestado.nota_para_bg || atestado.texto_publicacao || atestado.das_escusas || atestado.retorno || atestado.observacoes) && (
           <div className="grid grid-cols-1 gap-6 mt-6">
