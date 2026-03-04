@@ -10,7 +10,8 @@ import {
   Clock,
   AlertCircle,
   CheckCircle,
-  Shield
+  Shield,
+  History
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
+import JisoHistoricoModal from './JisoHistoricoModal';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',

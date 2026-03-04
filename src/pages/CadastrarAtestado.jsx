@@ -402,10 +402,10 @@ export default function CadastrarAtestado() {
                   value={formData.status}
                   onChange={handleChange}
                   type="select"
-                  options={['Ativo', 'Encerrado', 'Cancelado', 'Prorrogado']}
-                />
-                <FormField
-                  label="Status da Publicação"
+                  options={['Ativo', 'Encerrado']}
+                  />
+                  <FormField
+                     label="Status da Publicação"
                   name="status_publicacao"
                   value={formData.status_publicacao}
                   onChange={handleChange}
@@ -445,11 +445,11 @@ export default function CadastrarAtestado() {
                 value={formData.status}
                 onChange={handleChange}
                 type="select"
-                options={['Ativo', 'Encerrado', 'Cancelado', 'Prorrogado']}
-              />
-              <p className="text-sm text-slate-500 mt-2">
+                options={['Ativo', 'Encerrado']}
+                />
+                <p className="text-sm text-slate-500 mt-2">
                 A publicação deste atestado será gerenciada através da JISO.
-              </p>
+                </p>
             </FormSection>
           )}
 
