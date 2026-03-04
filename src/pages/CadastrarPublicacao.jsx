@@ -68,6 +68,26 @@ export default function CadastrarPublicacao() {
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
 
+  // Configs - comandante
+  const { data: configs = [] } = useQuery({
+    queryKey: ['config-unidade'],
+    queryFn: () => base44.entities.ConfiguracaoUnidade.list()
+  });
+  const { data: militaresAll = [] } = useQuery({
+    queryKey: ['militares-selector-pub'],
+    queryFn: () => base44.entities.Militar.list()
+  });
+  const comandanteConfig = configs.find(c => c.chave === 'comandante_id');
+  const comandante = militaresAll.find(m => m.id === comandanteConfig?.valor);
+  const artigo = comandante?.sexo === 'Feminino' ? 'A' : 'O';
+
+  // Atestados do militar para JISO / homologação
+  const { data: atestadosMilitar = [] } = useQuery({
+    queryKey: ['atestados-militar-pub', formData.militar_id],
+    queryFn: () => base44.entities.Atestado.filter({ militar_id: formData.militar_id }),
+    enabled: !!formData.militar_id
+  });
+
   const { data: publicacaoExistente, isLoading: loadingPublicacao } = useQuery({
     queryKey: ['publicacao-ex-officio', publicacaoId],
     queryFn: async () => {
