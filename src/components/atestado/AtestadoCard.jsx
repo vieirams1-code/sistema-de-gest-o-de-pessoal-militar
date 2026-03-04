@@ -38,6 +38,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [savingJiso, setSavingJiso] = useState(false);
+  const [showJisoModal, setShowJisoModal] = useState(false);
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
