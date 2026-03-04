@@ -212,7 +212,10 @@ export default function CadastrarPublicacao() {
     // Marcar atestados homologados para Ata JISO
     if (formData.tipo === 'Ata JISO' && formData.atestados_jiso_ids?.length) {
       for (const aid of formData.atestados_jiso_ids) {
-        await base44.entities.Atestado.update(aid, { encaminhado_jiso: true, status_publicacao: 'Publicado' });
+        await base44.entities.Atestado.update(aid, {
+          status_jiso: 'Homologado pela JISO',
+          status_publicacao: 'Publicado'
+        });
       }
     }
 
@@ -220,6 +223,7 @@ export default function CadastrarPublicacao() {
     if (formData.tipo === 'Homologação de Atestado' && formData.atestado_homologado_id) {
       await base44.entities.Atestado.update(formData.atestado_homologado_id, {
         homologado_comandante: true,
+        status_jiso: 'Homologado pelo Comandante',
         status_publicacao: 'Publicado'
       });
     }
