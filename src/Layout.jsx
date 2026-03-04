@@ -24,7 +24,7 @@ const navItems = [
   { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
   { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
   { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
-  { name: 'Ficha Militar', page: 'FichaMilitar', icon: Shield },
+  { name: 'Alterações Militar', page: 'FichaMilitar', icon: Shield },
   { name: 'Configurações', page: 'Configuracoes', icon: Menu },
 ];
 

@@ -65,7 +65,18 @@ export default function CadastrarRegistroLivro() {
   const [textoPublicacao, setTextoPublicacao] = useState('');
 
   const handleChange = (name, value) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'nota_para_bg' || name === 'numero_bg' || name === 'data_bg') {
+        const nota = name === 'nota_para_bg' ? value : updated.nota_para_bg;
+        const numBg = name === 'numero_bg' ? value : updated.numero_bg;
+        const dataBg = name === 'data_bg' ? value : updated.data_bg;
+        if (numBg && dataBg) updated.status = 'Publicado';
+        else if (nota) updated.status = 'Aguardando Publicação';
+        else updated.status = 'Aguardando Nota';
+      }
+      return updated;
+    });
   };
 
   const handleMilitarSelect = (militar) => {
@@ -1023,16 +1034,9 @@ export default function CadastrarRegistroLivro() {
               />
               <div>
                 <Label className="text-sm font-medium text-slate-700">Status</Label>
-                <Select value={formData.status} onValueChange={(v) => handleChange('status', v)}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                    <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                    <SelectItem value="Publicado">Publicado</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
+                  {formData.status || 'Aguardando Nota'}
+                </div>
               </div>
               <FormField
                 label="Número do BG"

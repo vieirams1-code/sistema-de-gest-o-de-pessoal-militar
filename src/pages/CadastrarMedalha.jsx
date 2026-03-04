@@ -55,6 +55,8 @@ export default function CadastrarMedalha() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const isConcedido = formData.status === 'Concedido';
+
   const handleTipoMedalhaChange = (tipoId) => {
     const tipo = tiposMedalha.find(t => t.id === tipoId);
     setFormData(prev => ({
@@ -172,14 +174,34 @@ export default function CadastrarMedalha() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2">
-                <FormField
-                  label="Documento de Referência"
-                  name="documento_referencia"
-                  value={formData.documento_referencia}
-                  onChange={handleChange}
-                />
-              </div>
+              {isConcedido && (
+                <>
+                  <FormField
+                    label="Boletim Geral / DOEMS"
+                    name="documento_referencia"
+                    value={formData.documento_referencia}
+                    onChange={handleChange}
+                    placeholder="Ex: BG nº 045/2025 ou DOEMS nº 001"
+                  />
+                  <FormField
+                    label="Data do BG/DOEMS"
+                    name="data_concessao"
+                    value={formData.data_concessao}
+                    onChange={handleChange}
+                    type="date"
+                  />
+                </>
+              )}
+              {!isConcedido && (
+                <div className="col-span-2">
+                  <FormField
+                    label="Documento de Referência"
+                    name="documento_referencia"
+                    value={formData.documento_referencia}
+                    onChange={handleChange}
+                  />
+                </div>
+              )}
               <div className="col-span-2">
                 <Label>Observações</Label>
                 <Textarea
