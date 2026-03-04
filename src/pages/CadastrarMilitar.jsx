@@ -71,6 +71,27 @@ const initialFormData = {
 
 const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
+const POSTOS_GRADUACOES = [
+  // Oficiais
+  { value: 'Coronel', label: 'Coronel (Cel)', grupo: 'Oficiais' },
+  { value: 'Tenente Coronel', label: 'Tenente Coronel (TC)', grupo: 'Oficiais' },
+  { value: 'Major', label: 'Major (Maj)', grupo: 'Oficiais' },
+  { value: 'Capitão', label: 'Capitão (Cap)', grupo: 'Oficiais' },
+  { value: '1º Tenente', label: '1º Tenente (1º Ten)', grupo: 'Oficiais' },
+  { value: '2º Tenente', label: '2º Tenente (2º Ten)', grupo: 'Oficiais' },
+  { value: 'Aspirante', label: 'Aspirante (Asp Of)', grupo: 'Oficiais' },
+  // Praças
+  { value: 'Subtenente', label: 'Subtenente (ST)', grupo: 'Praças' },
+  { value: '1º Sargento', label: '1º Sargento (1º Sgt)', grupo: 'Praças' },
+  { value: '2º Sargento', label: '2º Sargento (2º Sgt)', grupo: 'Praças' },
+  { value: '3º Sargento', label: '3º Sargento (3º Sgt)', grupo: 'Praças' },
+  { value: 'Cabo', label: 'Cabo (CB)', grupo: 'Praças' },
+  { value: 'Soldado', label: 'Soldado (SD)', grupo: 'Praças' },
+];
+
+const POSTOS_OFICIAIS = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'];
+const isOficial = (posto) => POSTOS_OFICIAIS.includes(posto);
+
 export default function CadastrarMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -272,14 +293,24 @@ export default function CadastrarMilitar() {
                 onChange={handleChange}
                 required
               />
-              <FormField
-                label="Posto/Graduação"
-                name="posto_graduacao"
-                value={formData.posto_graduacao}
-                onChange={handleChange}
-                type="select"
-                options={['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante', 'Subtenente', '1º Sargento', '2º Sargento', '3º Sargento', 'Cabo', 'Soldado']}
-              />
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Posto/Graduação</label>
+                <Select value={formData.posto_graduacao} onValueChange={(v) => handleChange('posto_graduacao', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_header_oficiais" disabled className="font-semibold text-slate-400 text-xs uppercase">— Oficiais —</SelectItem>
+                    {POSTOS_GRADUACOES.filter(p => p.grupo === 'Oficiais').map(p => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                    <SelectItem value="_header_pracas" disabled className="font-semibold text-slate-400 text-xs uppercase">— Praças —</SelectItem>
+                    {POSTOS_GRADUACOES.filter(p => p.grupo === 'Praças').map(p => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <FormField
                 label="Quadro"
                 name="quadro"
@@ -297,31 +328,37 @@ export default function CadastrarMilitar() {
               />
               <div className="space-y-1.5 md:col-span-2">
               <label className="text-sm font-medium text-slate-700">Comportamento</label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <FormField
-                    label=""
-                    name="comportamento"
-                    value={formData.comportamento}
-                    onChange={handleChange}
-                    type="select"
-                    options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
-                  />
+              {isOficial(formData.posto_graduacao) ? (
+                <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-400 text-sm italic">
+                  Não aplicável para Oficiais
                 </div>
-                {editId && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setHistoricoOpen(true)}
-                    className="flex-shrink-0 self-end h-10 w-10"
-                    title="Ver histórico de comportamento"
-                  >
-                    <History className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-              {formData.comportamento !== comportamentoOriginal && comportamentoOriginal !== null && (
+              ) : (
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <FormField
+                      label=""
+                      name="comportamento"
+                      value={formData.comportamento}
+                      onChange={handleChange}
+                      type="select"
+                      options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
+                    />
+                  </div>
+                  {editId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setHistoricoOpen(true)}
+                      className="flex-shrink-0 self-end h-10 w-10"
+                      title="Ver histórico de comportamento"
+                    >
+                      <History className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
+              {!isOficial(formData.posto_graduacao) && formData.comportamento !== comportamentoOriginal && comportamentoOriginal !== null && (
                 <div className="mt-2">
                   <label className="text-xs font-medium text-slate-600">Motivo da alteração <span className="text-red-500">*</span></label>
                   <input
