@@ -8,8 +8,7 @@ import {
   Home,
   UserPlus,
   Shield,
-  ChevronRight,
-  Calendar
+  ChevronRight
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,7 +20,6 @@ const navItems = [
   { name: 'Medalhas', page: 'Medalhas', icon: Shield },
   { name: 'Armamentos', page: 'Armamentos', icon: Shield },
   { name: 'Atestados', page: 'DashboardAtestados', icon: Shield },
-  { name: 'Agenda JISO', page: 'AgendarJISO', icon: Calendar },
   { name: 'Férias', page: 'Ferias', icon: Menu },
   { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
   { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
