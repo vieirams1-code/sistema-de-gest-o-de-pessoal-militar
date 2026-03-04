@@ -481,55 +481,69 @@ export default function CadastrarPublicacao() {
           </div>
         );
 
-      case 'Ata JISO':
+      case 'Ata JISO': {
+        const atestadosJISOPendentes = atestadosMilitar.filter(a => a.necessita_jiso && a.status === 'Ativo');
+        const selectedIds = formData.atestados_jiso_ids || [];
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">JISO</h3>
             <div className="space-y-4">
-              <FormField
-                label="Finalidade"
-                name="finalidade_jiso"
-                value={formData.finalidade_jiso}
-                onChange={handleChange}
-                type="select"
-                options={['V.A.F', 'LTS', 'Reserva Remunerada', 'Atestado de Origem']}
-                required
-              />
-              <FormField
-                label="Seção JISO"
-                name="secao_jiso"
-                value={formData.secao_jiso}
-                onChange={handleChange}
-                placeholder="62/JISO/2025"
-              />
-              <FormField
-                label="Data da Ata"
-                name="data_ata"
-                value={formData.data_ata}
-                onChange={handleChange}
-                type="date"
-                required
-              />
-              <FormField
-                label="NUP"
-                name="nup"
-                value={formData.nup}
-                onChange={handleChange}
-                placeholder="31.001.005-12"
-              />
+              <FormField label="Finalidade" name="finalidade_jiso" value={formData.finalidade_jiso} onChange={handleChange} type="select" options={['V.A.F', 'LTS', 'Reserva Remunerada', 'Atestado de Origem']} required />
+              <FormField label="Seção JISO" name="secao_jiso" value={formData.secao_jiso} onChange={handleChange} placeholder="62/JISO/2025" />
+              <FormField label="Data da Ata" name="data_ata" value={formData.data_ata} onChange={handleChange} type="date" required />
+              <FormField label="NUP" name="nup" value={formData.nup} onChange={handleChange} placeholder="31.001.005-12" />
               <div>
                 <Label>Parecer</Label>
-                <Textarea
-                  value={formData.parecer_jiso}
-                  onChange={(e) => handleChange('parecer_jiso', e.target.value)}
-                  className="mt-1.5"
-                  rows={3}
-                  placeholder="Apto"
-                />
+                <Textarea value={formData.parecer_jiso} onChange={(e) => handleChange('parecer_jiso', e.target.value)} className="mt-1.5" rows={3} placeholder="Apto" />
               </div>
+              {atestadosJISOPendentes.length > 0 && (
+                <div>
+                  <Label className="block mb-2">Atestados em aberto que a JISO homologou</Label>
+                  <div className="space-y-2">
+                    {atestadosJISOPendentes.map(a => (
+                      <label key={a.id} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(a.id)}
+                          onChange={e => {
+                            const ids = e.target.checked ? [...selectedIds, a.id] : selectedIds.filter(id => id !== a.id);
+                            handleChange('atestados_jiso_ids', ids);
+                          }}
+                        />
+                        <span className="text-sm">{a.dias} dias — {a.data_inicio} até {a.data_termino} — CID: {a.cid_10 || '—'}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
+      }
+
+      case 'Homologação de Atestado': {
+        const atestadosCurtos = atestadosMilitar.filter(a => a.dias <= 15 && a.status === 'Ativo' && !a.homologado_comandante);
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Homologação de Atestado Médico</h3>
+            <p className="text-sm text-slate-500 mb-4">Somente atestados de até 15 dias não homologados.</p>
+            <div className="space-y-2">
+              {atestadosCurtos.length === 0 && <p className="text-sm text-slate-400">Nenhum atestado elegível para homologação.</p>}
+              {atestadosCurtos.map(a => (
+                <label key={a.id} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    name="atestado_homologado"
+                    checked={formData.atestado_homologado_id === a.id}
+                    onChange={() => handleChange('atestado_homologado_id', a.id)}
+                  />
+                  <span className="text-sm">{a.dias} dias — {a.data_inicio} até {a.data_termino} — CID: {a.cid_10 || '—'} — {a.tipo_afastamento}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      }
 
       case 'Transcrição de Documentos':
         return (
@@ -667,6 +681,7 @@ export default function CadastrarPublicacao() {
                   <SelectItem value="Geral">Geral</SelectItem>
                   <SelectItem value="Designação / Dispensa de Função">Designação / Dispensa de Função</SelectItem>
                   <SelectItem value="Ata JISO">Ata JISO</SelectItem>
+                  <SelectItem value="Homologação de Atestado">Homologação de Atestado Médico</SelectItem>
                   <SelectItem value="Transcrição de Documentos">Transcrição de Documentos</SelectItem>
                 </SelectContent>
               </Select>
