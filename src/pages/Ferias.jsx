@@ -16,18 +16,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Calendar, CheckCircle, Clock, Grid3X3, List } from 'lucide-react';
+import { Plus, Search, Calendar, CheckCircle, Clock, Grid3X3, List, Settings } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { format } from 'date-fns';
 
 const statusColors = {
   'Prevista': 'bg-slate-100 text-slate-700',
-  'Autorizada': 'bg-blue-100 text-blue-700',
   'Em Curso': 'bg-amber-100 text-amber-700',
   'Gozada': 'bg-emerald-100 text-emerald-700',
   'Interrompida': 'bg-orange-100 text-orange-700',
-  'Cancelada': 'bg-red-100 text-red-700'
 };
 
 export default function Ferias() {
@@ -101,13 +99,23 @@ export default function Ferias() {
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Férias</h1>
             <p className="text-slate-500">Controle de férias concedidas</p>
           </div>
-          <Button
-            onClick={() => navigate(createPageUrl('CadastrarFerias'))}
-            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Nova Férias
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}
+              className="border-slate-300"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Períodos Aquisitivos
+            </Button>
+            <Button
+              onClick={() => navigate(createPageUrl('CadastrarFerias'))}
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Nova Férias
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -178,10 +186,9 @@ export default function Ferias() {
                 <SelectContent>
                   <SelectItem value="all">Todos Status</SelectItem>
                   <SelectItem value="Prevista">Prevista</SelectItem>
-                  <SelectItem value="Autorizada">Autorizada</SelectItem>
                   <SelectItem value="Em Curso">Em Curso</SelectItem>
                   <SelectItem value="Gozada">Gozada</SelectItem>
-                  <SelectItem value="Cancelada">Cancelada</SelectItem>
+                  <SelectItem value="Interrompida">Interrompida</SelectItem>
                 </SelectContent>
               </Select>
               <div className="flex border border-slate-200 rounded-lg overflow-hidden">
@@ -256,11 +263,14 @@ export default function Ferias() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-3">
-                    <Badge className={statusColors[f.status] || statusColors['Prevista']}>
+                    <Badge className={statusColors[f.status] || 'bg-slate-100 text-slate-700'}>
                       {f.status}
                     </Badge>
                     {f.periodo_aquisitivo_ref && (
                       <Badge variant="outline">{f.periodo_aquisitivo_ref}</Badge>
+                    )}
+                    {f.fracionamento && (
+                      <Badge className="bg-purple-100 text-purple-700">{f.fracionamento}</Badge>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -275,10 +285,6 @@ export default function Ferias() {
                     <div>
                       <p className="text-slate-500">Dias</p>
                       <p className="font-medium">{f.dias} dias</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Tipo</p>
-                      <p className="font-medium text-xs">{f.tipo}</p>
                     </div>
                   </div>
                 </CardContent>

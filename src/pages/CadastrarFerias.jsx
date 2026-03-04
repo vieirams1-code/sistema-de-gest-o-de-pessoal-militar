@@ -145,6 +145,13 @@ export default function CadastrarFerias() {
     if (!formData.militar_id || !formData.periodo_aquisitivo_ref) return;
     setLoading(true);
 
+    const labelFracao = (i, total) => {
+      if (total === 1) return 'Integral';
+      if (i === 0) return '1ª Fração';
+      if (i === 1) return '2ª Fração';
+      return '3ª Fração';
+    };
+
     // Se é edição, atualizar registro único
     if (editId) {
       const f = fracoes[0];
@@ -154,13 +161,13 @@ export default function CadastrarFerias() {
         data_inicio: f.data_inicio,
         data_fim: f.data_fim,
         data_retorno: f.data_retorno,
-        fracionamento: fracoes.length > 1 ? `${fracoes.indexOf(f) + 1}ª fração de ${f.dias} dias` : ''
+        fracionamento: labelFracao(0, fracoes.length)
       });
     } else {
       // Criar uma fração por registro
       for (let i = 0; i < fracoes.length; i++) {
         const f = fracoes[i];
-        const fracionamento = fracoes.length > 1 ? `${i + 1}ª fração de ${f.dias} dias` : '';
+        const fracionamento = labelFracao(i, fracoes.length);
         await base44.entities.Ferias.create({
           ...formData,
           dias: f.dias,
