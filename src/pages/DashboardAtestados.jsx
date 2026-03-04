@@ -229,8 +229,8 @@ export default function DashboardAtestados() {
                               {atestado.tipo_afastamento}
                             </Badge>
                             {atestado.necessita_jiso && (
-                              <Badge className="bg-purple-100 text-purple-700">
-                                {atestado.encaminhado_jiso ? 'JISO Realizada' : 'Aguardando JISO'}
+                              <Badge className={`${atestado.status_jiso === 'Homologado pela JISO' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>
+                                {atestado.status_jiso || 'Aguardando JISO'}
                               </Badge>
                             )}
                           </div>
