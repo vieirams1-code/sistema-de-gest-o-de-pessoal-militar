@@ -20,14 +20,38 @@ import { format, differenceInDays, parseISO } from 'date-fns';
 
 export default function DashboardAtestados() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const hoje = new Date().toISOString().split('T')[0];
+  const [editingJisoId, setEditingJisoId] = useState(null);
+  const [jisoDateEdit, setJisoDateEdit] = useState('');
+  const [savingJiso, setSavingJiso] = useState(false);
 
   const { data: atestados = [], isLoading } = useQuery({
     queryKey: ['atestados-dashboard'],
     queryFn: () => base44.entities.Atestado.list('-created_date')
   });
 
-  const atestadosVigentes = atestados.filter(a => a.status === 'Ativo');
+  // Ordenar: Ativos acima, Encerrados abaixo
+  const atestadosOrdenados = [...atestados].sort((a, b) => {
+    if (a.status === 'Ativo' && b.status !== 'Ativo') return -1;
+    if (a.status !== 'Ativo' && b.status === 'Ativo') return 1;
+    return 0;
+  });
+
+  const atestadosVigentes = atestadosOrdenados.filter(a => a.status === 'Ativo');
+
+  const handleSaveJisoDate = async (atestadoId) => {
+    if (!jisoDateEdit) return;
+    setSavingJiso(true);
+    await base44.entities.Atestado.update(atestadoId, {
+      data_jiso_agendada: jisoDateEdit,
+      status_jiso: 'Aguardando JISO'
+    });
+    queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
+    setSavingJiso(false);
+    setEditingJisoId(null);
+    setJisoDateEdit('');
+  };
   
   const afastamentoTotal = atestadosVigentes.filter(a => a.tipo_afastamento === 'Afastamento Total');
   const esforcoFisico = atestadosVigentes.filter(a => a.tipo_afastamento === 'Esforço Físico');
