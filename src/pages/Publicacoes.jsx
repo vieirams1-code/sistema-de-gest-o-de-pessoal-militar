@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Calendar, CheckCircle, Clock, AlertCircle, Filter } from 'lucide-react';
-import { format } from 'date-fns';
+import { Card, CardContent } from "@/components/ui/card";
+import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 
 const statusColors = {
@@ -46,11 +45,8 @@ export default function Publicacoes() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data, tipo }) => {
-      if (tipo === 'ex-officio') {
-        return base44.entities.PublicacaoExOfficio.update(id, data);
-      } else if (tipo === 'atestado') {
-        return base44.entities.Atestado.update(id, data);
-      }
+      if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, data);
+      else if (tipo === 'atestado') return base44.entities.Atestado.update(id, data);
       return base44.entities.RegistroLivro.update(id, data);
     },
     onSuccess: () => {
@@ -58,6 +54,19 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ id, tipo }) => {
+      if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.delete(id);
+      if (tipo === 'atestado') return base44.entities.Atestado.delete(id);
+      return base44.entities.RegistroLivro.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
     }
   });
 
