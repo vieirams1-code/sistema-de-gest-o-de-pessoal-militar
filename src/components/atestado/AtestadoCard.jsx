@@ -127,9 +127,19 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
             <Badge className="bg-blue-100 text-blue-700">{atestado.tipo_afastamento}</Badge>
           )}
           {atestado.necessita_jiso && (
-            <Badge className="bg-purple-100 text-purple-700 flex items-center gap-1">
+            <Badge className={`flex items-center gap-1 ${
+              atestado.status_jiso === 'Homologado pela JISO'
+                ? 'bg-green-100 text-green-700'
+                : 'bg-purple-100 text-purple-700'
+            }`}>
               <Shield className="w-3 h-3" />
-              JISO
+              {atestado.status_jiso === 'Homologado pela JISO' ? 'JISO Homologado' : 'Aguardando JISO'}
+            </Badge>
+          )}
+          {atestado.status_jiso === 'Homologado pelo Comandante' && (
+            <Badge className="bg-blue-100 text-blue-700 flex items-center gap-1">
+              <Shield className="w-3 h-3" />
+              Homologado Cmt
             </Badge>
           )}
           {atestado.acompanhado && (
