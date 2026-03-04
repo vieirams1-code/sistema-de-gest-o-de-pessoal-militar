@@ -68,12 +68,15 @@ export default function CadastrarFerias() {
     enabled: !!formData.militar_id
   });
 
-  // Períodos aquisitivos existentes do militar
+  // Períodos aquisitivos ativos do militar
   const { data: periodosExistentes = [] } = useQuery({
     queryKey: ['periodos-existentes', formData.militar_id],
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: formData.militar_id }),
     enabled: !!formData.militar_id
   });
+
+  // Só períodos ativos (não inativados)
+  const periodosAtivos = periodosExistentes.filter(p => !p.inativo && p.status !== 'Inativo');
 
   // Carregar férias para edição
   const { data: editingFerias, isLoading: loadingEdit } = useQuery({
@@ -125,7 +128,7 @@ export default function CadastrarFerias() {
   };
 
   const handlePeriodoChange = (ref) => {
-    const periodoExistente = periodosExistentes.find(p => p.ano_referencia === ref);
+    const periodoExistente = periodosAtivos.find(p => p.ano_referencia === ref);
     setFormData(prev => ({
       ...prev,
       periodo_aquisitivo_ref: ref,
@@ -138,7 +141,12 @@ export default function CadastrarFerias() {
     .filter(f => !editId || f.id !== editId)
     .map(f => f.periodo_aquisitivo_ref);
 
-  const opcaoAnos = gerarOpcoesAnos().filter(ano => !periodosJaCadastrados.includes(ano));
+  // Usar somente os períodos ativos como opções
+  const opcaoAnos = periodosAtivos
+    .filter(p => !periodosJaCadastrados.includes(p.ano_referencia))
+    .map(p => p.ano_referencia)
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
