@@ -171,58 +171,64 @@ export default function CadastrarPublicacao() {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      let savedId = publicacaoId;
-      if (publicacaoId) {
-        await base44.entities.PublicacaoExOfficio.update(publicacaoId, formData);
-      } else {
-        const saved = await base44.entities.PublicacaoExOfficio.create(formData);
-        savedId = saved.id;
-      }
-
-      // Atualizar comportamento do militar conforme o tipo da publicação
-      if (formData.militar_id) {
-        let novoComportamento = null;
-        let motivoHistorico = null;
-
-        if (formData.tipo === 'Melhoria de Comportamento' && formData.comportamento_ingressou) {
-          novoComportamento = formData.comportamento_ingressou;
-          motivoHistorico = 'Melhoria de Comportamento';
-        } else if (formData.tipo === 'Punição' && formData.comportamento_ingresso) {
-          novoComportamento = formData.comportamento_ingresso;
-          motivoHistorico = 'Punição';
-        }
-
-        if (novoComportamento) {
-          // Buscar comportamento atual do militar
-          const militaresResult = await base44.entities.Militar.filter({ id: formData.militar_id });
-          const militarAtual = militaresResult[0];
-
-          // Só registra se mudou
-          if (militarAtual && militarAtual.comportamento !== novoComportamento) {
-            await base44.entities.Militar.update(formData.militar_id, { comportamento: novoComportamento });
-            await base44.entities.HistoricoComportamento.create({
-              militar_id: formData.militar_id,
-              militar_nome: formData.militar_nome,
-              comportamento_anterior: militarAtual.comportamento || null,
-              comportamento_novo: novoComportamento,
-              motivo: motivoHistorico,
-              publicacao_id: savedId,
-              data_alteracao: formData.data_publicacao || new Date().toISOString().split('T')[0],
-              observacoes: `Publicação Ex Officio - ${formData.tipo}`
-            });
-          }
-        }
-      }
-
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['militares'] });
-      navigate(createPageUrl('Publicacoes'));
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-    } finally {
-      setLoading(false);
+    let savedId = publicacaoId;
+    if (publicacaoId) {
+      await base44.entities.PublicacaoExOfficio.update(publicacaoId, formData);
+    } else {
+      const saved = await base44.entities.PublicacaoExOfficio.create(formData);
+      savedId = saved.id;
     }
+
+    // Marcar atestados homologados para Ata JISO
+    if (formData.tipo === 'Ata JISO' && formData.atestados_jiso_ids?.length) {
+      for (const aid of formData.atestados_jiso_ids) {
+        await base44.entities.Atestado.update(aid, { encaminhado_jiso: true, status_publicacao: 'Publicado' });
+      }
+    }
+
+    // Marcar atestado homologado para Homologação de Atestado
+    if (formData.tipo === 'Homologação de Atestado' && formData.atestado_homologado_id) {
+      await base44.entities.Atestado.update(formData.atestado_homologado_id, {
+        homologado_comandante: true,
+        status_publicacao: 'Publicado'
+      });
+    }
+
+    // Atualizar comportamento do militar
+    if (formData.militar_id) {
+      let novoComportamento = null;
+      let motivoHistorico = null;
+      if (formData.tipo === 'Melhoria de Comportamento' && formData.comportamento_ingressou) {
+        novoComportamento = formData.comportamento_ingressou;
+        motivoHistorico = 'Melhoria de Comportamento';
+      } else if (formData.tipo === 'Punição' && formData.comportamento_ingresso) {
+        novoComportamento = formData.comportamento_ingresso;
+        motivoHistorico = 'Punição';
+      }
+      if (novoComportamento) {
+        const militaresResult = await base44.entities.Militar.filter({ id: formData.militar_id });
+        const militarAtual = militaresResult[0];
+        if (militarAtual && militarAtual.comportamento !== novoComportamento) {
+          await base44.entities.Militar.update(formData.militar_id, { comportamento: novoComportamento });
+          await base44.entities.HistoricoComportamento.create({
+            militar_id: formData.militar_id,
+            militar_nome: formData.militar_nome,
+            comportamento_anterior: militarAtual.comportamento || null,
+            comportamento_novo: novoComportamento,
+            motivo: motivoHistorico,
+            publicacao_id: savedId,
+            data_alteracao: formData.data_publicacao || new Date().toISOString().split('T')[0],
+            observacoes: `Publicação Ex Officio - ${formData.tipo}`
+          });
+        }
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    queryClient.invalidateQueries({ queryKey: ['militares'] });
+    queryClient.invalidateQueries({ queryKey: ['atestados'] });
+    setLoading(false);
+    navigate(createPageUrl('Publicacoes'));
   };
 
   const renderSpecificFields = () => {

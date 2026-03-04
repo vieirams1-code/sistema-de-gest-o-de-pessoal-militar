@@ -266,37 +266,32 @@ export default function CadastrarRegistroLivro() {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      const registroData = {
-        ...formData,
-        texto_publicacao: textoPublicacao
-      };
-      
-      await base44.entities.RegistroLivro.create(registroData);
+    const registroData = {
+      ...formData,
+      texto_publicacao: textoPublicacao
+    };
+    
+    await base44.entities.RegistroLivro.create(registroData);
 
-      if (formData.ferias_id) {
-        if (formData.tipo_registro === 'Retorno Férias') {
-          await base44.entities.Ferias.update(formData.ferias_id, {
-            status: 'Gozada',
-            data_retorno_registrada: new Date().toISOString()
-          });
-        } else if (formData.tipo_registro === 'Saída Férias') {
-          await base44.entities.Ferias.update(formData.ferias_id, {
-            status: 'Em Curso',
-            data_saida_registrada: new Date().toISOString()
-          });
-        }
+    if (formData.ferias_id) {
+      if (formData.tipo_registro === 'Retorno Férias') {
+        await base44.entities.Ferias.update(formData.ferias_id, {
+          status: 'Gozada',
+          data_retorno_registrada: new Date().toISOString()
+        });
+      } else if (formData.tipo_registro === 'Saída Férias') {
+        await base44.entities.Ferias.update(formData.ferias_id, {
+          status: 'Em Curso',
+          data_saida_registrada: new Date().toISOString()
+        });
       }
-
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      
-      navigate(createPageUrl('Publicacoes'));
-    } catch (error) {
-      console.error('Erro ao salvar registro:', error);
-    } finally {
-      setLoading(false);
     }
+
+    queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+    queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    
+    setLoading(false);
+    navigate(createPageUrl('Publicacoes'));
   };
 
   const renderSpecificFields = () => {
