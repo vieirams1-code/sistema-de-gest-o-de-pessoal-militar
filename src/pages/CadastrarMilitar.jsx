@@ -104,6 +104,8 @@ export default function CadastrarMilitar() {
     }
   }, [editingMilitar]);
 
+  const [motivoComportamento, setMotivoComportamento] = useState('');
+
   const handleChange = (name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -139,7 +141,7 @@ export default function CadastrarMilitar() {
         comportamento_novo: formData.comportamento,
         motivo: 'Manual',
         data_alteracao: new Date().toISOString().split('T')[0],
-        observacoes: editId ? 'Alteração manual no cadastro' : 'Definição inicial no cadastro'
+        observacoes: editId ? (motivoComportamento || 'Alteração manual no cadastro') : 'Definição inicial no cadastro'
       });
     }
     
@@ -293,32 +295,44 @@ export default function CadastrarMilitar() {
                 onChange={handleChange}
                 type="date"
               />
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700">Comportamento</label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <FormField
-                      label=""
-                      name="comportamento"
-                      value={formData.comportamento}
-                      onChange={handleChange}
-                      type="select"
-                      options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
-                    />
-                  </div>
-                  {editId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setHistoricoOpen(true)}
-                      className="flex-shrink-0 self-end h-10 w-10"
-                      title="Ver histórico de comportamento"
-                    >
-                      <History className="w-4 h-4" />
-                    </Button>
-                  )}
+              <div className="space-y-1.5 md:col-span-2">
+              <label className="text-sm font-medium text-slate-700">Comportamento</label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <FormField
+                    label=""
+                    name="comportamento"
+                    value={formData.comportamento}
+                    onChange={handleChange}
+                    type="select"
+                    options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
+                  />
                 </div>
+                {editId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setHistoricoOpen(true)}
+                    className="flex-shrink-0 self-end h-10 w-10"
+                    title="Ver histórico de comportamento"
+                  >
+                    <History className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              {formData.comportamento !== comportamentoOriginal && comportamentoOriginal !== null && (
+                <div className="mt-2">
+                  <label className="text-xs font-medium text-slate-600">Motivo da alteração <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={motivoComportamento}
+                    onChange={e => setMotivoComportamento(e.target.value)}
+                    placeholder="Descreva o motivo da alteração do comportamento..."
+                    className="mt-1 w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f]"
+                  />
+                </div>
+              )}
               </div>
             </div>
           </FormSection>
