@@ -184,7 +184,7 @@ export default function FichaMilitar() {
       ]
     }));
 
-    publicacoes.forEach(p => lista.push({
+    publicacoes.filter(p => p.status === 'Publicado').forEach(p => lista.push({
       tipo: 'publicacao', data: p.data_publicacao,
       titulo: `${p.tipo}${p.subtipo_geral ? ` — ${p.subtipo_geral}` : ''}`,
       resumo: p.texto_publicacao?.substring(0, 120),
