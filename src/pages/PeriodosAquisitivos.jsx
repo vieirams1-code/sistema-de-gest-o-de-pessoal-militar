@@ -172,13 +172,24 @@ export default function PeriodosAquisitivos() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredPeriodos.map((periodo) => (
-              <PeriodoAquisitivoCard
-                key={periodo.id}
-                periodo={periodo}
-              />
-            ))}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Militar</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Período</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Prazo Gozo</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Dias</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
+                  <th className="text-right px-4 py-3 font-semibold text-slate-600">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPeriodos.map((periodo) => (
+                  <PeriodoAquisitivoCard key={periodo.id} periodo={periodo} listMode />
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
