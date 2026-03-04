@@ -5,7 +5,6 @@ import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, History } from 'lucide-react';
 import { createPageUrl } from '@/utils';
-import { Button } from "@/components/ui/button";
 
 import FormSection from '@/components/militar/FormSection';
 import FormField from '@/components/militar/FormField';
