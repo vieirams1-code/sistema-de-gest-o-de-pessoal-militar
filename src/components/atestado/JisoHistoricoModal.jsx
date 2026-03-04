@@ -17,6 +17,7 @@ export default function JisoHistoricoModal({ atestado, open, onClose }) {
   const [dias, setDias] = useState('');
   const [motivo, setMotivo] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteIdx, setConfirmDeleteIdx] = useState(null);
 
   const calcularNovasDatas = () => {
     if (!atestado.data_termino || !dias) return null;
@@ -59,6 +60,34 @@ export default function JisoHistoricoModal({ atestado, open, onClose }) {
     setDias('');
     setMotivo('');
     onClose();
+  };
+
+  const handleDelete = async (idx) => {
+    const historico = [...(atestado.historico_jiso || [])];
+    // Reverter o efeito deste registro nas datas
+    const entry = historico[idx];
+    // Recalcular datas a partir do histórico restante
+    const restante = historico.filter((_, i) => i !== idx);
+    let novaTermino = atestado.data_inicio;
+    // Recalcular data_termino somando dias originais do atestado
+    const { addDays: ad, parseISO: pI } = await import('date-fns');
+    let base = pI(atestado.data_inicio + 'T00:00:00');
+    let termino = ad(base, atestado.dias - 1);
+    for (const r of restante) {
+      const delta = r.tipo === 'Prorrogação' ? r.dias_alterados : -r.dias_alterados;
+      termino = ad(termino, delta);
+    }
+    const novaDataTermino = format(termino, 'yyyy-MM-dd');
+    const novaDataRetorno = format(ad(termino, 1), 'yyyy-MM-dd');
+
+    await base44.entities.Atestado.update(atestado.id, {
+      historico_jiso: restante,
+      data_termino: novaDataTermino,
+      data_retorno: novaDataRetorno
+    });
+    queryClient.invalidateQueries({ queryKey: ['atestados'] });
+    queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
+    setConfirmDeleteIdx(null);
   };
 
   const formatDate = (d) => {
@@ -132,14 +161,23 @@ export default function JisoHistoricoModal({ atestado, open, onClose }) {
           {atestado.historico_jiso?.length > 0 && (
             <div className="space-y-2">
               <Label className="text-sm text-slate-600">Histórico de Decisões</Label>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
                 {atestado.historico_jiso.map((h, idx) => (
                   <div key={idx} className="p-2 border rounded text-xs bg-white">
                     <div className="flex items-center justify-between mb-1">
                       <span className={`font-semibold ${h.tipo === 'Prorrogação' ? 'text-blue-700' : 'text-red-700'}`}>
                         {h.tipo} de {h.dias_alterados} dias
                       </span>
-                      <span className="text-slate-400">{formatDate(h.data_registro)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">{formatDate(h.data_registro)}</span>
+                        <button
+                          onClick={() => setConfirmDeleteIdx(idx)}
+                          className="text-red-400 hover:text-red-600"
+                          title="Excluir registro"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-slate-600">{h.motivo}</p>
                     <p className="text-slate-400">Novo término: {formatDate(h.nova_data_termino)}</p>
