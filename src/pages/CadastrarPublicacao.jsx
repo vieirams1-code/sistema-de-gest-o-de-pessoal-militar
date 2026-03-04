@@ -350,15 +350,12 @@ export default function CadastrarPublicacao() {
                 type="date"
                 required
               />
-              <FormField
-                label="Comportamento Atual"
-                name="comportamento_atual"
-                value={formData.comportamento_atual}
-                onChange={handleChange}
-                type="select"
-                options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
-                required
-              />
+              <div>
+                <Label className="text-sm text-slate-700 font-medium">Comportamento Atual</Label>
+                <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
+                  {formData.comportamento_atual || '—'}
+                </div>
+              </div>
               <FormField
                 label="Comportamento que Ingressa / Mantém"
                 name="comportamento_ingressou"
@@ -420,14 +417,12 @@ export default function CadastrarPublicacao() {
                 onChange={handleChange}
                 type="date"
               />
-              <FormField
-                label="Comportamento Inicial"
-                name="comportamento_inicial"
-                value={formData.comportamento_inicial}
-                onChange={handleChange}
-                type="select"
-                options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
-              />
+              <div>
+                <Label className="text-sm text-slate-700 font-medium">Comportamento Inicial</Label>
+                <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
+                  {formData.comportamento_inicial || '—'}
+                </div>
+              </div>
               <div>
                 <Label>Itens de Enquadramento</Label>
                 <Textarea

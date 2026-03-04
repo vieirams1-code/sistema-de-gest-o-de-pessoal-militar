@@ -37,7 +37,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
     data_bg: registro.data_bg || '',
   });
 
-  const currentStatus = registro.status_publicacao || registro.status || 'Aguardando Nota';
+  // Status canônico: sempre usar o calculado a partir dos campos de BG
+  const currentStatus = calcStatus(registro.nota_para_bg, registro.numero_bg, registro.data_bg);
 
   const handleSaveBg = () => {
     const novoStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
