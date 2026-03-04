@@ -177,7 +177,6 @@ export default function PeriodosAquisitivos() {
               <PeriodoAquisitivoCard
                 key={periodo.id}
                 periodo={periodo}
-                onClick={() => handleCardClick(periodo)}
               />
             ))}
           </div>
