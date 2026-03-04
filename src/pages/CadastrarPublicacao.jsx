@@ -481,7 +481,9 @@ export default function CadastrarPublicacao() {
         );
 
       case 'Ata JISO': {
-        const atestadosJISOPendentes = atestadosMilitar.filter(a => a.necessita_jiso && a.status === 'Ativo');
+        const finalidadesComAtestados = ['V.A.F', 'LTS', 'Atestado de Origem'];
+        const mostrarAtestados = finalidadesComAtestados.includes(formData.finalidade_jiso);
+        const atestadosJISOPendentes = atestadosMilitar.filter(a => a.necessita_jiso && a.status === 'Ativo' && a.status_jiso !== 'Homologado pela JISO');
         const selectedIds = formData.atestados_jiso_ids || [];
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -495,24 +497,28 @@ export default function CadastrarPublicacao() {
                 <Label>Parecer</Label>
                 <Textarea value={formData.parecer_jiso} onChange={(e) => handleChange('parecer_jiso', e.target.value)} className="mt-1.5" rows={3} placeholder="Apto" />
               </div>
-              {atestadosJISOPendentes.length > 0 && (
+              {mostrarAtestados && (
                 <div>
-                  <Label className="block mb-2">Atestados em aberto que a JISO homologou</Label>
-                  <div className="space-y-2">
-                    {atestadosJISOPendentes.map(a => (
-                      <label key={a.id} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(a.id)}
-                          onChange={e => {
-                            const ids = e.target.checked ? [...selectedIds, a.id] : selectedIds.filter(id => id !== a.id);
-                            handleChange('atestados_jiso_ids', ids);
-                          }}
-                        />
-                        <span className="text-sm">{a.dias} dias — {a.data_inicio} até {a.data_termino} — CID: {a.cid_10 || '—'}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <Label className="block mb-2">Atestados do militar homologados por esta JISO</Label>
+                  {atestadosJISOPendentes.length === 0 ? (
+                    <p className="text-sm text-slate-400">Nenhum atestado aguardando JISO.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {atestadosJISOPendentes.map(a => (
+                        <label key={a.id} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(a.id)}
+                            onChange={e => {
+                              const ids = e.target.checked ? [...selectedIds, a.id] : selectedIds.filter(id => id !== a.id);
+                              handleChange('atestados_jiso_ids', ids);
+                            }}
+                          />
+                          <span className="text-sm">{a.dias} dias — {a.data_inicio} até {a.data_termino} — CID: {a.cid_10 || '—'}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
