@@ -269,6 +269,49 @@ export default function DashboardAtestados() {
                           />
                         </div>
                       </div>
+
+                      {/* JISO Agendada inline edit */}
+                      {atestado.necessita_jiso && atestado.status_jiso !== 'Homologado pela JISO' && (
+                        <div className="pt-2 border-t border-slate-100 mt-2" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                            <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
+                            {editingJisoId === atestado.id ? (
+                              <div className="flex items-center gap-2 flex-1">
+                                <input
+                                  type="date"
+                                  value={jisoDateEdit}
+                                  onChange={e => setJisoDateEdit(e.target.value)}
+                                  className="border border-slate-300 rounded px-2 py-0.5 text-xs flex-1"
+                                />
+                                <button
+                                  onClick={() => handleSaveJisoDate(atestado.id)}
+                                  disabled={savingJiso}
+                                  className="text-xs bg-[#1e3a5f] text-white px-2 py-0.5 rounded hover:bg-[#2d4a6f]"
+                                >
+                                  {savingJiso ? '...' : 'OK'}
+                                </button>
+                                <button
+                                  onClick={() => { setEditingJisoId(null); setJisoDateEdit(''); }}
+                                  className="text-xs text-slate-500 hover:text-slate-700"
+                                >✕</button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 flex-1">
+                                <span className="text-xs text-slate-700">
+                                  {atestado.data_jiso_agendada ? formatDate(atestado.data_jiso_agendada) : 'Não definida'}
+                                </span>
+                                <button
+                                  onClick={() => { setEditingJisoId(atestado.id); setJisoDateEdit(atestado.data_jiso_agendada || ''); }}
+                                  className="text-slate-400 hover:text-[#1e3a5f]"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
