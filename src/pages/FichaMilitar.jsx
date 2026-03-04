@@ -1,12 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, Filter, ClipboardList, Shield, Award, Calendar, BookOpen, FileText, Activity, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, User, Filter, ClipboardList, Shield, Award, Calendar, BookOpen, FileText, Activity, Search, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 
@@ -31,12 +36,18 @@ const tipoConfig = {
   comportamento: { label: 'Comportamento', color: 'bg-slate-100 text-slate-700', icon: Activity },
 };
 
+// Dependências por tipo: quando excluir X, verificar Y
+const dependencias = {
+  atestado: ['publicacao', 'jiso'], // PublicacaoExOfficio com atestado_homologado_id, JISO
+  ferias: ['livro'],                // RegistroLivro com ferias_id
+};
+
 function formatDate(d) {
   if (!d) return '—';
   try { return format(new Date(d + 'T00:00:00'), 'dd/MM/yyyy'); } catch { return d; }
 }
 
-function EventCard({ event }) {
+function EventCard({ event, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const cfg = tipoConfig[event.tipo] || tipoConfig.publicacao;
   const Icon = cfg.icon;
@@ -47,10 +58,8 @@ function EventCard({ event }) {
         className="flex items-start gap-4 p-4 cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setExpanded(e => !e)}
       >
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.color.replace('text-', 'bg-').replace('bg-', 'bg-opacity-20 bg-')}`} style={{background: 'transparent'}}>
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${cfg.color}`}>
-            <Icon className="w-5 h-5" />
-          </div>
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
+          <Icon className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -60,8 +69,15 @@ function EventCard({ event }) {
           <p className="font-medium text-slate-900 text-sm">{event.titulo}</p>
           {event.resumo && <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{event.resumo}</p>}
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
           <span className="text-sm text-slate-500 whitespace-nowrap">{formatDate(event.data)}</span>
+          <button
+            className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+            title="Excluir"
+            onClick={() => onDelete(event)}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </div>
       </div>
@@ -83,6 +99,7 @@ function EventCard({ event }) {
 
 export default function FichaMilitar() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const militarId = searchParams.get('id');
 
@@ -91,56 +108,68 @@ export default function FichaMilitar() {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState(null); // { event }
+  const [deleteDeps, setDeleteDeps] = useState(null); // { event, deps: [{tipo, id, label}] }
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDepsConfirm, setShowDepsConfirm] = useState(false);
+  const [deleteTambemDeps, setDeleteTambemDeps] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const { data: militar } = useQuery({
     queryKey: ['militar', militarId],
     queryFn: async () => { const r = await base44.entities.Militar.filter({ id: militarId }); return r[0]; },
     enabled: !!militarId
   });
 
-  const { data: punicoes = [] } = useQuery({
+  const { data: punicoes = [], refetch: refetchPunicoes } = useQuery({
     queryKey: ['ficha-punicoes', militarId],
     queryFn: () => base44.entities.Punicao.filter({ militar_id: militarId }),
     enabled: !!militarId
   });
 
-  const { data: atestados = [] } = useQuery({
+  const { data: atestados = [], refetch: refetchAtestados } = useQuery({
     queryKey: ['ficha-atestados', militarId],
     queryFn: () => base44.entities.Atestado.filter({ militar_id: militarId }),
     enabled: !!militarId
   });
 
-  const { data: registrosLivro = [] } = useQuery({
+  const { data: registrosLivro = [], refetch: refetchLivro } = useQuery({
     queryKey: ['ficha-livro', militarId],
     queryFn: () => base44.entities.RegistroLivro.filter({ militar_id: militarId }),
     enabled: !!militarId
   });
 
-  const { data: publicacoes = [] } = useQuery({
+  const { data: publicacoes = [], refetch: refetchPublicacoes } = useQuery({
     queryKey: ['ficha-publicacoes', militarId],
     queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }),
     enabled: !!militarId
   });
 
-  const { data: medalhas = [] } = useQuery({
+  const { data: medalhas = [], refetch: refetchMedalhas } = useQuery({
     queryKey: ['ficha-medalhas', militarId],
     queryFn: () => base44.entities.Medalha.filter({ militar_id: militarId }),
     enabled: !!militarId
   });
 
-  const { data: historico = [] } = useQuery({
+  const { data: historico = [], refetch: refetchHistorico } = useQuery({
     queryKey: ['ficha-comportamento', militarId],
     queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: militarId }),
     enabled: !!militarId
   });
 
+  const refetchAll = () => {
+    refetchPunicoes(); refetchAtestados(); refetchLivro();
+    refetchPublicacoes(); refetchMedalhas(); refetchHistorico();
+  };
+
   const eventos = useMemo(() => {
     const lista = [];
 
     punicoes.forEach(p => lista.push({
-      tipo: 'punicao', data: p.data_aplicacao,
+      tipo: 'punicao', data: p.data_aplicacao, id: p.id, raw: p,
       titulo: `${p.tipo}${p.motivo ? ` — ${p.motivo}` : ''}`,
-      resumo: p.motivo,
-      subtipo: p.tipo,
+      resumo: p.motivo, subtipo: p.tipo,
       detalhes: [
         { label: 'Tipo', valor: p.tipo },
         { label: 'Data Aplicação', valor: formatDate(p.data_aplicacao) },
@@ -152,10 +181,9 @@ export default function FichaMilitar() {
     }));
 
     atestados.forEach(a => lista.push({
-      tipo: 'atestado', data: a.data_inicio,
+      tipo: 'atestado', data: a.data_inicio, id: a.id, raw: a,
       titulo: `Atestado — ${a.tipo_afastamento || ''}${a.cid_10 ? ` (${a.cid_10})` : ''}`,
-      resumo: `${a.dias} dias — ${a.medico || ''}`,
-      subtipo: a.tipo_afastamento,
+      resumo: `${a.dias} dias — ${a.medico || ''}`, subtipo: a.tipo_afastamento,
       detalhes: [
         { label: 'Início', valor: formatDate(a.data_inicio) },
         { label: 'Término', valor: formatDate(a.data_termino) },
@@ -168,10 +196,8 @@ export default function FichaMilitar() {
     }));
 
     registrosLivro.forEach(r => lista.push({
-      tipo: 'livro', data: r.data_registro,
-      titulo: r.tipo_registro,
-      resumo: r.observacoes,
-      subtipo: r.tipo_registro,
+      tipo: 'livro', data: r.data_registro, id: r.id, raw: r,
+      titulo: r.tipo_registro, resumo: r.observacoes, subtipo: r.tipo_registro,
       detalhes: [
         { label: 'Tipo', valor: r.tipo_registro },
         { label: 'Data', valor: formatDate(r.data_registro) },
@@ -185,10 +211,9 @@ export default function FichaMilitar() {
     }));
 
     publicacoes.filter(p => p.status === 'Publicado').forEach(p => lista.push({
-      tipo: 'publicacao', data: p.data_publicacao,
+      tipo: 'publicacao', data: p.data_publicacao, id: p.id, raw: p,
       titulo: `${p.tipo}${p.subtipo_geral ? ` — ${p.subtipo_geral}` : ''}`,
-      resumo: p.texto_publicacao?.substring(0, 120),
-      subtipo: p.tipo,
+      resumo: p.texto_publicacao?.substring(0, 120), subtipo: p.tipo,
       detalhes: [
         { label: 'Tipo', valor: p.tipo },
         { label: 'Data', valor: formatDate(p.data_publicacao) },
@@ -200,10 +225,9 @@ export default function FichaMilitar() {
     }));
 
     medalhas.forEach(m => lista.push({
-      tipo: 'medalha', data: m.data_indicacao,
+      tipo: 'medalha', data: m.data_indicacao, id: m.id, raw: m,
       titulo: m.tipo_medalha_nome || 'Medalha',
-      resumo: `Status: ${m.status}`,
-      subtipo: m.status,
+      resumo: `Status: ${m.status}`, subtipo: m.status,
       detalhes: [
         { label: 'Medalha', valor: m.tipo_medalha_nome },
         { label: 'Indicação', valor: formatDate(m.data_indicacao) },
@@ -214,10 +238,9 @@ export default function FichaMilitar() {
     }));
 
     historico.forEach(h => lista.push({
-      tipo: 'comportamento', data: h.data_alteracao,
+      tipo: 'comportamento', data: h.data_alteracao, id: h.id, raw: h,
       titulo: `Comportamento: ${h.comportamento_anterior || 'N/D'} → ${h.comportamento_novo}`,
-      resumo: `Motivo: ${h.motivo}`,
-      subtipo: h.motivo,
+      resumo: `Motivo: ${h.motivo}`, subtipo: h.motivo,
       detalhes: [
         { label: 'Anterior', valor: h.comportamento_anterior },
         { label: 'Novo', valor: h.comportamento_novo },
@@ -245,6 +268,67 @@ export default function FichaMilitar() {
     });
   }, [eventos, tipoFiltro, searchTerm, dataInicio, dataFim]);
 
+  // Calcula dependências do evento a excluir
+  const calcularDependencias = (event) => {
+    const deps = [];
+    if (event.tipo === 'atestado') {
+      // Publicações vinculadas ao atestado
+      publicacoes.forEach(p => {
+        if (p.atestado_homologado_id === event.id || (p.atestados_jiso_ids || []).includes(event.id)) {
+          deps.push({ tipo: 'publicacao', id: p.id, label: `Publicação Ex Officio: ${p.tipo} (${formatDate(p.data_publicacao)})` });
+        }
+      });
+    }
+    if (event.tipo === 'ferias') {
+      // Registros de livro vinculados às férias
+      registrosLivro.forEach(r => {
+        if (r.ferias_id === event.id) {
+          deps.push({ tipo: 'livro', id: r.id, label: `Registro Livro: ${r.tipo_registro} (${formatDate(r.data_registro)})` });
+        }
+      });
+    }
+    return deps;
+  };
+
+  const handleDeleteRequest = (event) => {
+    const deps = calcularDependencias(event);
+    setDeleteTarget(event);
+    if (deps.length > 0) {
+      setDeleteDeps({ event, deps });
+      setDeleteTambemDeps(false);
+      setShowDepsConfirm(true);
+    } else {
+      setShowDeleteConfirm(true);
+    }
+  };
+
+  const executeDelete = async (event, incluirDeps = false, deps = []) => {
+    setDeleting(true);
+    try {
+      // Excluir dependências se solicitado
+      if (incluirDeps && deps.length > 0) {
+        for (const dep of deps) {
+          if (dep.tipo === 'publicacao') await base44.entities.PublicacaoExOfficio.delete(dep.id);
+          else if (dep.tipo === 'livro') await base44.entities.RegistroLivro.delete(dep.id);
+        }
+      }
+      // Excluir o registro principal
+      if (event.tipo === 'punicao') await base44.entities.Punicao.delete(event.id);
+      else if (event.tipo === 'atestado') await base44.entities.Atestado.delete(event.id);
+      else if (event.tipo === 'livro') await base44.entities.RegistroLivro.delete(event.id);
+      else if (event.tipo === 'publicacao') await base44.entities.PublicacaoExOfficio.delete(event.id);
+      else if (event.tipo === 'medalha') await base44.entities.Medalha.delete(event.id);
+      else if (event.tipo === 'comportamento') await base44.entities.HistoricoComportamento.delete(event.id);
+      refetchAll();
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+      setDeleteDeps(null);
+      setShowDeleteConfirm(false);
+      setShowDepsConfirm(false);
+    }
+  };
+
   if (!militarId) return <div className="p-8 text-center text-slate-500">Militar não especificado.</div>;
 
   return (
@@ -264,12 +348,10 @@ export default function FichaMilitar() {
             )}
           </div>
           {militar && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militarId}`)}>
-                <User className="w-4 h-4 mr-2" />
-                Ver Cadastro
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militarId}`)}>
+              <User className="w-4 h-4 mr-2" />
+              Ver Cadastro
+            </Button>
           )}
         </div>
 
@@ -302,9 +384,9 @@ export default function FichaMilitar() {
           </div>
           <div className="flex flex-col md:flex-row gap-3 items-center">
             <label className="text-sm text-slate-500 whitespace-nowrap">Período:</label>
-            <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="flex-1" placeholder="Data início" />
+            <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="flex-1" />
             <span className="text-slate-400 text-sm">até</span>
-            <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="flex-1" placeholder="Data fim" />
+            <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="flex-1" />
             {(dataInicio || dataFim || tipoFiltro !== 'todos' || searchTerm) && (
               <Button variant="ghost" size="sm" onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro('todos'); setSearchTerm(''); }}>
                 Limpar
@@ -314,7 +396,7 @@ export default function FichaMilitar() {
         </div>
 
         {/* Contagem */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <p className="text-sm text-slate-500">
             {eventosFiltrados.length} {eventosFiltrados.length === 1 ? 'registro' : 'registros'}
             {eventos.length !== eventosFiltrados.length && ` (de ${eventos.length} no total)`}
@@ -331,11 +413,71 @@ export default function FichaMilitar() {
         ) : (
           <div className="space-y-3">
             {eventosFiltrados.map((event, i) => (
-              <EventCard key={i} event={event} />
+              <EventCard key={event.tipo + event.id} event={event} onDelete={handleDeleteRequest} />
             ))}
           </div>
         )}
       </div>
+
+      {/* Confirmação simples de exclusão */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.
+              {deleteTarget && <span className="block mt-2 font-medium text-slate-700">"{deleteTarget.titulo}"</span>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleting}
+              onClick={() => executeDelete(deleteTarget)}
+            >
+              {deleting ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmação com dependências */}
+      <AlertDialog open={showDepsConfirm} onOpenChange={setShowDepsConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Registros dependentes encontrados</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>O registro <span className="font-medium text-slate-700">"{deleteDeps?.event?.titulo}"</span> possui os seguintes registros vinculados:</p>
+                <ul className="mt-2 space-y-1">
+                  {deleteDeps?.deps?.map((d, i) => (
+                    <li key={i} className="text-sm text-slate-600 bg-slate-50 rounded px-3 py-1.5">• {d.label}</li>
+                  ))}
+                </ul>
+                <p className="mt-3">Deseja excluir também os registros dependentes?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              disabled={deleting}
+              onClick={() => executeDelete(deleteDeps.event, false, [])}
+            >
+              Excluir apenas este
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleting}
+              onClick={() => executeDelete(deleteDeps.event, true, deleteDeps.deps)}
+            >
+              {deleting ? 'Excluindo...' : 'Excluir tudo'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
