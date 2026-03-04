@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Settings, Trash2, Plus } from 'lucide-react';
+import { Settings, Trash2, Plus, Crown } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,30 @@ export default function Configuracoes() {
   const { data: funcoes = [] } = useQuery({
     queryKey: ['funcoes'],
     queryFn: () => base44.entities.Funcao.list('-created_date')
+  });
+
+  const { data: militares = [] } = useQuery({
+    queryKey: ['militares-ativos'],
+    queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' })
+  });
+
+  const { data: configs = [] } = useQuery({
+    queryKey: ['config-unidade'],
+    queryFn: () => base44.entities.ConfiguracaoUnidade.list()
+  });
+
+  const comandanteConfig = configs.find(c => c.chave === 'comandante_id');
+  const comandanteId = comandanteConfig?.valor || '';
+
+  const saveComandanteMutation = useMutation({
+    mutationFn: async (militarId) => {
+      if (comandanteConfig) {
+        await base44.entities.ConfiguracaoUnidade.update(comandanteConfig.id, { valor: militarId });
+      } else {
+        await base44.entities.ConfiguracaoUnidade.create({ chave: 'comandante_id', valor: militarId, descricao: 'ID do Comandante da Unidade' });
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['config-unidade'] })
   });
 
   const createLotacaoMutation = useMutation({
@@ -90,8 +115,44 @@ export default function Configuracoes() {
           <Settings className="w-8 h-8 text-[#1e3a5f]" />
           <div>
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Configurações</h1>
-            <p className="text-slate-500">Gerenciar lotações e funções</p>
+            <p className="text-slate-500">Gerenciar lotações, funções e configurações da unidade</p>
           </div>
+        </div>
+
+        {/* Comandante */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Crown className="w-5 h-5 text-amber-600" />
+            <h2 className="text-xl font-semibold text-[#1e3a5f]">Comandante da Unidade</h2>
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            O sexo do(a) comandante definido aqui será usado nos textos gerados para publicação (ex: "O Comandante" ou "A Comandante").
+          </p>
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-slate-700 block mb-1.5">Comandante</label>
+              <Select value={comandanteId} onValueChange={v => saveComandanteMutation.mutate(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o(a) Comandante..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {militares.map(m => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.posto_graduacao} {m.nome_completo} — {m.sexo === 'Feminino' ? '♀ Feminino' : '♂ Masculino'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {comandanteId && (() => {
+            const cmd = militares.find(m => m.id === comandanteId);
+            return cmd ? (
+              <p className="text-sm text-emerald-600 mt-3">
+                ✓ Textos gerados com: "{cmd.sexo === 'Feminino' ? 'A Comandante' : 'O Comandante'}"
+              </p>
+            ) : null;
+          })()}
         </div>
 
         {/* Lotações */}
