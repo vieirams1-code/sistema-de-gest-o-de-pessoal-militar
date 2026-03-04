@@ -132,11 +132,14 @@ export default function CadastrarAtestado() {
   };
 
   React.useEffect(() => {
-    // Auto-marcar homologado_comandante quando necessita_jiso for false
-    if (!formData.necessita_jiso && !formData.homologado_comandante && formData.dias > 0) {
+    const dias = parseInt(formData.dias) || 0;
+    // Auto-marcar JISO para >15 dias
+    if (dias > 15 && !formData.necessita_jiso) {
+      setFormData(prev => ({ ...prev, necessita_jiso: true, homologado_comandante: false }));
+    } else if (dias > 0 && dias <= 15 && !formData.homologado_comandante) {
       setFormData(prev => ({ ...prev, homologado_comandante: true }));
     }
-  }, [formData.necessita_jiso, formData.dias]);
+  }, [formData.dias]);
 
   React.useEffect(() => {
     if (formData.militar_nome && formData.data_inicio && formData.dias) {
@@ -353,18 +356,26 @@ export default function CadastrarAtestado() {
                   onCheckedChange={(checked) => {
                     handleChange('necessita_jiso', checked);
                     if (!checked) handleChange('homologado_comandante', true);
+                    else handleChange('homologado_comandante', false);
                   }}
                 />
                 <Label htmlFor="necessita_jiso" className="text-sm cursor-pointer">
-                  Encaminhar para JISO (mais de 15 dias ou decisão do comandante)
+                  Encaminhar para JISO {parseInt(formData.dias) > 15 ? '(marcado automaticamente — mais de 15 dias)' : '(decisão do comandante)'}
                 </Label>
               </div>
 
               {formData.necessita_jiso && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-900">
-                    ℹ️ Este atestado será encaminhado para JISO. Os dados da junta devem ser preenchidos na agenda JISO.
-                  </p>
+                <div className="space-y-3">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-900">ℹ️ Atestado encaminhado para JISO.</p>
+                  </div>
+                  <FormField
+                    label="Data JISO Agendada"
+                    name="data_jiso_agendada"
+                    value={formData.data_jiso_agendada || ''}
+                    onChange={handleChange}
+                    type="date"
+                  />
                 </div>
               )}
             </div>
