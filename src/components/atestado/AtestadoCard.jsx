@@ -179,7 +179,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
 
         {/* JISO agendada - editável inline */}
         {atestado.necessita_jiso && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
+          <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
               <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
@@ -194,7 +194,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                   <Button size="sm" className="h-6 px-2 text-xs bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={handleSaveJiso} disabled={savingJiso}>
                     {savingJiso ? '...' : 'OK'}
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingJiso(false)}>
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => { setEditingJiso(false); setJisoDate(atestado.data_jiso_agendada || ''); }}>
                     ✕
                   </Button>
                 </div>
@@ -203,13 +203,27 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                   <span className="text-sm text-slate-700">
                     {atestado.data_jiso_agendada ? formatDate(atestado.data_jiso_agendada) : 'Não definida'}
                   </span>
-                  <button onClick={() => setEditingJiso(true)} className="text-slate-400 hover:text-[#1e3a5f]" title="Editar data JISO">
+                  <button onClick={() => { setJisoDate(atestado.data_jiso_agendada || ''); setEditingJiso(true); }} className="text-slate-400 hover:text-[#1e3a5f]" title="Editar data JISO">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
             </div>
+            <button
+              onClick={() => setShowJisoModal(true)}
+              className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium"
+            >
+              <History className="w-3.5 h-3.5" />
+              Registrar decisão da JISO (prorrogação/cassação)
+            </button>
           </div>
+        )}
+        {showJisoModal && (
+          <JisoHistoricoModal
+            atestado={atestado}
+            open={showJisoModal}
+            onClose={() => setShowJisoModal(false)}
+          />
         )}
 
         {atestado.medico && (
