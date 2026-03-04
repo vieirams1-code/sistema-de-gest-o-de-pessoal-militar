@@ -1,10 +1,12 @@
 import React from 'react';
-import { format, differenceInDays, isPast } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Calendar, AlertCircle, CheckCircle, Clock, User } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
+import { base44 } from '@/api/base44Client';
+import { useQueryClient } from '@tanstack/react-query';
+import { Calendar, AlertCircle, CheckCircle, Clock, EyeOff } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 const statusColors = {
   'Pendente': 'bg-slate-100 text-slate-700 border-slate-200',
@@ -12,10 +14,19 @@ const statusColors = {
   'Previsto': 'bg-blue-100 text-blue-700 border-blue-200',
   'Parcialmente Gozado': 'bg-amber-100 text-amber-700 border-amber-200',
   'Gozado': 'bg-green-100 text-green-700 border-green-200',
-  'Vencido': 'bg-red-100 text-red-700 border-red-200'
+  'Vencido': 'bg-red-100 text-red-700 border-red-200',
+  'Inativo': 'bg-slate-100 text-slate-500 border-slate-200'
 };
 
 export default function PeriodoAquisitivoCard({ periodo, onClick }) {
+  const queryClient = useQueryClient();
+
+  const handleInativar = async (e) => {
+    e.stopPropagation();
+    const novoStatus = periodo.status === 'Inativo' ? 'Disponível' : 'Inativo';
+    await base44.entities.PeriodoAquisitivo.update(periodo.id, { status: novoStatus, inativo: novoStatus === 'Inativo' });
+    queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+  };
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return format(new Date(dateString + 'T00:00:00'), "dd/MM/yyyy");
@@ -75,8 +86,8 @@ export default function PeriodoAquisitivoCard({ periodo, onClick }) {
   const statusInfo = getStatusInfo();
 
   return (
-    <Card 
-      className="hover:shadow-md transition-all duration-200 cursor-pointer border border-slate-200"
+    <Card
+      className={`hover:shadow-md transition-all duration-200 cursor-pointer border border-slate-200 ${periodo.status === 'Inativo' ? 'opacity-60' : ''}`}
       onClick={onClick}
     >
       <CardContent className="p-4">
@@ -97,15 +108,22 @@ export default function PeriodoAquisitivoCard({ periodo, onClick }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-3">
-          <Badge className={`${statusColors[periodo.status] || statusColors['Pendente']} border`}>
-            {periodo.status}
-          </Badge>
-          {diasRestantesFerias > 0 && (
-            <Badge variant="outline" className="border-blue-200 text-blue-700">
-              {diasRestantesFerias} dias disponíveis
+        <div className="flex flex-wrap gap-2 mb-3 justify-between items-center">
+          <div className="flex gap-2 flex-wrap">
+            <Badge className={`${statusColors[periodo.status] || statusColors['Pendente']} border`}>
+              {periodo.status}
             </Badge>
-          )}
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs text-slate-500 hover:text-slate-700"
+            onClick={handleInativar}
+            title={periodo.status === 'Inativo' ? 'Reativar período' : 'Inativar período (desconsiderar)'}
+          >
+            <EyeOff className="w-3 h-3 mr-1" />
+            {periodo.status === 'Inativo' ? 'Reativar' : 'Inativar'}
+          </Button>
         </div>
 
         {statusInfo && (
