@@ -59,9 +59,14 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const handleSaveJiso = async () => {
+    if (!jisoDate) return;
     setSavingJiso(true);
-    await base44.entities.Atestado.update(atestado.id, { data_jiso_agendada: jisoDate });
+    await base44.entities.Atestado.update(atestado.id, {
+      data_jiso_agendada: jisoDate,
+      status_jiso: 'Aguardando JISO'
+    });
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
+    queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
     setSavingJiso(false);
     setEditingJiso(false);
   };
