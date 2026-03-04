@@ -13,7 +13,6 @@ import { format } from 'date-fns';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
-import { useQuery } from '@tanstack/react-query';
 
 const initialFormData = {
   militar_id: '',
