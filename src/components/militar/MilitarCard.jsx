@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, MapPin, Phone, Mail, MoreVertical, Pencil, Trash2, Eye } from 'lucide-react';
+import { User, MapPin, MoreVertical, Pencil, Trash2, Eye, ClipboardList } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +34,11 @@ const postoAbreviado = {
   'Coronel': 'Cel'
 };
 
+import { createPageUrl } from '@/utils';
+import { useNavigate } from 'react-router-dom';
+
 export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
+  const navigate = useNavigate();
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -81,16 +85,20 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => onView(militar)}>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Visualizar
+                   <Eye className="w-4 h-4 mr-2" />
+                   Visualizar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate(createPageUrl('FichaMilitar') + `?id=${militar.id}`)}>
+                   <ClipboardList className="w-4 h-4 mr-2" />
+                   Ficha Militar
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onEdit(militar)}>
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Editar
+                   <Pencil className="w-4 h-4 mr-2" />
+                   Editar
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onDelete(militar)} className="text-red-600">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir
+                   <Trash2 className="w-4 h-4 mr-2" />
+                   Excluir
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

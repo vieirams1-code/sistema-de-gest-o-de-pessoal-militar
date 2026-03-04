@@ -255,7 +255,7 @@ export default function CadastrarMilitar() {
           </FormSection>
 
           {/* Dados Funcionais */}
-          <FormSection title="Dados Funcionais" icon={Briefcase}>
+          <FormSection title="Dados Funcionais" icon={Briefcase} defaultOpen={true}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <FormField
                 label="Nome de Guerra"
@@ -293,35 +293,33 @@ export default function CadastrarMilitar() {
                 onChange={handleChange}
                 type="date"
               />
-              {formData.posto_graduacao && ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente', 'Aspirante'].includes(formData.posto_graduacao) && (
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700">Comportamento (Praças)</label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <FormField
-                        label=""
-                        name="comportamento"
-                        value={formData.comportamento}
-                        onChange={handleChange}
-                        type="select"
-                        options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
-                      />
-                    </div>
-                    {editId && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setHistoricoOpen(true)}
-                        className="flex-shrink-0 self-end h-10 w-10"
-                        title="Ver histórico de comportamento"
-                      >
-                        <History className="w-4 h-4" />
-                      </Button>
-                    )}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Comportamento</label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <FormField
+                      label=""
+                      name="comportamento"
+                      value={formData.comportamento}
+                      onChange={handleChange}
+                      type="select"
+                      options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
+                    />
                   </div>
+                  {editId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setHistoricoOpen(true)}
+                      className="flex-shrink-0 self-end h-10 w-10"
+                      title="Ver histórico de comportamento"
+                    >
+                      <History className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </FormSection>
 
