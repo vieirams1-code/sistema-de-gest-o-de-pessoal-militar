@@ -124,24 +124,25 @@ export default function CadastrarPublicacao() {
     const postoNome = formData.militar_posto ? `${formData.militar_posto} QBMP-1.a` : '';
     const nomeCompleto = formData.militar_nome || '';
     const matricula = formData.militar_matricula || '';
+    const cmd = `${artigo} Comandante do 1° Grupamento de Bombeiros Militar`;
     let texto = '';
 
     switch (formData.tipo) {
       case 'Elogio Individual':
         if (formData.texto_base && formData.texto_complemento) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 140, §1°, "c" e §2°, da Lei Complementar nº 053, de 30 de agosto de 1990 (Estatuto PMMS), em vigor nesta Corporação, c/c art. 67, I, e art. 68, "a" e "b", do Decreto nº 1.260, de 2 de outubro de 1981, Regulamento Disciplinar da PMMS, em vigor no CBMMS, resolve elogiar e externar sinceros cumprimentos ao 1° SGT QBMP-1.a ${nomeCompleto}, matrícula ${matricula}, ${formData.texto_complemento}`;
+          texto = `${cmd}, no uso das atribuições que lhe confere o art. 140, §1°, "c" e §2°, da Lei Complementar nº 053, de 30 de agosto de 1990 (Estatuto PMMS), em vigor nesta Corporação, c/c art. 67, I, e art. 68, "a" e "b", do Decreto nº 1.260, de 2 de outubro de 1981, Regulamento Disciplinar da PMMS, em vigor no CBMMS, resolve elogiar e externar sinceros cumprimentos ao ${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${formData.texto_complemento}`;
         }
         break;
 
       case 'Melhoria de Comportamento':
         if (formData.data_melhoria && formData.comportamento_atual && formData.comportamento_ingressou) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar, de acordo com o art. 51, § 1° c/c art. 52, inciso I, ambos do Decreto nº 1.260/1981, resolve: conceder melhoria de comportamento, a contar de ${formatarDataExtenso(formData.data_melhoria)}, ao militar a seguir: 1° SGT QBMP-1.a ${nomeCompleto}, matrícula n. ${matricula}, incluído em ${formData.data_melhoria ? new Date(formData.data_melhoria).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).split('/')[2] : ''}, por ter completado 08 (oito) meses sucessivos sem sofrer punição, melhorando o comportamento do último para o excepcional.`;
+          texto = `${cmd}, de acordo com o art. 51, § 1° c/c art. 52, inciso I, ambos do Decreto nº 1.260/1981, resolve: conceder melhoria de comportamento, a contar de ${formatarDataExtenso(formData.data_melhoria)}, ao militar a seguir: ${postoNome} ${nomeCompleto}, matrícula n. ${matricula}, por ter completado 08 (oito) meses sucessivos sem sofrer punição, melhorando o comportamento do último para o excepcional.`;
         }
         break;
 
       case 'Punição':
         if (formData.portaria && formData.tipo_punicao) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 140, § 1°, "c" e § 2°, "a" e "b", e inc. V do Decreto nº 1.260, de 02 de outubro de 1981, torna pública a Solução PAD instaurado pela Portaria n° ${formData.portaria} de ${formatarDataExtenso(formData.data_portaria)} e respectiva nota de punição, cujos conteúdos seguem em anexo, onde penaliza: 1° SGT QBMP-1.a ${nomeCompleto}, mat. ${matricula}, com: Prisão de ${formData.dias_punicao} dias, incurso em: ${formData.itens_enquadramento} transgressão Médio, Ingresso no comportamento ${formData.comportamento_ingresso}. A ${formData.tipo_punicao === 'Prisão' ? 'Prisão' : 'Detenção'} será cumprida no 1/1° GBM/CBMMS: 1) Notificar o militar punido; 2) Fazer constar nas observações do Livro de Férias e Outras Concessões.`;
+          texto = `${cmd} no uso das atribuições que lhe confere o art. 140, § 1°, "c" e § 2°, "a" e "b", e inc. V do Decreto nº 1.260, de 02 de outubro de 1981, torna pública a Solução PAD instaurado pela Portaria n° ${formData.portaria} de ${formatarDataExtenso(formData.data_portaria)} e respectiva nota de punição, cujos conteúdos seguem em anexo, onde penaliza: ${postoNome} ${nomeCompleto}, mat. ${matricula}, com: ${formData.tipo_punicao} de ${formData.dias_punicao} dias, incurso em: ${formData.itens_enquadramento} transgressão ${formData.graduacao_punicao || ''}, Ingresso no comportamento ${formData.comportamento_ingresso}. A ${formData.tipo_punicao === 'Prisão' ? 'Prisão' : 'Detenção'} será cumprida no 1/1° GBM/CBMMS: 1) Notificar o militar punido; 2) Fazer constar nas observações do Livro de Férias e Outras Concessões.`;
         }
         break;
 
@@ -153,21 +154,30 @@ export default function CadastrarPublicacao() {
         if (formData.tipo_designacao && formData.funcao && formData.data_designacao) {
           const acao = formData.tipo_designacao === 'Dispensa' ? 'dispensar' : 'designar';
           const preposicao = formData.tipo_designacao === 'Dispensa' ? 'da' : 'para exercer a';
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar, no uso de suas atribuições e conforme o §1°, "d" e §2°, "d" nº 2, do art. 5º, do Decreto nº 1.093, de 12 de junho de 1981 (Regulamento de Movimentação de Oficiais e Praças) c/c o QODE aprovado pela Portaria nº 199/BM-1 de 02 de fevereiro de 2016, resolve: ${acao} o 1° SGT QBMP-1.a ${nomeCompleto}, matrícula ${matricula}, ${preposicao} função de ${formData.funcao}, a contar de ${formatarDataExtenso(formData.data_designacao)}.`;
+          texto = `${cmd}, no uso de suas atribuições e conforme o §1°, "d" e §2°, "d" nº 2, do art. 5º, do Decreto nº 1.093, de 12 de junho de 1981 (Regulamento de Movimentação de Oficiais e Praças) c/c o QODE aprovado pela Portaria nº 199/BM-1 de 02 de fevereiro de 2016, resolve: ${acao} ${artigo === 'A' ? 'a' : 'o'} ${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${preposicao} função de ${formData.funcao}, a contar de ${formatarDataExtenso(formData.data_designacao)}.`;
         }
         break;
 
       case 'Ata JISO':
         if (formData.finalidade_jiso && formData.data_ata) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, resolve: tornar público que recebeu a Ata de Inspeção de Saúde Sessão Nº ${formData.secao_jiso}, de ${formatarDataExtenso(formData.data_ata)}, pertencente ao: 1° SGT QBMP-1.a ${nomeCompleto}, matrícula ${matricula}, inspecionado para fins de ${formData.finalidade_jiso}, conf. NUP Nº ${formData.nup}, com o parecer: ${formData.parecer_jiso}.`;
+          texto = `${cmd}, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, resolve: tornar público que recebeu a Ata de Inspeção de Saúde Sessão Nº ${formData.secao_jiso}, de ${formatarDataExtenso(formData.data_ata)}, pertencente ao: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, inspecionado para fins de ${formData.finalidade_jiso}, conf. NUP Nº ${formData.nup}, com o parecer: ${formData.parecer_jiso}.`;
         }
         break;
 
       case 'Transcrição de Documentos':
         if (formData.documento && formData.data_documento) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o recebimento do(a) ${formData.documento}, de ${formatarDataExtenso(formData.data_documento)}, ${formData.assunto}, cujo conteúdo segue anexo ao presente Boletim. Em consequência: (1) Ciente; (2) Publicar.`;
+          texto = `${cmd} torna público o recebimento do(a) ${formData.documento}, de ${formatarDataExtenso(formData.data_documento)}, ${formData.assunto}, cujo conteúdo segue anexo ao presente Boletim. Em consequência: (1) Ciente; (2) Publicar.`;
         }
         break;
+
+      case 'Homologação de Atestado': {
+        const at = atestadosMilitar.find(a => a.id === formData.atestado_homologado_id);
+        if (at) {
+          const diasExtenso = { 1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze' };
+          texto = `${cmd}, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, homologa o afastamento médico do ${postoNome} ${nomeCompleto}, matrícula ${matricula}, pelo período de ${at.dias} (${diasExtenso[at.dias] || at.dias}) dias, ${at.tipo_afastamento?.toLowerCase() || ''}, a contar de ${formatarDataExtenso(at.data_inicio)}, com término em ${formatarDataExtenso(at.data_termino)}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
+        }
+        break;
+      }
     }
 
     setFormData(prev => ({ ...prev, texto_publicacao: texto }));
