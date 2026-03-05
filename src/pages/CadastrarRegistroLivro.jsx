@@ -1060,9 +1060,14 @@ export default function CadastrarRegistroLivro() {
           {/* Texto para Publicação */}
           {textoPublicacao && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                Texto para publicação
-              </Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium text-slate-700">Texto para publicação</Label>
+                {usingCustomTemplate && (
+                  <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" /> Template personalizado aplicado
+                  </span>
+                )}
+              </div>
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-slate-700 leading-relaxed">
                   {textoPublicacao}
