@@ -28,6 +28,7 @@ const navItems = [
   { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
   { name: 'Alterações Militar', page: 'FichaMilitar', icon: Shield },
   { name: 'Templates de Texto', page: 'TemplatesTexto', icon: FileText },
+  { name: 'Subgrupamentos', page: 'Subgrupamentos', icon: Shield },
   { name: 'Configurações', page: 'Configuracoes', icon: Menu },
 ];
 
