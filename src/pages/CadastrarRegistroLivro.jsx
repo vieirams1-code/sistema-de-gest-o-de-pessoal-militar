@@ -170,7 +170,7 @@ export default function CadastrarRegistroLivro() {
 
   useEffect(() => {
     gerarTextoPublicacao();
-  }, [formData, selectedFerias]);
+  }, [formData, selectedFerias, templates]);
 
   const gerarTextoPublicacao = () => {
     const postoNome = formData.militar_posto ? `${formData.militar_posto} QOBM` : '';
@@ -182,23 +182,62 @@ export default function CadastrarRegistroLivro() {
     const dias = formData.dias || 0;
     const diasExtenso = numeroPorExtenso(dias);
 
+    // Helper: tenta usar template cadastrado primeiro
+    const tentarTemplate = (tipoRegistro, varsExtras = {}) => {
+      const tmpl = templates.find(
+        t => t.modulo === 'Livro' && t.tipo_registro === tipoRegistro && t.ativo !== false
+      );
+      if (tmpl?.template) {
+        const vars = {
+          posto_nome: postoNome,
+          nome_completo: nomeCompleto,
+          matricula,
+          data_registro: dataRegistro,
+          data_inicio: dataInicio,
+          data_termino: dataTermino,
+          dias: String(dias),
+          dias_extenso: diasExtenso,
+          ...varsExtras,
+        };
+        setUsingCustomTemplate(true);
+        return aplicarTemplate(tmpl.template, vars);
+      }
+      setUsingCustomTemplate(false);
+      return null;
+    };
+
     let texto = '';
 
     switch (formData.tipo_registro) {
       case 'Saída Férias':
         if (selectedFerias) {
-          const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
-          const fracionamento = selectedFerias.fracionamento || '';
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${formatarDataExtenso(selectedFerias.data_inicio)} entrará em gozo de férias regulamentares, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro });
+          const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Saída Férias' && t.ativo !== false);
+          if (tmpl?.template) {
+            texto = aplicarTemplate(tmpl.template, vars);
+            setUsingCustomTemplate(true);
+          } else {
+            setUsingCustomTemplate(false);
+            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
+            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${formatarDataExtenso(selectedFerias.data_inicio)} entrará em gozo de férias regulamentares, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+          }
         }
         break;
 
       case 'Retorno Férias':
         if (selectedFerias) {
-          const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
-          const fracionamento = selectedFerias.fracionamento || '';
-          const tipoFeriaTexto = fracionamento ? `${fracionamento} de férias regulamentares` : 'férias regulamentares';
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${formatarDataExtenso(formData.data_registro)}, por término do gozo da ${tipoFeriaTexto}, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro });
+          const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Retorno Férias' && t.ativo !== false);
+          if (tmpl?.template) {
+            texto = aplicarTemplate(tmpl.template, vars);
+            setUsingCustomTemplate(true);
+          } else {
+            setUsingCustomTemplate(false);
+            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
+            const fracionamento = selectedFerias.fracionamento || '';
+            const tipoFeriaTexto = fracionamento ? `${fracionamento} de férias regulamentares` : 'férias regulamentares';
+            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${formatarDataExtenso(formData.data_registro)}, por término do gozo da ${tipoFeriaTexto}, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+          }
         }
         break;
 
