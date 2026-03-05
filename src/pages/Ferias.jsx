@@ -368,31 +368,35 @@ export default function Ferias() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56">
-                                  {/* Registrar Saída (Início de Gozo) */}
-                                  {(f.status === 'Prevista' || f.status === 'Autorizada') && (
+                                  {/* Iniciar: Prevista ou Interrompida */}
+                                  {(f.status === 'Prevista' || f.status === 'Autorizada' || f.status === 'Interrompida') && (
                                     <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Saída Férias' })}>
                                       <LogOut className="w-4 h-4 mr-2 text-emerald-600" />
-                                      <span>Registrar Saída (Início Gozo)</span>
+                                      <span>{f.status === 'Interrompida' ? 'Reiniciar Férias' : 'Iniciar Férias (Registrar Saída)'}</span>
                                     </DropdownMenuItem>
                                   )}
-                                  {/* Registrar Retorno */}
+                                  {/* Em Curso: Retornar ou Interromper */}
                                   {f.status === 'Em Curso' && (
-                                    <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Retorno Férias' })}>
-                                      <LogIn className="w-4 h-4 mr-2 text-blue-600" />
-                                      <span>Registrar Retorno</span>
-                                    </DropdownMenuItem>
+                                    <>
+                                      <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Retorno Férias' })}>
+                                        <LogIn className="w-4 h-4 mr-2 text-blue-600" />
+                                        <span>Registrar Retorno</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => setInterromperModal({ open: true, ferias: f })}>
+                                        <PauseCircle className="w-4 h-4 mr-2 text-orange-600" />
+                                        <span>Interromper Férias</span>
+                                      </DropdownMenuItem>
+                                    </>
                                   )}
-                                  {/* Interromper Férias */}
-                                  {f.status === 'Em Curso' && (
-                                    <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?tipo=Interrup%C3%A7%C3%A3o+de+F%C3%A9rias&militar_id=${f.militar_id}&ferias_id=${f.id}`, '_blank')}>
-                                      <PauseCircle className="w-4 h-4 mr-2 text-orange-600" />
-                                      <span>Interromper Férias</span>
-                                    </DropdownMenuItem>
-                                  )}
-                                  {/* Adicionar outros registros */}
-                                  <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Saída Férias' })}>
-                                    <LogOut className="w-4 h-4 mr-2 text-slate-500" />
-                                    <span>Incluir Registro no Livro</span>
+                                  {/* Adicionar dias — sempre disponível */}
+                                  <DropdownMenuItem onClick={() => setAddDiasModal({ open: true, ferias: f, dias: 1, motivo: '' })}>
+                                    <PlusCircle className="w-4 h-4 mr-2 text-purple-600" />
+                                    <span>Adicionar Dias</span>
+                                  </DropdownMenuItem>
+                                  {/* Editar data início */}
+                                  <DropdownMenuItem onClick={() => setEditDataModal({ open: true, ferias: f, novaData: f.data_inicio || '' })}>
+                                    <Pencil className="w-4 h-4 mr-2 text-slate-500" />
+                                    <span>Alterar Data de Início</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem onClick={() => navigate(createPageUrl('CadastrarFerias') + `?id=${f.id}`)}>
