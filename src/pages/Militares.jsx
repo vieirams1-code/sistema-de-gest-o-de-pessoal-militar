@@ -23,22 +23,28 @@ import MilitarCard from '@/components/militar/MilitarCard';
 export default function Militares() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, isLoading: loadingUser } = useCurrentUser();
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [postoFilter, setPostoFilter] = useState('all');
-  const [mostrarInativos, setMostrarInativos] = useState(false);
-  const [viewMode, setViewMode] = useState('grid');
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [militarToDelete, setMilitarToDelete] = useState(null);
-
+  const { isAdmin, subgrupamentoId, subgrupamentoTipo, isLoading: loadingUser } = useCurrentUser();
+...
   const { data: militares = [], isLoading } = useQuery({
-    queryKey: ['militares', isAdmin, subgrupamentoId],
-    queryFn: () => {
+    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo],
+    queryFn: async () => {
       if (isAdmin) return base44.entities.Militar.list('-created_date');
-      if (subgrupamentoId) return base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-created_date');
-      return base44.entities.Militar.list('-created_date');
+      if (!subgrupamentoId) return base44.entities.Militar.list('-created_date');
+      // Usuário de Grupamento: busca todos com grupamento_id OU subgrupamento_id que sejam filhos
+      if (subgrupamentoTipo === 'Grupamento') {
+        const [porGrupamento, porSubgrupamento] = await Promise.all([
+          base44.entities.Militar.filter({ grupamento_id: subgrupamentoId }, '-created_date'),
+          base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-created_date'),
+        ]);
+        const ids = new Set();
+        const merged = [];
+        for (const m of [...porGrupamento, ...porSubgrupamento]) {
+          if (!ids.has(m.id)) { ids.add(m.id); merged.push(m); }
+        }
+        return merged;
+      }
+      // Usuário de Subgrupamento: apenas o próprio
+      return base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-created_date');
     },
     enabled: !loadingUser,
   });
