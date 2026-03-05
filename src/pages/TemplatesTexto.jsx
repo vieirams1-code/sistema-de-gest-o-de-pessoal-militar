@@ -310,31 +310,48 @@ export default function TemplatesTexto() {
                 />
               </div>
 
-              {/* Variáveis disponíveis */}
-              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                <p className="text-xs font-semibold text-slate-600 mb-2">Variáveis disponíveis (clique para copiar):</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {VARIAVEIS_COMUNS.map(v => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => {
-                        const textArea = document.querySelector('textarea.font-mono');
-                        if (textArea) {
-                          const start = textArea.selectionStart;
-                          const end = textArea.selectionEnd;
-                          const newText = editingTemplate.template.substring(0, start) + v + editingTemplate.template.substring(end);
-                          setEditingTemplate(p => ({ ...p, template: newText }));
-                        } else {
-                          setEditingTemplate(p => ({ ...p, template: p.template + v }));
-                        }
-                      }}
-                      className="text-xs bg-white border border-slate-300 rounded px-2 py-0.5 text-slate-600 hover:bg-[#1e3a5f] hover:text-white hover:border-[#1e3a5f] transition-colors font-mono"
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
+              {/* Variáveis disponíveis por grupo */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600">Variáveis disponíveis (clique para inserir no cursor):</p>
+                {GRUPOS_VARIAVEIS
+                  .filter(g => (GRUPOS_POR_MODULO[editingTemplate.modulo] || []).includes(g.grupo))
+                  .map(g => {
+                    const cores = COR_GRUPO[g.cor];
+                    return (
+                      <div key={g.grupo} className={`rounded-lg p-3 border ${cores.box}`}>
+                        <p className={`text-xs font-bold mb-2 ${cores.titulo}`}>{g.grupo}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {g.variaveis.map(({ v, desc }) => (
+                            <button
+                              key={v}
+                              type="button"
+                              title={desc}
+                              onClick={() => {
+                                const textArea = document.querySelector('textarea.font-mono');
+                                if (textArea) {
+                                  const start = textArea.selectionStart;
+                                  const end = textArea.selectionEnd;
+                                  const newText = editingTemplate.template.substring(0, start) + v + editingTemplate.template.substring(end);
+                                  setEditingTemplate(p => ({ ...p, template: newText }));
+                                  setTimeout(() => {
+                                    textArea.selectionStart = start + v.length;
+                                    textArea.selectionEnd = start + v.length;
+                                    textArea.focus();
+                                  }, 0);
+                                } else {
+                                  setEditingTemplate(p => ({ ...p, template: p.template + v }));
+                                }
+                              }}
+                              className={`text-xs border rounded px-2 py-0.5 font-mono transition-colors ${cores.badge}`}
+                            >
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                }
               </div>
 
               <div>
