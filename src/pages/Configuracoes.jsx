@@ -73,11 +73,29 @@ export default function Configuracoes() {
   const comandanteConfig = configs.find(c => c.chave === 'comandante_id');
   const comandanteId = comandanteConfig?.valor || '';
 
+  const massaSubgrupamentosFilhos = subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === massaGrupamentoId);
+
+  const militaresFiltradosMassa = militares.filter(m =>
+    !searchMassa ||
+    m.nome_completo?.toLowerCase().includes(searchMassa.toLowerCase()) ||
+    m.matricula?.includes(searchMassa) ||
+    m.posto_graduacao?.toLowerCase().includes(searchMassa.toLowerCase())
+  );
+
   const handleSelectUser = (userId) => {
     const u = usuarios.find(u => u.id === userId);
     setSelectedUser(u);
-    setUserGrupamentoId(u?.subgrupamento_id && grupamentos.find(g => g.id === u.subgrupamento_id) ? u.subgrupamento_id : u?.grupamento_id || '');
-    setUserSubgrupamentoId(u?.subgrupamento_id && subgrupamentos.find(s => s.tipo === 'Subgrupamento' && s.id === u.subgrupamento_id) ? u.subgrupamento_id : '');
+    // preenche o grupamento atual do usuário
+    const gId = grupamentos.find(g => g.id === u?.subgrupamento_id) ? u.subgrupamento_id : '';
+    const sId = subgrupamentos.find(s => s.tipo === 'Subgrupamento' && s.id === u?.subgrupamento_id) ? u.subgrupamento_id : '';
+    if (sId) {
+      const sub = subgrupamentos.find(s => s.id === sId);
+      setUserGrupamentoId(sub?.grupamento_id || '');
+      setUserSubgrupamentoId(sId);
+    } else {
+      setUserGrupamentoId(gId);
+      setUserSubgrupamentoId('');
+    }
   };
 
   const handleSaveUserScope = async () => {
@@ -90,9 +108,44 @@ export default function Configuracoes() {
       : grupamento
         ? { subgrupamento_id: grupamento.id, subgrupamento_nome: grupamento.nome, subgrupamento_tipo: 'Grupamento' }
         : { subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null };
+    await base44.auth.updateMe ? null : null; // User.update via admin
     await base44.entities.User.update(selectedUser.id, data);
     queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+    setSelectedUser(prev => ({ ...prev, ...data }));
     setSavingUser(false);
+  };
+
+  const toggleMilitar = (id) => {
+    setMilitaresSelecionados(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleTodosMilitares = () => {
+    const ids = militaresFiltradosMassa.map(m => m.id);
+    const todosSelecionados = ids.every(id => militaresSelecionados.includes(id));
+    if (todosSelecionados) {
+      setMilitaresSelecionados(prev => prev.filter(id => !ids.includes(id)));
+    } else {
+      setMilitaresSelecionados(prev => [...new Set([...prev, ...ids])]);
+    }
+  };
+
+  const handleSaveMassa = async () => {
+    if (!massaGrupamentoId || militaresSelecionados.length === 0) return;
+    setSavingMassa(true);
+    const grupamento = grupamentos.find(g => g.id === massaGrupamentoId);
+    const sub = subgrupamentos.find(s => s.id === massaSubgrupamentoId);
+    const updates = militaresSelecionados.map(id =>
+      base44.entities.Militar.update(id, sub
+        ? { grupamento_id: grupamento?.id, grupamento_nome: grupamento?.nome, subgrupamento_id: sub.id, subgrupamento_nome: sub.nome }
+        : { grupamento_id: grupamento?.id, grupamento_nome: grupamento?.nome, subgrupamento_id: '', subgrupamento_nome: '' }
+      )
+    );
+    await Promise.all(updates);
+    queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
+    setMilitaresSelecionados([]);
+    setSavingMassa(false);
   };
 
   const saveComandanteMutation = useMutation({
