@@ -176,19 +176,7 @@ export default function Atestados() {
                 className="pl-10 h-10 border-slate-200"
               />
             </div>
-            <div className="flex gap-3">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-36 h-10 border-slate-200">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Encerrado">Encerrado</SelectItem>
-                  <SelectItem value="Cancelado">Cancelado</SelectItem>
-                  <SelectItem value="Prorrogado">Prorrogado</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex gap-3 flex-wrap">
               <Select value={tipoFilter} onValueChange={setTipoFilter}>
                 <SelectTrigger className="w-40 h-10 border-slate-200">
                   <SelectValue placeholder="Tipo" />
@@ -202,24 +190,13 @@ export default function Atestados() {
                   <SelectItem value="Outro">Outro</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="flex border border-slate-200 rounded-lg overflow-hidden">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="icon"
-                  onClick={() => setViewMode('grid')}
-                  className={viewMode === 'grid' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
-                >
-                  <Grid3X3 className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="icon"
-                  onClick={() => setViewMode('list')}
-                  className={viewMode === 'list' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-              </div>
+              <Button
+                variant={showAll ? 'default' : 'outline'}
+                onClick={() => setShowAll(!showAll)}
+                className={showAll ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : 'border-slate-200'}
+              >
+                {showAll ? 'Mostrando Todos' : 'Ver Todos (Ativos)'}
+              </Button>
             </div>
           </div>
         </div>
