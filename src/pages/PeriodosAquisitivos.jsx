@@ -130,8 +130,8 @@ export default function PeriodosAquisitivos() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
+          <div className="flex flex-col md:flex-row gap-4 flex-wrap">
+            <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
                 placeholder="Buscar por militar, matrícula ou ano..."
@@ -140,6 +140,28 @@ export default function PeriodosAquisitivos() {
                 className="pl-10 h-10 border-slate-200"
               />
             </div>
+            <Select value={militarFilter} onValueChange={setMilitarFilter}>
+              <SelectTrigger className="w-full md:w-52 h-10 border-slate-200">
+                <SelectValue placeholder="Filtrar por Militar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Militares</SelectItem>
+                {militaresUnicos.map(m => (
+                  <SelectItem key={m.id} value={m.id}>{m.posto ? `${m.posto} ` : ''}{m.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={periodoFilter} onValueChange={setPeriodoFilter}>
+              <SelectTrigger className="w-full md:w-40 h-10 border-slate-200">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Períodos</SelectItem>
+                {periodosUnicos.map(p => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-48 h-10 border-slate-200">
                 <SelectValue placeholder="Status" />
