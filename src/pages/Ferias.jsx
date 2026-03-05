@@ -479,6 +479,123 @@ export default function Ferias() {
         tipoInicial={registroLivroModal.tipo}
       />
 
+      {/* Modal: Alterar Data de Início */}
+      <Dialog open={editDataModal.open} onOpenChange={v => !v && setEditDataModal({ open: false, ferias: null, novaData: '' })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-[#1e3a5f]">Alterar Data de Início</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {editDataModal.ferias && (
+              <p className="text-sm text-slate-500">
+                {editDataModal.ferias.militar_posto} {editDataModal.ferias.militar_nome} — {editDataModal.ferias.dias} dias
+              </p>
+            )}
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Nova data de início</Label>
+              <Input
+                type="date"
+                value={editDataModal.novaData}
+                onChange={e => setEditDataModal(p => ({ ...p, novaData: e.target.value }))}
+                className="mt-1.5"
+              />
+              {editDataModal.novaData && editDataModal.ferias && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Retorno: {formatDate(format(addDays(new Date(editDataModal.novaData + 'T00:00:00'), editDataModal.ferias.dias), 'yyyy-MM-dd'))}
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditDataModal({ open: false, ferias: null, novaData: '' })}>Cancelar</Button>
+              <Button
+                disabled={savingEdit || !editDataModal.novaData}
+                onClick={handleSalvarEditData}
+                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+              >
+                {savingEdit ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : null}
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Adicionar Dias */}
+      <Dialog open={addDiasModal.open} onOpenChange={v => !v && setAddDiasModal({ open: false, ferias: null, dias: 1, motivo: '' })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-[#1e3a5f]">Adicionar Dias</DialogTitle>
+            <DialogDescription>Adicione dias extras às férias e informe o motivo.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {addDiasModal.ferias && (
+              <p className="text-sm text-slate-500">
+                {addDiasModal.ferias.militar_posto} {addDiasModal.ferias.militar_nome} — Atual: {addDiasModal.ferias.dias} dias
+              </p>
+            )}
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Quantidade de dias a adicionar</Label>
+              <Input
+                type="number"
+                min={1}
+                max={30}
+                value={addDiasModal.dias}
+                onChange={e => setAddDiasModal(p => ({ ...p, dias: Number(e.target.value) }))}
+                className="mt-1.5 w-24"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Motivo <span className="text-red-500">*</span></Label>
+              <Textarea
+                value={addDiasModal.motivo}
+                onChange={e => setAddDiasModal(p => ({ ...p, motivo: e.target.value }))}
+                rows={2}
+                placeholder="Ex: Doação de sangue — Art. 46, §1º, Lei X.XXX"
+                className="mt-1.5"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setAddDiasModal({ open: false, ferias: null, dias: 1, motivo: '' })}>Cancelar</Button>
+              <Button
+                disabled={savingEdit || !addDiasModal.motivo || !addDiasModal.dias}
+                onClick={handleSalvarAddDias}
+                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+              >
+                {savingEdit ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : null}
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Interromper Férias (abre CadastrarPublicacao inline como redirect) */}
+      <Dialog open={interromperModal.open} onOpenChange={v => !v && setInterromperModal({ open: false, ferias: null })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-orange-600 flex items-center gap-2">
+              <PauseCircle className="w-5 h-5" /> Interromper Férias
+            </DialogTitle>
+            <DialogDescription>
+              Para registrar a interrupção de férias, você será redirecionado para a tela de Publicação Ex Officio com os dados preenchidos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setInterromperModal({ open: false, ferias: null })}>Cancelar</Button>
+            <Button
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              onClick={() => {
+                const f = interromperModal.ferias;
+                setInterromperModal({ open: false, ferias: null });
+                navigate(createPageUrl('CadastrarPublicacao') + `?tipo=Interrup%C3%A7%C3%A3o+de+F%C3%A9rias&militar_id=${f.militar_id}&ferias_id=${f.id}`);
+              }}
+            >
+              Ir para Publicação Ex Officio
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
