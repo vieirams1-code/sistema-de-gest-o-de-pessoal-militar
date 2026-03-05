@@ -5,26 +5,26 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Calendar, User, FileText } from 'lucide-react';
+import { Save, User, FileText, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { useQueryClient } from '@tanstack/react-query';
-import { addDays, format } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { aplicarTemplate, buildVarsLivro, formatDateBR } from '@/components/utils/templateUtils';
 
-const numeroPorExtenso = (num) => {
-  const numeros = {
-    1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',
-    11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze',16:'dezesseis',17:'dezessete',
-    18:'dezoito',19:'dezenove',20:'vinte',21:'vinte e um',22:'vinte e dois',23:'vinte e três',
-    24:'vinte e quatro',25:'vinte e cinco',26:'vinte e seis',27:'vinte e sete',28:'vinte e oito',
-    29:'vinte e nove',30:'trinta',60:'sessenta',120:'cento e vinte'
-  };
-  return numeros[num] || num.toString();
-};
-
-const formatDate = (ds) => {
-  if (!ds) return '';
-  const d = new Date(ds + 'T00:00:00');
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+// Textos padrão hardcoded (fallback quando não há template cadastrado)
+const TEXTOS_PADRAO = {
+  'Saída Férias': (ferias) => {
+    const postoNome = ferias.militar_posto ? `${ferias.militar_posto} QOBM` : '';
+    const dias = ferias.dias || 0;
+    const ext = [,'um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove','vinte','vinte e um','vinte e dois','vinte e três','vinte e quatro','vinte e cinco','vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta'][dias] || dias;
+    return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${ferias.militar_nome || ''}, matrícula ${ferias.militar_matricula || ''}, em ${formatDateBR(ferias.data_inicio)} entrará em gozo de férias regulamentares, ${dias} (${ext}) dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`;
+  },
+  'Retorno Férias': (ferias, dataRegistro) => {
+    const postoNome = ferias.militar_posto ? `${ferias.militar_posto} QOBM` : '';
+    const dias = ferias.dias || 0;
+    const ext = [,'um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove','vinte','vinte e um','vinte e dois','vinte e três','vinte e quatro','vinte e cinco','vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta'][dias] || dias;
+    const tipoFeriaTexto = ferias.fracionamento ? `${ferias.fracionamento} de férias regulamentares` : 'férias regulamentares';
+    return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${ferias.militar_nome || ''}, matrícula ${ferias.militar_matricula || ''}, em ${formatDateBR(dataRegistro)}, por término do gozo da ${tipoFeriaTexto}, ${dias} (${ext}) dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`;
+  },
 };
 
 export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial }) {
@@ -37,38 +37,52 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
   const [dataBg, setDataBg] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [textoGerado, setTextoGerado] = useState('');
+  const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
+
+  // Buscar templates cadastrados
+  const { data: templates = [] } = useQuery({
+    queryKey: ['templates-texto'],
+    queryFn: () => base44.entities.TemplateTexto.list(),
+    staleTime: 30000,
+  });
 
   useEffect(() => {
-    if (ferias && tipoInicial) {
-      setTipoRegistro(tipoInicial);
+    if (ferias && open) {
+      setTipoRegistro(tipoInicial || 'Saída Férias');
       const dataDefault = tipoInicial === 'Retorno Férias' ? ferias.data_retorno : ferias.data_inicio;
       setDataRegistro(dataDefault || new Date().toISOString().split('T')[0]);
+      setNotaBg('');
+      setNumeroBg('');
+      setDataBg('');
+      setObservacoes('');
     }
   }, [ferias, tipoInicial, open]);
 
   useEffect(() => {
-    if (!ferias) return;
+    if (!ferias || !dataRegistro) return;
     gerarTexto();
-  }, [ferias, tipoRegistro, dataRegistro]);
+  }, [ferias, tipoRegistro, dataRegistro, templates]);
 
   const gerarTexto = () => {
     if (!ferias) return;
-    const postoNome = ferias.militar_posto ? `${ferias.militar_posto} QOBM` : '';
-    const nome = ferias.militar_nome || '';
-    const mat = ferias.militar_matricula || '';
-    const periodoRef = ferias.periodo_aquisitivo_ref || '';
-    const dias = ferias.dias || 0;
-    const diasExt = numeroPorExtenso(dias);
-    const fracao = ferias.fracionamento || '';
 
-    let texto = '';
-    if (tipoRegistro === 'Saída Férias') {
-      texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nome}, matrícula ${mat}, em ${formatDate(ferias.data_inicio)} entrará em gozo de férias regulamentares, ${dias} (${diasExt}) dias, referente ao período aquisitivo ${periodoRef}.`;
-    } else if (tipoRegistro === 'Retorno Férias') {
-      const tipoFeriaTexto = fracao ? `${fracao} de férias regulamentares` : 'férias regulamentares';
-      texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nome}, matrícula ${mat}, em ${formatDate(dataRegistro)}, por término do gozo da ${tipoFeriaTexto}, ${dias} (${diasExt}) dias, referente ao período aquisitivo ${periodoRef}.`;
+    // 1. Procurar template cadastrado ativo para este tipo
+    const templateCadastrado = templates.find(
+      t => t.modulo === 'Livro' && t.tipo_registro === tipoRegistro && t.ativo !== false
+    );
+
+    if (templateCadastrado?.template) {
+      const vars = buildVarsLivro({ ferias, dataRegistro });
+      const texto = aplicarTemplate(templateCadastrado.template, vars);
+      setTextoGerado(texto);
+      setUsingCustomTemplate(true);
+    } else {
+      // 2. Fallback: texto padrão hardcoded
+      const gerador = TEXTOS_PADRAO[tipoRegistro];
+      const texto = gerador ? gerador(ferias, dataRegistro) : '';
+      setTextoGerado(texto);
+      setUsingCustomTemplate(false);
     }
-    setTextoGerado(texto);
   };
 
   const calcularStatus = () => {
@@ -81,7 +95,7 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
     if (!ferias || !dataRegistro) return;
     setLoading(true);
 
-    const registro = {
+    await base44.entities.RegistroLivro.create({
       militar_id: ferias.militar_id,
       militar_nome: ferias.militar_nome,
       militar_posto: ferias.militar_posto,
@@ -96,21 +110,12 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
       data_bg: dataBg || undefined,
       status: calcularStatus(),
       observacoes,
-    };
+    });
 
-    await base44.entities.RegistroLivro.create(registro);
-
-    // Atualizar status das férias
     if (tipoRegistro === 'Saída Férias') {
-      await base44.entities.Ferias.update(ferias.id, {
-        status: 'Em Curso',
-        data_saida_registrada: new Date().toISOString()
-      });
+      await base44.entities.Ferias.update(ferias.id, { status: 'Em Curso', data_saida_registrada: new Date().toISOString() });
     } else if (tipoRegistro === 'Retorno Férias') {
-      await base44.entities.Ferias.update(ferias.id, {
-        status: 'Gozada',
-        data_retorno_registrada: new Date().toISOString()
-      });
+      await base44.entities.Ferias.update(ferias.id, { status: 'Gozada', data_retorno_registrada: new Date().toISOString() });
     }
 
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
@@ -133,7 +138,7 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          {/* Info do militar e férias */}
+          {/* Info militar/férias */}
           <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
             <div className="flex items-center gap-2 mb-2">
               <User className="w-4 h-4 text-slate-500" />
@@ -147,11 +152,11 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
               </div>
               <div>
                 <p className="text-slate-400 text-xs">Início das Férias</p>
-                <p className="font-medium text-slate-700">{formatDate(ferias.data_inicio)}</p>
+                <p className="font-medium text-slate-700">{formatDateBR(ferias.data_inicio)}</p>
               </div>
               <div>
                 <p className="text-slate-400 text-xs">Retorno Previsto</p>
-                <p className="font-medium text-slate-700">{formatDate(ferias.data_retorno)}</p>
+                <p className="font-medium text-slate-700">{formatDateBR(ferias.data_retorno)}</p>
               </div>
               <div>
                 <p className="text-slate-400 text-xs">Dias</p>
@@ -163,10 +168,6 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
                   <p className="font-medium text-slate-700">{ferias.fracionamento}</p>
                 </div>
               )}
-              <div>
-                <p className="text-slate-400 text-xs">Status Atual</p>
-                <p className="font-medium text-slate-700">{ferias.status}</p>
-              </div>
             </div>
           </div>
 
@@ -174,9 +175,7 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
           <div>
             <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
             <Select value={tipoRegistro} onValueChange={setTipoRegistro}>
-              <SelectTrigger className="mt-1.5">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Saída Férias">Início de Férias (Saída)</SelectItem>
                 <SelectItem value="Retorno Férias">Retorno de Férias</SelectItem>
@@ -187,18 +186,20 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
           {/* Data do registro */}
           <div>
             <Label className="text-sm font-medium text-slate-700">Data do Registro <span className="text-red-500">*</span></Label>
-            <Input
-              type="date"
-              value={dataRegistro}
-              onChange={e => setDataRegistro(e.target.value)}
-              className="mt-1.5"
-            />
+            <Input type="date" value={dataRegistro} onChange={e => setDataRegistro(e.target.value)} className="mt-1.5" />
           </div>
 
           {/* Texto gerado */}
           {textoGerado && (
             <div>
-              <Label className="text-sm font-medium text-slate-700 mb-2 block">Texto para Publicação (gerado automaticamente)</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
+                {usingCustomTemplate && (
+                  <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" /> Template personalizado aplicado
+                  </span>
+                )}
+              </div>
               <Textarea
                 value={textoGerado}
                 onChange={e => setTextoGerado(e.target.value)}
