@@ -46,6 +46,14 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
     staleTime: 30000,
   });
 
+  // Buscar período aquisitivo para ter as datas completas
+  const { data: periodosAquisitivos = [] } = useQuery({
+    queryKey: ['periodos-aquisitivos', ferias?.militar_id],
+    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: ferias?.militar_id }),
+    enabled: !!ferias?.militar_id,
+    staleTime: 60000,
+  });
+
   useEffect(() => {
     if (ferias && open) {
       setTipoRegistro(tipoInicial || 'Saída Férias');
