@@ -44,6 +44,16 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   const [savingJiso, setSavingJiso] = useState(false);
   const [showJisoModal, setShowJisoModal] = useState(false);
 
+  // Buscar publicações vinculadas a este atestado
+  const { data: publicacoesVinculadas = [] } = useQuery({
+    queryKey: ['publicacoes-atestado', atestado.id],
+    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id }),
+    select: (data) => data.filter(p =>
+      p.atestado_homologado_id === atestado.id ||
+      (p.atestados_jiso_ids && p.atestados_jiso_ids.includes(atestado.id))
+    )
+  });
+
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return format(new Date(dateString + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR });
