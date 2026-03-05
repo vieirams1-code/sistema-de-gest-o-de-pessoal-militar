@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, Plus, Search, Edit } from 'lucide-react';
@@ -11,11 +12,22 @@ import { Badge } from "@/components/ui/badge";
 export default function Armamentos() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const { isAdmin, isLoading: loadingUser, hasAccess } = useCurrentUser();
 
-  const { data: armamentos = [], isLoading } = useQuery({
+  const { data: allArmamentos = [], isLoading } = useQuery({
     queryKey: ['armamentos'],
-    queryFn: () => base44.entities.Armamento.list('-created_date')
+    queryFn: () => base44.entities.Armamento.list('-created_date'),
+    enabled: !loadingUser,
   });
+
+  const { data: militaresAcessiveis = [] } = useQuery({
+    queryKey: ['militares-ids'],
+    queryFn: () => base44.entities.Militar.list(),
+    enabled: !loadingUser && !isAdmin,
+  });
+
+  const militaresIds = isAdmin ? null : new Set(militaresAcessiveis.filter(m => hasAccess(m)).map(m => m.id));
+  const armamentos = isAdmin ? allArmamentos : allArmamentos.filter(a => militaresIds?.has(a.militar_id));
 
   const filteredArmamentos = armamentos.filter(a =>
     a.tipo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
