@@ -22,6 +22,7 @@ const navItems = [
   { name: 'Armamentos', page: 'Armamentos', icon: Shield },
   { name: 'Atestados', page: 'DashboardAtestados', icon: Shield },
   { name: 'Férias', page: 'Ferias', icon: Menu },
+  { name: 'Processos & Tarefas', page: 'Processos', icon: FileText },
   { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
   { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
   { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
