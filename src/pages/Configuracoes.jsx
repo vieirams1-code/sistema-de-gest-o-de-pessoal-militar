@@ -20,6 +20,10 @@ export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userGrupamentoId, setUserGrupamentoId] = useState('');
+  const [userSubgrupamentoId, setUserSubgrupamentoId] = useState('');
+  const [savingUser, setSavingUser] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
 
   const { data: lotacoes = [] } = useQuery({
