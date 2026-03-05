@@ -702,7 +702,18 @@ export default function CadastrarPublicacao() {
                   <Input
                     type="date"
                     value={formData.data_interrupcao}
-                    onChange={e => handleChange('data_interrupcao', e.target.value)}
+                    onChange={e => {
+                      const novaData = e.target.value;
+                      handleChange('data_interrupcao', novaData);
+                      // Calcular dias gozados automaticamente com base na data de saída
+                      const feriasAlvo = feriasEmCurso.find(x => x.id === formData.ferias_interrompida_id);
+                      if (feriasAlvo && feriasAlvo.data_inicio && novaData) {
+                        const dtSaida = new Date(feriasAlvo.data_inicio + 'T00:00:00');
+                        const dtInterrupcao = new Date(novaData + 'T00:00:00');
+                        const diasGozados = Math.max(0, Math.floor((dtInterrupcao - dtSaida) / (1000 * 60 * 60 * 24)));
+                        setFormData(prev => ({ ...prev, data_interrupcao: novaData, dias_gozados_interrupcao: diasGozados }));
+                      }
+                    }}
                     className="mt-1.5"
                   />
                 </div>
@@ -716,6 +727,10 @@ export default function CadastrarPublicacao() {
                     className="mt-1.5"
                     placeholder="0"
                   />
+                  {formData.ferias_interrompida_id && formData.data_interrupcao && (() => {
+                    const f = feriasEmCurso.find(x => x.id === formData.ferias_interrompida_id);
+                    return f?.data_inicio ? <p className="text-xs text-slate-400 mt-1">Calculado a partir de {f.data_inicio}</p> : null;
+                  })()}
                 </div>
               </div>
               {formData.ferias_interrompida_id && formData.dias_gozados_interrupcao !== '' && (
@@ -724,7 +739,12 @@ export default function CadastrarPublicacao() {
                     const f = feriasEmCurso.find(x => x.id === formData.ferias_interrompida_id);
                     const gozados = Number(formData.dias_gozados_interrupcao) || 0;
                     const saldo = f ? (f.dias || 0) - gozados : 0;
-                    return `Saldo de dias a ser devolvido: ${saldo} dia(s)`;
+                    return (
+                      <div>
+                        <p><strong>Dias gozados:</strong> {gozados}</p>
+                        <p><strong>Saldo a devolver ao militar:</strong> {saldo} dia(s)</p>
+                      </div>
+                    );
                   })()}
                 </div>
               )}
