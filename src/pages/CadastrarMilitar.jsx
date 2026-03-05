@@ -101,9 +101,10 @@ export default function CadastrarMilitar() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, user } = useCurrentUser();
+  const { isAdmin, subgrupamentoId, subgrupamentoTipo, user } = useCurrentUser();
 
   const [formData, setFormData] = useState(initialFormData);
+
   const [loading, setLoading] = useState(false);
   const [historicoOpen, setHistoricoOpen] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
