@@ -52,7 +52,8 @@ export default function Atestados() {
       a.medico?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.cid_10?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || a.status === statusFilter;
+    const effectiveStatus = showAll ? 'all' : statusFilter;
+    const matchesStatus = effectiveStatus === 'all' || a.status === effectiveStatus;
     const matchesTipo = tipoFilter === 'all' || a.tipo === tipoFilter;
     
     return matchesSearch && matchesStatus && matchesTipo;
