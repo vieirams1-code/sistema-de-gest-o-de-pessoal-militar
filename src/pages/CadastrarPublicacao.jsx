@@ -134,6 +134,18 @@ export default function CadastrarPublicacao() {
     }
   }, [publicacaoExistente]);
 
+  // Pré-preencher via URL params (vindo do botão de ação rápida nas férias/atestados)
+  useEffect(() => {
+    if (!publicacaoId && (tipoParam || militarIdParam || feriasIdParam)) {
+      setFormData(prev => ({
+        ...prev,
+        ...(tipoParam ? { tipo: decodeURIComponent(tipoParam) } : {}),
+        ...(militarIdParam ? { militar_id: militarIdParam } : {}),
+        ...(feriasIdParam ? { ferias_interrompida_id: feriasIdParam } : {}),
+      }));
+    }
+  }, [tipoParam, militarIdParam, feriasIdParam, publicacaoId]);
+
   const handleChange = (name, value) => {
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
