@@ -281,7 +281,15 @@ export default function Ferias() {
                       </tr>
                     </thead>
                     <tbody>
-                      {grupo.items.map(f => (
+                      {grupo.items.map(f => {
+                        // Calcular saldo de dias para férias interrompidas
+                        let saldoDias = null;
+                        if (f.status === 'Interrompida' && f.observacoes) {
+                          const match = f.observacoes.match(/Saldo: (\d+) dias/);
+                          if (match) saldoDias = parseInt(match[1]);
+                        }
+
+                        return (
                         <tr key={f.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                           <td className="px-4 py-3">
                             <span className="font-medium text-slate-900">{f.militar_posto && <span className="text-slate-500 mr-1 text-xs">{f.militar_posto}</span>}{f.militar_nome}</span>
@@ -290,7 +298,12 @@ export default function Ferias() {
                           <td className="px-4 py-3 text-slate-600">{f.periodo_aquisitivo_ref || '-'}</td>
                           <td className="px-4 py-3 text-slate-700">{formatDate(f.data_inicio)}</td>
                           <td className="px-4 py-3 text-slate-700">{formatDate(f.data_retorno)}</td>
-                          <td className="px-4 py-3 text-slate-700">{f.dias}d</td>
+                          <td className="px-4 py-3 text-slate-700">
+                            <span>{f.dias}d</span>
+                            {saldoDias !== null && (
+                              <p className="text-xs text-orange-600 font-medium">Saldo: {saldoDias}d</p>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             {f.fracionamento && <Badge className="bg-purple-100 text-purple-700 text-xs">{f.fracionamento}</Badge>}
                           </td>
@@ -299,18 +312,55 @@ export default function Ferias() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-[#1e3a5f]"
-                                onClick={() => navigate(createPageUrl('CadastrarFerias') + `?id=${f.id}`)}>
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-red-600"
-                                onClick={() => handleDelete(f)}>
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-[#1e3a5f] hover:bg-slate-100">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  {/* Registrar Saída (Início de Gozo) */}
+                                  {(f.status === 'Prevista' || f.status === 'Autorizada') && (
+                                    <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarRegistroLivro') + `?tipo=Sa%C3%ADda+F%C3%A9rias&ferias_id=${f.id}&militar_id=${f.militar_id}`, '_blank')}>
+                                      <LogOut className="w-4 h-4 mr-2 text-emerald-600" />
+                                      <span>Registrar Saída (Início Gozo)</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {/* Registrar Retorno */}
+                                  {f.status === 'Em Curso' && (
+                                    <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarRegistroLivro') + `?tipo=Retorno+F%C3%A9rias&ferias_id=${f.id}&militar_id=${f.militar_id}`, '_blank')}>
+                                      <LogIn className="w-4 h-4 mr-2 text-blue-600" />
+                                      <span>Registrar Retorno</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {/* Interromper Férias */}
+                                  {f.status === 'Em Curso' && (
+                                    <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?tipo=Interrup%C3%A7%C3%A3o+de+F%C3%A9rias&militar_id=${f.militar_id}&ferias_id=${f.id}`, '_blank')}>
+                                      <PauseCircle className="w-4 h-4 mr-2 text-orange-600" />
+                                      <span>Interromper Férias</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {/* Consultar lançamentos de livro */}
+                                  <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarRegistroLivro') + `?ferias_id=${f.id}&militar_id=${f.militar_id}`, '_blank')}>
+                                    <BookOpen className="w-4 h-4 mr-2 text-slate-500" />
+                                    <span>Ver Lançamentos de Livro</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => navigate(createPageUrl('CadastrarFerias') + `?id=${f.id}`)}>
+                                    <Pencil className="w-4 h-4 mr-2 text-slate-500" />
+                                    <span>Editar Férias</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDelete(f)} className="text-red-600 focus:text-red-600">
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    <span>Excluir Férias</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
