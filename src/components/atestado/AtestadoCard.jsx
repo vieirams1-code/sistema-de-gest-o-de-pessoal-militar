@@ -11,7 +11,9 @@ import {
   AlertCircle,
   CheckCircle,
   Shield,
-  History
+  History,
+  Plus,
+  BookOpen
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,12 +21,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import JisoHistoricoModal from './JisoHistoricoModal';
+import { createPageUrl } from '@/utils';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
