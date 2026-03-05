@@ -266,82 +266,189 @@ export default function Configuracoes() {
             <h2 className="text-xl font-semibold text-[#1e3a5f]">Permissões de Usuários</h2>
           </div>
           <p className="text-sm text-slate-500 mb-4">
-            Defina qual grupamento/subgrupamento cada usuário pode acessar. Usuários sem atribuição veem apenas o que criaram.
+            Defina qual grupamento/subgrupamento cada usuário pode acessar. Usuários sem atribuição têm acesso total.
           </p>
 
-          <div className="space-y-4">
+          {/* Lista de usuários com suas permissões atuais */}
+          <div className="space-y-2 mb-6">
+            {usuarios.filter(u => u.role !== 'admin').map(u => (
+              <div
+                key={u.id}
+                onClick={() => handleSelectUser(u.id)}
+                className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                  selectedUser?.id === u.id
+                    ? 'border-[#1e3a5f] bg-blue-50'
+                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                }`}
+              >
+                <div>
+                  <p className="font-medium text-sm text-slate-800">{u.full_name || u.email}</p>
+                  <p className="text-xs text-slate-500">{u.email}</p>
+                </div>
+                {u.subgrupamento_nome ? (
+                  <Badge className={u.subgrupamento_tipo === 'Grupamento' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>
+                    {u.subgrupamento_nome} ({u.subgrupamento_tipo})
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-slate-400">Sem restrição</Badge>
+                )}
+              </div>
+            ))}
+            {usuarios.filter(u => u.role !== 'admin').length === 0 && (
+              <p className="text-center text-slate-400 py-4 text-sm">Nenhum usuário cadastrado</p>
+            )}
+          </div>
+
+          {/* Painel de edição do usuário selecionado */}
+          {selectedUser && (
+            <div className="border-t pt-4 space-y-4">
+              <p className="text-sm font-semibold text-slate-700">
+                Editando: <span className="text-[#1e3a5f]">{selectedUser.full_name || selectedUser.email}</span>
+              </p>
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-1.5">Grupamento</label>
+                <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um grupamento..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_nenhum">— Sem restrição —</SelectItem>
+                    {grupamentos.map(g => (
+                      <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {userGrupamentoId && !userSubgrupamentoId && (
+                  <p className="text-xs text-blue-600 mt-1">✓ Acesso a todos os subgrupamentos deste grupamento</p>
+                )}
+              </div>
+
+              {userGrupamentoId && subgrupamentosFilhos.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-1.5">Restringir a um Subgrupamento (opcional)</label>
+                  <Select value={userSubgrupamentoId || '_todos'} onValueChange={(v) => setUserSubgrupamentoId(v === '_todos' ? '' : v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos os subgrupamentos do grupamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_todos">— Acesso a todo o grupamento —</SelectItem>
+                      {subgrupamentosFilhos.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {userSubgrupamentoId && (
+                    <p className="text-xs text-amber-600 mt-1">✓ Acesso restrito apenas a este subgrupamento</p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => setSelectedUser(null)}>Cancelar</Button>
+                <Button onClick={handleSaveUserScope} disabled={savingUser} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+                  {savingUser ? 'Salvando...' : 'Salvar Permissão'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Atribuição em massa - Militares */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="w-5 h-5 text-[#1e3a5f]" />
+            <h2 className="text-xl font-semibold text-[#1e3a5f]">Atribuir Grupamento/Subgrupamento a Militares</h2>
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            Selecione militares e atribua o grupamento/subgrupamento em massa de uma vez.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="text-sm font-medium text-slate-700 block mb-1.5">Selecione o Usuário</label>
-              <Select value={selectedUser?.id || ''} onValueChange={handleSelectUser}>
+              <label className="text-sm font-medium text-slate-700 block mb-1.5">Grupamento</label>
+              <Select value={massaGrupamentoId || '_nenhum'} onValueChange={(v) => { setMassaGrupamentoId(v === '_nenhum' ? '' : v); setMassaSubgrupamentoId(''); }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione um usuário..." />
+                  <SelectValue placeholder="Selecione o grupamento..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {usuarios.filter(u => u.role !== 'admin').map(u => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.full_name || u.email} — {u.email}
-                    </SelectItem>
+                  <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                  {grupamentos.map(g => (
+                    <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {selectedUser && (
-              <>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 block mb-1.5">Grupamento</label>
-                  <Select value={userGrupamentoId} onValueChange={(v) => { setUserGrupamentoId(v); setUserSubgrupamentoId(''); }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um grupamento..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_nenhum">— Sem restrição de grupamento —</SelectItem>
-                      {grupamentos.map(g => (
-                        <SelectItem key={g.id} value={g.id}>{g.nome} {g.sigla ? `(${g.sigla})` : ''}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {userGrupamentoId && userGrupamentoId !== '_nenhum' && !userSubgrupamentoId && (
-                    <p className="text-xs text-blue-600 mt-1">✓ Acesso a todos os subgrupamentos deste grupamento</p>
-                  )}
-                </div>
-
-                {userGrupamentoId && userGrupamentoId !== '_nenhum' && subgrupamentosFilhos.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Restringir a um Subgrupamento (opcional)</label>
-                    <Select value={userSubgrupamentoId} onValueChange={setUserSubgrupamentoId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos os subgrupamentos do grupamento" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={null}>— Acesso a todo o grupamento —</SelectItem>
-                        {subgrupamentosFilhos.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.nome} {s.sigla ? `(${s.sigla})` : ''}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {userSubgrupamentoId && (
-                      <p className="text-xs text-amber-600 mt-1">✓ Acesso restrito apenas a este subgrupamento</p>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center pt-2">
-                  <div className="text-sm text-slate-500">
-                    {selectedUser.subgrupamento_nome
-                      ? `Atual: ${selectedUser.subgrupamento_nome} (${selectedUser.subgrupamento_tipo})`
-                      : 'Sem atribuição atual'}
-                  </div>
-                  <Button
-                    onClick={handleSaveUserScope}
-                    disabled={savingUser}
-                    className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                  >
-                    {savingUser ? 'Salvando...' : 'Salvar Permissão'}
-                  </Button>
-                </div>
-              </>
+            {massaGrupamentoId && massaSubgrupamentosFilhos.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-1.5">Subgrupamento (opcional)</label>
+                <Select value={massaSubgrupamentoId || '_todos'} onValueChange={(v) => setMassaSubgrupamentoId(v === '_todos' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Apenas grupamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_todos">— Apenas grupamento —</SelectItem>
+                    {massaSubgrupamentosFilhos.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
+          </div>
+
+          <div className="mb-3 flex gap-2">
+            <Input
+              placeholder="Buscar militar..."
+              value={searchMassa}
+              onChange={e => setSearchMassa(e.target.value)}
+              className="flex-1"
+            />
+            <Button variant="outline" onClick={toggleTodosMilitares} className="whitespace-nowrap">
+              {militaresFiltradosMassa.every(m => militaresSelecionados.includes(m.id)) ? (
+                <><CheckSquare className="w-4 h-4 mr-1" /> Desmarcar todos</>
+              ) : (
+                <><Square className="w-4 h-4 mr-1" /> Selecionar todos</>
+              )}
+            </Button>
+          </div>
+
+          <div className="border rounded-lg overflow-hidden max-h-72 overflow-y-auto">
+            {militaresFiltradosMassa.length === 0 ? (
+              <p className="text-center text-slate-400 py-6 text-sm">Nenhum militar encontrado</p>
+            ) : militaresFiltradosMassa.map(m => (
+              <div
+                key={m.id}
+                onClick={() => toggleMilitar(m.id)}
+                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b last:border-b-0 transition-colors ${
+                  militaresSelecionados.includes(m.id) ? 'bg-blue-50 border-blue-100' : 'hover:bg-slate-50'
+                }`}
+              >
+                {militaresSelecionados.includes(m.id)
+                  ? <CheckSquare className="w-4 h-4 text-[#1e3a5f] shrink-0" />
+                  : <Square className="w-4 h-4 text-slate-300 shrink-0" />
+                }
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-slate-800">{m.posto_graduacao} {m.nome_completo}</span>
+                  <span className="text-xs text-slate-400 ml-2">Mat. {m.matricula}</span>
+                </div>
+                {m.subgrupamento_nome && (
+                  <Badge variant="outline" className="text-xs shrink-0">{m.subgrupamento_nome}</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-between items-center mt-4">
+            <span className="text-sm text-slate-500">
+              {militaresSelecionados.length} militar(es) selecionado(s)
+            </span>
+            <Button
+              onClick={handleSaveMassa}
+              disabled={savingMassa || !massaGrupamentoId || militaresSelecionados.length === 0}
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+            >
+              {savingMassa ? 'Salvando...' : `Atribuir a ${militaresSelecionados.length} militar(es)`}
+            </Button>
           </div>
         </div>
 
