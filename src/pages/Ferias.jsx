@@ -63,6 +63,14 @@ export default function Ferias() {
   // Estado para o modal de registro de livro
   const [registroLivroModal, setRegistroLivroModal] = useState({ open: false, ferias: null, tipo: 'Saída Férias' });
 
+  // Modal editar data início
+  const [editDataModal, setEditDataModal] = useState({ open: false, ferias: null, novaData: '' });
+  // Modal adicionar dias
+  const [addDiasModal, setAddDiasModal] = useState({ open: false, ferias: null, dias: 1, motivo: '' });
+  // Modal interromper férias (publicação ex officio via popup)
+  const [interromperModal, setInterromperModal] = useState({ open: false, ferias: null });
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const { data: ferias = [], isLoading } = useQuery({
     queryKey: ['ferias'],
     queryFn: () => base44.entities.Ferias.list('-data_inicio')
