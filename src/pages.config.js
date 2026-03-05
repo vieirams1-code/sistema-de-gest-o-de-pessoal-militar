@@ -68,13 +68,14 @@ import Medalhas from './pages/Medalhas';
 import Militares from './pages/Militares';
 import PeriodosAquisitivos from './pages/PeriodosAquisitivos';
 import PlanoAnualFerias from './pages/PlanoAnualFerias';
+import Processos from './pages/Processos';
 import Publicacoes from './pages/Publicacoes';
 import Punicoes from './pages/Punicoes';
 import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
-import Processos from './pages/Processos';
+import Subgrupamentos from './pages/Subgrupamentos';
 import __Layout from './Layout.jsx';
 
 
@@ -100,13 +101,14 @@ export const PAGES = {
     "Militares": Militares,
     "PeriodosAquisitivos": PeriodosAquisitivos,
     "PlanoAnualFerias": PlanoAnualFerias,
+    "Processos": Processos,
     "Publicacoes": Publicacoes,
     "Punicoes": Punicoes,
     "TemplatesTexto": TemplatesTexto,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
-    "Processos": Processos,
+    "Subgrupamentos": Subgrupamentos,
 }
 
 export const pagesConfig = {
