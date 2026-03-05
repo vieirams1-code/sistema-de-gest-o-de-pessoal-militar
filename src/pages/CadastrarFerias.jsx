@@ -329,6 +329,12 @@ export default function CadastrarFerias() {
                         className="mt-1.5"
                         required
                       />
+                      {i === 0 && avisoVencimento && (
+                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-1.5 flex items-start gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          {avisoVencimento}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-slate-700">Data de Fim</Label>
