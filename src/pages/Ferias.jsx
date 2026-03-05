@@ -173,6 +173,41 @@ export default function Ferias() {
     return format(new Date(dateString + 'T00:00:00'), "dd/MM/yyyy");
   };
 
+  const handleSalvarEditData = async () => {
+    if (!editDataModal.ferias || !editDataModal.novaData) return;
+    setSavingEdit(true);
+    const f = editDataModal.ferias;
+    const novaDataFim = format(addDays(new Date(editDataModal.novaData + 'T00:00:00'), f.dias - 1), 'yyyy-MM-dd');
+    const novaDataRetorno = format(addDays(new Date(editDataModal.novaData + 'T00:00:00'), f.dias), 'yyyy-MM-dd');
+    await base44.entities.Ferias.update(f.id, {
+      data_inicio: editDataModal.novaData,
+      data_fim: novaDataFim,
+      data_retorno: novaDataRetorno,
+    });
+    queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    setSavingEdit(false);
+    setEditDataModal({ open: false, ferias: null, novaData: '' });
+  };
+
+  const handleSalvarAddDias = async () => {
+    if (!addDiasModal.ferias || !addDiasModal.dias) return;
+    setSavingEdit(true);
+    const f = addDiasModal.ferias;
+    const novaQtd = (f.dias || 0) + Number(addDiasModal.dias);
+    const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
+    const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
+    const obs = f.observacoes ? `${f.observacoes}\n+${addDiasModal.dias}d: ${addDiasModal.motivo}` : `+${addDiasModal.dias}d: ${addDiasModal.motivo}`;
+    await base44.entities.Ferias.update(f.id, {
+      dias: novaQtd,
+      data_fim: novaDataFim,
+      data_retorno: novaDataRetorno,
+      observacoes: obs,
+    });
+    queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    setSavingEdit(false);
+    setAddDiasModal({ open: false, ferias: null, dias: 1, motivo: '' });
+  };
+
   const stats = {
     total: ferias.length,
     emCurso: ferias.filter(f => f.status === 'Em Curso').length,
