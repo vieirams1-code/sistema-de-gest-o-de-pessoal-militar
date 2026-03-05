@@ -69,6 +69,7 @@ export default function Configuracoes() {
 
   const grupamentos = subgrupamentos.filter(s => s.tipo === 'Grupamento');
   const subgrupamentosFilhos = subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId);
+  
 
   const comandanteConfig = configs.find(c => c.chave === 'comandante_id');
   const comandanteId = comandanteConfig?.valor || '';
