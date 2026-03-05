@@ -23,7 +23,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Search, Calendar, CheckCircle, Clock, Settings, Trash2, Pencil, AlertTriangle, MoreHorizontal, LogIn, LogOut, PauseCircle, BookOpen, FileText } from 'lucide-react';
+import { Plus, Search, Calendar, CheckCircle, Clock, Settings, Trash2, Pencil, AlertTriangle, MoreHorizontal, LogIn, LogOut, PauseCircle } from 'lucide-react';
+import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -56,6 +57,9 @@ export default function Ferias() {
   const [livrosDialogOpen, setLivrosDialogOpen] = useState(false);
   const [deletingLivroId, setDeletingLivroId] = useState(null);
   const [deletingLivro, setDeletingLivro] = useState(false);
+
+  // Estado para o modal de registro de livro
+  const [registroLivroModal, setRegistroLivroModal] = useState({ open: false, ferias: null, tipo: 'Saída Férias' });
 
   const { data: ferias = [], isLoading } = useQuery({
     queryKey: ['ferias'],
