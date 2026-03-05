@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Save, ArrowLeft, Calendar, User as UserIcon, Plus, Trash2 } from 'lucide-react';
+import { Save, ArrowLeft, Calendar, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
-import { addDays, format, addYears } from 'date-fns';
+import { addDays, format, addYears, differenceInDays } from 'date-fns';
 
 import FormSection from '@/components/militar/FormSection';
 import FormField from '@/components/militar/FormField';
@@ -113,6 +113,8 @@ export default function CadastrarFerias() {
     setFracoes(novasFracoes);
   };
 
+  const [avisoVencimento, setAvisoVencimento] = useState(null);
+
   const handleFracaoChange = (i, field, value) => {
     setFracoes(prev => {
       const updated = [...prev];
@@ -125,6 +127,20 @@ export default function CadastrarFerias() {
       }
       return updated;
     });
+
+    // Verificar se a data de início está além de 24 meses do período aquisitivo
+    if (field === 'data_inicio' && value && formData.periodo_aquisitivo_id) {
+      const periodo = periodosAtivos.find(p => p.id === formData.periodo_aquisitivo_id);
+      if (periodo?.data_limite_gozo) {
+        const inicio = new Date(value + 'T00:00:00');
+        const limite = new Date(periodo.data_limite_gozo + 'T00:00:00');
+        if (inicio > limite) {
+          setAvisoVencimento(`⚠ A data de início (${format(inicio, 'dd/MM/yyyy')}) ultrapassa o prazo limite de 24 meses do período aquisitivo (${format(limite, 'dd/MM/yyyy')}).`);
+        } else {
+          setAvisoVencimento(null);
+        }
+      }
+    }
   };
 
   const handlePeriodoChange = (ref) => {
