@@ -345,7 +345,18 @@ export default function Ferias() {
                             <p className="text-xs text-slate-400">Mat: {f.militar_matricula}</p>
                           </td>
                           <td className="px-4 py-3 text-slate-600">{f.periodo_aquisitivo_ref || '-'}</td>
-                          <td className="px-4 py-3 text-slate-700">{formatDate(f.data_inicio)}</td>
+                          <td className="px-4 py-3 text-slate-700">
+                            <div className="flex items-center gap-1 group">
+                              <span>{formatDate(f.data_inicio)}</span>
+                              <button
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-[#1e3a5f]"
+                                title="Alterar data de início"
+                                onClick={() => setEditDataModal({ open: true, ferias: f, novaData: f.data_inicio || '' })}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-slate-700">{formatDate(f.data_retorno)}</td>
                           <td className="px-4 py-3 text-slate-700">
                             <span>{f.dias}d</span>
