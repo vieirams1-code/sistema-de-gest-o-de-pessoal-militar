@@ -1,0 +1,92 @@
+/**
+ * Utilitário para aplicar templates de texto com variáveis {{variavel}}.
+ */
+
+const numeroPorExtenso = (num) => {
+  const numeros = {
+    1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',
+    11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze',16:'dezesseis',17:'dezessete',
+    18:'dezoito',19:'dezenove',20:'vinte',21:'vinte e um',22:'vinte e dois',23:'vinte e três',
+    24:'vinte e quatro',25:'vinte e cinco',26:'vinte e seis',27:'vinte e sete',28:'vinte e oito',
+    29:'vinte e nove',30:'trinta',60:'sessenta',120:'cento e vinte'
+  };
+  return numeros[num] || num.toString();
+};
+
+export const formatDateBR = (ds) => {
+  if (!ds) return '';
+  try {
+    const d = new Date(ds + 'T00:00:00');
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  } catch { return ds; }
+};
+
+/**
+ * Substitui variáveis {{var}} no template pelos valores do mapa.
+ */
+export function aplicarTemplate(template, vars) {
+  if (!template) return '';
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const val = vars[key];
+    return val !== undefined && val !== null && val !== '' ? val : `{{${key}}}`;
+  });
+}
+
+/**
+ * Constrói o mapa de variáveis para registros do Livro com base em férias + dados do registro.
+ */
+export function buildVarsLivro({ ferias, dataRegistro } = {}) {
+  if (!ferias) return {};
+  const dias = ferias.dias || 0;
+  return {
+    posto_nome: ferias.militar_posto ? `${ferias.militar_posto} QOBM` : '',
+    nome_completo: ferias.militar_nome || '',
+    matricula: ferias.militar_matricula || '',
+    data_inicio: formatDateBR(ferias.data_inicio),
+    data_termino: formatDateBR(ferias.data_fim || ferias.data_termino),
+    data_retorno: formatDateBR(ferias.data_retorno),
+    data_registro: formatDateBR(dataRegistro || ferias.data_inicio),
+    dias: String(dias),
+    dias_extenso: numeroPorExtenso(dias),
+    periodo_aquisitivo: ferias.periodo_aquisitivo_ref || '',
+    fracionamento: ferias.fracionamento || '',
+    tipo_ferias_texto: ferias.fracionamento
+      ? `${ferias.fracionamento} de férias regulamentares`
+      : 'férias regulamentares',
+  };
+}
+
+/**
+ * Dados simulados para preview do template na página de edição.
+ */
+export const VARS_PREVIEW = {
+  posto_nome: 'Capitão QOBM',
+  nome_completo: 'João da Silva',
+  matricula: '123456',
+  data_inicio: '01/04/2026',
+  data_termino: '30/04/2026',
+  data_retorno: '01/05/2026',
+  data_registro: '01/04/2026',
+  dias: '30',
+  dias_extenso: 'trinta',
+  periodo_aquisitivo: '2024/2025',
+  fracionamento: '1ª parcela',
+  tipo_ferias_texto: '1ª parcela de férias regulamentares',
+  conjuge_nome: 'Maria da Silva',
+  falecido_nome: 'José da Silva',
+  falecido_certidao: '123456',
+  grau_parentesco: 'Ascendentes',
+  origem: '1° GBM',
+  destino: '2° GBM',
+  data_cedencia: '01/04/2026',
+  data_transferencia: '01/04/2026',
+  documento_referencia: 'DOEMS nº 1.234, de 01 de abril de 2026',
+  tipo_transferencia: 'Ex officio',
+  missao_descricao: 'CMAUT/2026',
+  curso_nome: 'CBMESC/2026',
+  curso_local: 'Florianópolis',
+  edicao_ano: '2026',
+  motivo_dispensa: 'serviços prestados',
+  dias_restantes: '24',
+  inicio_termino: 'Início',
+};
