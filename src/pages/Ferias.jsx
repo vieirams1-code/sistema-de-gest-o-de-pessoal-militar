@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Search, Calendar, CheckCircle, Clock, Settings, Trash2, Pencil, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Calendar, CheckCircle, Clock, Settings, Trash2, Pencil, AlertTriangle, MoreHorizontal, LogIn, LogOut, PauseCircle, BookOpen, FileText } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

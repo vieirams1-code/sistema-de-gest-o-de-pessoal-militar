@@ -20,7 +20,7 @@ export default function PeriodosAquisitivos() {
 
   const { data: periodos = [], isLoading } = useQuery({
     queryKey: ['periodos-aquisitivos'],
-    queryFn: () => base44.entities.PeriodoAquisitivo.list('-data_limite_gozo')
+    queryFn: () => base44.entities.PeriodoAquisitivo.list('-inicio_aquisitivo')
   });
 
   // Opções únicas para os filtros
