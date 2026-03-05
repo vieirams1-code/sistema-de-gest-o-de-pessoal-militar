@@ -31,6 +31,7 @@ function PrazoChip({ data }) {
 
 export default function Processos() {
   const queryClient = useQueryClient();
+  const { isAdmin, subgrupamentoId, isLoading: loadingUser } = useCurrentUser();
   const [view, setView] = useState('kanban');
   const [search, setSearch] = useState('');
   const [filterPrio, setFilterPrio] = useState('Todas');
@@ -39,8 +40,13 @@ export default function Processos() {
   const [modal, setModal] = useState({ open: false, processo: null });
 
   const { data: processos = [], isLoading } = useQuery({
-    queryKey: ['processos'],
-    queryFn: () => base44.entities.Processo.list('-created_date', 200),
+    queryKey: ['processos', isAdmin, subgrupamentoId],
+    queryFn: () => {
+      if (isAdmin) return base44.entities.Processo.list('-created_date', 200);
+      if (subgrupamentoId) return base44.entities.Processo.filter({ subgrupamento_id: subgrupamentoId }, '-created_date', 200);
+      return base44.entities.Processo.list('-created_date', 200);
+    },
+    enabled: !loadingUser,
   });
 
   const updateMutation = useMutation({

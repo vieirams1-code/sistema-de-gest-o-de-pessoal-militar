@@ -23,6 +23,7 @@ import MilitarCard from '@/components/militar/MilitarCard';
 export default function Militares() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin, subgrupamentoId, isLoading: loadingUser } = useCurrentUser();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -33,8 +34,13 @@ export default function Militares() {
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
   const { data: militares = [], isLoading } = useQuery({
-    queryKey: ['militares'],
-    queryFn: () => base44.entities.Militar.list('-created_date')
+    queryKey: ['militares', isAdmin, subgrupamentoId],
+    queryFn: () => {
+      if (isAdmin) return base44.entities.Militar.list('-created_date');
+      if (subgrupamentoId) return base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-created_date');
+      return base44.entities.Militar.list('-created_date');
+    },
+    enabled: !loadingUser,
   });
 
   const deleteMutation = useMutation({
