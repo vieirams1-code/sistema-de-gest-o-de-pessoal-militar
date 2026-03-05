@@ -62,6 +62,28 @@ export default function Configuracoes() {
   const comandanteConfig = configs.find(c => c.chave === 'comandante_id');
   const comandanteId = comandanteConfig?.valor || '';
 
+  const handleSelectUser = (userId) => {
+    const u = usuarios.find(u => u.id === userId);
+    setSelectedUser(u);
+    setUserGrupamentoId(u?.subgrupamento_id && grupamentos.find(g => g.id === u.subgrupamento_id) ? u.subgrupamento_id : u?.grupamento_id || '');
+    setUserSubgrupamentoId(u?.subgrupamento_id && subgrupamentos.find(s => s.tipo === 'Subgrupamento' && s.id === u.subgrupamento_id) ? u.subgrupamento_id : '');
+  };
+
+  const handleSaveUserScope = async () => {
+    if (!selectedUser) return;
+    setSavingUser(true);
+    const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
+    const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
+    const data = sub
+      ? { subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento' }
+      : grupamento
+        ? { subgrupamento_id: grupamento.id, subgrupamento_nome: grupamento.nome, subgrupamento_tipo: 'Grupamento' }
+        : { subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null };
+    await base44.entities.User.update(selectedUser.id, data);
+    queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+    setSavingUser(false);
+  };
+
   const saveComandanteMutation = useMutation({
     mutationFn: async (militarId) => {
       if (comandanteConfig) {
