@@ -71,11 +71,11 @@ import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import Processos from './pages/Processos';
 import Publicacoes from './pages/Publicacoes';
 import Punicoes from './pages/Punicoes';
+import Subgrupamentos from './pages/Subgrupamentos';
 import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
-import Subgrupamentos from './pages/Subgrupamentos';
 import __Layout from './Layout.jsx';
 
 
@@ -104,11 +104,11 @@ export const PAGES = {
     "Processos": Processos,
     "Publicacoes": Publicacoes,
     "Punicoes": Punicoes,
+    "Subgrupamentos": Subgrupamentos,
     "TemplatesTexto": TemplatesTexto,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
-    "Subgrupamentos": Subgrupamentos,
 }
 
 export const pagesConfig = {
