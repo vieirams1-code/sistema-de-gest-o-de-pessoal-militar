@@ -21,11 +21,91 @@ const TIPOS_POR_MODULO = {
   'JISO': ['Ata JISO', 'Resultado JISO'],
 };
 
-const VARIAVEIS_COMUNS = [
-  '{{posto_nome}}', '{{nome_completo}}', '{{matricula}}',
-  '{{data_inicio}}', '{{data_termino}}', '{{data_retorno}}',
-  '{{dias}}', '{{dias_extenso}}', '{{periodo_aquisitivo}}', '{{fracionamento}}'
+// Grupos de variáveis por categoria, com descrição
+const GRUPOS_VARIAVEIS = [
+  {
+    grupo: 'Militar',
+    cor: 'blue',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM (ex: Capitão QOBM)' },
+      { v: '{{nome_completo}}', desc: 'Nome completo do militar' },
+      { v: '{{matricula}}', desc: 'Matrícula funcional' },
+    ]
+  },
+  {
+    grupo: 'Férias / Período',
+    cor: 'green',
+    variaveis: [
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo (ex: 2024/2025)' },
+      { v: '{{data_inicio}}', desc: 'Data de início das férias (dd/mm/aaaa)' },
+      { v: '{{data_termino}}', desc: 'Data de término das férias (dd/mm/aaaa)' },
+      { v: '{{data_retorno}}', desc: 'Data de retorno ao trabalho (dd/mm/aaaa)' },
+      { v: '{{dias}}', desc: 'Quantidade de dias (número)' },
+      { v: '{{dias_extenso}}', desc: 'Quantidade de dias por extenso (ex: vinte)' },
+      { v: '{{fracionamento}}', desc: 'Fração das férias (ex: 1ª parcela)' },
+      { v: '{{tipo_ferias_texto}}', desc: 'Texto do tipo de férias (ex: 1ª parcela de férias regulamentares)' },
+    ]
+  },
+  {
+    grupo: 'Registro / Publicação',
+    cor: 'purple',
+    variaveis: [
+      { v: '{{data_registro}}', desc: 'Data do registro no livro (dd/mm/aaaa)' },
+      { v: '{{documento_referencia}}', desc: 'Documento de referência (DOEMS, Nota, OS)' },
+      { v: '{{tipo_transferencia}}', desc: 'Tipo de transferência (A pedido / Ex officio)' },
+    ]
+  },
+  {
+    grupo: 'Licenças / Afastamentos',
+    cor: 'orange',
+    variaveis: [
+      { v: '{{inicio_termino}}', desc: 'Se é início ou término do afastamento' },
+      { v: '{{conjuge_nome}}', desc: 'Nome do cônjuge (Núpcias)' },
+      { v: '{{falecido_nome}}', desc: 'Nome do falecido (Luto)' },
+      { v: '{{falecido_certidao}}', desc: 'Número da certidão de óbito (Luto)' },
+      { v: '{{grau_parentesco}}', desc: 'Grau de parentesco (Luto)' },
+      { v: '{{motivo_dispensa}}', desc: 'Motivo da dispensa (Recompensa)' },
+      { v: '{{dias_restantes}}', desc: 'Dias restantes (Dispensa Desconto Férias)' },
+    ]
+  },
+  {
+    grupo: 'Movimentação / Missões',
+    cor: 'slate',
+    variaveis: [
+      { v: '{{origem}}', desc: 'Unidade de origem' },
+      { v: '{{destino}}', desc: 'Unidade ou local de destino' },
+      { v: '{{data_cedencia}}', desc: 'Data da cedência (dd/mm/aaaa)' },
+      { v: '{{data_transferencia}}', desc: 'Data da transferência (dd/mm/aaaa)' },
+      { v: '{{missao_descricao}}', desc: 'Descrição da missão (ex: CMAUT/2026)' },
+    ]
+  },
+  {
+    grupo: 'Cursos / Estágios',
+    cor: 'teal',
+    variaveis: [
+      { v: '{{curso_nome}}', desc: 'Nome do curso ou estágio' },
+      { v: '{{curso_local}}', desc: 'Local do curso' },
+      { v: '{{edicao_ano}}', desc: 'Edição ou ano do curso' },
+    ]
+  },
 ];
+
+// Quais grupos mostrar por módulo
+const GRUPOS_POR_MODULO = {
+  'Livro': ['Militar', 'Férias / Período', 'Registro / Publicação', 'Licenças / Afastamentos', 'Movimentação / Missões', 'Cursos / Estágios'],
+  'Publicação Ex Officio': ['Militar', 'Registro / Publicação'],
+  'Atestado': ['Militar'],
+  'JISO': ['Militar'],
+};
+
+const COR_GRUPO = {
+  blue: { box: 'bg-blue-50 border-blue-200', titulo: 'text-blue-700', badge: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600' },
+  green: { box: 'bg-green-50 border-green-200', titulo: 'text-green-700', badge: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-600 hover:text-white hover:border-green-600' },
+  purple: { box: 'bg-purple-50 border-purple-200', titulo: 'text-purple-700', badge: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-600 hover:text-white hover:border-purple-600' },
+  orange: { box: 'bg-orange-50 border-orange-200', titulo: 'text-orange-700', badge: 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-600 hover:text-white hover:border-orange-600' },
+  slate: { box: 'bg-slate-50 border-slate-200', titulo: 'text-slate-700', badge: 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-600 hover:text-white hover:border-slate-600' },
+  teal: { box: 'bg-teal-50 border-teal-200', titulo: 'text-teal-700', badge: 'bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-600 hover:text-white hover:border-teal-600' },
+};
 
 export default function TemplatesTexto() {
   const queryClient = useQueryClient();
