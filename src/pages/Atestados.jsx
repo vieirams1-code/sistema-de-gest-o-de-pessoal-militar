@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, FileText, Grid3X3, List, Calendar, AlertCircle } from 'lucide-react';
+import { Plus, Search, FileText, Calendar, AlertCircle } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
 
