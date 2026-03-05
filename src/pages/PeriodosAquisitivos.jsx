@@ -15,21 +15,30 @@ export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [militarFilter, setMilitarFilter] = useState('all');
+  const [periodoFilter, setPeriodoFilter] = useState('all');
 
   const { data: periodos = [], isLoading } = useQuery({
     queryKey: ['periodos-aquisitivos'],
     queryFn: () => base44.entities.PeriodoAquisitivo.list('-data_limite_gozo')
   });
 
+  // Opções únicas para os filtros
+  const militaresUnicos = [...new Map(periodos.map(p => [p.militar_id, { id: p.militar_id, nome: p.militar_nome, posto: p.militar_posto }])).values()]
+    .filter(m => m.id)
+    .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
+  const periodosUnicos = [...new Set(periodos.map(p => p.ano_referencia).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+
   const filteredPeriodos = periodos.filter(p => {
     const matchesSearch = 
       p.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.ano_referencia?.includes(searchTerm);
-    
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
+    const matchesMilitar = militarFilter === 'all' || p.militar_id === militarFilter;
+    const matchesPeriodo = periodoFilter === 'all' || p.ano_referencia === periodoFilter;
+    return matchesSearch && matchesStatus && matchesMilitar && matchesPeriodo;
   });
 
   // Estatísticas
