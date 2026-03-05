@@ -116,7 +116,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem onClick={() => onView(atestado)}>
                 <Eye className="w-4 h-4 mr-2" />
                 Visualizar
@@ -125,11 +125,32 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 <Pencil className="w-4 h-4 mr-2" />
                 Editar
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?tipo=Homologa%C3%A7%C3%A3o+de+Atestado&militar_id=${atestado.militar_id}&atestado_id=${atestado.id}`, '_blank')}>
+                <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
+                Homologação pelo Comandante
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?tipo=Ata+JISO&militar_id=${atestado.militar_id}&atestado_id=${atestado.id}`, '_blank')}>
+                <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
+                Ata JISO
+              </DropdownMenuItem>
+              {publicacoesVinculadas.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  {publicacoesVinculadas.map(p => (
+                    <DropdownMenuItem key={p.id} onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?id=${p.id}`, '_blank')}>
+                      <FileText className="w-4 h-4 mr-2 text-blue-500" />
+                      <span className="truncate">{p.tipo} — {p.status}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowJisoModal(true)}>
                 <History className="w-4 h-4 mr-2" />
-                Ver registros de decisões
+                Registrar decisão JISO
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDelete(atestado)} className="text-red-600">
+              <DropdownMenuItem onClick={() => onDelete(atestado)} className="text-red-600 focus:text-red-600">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Excluir
               </DropdownMenuItem>
