@@ -24,7 +24,7 @@ export default function Militares() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin, subgrupamentoId, subgrupamentoTipo, isLoading: loadingUser } = useCurrentUser();
-...
+
   const { data: militares = [], isLoading } = useQuery({
     queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo],
     queryFn: async () => {
