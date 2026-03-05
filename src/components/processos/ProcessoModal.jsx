@@ -22,13 +22,15 @@ const TIPOS = ['Renovação de Contrato', 'Processo Administrativo', 'Processo J
 
 export default function ProcessoModal({ open, onClose, processo }) {
   const queryClient = useQueryClient();
+  const { isAdmin, subgrupamentoId, user } = useCurrentUser();
   const isNew = !processo?.id;
 
   const defaultForm = {
     titulo: '', descricao: '', tipo: '', status: 'A Fazer', prioridade: 'Média',
     militar_id: '', militar_nome: '', militar_posto: '', militar_matricula: '',
     numero_protocolo: '', data_limite: '', data_renovacao: '',
-    responsavel: '', tags: [], observacoes: '', historico_acoes: []
+    responsavel: '', tags: [], observacoes: '', historico_acoes: [],
+    subgrupamento_id: '', subgrupamento_nome: ''
   };
 
   const [form, setForm] = useState(defaultForm);
