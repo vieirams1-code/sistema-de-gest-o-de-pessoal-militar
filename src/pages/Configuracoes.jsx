@@ -194,6 +194,92 @@ export default function Configuracoes() {
           })()}
         </div>
 
+        {/* Permissões de Usuários */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-[#1e3a5f]" />
+            <h2 className="text-xl font-semibold text-[#1e3a5f]">Permissões de Usuários</h2>
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            Defina qual grupamento/subgrupamento cada usuário pode acessar. Usuários sem atribuição veem apenas o que criaram.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700 block mb-1.5">Selecione o Usuário</label>
+              <Select value={selectedUser?.id || ''} onValueChange={handleSelectUser}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um usuário..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {usuarios.filter(u => u.role !== 'admin').map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.full_name || u.email} — {u.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedUser && (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-1.5">Grupamento</label>
+                  <Select value={userGrupamentoId} onValueChange={(v) => { setUserGrupamentoId(v); setUserSubgrupamentoId(''); }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um grupamento..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_nenhum">— Sem restrição de grupamento —</SelectItem>
+                      {grupamentos.map(g => (
+                        <SelectItem key={g.id} value={g.id}>{g.nome} {g.sigla ? `(${g.sigla})` : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {userGrupamentoId && userGrupamentoId !== '_nenhum' && !userSubgrupamentoId && (
+                    <p className="text-xs text-blue-600 mt-1">✓ Acesso a todos os subgrupamentos deste grupamento</p>
+                  )}
+                </div>
+
+                {userGrupamentoId && userGrupamentoId !== '_nenhum' && subgrupamentosFilhos.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Restringir a um Subgrupamento (opcional)</label>
+                    <Select value={userSubgrupamentoId} onValueChange={setUserSubgrupamentoId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos os subgrupamentos do grupamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={null}>— Acesso a todo o grupamento —</SelectItem>
+                        {subgrupamentosFilhos.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.nome} {s.sigla ? `(${s.sigla})` : ''}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {userSubgrupamentoId && (
+                      <p className="text-xs text-amber-600 mt-1">✓ Acesso restrito apenas a este subgrupamento</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2">
+                  <div className="text-sm text-slate-500">
+                    {selectedUser.subgrupamento_nome
+                      ? `Atual: ${selectedUser.subgrupamento_nome} (${selectedUser.subgrupamento_tipo})`
+                      : 'Sem atribuição atual'}
+                  </div>
+                  <Button
+                    onClick={handleSaveUserScope}
+                    disabled={savingUser}
+                    className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                  >
+                    {savingUser ? 'Salvando...' : 'Salvar Permissão'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
         {/* Lotações */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Lotações</h2>
