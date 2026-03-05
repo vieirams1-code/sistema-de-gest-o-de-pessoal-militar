@@ -27,6 +27,8 @@ const initialFormData = {
   destino: '',
   nome_guerra: '',
   matricula: '',
+  subgrupamento_id: '',
+  subgrupamento_nome: '',
   posto_graduacao: '',
   quadro: '',
   data_inclusao: '',
