@@ -65,6 +65,9 @@ export default function CadastrarPublicacao() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const publicacaoId = searchParams.get('id');
+  const tipoParam = searchParams.get('tipo');
+  const militarIdParam = searchParams.get('militar_id');
+  const feriasIdParam = searchParams.get('ferias_id');
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
