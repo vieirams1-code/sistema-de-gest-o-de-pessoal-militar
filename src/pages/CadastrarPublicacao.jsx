@@ -20,6 +20,9 @@ const initialFormData = {
   militar_posto: '',
   militar_matricula: '',
   tipo: 'Elogio Individual',
+  ferias_interrompida_id: '',
+  dias_gozados_interrupcao: '',
+  data_interrupcao: '',
   data_publicacao: new Date().toISOString().split('T')[0],
   texto_base: '',
   texto_complemento: '',
@@ -97,6 +100,14 @@ export default function CadastrarPublicacao() {
       comportamento_atual: comp,
     }));
   }, [militarSelecionado?.id]);
+
+  // Férias em curso para interrupção
+  const { data: feriasEmCurso = [] } = useQuery({
+    queryKey: ['ferias-em-curso', formData.militar_id],
+    queryFn: () => base44.entities.Ferias.filter({ militar_id: formData.militar_id }),
+    enabled: !!formData.militar_id && formData.tipo === 'Interrupção de Férias',
+    select: (data) => data.filter(f => f.status === 'Em Curso' || f.status === 'Prevista')
+  });
 
   // Atestados do militar para JISO / homologação
   const { data: atestadosMilitar = [] } = useQuery({
