@@ -8,7 +8,8 @@ import {
   Home,
   UserPlus,
   Shield,
-  ChevronRight
+  ChevronRight,
+  FileText
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +26,7 @@ const navItems = [
   { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
   { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
   { name: 'Alterações Militar', page: 'FichaMilitar', icon: Shield },
+  { name: 'Templates de Texto', page: 'TemplatesTexto', icon: FileText },
   { name: 'Configurações', page: 'Configuracoes', icon: Menu },
 ];
 
