@@ -146,6 +146,12 @@ export default function CadastrarMilitar() {
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
 
+    // Preencher subgrupamento automaticamente para usuários não-admin
+    if (!editId && !isAdmin && subgrupamentoId) {
+      dataToSave.subgrupamento_id = subgrupamentoId;
+      dataToSave.subgrupamento_nome = user?.subgrupamento_nome || '';
+    }
+
     let militarId = editId;
     if (editId) {
       await base44.entities.Militar.update(editId, dataToSave);
