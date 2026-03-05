@@ -675,6 +675,63 @@ export default function CadastrarPublicacao() {
           </div>
         );
 
+      case 'Interrupção de Férias':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Interrupção de Férias</h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm text-slate-700 font-medium">Férias a Interromper <span className="text-red-500">*</span></Label>
+                <Select value={formData.ferias_interrompida_id} onValueChange={v => handleChange('ferias_interrompida_id', v)}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Selecione as férias em curso..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {feriasEmCurso.length === 0 && <SelectItem value="_none" disabled>Nenhuma férias em curso para este militar</SelectItem>}
+                    {feriasEmCurso.map(f => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.periodo_aquisitivo_ref} — {f.data_inicio} a {f.data_fim} ({f.dias}d) — {f.status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-slate-700 font-medium">Data da Interrupção <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="date"
+                    value={formData.data_interrupcao}
+                    onChange={e => handleChange('data_interrupcao', e.target.value)}
+                    className="mt-1.5"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm text-slate-700 font-medium">Dias Efetivamente Gozados</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.dias_gozados_interrupcao}
+                    onChange={e => handleChange('dias_gozados_interrupcao', e.target.value)}
+                    className="mt-1.5"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              {formData.ferias_interrompida_id && formData.dias_gozados_interrupcao !== '' && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                  {(() => {
+                    const f = feriasEmCurso.find(x => x.id === formData.ferias_interrompida_id);
+                    const gozados = Number(formData.dias_gozados_interrupcao) || 0;
+                    const saldo = f ? (f.dias || 0) - gozados : 0;
+                    return `Saldo de dias a ser devolvido: ${saldo} dia(s)`;
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -762,6 +819,7 @@ export default function CadastrarPublicacao() {
                   <SelectItem value="Designação / Dispensa de Função">Designação / Dispensa de Função</SelectItem>
                   <SelectItem value="Ata JISO">Ata JISO</SelectItem>
                   <SelectItem value="Transcrição de Documentos">Transcrição de Documentos</SelectItem>
+                  <SelectItem value="Interrupção de Férias">Interrupção de Férias</SelectItem>
                 </SelectContent>
               </Select>
             </div>
