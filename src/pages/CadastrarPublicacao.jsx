@@ -261,6 +261,30 @@ export default function CadastrarPublicacao() {
       savedId = saved.id;
     }
 
+    // Interrupção de férias
+    if (formData.tipo === 'Interrupção de Férias' && formData.ferias_interrompida_id) {
+      const feriasAlvo = feriasEmCurso.find(f => f.id === formData.ferias_interrompida_id);
+      if (feriasAlvo) {
+        const diasGozados = Number(formData.dias_gozados_interrupcao) || 0;
+        const diasSaldo = (feriasAlvo.dias || 0) - diasGozados;
+        await base44.entities.Ferias.update(formData.ferias_interrompida_id, {
+          status: 'Interrompida',
+          observacoes: `Interrompida em ${formData.data_interrupcao || formData.data_publicacao}. Dias gozados: ${diasGozados}. Saldo: ${diasSaldo} dias.`
+        });
+        // Atualizar período aquisitivo
+        if (feriasAlvo.periodo_aquisitivo_id) {
+          const periodoList = await base44.entities.PeriodoAquisitivo.filter({ id: feriasAlvo.periodo_aquisitivo_id });
+          const periodo = periodoList[0];
+          if (periodo) {
+            await base44.entities.PeriodoAquisitivo.update(feriasAlvo.periodo_aquisitivo_id, {
+              dias_gozados: diasGozados,
+              status: diasSaldo > 0 ? 'Parcialmente Gozado' : 'Gozado'
+            });
+          }
+        }
+      }
+    }
+
     // Marcar atestados homologados para Ata JISO
     if (formData.tipo === 'Ata JISO' && formData.atestados_jiso_ids?.length) {
       for (const aid of formData.atestados_jiso_ids) {
