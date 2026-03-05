@@ -36,7 +36,8 @@ const GRUPOS_VARIAVEIS = [
     grupo: 'Férias / Período',
     cor: 'green',
     variaveis: [
-      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo (ex: 2024/2025)' },
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo completo (ex: 01/09/2024 a 31/08/2025)' },
+      { v: '{{periodo_aquisitivo_simplificado}}', desc: 'Período aquisitivo simplificado (ex: 2024/2025)' },
       { v: '{{data_inicio}}', desc: 'Data de início das férias (dd/mm/aaaa)' },
       { v: '{{data_termino}}', desc: 'Data de término das férias (dd/mm/aaaa)' },
       { v: '{{data_retorno}}', desc: 'Data de retorno ao trabalho (dd/mm/aaaa)' },

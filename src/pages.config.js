@@ -70,10 +70,10 @@ import PeriodosAquisitivos from './pages/PeriodosAquisitivos';
 import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import Publicacoes from './pages/Publicacoes';
 import Punicoes from './pages/Punicoes';
+import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
-import TemplatesTexto from './pages/TemplatesTexto';
 import __Layout from './Layout.jsx';
 
 
@@ -101,10 +101,10 @@ export const PAGES = {
     "PlanoAnualFerias": PlanoAnualFerias,
     "Publicacoes": Publicacoes,
     "Punicoes": Punicoes,
+    "TemplatesTexto": TemplatesTexto,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
-    "TemplatesTexto": TemplatesTexto,
 }
 
 export const pagesConfig = {
