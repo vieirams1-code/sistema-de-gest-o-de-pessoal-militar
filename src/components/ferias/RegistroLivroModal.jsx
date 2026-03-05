@@ -69,7 +69,7 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
   useEffect(() => {
     if (!ferias || !dataRegistro) return;
     gerarTexto();
-  }, [ferias, tipoRegistro, dataRegistro, templates]);
+  }, [ferias, tipoRegistro, dataRegistro, templates, periodosAquisitivos]);
 
   const gerarTexto = () => {
     if (!ferias) return;
