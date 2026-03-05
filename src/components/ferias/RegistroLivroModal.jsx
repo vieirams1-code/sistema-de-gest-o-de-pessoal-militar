@@ -74,13 +74,16 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
   const gerarTexto = () => {
     if (!ferias) return;
 
+    // Buscar período aquisitivo para datas completas
+    const periodo = periodosAquisitivos.find(p => p.id === ferias.periodo_aquisitivo_id);
+
     // 1. Procurar template cadastrado ativo para este tipo
     const templateCadastrado = templates.find(
       t => t.modulo === 'Livro' && t.tipo_registro === tipoRegistro && t.ativo !== false
     );
 
     if (templateCadastrado?.template) {
-      const vars = buildVarsLivro({ ferias, dataRegistro });
+      const vars = buildVarsLivro({ ferias, dataRegistro, periodo });
       const texto = aplicarTemplate(templateCadastrado.template, vars);
       setTextoGerado(texto);
       setUsingCustomTemplate(true);
