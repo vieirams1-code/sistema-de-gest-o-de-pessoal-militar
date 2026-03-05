@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Award, Plus, Search, Settings, Edit } from 'lucide-react';
@@ -15,11 +16,23 @@ export default function Medalhas() {
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState('all');
   const [anoFilter, setAnoFilter] = useState('all');
+  const { isAdmin, isLoading: loadingUser, hasAccess } = useCurrentUser();
 
-  const { data: medalhas = [], isLoading } = useQuery({
+  const { data: allMedalhas = [], isLoading } = useQuery({
     queryKey: ['medalhas'],
-    queryFn: () => base44.entities.Medalha.list('-created_date')
+    queryFn: () => base44.entities.Medalha.list('-created_date'),
+    enabled: !loadingUser,
   });
+
+  // Filtrar medalhas pelo escopo do usuário: busca os militares acessíveis via hasAccess
+  const { data: militaresAcessiveis = [] } = useQuery({
+    queryKey: ['militares-ids'],
+    queryFn: () => base44.entities.Militar.list(),
+    enabled: !loadingUser && !isAdmin,
+  });
+
+  const militaresIds = isAdmin ? null : new Set(militaresAcessiveis.filter(m => hasAccess(m)).map(m => m.id));
+  const medalhas = isAdmin ? allMedalhas : allMedalhas.filter(m => militaresIds?.has(m.militar_id));
 
   const { data: tiposMedalha = [] } = useQuery({
     queryKey: ['tipos-medalha'],
