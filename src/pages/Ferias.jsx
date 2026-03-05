@@ -23,9 +23,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Search, Calendar, CheckCircle, Clock, Settings, Trash2, Pencil, AlertTriangle, MoreHorizontal, LogIn, LogOut, PauseCircle } from 'lucide-react';
+import { Plus, Search, Calendar, CheckCircle, Clock, Settings, Trash2, Pencil, AlertTriangle, MoreHorizontal, LogIn, LogOut, PauseCircle, PlusCircle } from 'lucide-react';
 import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const statusColors = {
