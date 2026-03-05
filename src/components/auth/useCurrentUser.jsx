@@ -17,15 +17,15 @@ export function useCurrentUser() {
     if (isAdmin) return true;
     if (!subgrupamentoId) return false;
 
-    // Se o usuário é de um Grupamento, vê tudo do grupamento + todos os subgrupamentos filhos
+    // Se o usuário é de um Grupamento, vê tudo do grupamento (via grupamento_id ou subgrupamento_id direto)
     if (subgrupamentoTipo === 'Grupamento') {
       return (
-        registro.subgrupamento_id === subgrupamentoId ||
-        registro.grupamento_id === subgrupamentoId
+        registro.grupamento_id === subgrupamentoId ||
+        registro.subgrupamento_id === subgrupamentoId
       );
     }
 
-    // Se o usuário é de um Subgrupamento específico, vê apenas o próprio
+    // Se o usuário é de um Subgrupamento específico, vê apenas o próprio subgrupamento
     return registro.subgrupamento_id === subgrupamentoId;
   };
 
