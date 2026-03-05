@@ -14,6 +14,7 @@ import TagInput from '@/components/militar/TagInput';
 import LotacaoSelector from '@/components/militar/LotacaoSelector';
 import FuncaoSelector from '@/components/militar/FuncaoSelector';
 import HistoricoComportamentoModal from '@/components/militar/HistoricoComportamentoModal';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const initialFormData = {
   nome_completo: '',
