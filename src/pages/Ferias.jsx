@@ -422,6 +422,14 @@ export default function Ferias() {
         </DialogContent>
       </Dialog>
 
+      {/* Modal de Registro no Livro */}
+      <RegistroLivroModal
+        open={registroLivroModal.open}
+        onClose={() => setRegistroLivroModal({ open: false, ferias: null, tipo: 'Saída Férias' })}
+        ferias={registroLivroModal.ferias}
+        tipoInicial={registroLivroModal.tipo}
+      />
+
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
