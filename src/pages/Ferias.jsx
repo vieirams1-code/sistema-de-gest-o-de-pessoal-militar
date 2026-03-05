@@ -325,14 +325,14 @@ export default function Ferias() {
                                 <DropdownMenuContent align="end" className="w-56">
                                   {/* Registrar Saída (Início de Gozo) */}
                                   {(f.status === 'Prevista' || f.status === 'Autorizada') && (
-                                    <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarRegistroLivro') + `?tipo=Sa%C3%ADda+F%C3%A9rias&ferias_id=${f.id}&militar_id=${f.militar_id}`, '_blank')}>
+                                    <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Saída Férias' })}>
                                       <LogOut className="w-4 h-4 mr-2 text-emerald-600" />
                                       <span>Registrar Saída (Início Gozo)</span>
                                     </DropdownMenuItem>
                                   )}
                                   {/* Registrar Retorno */}
                                   {f.status === 'Em Curso' && (
-                                    <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarRegistroLivro') + `?tipo=Retorno+F%C3%A9rias&ferias_id=${f.id}&militar_id=${f.militar_id}`, '_blank')}>
+                                    <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Retorno Férias' })}>
                                       <LogIn className="w-4 h-4 mr-2 text-blue-600" />
                                       <span>Registrar Retorno</span>
                                     </DropdownMenuItem>
@@ -344,10 +344,10 @@ export default function Ferias() {
                                       <span>Interromper Férias</span>
                                     </DropdownMenuItem>
                                   )}
-                                  {/* Consultar lançamentos de livro */}
-                                  <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarRegistroLivro') + `?ferias_id=${f.id}&militar_id=${f.militar_id}`, '_blank')}>
-                                    <BookOpen className="w-4 h-4 mr-2 text-slate-500" />
-                                    <span>Ver Lançamentos de Livro</span>
+                                  {/* Adicionar outros registros */}
+                                  <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Saída Férias' })}>
+                                    <LogOut className="w-4 h-4 mr-2 text-slate-500" />
+                                    <span>Incluir Registro no Livro</span>
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem onClick={() => navigate(createPageUrl('CadastrarFerias') + `?id=${f.id}`)}>
