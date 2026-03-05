@@ -109,6 +109,13 @@ export default function CadastrarMilitar() {
   const [historicoOpen, setHistoricoOpen] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
 
+  const { data: subgrupamentosAll = [] } = useQuery({
+    queryKey: ['subgrupamentos'],
+    queryFn: () => base44.entities.Subgrupamento.list('nome'),
+  });
+  const grupamentos = subgrupamentosAll.filter(s => s.tipo === 'Grupamento');
+  const subgrupamentosLista = subgrupamentosAll.filter(s => s.tipo === 'Subgrupamento');
+
   const { data: editingMilitar, isLoading: loadingEdit } = useQuery({
     queryKey: ['militar', editId],
     queryFn: async () => {
