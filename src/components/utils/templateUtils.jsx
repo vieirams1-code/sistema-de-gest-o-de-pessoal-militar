@@ -33,9 +33,21 @@ export function aplicarTemplate(template, vars) {
 }
 
 /**
- * Constrói o mapa de variáveis para registros do Livro com base em férias + dados do registro.
+ * Formata período aquisitivo completo: busca datas no PeriodoAquisitivo.
+ * Recebe o objeto periodo (opcional) para exibir datas completas.
  */
-export function buildVarsLivro({ ferias, dataRegistro } = {}) {
+export const formatPeriodoAquisitivo = (ref, periodo) => {
+  if (periodo?.inicio_aquisitivo && periodo?.fim_aquisitivo) {
+    return `${formatDateBR(periodo.inicio_aquisitivo)} a ${formatDateBR(periodo.fim_aquisitivo)}`;
+  }
+  return ref || '';
+};
+
+/**
+ * Constrói o mapa de variáveis para registros do Livro com base em férias + dados do registro.
+ * Recebe opcionalmente o objeto periodo aquisitivo para gerar a data completa.
+ */
+export function buildVarsLivro({ ferias, dataRegistro, periodo } = {}) {
   if (!ferias) return {};
   const dias = ferias.dias || 0;
   return {
@@ -48,7 +60,8 @@ export function buildVarsLivro({ ferias, dataRegistro } = {}) {
     data_registro: formatDateBR(dataRegistro || ferias.data_inicio),
     dias: String(dias),
     dias_extenso: numeroPorExtenso(dias),
-    periodo_aquisitivo: ferias.periodo_aquisitivo_ref || '',
+    periodo_aquisitivo: formatPeriodoAquisitivo(ferias.periodo_aquisitivo_ref, periodo),
+    periodo_aquisitivo_simplificado: ferias.periodo_aquisitivo_ref || '',
     fracionamento: ferias.fracionamento || '',
     tipo_ferias_texto: ferias.fracionamento
       ? `${ferias.fracionamento} de férias regulamentares`
