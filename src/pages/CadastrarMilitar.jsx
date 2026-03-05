@@ -299,6 +299,65 @@ export default function CadastrarMilitar() {
           {/* Dados Funcionais */}
           <FormSection title="Dados Funcionais" icon={Briefcase} defaultOpen={true}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Grupamento / Subgrupamento */}
+              <div className="col-span-full">
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <GitBranch className="w-4 h-4 text-[#1e3a5f]" />
+                    <span className="text-sm font-semibold text-slate-700">Vinculação Organizacional</span>
+                    {!isAdmin && <span className="text-xs text-slate-400">(definido automaticamente)</span>}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Grupamento</label>
+                      <select
+                        disabled={!isAdmin}
+                        className={`w-full border border-slate-200 rounded-md px-3 py-2 text-sm ${!isAdmin ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`}
+                        value={formData.grupamento_id || ''}
+                        onChange={e => {
+                          const gp = grupamentos.find(g => g.id === e.target.value);
+                          setFormData(prev => ({
+                            ...prev,
+                            grupamento_id: e.target.value,
+                            grupamento_nome: gp?.nome || '',
+                            subgrupamento_id: '',
+                            subgrupamento_nome: ''
+                          }));
+                        }}
+                      >
+                        <option value="">Nenhum / Selecione...</option>
+                        {grupamentos.map(g => (
+                          <option key={g.id} value={g.id}>{g.nome} {g.sigla && `(${g.sigla})`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Subgrupamento</label>
+                      <select
+                        disabled={!isAdmin}
+                        className={`w-full border border-slate-200 rounded-md px-3 py-2 text-sm ${!isAdmin ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`}
+                        value={formData.subgrupamento_id || ''}
+                        onChange={e => {
+                          const sg = subgrupamentosLista.find(s => s.id === e.target.value);
+                          setFormData(prev => ({
+                            ...prev,
+                            subgrupamento_id: e.target.value,
+                            subgrupamento_nome: sg?.nome || ''
+                          }));
+                        }}
+                      >
+                        <option value="">Nenhum / Selecione...</option>
+                        {(formData.grupamento_id
+                          ? subgrupamentosLista.filter(s => s.grupamento_id === formData.grupamento_id)
+                          : subgrupamentosLista
+                        ).map(s => (
+                          <option key={s.id} value={s.id}>{s.nome} {s.sigla && `(${s.sigla})`}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <FormField
                 label="Nome de Guerra"
                 name="nome_guerra"
