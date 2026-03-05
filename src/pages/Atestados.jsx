@@ -25,9 +25,9 @@ export default function Atestados() {
   const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('Ativo');
   const [tipoFilter, setTipoFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('grid');
+  const [showAll, setShowAll] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [atestadoToDelete, setAtestadoToDelete] = useState(null);
 
