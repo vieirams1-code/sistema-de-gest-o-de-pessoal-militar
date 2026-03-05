@@ -46,6 +46,19 @@ export default function Configuracoes() {
     queryFn: () => base44.entities.ConfiguracaoUnidade.list()
   });
 
+  const { data: usuarios = [] } = useQuery({
+    queryKey: ['usuarios'],
+    queryFn: () => base44.entities.User.list()
+  });
+
+  const { data: subgrupamentos = [] } = useQuery({
+    queryKey: ['subgrupamentos'],
+    queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome')
+  });
+
+  const grupamentos = subgrupamentos.filter(s => s.tipo === 'Grupamento');
+  const subgrupamentosFilhos = subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId);
+
   const comandanteConfig = configs.find(c => c.chave === 'comandante_id');
   const comandanteId = comandanteConfig?.valor || '';
 
