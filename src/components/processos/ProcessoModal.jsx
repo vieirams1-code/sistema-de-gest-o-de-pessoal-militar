@@ -65,6 +65,11 @@ export default function ProcessoModal({ open, onClose, processo }) {
     const data = { ...form };
     if (!data.tags) data.tags = [];
     if (!data.historico_acoes) data.historico_acoes = [];
+    // Preencher subgrupamento automaticamente para usuários não-admin
+    if (isNew && !isAdmin && subgrupamentoId) {
+      data.subgrupamento_id = subgrupamentoId;
+      data.subgrupamento_nome = user?.subgrupamento_nome || '';
+    }
     if (isNew) {
       await base44.entities.Processo.create(data);
     } else {
