@@ -178,6 +178,19 @@ export default function TemplatesTexto() {
 
           {editingTemplate && (
             <div className="space-y-4 py-2">
+              {/* Preview ao vivo */}
+              {editingTemplate.template && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Eye className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-semibold text-emerald-700">Prévia com dados simulados</span>
+                  </div>
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {aplicarTemplate(editingTemplate.template, VARS_PREVIEW)}
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-slate-700">Módulo <span className="text-red-500">*</span></Label>
