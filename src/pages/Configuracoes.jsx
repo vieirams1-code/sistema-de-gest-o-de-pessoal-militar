@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Settings, Trash2, Plus, Crown, Users } from 'lucide-react';
+import { Settings, Trash2, Plus, Crown, Users, Shield, CheckSquare, Square } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,10 +21,20 @@ export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
+
+  // Estado - permissões de usuários
   const [selectedUser, setSelectedUser] = useState(null);
   const [userGrupamentoId, setUserGrupamentoId] = useState('');
   const [userSubgrupamentoId, setUserSubgrupamentoId] = useState('');
   const [savingUser, setSavingUser] = useState(false);
+
+  // Estado - atribuição em massa de militares
+  const [massaGrupamentoId, setMassaGrupamentoId] = useState('');
+  const [massaSubgrupamentoId, setMassaSubgrupamentoId] = useState('');
+  const [militaresSelecionados, setMilitaresSelecionados] = useState([]);
+  const [searchMassa, setSearchMassa] = useState('');
+  const [savingMassa, setSavingMassa] = useState(false);
+
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
 
   const { data: lotacoes = [] } = useQuery({
