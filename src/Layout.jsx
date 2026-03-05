@@ -117,7 +117,14 @@ export default function Layout({ children, currentPageName }) {
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4">
-          <div className="bg-white/10 rounded-lg p-4">
+          <button
+            onClick={() => base44.auth.logout()}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="font-medium">Sair do Sistema</span>
+          </button>
+          <div className="bg-white/10 rounded-lg p-3 mt-2">
             <p className="text-xs text-white/60 text-center">
               Sistema de Gerenciamento de Pessoal
             </p>
