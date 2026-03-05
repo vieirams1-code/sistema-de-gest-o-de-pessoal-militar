@@ -64,6 +64,14 @@ export default function CadastrarRegistroLivro() {
   const [loading, setLoading] = useState(false);
   const [selectedFerias, setSelectedFerias] = useState(null);
   const [textoPublicacao, setTextoPublicacao] = useState('');
+  const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
+
+  // Buscar templates cadastrados
+  const { data: templates = [] } = useQuery({
+    queryKey: ['templates-texto'],
+    queryFn: () => base44.entities.TemplateTexto.list(),
+    staleTime: 30000,
+  });
 
   const handleChange = (name, value) => {
     setFormData(prev => {
