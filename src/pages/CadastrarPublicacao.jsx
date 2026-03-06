@@ -811,6 +811,121 @@ export default function CadastrarPublicacao() {
         );
       }
 
+      case 'Apostila': {
+        const pubRef = todasPublicacoes.find(p => p.id === formData.publicacao_referencia_id);
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Apostila</h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Publicação a Apostilar <span className="text-red-500">*</span></Label>
+                <Select value={formData.publicacao_referencia_id} onValueChange={v => {
+                  const pub = todasPublicacoes.find(p => p.id === v);
+                  setFormData(prev => ({
+                    ...prev,
+                    publicacao_referencia_id: v,
+                    publicacao_referencia_numero_bg: pub?.numero_bg || '',
+                    publicacao_referencia_data_bg: pub?.data_bg || '',
+                    publicacao_referencia_nota: pub?.nota_para_bg || '',
+                    texto_errado: pub?.texto_publicacao || '',
+                  }));
+                }}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Selecione a publicação a corrigir..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {todasPublicacoes.filter(p => p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito').map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.militar_nome} — {p.tipo} {p.numero_bg ? `BG ${p.numero_bg}` : ''} {p.data_publicacao || ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {pubRef && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                  <p><span className="font-medium">Publicação:</span> {pubRef.tipo} — {pubRef.militar_nome}</p>
+                  {pubRef.numero_bg && <p><span className="font-medium">BG Nº:</span> {pubRef.numero_bg} de {pubRef.data_bg}</p>}
+                  {pubRef.nota_para_bg && <p><span className="font-medium">Nota:</span> {pubRef.nota_para_bg}</p>}
+                </div>
+              )}
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Texto Errado (edite para deixar apenas a parte incorreta)</Label>
+                <Textarea
+                  value={formData.texto_errado || ''}
+                  onChange={e => handleChange('texto_errado', e.target.value)}
+                  rows={4}
+                  className="mt-1.5 font-mono text-sm"
+                  placeholder="Cole aqui o trecho com erro..."
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Texto Novo (correto)</Label>
+                <Textarea
+                  value={formData.texto_novo || ''}
+                  onChange={e => handleChange('texto_novo', e.target.value)}
+                  rows={4}
+                  className="mt-1.5"
+                  placeholder="Digite o texto correto..."
+                />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      case 'Tornar sem Efeito': {
+        const pubRefTSE = todasPublicacoes.find(p => p.id === formData.publicacao_referencia_id);
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Tornar sem Efeito</h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Publicação a Tornar sem Efeito <span className="text-red-500">*</span></Label>
+                <Select value={formData.publicacao_referencia_id} onValueChange={v => {
+                  const pub = todasPublicacoes.find(p => p.id === v);
+                  setFormData(prev => ({
+                    ...prev,
+                    publicacao_referencia_id: v,
+                    publicacao_referencia_numero_bg: pub?.numero_bg || '',
+                    publicacao_referencia_data_bg: pub?.data_bg || '',
+                    publicacao_referencia_nota: pub?.nota_para_bg || '',
+                    militar_id: pub?.militar_id || prev.militar_id,
+                    militar_nome: pub?.militar_nome || prev.militar_nome,
+                    militar_posto: pub?.militar_posto || prev.militar_posto,
+                    militar_matricula: pub?.militar_matricula || prev.militar_matricula,
+                  }));
+                }}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Selecione a publicação a tornar sem efeito..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {todasPublicacoes.filter(p => p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito').map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.militar_nome} — {p.tipo} {p.numero_bg ? `BG ${p.numero_bg}` : ''} {p.data_publicacao || ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {pubRefTSE && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1">
+                  <p><span className="font-medium">Publicação:</span> {pubRefTSE.tipo} — {pubRefTSE.militar_nome}</p>
+                  {pubRefTSE.numero_bg && <p><span className="font-medium">BG Nº:</span> {pubRefTSE.numero_bg} de {pubRefTSE.data_bg}</p>}
+                  {pubRefTSE.nota_para_bg && <p><span className="font-medium">Nota:</span> {pubRefTSE.nota_para_bg}</p>}
+                  {pubRefTSE.texto_publicacao && (
+                    <div className="mt-2">
+                      <p className="font-medium mb-1">Texto original:</p>
+                      <p className="italic text-red-600 line-clamp-3">{pubRefTSE.texto_publicacao}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
       case 'Interrupção de Férias':
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
