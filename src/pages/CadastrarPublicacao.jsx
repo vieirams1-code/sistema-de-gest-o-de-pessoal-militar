@@ -192,7 +192,7 @@ export default function CadastrarPublicacao() {
 
   useEffect(() => {
     gerarTextoPublicacao();
-  }, [formData, templatesExOfficio, textoDesignacao]);
+  }, [formData, templatesExOfficio, militarSelecionado]);
 
   const gerarTextoPublicacao = () => {
     const postoNome = formData.militar_posto ? `${formData.militar_posto} QBMP-1.a` : '';
