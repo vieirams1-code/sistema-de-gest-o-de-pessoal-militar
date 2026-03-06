@@ -407,25 +407,10 @@ export default function CadastrarRegistroLivro() {
   };
 
   const renderSpecificFields = () => {
-    const tipoNecessitaFerias = ['Saída Férias', 'Retorno Férias'].includes(formData.tipo_registro);
-
-    if (tipoNecessitaFerias) {
+    if (formData.tipo_registro === 'Saída Férias') {
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Férias</h3>
-          
-          <div className="mb-4">
-            <Label className="text-sm font-medium text-slate-700">Tipo - Férias</Label>
-            <Select value={formData.tipo_registro} onValueChange={(v) => handleChange('tipo_registro', v)}>
-              <SelectTrigger className="mt-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Saída Férias">Início de Férias</SelectItem>
-                <SelectItem value="Retorno Férias">Retorno de Férias</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           <FeriasSelector
             militarId={formData.militar_id}
@@ -652,7 +637,8 @@ export default function CadastrarRegistroLivro() {
 
       case 'Dispensa Desconto Férias': {
         // Calcular dias restantes automaticamente baseado no período selecionado
-        const periodoSelecionado = periodosParaDesconto.find(p => p.ano_referencia === formData.periodo_aquisitivo || p.id === formData.periodo_aquisitivo_id);
+        // eslint-disable-next-line no-unused-vars
+        const periodoSelecionado = periodosParaDesconto.find(p => p.ano_referencia === formData.periodo_aquisitivo || p.id === formData.periodo_aquisitivo);
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa com Desconto em Férias</h3>
@@ -730,18 +716,6 @@ export default function CadastrarRegistroLivro() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Deslocamento para Missões</h3>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Início / Término"
-                  name="inicio_termino"
-                  value={formData.inicio_termino}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Início', 'Término']}
-                  required
-                />
-                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="Ex: Campo Grande" />
-              </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
                 <FormField label="Data de Retorno" name="data_retorno" value={formData.data_retorno} onChange={handleChange} type="date" />
@@ -839,7 +813,6 @@ export default function CadastrarRegistroLivro() {
   const tiposFiltrados = () => {
     const tipos = [
       { value: 'Saída Férias', label: 'Férias', sexo: null },
-      { value: 'Retorno Férias', label: 'Retorno de Férias', sexo: null },
       { value: 'Licença Maternidade', label: 'Licença Maternidade', sexo: 'Feminino' },
       { value: 'Prorrogação de Licença Maternidade', label: 'Prorrogação de Licença Maternidade', sexo: 'Feminino' },
       { value: 'Licença Paternidade', label: 'Licença Paternidade', sexo: 'Masculino' },
