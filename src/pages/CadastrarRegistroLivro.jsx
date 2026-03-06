@@ -824,6 +824,7 @@ export default function CadastrarRegistroLivro() {
       { value: 'Núpcias', label: 'Núpcias', sexo: null },
       { value: 'Luto', label: 'Luto', sexo: null },
       { value: 'Cedência', label: 'Cedência', sexo: null },
+      { value: 'Transferência', label: 'Transferência', sexo: null },
       { value: 'Trânsito', label: 'Trânsito', sexo: null },
       { value: 'Instalação', label: 'Instalação', sexo: null },
       { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
