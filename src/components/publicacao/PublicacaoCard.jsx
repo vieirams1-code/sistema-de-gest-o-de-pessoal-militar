@@ -93,6 +93,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
 
   // É uma publicação ex-officio editável
   const isExOfficio = !!(registro.tipo && !registro.medico && !registro.cid_10);
+  // Publicações Publicadas podem ter Apostila / Tornar sem Efeito
+  const podeApostilarOuTSE = isExOfficio && currentStatus === 'Publicado' && !foiTornadaSemEfeito;
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
