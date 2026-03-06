@@ -474,6 +474,41 @@ export default function CadastrarRegistroLivro() {
           </div>
         );
 
+      case 'Transferência':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência</h3>
+            <div className="space-y-4">
+              <FormField
+                label="Tipo"
+                name="tipo_transferencia"
+                value={formData.tipo_transferencia}
+                onChange={handleChange}
+                type="select"
+                options={['Entrada', 'Saída', 'Ex Officio']}
+                required
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="1ºSGBM/3°GBM" required />
+                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="1° Grupamento de Bombeiros Militar" required />
+              </div>
+              <FormField label="Data da Transferência" name="data_transferencia" value={formData.data_transferencia} onChange={handleChange} type="date" required />
+              <div>
+                <Label className="text-sm font-medium text-slate-700">
+                  Publicação da Transferência
+                  <span className="ml-2 text-xs text-slate-400 font-normal">(Ex: DOEMS nº XX.XXX de XX de XXX de XXXX)</span>
+                </Label>
+                <Input
+                  value={formData.publicacao_transferencia || ''}
+                  onChange={(e) => handleChange('publicacao_transferencia', e.target.value)}
+                  className="mt-1.5"
+                  placeholder="DOEMS nº XX.XXX de XX de XXX de XXXX"
+                />
+              </div>
+            </div>
+          </div>
+        );
+
       case 'Núpcias':
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
