@@ -659,59 +659,13 @@ export default function CadastrarRegistroLivro() {
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Deslocamento para Missões</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Deslocamento / Retorno"
-                  name="inicio_termino"
-                  value={formData.inicio_termino}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Início', 'Término']}
-                  required
-                />
-                <FormField
-                  label="Destino"
-                  name="destino"
-                  value={formData.destino}
-                  onChange={handleChange}
-                  placeholder="Local do deslocamento"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Data de Início"
-                  name="data_inicio"
-                  value={formData.data_inicio}
-                  onChange={handleChange}
-                  type="date"
-                  required
-                />
-                <FormField
-                  label="Data de Retorno"
-                  name="data_retorno"
-                  value={formData.data_retorno}
-                  onChange={handleChange}
-                  type="date"
-                />
+                <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+                <FormField label="Data de Retorno" name="data_retorno" value={formData.data_retorno} onChange={handleChange} type="date" />
               </div>
               <div>
                 <Label>Descrição da Missão</Label>
-                <Textarea
-                  value={formData.missao_descricao}
-                  onChange={(e) => handleChange('missao_descricao', e.target.value)}
-                  className="mt-1.5"
-                  rows={2}
-                  placeholder="Ex: CMAUT/2025"
-                  required
-                />
+                <Textarea value={formData.missao_descricao} onChange={(e) => handleChange('missao_descricao', e.target.value)} className="mt-1.5" rows={2} placeholder="Ex: CMAUT/2025" />
               </div>
-              <FormField
-                label="Nota ou OS"
-                name="documento_referencia"
-                value={formData.documento_referencia}
-                onChange={handleChange}
-                placeholder="Ex: 001/2024"
-              />
             </div>
           </div>
         );
