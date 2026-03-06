@@ -73,6 +73,16 @@ export default function CadastrarRegistroLivro() {
     staleTime: 30000,
   });
 
+  // Buscar períodos aquisitivos do militar para Dispensa Desconto Férias
+  const { data: periodosAquisitivos = [] } = useQuery({
+    queryKey: ['periodos-aquisitivos-livro', formData.militar_id],
+    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: formData.militar_id }),
+    enabled: !!formData.militar_id && formData.tipo_registro === 'Dispensa Desconto Férias',
+    staleTime: 30000,
+  });
+
+  const periodosParaDesconto = periodosAquisitivos.filter(p => p.status === 'Previsto' && !p.inativo);
+
   const { data: tiposCustom = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom-livro'],
     queryFn: () => base44.entities.TipoPublicacaoCustom.filter({ modulo: 'Livro', ativo: true }),
