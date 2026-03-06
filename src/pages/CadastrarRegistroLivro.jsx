@@ -713,6 +713,27 @@ export default function CadastrarRegistroLivro() {
     }
   };
 
+  const tipoAtualCustom = tiposCustom.find(t => t.nome === formData.tipo_registro);
+
+  // Gerar texto para tipo customizado
+  useEffect(() => {
+    if (!tipoAtualCustom) return;
+    const vars = {
+      posto_nome: formData.militar_posto ? `${formData.militar_posto} QOBM` : '',
+      nome_completo: formData.militar_nome || '',
+      matricula: formData.militar_matricula || '',
+      data_registro: formatarDataExtenso(formData.data_registro),
+      data_inicio: formatarDataExtenso(formData.data_inicio),
+      data_termino: formatarDataExtenso(formData.data_termino),
+      ...(camposCustom),
+    };
+    let texto = tipoAtualCustom.template || '';
+    Object.entries(vars).forEach(([k, v]) => {
+      texto = texto.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v || '');
+    });
+    setTextoPublicacao(texto);
+  }, [tipoAtualCustom, formData, camposCustom]);
+
   const tiposFiltrados = () => {
     const tipos = [
       { value: 'Saída Férias', label: 'Férias', sexo: null },
