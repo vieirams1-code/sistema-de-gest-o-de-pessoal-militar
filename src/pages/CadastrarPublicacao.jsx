@@ -58,7 +58,13 @@ const initialFormData = {
   numero_bg: '',
   data_bg: '',
   status: 'Aguardando Nota',
-  observacoes: ''
+  observacoes: '',
+  publicacao_referencia_id: '',
+  publicacao_referencia_numero_bg: '',
+  publicacao_referencia_data_bg: '',
+  publicacao_referencia_nota: '',
+  texto_errado: '',
+  texto_novo: '',
 };
 
 export default function CadastrarPublicacao() {
