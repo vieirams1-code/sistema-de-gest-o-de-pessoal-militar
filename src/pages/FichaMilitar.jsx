@@ -260,9 +260,16 @@ export default function FichaMilitar() {
     });
   }, [punicoes, atestados, registrosLivro, publicacoes, medalhas, historico]);
 
+  const ELOGIOS_PUNICOES_TIPOS_PUB = ['Elogio Individual', 'Melhoria de Comportamento', 'Punição', 'Geral'];
+
   const eventosFiltrados = useMemo(() => {
     return eventos.filter(e => {
-      if (tipoFiltro !== 'todos' && e.tipo !== tipoFiltro) return false;
+      if (tipoFiltro === 'elogios_punicoes') {
+        // Mostra: punições (tipo punicao) e publicações de elogio/punição/melhoria
+        const isPunicao = e.tipo === 'punicao';
+        const isElogioOuPunicaoPub = e.tipo === 'publicacao' && ELOGIOS_PUNICOES_TIPOS_PUB.includes(e.raw?.tipo);
+        if (!isPunicao && !isElogioOuPunicaoPub) return false;
+      } else if (tipoFiltro !== 'todos' && e.tipo !== tipoFiltro) return false;
       if (searchTerm && !e.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) && !e.resumo?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       if (dataInicio && e.data && e.data < dataInicio) return false;
       if (dataFim && e.data && e.data > dataFim) return false;
