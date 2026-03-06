@@ -116,7 +116,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card className={`border hover:shadow-md transition-shadow ${registro.urgente ? 'border-red-400 bg-red-50' : registro.importante ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}>
+      <Card className={`border hover:shadow-md transition-shadow ${foiTornadaSemEfeito ? 'border-red-400 bg-red-50 opacity-70' : foiApostilada ? 'border-purple-400 bg-purple-50' : registro.urgente ? 'border-red-400 bg-red-50' : registro.importante ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
