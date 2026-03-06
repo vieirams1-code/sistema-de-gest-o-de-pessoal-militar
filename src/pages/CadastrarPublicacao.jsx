@@ -225,13 +225,26 @@ export default function CadastrarPublicacao() {
         texto = formData.texto_base || '';
         break;
 
-      case 'Designação / Dispensa de Função':
-        if (formData.tipo_designacao && formData.funcao && formData.data_designacao) {
-          const acao = formData.tipo_designacao === 'Dispensa' ? 'dispensar' : 'designar';
-          const preposicao = formData.tipo_designacao === 'Dispensa' ? 'da' : 'para exercer a';
-          texto = `${cmd}, no uso de suas atribuições e conforme o §1°, "d" e §2°, "d" nº 2, do art. 5º, do Decreto nº 1.093, de 12 de junho de 1981 (Regulamento de Movimentação de Oficiais e Praças) c/c o QODE aprovado pela Portaria nº 199/BM-1 de 02 de fevereiro de 2016, resolve: ${acao} ${artigo === 'A' ? 'a' : 'o'} ${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${preposicao} função de ${formData.funcao}, a contar de ${formatarDataExtenso(formData.data_designacao)}.`;
+      case 'Designação de Função':
+      case 'Dispensa de Função': {
+        const tmpl = templatesExOfficio.find(t => t.tipo_registro === formData.tipo && t.ativo !== false);
+        if (tmpl?.template) {
+          texto = aplicarTemplate(tmpl.template, {
+            posto_nome: postoNome,
+            nome_completo: nomeCompleto,
+            matricula,
+            funcao: formData.funcao || '',
+            data_designacao: formatarDataExtenso(formData.data_designacao),
+          });
+        } else if (textoDesignacao) {
+          texto = textoDesignacao;
+        } else if (formData.funcao && formData.data_designacao) {
+          const acao = formData.tipo === 'Dispensa de Função' ? 'dispensar' : 'designar';
+          const preposicao = formData.tipo === 'Dispensa de Função' ? 'da' : 'para exercer a';
+          texto = `${cmd}, no uso de suas atribuições, resolve: ${acao} ${artigo === 'A' ? 'a' : 'o'} ${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${preposicao} função de ${formData.funcao}, a contar de ${formatarDataExtenso(formData.data_designacao)}.`;
         }
         break;
+      }
 
       case 'Ata JISO':
         if (formData.finalidade_jiso && formData.data_ata) {
