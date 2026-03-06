@@ -71,9 +71,10 @@ export const formatPeriodoAquisitivo = (ref, periodo) => {
  * Constrói o mapa de variáveis para registros do Livro com base em férias + dados do registro.
  * Recebe opcionalmente o objeto periodo aquisitivo para gerar a data completa.
  */
-export function buildVarsLivro({ ferias, dataRegistro, periodo } = {}) {
+export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto } = {}) {
   if (!ferias) return {};
   const dias = ferias.dias || 0;
+  const desconto = diasDesconto || ferias._diasDesconto || 0;
   const abreviatura = abreviarPosto(ferias.militar_posto);
   return {
     posto_nome: abreviatura ? `${abreviatura} QOBM` : '',
@@ -86,6 +87,8 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo } = {}) {
     data_registro: formatDateBR(dataRegistro || ferias.data_inicio),
     dias: String(dias),
     dias_extenso: numeroPorExtenso(dias),
+    dias_desconto: String(desconto),
+    dias_desconto_extenso: numeroPorExtenso(desconto),
     periodo_aquisitivo: formatPeriodoAquisitivo(ferias.periodo_aquisitivo_ref, periodo),
     periodo_aquisitivo_simplificado: ferias.periodo_aquisitivo_ref || '',
     fracionamento: ferias.fracionamento || '',
