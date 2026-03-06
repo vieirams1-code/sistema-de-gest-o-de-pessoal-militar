@@ -75,6 +75,13 @@ export default function CadastrarPublicacao() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
 
+  // Para apostila / tornar sem efeito: buscar todas as publicações para seleção
+  const { data: todasPublicacoes = [] } = useQuery({
+    queryKey: ['todas-publicacoes-exofficio'],
+    queryFn: () => base44.entities.PublicacaoExOfficio.list('-data_publicacao'),
+    enabled: formData.tipo === 'Apostila' || formData.tipo === 'Tornar sem Efeito',
+  });
+
   // Templates para Ex Officio
   const { data: templatesExOfficio = [] } = useQuery({
     queryKey: ['templates-texto-exofficio'],
