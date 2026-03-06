@@ -1195,6 +1195,8 @@ export default function CadastrarPublicacao() {
                   <SelectItem value="Transcrição de Documentos">Transcrição de Documentos</SelectItem>
                   <SelectItem value="Interrupção de Férias">Interrupção de Férias</SelectItem>
                   <SelectItem value="Transferência para RR">Transferência para RR</SelectItem>
+                  <SelectItem value="Apostila">Apostila</SelectItem>
+                  <SelectItem value="Tornar sem Efeito">Tornar sem Efeito</SelectItem>
                   {tiposCustomExOfficio.map(t => (
                     <SelectItem key={t.id} value={t.nome}>{t.nome}</SelectItem>
                   ))}
