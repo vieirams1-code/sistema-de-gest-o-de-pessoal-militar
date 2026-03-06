@@ -730,33 +730,41 @@ export default function CadastrarRegistroLivro() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  label="Data de Início"
-                  name="data_inicio"
-                  value={formData.data_inicio}
-                  onChange={handleChange}
-                  type="date"
-                  required
-                />
-                <FormField
-                  label="Dias"
-                  name="dias"
-                  value={formData.dias}
-                  onChange={handleChange}
+              <FormField
+                label="Data de Início"
+                name="data_inicio"
+                value={formData.data_inicio}
+                onChange={handleChange}
+                type="date"
+                required
+              />
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Dias <span className="text-red-500">*</span></Label>
+                <Input
                   type="number"
+                  value={formData.dias}
+                  onChange={(e) => {
+                    const diasVal = Number(e.target.value) || 0;
+                    const periodoSel = periodosParaDesconto.find(p => p.id === formData.periodo_aquisitivo);
+                    const saldo = periodoSel ? (periodoSel.dias_direito || 30) - (periodoSel.dias_gozados || 0) - (periodoSel.dias_previstos || 0) : 0;
+                    const restantes = Math.max(0, saldo - diasVal);
+                    setFormData(prev => ({ ...prev, dias: diasVal, dias_restantes: restantes }));
+                  }}
+                  className="mt-1.5"
                   required
                 />
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Dias Restantes</Label>
-                  <Input
-                    type="number"
-                    value={formData.dias_restantes}
-                    disabled
-                    className="mt-1.5 bg-slate-50"
-                    placeholder="Calculado automaticamente"
-                  />
-                  <p className="text-xs text-slate-400 mt-1">Calculado pelo período selecionado</p>
-                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Dias Restantes</Label>
+                <Input
+                  type="number"
+                  value={formData.dias_restantes}
+                  disabled
+                  className="mt-1.5 bg-slate-50"
+                  placeholder="Calculado automaticamente"
+                />
+                <p className="text-xs text-slate-400 mt-1">Saldo − dias a descontar</p>
+              </div>
               </div>
             </div>
           </div>
