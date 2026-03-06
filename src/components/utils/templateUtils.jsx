@@ -132,5 +132,7 @@ export const VARS_PREVIEW = {
   edicao_ano: '2026',
   motivo_dispensa: 'serviços prestados',
   dias_restantes: '24',
+  dias_desconto: '6',
+  dias_desconto_extenso: 'seis',
   inicio_termino: 'Início',
 };
