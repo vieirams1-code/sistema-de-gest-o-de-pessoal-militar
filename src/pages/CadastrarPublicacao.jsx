@@ -436,6 +436,20 @@ export default function CadastrarPublicacao() {
       }
     }
 
+    // Apostila: marcar publicação original
+    if (formData.tipo === 'Apostila' && formData.publicacao_referencia_id) {
+      await base44.entities.PublicacaoExOfficio.update(formData.publicacao_referencia_id, {
+        apostilada_por_id: savedId,
+      });
+    }
+
+    // Tornar sem Efeito: marcar publicação original
+    if (formData.tipo === 'Tornar sem Efeito' && formData.publicacao_referencia_id) {
+      await base44.entities.PublicacaoExOfficio.update(formData.publicacao_referencia_id, {
+        tornada_sem_efeito_por_id: savedId,
+      });
+    }
+
     // Marcar atestado homologado para Homologação de Atestado
     if (formData.tipo === 'Homologação de Atestado' && formData.atestado_homologado_id) {
       await base44.entities.Atestado.update(formData.atestado_homologado_id, {
