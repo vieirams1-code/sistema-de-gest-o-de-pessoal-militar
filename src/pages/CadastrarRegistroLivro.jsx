@@ -79,10 +79,11 @@ export default function CadastrarRegistroLivro() {
     queryKey: ['periodos-aquisitivos-livro', formData.militar_id],
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: formData.militar_id }),
     enabled: !!formData.militar_id,
-    staleTime: 30000,
+    staleTime: 0,
   });
 
-  const periodosParaDesconto = periodosAquisitivos.filter(p => p.status === 'Previsto' && !p.inativo);
+  // Mostra períodos Previsto OU Disponível (pode ter saldo para descontar)
+  const periodosParaDesconto = periodosAquisitivos.filter(p => !p.inativo && (p.status === 'Previsto' || p.status === 'Disponível' || p.status === 'Parcialmente Gozado'));
 
   const { data: tiposCustom = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom-livro'],
