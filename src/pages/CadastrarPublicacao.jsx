@@ -82,10 +82,14 @@ export default function CadastrarPublicacao() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
 
-  // Para apostila / tornar sem efeito: buscar publicações do militar selecionado e com status Publicado
+  // Para apostila / tornar sem efeito: buscar publicações do militar selecionado, filtrar Publicadas no client
   const { data: todasPublicacoes = [] } = useQuery({
     queryKey: ['publicacoes-apostila', formData.militar_id],
-    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: formData.militar_id, status: 'Publicado' }, '-data_publicacao'),
+    queryFn: async () => {
+      const all = await base44.entities.PublicacaoExOfficio.filter({ militar_id: formData.militar_id }, '-data_publicacao');
+      // Considerar Publicada: tem numero_bg e data_bg preenchidos
+      return all.filter(p => p.numero_bg && p.data_bg && p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito');
+    },
     enabled: (formData.tipo === 'Apostila' || formData.tipo === 'Tornar sem Efeito') && !!formData.militar_id,
   });
 
