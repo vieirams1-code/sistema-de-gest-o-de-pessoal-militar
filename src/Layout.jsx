@@ -37,6 +37,7 @@ const navItems = [
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedItems, setExpandedItems] = useState(['Configurações']);
 
   return (
     <div className="min-h-screen bg-slate-50">
