@@ -66,10 +66,10 @@ const GRUPOS_VARIAVEIS = [
       { v: '{{falecido_nome}}', desc: 'Nome do falecido (Luto)' },
       { v: '{{falecido_certidao}}', desc: 'Número da certidão de óbito (Luto)' },
       { v: '{{grau_parentesco}}', desc: 'Grau de parentesco (Luto)' },
-      { v: '{{conjuge_nome}}', desc: 'Nome do cônjuge (Núpcias)' },
-      { v: '{{falecido_nome}}', desc: 'Nome do falecido (Luto)' },
       { v: '{{motivo_dispensa}}', desc: 'Motivo da dispensa (Recompensa)' },
       { v: '{{dias_restantes}}', desc: 'Dias restantes (Dispensa Desconto Férias)' },
+      { v: '{{dias_desconto}}', desc: 'Dias de desconto em férias' },
+      { v: '{{dias_desconto_extenso}}', desc: 'Dias de desconto por extenso' },
       { v: '{{funcao}}', desc: 'Função (Designação / Dispensa de Função)' },
       { v: '{{data_designacao}}', desc: 'Data de designação/dispensa (dd/mm/aaaa)' },
     ]
