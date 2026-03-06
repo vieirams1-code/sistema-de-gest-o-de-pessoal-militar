@@ -208,8 +208,33 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
                   <span className="hidden sm:inline">Editar</span>
                 </Button>
               )}
+              {/* Botões Apostila / Tornar sem Efeito (apenas para publicadas) */}
+              {podeApostilarOuTSE && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title="Fazer Apostila"
+                    onClick={() => navigate(createPageUrl('CadastrarPublicacao') + `?tipo=Apostila&militar_id=${registro.militar_id}&ref_id=${registro.id}`)}
+                    className="text-purple-500 hover:text-purple-700 text-xs gap-1"
+                  >
+                    <PenLine className="w-4 h-4" />
+                    <span className="hidden sm:inline">Apostila</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title="Tornar sem Efeito"
+                    onClick={() => navigate(createPageUrl('CadastrarPublicacao') + `?tipo=Tornar+sem+Efeito&militar_id=${registro.militar_id}&ref_id=${registro.id}`)}
+                    className="text-red-500 hover:text-red-700 text-xs gap-1"
+                  >
+                    <Ban className="w-4 h-4" />
+                    <span className="hidden sm:inline">Tornar s/ Efeito</span>
+                  </Button>
+                </>
+              )}
               {/* Excluir */}
-              {isExOfficio && (
+              {isExOfficio && currentStatus !== 'Publicado' && (
                 <Button
                   variant="ghost"
                   size="sm"
