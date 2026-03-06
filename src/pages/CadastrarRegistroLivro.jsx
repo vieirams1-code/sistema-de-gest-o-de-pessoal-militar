@@ -647,7 +647,9 @@ export default function CadastrarRegistroLivro() {
           </div>
         );
 
-      case 'Dispensa Desconto Férias':
+      case 'Dispensa Desconto Férias': {
+        // Calcular dias restantes automaticamente baseado no período selecionado
+        const periodoSelecionado = periodosParaDesconto.find(p => p.ano_referencia === formData.periodo_aquisitivo || p.id === formData.periodo_aquisitivo_id);
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa com Desconto em Férias</h3>
@@ -662,14 +664,29 @@ export default function CadastrarRegistroLivro() {
                   options={['Início', 'Término']}
                   required
                 />
-                <FormField
-                  label="Período Aquisitivo"
-                  name="periodo_aquisitivo"
-                  value={formData.periodo_aquisitivo}
-                  onChange={handleChange}
-                  placeholder="Ex: 2023/2024"
-                  required
-                />
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Período Aquisitivo <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.periodo_aquisitivo}
+                    onValueChange={v => {
+                      const periodo = periodosParaDesconto.find(p => p.ano_referencia === v);
+                      const diasRestantes = periodo ? (periodo.dias_direito || 30) - (periodo.dias_gozados || 0) - (periodo.dias_previstos || 0) : '';
+                      setFormData(prev => ({ ...prev, periodo_aquisitivo: v, dias_restantes: diasRestantes }));
+                    }}
+                  >
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue placeholder="Selecione o período..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {periodosParaDesconto.length === 0 && <SelectItem value="_none" disabled>Nenhum período Previsto disponível</SelectItem>}
+                      {periodosParaDesconto.map(p => (
+                        <SelectItem key={p.id} value={p.ano_referencia || p.id}>
+                          {p.ano_referencia} — {p.dias_direito || 30}d direito — {(p.dias_gozados || 0) + (p.dias_previstos || 0)}d usados
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <FormField
@@ -688,18 +705,22 @@ export default function CadastrarRegistroLivro() {
                   type="number"
                   required
                 />
-                <FormField
-                  label="Dias Restantes"
-                  name="dias_restantes"
-                  value={formData.dias_restantes}
-                  onChange={handleChange}
-                  type="number"
-                  required
-                />
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Dias Restantes</Label>
+                  <Input
+                    type="number"
+                    value={formData.dias_restantes}
+                    disabled
+                    className="mt-1.5 bg-slate-50"
+                    placeholder="Calculado automaticamente"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Calculado pelo período selecionado</p>
+                </div>
               </div>
             </div>
           </div>
         );
+      }
 
       case 'Deslocamento Missão':
         return (
