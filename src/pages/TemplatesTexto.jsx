@@ -95,7 +95,7 @@ const GRUPOS_VARIAVEIS = [
 // Quais grupos mostrar por módulo
 const GRUPOS_POR_MODULO = {
   'Livro': ['Militar', 'Férias / Período', 'Registro / Publicação', 'Licenças / Afastamentos', 'Movimentação / Missões', 'Cursos / Estágios'],
-  'Publicação Ex Officio': ['Militar', 'Registro / Publicação'],
+  'Publicação Ex Officio': ['Militar', 'Registro / Publicação', 'Licenças / Afastamentos'],
   'Atestado': ['Militar'],
   'JISO': ['Militar'],
 };
