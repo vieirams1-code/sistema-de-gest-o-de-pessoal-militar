@@ -439,8 +439,13 @@ export default function Ferias() {
                                   )}
                                   {/* Adicionar dias — sempre disponível */}
                                   <DropdownMenuItem onClick={() => setAddDiasModal({ open: true, ferias: f, dias: 1, motivo: '' })}>
-                                    <PlusCircle className="w-4 h-4 mr-2 text-purple-600" />
-                                    <span>Adicionar Dias</span>
+                                   <PlusCircle className="w-4 h-4 mr-2 text-purple-600" />
+                                   <span>Adicionar Dias</span>
+                                  </DropdownMenuItem>
+                                  {/* Desconto em Férias */}
+                                  <DropdownMenuItem onClick={() => setDescontoModal({ open: true, ferias: f, dias: 1, motivo: '' })}>
+                                   <MinusCircle className="w-4 h-4 mr-2 text-orange-500" />
+                                   <span>Desconto em Férias</span>
                                   </DropdownMenuItem>
                                   {/* Editar data início */}
                                   <DropdownMenuItem onClick={() => setEditDataModal({ open: true, ferias: f, novaData: f.data_inicio || '' })}>
