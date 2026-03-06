@@ -1099,6 +1099,27 @@ export default function CadastrarPublicacao() {
     }
   };
 
+  // Quando publicacao_referencia_id muda (e temos as publicações carregadas), preencher dados da referência
+  useEffect(() => {
+    if (!formData.publicacao_referencia_id || todasPublicacoes.length === 0) return;
+    const pub = todasPublicacoes.find(p => p.id === formData.publicacao_referencia_id);
+    if (!pub) return;
+    setFormData(prev => ({
+      ...prev,
+      publicacao_referencia_numero_bg: prev.publicacao_referencia_numero_bg || pub.numero_bg || '',
+      publicacao_referencia_data_bg: prev.publicacao_referencia_data_bg || pub.data_bg || '',
+      publicacao_referencia_nota: prev.publicacao_referencia_nota || pub.nota_para_bg || '',
+      texto_errado: prev.texto_errado || (prev.tipo === 'Apostila' ? pub.texto_publicacao || '' : ''),
+      // Para TSE: puxar dados do militar da publicação original
+      ...(prev.tipo === 'Tornar sem Efeito' && !prev.militar_id ? {
+        militar_id: pub.militar_id || '',
+        militar_nome: pub.militar_nome || '',
+        militar_posto: pub.militar_posto || '',
+        militar_matricula: pub.militar_matricula || '',
+      } : {}),
+    }));
+  }, [formData.publicacao_referencia_id, todasPublicacoes]);
+
   // Gerar texto para tipo customizado Ex Officio
   useEffect(() => {
     const tipoCustom = tiposCustomExOfficio.find(t => t.nome === formData.tipo);
