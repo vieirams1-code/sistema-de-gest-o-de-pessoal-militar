@@ -295,11 +295,20 @@ export default function CadastrarPublicacao() {
         break;
       }
 
-      case 'Transcrição de Documentos':
-        if (formData.documento && formData.data_documento) {
-          texto = `${cmd} torna público o recebimento do(a) ${formData.documento}, de ${formatarDataExtenso(formData.data_documento)}, ${formData.assunto}, cujo conteúdo segue anexo ao presente Boletim. Em consequência: (1) Ciente; (2) Publicar.`;
+      case 'Transcrição de Documentos': {
+        const tmplTranscricao = templatesExOfficio.find(t => t.tipo_registro === 'Transcrição de Documentos' && t.ativo !== false);
+        if (tmplTranscricao?.template) {
+          texto = aplicarTemplate(tmplTranscricao.template, {
+            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
+            documento: formData.documento || '',
+            data_documento: formatarDataExtenso(formData.data_documento),
+            assunto: formData.assunto || '',
+          });
+        } else if (formData.documento && formData.data_documento) {
+          texto = `${cmd} torna público o recebimento do(a) ${formData.documento}, de ${formatarDataExtenso(formData.data_documento)}, ${formData.assunto ? formData.assunto + ', ' : ''}cujo conteúdo segue anexo ao presente Boletim. Em consequência: (1) Ciente; (2) Publicar.`;
         }
         break;
+      }
 
       case 'Homologação de Atestado': {
         const at = atestadosMilitar.find(a => a.id === formData.atestado_homologado_id);
