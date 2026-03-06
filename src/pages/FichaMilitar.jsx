@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 
 const TIPOS = [
   { value: 'todos', label: 'Todos os Registros' },
+  { value: 'elogios_punicoes', label: 'Extrato de Elogios e Punições' },
   { value: 'punicao', label: 'Punições' },
   { value: 'atestado', label: 'Atestados Médicos' },
   { value: 'ferias', label: 'Férias' },
