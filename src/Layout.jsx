@@ -94,26 +94,63 @@ export default function Layout({ children, currentPageName }) {
           </Button>
         </div>
 
-        <nav className="px-4 space-y-1">
+        <nav className="px-4 space-y-1 overflow-y-auto flex-1 pb-4">
           {navItems.map((item) => {
             const isActive = currentPageName === item.page;
+            const hasChildren = item.children && item.children.length > 0;
+            const isExpanded = expandedItems.includes(item.name);
+            const isChildActive = hasChildren && item.children.some(c => c.page === currentPageName);
+
             return (
-              <Link
-                key={item.page}
-                to={createPageUrl(item.page)}
-                onClick={() => setSidebarOpen(false)}
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                  ${isActive 
-                    ? 'bg-white/20 text-white' 
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
-                  }
-                `}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="font-medium">{item.name}</span>
-                {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
-              </Link>
+              <div key={item.page}>
+                {hasChildren ? (
+                  <button
+                    onClick={() => setExpandedItems(prev => prev.includes(item.name) ? prev.filter(x => x !== item.name) : [...prev, item.name])}
+                    className={`
+                      w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                      ${isActive || isChildActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}
+                    `}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="font-medium flex-1 text-left">{item.name}</span>
+                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </button>
+                ) : (
+                  <Link
+                    to={createPageUrl(item.page)}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`
+                      flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                      ${isActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}
+                    `}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="font-medium">{item.name}</span>
+                    {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
+                  </Link>
+                )}
+                {hasChildren && isExpanded && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    {item.children.map(child => {
+                      const isChildActiveItem = currentPageName === child.page;
+                      return (
+                        <Link
+                          key={child.page}
+                          to={createPageUrl(child.page)}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`
+                            flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200
+                            ${isChildActiveItem ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'}
+                          `}
+                        >
+                          <child.icon className="w-4 h-4 flex-shrink-0" />
+                          <span className="text-sm font-medium">{child.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
