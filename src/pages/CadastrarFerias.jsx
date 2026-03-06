@@ -158,8 +158,10 @@ export default function CadastrarFerias() {
     .map(f => f.periodo_aquisitivo_ref);
 
   // Usar somente os períodos ativos como opções
+  // Em modo de edição, inclui sempre o período atual da férias sendo editada
+  const periodoAtualEdicao = editingFerias?.periodo_aquisitivo_ref;
   const opcaoAnos = periodosAtivos
-    .filter(p => !periodosJaCadastrados.includes(p.ano_referencia))
+    .filter(p => !periodosJaCadastrados.includes(p.ano_referencia) || p.ano_referencia === periodoAtualEdicao)
     .map(p => p.ano_referencia)
     .filter(Boolean)
     .sort((a, b) => b.localeCompare(a));
