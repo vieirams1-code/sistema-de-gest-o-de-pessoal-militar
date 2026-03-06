@@ -11,7 +11,8 @@ import {
   ChevronRight,
   ChevronDown,
   FileText,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
