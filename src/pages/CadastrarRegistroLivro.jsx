@@ -709,6 +709,42 @@ export default function CadastrarRegistroLivro() {
         );
 
       default:
+        // Verifica se é um tipo customizado
+        if (tipoAtualCustom) {
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{tipoAtualCustom.nome}</h3>
+              <div className="space-y-4">
+                {(tipoAtualCustom.campos || []).map((campo) => (
+                  <div key={campo.chave}>
+                    <Label className="text-sm font-medium text-slate-700">
+                      {campo.label}{campo.obrigatorio && <span className="text-red-500 ml-1">*</span>}
+                    </Label>
+                    {campo.tipo === 'textarea' ? (
+                      <Textarea
+                        className="mt-1.5"
+                        value={camposCustom[campo.chave] || ''}
+                        onChange={e => setCamposCustom(prev => ({ ...prev, [campo.chave]: e.target.value }))}
+                        rows={3}
+                      />
+                    ) : (
+                      <Input
+                        className="mt-1.5"
+                        type={campo.tipo === 'date' ? 'date' : campo.tipo === 'number' ? 'number' : 'text'}
+                        value={camposCustom[campo.chave] || ''}
+                        onChange={e => setCamposCustom(prev => ({ ...prev, [campo.chave]: e.target.value }))}
+                        required={campo.obrigatorio}
+                      />
+                    )}
+                  </div>
+                ))}
+                {(!tipoAtualCustom.campos || tipoAtualCustom.campos.length === 0) && (
+                  <p className="text-sm text-slate-400">Nenhum campo adicional para este tipo.</p>
+                )}
+              </div>
+            </div>
+          );
+        }
         return null;
     }
   };
