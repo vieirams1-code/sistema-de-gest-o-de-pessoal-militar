@@ -10,20 +10,25 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { aplicarTemplate, buildVarsLivro, formatDateBR, abreviarPosto } from '@/components/utils/templateUtils';
 
+const extNum = (n) => {
+  const nums = [,'um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove','vinte','vinte e um','vinte e dois','vinte e três','vinte e quatro','vinte e cinco','vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta'];
+  return nums[n] || String(n);
+};
+
 // Textos padrão hardcoded (fallback quando não há template cadastrado)
 const TEXTOS_PADRAO = {
   'Saída Férias': (ferias) => {
-    const postoNome = ferias.militar_posto ? `${ferias.militar_posto} QOBM` : '';
+    const abrev = abreviarPosto(ferias.militar_posto);
+    const postoNome = abrev ? `${abrev} QOBM` : '';
     const dias = ferias.dias || 0;
-    const ext = [,'um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove','vinte','vinte e um','vinte e dois','vinte e três','vinte e quatro','vinte e cinco','vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta'][dias] || dias;
-    return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${ferias.militar_nome || ''}, matrícula ${ferias.militar_matricula || ''}, em ${formatDateBR(ferias.data_inicio)} entrará em gozo de férias regulamentares, ${dias} (${ext}) dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`;
+    return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${ferias.militar_nome || ''}, matrícula ${ferias.militar_matricula || ''}, em ${formatDateBR(ferias.data_inicio)} entrará em gozo de férias regulamentares, ${dias} (${extNum(dias)}) dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`;
   },
   'Retorno Férias': (ferias, dataRegistro) => {
-    const postoNome = ferias.militar_posto ? `${ferias.militar_posto} QOBM` : '';
+    const abrev = abreviarPosto(ferias.militar_posto);
+    const postoNome = abrev ? `${abrev} QOBM` : '';
     const dias = ferias.dias || 0;
-    const ext = [,'um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove','vinte','vinte e um','vinte e dois','vinte e três','vinte e quatro','vinte e cinco','vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta'][dias] || dias;
     const tipoFeriaTexto = ferias.fracionamento ? `${ferias.fracionamento} de férias regulamentares` : 'férias regulamentares';
-    return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${ferias.militar_nome || ''}, matrícula ${ferias.militar_matricula || ''}, em ${formatDateBR(dataRegistro)}, por término do gozo da ${tipoFeriaTexto}, ${dias} (${ext}) dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`;
+    return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${ferias.militar_nome || ''}, matrícula ${ferias.militar_matricula || ''}, em ${formatDateBR(dataRegistro)}, por término do gozo da ${tipoFeriaTexto}, ${dias} (${extNum(dias)}) dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`;
   },
 };
 
