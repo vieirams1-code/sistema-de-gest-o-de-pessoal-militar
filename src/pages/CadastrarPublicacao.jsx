@@ -777,10 +777,64 @@ export default function CadastrarPublicacao() {
           </div>
         );
 
-      default:
+      default: {
+        // Tipo customizado Ex Officio
+        const tipoCustom = tiposCustomExOfficio.find(t => t.nome === formData.tipo);
+        if (tipoCustom) {
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{tipoCustom.nome}</h3>
+              <div className="space-y-4">
+                {(tipoCustom.campos || []).map((campo) => (
+                  <div key={campo.chave}>
+                    <Label className="text-sm font-medium text-slate-700">
+                      {campo.label}{campo.obrigatorio && <span className="text-red-500 ml-1">*</span>}
+                    </Label>
+                    {campo.tipo === 'textarea' ? (
+                      <Textarea
+                        className="mt-1.5"
+                        value={camposCustom[campo.chave] || ''}
+                        onChange={e => setCamposCustom(prev => ({ ...prev, [campo.chave]: e.target.value }))}
+                        rows={3}
+                      />
+                    ) : (
+                      <Input
+                        className="mt-1.5"
+                        type={campo.tipo === 'date' ? 'date' : campo.tipo === 'number' ? 'number' : 'text'}
+                        value={camposCustom[campo.chave] || ''}
+                        onChange={e => setCamposCustom(prev => ({ ...prev, [campo.chave]: e.target.value }))}
+                        required={campo.obrigatorio}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
         return null;
+      }
     }
   };
+
+  // Gerar texto para tipo customizado Ex Officio
+  useEffect(() => {
+    const tipoCustom = tiposCustomExOfficio.find(t => t.nome === formData.tipo);
+    if (!tipoCustom) return;
+    const postoNome = formData.militar_posto ? `${formData.militar_posto} QOBM` : '';
+    const vars = {
+      posto_nome: postoNome,
+      nome_completo: formData.militar_nome || '',
+      matricula: formData.militar_matricula || '',
+      data_publicacao: formData.data_publicacao || '',
+      ...camposCustom,
+    };
+    let texto = tipoCustom.template || '';
+    Object.entries(vars).forEach(([k, v]) => {
+      texto = texto.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v || '');
+    });
+    setFormData(prev => ({ ...prev, texto_publicacao: texto }));
+  }, [tiposCustomExOfficio, formData.tipo, formData.militar_id, camposCustom]);
 
   if (loadingPublicacao) {
     return (
