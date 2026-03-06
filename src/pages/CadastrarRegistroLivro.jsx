@@ -73,6 +73,15 @@ export default function CadastrarRegistroLivro() {
     staleTime: 30000,
   });
 
+  const { data: tiposCustom = [] } = useQuery({
+    queryKey: ['tipos-publicacao-custom-livro'],
+    queryFn: () => base44.entities.TipoPublicacaoCustom.filter({ modulo: 'Livro', ativo: true }),
+    staleTime: 30000,
+  });
+
+  // Dados extras para tipos customizados
+  const [camposCustom, setCamposCustom] = useState({});
+
   const handleChange = (name, value) => {
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
