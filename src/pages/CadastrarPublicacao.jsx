@@ -588,8 +588,7 @@ export default function CadastrarPublicacao() {
         );
 
       case 'Designação de Função':
-      case 'Dispensa de Função': {
-        const tmplDesig = templatesExOfficio.find(t => t.tipo_registro === formData.tipo && t.ativo !== false);
+      case 'Dispensa de Função':
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{formData.tipo}</h3>
@@ -610,26 +609,9 @@ export default function CadastrarPublicacao() {
                 type="date"
                 required
               />
-              {tmplDesig ? (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 flex items-center gap-2">
-                  <RefreshCw className="w-3 h-3" /> Template personalizado será aplicado automaticamente.
-                </div>
-              ) : (
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
-                  <Textarea
-                    value={textoDesignacao}
-                    onChange={e => setTextoDesignacao(e.target.value)}
-                    className="mt-1.5"
-                    rows={5}
-                    placeholder="O texto será gerado automaticamente com base nos campos acima, ou edite manualmente aqui."
-                  />
-                </div>
-              )}
             </div>
           </div>
         );
-      }
 
       case 'Ata JISO': {
         const finalidadesComAtestados = ['V.A.F', 'LTS', 'Atestado de Origem'];
