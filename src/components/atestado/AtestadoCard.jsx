@@ -243,14 +243,16 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?tipo=Homologa%C3%A7%C3%A3o+de+Atestado&militar_id=${atestado.militar_id}&atestado_id=${atestado.id}`, '_blank')}>
+              <DropdownMenuItem onClick={handleOpenHomologacao}>
                 <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
                 Homologação pelo Comandante
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?tipo=Ata+JISO&militar_id=${atestado.militar_id}&atestado_id=${atestado.id}`, '_blank')}>
-                <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
-                Ata JISO
-              </DropdownMenuItem>
+              {atestado.necessita_jiso && (
+                <DropdownMenuItem onClick={handleOpenAtaJiso}>
+                  <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
+                  Ata JISO
+                </DropdownMenuItem>
+              )}
               {publicacoesVinculadas.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
