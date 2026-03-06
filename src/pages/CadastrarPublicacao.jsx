@@ -919,6 +919,10 @@ export default function CadastrarPublicacao() {
                   <SelectItem value="Ata JISO">Ata JISO</SelectItem>
                   <SelectItem value="Transcrição de Documentos">Transcrição de Documentos</SelectItem>
                   <SelectItem value="Interrupção de Férias">Interrupção de Férias</SelectItem>
+                  <SelectItem value="Transferência para RR">Transferência para RR</SelectItem>
+                  {tiposCustomExOfficio.map(t => (
+                    <SelectItem key={t.id} value={t.nome}>{t.nome}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
