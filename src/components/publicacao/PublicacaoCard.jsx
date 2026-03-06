@@ -37,6 +37,14 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
     data_bg: registro.data_bg || '',
   });
 
+  const handleTogglePrioridade = (flag) => {
+    let tipo = 'livro';
+    if (registro.tipo) tipo = 'ex-officio';
+    else if (registro.medico || registro.cid_10) tipo = 'atestado';
+    const newVal = !registro[flag];
+    onUpdate(registro.id, { [flag]: newVal }, tipo);
+  };
+
   // Status canônico: sempre usar o calculado a partir dos campos de BG
   const currentStatus = calcStatus(registro.nota_para_bg, registro.numero_bg, registro.data_bg);
 
