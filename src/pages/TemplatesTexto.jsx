@@ -16,122 +16,363 @@ import { aplicarTemplate, VARS_PREVIEW } from '@/components/utils/templateUtils'
 const MODULOS = ['Livro', 'Publicação Ex Officio', 'Atestado', 'JISO'];
 
 const TIPOS_POR_MODULO = {
-  'Livro': ['Saída Férias', 'Retorno Férias', 'Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade', 'Núpcias', 'Luto', 'Cedência', 'Transferência', 'Transferência para RR', 'Trânsito', 'Instalação', 'Dispensa Recompensa', 'Dispensa Desconto Férias', 'Deslocamento Missão', 'Curso/Estágio'],
-  'Publicação Ex Officio': ['Elogio Individual', 'Melhoria de Comportamento', 'Punição', 'Geral', 'Designação de Função', 'Dispensa de Função', 'Ata JISO', 'Transcrição de Documentos', 'Interrupção de Férias', 'Transferência para RR', 'Homologação de Atestado'],
+  'Livro': ['Saída Férias', 'Retorno Férias', 'Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade', 'Núpcias', 'Luto', 'Cedência', 'Transferência', 'Transferência para RR', 'Trânsito', 'Instalação', 'Dispensa Recompensa', 'Dispensa Desconto Férias', 'Deslocamento Missão', 'Curso/Estágio', 'Designação de Função', 'Dispensa de Função'],
+  'Publicação Ex Officio': ['Elogio Individual', 'Melhoria de Comportamento', 'Punição', 'Geral', 'Designação de Função', 'Dispensa de Função', 'Ata JISO', 'Transcrição de Documentos', 'Interrupção de Férias', 'Transferência para RR', 'Homologação de Atestado', 'Apostila', 'Tornar sem Efeito'],
   'Atestado': ['Homologação pelo Comandante', 'Encaminhamento JISO'],
   'JISO': ['Ata JISO', 'Resultado JISO'],
 };
 
-// Grupos de variáveis por categoria, com descrição
-const GRUPOS_VARIAVEIS = [
-  {
-    grupo: 'Militar',
-    cor: 'blue',
-    variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM (ex: Capitão QOBM)' },
-      { v: '{{nome_completo}}', desc: 'Nome completo do militar' },
-      { v: '{{matricula}}', desc: 'Matrícula funcional' },
-    ]
-  },
-  {
-    grupo: 'Férias / Período',
+// Variáveis agrupadas por tipo de registro
+const VARS_POR_TIPO = {
+  'Saída Férias': {
+    grupo: 'Saída Férias',
     cor: 'green',
     variaveis: [
-      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo completo (ex: 01/09/2024 a 31/08/2025)' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo do militar' },
+      { v: '{{matricula}}', desc: 'Matrícula funcional' },
+      { v: '{{data_registro}}', desc: 'Data do registro' },
+      { v: '{{data_inicio}}', desc: 'Data de início das férias' },
+      { v: '{{dias}}', desc: 'Quantidade de dias' },
+      { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo completo' },
       { v: '{{periodo_aquisitivo_simplificado}}', desc: 'Período aquisitivo simplificado (ex: 2024/2025)' },
-      { v: '{{data_inicio}}', desc: 'Data de início das férias (dd/mm/aaaa)' },
-      { v: '{{data_termino}}', desc: 'Data de término das férias (dd/mm/aaaa)' },
-      { v: '{{data_retorno}}', desc: 'Data de retorno ao trabalho (dd/mm/aaaa)' },
-      { v: '{{dias}}', desc: 'Quantidade de dias (número)' },
-      { v: '{{dias_extenso}}', desc: 'Quantidade de dias por extenso (ex: vinte)' },
       { v: '{{fracionamento}}', desc: 'Fração das férias (ex: 1ª parcela)' },
-      { v: '{{tipo_ferias_texto}}', desc: 'Texto do tipo de férias (ex: 1ª parcela de férias regulamentares)' },
     ]
   },
-  {
-    grupo: 'Registro / Publicação',
-    cor: 'purple',
+  'Retorno Férias': {
+    grupo: 'Retorno Férias',
+    cor: 'green',
     variaveis: [
-      { v: '{{data_registro}}', desc: 'Data do registro no livro (dd/mm/aaaa)' },
-      { v: '{{documento_referencia}}', desc: 'Documento de referência (DOEMS, Nota, OS)' },
-      { v: '{{publicacao_transferencia}}', desc: 'Publicação da transferência (DOEMS nº XX.XXX de XX de XXX de XXXX)' },
-      { v: '{{tipo_transferencia}}', desc: 'Tipo de transferência (A pedido / Ex officio)' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_registro}}', desc: 'Data de retorno' },
+      { v: '{{dias}}', desc: 'Dias' },
+      { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+      { v: '{{tipo_ferias_texto}}', desc: 'Texto do tipo de férias' },
     ]
   },
-  {
-    grupo: 'Licenças / Afastamentos',
+  'Licença Maternidade': {
+    grupo: 'Licença Maternidade',
     cor: 'orange',
     variaveis: [
-      { v: '{{inicio_termino}}', desc: 'Se é início ou término do afastamento' },
-      { v: '{{conjuge_nome}}', desc: 'Nome do cônjuge (Núpcias)' },
-      { v: '{{falecido_nome}}', desc: 'Nome do falecido (Luto)' },
-      { v: '{{falecido_certidao}}', desc: 'Número da certidão de óbito (Luto)' },
-      { v: '{{grau_parentesco}}', desc: 'Grau de parentesco (Luto)' },
-      { v: '{{motivo_dispensa}}', desc: 'Motivo da dispensa (Recompensa)' },
-      { v: '{{dias_restantes}}', desc: 'Dias restantes (Dispensa Desconto Férias)' },
-      { v: '{{dias_desconto}}', desc: 'Dias de desconto em férias' },
-      { v: '{{dias_desconto_extenso}}', desc: 'Dias de desconto por extenso' },
-      { v: '{{funcao}}', desc: 'Função (Designação / Dispensa de Função)' },
-      { v: '{{data_designacao}}', desc: 'Data de designação/dispensa (dd/mm/aaaa)' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{data_termino}}', desc: 'Data de término' },
+      { v: '{{dias}}', desc: 'Dias de licença' },
+      { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
     ]
   },
-  {
-    grupo: 'Movimentação / Missões',
+  'Prorrogação de Licença Maternidade': {
+    grupo: 'Prorrogação de Licença Maternidade',
+    cor: 'orange',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{data_termino}}', desc: 'Data de término' },
+    ]
+  },
+  'Licença Paternidade': {
+    grupo: 'Licença Paternidade',
+    cor: 'orange',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{data_termino}}', desc: 'Data de término' },
+    ]
+  },
+  'Núpcias': {
+    grupo: 'Núpcias',
+    cor: 'purple',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{conjuge_nome}}', desc: 'Nome do cônjuge' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{inicio_termino}}', desc: 'Início ou término' },
+    ]
+  },
+  'Luto': {
+    grupo: 'Luto',
     cor: 'slate',
     variaveis: [
-      { v: '{{origem}}', desc: 'Unidade de origem' },
-      { v: '{{destino}}', desc: 'Unidade ou local de destino' },
-      { v: '{{data_cedencia}}', desc: 'Data da cedência (dd/mm/aaaa)' },
-      { v: '{{data_transferencia}}', desc: 'Data da transferência (dd/mm/aaaa)' },
-      { v: '{{data_retorno}}', desc: 'Data de retorno da missão (dd/mm/aaaa)' },
-      { v: '{{missao_descricao}}', desc: 'Descrição da missão (ex: CMAUT/2026)' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{falecido_nome}}', desc: 'Nome do falecido' },
+      { v: '{{falecido_certidao}}', desc: 'Número da certidão de óbito' },
+      { v: '{{grau_parentesco}}', desc: 'Grau de parentesco' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{data_termino}}', desc: 'Data de término' },
     ]
   },
-  {
-    grupo: 'Cursos / Estágios',
+  'Cedência': {
+    grupo: 'Cedência',
+    cor: 'slate',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{origem}}', desc: 'Unidade de origem' },
+      { v: '{{destino}}', desc: 'Unidade de destino' },
+      { v: '{{data_cedencia}}', desc: 'Data da cedência' },
+    ]
+  },
+  'Transferência': {
+    grupo: 'Transferência',
+    cor: 'slate',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{origem}}', desc: 'Unidade de origem' },
+      { v: '{{destino}}', desc: 'Unidade de destino' },
+      { v: '{{data_transferencia}}', desc: 'Data da transferência' },
+      { v: '{{publicacao_transferencia}}', desc: 'Publicação da transferência (DOEMS nº XX.XXX...)' },
+      { v: '{{tipo_transferencia}}', desc: 'Tipo (Entrada / Saída / Ex Officio)' },
+    ]
+  },
+  'Transferência para RR': {
+    grupo: 'Transferência para Reserva Remunerada',
+    cor: 'slate',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{documento_referencia_rr}}', desc: 'Documento de referência RR' },
+      { v: '{{data_transferencia_rr}}', desc: 'Data da transferência para RR' },
+      { v: '{{documento_referencia}}', desc: 'Documento de referência' },
+      { v: '{{publicacao_transferencia}}', desc: 'Publicação da transferência' },
+      { v: '{{data_transferencia}}', desc: 'Data da transferência' },
+    ]
+  },
+  'Trânsito': {
+    grupo: 'Trânsito',
+    cor: 'slate',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{origem}}', desc: 'Unidade de origem' },
+      { v: '{{destino}}', desc: 'Unidade de destino' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+    ]
+  },
+  'Instalação': {
+    grupo: 'Instalação',
+    cor: 'slate',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{origem}}', desc: 'Unidade de origem' },
+      { v: '{{destino}}', desc: 'Unidade de destino' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+    ]
+  },
+  'Dispensa Recompensa': {
+    grupo: 'Dispensa como Recompensa',
+    cor: 'orange',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{dias}}', desc: 'Dias de dispensa' },
+      { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{motivo_dispensa}}', desc: 'Motivo da dispensa' },
+    ]
+  },
+  'Dispensa Desconto Férias': {
+    grupo: 'Dispensa com Desconto em Férias',
+    cor: 'orange',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{dias}}', desc: 'Dias a descontar' },
+      { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+      { v: '{{dias_restantes}}', desc: 'Dias restantes após desconto' },
+    ]
+  },
+  'Deslocamento Missão': {
+    grupo: 'Deslocamento para Missões',
     cor: 'teal',
     variaveis: [
-      { v: '{{curso_nome}}', desc: 'Nome do curso ou estágio' },
-      { v: '{{curso_local}}', desc: 'Local do curso' },
-      { v: '{{edicao_ano}}', desc: 'Edição ou ano do curso' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{data_retorno}}', desc: 'Data de retorno' },
+      { v: '{{destino}}', desc: 'Local de destino' },
+      { v: '{{missao_descricao}}', desc: 'Descrição da missão' },
+      { v: '{{documento_referencia}}', desc: 'Documento de referência' },
+      { v: '{{inicio_termino}}', desc: 'Início ou término' },
     ]
   },
-  {
+  'Curso/Estágio': {
+    grupo: 'Cursos / Estágios / Capacitações',
+    cor: 'teal',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{curso_nome}}', desc: 'Nome do curso ou estágio' },
+      { v: '{{curso_local}}', desc: 'Local do curso' },
+      { v: '{{edicao_ano}}', desc: 'Edição ou ano' },
+      { v: '{{documento_referencia}}', desc: 'Documento de referência' },
+      { v: '{{inicio_termino}}', desc: 'Início ou término' },
+    ]
+  },
+  'Designação de Função': {
+    grupo: 'Designação de Função',
+    cor: 'blue',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{funcao}}', desc: 'Função designada' },
+      { v: '{{data_designacao}}', desc: 'Data de designação' },
+    ]
+  },
+  'Dispensa de Função': {
+    grupo: 'Dispensa de Função',
+    cor: 'blue',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{funcao}}', desc: 'Função dispensada' },
+      { v: '{{data_designacao}}', desc: 'Data da dispensa' },
+    ]
+  },
+  'Elogio Individual': {
+    grupo: 'Elogio Individual',
+    cor: 'green',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{texto_complemento}}', desc: 'Texto do elogio' },
+    ]
+  },
+  'Melhoria de Comportamento': {
+    grupo: 'Melhoria de Comportamento',
+    cor: 'green',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_melhoria}}', desc: 'Data da melhoria' },
+      { v: '{{comportamento_atual}}', desc: 'Comportamento anterior' },
+      { v: '{{comportamento_ingressou}}', desc: 'Comportamento novo' },
+      { v: '{{data_inclusao}}', desc: 'Data de inclusão do militar' },
+    ]
+  },
+  'Ata JISO': {
+    grupo: 'Ata JISO',
+    cor: 'purple',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{finalidade_jiso}}', desc: 'Finalidade da JISO' },
+      { v: '{{secao_jiso}}', desc: 'Seção JISO' },
+      { v: '{{data_ata}}', desc: 'Data da ata' },
+      { v: '{{nup}}', desc: 'NUP' },
+      { v: '{{parecer_jiso}}', desc: 'Parecer da JISO' },
+    ]
+  },
+  'Transcrição de Documentos': {
     grupo: 'Transcrição de Documentos',
     cor: 'teal',
     variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{documento}}', desc: 'Nome do documento (ex: Ofício 001)' },
-      { v: '{{data_documento}}', desc: 'Data do documento (dd/mm/aaaa)' },
+      { v: '{{data_documento}}', desc: 'Data do documento' },
       { v: '{{assunto}}', desc: 'Assunto do documento' },
     ]
   },
-  {
-    grupo: 'Ex Officio / Geral',
-    cor: 'purple',
+  'Interrupção de Férias': {
+    grupo: 'Interrupção de Férias',
+    cor: 'orange',
     variaveis: [
-      { v: '{{documento_referencia_rr}}', desc: 'Documento de referência RR (DOEMS nº XX.XXX, de xx de xxx de xxxx)' },
-      { v: '{{data_transferencia_rr}}', desc: 'Data da transferência para RR (dd/mm/aaaa)' },
-      { v: '{{finalidade_jiso}}', desc: 'Finalidade da JISO (V.A.F, LTS, etc.)' },
-      { v: '{{secao_jiso}}', desc: 'Seção JISO (ex: 62/JISO/2026)' },
-      { v: '{{data_ata}}', desc: 'Data da Ata JISO (dd/mm/aaaa)' },
-      { v: '{{nup}}', desc: 'NUP da JISO' },
-      { v: '{{parecer_jiso}}', desc: 'Parecer da JISO' },
-      { v: '{{data_melhoria}}', desc: 'Data da melhoria de comportamento (dd/mm/aaaa)' },
-      { v: '{{data_inclusao}}', desc: 'Data de inclusão do militar (dd/mm/aaaa)' },
-      { v: '{{comportamento_atual}}', desc: 'Comportamento atual do militar' },
-      { v: '{{comportamento_ingressou}}', desc: 'Comportamento que ingressa / mantém' },
-      { v: '{{texto_complemento}}', desc: 'Texto complemento (Elogio Individual)' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_interrupcao}}', desc: 'Data da interrupção' },
+      { v: '{{dias_gozados_interrupcao}}', desc: 'Dias efetivamente gozados' },
     ]
   },
-];
-
-// Quais grupos mostrar por módulo
-const GRUPOS_POR_MODULO = {
-  'Livro': ['Militar', 'Férias / Período', 'Registro / Publicação', 'Licenças / Afastamentos', 'Movimentação / Missões', 'Cursos / Estágios', 'Ex Officio / Geral'],
-  'Publicação Ex Officio': ['Militar', 'Férias / Período', 'Registro / Publicação', 'Licenças / Afastamentos', 'Movimentação / Missões', 'Cursos / Estágios', 'Transcrição de Documentos', 'Ex Officio / Geral'],
-  'Atestado': ['Militar'],
-  'JISO': ['Militar'],
+  'Homologação de Atestado': {
+    grupo: 'Homologação de Atestado',
+    cor: 'blue',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+    ]
+  },
+  'Apostila': {
+    grupo: 'Apostila',
+    cor: 'purple',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{numero_bg_ref}}', desc: 'Número do BG da publicação corrigida' },
+      { v: '{{data_bg_ref}}', desc: 'Data do BG da publicação corrigida' },
+      { v: '{{nota_ref}}', desc: 'Nota da publicação corrigida' },
+      { v: '{{texto_errado}}', desc: 'Texto errado a ser corrigido' },
+      { v: '{{texto_novo}}', desc: 'Novo texto correto' },
+    ]
+  },
+  'Tornar sem Efeito': {
+    grupo: 'Tornar sem Efeito',
+    cor: 'orange',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{numero_bg_ref}}', desc: 'Número do BG da publicação tornada sem efeito' },
+      { v: '{{data_bg_ref}}', desc: 'Data do BG da publicação tornada sem efeito' },
+      { v: '{{nota_ref}}', desc: 'Nota da publicação tornada sem efeito' },
+      { v: '{{tipo_ref}}', desc: 'Tipo da publicação tornada sem efeito' },
+    ]
+  },
 };
+
+// Quais grupos mostrar por módulo (fallback genérico quando tipo não selecionado)
+const GRUPOS_GENERICOS_LIVRO = [
+  { grupo: 'Militar (Geral)', cor: 'blue', variaveis: [
+    { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+    { v: '{{nome_completo}}', desc: 'Nome completo' },
+    { v: '{{matricula}}', desc: 'Matrícula' },
+    { v: '{{data_registro}}', desc: 'Data do registro' },
+  ]},
+];
+const GRUPOS_GENERICOS_EXOFFICIO = [
+  { grupo: 'Militar (Geral)', cor: 'blue', variaveis: [
+    { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+    { v: '{{nome_completo}}', desc: 'Nome completo' },
+    { v: '{{matricula}}', desc: 'Matrícula' },
+    { v: '{{data_publicacao}}', desc: 'Data da publicação' },
+  ]},
+];
 
 const COR_GRUPO = {
   blue: { box: 'bg-blue-50 border-blue-200', titulo: 'text-blue-700', badge: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600' },
