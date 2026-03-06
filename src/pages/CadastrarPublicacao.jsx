@@ -556,7 +556,8 @@ export default function CadastrarPublicacao() {
         );
 
       case 'Designação de Função':
-      case 'Dispensa de Função':
+      case 'Dispensa de Função': {
+        const tmplDesig = templatesExOfficio.find(t => t.tipo_registro === formData.tipo && t.ativo !== false);
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{formData.tipo}</h3>
@@ -577,9 +578,26 @@ export default function CadastrarPublicacao() {
                 type="date"
                 required
               />
+              {tmplDesig ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 flex items-center gap-2">
+                  <RefreshCw className="w-3 h-3" /> Template personalizado será aplicado automaticamente.
+                </div>
+              ) : (
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
+                  <Textarea
+                    value={textoDesignacao}
+                    onChange={e => setTextoDesignacao(e.target.value)}
+                    className="mt-1.5"
+                    rows={5}
+                    placeholder="O texto será gerado automaticamente com base nos campos acima, ou edite manualmente aqui."
+                  />
+                </div>
+              )}
             </div>
           </div>
         );
+      }
 
       case 'Ata JISO': {
         const finalidadesComAtestados = ['V.A.F', 'LTS', 'Atestado de Origem'];
@@ -702,7 +720,33 @@ export default function CadastrarPublicacao() {
         );
 
       case 'Transferência para RR':
-        return null;
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência para Reserva Remunerada</h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-slate-700">
+                  Documento de Referência
+                  <span className="ml-2 text-xs text-slate-400 font-normal">(Ex: DOEMS nº XX.XXX, de xx de maio de xxxx)</span>
+                </Label>
+                <Input
+                  value={formData.documento_referencia_rr || ''}
+                  onChange={e => handleChange('documento_referencia_rr', e.target.value)}
+                  className="mt-1.5"
+                  placeholder="DOEMS nº XX.XXX, de xx de maio de xxxx"
+                />
+              </div>
+              <FormField
+                label="Data da Transferência"
+                name="data_transferencia_rr"
+                value={formData.data_transferencia_rr || ''}
+                onChange={handleChange}
+                type="date"
+                required
+              />
+            </div>
+          </div>
+        );
 
       case 'Interrupção de Férias':
         return (
