@@ -78,6 +78,7 @@ const GRUPOS_VARIAVEIS = [
       { v: '{{destino}}', desc: 'Unidade ou local de destino' },
       { v: '{{data_cedencia}}', desc: 'Data da cedência (dd/mm/aaaa)' },
       { v: '{{data_transferencia}}', desc: 'Data da transferência (dd/mm/aaaa)' },
+      { v: '{{data_retorno}}', desc: 'Data de retorno da missão (dd/mm/aaaa)' },
       { v: '{{missao_descricao}}', desc: 'Descrição da missão (ex: CMAUT/2026)' },
     ]
   },
