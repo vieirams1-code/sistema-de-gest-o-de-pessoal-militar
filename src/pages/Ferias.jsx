@@ -387,6 +387,20 @@ export default function Ferias() {
                             {saldoDias !== null && (
                               <p className="text-xs text-orange-600 font-medium">Saldo: {saldoDias}d</p>
                             )}
+                            {/* Indicativos de adições e descontos */}
+                            {f.observacoes && (() => {
+                              const linhas = f.observacoes.split('\n').filter(l => l.match(/^[+-]\d+d:/));
+                              return linhas.length > 0 ? (
+                                <div className="mt-1 space-y-0.5">
+                                  {linhas.map((linha, i) => {
+                                    const isAdd = linha.startsWith('+');
+                                    return (
+                                      <p key={i} className={`text-xs font-medium ${isAdd ? 'text-green-600' : 'text-orange-600'}`}>{linha}</p>
+                                    );
+                                  })}
+                                </div>
+                              ) : null;
+                            })()}
                           </td>
                           <td className="px-4 py-3">
                             {f.fracionamento && <Badge className="bg-purple-100 text-purple-700 text-xs">{f.fracionamento}</Badge>}
