@@ -273,6 +273,9 @@ export default function CadastrarPublicacao() {
       dias_punicao: formData.dias_punicao !== '' && formData.dias_punicao !== undefined && formData.dias_punicao !== null
         ? Number(formData.dias_punicao)
         : undefined,
+      dias_gozados_interrupcao: formData.dias_gozados_interrupcao !== '' && formData.dias_gozados_interrupcao !== undefined && formData.dias_gozados_interrupcao !== null
+        ? Number(formData.dias_gozados_interrupcao)
+        : undefined,
     };
 
     let savedId = publicacaoId;
