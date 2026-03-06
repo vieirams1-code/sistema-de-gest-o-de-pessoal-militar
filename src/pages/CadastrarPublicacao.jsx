@@ -74,7 +74,6 @@ export default function CadastrarPublicacao() {
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
-  const [textoDesignacao, setTextoDesignacao] = useState('');
 
   // Templates para Ex Officio
   const { data: templatesExOfficio = [] } = useQuery({
