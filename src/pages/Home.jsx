@@ -21,6 +21,21 @@ export default function Home() {
     queryFn: () => base44.entities.PeriodoAquisitivo.list()
   });
 
+  const { data: publicacoesUrgentesImportantes = [] } = useQuery({
+    queryKey: ['publicacoes-urgentes-importantes'],
+    queryFn: async () => {
+      const [exofficio, livro] = await Promise.all([
+        base44.entities.PublicacaoExOfficio.list('-created_date'),
+        base44.entities.RegistroLivro.list('-created_date'),
+      ]);
+      return [...exofficio, ...livro].filter(p => {
+        const status = p.status;
+        const naoPublicado = status !== 'Publicado';
+        return naoPublicado && (p.urgente || p.importante);
+      });
+    }
+  });
+
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
