@@ -334,9 +334,10 @@ export default function CadastrarRegistroLivro() {
 
       case 'Dispensa Desconto Férias': {
         const diasRestantes = formData.dias_restantes || '';
-        const t = tentarTemplate('Dispensa Desconto Férias', { data_inicio: dataInicio, periodo_aquisitivo: formData.periodo_aquisitivo, dias_restantes: diasRestantes });
+        const periodoLabel = formData.periodo_aquisitivo_label || formData.periodo_aquisitivo || '';
+        const t = tentarTemplate('Dispensa Desconto Férias', { data_inicio: dataInicio, periodo_aquisitivo: periodoLabel, dias_restantes: diasRestantes });
         if (t) { texto = t; break; }
-        if (formData.periodo_aquisitivo && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de Dispensa para Desconto em Férias a contar de ${dataInicio}, referentes ao período aquisitivo de ${formData.periodo_aquisitivo}, restando ${diasRestantes} dias.`;
+        if (formData.periodo_aquisitivo && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de Dispensa para Desconto em Férias a contar de ${dataInicio}, referentes ao período aquisitivo de ${periodoLabel}, restando ${diasRestantes} dias.`;
         break;
       }
 
@@ -658,19 +659,22 @@ export default function CadastrarRegistroLivro() {
                   <Select
                     value={formData.periodo_aquisitivo}
                     onValueChange={v => {
-                      const periodo = periodosParaDesconto.find(p => p.ano_referencia === v);
+                      const periodo = periodosParaDesconto.find(p => p.id === v);
                       const diasRestantes = periodo ? (periodo.dias_direito || 30) - (periodo.dias_gozados || 0) - (periodo.dias_previstos || 0) : '';
-                      setFormData(prev => ({ ...prev, periodo_aquisitivo: v, dias_restantes: diasRestantes }));
+                      const label = periodo ? (periodo.ano_referencia || `${periodo.inicio_aquisitivo} a ${periodo.fim_aquisitivo}`) : v;
+                      setFormData(prev => ({ ...prev, periodo_aquisitivo: v, periodo_aquisitivo_label: label, dias_restantes: diasRestantes }));
                     }}
                   >
                     <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder="Selecione o período..." />
+                      <SelectValue placeholder={periodosParaDesconto.length === 0 ? 'Nenhum período Previsto disponível' : 'Selecione o período...'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {periodosParaDesconto.length === 0 && <SelectItem value="_none" disabled>Nenhum período Previsto disponível</SelectItem>}
+                      {periodosParaDesconto.length === 0 && (
+                        <div className="px-3 py-2 text-sm text-slate-400">Nenhum período com status "Previsto"</div>
+                      )}
                       {periodosParaDesconto.map(p => (
-                        <SelectItem key={p.id} value={p.ano_referencia || p.id}>
-                          {p.ano_referencia} — {p.dias_direito || 30}d direito — {(p.dias_gozados || 0) + (p.dias_previstos || 0)}d usados
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.ano_referencia || `${p.inicio_aquisitivo} a ${p.fim_aquisitivo}`} — {p.dias_direito || 30}d direito — {(p.dias_gozados || 0) + (p.dias_previstos || 0)}d usados
                         </SelectItem>
                       ))}
                     </SelectContent>
