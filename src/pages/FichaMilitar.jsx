@@ -485,9 +485,60 @@ export default function FichaMilitar() {
             <h3 className="text-lg font-semibold text-slate-700">Nenhum registro encontrado</h3>
             <p className="text-slate-500 text-sm mt-1">Tente ajustar os filtros</p>
           </div>
+        ) : (tipoFiltro === 'publicacao' || tipoFiltro === 'todos') && eventosFiltrados.some(e => e.tipo === 'publicacao') ? (
+          // Agrupamento por status quando há publicações visíveis
+          (() => {
+            const getStatusPub = (e) => {
+              if (e.tipo !== 'publicacao') return null;
+              if (e.raw?.numero_bg && e.raw?.data_bg) return 'Publicado';
+              if (e.raw?.nota_para_bg) return 'Aguardando Publicação';
+              return 'Aguardando Nota';
+            };
+            const grupos = [
+              { key: 'Aguardando Nota', color: 'text-amber-700', border: 'border-amber-300', bg: 'bg-amber-50' },
+              { key: 'Aguardando Publicação', color: 'text-blue-700', border: 'border-blue-300', bg: 'bg-blue-50' },
+              { key: 'Publicado', color: 'text-emerald-700', border: 'border-emerald-300', bg: 'bg-emerald-50' },
+            ];
+            const pubEventos = eventosFiltrados.filter(e => e.tipo === 'publicacao');
+            const outrosEventos = eventosFiltrados.filter(e => e.tipo !== 'publicacao');
+            return (
+              <div className="space-y-6">
+                {/* Outros registros (não publicação) */}
+                {outrosEventos.length > 0 && (
+                  <div className="space-y-3">
+                    {outrosEventos.map((event) => (
+                      <EventCard key={event.tipo + event.id} event={event} onDelete={handleDeleteRequest} />
+                    ))}
+                  </div>
+                )}
+                {/* Publicações agrupadas por status */}
+                {pubEventos.length > 0 && (
+                  <div className="space-y-5">
+                    {grupos.map(grupo => {
+                      const items = pubEventos.filter(e => getStatusPub(e) === grupo.key);
+                      if (items.length === 0) return null;
+                      return (
+                        <div key={grupo.key}>
+                          <div className={`flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg border ${grupo.border} ${grupo.bg}`}>
+                            <span className={`font-bold text-sm ${grupo.color}`}>{grupo.key}</span>
+                            <span className={`text-xs ${grupo.color} opacity-70`}>— {items.length} publicação(ões)</span>
+                          </div>
+                          <div className="space-y-3">
+                            {items.map(event => (
+                              <EventCard key={event.tipo + event.id} event={event} onDelete={handleDeleteRequest} />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()
         ) : (
           <div className="space-y-3">
-            {eventosFiltrados.map((event, i) => (
+            {eventosFiltrados.map((event) => (
               <EventCard key={event.tipo + event.id} event={event} onDelete={handleDeleteRequest} />
             ))}
           </div>
