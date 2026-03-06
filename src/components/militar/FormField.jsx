@@ -12,7 +12,8 @@ export default function FormField({
   options = [], 
   placeholder,
   required = false,
-  className = ""
+  className = "",
+  hint = ""
 }) {
   const handleChange = (e) => {
     onChange(name, e.target.value);
@@ -52,6 +53,7 @@ export default function FormField({
           className="h-10 border-slate-200 focus:border-[#1e3a5f] focus:ring-[#1e3a5f]/20"
         />
       )}
+      {hint && <p className="text-xs text-blue-600 mt-0.5">{hint}</p>}
     </div>
   );
 }
