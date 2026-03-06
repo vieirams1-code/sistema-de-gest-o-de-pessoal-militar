@@ -113,11 +113,13 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card className="border-slate-200 hover:shadow-md transition-shadow">
+      <Card className={`border hover:shadow-md transition-shadow ${registro.urgente ? 'border-red-400 bg-red-50' : registro.importante ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`}>
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
+                {registro.urgente && <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full"><AlertTriangle className="w-3 h-3" />URGENTE</span>}
+                {registro.importante && !registro.urgente && <span className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full"><Star className="w-3 h-3" />IMPORTANTE</span>}
                 <h3 className="font-semibold text-lg text-slate-900 truncate">
                   {registro.militar_posto && `${registro.militar_posto} `}
                   {registro.militar_nome}
