@@ -81,6 +81,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
       ? (registro.necessita_jiso ? 'Atestado - JISO' : 'Atestado - Homologação')
       : '');
 
+  const foiApostilada = !!registro.apostilada_por_id;
+  const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id;
+
   // Link para atestado vinculado (publicações ex-officio que têm atestado_homologado_id ou atestados_jiso_ids)
   const atestadoLink = registro.atestado_homologado_id
     ? createPageUrl('VerAtestado') + `?id=${registro.atestado_homologado_id}`
