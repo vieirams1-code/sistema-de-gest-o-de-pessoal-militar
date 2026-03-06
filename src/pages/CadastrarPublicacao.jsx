@@ -261,17 +261,15 @@ export default function CadastrarPublicacao() {
 
       case 'Designação de Função':
       case 'Dispensa de Função': {
-        const tmpl = templatesExOfficio.find(t => t.tipo_registro === formData.tipo && t.ativo !== false);
-        if (tmpl?.template) {
-          texto = aplicarTemplate(tmpl.template, {
+        const tmplDesig = templatesExOfficio.find(t => t.tipo_registro === formData.tipo && t.ativo !== false);
+        if (tmplDesig?.template) {
+          texto = aplicarTemplate(tmplDesig.template, {
             posto_nome: postoNome,
             nome_completo: nomeCompleto,
             matricula,
             funcao: formData.funcao || '',
             data_designacao: formatarDataExtenso(formData.data_designacao),
           });
-        } else if (textoDesignacao) {
-          texto = textoDesignacao;
         } else if (formData.funcao && formData.data_designacao) {
           const acao = formData.tipo === 'Dispensa de Função' ? 'dispensar' : 'designar';
           const preposicao = formData.tipo === 'Dispensa de Função' ? 'da' : 'para exercer a';
