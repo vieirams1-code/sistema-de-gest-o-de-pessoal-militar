@@ -135,11 +135,14 @@ export default function Layout({ children, currentPageName }) {
                 {hasChildren && isExpanded && (
                   <div className="ml-4 mt-1 space-y-1">
                     {item.children.map(child => {
-                      const isChildActiveItem = currentPageName === child.page;
+                      const isChildActiveItem = currentPageName === child.page && !child.tab;
+                      const href = child.tab
+                        ? createPageUrl(child.page) + `?tab=${child.tab}`
+                        : createPageUrl(child.page);
                       return (
                         <Link
-                          key={child.page}
-                          to={createPageUrl(child.page)}
+                          key={child.name}
+                          to={href}
                           onClick={() => setSidebarOpen(false)}
                           className={`
                             flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200
