@@ -10,7 +10,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Calendar, FileText, Save, Edit2, X, ChevronDown, ChevronUp, Trash2, ExternalLink } from 'lucide-react';
+import { Calendar, FileText, Save, Edit2, X, ChevronDown, ChevronUp, Trash2, ExternalLink, Star, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
 
