@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Save, User, FileText, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { aplicarTemplate, buildVarsLivro, formatDateBR } from '@/components/utils/templateUtils';
+import { aplicarTemplate, buildVarsLivro, formatDateBR, abreviarPosto } from '@/components/utils/templateUtils';
 
 // Textos padrão hardcoded (fallback quando não há template cadastrado)
 const TEXTOS_PADRAO = {
