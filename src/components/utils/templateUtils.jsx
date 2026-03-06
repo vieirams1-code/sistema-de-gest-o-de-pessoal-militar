@@ -135,4 +135,6 @@ export const VARS_PREVIEW = {
   dias_desconto: '6',
   dias_desconto_extenso: 'seis',
   inicio_termino: 'Início',
+  funcao: 'Auxiliar B1',
+  data_designacao: '01/03/2026',
 };
