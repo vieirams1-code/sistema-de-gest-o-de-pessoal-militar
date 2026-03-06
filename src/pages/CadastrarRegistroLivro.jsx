@@ -953,19 +953,21 @@ export default function CadastrarRegistroLivro() {
       { value: 'Saída Férias', label: 'Férias', sexo: null },
       { value: 'Retorno Férias', label: 'Retorno de Férias', sexo: null },
       { value: 'Licença Maternidade', label: 'Licença Maternidade', sexo: 'Feminino' },
+      { value: 'Prorrogação de Licença Maternidade', label: 'Prorrogação de Licença Maternidade', sexo: 'Feminino' },
       { value: 'Licença Paternidade', label: 'Licença Paternidade', sexo: 'Masculino' },
       { value: 'Núpcias', label: 'Núpcias', sexo: null },
       { value: 'Luto', label: 'Luto', sexo: null },
       { value: 'Cedência', label: 'Cedência', sexo: null },
-      { value: 'Transferência para RR', label: 'Transferência', sexo: null },
+      { value: 'Transferência para RR', label: 'Transferência para RR', sexo: null },
       { value: 'Trânsito', label: 'Trânsito', sexo: null },
       { value: 'Instalação', label: 'Instalação', sexo: null },
       { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
       { value: 'Dispensa Desconto Férias', label: 'Dispensa com Desconto em Férias', sexo: null },
       { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
-      { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações, etc...', sexo: null }
+      { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
+      { value: 'Designação de Função', label: 'Designação de Função', sexo: null },
+      { value: 'Dispensa de Função', label: 'Dispensa de Função', sexo: null },
     ];
-
     return tipos.filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
   };
 
