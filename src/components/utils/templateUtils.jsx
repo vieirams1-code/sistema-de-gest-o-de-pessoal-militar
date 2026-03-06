@@ -2,6 +2,30 @@
  * Utilitário para aplicar templates de texto com variáveis {{variavel}}.
  */
 
+/**
+ * Abreviações de posto/graduação
+ */
+const ABREVIATURAS = {
+  'Coronel': 'Cel',
+  'Tenente Coronel': 'TC',
+  'Major': 'Maj',
+  'Capitão': 'Cap',
+  '1º Tenente': '1º Ten',
+  '2º Tenente': '2º Ten',
+  'Aspirante': 'Asp',
+  'Subtenente': 'ST',
+  '1º Sargento': '1º Sgt',
+  '2º Sargento': '2º Sgt',
+  '3º Sargento': '3º Sgt',
+  'Cabo': 'Cb',
+  'Soldado': 'Sd',
+};
+
+export const abreviarPosto = (posto) => {
+  if (!posto) return '';
+  return ABREVIATURAS[posto] || posto;
+};
+
 const numeroPorExtenso = (num) => {
   const numeros = {
     1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',
