@@ -74,8 +74,10 @@ export const formatPeriodoAquisitivo = (ref, periodo) => {
 export function buildVarsLivro({ ferias, dataRegistro, periodo } = {}) {
   if (!ferias) return {};
   const dias = ferias.dias || 0;
+  const abreviatura = abreviarPosto(ferias.militar_posto);
   return {
-    posto_nome: ferias.militar_posto ? `${ferias.militar_posto} QOBM` : '',
+    posto_nome: abreviatura ? `${abreviatura} QOBM` : '',
+    posto: abreviatura,
     nome_completo: ferias.militar_nome || '',
     matricula: ferias.militar_matricula || '',
     data_inicio: formatDateBR(ferias.data_inicio),
