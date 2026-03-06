@@ -697,6 +697,9 @@ export default function CadastrarPublicacao() {
           </div>
         );
 
+      case 'Transferência para RR':
+        return null;
+
       case 'Interrupção de Férias':
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
