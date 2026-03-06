@@ -239,6 +239,23 @@ export default function CadastrarPublicacao() {
         }
         break;
 
+      case 'Transferência para RR': {
+        const tmplRR = templatesExOfficio.find(t => t.tipo_registro === 'Transferência para RR' && t.ativo !== false);
+        if (tmplRR?.template) {
+          texto = aplicarTemplate(tmplRR.template, {
+            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
+            documento_referencia_rr: formData.documento_referencia_rr || '',
+            data_transferencia_rr: formatarDataExtenso(formData.data_transferencia_rr),
+          });
+        } else if (formData.documento_referencia_rr && formData.data_transferencia_rr) {
+          texto = `${cmd}, no uso das atribuições que lhe confere, torna público que o ${postoNome} ${nomeCompleto}, matrícula ${matricula}, foi transferido para a Reserva Remunerada, conforme ${formData.documento_referencia_rr}, a contar de ${formatarDataExtenso(formData.data_transferencia_rr)}.`;
+        } else {
+          // preserve manual text
+          texto = formData.texto_publicacao || '';
+        }
+        break;
+      }
+
       case 'Geral':
         texto = formData.texto_base || '';
         break;
