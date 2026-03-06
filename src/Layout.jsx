@@ -30,8 +30,11 @@ const navItems = [
   { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
   { name: 'Alterações Militar', page: 'FichaMilitar', icon: Shield },
   { name: 'Templates de Texto', page: 'TemplatesTexto', icon: FileText },
-  { name: 'Configurações', page: 'Configuracoes', icon: Menu },
-  { name: 'Organização Estrutural', page: 'Subgrupamentos', icon: Shield },
+  { name: 'Configurações', page: 'Configuracoes', icon: Menu, children: [
+    { name: 'Permissões e Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
+    { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Settings, tab: 'adicoes' },
+    { name: 'Organização Estrutural', page: 'Subgrupamentos', icon: Shield },
+  ]},
 ];
 
 export default function Layout({ children, currentPageName }) {
