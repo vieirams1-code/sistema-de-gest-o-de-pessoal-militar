@@ -15,22 +15,7 @@ const extNum = (n) => {
   return nums[n] || String(n);
 };
 
-// Textos padrão hardcoded (fallback quando não há template cadastrado)
-const TEXTOS_PADRAO = {
-  'Saída Férias': (ferias) => {
-    const abrev = abreviarPosto(ferias.militar_posto);
-    const postoNome = abrev ? `${abrev} QOBM` : '';
-    const dias = ferias.dias || 0;
-    return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${ferias.militar_nome || ''}, matrícula ${ferias.militar_matricula || ''}, em ${formatDateBR(ferias.data_inicio)} entrará em gozo de férias regulamentares, ${dias} (${extNum(dias)}) dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`;
-  },
-  'Retorno Férias': (ferias, dataRegistro) => {
-    const abrev = abreviarPosto(ferias.militar_posto);
-    const postoNome = abrev ? `${abrev} QOBM` : '';
-    const dias = ferias.dias || 0;
-    const tipoFeriaTexto = ferias.fracionamento ? `${ferias.fracionamento} de férias regulamentares` : 'férias regulamentares';
-    return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${ferias.militar_nome || ''}, matrícula ${ferias.militar_matricula || ''}, em ${formatDateBR(dataRegistro)}, por término do gozo da ${tipoFeriaTexto}, ${dias} (${extNum(dias)}) dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`;
-  },
-};
+
 
 export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial }) {
   const queryClient = useQueryClient();
