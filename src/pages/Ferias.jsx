@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Search, Calendar, CheckCircle, Clock, Settings, Trash2, Pencil, AlertTriangle, MoreHorizontal, LogIn, LogOut, PauseCircle, PlusCircle } from 'lucide-react';
+import { Plus, Search, Calendar, CheckCircle, Clock, Settings, Trash2, Pencil, AlertTriangle, MoreHorizontal, LogIn, LogOut, PauseCircle, PlusCircle, MinusCircle } from 'lucide-react';
 import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
