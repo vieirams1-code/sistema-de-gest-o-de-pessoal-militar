@@ -676,56 +676,12 @@ export default function CadastrarRegistroLivro() {
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cursos / Estágios / Capacitações</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Início / Término / Desligamento"
-                  name="inicio_termino"
-                  value={formData.inicio_termino}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Início', 'Término', 'Desligamento']}
-                  required
-                />
-                <FormField
-                  label="Data de Início"
-                  name="data_inicio"
-                  value={formData.data_inicio}
-                  onChange={handleChange}
-                  type="date"
-                  required
-                />
+                <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+                <FormField label="Edição ou Ano" name="edicao_ano" value={formData.edicao_ano} onChange={handleChange} placeholder="Ex: 2025" />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Cursos"
-                  name="curso_nome"
-                  value={formData.curso_nome}
-                  onChange={handleChange}
-                  placeholder="Ex: CMAUT/2025"
-                  required
-                />
-                <FormField
-                  label="Edição ou Ano"
-                  name="edicao_ano"
-                  value={formData.edicao_ano}
-                  onChange={handleChange}
-                  placeholder="Ex: 2025"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Nota ou OS"
-                  name="documento_referencia"
-                  value={formData.documento_referencia}
-                  onChange={handleChange}
-                  placeholder="Ex: 001/2024"
-                />
-                <FormField
-                  label="Localidade de Realização"
-                  name="curso_local"
-                  value={formData.curso_local}
-                  onChange={handleChange}
-                  placeholder="Ex: Manaus"
-                />
+                <FormField label="Cursos" name="curso_nome" value={formData.curso_nome} onChange={handleChange} placeholder="Ex: CMAUT/2025" required />
+                <FormField label="Localidade de Realização" name="curso_local" value={formData.curso_local} onChange={handleChange} placeholder="Ex: Manaus" />
               </div>
             </div>
           </div>
