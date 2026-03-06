@@ -95,6 +95,25 @@ const GRUPOS_VARIAVEIS = [
       { v: '{{edicao_ano}}', desc: 'Edição ou ano do curso' },
     ]
   },
+  {
+    grupo: 'Ex Officio / Geral',
+    cor: 'purple',
+    variaveis: [
+      { v: '{{assunto}}', desc: 'Assunto (Transcrição de Documentos)' },
+      { v: '{{documento_referencia_rr}}', desc: 'Documento de referência RR (DOEMS nº XX.XXX, de xx de xxx de xxxx)' },
+      { v: '{{data_transferencia_rr}}', desc: 'Data da transferência para RR (dd/mm/aaaa)' },
+      { v: '{{finalidade_jiso}}', desc: 'Finalidade da JISO (V.A.F, LTS, etc.)' },
+      { v: '{{secao_jiso}}', desc: 'Seção JISO (ex: 62/JISO/2026)' },
+      { v: '{{data_ata}}', desc: 'Data da Ata JISO (dd/mm/aaaa)' },
+      { v: '{{nup}}', desc: 'NUP da JISO' },
+      { v: '{{parecer_jiso}}', desc: 'Parecer da JISO' },
+      { v: '{{data_melhoria}}', desc: 'Data da melhoria de comportamento (dd/mm/aaaa)' },
+      { v: '{{data_inclusao}}', desc: 'Data de inclusão do militar (dd/mm/aaaa)' },
+      { v: '{{comportamento_atual}}', desc: 'Comportamento atual do militar' },
+      { v: '{{comportamento_ingressou}}', desc: 'Comportamento que ingressa / mantém' },
+      { v: '{{texto_complemento}}', desc: 'Texto complemento (Elogio Individual)' },
+    ]
+  },
 ];
 
 // Quais grupos mostrar por módulo
