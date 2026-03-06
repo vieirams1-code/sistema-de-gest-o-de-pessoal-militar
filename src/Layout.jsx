@@ -19,7 +19,6 @@ import { base44 } from '@/api/base44Client';
 const navItems = [
   { name: 'Dashboard', page: 'Home', icon: Home },
   { name: 'Efetivo', page: 'Militares', icon: Users },
-
   { name: 'Medalhas', page: 'Medalhas', icon: Shield },
   { name: 'Armamentos', page: 'Armamentos', icon: Shield },
   { name: 'Atestados', page: 'DashboardAtestados', icon: Shield },
@@ -30,8 +29,9 @@ const navItems = [
   { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
   { name: 'Alterações Militar', page: 'FichaMilitar', icon: Shield },
   { name: 'Templates de Texto', page: 'TemplatesTexto', icon: FileText },
-  { name: 'Subgrupamentos', page: 'Subgrupamentos', icon: Shield },
-  { name: 'Configurações', page: 'Configuracoes', icon: Menu },
+  { name: 'Configurações', page: 'Configuracoes', icon: Menu, children: [
+    { name: 'Organização Estrutural', page: 'Subgrupamentos', icon: Shield },
+  ]},
 ];
 
 export default function Layout({ children, currentPageName }) {
