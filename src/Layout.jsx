@@ -9,6 +9,7 @@ import {
   UserPlus,
   Shield,
   ChevronRight,
+  ChevronDown,
   FileText,
   LogOut
 } from 'lucide-react';
