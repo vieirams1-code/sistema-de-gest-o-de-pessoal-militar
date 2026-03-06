@@ -207,18 +207,44 @@ export default function Publicacoes() {
                 : 'Os registros de livro aparecerão aqui'}
             </p>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredRegistros.map((registro) => (
-              <PublicacaoCard
-                key={registro.id}
-                registro={registro}
-                onUpdate={handleUpdate}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
+        ) : (() => {
+          const grupos = [
+            { key: 'Aguardando Nota', label: 'Aguardando Nota', color: 'text-amber-700', border: 'border-amber-300', bg: 'bg-amber-50' },
+            { key: 'Aguardando Publicação', label: 'Aguardando Publicação', color: 'text-blue-700', border: 'border-blue-300', bg: 'bg-blue-50' },
+            { key: 'Publicado', label: 'Publicado', color: 'text-emerald-700', border: 'border-emerald-300', bg: 'bg-emerald-50' },
+          ];
+          const calcStatus = (r) => {
+            if (r.numero_bg && r.data_bg) return 'Publicado';
+            if (r.nota_para_bg) return 'Aguardando Publicação';
+            return 'Aguardando Nota';
+          };
+          return (
+            <div className="space-y-8">
+              {grupos.map(grupo => {
+                const items = filteredRegistros.filter(r => calcStatus(r) === grupo.key);
+                if (items.length === 0) return null;
+                return (
+                  <div key={grupo.key}>
+                    <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border ${grupo.border} ${grupo.bg}`}>
+                      <span className={`font-bold text-sm ${grupo.color}`}>{grupo.label}</span>
+                      <span className={`text-xs ${grupo.color} opacity-70`}>— {items.length} registro(s)</span>
+                    </div>
+                    <div className="space-y-3">
+                      {items.map((registro) => (
+                        <PublicacaoCard
+                          key={registro.id}
+                          registro={registro}
+                          onUpdate={handleUpdate}
+                          onDelete={handleDelete}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
