@@ -390,7 +390,107 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
             <p className="text-sm font-medium text-slate-700">{atestado.medico}</p>
           </div>
         )}
+        {atestado.observacoes && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-xs text-slate-500">Observações</p>
+            <p className="text-sm text-slate-700 mt-0.5 whitespace-pre-wrap">{atestado.observacoes}</p>
+          </div>
+        )}
       </div>
+
+      {/* Modal Homologação pelo Comandante */}
+      <Dialog open={showHomologacaoModal} onOpenChange={setShowHomologacaoModal}>
+        <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Homologação pelo Comandante</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+              <strong>{atestado.militar_posto} {atestado.militar_nome}</strong> — {atestado.dias} dias — {formatarDataExtenso(atestado.data_inicio)} a {formatarDataExtenso(atestado.data_termino)}
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Data da Publicação</Label>
+              <Input type="date" value={homologacaoForm.data_publicacao} onChange={e => setHomologacaoForm(p => ({ ...p, data_publicacao: e.target.value }))} className="mt-1.5" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Texto para Publicação</Label>
+              <Textarea value={homologacaoForm.texto_publicacao} onChange={e => setHomologacaoForm(p => ({ ...p, texto_publicacao: e.target.value }))} className="mt-1.5" rows={5} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label className="text-sm">Nota para BG</Label><Input value={homologacaoForm.nota_para_bg} onChange={e => setHomologacaoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" /></div>
+              <div><Label className="text-sm">Número BG</Label><Input value={homologacaoForm.numero_bg} onChange={e => setHomologacaoForm(p => ({ ...p, numero_bg: e.target.value }))} className="mt-1.5" /></div>
+              <div><Label className="text-sm">Data BG</Label><Input type="date" value={homologacaoForm.data_bg} onChange={e => setHomologacaoForm(p => ({ ...p, data_bg: e.target.value }))} className="mt-1.5" /></div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowHomologacaoModal(false)}>Cancelar</Button>
+              <Button onClick={handleSaveHomologacao} disabled={savingPublicacao} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+                <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar Publicação'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Ata JISO */}
+      <Dialog open={showAtaJisoModal} onOpenChange={setShowAtaJisoModal}>
+        <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ata JISO</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
+              <strong>{atestado.militar_posto} {atestado.militar_nome}</strong> — {atestado.dias} dias — JISO: {atestado.status_jiso || 'Aguardando'}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">Data da Publicação</Label>
+                <Input type="date" value={ataJisoForm.data_publicacao} onChange={e => setAtaJisoForm(p => ({ ...p, data_publicacao: e.target.value }))} className="mt-1.5" />
+              </div>
+              <div>
+                <Label className="text-sm">Finalidade</Label>
+                <select value={ataJisoForm.finalidade_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, finalidade_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5 w-full border rounded-md px-3 py-2 text-sm">
+                  {['V.A.F','LTS','Reserva Remunerada','Atestado de Origem'].map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">Seção JISO</Label>
+                <Input value={ataJisoForm.secao_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, secao_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5" placeholder="62/JISO/2025" />
+              </div>
+              <div>
+                <Label className="text-sm">Data da Ata</Label>
+                <Input type="date" value={ataJisoForm.data_ata} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, data_ata: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">NUP</Label>
+                <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5" placeholder="31.001.005-12" />
+              </div>
+              <div>
+                <Label className="text-sm">Parecer</Label>
+                <Input value={ataJisoForm.parecer_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, parecer_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5" placeholder="Apto" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Texto para Publicação</Label>
+              <Textarea value={ataJisoForm.texto_publicacao} onChange={e => setAtaJisoForm(p => ({ ...p, texto_publicacao: e.target.value }))} className="mt-1.5" rows={5} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label className="text-sm">Nota para BG</Label><Input value={ataJisoForm.nota_para_bg} onChange={e => setAtaJisoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" /></div>
+              <div><Label className="text-sm">Número BG</Label><Input value={ataJisoForm.numero_bg} onChange={e => setAtaJisoForm(p => ({ ...p, numero_bg: e.target.value }))} className="mt-1.5" /></div>
+              <div><Label className="text-sm">Data BG</Label><Input type="date" value={ataJisoForm.data_bg} onChange={e => setAtaJisoForm(p => ({ ...p, data_bg: e.target.value }))} className="mt-1.5" /></div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowAtaJisoModal(false)}>Cancelar</Button>
+              <Button onClick={handleSaveAtaJiso} disabled={savingPublicacao} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+                <Save className="w-4 h-4 mr-2" />{savingPublicacao ? 'Salvando...' : 'Salvar Publicação'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
