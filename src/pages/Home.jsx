@@ -4,8 +4,9 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
-import { Users, Award, Shield, AlertTriangle, Calendar } from 'lucide-react';
-import { differenceInDays, addMonths } from 'date-fns';
+import { Badge } from "@/components/ui/badge";
+import { Users, Award, Shield, AlertTriangle, Calendar, Star, FileText } from 'lucide-react';
+import { differenceInDays } from 'date-fns';
 
 export default function Home() {
   const navigate = useNavigate();
