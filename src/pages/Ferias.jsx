@@ -198,7 +198,8 @@ export default function Ferias() {
     const novaQtd = (f.dias || 0) + Number(addDiasModal.dias);
     const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
     const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
-    const obs = f.observacoes ? `${f.observacoes}\n+${addDiasModal.dias}d: ${addDiasModal.motivo}` : `+${addDiasModal.dias}d: ${addDiasModal.motivo}`;
+    const novaLinha = `+${addDiasModal.dias}d: ${addDiasModal.motivo}`;
+    const obs = f.observacoes ? `${f.observacoes}\n${novaLinha}` : novaLinha;
     await base44.entities.Ferias.update(f.id, {
       dias: novaQtd,
       data_fim: novaDataFim,
