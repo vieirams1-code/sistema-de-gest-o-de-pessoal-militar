@@ -39,9 +39,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
 
   const handleTogglePrioridade = (e, flag) => {
     e.stopPropagation();
-    // tipo_registro indica registro de livro; tipo indica ex-officio; cid_10/medico indica atestado
+    // tipo indica ex-officio; medico/cid_10 indica atestado; demais são livro
     let tipo = 'livro';
-    if (registro.tipo && !registro.tipo_registro) tipo = 'ex-officio';
+    if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) tipo = 'ex-officio';
     else if (registro.medico || registro.cid_10) tipo = 'atestado';
     const newVal = !registro[flag];
     onUpdate(registro.id, { [flag]: newVal }, tipo);
