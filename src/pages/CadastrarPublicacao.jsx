@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Upload } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
+import { aplicarTemplate } from '@/components/utils/templateUtils';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
@@ -73,6 +74,14 @@ export default function CadastrarPublicacao() {
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
+  const [textoDesignacao, setTextoDesignacao] = useState('');
+
+  // Templates para Ex Officio
+  const { data: templatesExOfficio = [] } = useQuery({
+    queryKey: ['templates-texto-exofficio'],
+    queryFn: () => base44.entities.TemplateTexto.filter({ modulo: 'Publicação Ex Officio' }),
+    staleTime: 30000,
+  });
 
   const { data: tiposCustomExOfficio = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom-exofficio'],
