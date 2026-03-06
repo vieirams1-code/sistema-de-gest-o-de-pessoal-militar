@@ -103,7 +103,8 @@ export default function FichaMilitar() {
   const [searchParams] = useSearchParams();
   const militarId = searchParams.get('id');
 
-  const [tipoFiltro, setTipoFiltro] = useState('todos');
+  const filtroParam = searchParams.get('filtro');
+  const [tipoFiltro, setTipoFiltro] = useState(filtroParam === 'elogios_punicoes' ? 'elogios_punicoes' : 'todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
