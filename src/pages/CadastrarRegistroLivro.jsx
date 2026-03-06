@@ -531,42 +531,25 @@ export default function CadastrarRegistroLivro() {
       case 'Transferência para RR':
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência para Reserva</h3>
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência para Reserva Remunerada</h3>
             <div className="space-y-4">
-              <FormField
-                label="Tipo"
-                name="tipo_transferencia"
-                value={formData.tipo_transferencia}
-                onChange={handleChange}
-                type="select"
-                options={['A pedido', 'Ex officio']}
-                required
-              />
-              <FormField
-                label="Documento Referência"
-                name="documento_referencia"
-                value={formData.documento_referencia}
-                onChange={handleChange}
-                placeholder="Ex: DOEMS nº 123, de xx de maio de xxxx"
-                required
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="Unidade de origem" />
+                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="Unidade de destino" />
+              </div>
+              <FormField label="Data de Transferência" name="data_transferencia" value={formData.data_transferencia} onChange={handleChange} type="date" required />
               <div>
-                <Label>DOEMS nº XX.XXX, de xx de maio de xxxx</Label>
-                <Textarea
-                  value={formData.documento_texto}
-                  onChange={(e) => handleChange('documento_texto', e.target.value)}
+                <Label className="text-sm font-medium text-slate-700">
+                  Publicação da Transferência
+                  <span className="ml-2 text-xs text-slate-400 font-normal">(Ex: DOEMS nº XX.XXX de XX de XXX de XXXX)</span>
+                </Label>
+                <Input
+                  value={formData.publicacao_transferencia || ''}
+                  onChange={(e) => handleChange('publicacao_transferencia', e.target.value)}
                   className="mt-1.5"
-                  rows={2}
+                  placeholder="DOEMS nº XX.XXX de XX de XXX de XXXX"
                 />
               </div>
-              <FormField
-                label="Data de Transferência"
-                name="data_transferencia"
-                value={formData.data_transferencia}
-                onChange={handleChange}
-                type="date"
-                required
-              />
             </div>
           </div>
         );
