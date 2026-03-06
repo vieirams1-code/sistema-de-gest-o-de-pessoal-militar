@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings, Trash2, Plus, Users, Shield, CheckSquare, Square } from 'lucide-react';
+import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoManager';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
