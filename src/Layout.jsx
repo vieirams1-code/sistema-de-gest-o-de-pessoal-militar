@@ -30,9 +30,8 @@ const navItems = [
   { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
   { name: 'Alterações Militar', page: 'FichaMilitar', icon: Shield },
   { name: 'Templates de Texto', page: 'TemplatesTexto', icon: FileText },
-  { name: 'Configurações', page: 'Configuracoes', icon: Menu, children: [
-    { name: 'Organização Estrutural', page: 'Subgrupamentos', icon: Shield },
-  ]},
+  { name: 'Configurações', page: 'Configuracoes', icon: Menu },
+  { name: 'Organização Estrutural', page: 'Subgrupamentos', icon: Shield },
 ];
 
 export default function Layout({ children, currentPageName }) {
