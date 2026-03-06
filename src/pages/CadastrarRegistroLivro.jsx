@@ -754,7 +754,9 @@ export default function CadastrarRegistroLivro() {
       { value: 'Designação de Função', label: 'Designação de Função', sexo: null },
       { value: 'Dispensa de Função', label: 'Dispensa de Função', sexo: null },
     ];
-    return tipos.filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
+    // Adicionar tipos customizados
+    const customTipos = tiposCustom.map(t => ({ value: t.nome, label: t.nome, sexo: null }));
+    return [...tipos, ...customTipos].filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
   };
 
   return (
