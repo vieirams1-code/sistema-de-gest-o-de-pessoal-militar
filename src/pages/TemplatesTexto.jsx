@@ -16,7 +16,7 @@ import { aplicarTemplate, VARS_PREVIEW } from '@/components/utils/templateUtils'
 const MODULOS = ['Livro', 'Publicação Ex Officio', 'Atestado', 'JISO'];
 
 const TIPOS_POR_MODULO = {
-  'Livro': ['Saída Férias', 'Retorno Férias', 'Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade', 'Núpcias', 'Luto', 'Cedência', 'Transferência para RR', 'Trânsito', 'Instalação', 'Dispensa Recompensa', 'Dispensa Desconto Férias', 'Deslocamento Missão', 'Curso/Estágio'],
+  'Livro': ['Saída Férias', 'Retorno Férias', 'Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade', 'Núpcias', 'Luto', 'Cedência', 'Transferência', 'Transferência para RR', 'Trânsito', 'Instalação', 'Dispensa Recompensa', 'Dispensa Desconto Férias', 'Deslocamento Missão', 'Curso/Estágio'],
   'Publicação Ex Officio': ['Elogio Individual', 'Melhoria de Comportamento', 'Punição', 'Geral', 'Designação de Função', 'Dispensa de Função', 'Ata JISO', 'Transcrição de Documentos', 'Interrupção de Férias', 'Transferência para RR', 'Homologação de Atestado'],
   'Atestado': ['Homologação pelo Comandante', 'Encaminhamento JISO'],
   'JISO': ['Ata JISO', 'Resultado JISO'],
