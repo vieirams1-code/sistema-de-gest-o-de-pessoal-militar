@@ -894,9 +894,12 @@ export default function CadastrarPublicacao() {
                     <SelectValue placeholder="Selecione a publicação a corrigir..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {todasPublicacoes.filter(p => p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito').map(p => (
+                    {todasPublicacoes.length === 0 && (
+                      <SelectItem value="_none" disabled>Nenhuma publicação publicada encontrada para este militar</SelectItem>
+                    )}
+                    {todasPublicacoes.map(p => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.militar_nome} — {p.tipo} {p.numero_bg ? `BG ${p.numero_bg}` : ''} {p.data_publicacao || ''}
+                        {p.tipo} — BG {p.numero_bg} ({p.data_bg || ''})
                       </SelectItem>
                     ))}
                   </SelectContent>
