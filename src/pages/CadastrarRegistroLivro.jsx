@@ -256,81 +256,104 @@ export default function CadastrarRegistroLivro() {
         }
         break;
 
-      case 'Licença Maternidade':
-        if (dataInicio) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por término de ${dias} (${diasExtenso}) dias de Licença-Maternidade, acrescidos de 60 (sessenta) dias de prorrogação, a contar de ${dataInicio}, com término em ${dataTermino}.`;
-        }
+      case 'Licença Maternidade': {
+        const t = tentarTemplate('Licença Maternidade', { data_inicio: dataInicio, data_termino: dataTermino });
+        if (t) { texto = t; break; }
+        if (dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por término de ${dias} (${diasExtenso}) dias de Licença-Maternidade, acrescidos de 60 (sessenta) dias de prorrogação, a contar de ${dataInicio}, com término em ${dataTermino}.`;
         break;
+      }
 
-      case 'Licença Paternidade':
-        if (dataInicio) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 05 (cinco) dias de Licença-Paternidade, a contar de ${dataInicio}, com término em ${formatarDataExtenso(formData.data_termino || calcularDataTermino())}.`;
-        }
+      case 'Licença Paternidade': {
+        const t = tentarTemplate('Licença Paternidade', { data_inicio: dataInicio, data_termino: dataTermino });
+        if (t) { texto = t; break; }
+        if (dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 05 (cinco) dias de Licença-Paternidade, a contar de ${dataInicio}, com término em ${formatarDataExtenso(formData.data_termino || calcularDataTermino())}.`;
         break;
+      }
 
-      case 'Núpcias':
-        if (formData.conjuge_nome && dataInicio) {
-          const tipoTexto = formData.inicio_termino === 'Início' ? 'início' : 'término';
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${tipoTexto} de 08 (oito) dias de afastamento, por ter contraído matrimônio, a contar de ${dataInicio}.`;
-        }
+      case 'Núpcias': {
+        const tipoTexto = formData.inicio_termino === 'Início' ? 'início' : 'término';
+        const t = tentarTemplate('Núpcias', { data_inicio: dataInicio, tipo_texto: tipoTexto });
+        if (t) { texto = t; break; }
+        if (formData.conjuge_nome && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${tipoTexto} de 08 (oito) dias de afastamento, por ter contraído matrimônio, a contar de ${dataInicio}.`;
         break;
+      }
 
-      case 'Luto':
-        if (formData.falecido_nome && formData.falecido_certidao && formData.grau_parentesco && dataInicio) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por término de 08 (oito) dias de luto, a contar de ${dataInicio}, com término em ${dataTermino}, referente ao falecimento de ${formData.falecido_nome}, conforme Certidão de Óbito n. ${formData.falecido_certidao}, que segue anexa ao presente boletim.`;
-        }
+      case 'Luto': {
+        const t = tentarTemplate('Luto', { data_inicio: dataInicio, data_termino: dataTermino, falecido_nome: formData.falecido_nome, falecido_certidao: formData.falecido_certidao, grau_parentesco: formData.grau_parentesco });
+        if (t) { texto = t; break; }
+        if (formData.falecido_nome && formData.falecido_certidao && formData.grau_parentesco && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por término de 08 (oito) dias de luto, a contar de ${dataInicio}, com término em ${dataTermino}, referente ao falecimento de ${formData.falecido_nome}, conforme Certidão de Óbito n. ${formData.falecido_certidao}, que segue anexa ao presente boletim.`;
         break;
+      }
 
-      case 'Cedência':
-        if (formData.origem && formData.destino && formData.data_cedencia) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do Militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido cedido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_cedencia)}.`;
-        }
+      case 'Cedência': {
+        const t = tentarTemplate('Cedência', { origem: formData.origem, destino: formData.destino, data_cedencia: formatarDataExtenso(formData.data_cedencia) });
+        if (t) { texto = t; break; }
+        if (formData.origem && formData.destino && formData.data_cedencia) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do Militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido cedido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_cedencia)}.`;
         break;
+      }
 
-      case 'Transferência para RR':
-        if (formData.tipo_transferencia && formData.documento_referencia && formData.data_transferencia) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido transferido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_transferencia)}, conforme ${formData.documento_referencia}.`;
-        }
+      case 'Transferência para RR': {
+        const t = tentarTemplate('Transferência para RR', { origem: formData.origem, destino: formData.destino, documento_referencia: formData.documento_referencia, publicacao_transferencia: formData.publicacao_transferencia, data_transferencia: formatarDataExtenso(formData.data_transferencia) });
+        if (t) { texto = t; break; }
+        if (formData.documento_referencia && formData.data_transferencia) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido transferido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_transferencia)}, conforme ${formData.documento_referencia}.`;
         break;
+      }
 
-      case 'Trânsito':
-        if (formData.origem && formData.destino && dataInicio) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 30 (trinta) dias de trânsito, por ter sido movimentado do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${dataInicio}.`;
-        }
+      case 'Trânsito': {
+        const t = tentarTemplate('Trânsito', { origem: formData.origem, destino: formData.destino, data_inicio: dataInicio });
+        if (t) { texto = t; break; }
+        if (formData.origem && formData.destino && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 30 (trinta) dias de trânsito, por ter sido movimentado do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${dataInicio}.`;
         break;
+      }
 
-      case 'Instalação':
-        if (formData.origem && formData.destino && dataInicio) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 10 (dez) dias de instalação, por ter sido movimentado do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${dataInicio}.`;
-        }
+      case 'Instalação': {
+        const t = tentarTemplate('Instalação', { origem: formData.origem, destino: formData.destino, data_inicio: dataInicio });
+        if (t) { texto = t; break; }
+        if (formData.origem && formData.destino && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 10 (dez) dias de instalação, por ter sido movimentado do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${dataInicio}.`;
         break;
+      }
 
-      case 'Dispensa Recompensa':
-        if (formData.motivo_dispensa && dataInicio) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de dispensa total do serviço e expediente, a título de recompensa, a contar de ${dataInicio}.`;
-        }
+      case 'Dispensa Recompensa': {
+        const t = tentarTemplate('Dispensa Recompensa', { data_inicio: dataInicio, motivo_dispensa: formData.motivo_dispensa });
+        if (t) { texto = t; break; }
+        if (formData.motivo_dispensa && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de dispensa total do serviço e expediente, a título de recompensa, a contar de ${dataInicio}.`;
         break;
+      }
 
-      case 'Dispensa Desconto Férias':
-        if (formData.periodo_aquisitivo && dataInicio) {
-          const diasRestantes = formData.dias_restantes || '';
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de Dispensa para Desconto em Férias a contar de ${dataInicio}, referentes ao período aquisitivo de ${formData.periodo_aquisitivo}, restando ${diasRestantes} dias.`;
-        }
+      case 'Dispensa Desconto Férias': {
+        const diasRestantes = formData.dias_restantes || '';
+        const t = tentarTemplate('Dispensa Desconto Férias', { data_inicio: dataInicio, periodo_aquisitivo: formData.periodo_aquisitivo, dias_restantes: diasRestantes });
+        if (t) { texto = t; break; }
+        if (formData.periodo_aquisitivo && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de Dispensa para Desconto em Férias a contar de ${dataInicio}, referentes ao período aquisitivo de ${formData.periodo_aquisitivo}, restando ${diasRestantes} dias.`;
         break;
+      }
 
-      case 'Deslocamento Missão':
-        if (formData.missao_descricao && formData.destino && dataInicio && formData.data_retorno) {
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.missao_descricao}, conforme ${formData.documento_referencia}, a contar de ${dataInicio} ${formData.inicio_termino === 'Início' ? 'a ' + formatarDataExtenso(formData.data_retorno) : ''} em ${formData.destino}.`;
-        }
+      case 'Deslocamento Missão': {
+        const t = tentarTemplate('Deslocamento Missão', { data_inicio: dataInicio, destino: formData.destino, missao_descricao: formData.missao_descricao, documento_referencia: formData.documento_referencia, inicio_termino: formData.inicio_termino });
+        if (t) { texto = t; break; }
+        if (formData.missao_descricao && formData.destino && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.missao_descricao}, conforme ${formData.documento_referencia}, a contar de ${dataInicio} ${formData.inicio_termino === 'Início' ? 'a ' + formatarDataExtenso(formData.data_retorno) : ''} em ${formData.destino}.`;
         break;
+      }
 
-      case 'Curso/Estágio':
+      case 'Curso/Estágio': {
+        const localTexto = formData.curso_local ? ` em ${formData.curso_local}` : '';
+        const t = tentarTemplate('Curso/Estágio', { data_inicio: dataInicio, curso_nome: formData.curso_nome, curso_local: formData.curso_local, edicao_ano: formData.edicao_ano, documento_referencia: formData.documento_referencia, inicio_termino: formData.inicio_termino });
+        if (t) { texto = t; break; }
         if (formData.curso_nome && formData.inicio_termino && dataInicio) {
           const eventoOuAno = formData.edicao_ano ? `, conforme ${formData.documento_referencia}, a contar de ${dataInicio}` : '';
-          const localTexto = formData.curso_local ? ` em ${formData.curso_local}` : '';
-          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º Ten ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.curso_nome}${localTexto}${eventoOuAno}.`;
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.curso_nome}${localTexto}${eventoOuAno}.`;
         }
         break;
+      }
+
+      case 'Designação de Função':
+      case 'Dispensa de Função': {
+        const tipoLabel = formData.tipo_registro === 'Designação de Função' ? 'designado(a)' : 'dispensado(a)';
+        const t = tentarTemplate(formData.tipo_registro, { funcao: formData.funcao || '', data_designacao: formatarDataExtenso(formData.data_designacao) });
+        if (t) { texto = t; break; }
+        if (formData.funcao && formData.data_designacao) texto = `${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${tipoLabel} da função de ${formData.funcao}, a contar de ${formatarDataExtenso(formData.data_designacao)}.`;
+        break;
+      }
     }
 
     setTextoPublicacao(texto);
