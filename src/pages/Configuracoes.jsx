@@ -223,42 +223,6 @@ export default function Configuracoes() {
           </div>
         </div>
 
-        {/* Comandante */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Crown className="w-5 h-5 text-amber-600" />
-            <h2 className="text-xl font-semibold text-[#1e3a5f]">Comandante da Unidade</h2>
-          </div>
-          <p className="text-sm text-slate-500 mb-4">
-            O sexo do(a) comandante definido aqui será usado nos textos gerados para publicação (ex: "O Comandante" ou "A Comandante").
-          </p>
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="text-sm font-medium text-slate-700 block mb-1.5">Comandante</label>
-              <Select value={comandanteId} onValueChange={v => saveComandanteMutation.mutate(v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o(a) Comandante..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {militares.map(m => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.posto_graduacao} {m.nome_completo} — {m.sexo === 'Feminino' ? '♀ Feminino' : '♂ Masculino'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {comandanteId && (() => {
-            const cmd = militares.find(m => m.id === comandanteId);
-            return cmd ? (
-              <p className="text-sm text-emerald-600 mt-3">
-                ✓ Textos gerados com: "{cmd.sexo === 'Feminino' ? 'A Comandante' : 'O Comandante'}"
-              </p>
-            ) : null;
-          })()}
-        </div>
-
         {/* Permissões de Usuários */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
