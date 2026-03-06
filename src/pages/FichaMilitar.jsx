@@ -366,6 +366,11 @@ export default function FichaMilitar() {
   };
 
   const handleDeleteRequest = (event) => {
+    // Bloquear exclusão de publicações publicadas
+    if (event.tipo === 'publicacao') {
+      const isPublicada = (event.raw?.numero_bg && event.raw?.data_bg) || event.raw?.status === 'Publicado';
+      if (isPublicada) return; // Não deve chegar aqui, mas garantia extra
+    }
     const deps = calcularDependencias(event);
     setDeleteTarget(event);
     if (deps.length > 0) {
