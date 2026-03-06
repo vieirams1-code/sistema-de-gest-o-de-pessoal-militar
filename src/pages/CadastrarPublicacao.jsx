@@ -751,7 +751,8 @@ export default function CadastrarPublicacao() {
           </div>
         );
 
-      case 'Transferência para RR':
+      case 'Transferência para RR': {
+        const tmplRR = templatesExOfficio.find(t => t.tipo_registro === 'Transferência para RR' && t.ativo !== false);
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência para Reserva Remunerada</h3>
@@ -776,9 +777,26 @@ export default function CadastrarPublicacao() {
                 type="date"
                 required
               />
+              {tmplRR ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 flex items-center gap-2">
+                  <RefreshCw className="w-3 h-3" /> Template personalizado será aplicado automaticamente.
+                </div>
+              ) : (
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
+                  <Textarea
+                    value={formData.texto_publicacao || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, texto_publicacao: e.target.value }))}
+                    className="mt-1.5"
+                    rows={5}
+                    placeholder="O texto será gerado automaticamente ou edite manualmente aqui."
+                  />
+                </div>
+              )}
             </div>
           </div>
         );
+      }
 
       case 'Interrupção de Férias':
         return (
