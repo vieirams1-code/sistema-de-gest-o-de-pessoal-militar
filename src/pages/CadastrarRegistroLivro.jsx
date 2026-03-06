@@ -992,11 +992,20 @@ export default function CadastrarRegistroLivro() {
                   </span>
                 )}
               </div>
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-slate-700 leading-relaxed">
-                  {textoPublicacao}
-                </p>
-              </div>
+              {['Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade'].includes(formData.tipo_registro) ? (
+                <Textarea
+                  value={textoPublicacao}
+                  onChange={e => setTextoPublicacao(e.target.value)}
+                  rows={6}
+                  className="text-sm text-slate-700 leading-relaxed"
+                />
+              ) : (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {textoPublicacao}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
