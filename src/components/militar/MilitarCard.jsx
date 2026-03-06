@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, MapPin, MoreVertical, Pencil, Trash2, Eye, ClipboardList } from 'lucide-react';
+import { User, MapPin, MoreVertical, Pencil, Trash2, Eye, ClipboardList, ExternalLink, FileText } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
