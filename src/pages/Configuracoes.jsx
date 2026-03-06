@@ -505,6 +505,11 @@ export default function Configuracoes() {
           </div>
         </div>
 
+        {/* Tipos de Publicação Personalizados */}
+        <div className="mb-6">
+          <TiposPublicacaoManager />
+        </div>
+
         <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
           <AlertDialogContent>
             <AlertDialogHeader>
