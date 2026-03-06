@@ -76,6 +76,8 @@ import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
+import Contratos from './pages/Contratos';
+import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
 import __Layout from './Layout.jsx';
 
 
@@ -109,6 +111,8 @@ export const PAGES = {
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
+    "Contratos": Contratos,
+    "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
 }
 
 export const pagesConfig = {
