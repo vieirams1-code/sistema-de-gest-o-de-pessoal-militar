@@ -216,11 +216,22 @@ export default function CadastrarPublicacao() {
         break;
       }
 
-      case 'Melhoria de Comportamento':
-        if (formData.data_melhoria && formData.comportamento_atual && formData.comportamento_ingressou) {
+      case 'Melhoria de Comportamento': {
+        const tmplMelhoria = templatesExOfficio.find(t => t.tipo_registro === 'Melhoria de Comportamento' && t.ativo !== false);
+        const dataInclusao = militarSelecionado?.data_inclusao ? formatarDataExtenso(militarSelecionado.data_inclusao) : '';
+        if (tmplMelhoria?.template) {
+          texto = aplicarTemplate(tmplMelhoria.template, {
+            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
+            data_melhoria: formatarDataExtenso(formData.data_melhoria),
+            comportamento_atual: formData.comportamento_atual || '',
+            comportamento_ingressou: formData.comportamento_ingressou || '',
+            data_inclusao: dataInclusao,
+          });
+        } else if (formData.data_melhoria && formData.comportamento_atual && formData.comportamento_ingressou) {
           texto = `${cmd}, de acordo com o art. 51, § 1° c/c art. 52, inciso I, ambos do Decreto nº 1.260/1981, resolve: conceder melhoria de comportamento, a contar de ${formatarDataExtenso(formData.data_melhoria)}, ao militar a seguir: ${postoNome} ${nomeCompleto}, matrícula n. ${matricula}, por ter completado 08 (oito) meses sucessivos sem sofrer punição, melhorando o comportamento do último para o excepcional.`;
         }
         break;
+      }
 
       case 'Punição':
         if (formData.portaria && formData.tipo_punicao) {
@@ -253,11 +264,22 @@ export default function CadastrarPublicacao() {
         break;
       }
 
-      case 'Ata JISO':
-        if (formData.finalidade_jiso && formData.data_ata) {
+      case 'Ata JISO': {
+        const tmplJISO = templatesExOfficio.find(t => t.tipo_registro === 'Ata JISO' && t.ativo !== false);
+        if (tmplJISO?.template) {
+          texto = aplicarTemplate(tmplJISO.template, {
+            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
+            finalidade_jiso: formData.finalidade_jiso || '',
+            secao_jiso: formData.secao_jiso || '',
+            data_ata: formatarDataExtenso(formData.data_ata),
+            nup: formData.nup || '',
+            parecer_jiso: formData.parecer_jiso || '',
+          });
+        } else if (formData.finalidade_jiso && formData.data_ata) {
           texto = `${cmd}, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, resolve: tornar público que recebeu a Ata de Inspeção de Saúde Sessão Nº ${formData.secao_jiso}, de ${formatarDataExtenso(formData.data_ata)}, pertencente ao: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, inspecionado para fins de ${formData.finalidade_jiso}, conf. NUP Nº ${formData.nup}, com o parecer: ${formData.parecer_jiso}.`;
         }
         break;
+      }
 
       case 'Transcrição de Documentos':
         if (formData.documento && formData.data_documento) {
