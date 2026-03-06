@@ -232,7 +232,8 @@ export default function CadastrarRegistroLivro() {
     switch (formData.tipo_registro) {
       case 'Saída Férias':
         if (selectedFerias) {
-          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro });
+          const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
+          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
           const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Saída Férias' && t.ativo !== false);
           if (tmpl?.template) {
             texto = aplicarTemplate(tmpl.template, vars);
@@ -249,7 +250,8 @@ export default function CadastrarRegistroLivro() {
 
       case 'Retorno Férias':
         if (selectedFerias) {
-          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro });
+          const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
+          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
           const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Retorno Férias' && t.ativo !== false);
           if (tmpl?.template) {
             texto = aplicarTemplate(tmpl.template, vars);
