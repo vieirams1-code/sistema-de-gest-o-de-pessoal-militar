@@ -187,16 +187,12 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
             </div>
           </div>
 
-          {/* Tipo de registro */}
+          {/* Tipo de registro - somente exibição, não editável */}
           <div>
             <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
-            <Select value={tipoRegistro} onValueChange={setTipoRegistro}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Saída Férias">Início de Férias (Saída)</SelectItem>
-                <SelectItem value="Retorno Férias">Retorno de Férias</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-700 text-sm font-medium">
+              {tipoRegistro === 'Saída Férias' ? 'Início de Férias (Saída)' : tipoRegistro === 'Retorno Férias' ? 'Retorno de Férias' : tipoRegistro}
+            </div>
           </div>
 
           {/* Data do registro */}
