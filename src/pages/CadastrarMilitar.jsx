@@ -770,6 +770,21 @@ export default function CadastrarMilitar() {
             />
           </FormSection>
 
+          {/* Link de Alterações Anteriores */}
+          <FormSection title="Documentos Externos" icon={FileText}>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">Link para Alterações Anteriores (Drive/Pasta)</label>
+              <p className="text-xs text-slate-400">Cole o link de uma pasta no Drive com os documentos de alterações anteriores deste militar.</p>
+              <input
+                type="url"
+                value={formData.link_alteracoes_anteriores || ''}
+                onChange={e => handleChange('link_alteracoes_anteriores', e.target.value)}
+                placeholder="https://drive.google.com/..."
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f]"
+              />
+            </div>
+          </FormSection>
+
           {/* Histórico de Comportamento */}
           <HistoricoComportamentoModal
             militarId={editId}
