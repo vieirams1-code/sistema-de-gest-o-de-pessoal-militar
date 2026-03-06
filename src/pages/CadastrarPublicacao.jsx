@@ -72,6 +72,13 @@ export default function CadastrarPublicacao() {
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [camposCustom, setCamposCustom] = useState({});
+
+  const { data: tiposCustomExOfficio = [] } = useQuery({
+    queryKey: ['tipos-publicacao-custom-exofficio'],
+    queryFn: () => base44.entities.TipoPublicacaoCustom.filter({ modulo: 'Publicação Ex Officio', ativo: true }),
+    staleTime: 30000,
+  });
 
   // Configs - comandante
   const { data: configs = [] } = useQuery({
