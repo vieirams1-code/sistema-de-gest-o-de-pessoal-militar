@@ -53,6 +53,7 @@ const GRUPOS_VARIAVEIS = [
     variaveis: [
       { v: '{{data_registro}}', desc: 'Data do registro no livro (dd/mm/aaaa)' },
       { v: '{{documento_referencia}}', desc: 'Documento de referência (DOEMS, Nota, OS)' },
+      { v: '{{publicacao_transferencia}}', desc: 'Publicação da transferência (DOEMS nº XX.XXX de XX de XXX de XXXX)' },
       { v: '{{tipo_transferencia}}', desc: 'Tipo de transferência (A pedido / Ex officio)' },
     ]
   },
