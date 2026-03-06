@@ -121,6 +121,16 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
+                {foiTornadaSemEfeito && (
+                  <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full border border-red-300">
+                    <XCircle className="w-3 h-3" /> TORNADA SEM EFEITO
+                  </span>
+                )}
+                {foiApostilada && !foiTornadaSemEfeito && (
+                  <span className="flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-300">
+                    <Stamp className="w-3 h-3" /> APOSTILADA
+                  </span>
+                )}
                 {registro.urgente && <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full"><AlertTriangle className="w-3 h-3" />URGENTE</span>}
                 {registro.importante && !registro.urgente && <span className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full"><Star className="w-3 h-3" />IMPORTANTE</span>}
                 <h3 className="font-semibold text-lg text-slate-900 truncate">
