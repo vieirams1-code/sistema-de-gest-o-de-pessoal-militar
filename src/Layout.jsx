@@ -72,11 +72,11 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 h-full w-64 bg-[#1e3a5f] text-white z-50
+        fixed top-0 left-0 h-full w-64 bg-[#1e3a5f] text-white z-50 flex flex-col
         transform transition-transform duration-300 ease-in-out
         lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-6 flex items-center justify-between">
+        <div className="p-6 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <Shield className="w-8 h-8" />
             <div>
