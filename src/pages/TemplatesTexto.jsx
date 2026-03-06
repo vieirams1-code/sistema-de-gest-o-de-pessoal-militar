@@ -97,10 +97,18 @@ const GRUPOS_VARIAVEIS = [
     ]
   },
   {
+    grupo: 'Transcrição de Documentos',
+    cor: 'teal',
+    variaveis: [
+      { v: '{{documento}}', desc: 'Nome do documento (ex: Ofício 001)' },
+      { v: '{{data_documento}}', desc: 'Data do documento (dd/mm/aaaa)' },
+      { v: '{{assunto}}', desc: 'Assunto do documento' },
+    ]
+  },
+  {
     grupo: 'Ex Officio / Geral',
     cor: 'purple',
     variaveis: [
-      { v: '{{assunto}}', desc: 'Assunto (Transcrição de Documentos)' },
       { v: '{{documento_referencia_rr}}', desc: 'Documento de referência RR (DOEMS nº XX.XXX, de xx de xxx de xxxx)' },
       { v: '{{data_transferencia_rr}}', desc: 'Data da transferência para RR (dd/mm/aaaa)' },
       { v: '{{finalidade_jiso}}', desc: 'Finalidade da JISO (V.A.F, LTS, etc.)' },
