@@ -431,37 +431,8 @@ export default function CadastrarRegistroLivro() {
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Núpcias</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Início / Término"
-                  name="inicio_termino"
-                  value={formData.inicio_termino}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Início', 'Término']}
-                  required
-                />
-                <FormField
-                  label="Cônjuge"
-                  name="conjuge_nome"
-                  value={formData.conjuge_nome}
-                  onChange={handleChange}
-                  placeholder="Nome do cônjuge"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Data de Início"
-                  name="data_inicio"
-                  value={formData.data_inicio}
-                  onChange={handleChange}
-                  type="date"
-                  required
-                />
-                <div>
-                  <Label>Dias</Label>
-                  <Input value="8" disabled className="mt-1.5" />
-                </div>
+                <FormField label="Cônjuge" name="conjuge_nome" value={formData.conjuge_nome} onChange={handleChange} placeholder="Nome do cônjuge" required />
+                <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
               </div>
             </div>
           </div>
