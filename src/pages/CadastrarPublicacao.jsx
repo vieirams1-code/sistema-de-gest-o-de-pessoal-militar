@@ -203,11 +203,18 @@ export default function CadastrarPublicacao() {
     let texto = '';
 
     switch (formData.tipo) {
-      case 'Elogio Individual':
-        if (formData.texto_base && formData.texto_complemento) {
-          texto = `${cmd}, no uso das atribuições que lhe confere o art. 140, §1°, "c" e §2°, da Lei Complementar nº 053, de 30 de agosto de 1990 (Estatuto PMMS), em vigor nesta Corporação, c/c art. 67, I, e art. 68, "a" e "b", do Decreto nº 1.260, de 2 de outubro de 1981, Regulamento Disciplinar da PMMS, em vigor no CBMMS, resolve elogiar e externar sinceros cumprimentos ao ${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${formData.texto_complemento}`;
+      case 'Elogio Individual': {
+        const tmplElogio = templatesExOfficio.find(t => t.tipo_registro === 'Elogio Individual' && t.ativo !== false);
+        if (tmplElogio?.template) {
+          texto = aplicarTemplate(tmplElogio.template, {
+            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
+            texto_complemento: formData.texto_complemento || '',
+          });
+        } else if (formData.texto_complemento) {
+          texto = `${cmd}, no uso das atribuições que lhe confere o art. 140, §1°, "c" e §2°, da Lei Complementar nº 053, de 30 de agosto de 1990, c/c art. 67, I, e art. 68, "a" e "b", do Decreto nº 1.260, de 2 de outubro de 1981, resolve elogiar e externar sinceros cumprimentos ao ${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${formData.texto_complemento}`;
         }
         break;
+      }
 
       case 'Melhoria de Comportamento':
         if (formData.data_melhoria && formData.comportamento_atual && formData.comportamento_ingressou) {
@@ -396,23 +403,13 @@ export default function CadastrarPublicacao() {
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Elogio Individual</h3>
             <div className="space-y-4">
               <div>
-                <Label>Texto Base</Label>
-                <Textarea
-                  value={formData.texto_base}
-                  onChange={(e) => handleChange('texto_base', e.target.value)}
-                  className="mt-1.5"
-                  rows={5}
-                  placeholder="A Comandante do 1° Grupamento de Bombeiros Militar..."
-                />
-              </div>
-              <div>
                 <Label>Texto Complemento</Label>
                 <Textarea
                   value={formData.texto_complemento}
                   onChange={(e) => handleChange('texto_complemento', e.target.value)}
                   className="mt-1.5"
-                  rows={3}
-                  placeholder="É um cara muito bom"
+                  rows={4}
+                  placeholder="pela dedicação e esforço demonstrados..."
                 />
               </div>
             </div>
