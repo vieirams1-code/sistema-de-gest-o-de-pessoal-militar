@@ -383,6 +383,14 @@ export default function VerMilitar() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {showSolicitacao && (
+        <SolicitarAtualizacaoModal
+          militar={militar}
+          onClose={() => setShowSolicitacao(false)}
+          onSaved={() => setShowSolicitacao(false)}
+        />
+      )}
     </div>
   );
 }
