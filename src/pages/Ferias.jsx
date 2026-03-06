@@ -214,36 +214,22 @@ export default function Ferias() {
     if (!descontoModal.ferias || !descontoModal.dias) return;
     setSavingEdit(true);
     const f = descontoModal.ferias;
-    const novaQtd = Math.max(0, (f.dias || 0) - Number(descontoModal.dias));
+    const diasDesconto = Number(descontoModal.dias);
+    const novaQtd = Math.max(0, (f.dias || 0) - diasDesconto);
     const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
     const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
-    const obs = f.observacoes ? `${f.observacoes}\n-${descontoModal.dias}d (desconto): ${descontoModal.motivo}` : `-${descontoModal.dias}d (desconto): ${descontoModal.motivo}`;
-    // Atualiza férias
+    // Atualiza apenas as férias (sem criar publicação aqui)
     await base44.entities.Ferias.update(f.id, {
       dias: novaQtd,
       data_fim: novaDataFim,
       data_retorno: novaDataRetorno,
-      observacoes: obs,
-    });
-    // Registra publicação de desconto em férias no Livro
-    await base44.entities.RegistroLivro.create({
-      militar_id: f.militar_id,
-      militar_nome: f.militar_nome,
-      militar_posto: f.militar_posto,
-      militar_matricula: f.militar_matricula,
-      ferias_id: f.id,
-      tipo_registro: 'Dispensa Desconto Férias',
-      data_registro: new Date().toISOString().split('T')[0],
-      dias: Number(descontoModal.dias),
-      dias_restantes: novaQtd,
-      periodo_aquisitivo: f.periodo_aquisitivo_ref || '',
-      observacoes: descontoModal.motivo,
-      status: 'Aguardando Nota',
     });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
-    queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
     setSavingEdit(false);
     setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' });
+    // Abre o RegistroLivroModal para gerar a publicação via template
+    const feriasAtualizada = { ...f, dias: novaQtd, data_fim: novaDataFim, data_retorno: novaDataRetorno, _diasDesconto: diasDesconto };
+    setRegistroLivroModal({ open: true, ferias: feriasAtualizada, tipo: 'Dispensa Desconto Férias' });
   };
 
   const stats = {
