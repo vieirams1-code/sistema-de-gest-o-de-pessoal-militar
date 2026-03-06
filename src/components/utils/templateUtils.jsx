@@ -99,7 +99,8 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo } = {}) {
  * Dados simulados para preview do template na página de edição.
  */
 export const VARS_PREVIEW = {
-  posto_nome: 'Capitão QOBM',
+  posto_nome: 'Cap QOBM',
+  posto: 'Cap',
   nome_completo: 'João da Silva',
   matricula: '123456',
   data_inicio: '01/04/2026',
