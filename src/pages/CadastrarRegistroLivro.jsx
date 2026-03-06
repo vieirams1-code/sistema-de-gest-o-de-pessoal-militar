@@ -312,6 +312,17 @@ export default function CadastrarRegistroLivro() {
         break;
       }
 
+      case 'Transferência': {
+        const t = tentarTemplate('Transferência', { origem: formData.origem, destino: formData.destino, publicacao_transferencia: formData.publicacao_transferencia, data_transferencia: formatarDataExtenso(formData.data_transferencia), tipo_transferencia: formData.tipo_transferencia });
+        if (t) { texto = t; break; }
+        if (formData.data_transferencia) {
+          const origemTexto = formData.tipo_transferencia === 'Entrada' ? `do(a) ${formData.origem || '___'}` : `do(a) ${formData.origem || '___'}`;
+          const destinoTexto = formData.tipo_transferencia === 'Entrada' ? `para o(a) ${formData.destino || '___'}` : `para o(a) ${formData.destino || '___'}`;
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do Militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido transferido ${origemTexto} ${destinoTexto}, a contar de ${formatarDataExtenso(formData.data_transferencia)}${formData.publicacao_transferencia ? `, conforme ${formData.publicacao_transferencia}` : ''}.`;
+        }
+        break;
+      }
+
       case 'Trânsito': {
         const t = tentarTemplate('Trânsito', { origem: formData.origem, destino: formData.destino, data_inicio: dataInicio });
         if (t) { texto = t; break; }
