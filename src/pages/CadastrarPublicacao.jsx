@@ -78,8 +78,9 @@ export default function CadastrarPublicacao() {
   // Templates para Ex Officio
   const { data: templatesExOfficio = [] } = useQuery({
     queryKey: ['templates-texto-exofficio'],
-    queryFn: () => base44.entities.TemplateTexto.filter({ modulo: 'Publicação Ex Officio' }),
+    queryFn: () => base44.entities.TemplateTexto.list(),
     staleTime: 30000,
+    select: (data) => data.filter(t => t.modulo === 'Publicação Ex Officio'),
   });
 
   const { data: tiposCustomExOfficio = [] } = useQuery({
