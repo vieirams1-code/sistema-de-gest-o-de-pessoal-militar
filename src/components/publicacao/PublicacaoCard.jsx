@@ -195,8 +195,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
                   <span className="hidden sm:inline">Nota/BG</span>
                 </Button>
               )}
-              {/* Editar completo (ex-officio) */}
-              {isExOfficio && (
+              {/* Editar completo (ex-officio) — apenas se NÃO estiver Publicado */}
+              {isExOfficio && currentStatus !== 'Publicado' && (
                 <Button
                   variant="ghost"
                   size="sm"
