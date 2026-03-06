@@ -173,7 +173,7 @@ export default function Configuracoes() {
                 <Users className="w-5 h-5 text-[#1e3a5f]" />
                 <h2 className="text-xl font-semibold text-[#1e3a5f]">Permissões de Usuários</h2>
               </div>
-              <p className="text-sm text-slate-500 mb-4">Defina qual grupamento/subgrupamento cada usuário pode acessar. Usuários sem atribuição têm acesso total.</p>
+              <p className="text-sm text-slate-500 mb-4">Defina qual setor/subsetor cada usuário pode acessar. Sem atribuição de setor = acesso apenas aos próprios dados (militares vinculados ao próprio email).</p>
               <div className="space-y-2 mb-6">
                 {usuarios.filter(u => u.role !== 'admin').map(u => (
                   <div key={u.id} onClick={() => handleSelectUser(u.id)} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
@@ -194,27 +194,27 @@ export default function Configuracoes() {
                 <div className="border-t pt-4 space-y-4">
                   <p className="text-sm font-semibold text-slate-700">Editando: <span className="text-[#1e3a5f]">{selectedUser.full_name || selectedUser.email}</span></p>
                   <div>
-                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Grupamento</label>
+                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Setor</label>
                     <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); }}>
-                      <SelectTrigger><SelectValue placeholder="Selecione um grupamento..." /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Selecione um setor..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="_nenhum">— Sem restrição —</SelectItem>
+                        <SelectItem value="_nenhum">— Acesso apenas aos próprios dados —</SelectItem>
                         {grupamentos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    {userGrupamentoId && !userSubgrupamentoId && <p className="text-xs text-blue-600 mt-1">✓ Acesso a todos os subgrupamentos deste grupamento</p>}
+                    {userGrupamentoId && !userSubgrupamentoId && <p className="text-xs text-blue-600 mt-1">✓ Acesso a todos os subsetores/seções deste setor</p>}
                   </div>
                   {userGrupamentoId && subgrupamentosFilhos.length > 0 && (
                     <div>
-                      <label className="text-sm font-medium text-slate-700 block mb-1.5">Restringir a um Subgrupamento (opcional)</label>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">Restringir a Subsetor/Seção (opcional)</label>
                       <Select value={userSubgrupamentoId || '_todos'} onValueChange={(v) => setUserSubgrupamentoId(v === '_todos' ? '' : v)}>
-                        <SelectTrigger><SelectValue placeholder="Todos os subgrupamentos do grupamento" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Todo o setor" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="_todos">— Acesso a todo o grupamento —</SelectItem>
+                          <SelectItem value="_todos">— Acesso a todo o setor —</SelectItem>
                           {subgrupamentosFilhos.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      {userSubgrupamentoId && <p className="text-xs text-amber-600 mt-1">✓ Acesso restrito apenas a este subgrupamento</p>}
+                      {userSubgrupamentoId && <p className="text-xs text-amber-600 mt-1">✓ Acesso restrito apenas a este subsetor/seção</p>}
                     </div>
                   )}
                   <div className="flex justify-end gap-2 pt-1">
@@ -229,13 +229,13 @@ export default function Configuracoes() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="w-5 h-5 text-[#1e3a5f]" />
-                <h2 className="text-xl font-semibold text-[#1e3a5f]">Atribuir Grupamento/Subgrupamento a Militares</h2>
+                <h2 className="text-xl font-semibold text-[#1e3a5f]">Atribuir Setor/Subsetor a Militares</h2>
               </div>
-              <p className="text-sm text-slate-500 mb-4">Selecione militares e atribua o grupamento/subgrupamento em massa de uma vez.</p>
+              <p className="text-sm text-slate-500 mb-4">Selecione militares e atribua o setor/subsetor em massa de uma vez.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="text-sm font-medium text-slate-700 block mb-1.5">Grupamento</label>
-                  <Select value={massaGrupamentoId || '_nenhum'} onValueChange={(v) => { setMassaGrupamentoId(v === '_nenhum' ? '' : v); setMassaSubgrupamentoId(''); }}>
+                   <label className="text-sm font-medium text-slate-700 block mb-1.5">Setor</label>
+                   <Select value={massaGrupamentoId || '_nenhum'} onValueChange={(v) => { setMassaGrupamentoId(v === '_nenhum' ? '' : v); setMassaSubgrupamentoId(''); }}>
                     <SelectTrigger><SelectValue placeholder="Selecione o grupamento..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_nenhum">— Selecione —</SelectItem>
@@ -245,7 +245,7 @@ export default function Configuracoes() {
                 </div>
                 {massaGrupamentoId && massaSubgrupamentosFilhos.length > 0 && (
                   <div>
-                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Subgrupamento (opcional)</label>
+                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Subsetor/Seção (opcional)</label>
                     <Select value={massaSubgrupamentoId || '_todos'} onValueChange={(v) => setMassaSubgrupamentoId(v === '_todos' ? '' : v)}>
                       <SelectTrigger><SelectValue placeholder="Apenas grupamento" /></SelectTrigger>
                       <SelectContent>
