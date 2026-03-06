@@ -650,6 +650,62 @@ export default function Ferias() {
         </DialogContent>
       </Dialog>
 
+      {/* Modal: Desconto em Férias */}
+      <Dialog open={descontoModal.open} onOpenChange={v => !v && setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' })}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-orange-600 flex items-center gap-2">
+              <MinusCircle className="w-5 h-5" /> Desconto em Férias
+            </DialogTitle>
+            <DialogDescription>Registra o desconto de dias nas férias e gera publicação no Livro.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {descontoModal.ferias && (
+              <p className="text-sm text-slate-500">
+                {descontoModal.ferias.militar_posto} {descontoModal.ferias.militar_nome} — Atual: {descontoModal.ferias.dias} dias
+              </p>
+            )}
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Quantidade de dias a descontar</Label>
+              <Input
+                type="number"
+                min={1}
+                max={descontoModal.ferias?.dias || 30}
+                value={descontoModal.dias}
+                onChange={e => setDescontoModal(p => ({ ...p, dias: Number(e.target.value) }))}
+                className="mt-1.5 w-24"
+              />
+              {descontoModal.ferias && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Saldo após desconto: <strong>{Math.max(0, (descontoModal.ferias.dias || 0) - descontoModal.dias)} dias</strong>
+                </p>
+              )}
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-slate-700">Motivo / Período Aquisitivo <span className="text-red-500">*</span></Label>
+              <Textarea
+                value={descontoModal.motivo}
+                onChange={e => setDescontoModal(p => ({ ...p, motivo: e.target.value }))}
+                rows={2}
+                placeholder="Ex: Referente ao período aquisitivo 2023/2024 — Art. XX"
+                className="mt-1.5"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' })}>Cancelar</Button>
+              <Button
+                disabled={savingEdit || !descontoModal.motivo || !descontoModal.dias}
+                onClick={handleSalvarDesconto}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                {savingEdit ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : null}
+                Confirmar Desconto
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
