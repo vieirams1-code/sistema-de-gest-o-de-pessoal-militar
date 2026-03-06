@@ -81,11 +81,11 @@ export default function CadastrarPublicacao() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
 
-  // Para apostila / tornar sem efeito: buscar todas as publicações para seleção
+  // Para apostila / tornar sem efeito: buscar publicações do militar selecionado e com status Publicado
   const { data: todasPublicacoes = [] } = useQuery({
-    queryKey: ['todas-publicacoes-exofficio'],
-    queryFn: () => base44.entities.PublicacaoExOfficio.list('-data_publicacao'),
-    enabled: formData.tipo === 'Apostila' || formData.tipo === 'Tornar sem Efeito',
+    queryKey: ['publicacoes-apostila', formData.militar_id],
+    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: formData.militar_id, status: 'Publicado' }, '-data_publicacao'),
+    enabled: (formData.tipo === 'Apostila' || formData.tipo === 'Tornar sem Efeito') && !!formData.militar_id,
   });
 
   // Templates para Ex Officio
