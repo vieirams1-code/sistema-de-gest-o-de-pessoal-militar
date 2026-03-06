@@ -48,6 +48,118 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [savingJiso, setSavingJiso] = useState(false);
   const [showJisoModal, setShowJisoModal] = useState(false);
+  const [showHomologacaoModal, setShowHomologacaoModal] = useState(false);
+  const [showAtaJisoModal, setShowAtaJisoModal] = useState(false);
+  const [savingPublicacao, setSavingPublicacao] = useState(false);
+
+  // Estado do formulário de homologação
+  const [homologacaoForm, setHomologacaoForm] = useState({
+    data_publicacao: new Date().toISOString().split('T')[0],
+    nota_para_bg: '', numero_bg: '', data_bg: '',
+    texto_publicacao: ''
+  });
+
+  // Estado do formulário de Ata JISO
+  const [ataJisoForm, setAtaJisoForm] = useState({
+    data_publicacao: new Date().toISOString().split('T')[0],
+    finalidade_jiso: 'LTS',
+    secao_jiso: '', data_ata: new Date().toISOString().split('T')[0],
+    nup: '', parecer_jiso: '',
+    nota_para_bg: '', numero_bg: '', data_bg: '',
+    texto_publicacao: ''
+  });
+
+  const formatarDataExtenso = (d) => {
+    if (!d) return '';
+    const dt = new Date(d + 'T00:00:00');
+    return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+  };
+
+  const diasExtensoMap = { 1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze' };
+
+  const gerarTextoHomologacao = (form) => {
+    const posto = `${atestado.militar_posto || ''} QOBM`;
+    return `O(A) Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, homologa o afastamento médico do ${posto} ${atestado.militar_nome}, matrícula ${atestado.militar_matricula}, pelo período de ${atestado.dias} (${diasExtensoMap[atestado.dias] || atestado.dias}) dias, ${(atestado.tipo_afastamento || '').toLowerCase()}, a contar de ${formatarDataExtenso(atestado.data_inicio)}, com término em ${formatarDataExtenso(atestado.data_termino)}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
+  };
+
+  const gerarTextoAtaJiso = (form) => {
+    const posto = `${atestado.militar_posto || ''} QOBM`;
+    return `O(A) Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, resolve: tornar público que recebeu a Ata de Inspeção de Saúde Sessão Nº ${form.secao_jiso || '___'}, de ${formatarDataExtenso(form.data_ata)}, pertencente ao: ${posto} ${atestado.militar_nome}, matrícula ${atestado.militar_matricula}, inspecionado para fins de ${form.finalidade_jiso}, conf. NUP Nº ${form.nup || '___'}, com o parecer: ${form.parecer_jiso || '___'}.`;
+  };
+
+  const handleOpenHomologacao = () => {
+    const texto = gerarTextoHomologacao({});
+    setHomologacaoForm(prev => ({ ...prev, texto_publicacao: texto }));
+    setShowHomologacaoModal(true);
+  };
+
+  const handleOpenAtaJiso = () => {
+    const texto = gerarTextoAtaJiso(ataJisoForm);
+    setAtaJisoForm(prev => ({ ...prev, texto_publicacao: texto }));
+    setShowAtaJisoModal(true);
+  };
+
+  const handleSaveHomologacao = async () => {
+    setSavingPublicacao(true);
+    const calcStatus = (nota, num, data) => num && data ? 'Publicado' : nota ? 'Aguardando Publicação' : 'Aguardando Nota';
+    const status = calcStatus(homologacaoForm.nota_para_bg, homologacaoForm.numero_bg, homologacaoForm.data_bg);
+    await base44.entities.PublicacaoExOfficio.create({
+      tipo: 'Homologação de Atestado',
+      militar_id: atestado.militar_id,
+      militar_nome: atestado.militar_nome,
+      militar_posto: atestado.militar_posto,
+      militar_matricula: atestado.militar_matricula,
+      data_publicacao: homologacaoForm.data_publicacao,
+      atestado_homologado_id: atestado.id,
+      texto_publicacao: homologacaoForm.texto_publicacao,
+      nota_para_bg: homologacaoForm.nota_para_bg,
+      numero_bg: homologacaoForm.numero_bg,
+      data_bg: homologacaoForm.data_bg,
+      status
+    });
+    await base44.entities.Atestado.update(atestado.id, {
+      homologado_comandante: true,
+      status_jiso: 'Homologado pelo Comandante',
+      status_publicacao: status
+    });
+    queryClient.invalidateQueries({ queryKey: ['atestados'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    setSavingPublicacao(false);
+    setShowHomologacaoModal(false);
+  };
+
+  const handleSaveAtaJiso = async () => {
+    setSavingPublicacao(true);
+    const calcStatus = (nota, num, data) => num && data ? 'Publicado' : nota ? 'Aguardando Publicação' : 'Aguardando Nota';
+    const status = calcStatus(ataJisoForm.nota_para_bg, ataJisoForm.numero_bg, ataJisoForm.data_bg);
+    await base44.entities.PublicacaoExOfficio.create({
+      tipo: 'Ata JISO',
+      militar_id: atestado.militar_id,
+      militar_nome: atestado.militar_nome,
+      militar_posto: atestado.militar_posto,
+      militar_matricula: atestado.militar_matricula,
+      data_publicacao: ataJisoForm.data_publicacao,
+      atestados_jiso_ids: [atestado.id],
+      finalidade_jiso: ataJisoForm.finalidade_jiso,
+      secao_jiso: ataJisoForm.secao_jiso,
+      data_ata: ataJisoForm.data_ata,
+      nup: ataJisoForm.nup,
+      parecer_jiso: ataJisoForm.parecer_jiso,
+      texto_publicacao: ataJisoForm.texto_publicacao,
+      nota_para_bg: ataJisoForm.nota_para_bg,
+      numero_bg: ataJisoForm.numero_bg,
+      data_bg: ataJisoForm.data_bg,
+      status
+    });
+    await base44.entities.Atestado.update(atestado.id, {
+      status_jiso: 'Homologado pela JISO',
+      status_publicacao: status
+    });
+    queryClient.invalidateQueries({ queryKey: ['atestados'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    setSavingPublicacao(false);
+    setShowAtaJisoModal(false);
+  };
 
   // Buscar publicações vinculadas a este atestado
   const { data: publicacoesVinculadas = [] } = useQuery({
