@@ -546,20 +546,12 @@ export default function CadastrarPublicacao() {
           </div>
         );
 
-      case 'Designação / Dispensa de Função':
+      case 'Designação de Função':
+      case 'Dispensa de Função':
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Designação / Dispensa de Função</h3>
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{formData.tipo}</h3>
             <div className="space-y-4">
-              <FormField
-                label="Tipo"
-                name="tipo_designacao"
-                value={formData.tipo_designacao}
-                onChange={handleChange}
-                type="select"
-                options={['Dispensa', 'Designação']}
-                required
-              />
               <FormField
                 label="Função"
                 name="funcao"
