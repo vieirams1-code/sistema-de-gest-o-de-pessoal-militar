@@ -339,9 +339,10 @@ export default function CadastrarRegistroLivro() {
       }
 
       case 'Deslocamento Missão': {
-        const t = tentarTemplate('Deslocamento Missão', { data_inicio: dataInicio, destino: formData.destino, missao_descricao: formData.missao_descricao, documento_referencia: formData.documento_referencia, inicio_termino: formData.inicio_termino });
+        const dataRetornoMissao = formatarDataExtenso(formData.data_retorno);
+        const t = tentarTemplate('Deslocamento Missão', { data_inicio: dataInicio, data_retorno: dataRetornoMissao, destino: formData.destino, missao_descricao: formData.missao_descricao, documento_referencia: formData.documento_referencia, inicio_termino: formData.inicio_termino });
         if (t) { texto = t; break; }
-        if (formData.missao_descricao && formData.destino && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.missao_descricao}, conforme ${formData.documento_referencia}, a contar de ${dataInicio} ${formData.inicio_termino === 'Início' ? 'a ' + formatarDataExtenso(formData.data_retorno) : ''} em ${formData.destino}.`;
+        if (formData.missao_descricao && formData.destino && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.missao_descricao}, conforme ${formData.documento_referencia}, a contar de ${dataInicio} ${formData.inicio_termino === 'Início' && dataRetornoMissao ? 'a ' + dataRetornoMissao : ''} em ${formData.destino}.`;
         break;
       }
 
