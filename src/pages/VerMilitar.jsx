@@ -8,12 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ArrowLeft, Pencil, User, Briefcase, FileText, Building,
+  ArrowLeft, Pencil, User, Briefcase, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Activity, BookOpen
+  Shield, Award, Send
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import TempoServico from '@/components/militar/TempoServico';
+import AlertasContrato from '@/components/militar/AlertasContrato';
+import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
