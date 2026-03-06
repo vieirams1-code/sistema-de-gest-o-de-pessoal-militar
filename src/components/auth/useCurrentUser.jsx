@@ -9,25 +9,56 @@ export function useCurrentUser() {
   });
 
   const isAdmin = user?.role === 'admin';
+  // setorId: ID do Setor (Grupamento) ou Subsetor (Subgrupamento) atribuído ao usuário
   const subgrupamentoId = user?.subgrupamento_id || null;
-  const subgrupamentoTipo = user?.subgrupamento_tipo || null; // 'Grupamento' ou 'Subgrupamento'
+  const subgrupamentoTipo = user?.subgrupamento_tipo || null; // 'Grupamento' (Setor) ou 'Subgrupamento' (Subsetor/Seção)
 
-  // Retorna true se o usuário tem acesso ao registro com base no subgrupamento_id e grupamento_id do registro
+  // Modo de acesso:
+  // 'admin' - acesso total
+  // 'setor' - acesso a todos os registros do setor e subsetores
+  // 'subsetor' - acesso apenas ao próprio subsetor
+  // 'proprio' - sem setor atribuído: acesso apenas aos próprios dados (por email)
+  const modoAcesso = isAdmin
+    ? 'admin'
+    : subgrupamentoId
+      ? (subgrupamentoTipo === 'Grupamento' ? 'setor' : 'subsetor')
+      : 'proprio';
+
+  /**
+   * Retorna true se o usuário tem acesso ao registro.
+   * @param registro - objeto com grupamento_id, subgrupamento_id e/ou created_by
+   */
   const hasAccess = (registro) => {
     if (isAdmin) return true;
-    if (!subgrupamentoId) return false;
 
-    // Se o usuário é de um Grupamento, vê tudo do grupamento (via grupamento_id ou subgrupamento_id direto)
-    if (subgrupamentoTipo === 'Grupamento') {
+    // Modo Setor: vê tudo do setor (via grupamento_id) e seus subsetores
+    if (modoAcesso === 'setor') {
       return (
         registro.grupamento_id === subgrupamentoId ||
         registro.subgrupamento_id === subgrupamentoId
       );
     }
 
-    // Se o usuário é de um Subgrupamento específico, vê apenas o próprio subgrupamento
-    return registro.subgrupamento_id === subgrupamentoId;
+    // Modo Subsetor/Seção: vê apenas o próprio subsetor
+    if (modoAcesso === 'subsetor') {
+      return registro.subgrupamento_id === subgrupamentoId;
+    }
+
+    // Modo Próprio: acessa apenas registros criados pelo próprio email ou com created_by igual ao email
+    if (modoAcesso === 'proprio') {
+      return registro.created_by === user?.email || registro.militar_email === user?.email;
+    }
+
+    return false;
   };
 
-  return { user, isLoading, isAdmin, subgrupamentoId, subgrupamentoTipo, hasAccess };
+  return {
+    user,
+    isLoading,
+    isAdmin,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    modoAcesso,
+    hasAccess,
+  };
 }
