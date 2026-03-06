@@ -280,18 +280,26 @@ export default function CadastrarFerias() {
             <FormSection title="Período Aquisitivo" icon={Calendar} defaultOpen={true}>
               <div className="space-y-3">
                 <Label className="text-sm font-medium text-slate-700">Selecione o Período <span className="text-red-500">*</span></Label>
-                <Select value={formData.periodo_aquisitivo_ref} onValueChange={handlePeriodoChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Escolha o período aquisitivo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {opcaoAnos.map(ano => (
-                      <SelectItem key={ano} value={ano}>{ano}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formData.periodo_aquisitivo_ref && periodosJaCadastrados.includes(formData.periodo_aquisitivo_ref) && (
-                  <p className="text-xs text-red-500">⚠ Já existe férias cadastradas para este período.</p>
+                {editId ? (
+                  <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-700 text-sm font-medium">
+                    {formData.periodo_aquisitivo_ref || '—'}
+                  </div>
+                ) : (
+                  <>
+                    <Select value={formData.periodo_aquisitivo_ref} onValueChange={handlePeriodoChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Escolha o período aquisitivo..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {opcaoAnos.map(ano => (
+                          <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formData.periodo_aquisitivo_ref && periodosJaCadastrados.includes(formData.periodo_aquisitivo_ref) && (
+                      <p className="text-xs text-red-500">⚠ Já existe férias cadastradas para este período.</p>
+                    )}
+                  </>
                 )}
               </div>
             </FormSection>
