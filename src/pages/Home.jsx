@@ -125,17 +125,49 @@ export default function Home() {
           </div>
         )}
 
+        {/* Publicações Urgentes/Importantes */}
+        {publicacoesUrgentesImportantes.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              <h2 className="text-lg font-semibold text-slate-800">Publicações com Atenção Necessária</h2>
+              <Badge className="bg-red-100 text-red-700 ml-auto">{publicacoesUrgentesImportantes.length}</Badge>
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {publicacoesUrgentesImportantes.map(p => (
+                <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border ${p.urgente ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {p.urgente
+                      ? <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      : <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                    }
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">
+                        {p.militar_posto && <span className="text-slate-500 text-xs mr-1">{p.militar_posto}</span>}
+                        {p.militar_nome}
+                      </p>
+                      <p className="text-xs text-slate-500">{p.tipo || p.tipo_registro} — {p.status}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" className="flex-shrink-0 ml-2" onClick={() => navigate(createPageUrl('Publicacoes'))}>
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate(createPageUrl('Publicacoes'))}>
+              Ver Controle de Publicações
+            </Button>
+          </div>
+        )}
+
         {/* Atalhos Rápidos */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Atalhos Rápidos</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(createPageUrl('Militares'))}>
               <Users className="w-6 h-6 mb-2" />
               <span>Efetivo</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(createPageUrl('Punicoes'))}>
-              <Shield className="w-6 h-6 mb-2" />
-              <span>Punições</span>
             </Button>
             <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(createPageUrl('Medalhas'))}>
               <Award className="w-6 h-6 mb-2" />
