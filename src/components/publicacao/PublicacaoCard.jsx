@@ -157,6 +157,14 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
             </div>
 
             <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Marcar Urgente */}
+              <Button variant="ghost" size="sm" title={registro.urgente ? 'Remover Urgente' : 'Marcar como Urgente'} onClick={() => handleTogglePrioridade('urgente')} className={`text-xs gap-1 ${registro.urgente ? 'text-red-600' : 'text-slate-400 hover:text-red-500'}`}>
+                <AlertTriangle className="w-4 h-4" />
+              </Button>
+              {/* Marcar Importante */}
+              <Button variant="ghost" size="sm" title={registro.importante ? 'Remover Importante' : 'Marcar como Importante'} onClick={() => handleTogglePrioridade('importante')} className={`text-xs gap-1 ${registro.importante ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'}`}>
+                <Star className="w-4 h-4" />
+              </Button>
               {/* Editar nota/BG inline */}
               {!isEditingBg && (
                 <Button
