@@ -574,46 +574,10 @@ export default function CadastrarRegistroLivro() {
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Instalação</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Início / Término"
-                  name="inicio_termino"
-                  value={formData.inicio_termino}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Início', 'Término']}
-                  required
-                />
-                <div>
-                  <Label>Dias</Label>
-                  <Input value="10" disabled className="mt-1.5" />
-                </div>
+                <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="Unidade de origem" required />
+                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="Unidade de destino" required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Origem"
-                  name="origem"
-                  value={formData.origem}
-                  onChange={handleChange}
-                  placeholder="Unidade de origem"
-                  required
-                />
-                <FormField
-                  label="Destino"
-                  name="destino"
-                  value={formData.destino}
-                  onChange={handleChange}
-                  placeholder="Unidade de destino"
-                  required
-                />
-              </div>
-              <FormField
-                label="Data de Início"
-                name="data_inicio"
-                value={formData.data_inicio}
-                onChange={handleChange}
-                type="date"
-                required
-              />
+              <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
             </div>
           </div>
         );
