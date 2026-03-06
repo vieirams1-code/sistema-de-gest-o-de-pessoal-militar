@@ -182,7 +182,8 @@ export default function CadastrarRegistroLivro() {
   }, [formData, selectedFerias, templates]);
 
   const gerarTextoPublicacao = () => {
-    const postoNome = formData.militar_posto ? `${formData.militar_posto} QOBM` : '';
+    const abreviatura = abreviarPosto(formData.militar_posto);
+    const postoNome = abreviatura ? `${abreviatura} QOBM` : '';
     const nomeCompleto = formData.militar_nome || '';
     const matricula = formData.militar_matricula || '';
     const dataRegistro = formatarDataExtenso(formData.data_registro);
@@ -199,6 +200,7 @@ export default function CadastrarRegistroLivro() {
       if (tmpl?.template) {
         const vars = {
           posto_nome: postoNome,
+          posto: abreviatura,
           nome_completo: nomeCompleto,
           matricula,
           data_registro: dataRegistro,
@@ -227,8 +229,10 @@ export default function CadastrarRegistroLivro() {
             setUsingCustomTemplate(true);
           } else {
             setUsingCustomTemplate(false);
+            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
+            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
             const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
-            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${formatarDataExtenso(selectedFerias.data_inicio)} entrará em gozo de férias regulamentares, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(selectedFerias.data_inicio)} entrará em gozo de férias regulamentares, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
           }
         }
         break;
@@ -242,10 +246,12 @@ export default function CadastrarRegistroLivro() {
             setUsingCustomTemplate(true);
           } else {
             setUsingCustomTemplate(false);
+            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
+            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
             const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
             const fracionamento = selectedFerias.fracionamento || '';
             const tipoFeriaTexto = fracionamento ? `${fracionamento} de férias regulamentares` : 'férias regulamentares';
-            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em ${formatarDataExtenso(formData.data_registro)}, por término do gozo da ${tipoFeriaTexto}, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(formData.data_registro)}, por término do gozo da ${tipoFeriaTexto}, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
           }
         }
         break;
