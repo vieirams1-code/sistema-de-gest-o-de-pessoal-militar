@@ -11,7 +11,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, User, Filter, ClipboardList, Shield, Award, Calendar, BookOpen, FileText, Activity, Search, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, Filter, ClipboardList, Shield, Award, Calendar, BookOpen, FileText, Activity, Search, ChevronDown, ChevronUp, Trash2, PenLine, Ban, ExternalLink } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 
