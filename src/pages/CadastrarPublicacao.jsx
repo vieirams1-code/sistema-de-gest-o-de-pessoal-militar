@@ -918,7 +918,8 @@ export default function CadastrarPublicacao() {
                   <SelectItem value="Melhoria de Comportamento">Melhoria de Comportamento</SelectItem>
                   <SelectItem value="Punição">Punição</SelectItem>
                   <SelectItem value="Geral">Geral</SelectItem>
-                  <SelectItem value="Designação / Dispensa de Função">Designação / Dispensa de Função</SelectItem>
+                  <SelectItem value="Designação de Função">Designação de Função</SelectItem>
+                  <SelectItem value="Dispensa de Função">Dispensa de Função</SelectItem>
                   <SelectItem value="Ata JISO">Ata JISO</SelectItem>
                   <SelectItem value="Transcrição de Documentos">Transcrição de Documentos</SelectItem>
                   <SelectItem value="Interrupção de Férias">Interrupção de Férias</SelectItem>
