@@ -219,11 +219,13 @@ export default function Ferias() {
     const novaQtd = Math.max(0, (f.dias || 0) - diasDesconto);
     const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
     const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
-    // Atualiza apenas as férias (sem criar publicação aqui)
+    const novaLinhaDesc = `-${diasDesconto}d: ${descontoModal.motivo}`;
+    const obsDesc = f.observacoes ? `${f.observacoes}\n${novaLinhaDesc}` : novaLinhaDesc;
     await base44.entities.Ferias.update(f.id, {
       dias: novaQtd,
       data_fim: novaDataFim,
       data_retorno: novaDataRetorno,
+      observacoes: obsDesc,
     });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     setSavingEdit(false);
