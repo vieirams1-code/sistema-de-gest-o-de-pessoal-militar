@@ -14,6 +14,8 @@ import TagInput from '@/components/militar/TagInput';
 import LotacaoSelector from '@/components/militar/LotacaoSelector';
 import FuncaoSelector from '@/components/militar/FuncaoSelector';
 import HistoricoComportamentoModal from '@/components/militar/HistoricoComportamentoModal';
+import TempoServico from '@/components/militar/TempoServico';
+import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const initialFormData = {
@@ -114,6 +116,7 @@ export default function CadastrarMilitar() {
     queryKey: ['subgrupamentos'],
     queryFn: () => base44.entities.Subgrupamento.list('nome'),
   });
+  // Nomenclatura: Grupamento = Setor, Subgrupamento = Subsetor/Seção
   const grupamentos = subgrupamentosAll.filter(s => s.tipo === 'Grupamento');
   const subgrupamentosLista = subgrupamentosAll.filter(s => s.tipo === 'Subgrupamento');
 
@@ -265,6 +268,7 @@ export default function CadastrarMilitar() {
                   onChange={handleChange}
                   type="select"
                   options={['Ativa', 'Reserva Remunerada', 'Reformado', 'Designado', 'Convocado']}
+                  hint={['Designado', 'Convocado'].includes(formData.situacao_militar) ? 'Gerencie contratos na página Contratos' : ''}
                 />
                 <LotacaoSelector
                   value={formData.lotacao}
@@ -297,6 +301,16 @@ export default function CadastrarMilitar() {
             </div>
           </FormSection>
 
+          {/* Alertas de contrato para edição */}
+          {editId && (
+            <div className="space-y-2">
+              <AlertasContrato militarId={editId} />
+              {formData.data_inclusao && (
+                <TempoServico dataInclusao={formData.data_inclusao} />
+              )}
+            </div>
+          )}
+
           {/* Dados Funcionais */}
           <FormSection title="Dados Funcionais" icon={Briefcase} defaultOpen={true}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -304,13 +318,13 @@ export default function CadastrarMilitar() {
               <div className="col-span-full">
                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-2">
-                    <GitBranch className="w-4 h-4 text-[#1e3a5f]" />
-                    <span className="text-sm font-semibold text-slate-700">Vinculação Organizacional</span>
-                    {!isAdmin && <span className="text-xs text-slate-400">(definido automaticamente)</span>}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">Grupamento</label>
+                     <GitBranch className="w-4 h-4 text-[#1e3a5f]" />
+                     <span className="text-sm font-semibold text-slate-700">Vinculação Organizacional</span>
+                     {!isAdmin && <span className="text-xs text-slate-400">(definido automaticamente)</span>}
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                     <div className="space-y-1">
+                       <label className="text-xs font-medium text-slate-600">Setor</label>
                       <select
                         disabled={!isAdmin}
                         className={`w-full border border-slate-200 rounded-md px-3 py-2 text-sm ${!isAdmin ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`}
@@ -333,7 +347,7 @@ export default function CadastrarMilitar() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">Subgrupamento</label>
+                      <label className="text-xs font-medium text-slate-600">Subsetor / Seção</label>
                       <select
                         disabled={!isAdmin}
                         className={`w-full border border-slate-200 rounded-md px-3 py-2 text-sm ${!isAdmin ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`}
