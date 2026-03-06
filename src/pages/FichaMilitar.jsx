@@ -49,12 +49,33 @@ function formatDate(d) {
 }
 
 function EventCard({ event, onDelete }) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const cfg = tipoConfig[event.tipo] || tipoConfig.publicacao;
   const Icon = cfg.icon;
 
+  // Para publicações ex-officio: verificar se está Publicada
+  const isPublicacao = event.tipo === 'publicacao';
+  const statusPublicacao = event.raw?.status || '';
+  const isPublicada = isPublicacao && (statusPublicacao === 'Publicado' || (event.raw?.numero_bg && event.raw?.data_bg));
+  const foiTornadaSemEfeito = isPublicacao && !!event.raw?.tornada_sem_efeito_por_id;
+  const podeApostilarOuTSE = isPublicada && !foiTornadaSemEfeito;
+  const podeExcluir = !isPublicada; // publicadas não podem ser excluídas
+
+  // Status badge color para publicações
+  const statusColors = {
+    'Aguardando Nota': 'bg-amber-100 text-amber-700',
+    'Aguardando Publicação': 'bg-blue-100 text-blue-700',
+    'Publicado': 'bg-emerald-100 text-emerald-700',
+  };
+  const statusDisplay = isPublicacao
+    ? (event.raw?.numero_bg && event.raw?.data_bg ? 'Publicado'
+      : event.raw?.nota_para_bg ? 'Aguardando Publicação'
+      : 'Aguardando Nota')
+    : null;
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className={`bg-white rounded-xl border shadow-sm overflow-hidden ${foiTornadaSemEfeito ? 'border-red-300 opacity-70' : isPublicada ? 'border-emerald-200' : 'border-slate-200'}`}>
       <div
         className="flex items-start gap-4 p-4 cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setExpanded(e => !e)}
@@ -66,19 +87,55 @@ function EventCard({ event, onDelete }) {
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <Badge className={cfg.color + ' text-xs'}>{cfg.label}</Badge>
             {event.subtipo && <span className="text-xs text-slate-500 font-medium">{event.subtipo}</span>}
+            {statusDisplay && (
+              <Badge className={`text-xs ${statusColors[statusDisplay] || ''}`}>{statusDisplay}</Badge>
+            )}
+            {foiTornadaSemEfeito && <Badge className="text-xs bg-red-100 text-red-700">TORNADA SEM EFEITO</Badge>}
           </div>
           <p className="font-medium text-slate-900 text-sm">{event.titulo}</p>
           {event.resumo && <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{event.resumo}</p>}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <span className="text-sm text-slate-500 whitespace-nowrap">{formatDate(event.data)}</span>
-          <button
-            className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-            title="Excluir"
-            onClick={() => onDelete(event)}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          <span className="text-sm text-slate-500 whitespace-nowrap mr-1">{formatDate(event.data)}</span>
+          {/* Botões Apostila/TSE para publicações Publicadas */}
+          {podeApostilarOuTSE && (
+            <>
+              <button
+                className="p-1 rounded hover:bg-purple-50 text-purple-400 hover:text-purple-600 transition-colors"
+                title="Fazer Apostila"
+                onClick={() => navigate(createPageUrl('CadastrarPublicacao') + `?tipo=Apostila&militar_id=${event.raw.militar_id}&ref_id=${event.id}`)}
+              >
+                <PenLine className="w-4 h-4" />
+              </button>
+              <button
+                className="p-1 rounded hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
+                title="Tornar sem Efeito"
+                onClick={() => navigate(createPageUrl('CadastrarPublicacao') + `?tipo=Tornar+sem+Efeito&militar_id=${event.raw.militar_id}&ref_id=${event.id}`)}
+              >
+                <Ban className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {/* Excluir apenas se não for Publicada */}
+          {podeExcluir ? (
+            <button
+              className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+              title="Excluir"
+              onClick={() => onDelete(event)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          ) : isPublicacao ? (
+            <span className="text-xs text-slate-400 px-1" title="Publicações publicadas não podem ser excluídas">🔒</span>
+          ) : (
+            <button
+              className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+              title="Excluir"
+              onClick={() => onDelete(event)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </div>
       </div>
@@ -92,6 +149,15 @@ function EventCard({ event, onDelete }) {
               </div>
             ) : null)}
           </div>
+          {/* Texto publicação para ex-officio */}
+          {isPublicacao && event.raw?.texto_publicacao && (
+            <div className="mt-3">
+              <p className="text-xs text-slate-500 mb-1 font-medium">Texto para Publicação</p>
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {event.raw.texto_publicacao}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
