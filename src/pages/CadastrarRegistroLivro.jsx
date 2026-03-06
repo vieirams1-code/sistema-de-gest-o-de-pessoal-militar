@@ -687,6 +687,18 @@ export default function CadastrarRegistroLivro() {
           </div>
         );
 
+      case 'Designação de Função':
+      case 'Dispensa de Função':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{formData.tipo_registro}</h3>
+            <div className="space-y-4">
+              <FormField label="Função" name="funcao" value={formData.funcao || ''} onChange={handleChange} placeholder="Ex: Auxiliar B1" required />
+              <FormField label="Data" name="data_designacao" value={formData.data_designacao || ''} onChange={handleChange} type="date" required />
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
