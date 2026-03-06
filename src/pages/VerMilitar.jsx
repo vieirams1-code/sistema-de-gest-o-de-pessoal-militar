@@ -51,6 +51,8 @@ export default function VerMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+  const { user, isAdmin } = useCurrentUser();
+  const [showSolicitacao, setShowSolicitacao] = useState(false);
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
@@ -125,9 +127,22 @@ export default function VerMilitar() {
               <p className="text-slate-500 text-sm">Visualização completa dos dados</p>
             </div>
           </div>
-          <Button onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-            <Pencil className="w-4 h-4 mr-2" />Editar
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowSolicitacao(true)}>
+              <Send className="w-4 h-4 mr-2" />Solicitar Correção
+            </Button>
+            {isAdmin && (
+              <Button onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                <Pencil className="w-4 h-4 mr-2" />Editar
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Alertas e tempo de serviço */}
+        <div className="space-y-2 mb-4">
+          <AlertasContrato militarId={id} />
+          {militar.data_inclusao && <TempoServico dataInclusao={militar.data_inclusao} />}
         </div>
 
         {/* Profile Header */}
