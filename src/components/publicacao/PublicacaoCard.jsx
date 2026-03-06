@@ -309,32 +309,72 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
               </div>
             ) : (
               <div className="mt-4 space-y-4">
+                {/* Bloco de Publicação BG */}
+                <div className="grid grid-cols-3 gap-4 text-sm bg-slate-50 rounded-lg border border-slate-100 p-3">
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Nota para BG</p>
+                    <p className="font-semibold mt-0.5 text-slate-800">{registro.nota_para_bg || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Número do BG</p>
+                    <p className="font-semibold mt-0.5 text-slate-800">{registro.numero_bg || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Data do BG</p>
+                    <p className="font-semibold mt-0.5 text-slate-800">{formatDate(registro.data_bg)}</p>
+                  </div>
+                </div>
+
+                {/* Datas e Período */}
+                {(registro.data_inicio || registro.data_termino || registro.data_retorno || registro.dias || registro.periodo_aquisitivo || registro.data_designacao || registro.data_melhoria || registro.data_punicao) && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Datas e Período</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      {registro.data_inicio && <div><p className="text-xs text-slate-400">Data Início</p><p className="font-medium text-slate-700">{formatDate(registro.data_inicio)}</p></div>}
+                      {registro.data_termino && <div><p className="text-xs text-slate-400">Data Término</p><p className="font-medium text-slate-700">{formatDate(registro.data_termino)}</p></div>}
+                      {registro.data_retorno && <div><p className="text-xs text-slate-400">Data Retorno</p><p className="font-medium text-slate-700">{formatDate(registro.data_retorno)}</p></div>}
+                      {registro.dias && <div><p className="text-xs text-slate-400">Dias</p><p className="font-medium text-slate-700">{registro.dias} dias</p></div>}
+                      {registro.periodo_aquisitivo && <div><p className="text-xs text-slate-400">Período Aquisitivo</p><p className="font-medium text-slate-700">{registro.periodo_aquisitivo}</p></div>}
+                      {registro.data_designacao && <div><p className="text-xs text-slate-400">Data Designação</p><p className="font-medium text-slate-700">{formatDate(registro.data_designacao)}</p></div>}
+                      {registro.data_melhoria && <div><p className="text-xs text-slate-400">Data Melhoria</p><p className="font-medium text-slate-700">{formatDate(registro.data_melhoria)}</p></div>}
+                      {registro.data_punicao && <div><p className="text-xs text-slate-400">Data Punição</p><p className="font-medium text-slate-700">{formatDate(registro.data_punicao)}</p></div>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dados específicos por tipo */}
+                {(registro.funcao || registro.portaria || registro.tipo_punicao || registro.dias_punicao || registro.comportamento_atual || registro.comportamento_ingresso || registro.graduacao_punicao || registro.documento_referencia || registro.origem || registro.destino) && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Dados Específicos</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      {registro.funcao && <div><p className="text-xs text-slate-400">Função</p><p className="font-medium text-slate-700">{registro.funcao}</p></div>}
+                      {registro.portaria && <div><p className="text-xs text-slate-400">Portaria</p><p className="font-medium text-slate-700">{registro.portaria}</p></div>}
+                      {registro.tipo_punicao && <div><p className="text-xs text-slate-400">Tipo Punição</p><p className="font-medium text-slate-700">{registro.tipo_punicao}</p></div>}
+                      {registro.dias_punicao && <div><p className="text-xs text-slate-400">Dias Punição</p><p className="font-medium text-slate-700">{registro.dias_punicao} dias</p></div>}
+                      {registro.comportamento_atual && <div><p className="text-xs text-slate-400">Comportamento Atual</p><p className="font-medium text-slate-700">{registro.comportamento_atual}</p></div>}
+                      {registro.comportamento_ingresso && <div><p className="text-xs text-slate-400">Comportamento Ingresso</p><p className="font-medium text-slate-700">{registro.comportamento_ingresso}</p></div>}
+                      {registro.graduacao_punicao && <div><p className="text-xs text-slate-400">Graduação Punição</p><p className="font-medium text-slate-700">{registro.graduacao_punicao}</p></div>}
+                      {registro.documento_referencia && <div><p className="text-xs text-slate-400">Documento</p><p className="font-medium text-slate-700">{registro.documento_referencia}</p></div>}
+                      {registro.origem && <div><p className="text-xs text-slate-400">Origem</p><p className="font-medium text-slate-700">{registro.origem}</p></div>}
+                      {registro.destino && <div><p className="text-xs text-slate-400">Destino</p><p className="font-medium text-slate-700">{registro.destino}</p></div>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Texto para Publicação */}
                 {registro.texto_publicacao && (
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Texto para Publicação</p>
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-700 leading-relaxed">
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                       {registro.texto_publicacao}
                     </div>
                   </div>
                 )}
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-xs text-slate-500">Nota para BG</p>
-                    <p className="font-medium mt-0.5">{registro.nota_para_bg || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Número do BG</p>
-                    <p className="font-medium mt-0.5">{registro.numero_bg || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Data do BG</p>
-                    <p className="font-medium mt-0.5">{formatDate(registro.data_bg)}</p>
-                  </div>
-                </div>
+
                 {registro.observacoes && (
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Observações</p>
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-700">
+                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-sm text-slate-700">
                       {registro.observacoes}
                     </div>
                   </div>
