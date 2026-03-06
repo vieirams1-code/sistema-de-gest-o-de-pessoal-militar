@@ -25,6 +25,7 @@ const navItems = [
   { name: 'Armamentos', page: 'Armamentos', icon: Shield },
   { name: 'Atestados', page: 'DashboardAtestados', icon: Shield },
   { name: 'Férias', page: 'Ferias', icon: Menu },
+  { name: 'Contratos Conv./Design.', page: 'Contratos', icon: FileText },
   { name: 'Processos & Tarefas', page: 'Processos', icon: FileText },
   { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
   { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
@@ -34,7 +35,8 @@ const navItems = [
   { name: 'Configurações', page: 'Configuracoes', icon: Menu, children: [
     { name: 'Permissões e Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
     { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Settings, tab: 'adicoes' },
-    { name: 'Organização Estrutural', page: 'Subgrupamentos', icon: Shield },
+    { name: 'Estrutura Organizacional', page: 'Subgrupamentos', icon: Shield },
+    { name: 'Solicitações de Atualização', page: 'SolicitacoesAtualizacao', icon: FileText },
   ]},
 ];
 
