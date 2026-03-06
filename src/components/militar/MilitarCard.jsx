@@ -84,22 +84,32 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onView(militar)}>
-                   <Eye className="w-4 h-4 mr-2" />
-                   Visualizar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate(createPageUrl('FichaMilitar') + `?id=${militar.id}`)}>
-                   <ClipboardList className="w-4 h-4 mr-2" />
-                   Ficha Militar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onEdit(militar)}>
-                   <Pencil className="w-4 h-4 mr-2" />
-                   Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onDelete(militar)} className="text-red-600">
-                   <Trash2 className="w-4 h-4 mr-2" />
-                   Excluir
-                  </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => onView(militar)}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Visualizar
+                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => navigate(createPageUrl('FichaMilitar') + `?id=${militar.id}`)}>
+                  <ClipboardList className="w-4 h-4 mr-2" />
+                  Ficha Militar
+                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => navigate(createPageUrl('FichaMilitar') + `?id=${militar.id}&filtro=elogios_punicoes`)}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Extrato de Elogios e Punições
+                 </DropdownMenuItem>
+                 {militar.link_alteracoes_anteriores && (
+                   <DropdownMenuItem onClick={() => window.open(militar.link_alteracoes_anteriores, '_blank')}>
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Alterações Anteriores
+                   </DropdownMenuItem>
+                 )}
+                 <DropdownMenuItem onClick={() => onEdit(militar)}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Editar
+                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => onDelete(militar)} className="text-red-600">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir
+                 </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
