@@ -82,8 +82,8 @@ export default function Subgrupamentos() {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3a5f]">Grupamentos e Subgrupamentos</h1>
-            <p className="text-sm text-slate-500 mt-1">Estrutura hierárquica da unidade</p>
+            <h1 className="text-2xl font-bold text-[#1e3a5f]">Estrutura Organizacional</h1>
+            <p className="text-sm text-slate-500 mt-1">Setores, Subsetores e Seções da unidade</p>
           </div>
           <Button onClick={() => setShowNew(true)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
             <Plus className="w-4 h-4 mr-2" /> Novo
@@ -93,7 +93,7 @@ export default function Subgrupamentos() {
         {/* Formulário de criação */}
         {showNew && (
           <div className="bg-white border border-slate-200 rounded-xl p-4 mb-6 shadow-sm">
-            <p className="font-semibold text-slate-700 mb-3">Novo Grupamento / Subgrupamento</p>
+            <p className="font-semibold text-slate-700 mb-3">Nova Unidade Organizacional</p>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="col-span-2">
                 <label className="text-xs font-medium text-slate-600 mb-1 block">Tipo *</label>
@@ -105,7 +105,7 @@ export default function Subgrupamentos() {
                       onClick={() => setNewData(d => ({ ...d, tipo, grupamento_id: '' }))}
                       className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${newData.tipo === tipo ? 'bg-[#1e3a5f] text-white border-[#1e3a5f]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#1e3a5f]'}`}
                     >
-                      {tipo === 'Grupamento' ? '🏢 Grupamento (Pai)' : '🔹 Subgrupamento (Filho)'}
+                      {tipo === 'Grupamento' ? '🏢 Setor (Nível 1)' : '🔹 Subsetor / Seção (Nível 2/3)'}
                     </button>
                   ))}
                 </div>
@@ -115,13 +115,13 @@ export default function Subgrupamentos() {
               <Input placeholder="Descrição" value={newData.descricao} onChange={e => setNewData(d => ({ ...d, descricao: e.target.value }))} className="col-span-2" />
               {newData.tipo === 'Subgrupamento' && (
                 <div className="col-span-2">
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">Grupamento Pai *</label>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">Setor Pai *</label>
                   <select
                     className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm"
                     value={newData.grupamento_id}
                     onChange={e => setNewData(d => ({ ...d, grupamento_id: e.target.value }))}
                   >
-                    <option value="">Selecione o grupamento pai...</option>
+                    <option value="">Selecione o setor pai...</option>
                     {grupamentos.map(g => (
                       <option key={g.id} value={g.id}>{g.nome} {g.sigla && `(${g.sigla})`}</option>
                     ))}
@@ -177,7 +177,7 @@ export default function Subgrupamentos() {
                           <p className="font-bold text-[#1e3a5f]">{g.nome} {g.sigla && <span className="font-normal text-slate-400 text-sm">({g.sigla})</span>}</p>
                           {g.descricao && <p className="text-xs text-slate-500">{g.descricao}</p>}
                         </div>
-                        <span className="ml-2 text-xs bg-[#1e3a5f]/10 text-[#1e3a5f] px-2 py-0.5 rounded-full font-medium">{filhos.length} subgrupamentos</span>
+                        <span className="ml-2 text-xs bg-[#1e3a5f]/10 text-[#1e3a5f] px-2 py-0.5 rounded-full font-medium">{filhos.length} subsetor(es)/seção(ões)</span>
                       </div>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => startEdit(g)}><Pencil className="w-4 h-4" /></Button>
@@ -221,7 +221,7 @@ export default function Subgrupamentos() {
                     </div>
                   )}
                   {expanded && filhos.length === 0 && editingId !== g.id && (
-                    <p className="text-xs text-slate-400 px-10 py-2 italic">Nenhum subgrupamento vinculado</p>
+                    <p className="text-xs text-slate-400 px-10 py-2 italic">Nenhum subsetor/seção vinculado</p>
                   )}
                 </div>
               );
@@ -256,13 +256,19 @@ export default function Subgrupamentos() {
 
         {/* Legenda */}
         <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-4">
-          <p className="text-sm font-semibold text-blue-800 mb-2">Como funciona o acesso por hierarquia:</p>
+          <p className="text-sm font-semibold text-blue-800 mb-2">Como funciona a hierarquia organizacional:</p>
           <ul className="text-sm text-blue-700 space-y-1">
-            <li>🔑 <strong>Admin:</strong> Acesso total a todos os dados</li>
-            <li>🏢 <strong>Usuário com ID de Grupamento:</strong> Vê todos os militares/processos do grupamento e seus subgrupamentos filhos</li>
-            <li>🔹 <strong>Usuário com ID de Subgrupamento:</strong> Vê apenas os militares/processos do seu subgrupamento</li>
+            <li>🏢 <strong>Setor (Nível 1):</strong> Unidade principal (ex: 1º GBM)</li>
+            <li>🔹 <strong>Subsetor (Nível 2):</strong> Subdivisão do setor (ex: 1ª Cia, Seção de Saúde)</li>
+            <li>📋 <strong>Seção (Nível 3):</strong> Subdivisão do subsetor — cadastre como Subgrupamento filho de outro Subgrupamento</li>
           </ul>
-          <p className="text-xs text-blue-600 mt-3">Para atribuir um grupamento/subgrupamento a um usuário, edite o perfil do usuário e preencha o campo <strong>subgrupamento_id</strong> com o ID desejado e <strong>subgrupamento_tipo</strong> com "Grupamento" ou "Subgrupamento".</p>
+          <p className="text-sm font-semibold text-blue-800 mt-3 mb-1">Controle de acesso:</p>
+          <ul className="text-sm text-blue-700 space-y-1">
+            <li>🔑 <strong>Admin:</strong> Acesso total</li>
+            <li>🏢 <strong>Usuário de Setor:</strong> Vê dados do setor e todos os subsetores/seções</li>
+            <li>🔹 <strong>Usuário de Subsetor/Seção:</strong> Vê apenas sua unidade</li>
+          </ul>
+          <p className="text-xs text-blue-600 mt-3">Configure as permissões dos usuários em <strong>Configurações → Permissões e Usuários</strong>.</p>
         </div>
       </div>
     </div>
