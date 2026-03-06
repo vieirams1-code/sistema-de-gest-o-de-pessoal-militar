@@ -849,8 +849,6 @@ export default function CadastrarRegistroLivro() {
       { value: 'Dispensa Desconto Férias', label: 'Dispensa com Desconto em Férias', sexo: null },
       { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
       { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
-      { value: 'Designação de Função', label: 'Designação de Função', sexo: null },
-      { value: 'Dispensa de Função', label: 'Dispensa de Função', sexo: null },
     ];
     // Adicionar tipos customizados
     const customTipos = tiposCustom.map(t => ({ value: t.nome, label: t.nome, sexo: null }));
