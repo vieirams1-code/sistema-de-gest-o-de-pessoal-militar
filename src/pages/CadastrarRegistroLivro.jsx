@@ -708,7 +708,8 @@ export default function CadastrarRegistroLivro() {
                     value={formData.periodo_aquisitivo}
                     onValueChange={v => {
                       const periodo = periodosParaDesconto.find(p => p.id === v);
-                      const diasRestantes = periodo ? (periodo.dias_direito || 30) - (periodo.dias_gozados || 0) - (periodo.dias_previstos || 0) : '';
+                      const saldo = periodo ? (periodo.dias_direito || 30) - (periodo.dias_gozados || 0) - (periodo.dias_previstos || 0) : 0;
+                      const diasRestantes = Math.max(0, saldo - (Number(formData.dias) || 0));
                       const label = periodo ? (periodo.ano_referencia || `${periodo.inicio_aquisitivo} a ${periodo.fim_aquisitivo}`) : v;
                       setFormData(prev => ({ ...prev, periodo_aquisitivo: v, periodo_aquisitivo_label: label, dias_restantes: diasRestantes }));
                     }}
