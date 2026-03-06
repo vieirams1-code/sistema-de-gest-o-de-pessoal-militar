@@ -4,16 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, User, FileText, RefreshCw } from 'lucide-react';
+import { Save, User, FileText, AlertCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { aplicarTemplate, buildVarsLivro, formatDateBR, abreviarPosto } from '@/components/utils/templateUtils';
-
-const extNum = (n) => {
-  const nums = [,'um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove','vinte','vinte e um','vinte e dois','vinte e três','vinte e quatro','vinte e cinco','vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta'];
-  return nums[n] || String(n);
-};
+import { aplicarTemplate, buildVarsLivro, formatDateBR } from '@/components/utils/templateUtils';
 
 
 
@@ -27,7 +21,7 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
   const [dataBg, setDataBg] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [textoGerado, setTextoGerado] = useState('');
-  const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
+  const [semTemplate, setSemTemplate] = useState(false);
 
   // Buscar templates cadastrados
   const { data: templates = [] } = useQuery({
@@ -73,16 +67,13 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
     );
 
     if (templateCadastrado?.template) {
-      const vars = buildVarsLivro({ ferias, dataRegistro, periodo });
+      const vars = buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto: ferias._diasDesconto });
       const texto = aplicarTemplate(templateCadastrado.template, vars);
       setTextoGerado(texto);
-      setUsingCustomTemplate(true);
+      setSemTemplate(false);
     } else {
-      // 2. Fallback: texto padrão hardcoded
-      const gerador = TEXTOS_PADRAO[tipoRegistro];
-      const texto = gerador ? gerador(ferias, dataRegistro) : '';
-      setTextoGerado(texto);
-      setUsingCustomTemplate(false);
+      setTextoGerado('');
+      setSemTemplate(true);
     }
   };
 
@@ -186,26 +177,26 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
             <Input type="date" value={dataRegistro} onChange={e => setDataRegistro(e.target.value)} className="mt-1.5" />
           </div>
 
-          {/* Texto gerado */}
-          {textoGerado && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
-                {usingCustomTemplate && (
-                  <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3" /> Template personalizado aplicado
-                  </span>
-                )}
+          {/* Texto para publicação */}
+          <div>
+            <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
+            {semTemplate ? (
+              <div className="mt-1.5 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>Nenhum template cadastrado para <strong>"{tipoRegistro}"</strong> no módulo Livro. Cadastre um template em <strong>Templates de Texto</strong> para gerar o texto automaticamente.</span>
               </div>
-              <Textarea
-                value={textoGerado}
-                onChange={e => setTextoGerado(e.target.value)}
-                rows={5}
-                className="text-sm bg-blue-50 border-blue-200"
-              />
-              <p className="text-xs text-slate-400 mt-1">Você pode editar o texto antes de salvar.</p>
-            </div>
-          )}
+            ) : (
+              <>
+                <Textarea
+                  value={textoGerado}
+                  onChange={e => setTextoGerado(e.target.value)}
+                  rows={5}
+                  className="mt-1.5 text-sm bg-blue-50 border-blue-200"
+                />
+                <p className="text-xs text-slate-400 mt-1">Você pode editar o texto antes de salvar.</p>
+              </>
+            )}
+          </div>
 
           {/* Publicação */}
           <div className="border border-slate-200 rounded-lg p-4 space-y-3">
