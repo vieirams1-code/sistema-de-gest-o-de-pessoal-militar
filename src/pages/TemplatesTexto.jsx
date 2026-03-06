@@ -140,6 +140,7 @@ export default function TemplatesTexto() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates-texto'],
