@@ -80,9 +80,44 @@ export default function Publicacoes() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: ({ id, tipo }) => {
+    mutationFn: async ({ id, tipo, registro }) => {
+      // Nunca excluir o atestado em si — apenas publicações derivadas (ex-officio)
+      // Apostila ou TSE: reverter vínculo da original antes de excluir
+      if (tipo === 'ex-officio' || tipo === 'livro') {
+        const isApostila = registro?.tipo === 'Apostila';
+        const isTSE = registro?.tipo === 'Tornar sem Efeito';
+        const refId = registro?.publicacao_referencia_id;
+        const origemTipo = registro?.publicacao_referencia_origem_tipo;
+
+        if ((isApostila || isTSE) && refId) {
+          const entityOriginal =
+            origemTipo === 'atestado' ? base44.entities.Atestado :
+            origemTipo === 'livro' ? base44.entities.RegistroLivro :
+            base44.entities.PublicacaoExOfficio;
+
+          if (isApostila) {
+            // Buscar original para confirmar que o campo aponta para esta publicação
+            const originais = await entityOriginal.filter({ id: refId });
+            const original = originais[0];
+            if (original?.apostilada_por_id === id) {
+              await entityOriginal.update(refId, { apostilada_por_id: null });
+            }
+          } else if (isTSE) {
+            const originais = await entityOriginal.filter({ id: refId });
+            const original = originais[0];
+            if (original?.tornada_sem_efeito_por_id === id) {
+              await entityOriginal.update(refId, { tornada_sem_efeito_por_id: null });
+            }
+          }
+        }
+      }
+
+      // Nunca excluir o Atestado em si — publicações de atestado são ex-officio (PublicacaoExOfficio)
+      if (tipo === 'atestado') {
+        // Registros de atestado na lista são apenas para visualização — não devem ser excluídos aqui
+        return;
+      }
       if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.delete(id);
-      if (tipo === 'atestado') return base44.entities.Atestado.delete(id);
       return base44.entities.RegistroLivro.delete(id);
     },
     onSuccess: () => {
