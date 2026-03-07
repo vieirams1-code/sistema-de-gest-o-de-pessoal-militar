@@ -516,26 +516,34 @@ export default function CadastrarPublicacao() {
       }
     }
 
+    // Helper: resolver entidade correta pelo origem_tipo
+    const resolverEntidade = (origemTipo) => {
+      if (origemTipo === 'atestado') return base44.entities.Atestado;
+      if (origemTipo === 'livro') return base44.entities.RegistroLivro;
+      return base44.entities.PublicacaoExOfficio;
+    };
+
+    // Helper: detectar origem_tipo a partir de todasPublicacoes ou do campo salvo no formData
+    const resolverOrigemTipo = (refId) => {
+      // Primeiro tenta pelo array carregado (mais confiável)
+      const pubRef = todasPublicacoes.find(p => p.id === refId);
+      if (pubRef?.origem_tipo) return pubRef.origem_tipo;
+      // Fallback: campo salvo no formData
+      return formData.publicacao_referencia_origem_tipo || 'ex-officio';
+    };
+
     // Apostila: marcar publicação original na entidade correta
     if (formData.tipo === 'Apostila' && formData.publicacao_referencia_id) {
-      const origemTipoApostila = formData.publicacao_referencia_origem_tipo;
-      const entityApostila =
-        origemTipoApostila === 'atestado' ? base44.entities.Atestado :
-        origemTipoApostila === 'livro' ? base44.entities.RegistroLivro :
-        base44.entities.PublicacaoExOfficio;
-      await entityApostila.update(formData.publicacao_referencia_id, {
+      const origemTipoApostila = resolverOrigemTipo(formData.publicacao_referencia_id);
+      await resolverEntidade(origemTipoApostila).update(formData.publicacao_referencia_id, {
         apostilada_por_id: savedId,
       });
     }
 
     // Tornar sem Efeito: marcar publicação original na entidade correta
     if (formData.tipo === 'Tornar sem Efeito' && formData.publicacao_referencia_id) {
-      const origemTipoTSE = formData.publicacao_referencia_origem_tipo;
-      const entityTSE =
-        origemTipoTSE === 'atestado' ? base44.entities.Atestado :
-        origemTipoTSE === 'livro' ? base44.entities.RegistroLivro :
-        base44.entities.PublicacaoExOfficio;
-      await entityTSE.update(formData.publicacao_referencia_id, {
+      const origemTipoTSE = resolverOrigemTipo(formData.publicacao_referencia_id);
+      await resolverEntidade(origemTipoTSE).update(formData.publicacao_referencia_id, {
         tornada_sem_efeito_por_id: savedId,
       });
     }
