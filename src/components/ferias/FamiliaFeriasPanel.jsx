@@ -245,7 +245,6 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
             </div>
           )}
         </div>
-      </div>
 
         {/* Seção administrativa — apenas para admins */}
         {currentUser?.role === 'admin' && (
