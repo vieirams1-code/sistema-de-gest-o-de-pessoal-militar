@@ -150,13 +150,25 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
     r.publicacao_referencia_id === raiz.id && r.tipo === 'Apostila'
   );
 
-  // TSEs da raiz — buscar pelo campo tornada_sem_efeito_por_id OU por referência
-  const tseVinculado = raiz.tornada_sem_efeito_por_id
+  // TSE direto da raiz
+  const tseRaiz = raiz.tornada_sem_efeito_por_id
     ? todosRegistros.find(r => r.id === raiz.tornada_sem_efeito_por_id)
     : todosRegistros.find(r => r.publicacao_referencia_id === raiz.id && r.tipo === 'Tornar sem Efeito');
 
-  const foiApostilada = !!raiz.apostilada_por_id || apostilas.length > 0;
-  const foiInvalidada = !!raiz.tornada_sem_efeito_por_id || !!tseVinculado;
+  // TSEs das Apostilas (cadeia: Apostila → TSE da Apostila)
+  // Para cada apostila, buscar seu TSE
+  const tsesPorApostila = apostilas.map(ap => {
+    const tse = ap.tornada_sem_efeito_por_id
+      ? todosRegistros.find(r => r.id === ap.tornada_sem_efeito_por_id)
+      : todosRegistros.find(r => r.publicacao_referencia_id === ap.id && r.tipo === 'Tornar sem Efeito');
+    return { apostila: ap, tse: tse || null };
+  });
+
+  const foiInvalidada = !!raiz.tornada_sem_efeito_por_id || !!tseRaiz;
+
+  // foiApostilada: só se houver apostila ativa (sem TSE)
+  const apostilaAtiva = apostilas.find(ap => !ap.tornada_sem_efeito_por_id);
+  const foiApostilada = !!apostilaAtiva || (!!raiz.apostilada_por_id && !tsesPorApostila.some(x => x.apostila.id === raiz.apostilada_por_id && x.tse));
 
   const raizStatus = calcStatus(raiz);
   const raizTipoLabel = getTipoLabel(raiz);
