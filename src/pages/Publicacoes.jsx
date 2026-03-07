@@ -84,44 +84,73 @@ export default function Publicacoes() {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, tipo, registro }) => {
-      // Nunca excluir o atestado em si — apenas publicações derivadas (ex-officio)
-      // Apostila ou TSE: reverter vínculo da original antes de excluir
-      if (tipo === 'ex-officio' || tipo === 'livro') {
+      // Registros de atestado na lista são apenas para visualização — não devem ser excluídos aqui
+      if (tipo === 'atestado') return;
+
+      // Helper: reverter vínculo Apostila/TSE na publicação original
+      const reverterVinculo = async (isApostila, isTSE, refId, origemTipo) => {
+        if (!refId) return;
+        const entityOriginal =
+          origemTipo === 'atestado' ? base44.entities.Atestado :
+          origemTipo === 'livro' ? base44.entities.RegistroLivro :
+          base44.entities.PublicacaoExOfficio;
+        const originais = await entityOriginal.filter({ id: refId });
+        const original = originais[0];
+        if (!original) return;
+        if (isApostila && original.apostilada_por_id === id) {
+          await entityOriginal.update(refId, { apostilada_por_id: null });
+        } else if (isTSE && original.tornada_sem_efeito_por_id === id) {
+          await entityOriginal.update(refId, { tornada_sem_efeito_por_id: null });
+        }
+      };
+
+      if (tipo === 'ex-officio') {
         const isApostila = registro?.tipo === 'Apostila';
         const isTSE = registro?.tipo === 'Tornar sem Efeito';
-        const refId = registro?.publicacao_referencia_id;
-        const origemTipo = registro?.publicacao_referencia_origem_tipo;
 
-        if ((isApostila || isTSE) && refId) {
-          const entityOriginal =
-            origemTipo === 'atestado' ? base44.entities.Atestado :
-            origemTipo === 'livro' ? base44.entities.RegistroLivro :
-            base44.entities.PublicacaoExOfficio;
+        // Reverter vínculos de Apostila/TSE
+        if (isApostila || isTSE) {
+          await reverterVinculo(isApostila, isTSE, registro?.publicacao_referencia_id, registro?.publicacao_referencia_origem_tipo);
+        }
 
-          if (isApostila) {
-            // Buscar original para confirmar que o campo aponta para esta publicação
-            const originais = await entityOriginal.filter({ id: refId });
-            const original = originais[0];
-            if (original?.apostilada_por_id === id) {
-              await entityOriginal.update(refId, { apostilada_por_id: null });
-            }
-          } else if (isTSE) {
-            const originais = await entityOriginal.filter({ id: refId });
-            const original = originais[0];
-            if (original?.tornada_sem_efeito_por_id === id) {
-              await entityOriginal.update(refId, { tornada_sem_efeito_por_id: null });
+        // Reverter campos do atestado ao excluir Homologação pelo Comandante
+        if (registro?.tipo === 'Homologação de Atestado' && registro?.atestado_homologado_id) {
+          const atList = await base44.entities.Atestado.filter({ id: registro.atestado_homologado_id });
+          const at = atList[0];
+          if (at && at.homologado_comandante === true) {
+            await base44.entities.Atestado.update(registro.atestado_homologado_id, {
+              homologado_comandante: false,
+              status_jiso: null,
+              status_publicacao: 'Aguardando Nota',
+            });
+          }
+        }
+
+        // Reverter campos do atestado ao excluir Ata JISO
+        if (registro?.tipo === 'Ata JISO' && registro?.atestados_jiso_ids?.length) {
+          for (const aid of registro.atestados_jiso_ids) {
+            const atList = await base44.entities.Atestado.filter({ id: aid });
+            const at = atList[0];
+            if (at && at.status_jiso === 'Homologado pela JISO') {
+              await base44.entities.Atestado.update(aid, {
+                status_jiso: 'Aguardando JISO',
+                status_publicacao: 'Aguardando Nota',
+              });
             }
           }
         }
+
+        return base44.entities.PublicacaoExOfficio.delete(id);
       }
 
-      // Nunca excluir o Atestado em si — publicações de atestado são ex-officio (PublicacaoExOfficio)
-      if (tipo === 'atestado') {
-        // Registros de atestado na lista são apenas para visualização — não devem ser excluídos aqui
-        return;
+      if (tipo === 'livro') {
+        const isApostila = registro?.tipo === 'Apostila';
+        const isTSE = registro?.tipo === 'Tornar sem Efeito';
+        if (isApostila || isTSE) {
+          await reverterVinculo(isApostila, isTSE, registro?.publicacao_referencia_id, registro?.publicacao_referencia_origem_tipo);
+        }
+        return base44.entities.RegistroLivro.delete(id);
       }
-      if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.delete(id);
-      return base44.entities.RegistroLivro.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
