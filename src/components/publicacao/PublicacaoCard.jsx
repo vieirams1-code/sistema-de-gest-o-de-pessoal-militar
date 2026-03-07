@@ -203,9 +203,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete }) {
             ? 'border-red-400 bg-red-50 opacity-70'
             : foiApostilada
               ? 'border-purple-400 bg-purple-50'
-              : registro.urgente
+              : !isPublicado && registro.urgente
                 ? 'border-red-400 bg-red-50'
-                : registro.importante
+                : !isPublicado && registro.importante
                   ? 'border-amber-400 bg-amber-50'
                   : 'border-slate-200'
         }`}
