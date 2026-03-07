@@ -101,12 +101,16 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const isTSE = registro.tipo === 'Tornar sem Efeito';
   const isDerivado = isApostila || isTSE;
 
-  // Regra de ações:
-  // - Apostila e TSE: só Nota/BG e Família
-  // - Original invalidada (tornada_sem_efeito_por_id preenchido): só Nota/BG e Família
-  // - Original válida e publicada: Nota/BG + Apostila + TSE + Família
-  const jaFoiTornadaSemEfeito = foiTornadaSemEfeito; // alias legível
-  const podeApostilarOuTSE = isPublicado && !jaFoiTornadaSemEfeito && !isDerivado;
+  // Regras de ações por tipo:
+  // 3.1 Original publicada e válida → Nota/BG + Apostila + TSE + Família
+  // 3.2 Original já tornada sem efeito → Nota/BG + Família
+  // 3.3 Apostila publicada → Nota/BG + TSE + Família (NÃO Apostila)
+  // 3.4 TSE publicada → Nota/BG + Família (NÃO Apostila, NÃO TSE)
+  const podeApostilar = isPublicado && !foiTornadaSemEfeito && !isDerivado;
+  const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && (
+    (!isDerivado) || // original válida
+    (isApostila)    // apostila publicada também pode ser tornada sem efeito
+  ) && !isTSE;     // TSE não pode ser tornada sem efeito
   const podeMarcarPrioridade = !isPublicado;
   const podeEditar = !isPublicado;
   const podeExcluir = !isPublicado;
