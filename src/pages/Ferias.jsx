@@ -732,6 +732,21 @@ export default function Ferias() {
         </DialogContent>
       </Dialog>
 
+      {/* Painel Família Férias */}
+      {familiaPanel.open && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-40"
+            onClick={() => setFamiliaPanel({ open: false, ferias: null })}
+          />
+          <FamiliaFeriasPanel
+            ferias={familiaPanel.ferias}
+            registrosLivro={registrosLivro}
+            onClose={() => setFamiliaPanel({ open: false, ferias: null })}
+          />
+        </>
+      )}
+
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
