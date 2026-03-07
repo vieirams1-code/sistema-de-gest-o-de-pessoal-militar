@@ -164,14 +164,30 @@ export default function Publicacoes() {
     const registro = registros.find(r => r.id === id);
     if (!registro) return;
 
-    if (registro.status_calculado === 'Publicado') {
-      alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
+    // Registros de atestado não podem ser excluídos daqui
+    if (tipo === 'atestado') {
+      alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
       return;
+    }
+
+    if (registro.status_calculado === 'Publicado') {
+      // Apostila publicada de Apostila pode ser TSE — mas excluir não é permitido
+      if (registro.tipo !== 'Apostila' && registro.tipo !== 'Tornar sem Efeito') {
+        alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
+        return;
+      }
+      // TSE publicado: não pode excluir
+      if (registro.tipo === 'Tornar sem Efeito') {
+        alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
+        return;
+      }
     }
 
     // Proteção conservadora para evitar bagunça em cadeias de férias/livro
     if (
       registro.origem_tipo === 'livro' &&
+      registro.tipo !== 'Apostila' &&
+      registro.tipo !== 'Tornar sem Efeito' &&
       (
         registro.ferias_id ||
         registro.periodo_aquisitivo ||
@@ -187,7 +203,7 @@ export default function Publicacoes() {
       return;
     }
 
-    deleteMutation.mutate({ id, tipo });
+    deleteMutation.mutate({ id, tipo, registro });
   };
 
   const grupos = [
