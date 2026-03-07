@@ -104,10 +104,11 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
       observacoes,
     });
 
-    if (tipoRegistro === 'Saída Férias') {
-      await base44.entities.Ferias.update(ferias.id, { status: 'Em Curso', data_saida_registrada: new Date().toISOString() });
+    const tiposSaida = ['Saída Férias', 'Nova Saída / Retomada'];
+    if (tiposSaida.includes(tipoRegistro)) {
+      await base44.entities.Ferias.update(ferias.id, { status: 'Em Curso' });
     } else if (tipoRegistro === 'Retorno Férias') {
-      await base44.entities.Ferias.update(ferias.id, { status: 'Gozada', data_retorno_registrada: new Date().toISOString() });
+      await base44.entities.Ferias.update(ferias.id, { status: 'Gozada' });
     }
 
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
