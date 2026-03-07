@@ -133,8 +133,22 @@ export default function CadastrarAtestado() {
     const dataToSave = {
       ...formData,
       dias: formData.dias ? parseInt(formData.dias) : 0,
-      dias_jiso: formData.dias_jiso ? parseInt(formData.dias_jiso) : undefined
     };
+
+    // Remover campos que não existem mais no schema
+    delete dataToSave.texto_publicacao;
+    delete dataToSave.nota_para_bg;
+    delete dataToSave.numero_bg;
+    delete dataToSave.data_bg;
+    delete dataToSave.status_publicacao;
+    delete dataToSave.data_jiso;
+    delete dataToSave.secao_jiso;
+    delete dataToSave.finalidade_jiso;
+    delete dataToSave.nup;
+    delete dataToSave.resultado_jiso;
+    delete dataToSave.dias_jiso;
+    delete dataToSave.ata_jiso;
+    delete dataToSave.parecer_jiso;
 
     if (editId) {
       await base44.entities.Atestado.update(editId, dataToSave);
