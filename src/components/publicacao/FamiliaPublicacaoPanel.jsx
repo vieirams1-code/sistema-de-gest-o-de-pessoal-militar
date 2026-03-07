@@ -201,7 +201,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
     return 'Publicação vinculada à família.';
   }
 
-  const temFamilia = foiApostilada || foiInvalidada || !!registro.publicacao_referencia_id;
+  const temFamilia = apostilas.length > 0 || foiInvalidada || !!registro.publicacao_referencia_id || tsesPorApostila.some(x => x.tse);
 
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-[440px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">
