@@ -246,13 +246,11 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
           )}
         </div>
 
-        {/* Seção administrativa — apenas para admins */}
         {currentUser?.role === 'admin' && (
           <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} />
         )}
       </div>
 
-      {/* Alerta operacional no rodapé */}
       {possuiEventosPendentes && (
         <div className="shrink-0 border-t border-slate-200 bg-amber-50 px-5 py-3">
           <div className="flex items-start gap-2">
