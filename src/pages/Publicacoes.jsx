@@ -37,6 +37,7 @@ export default function Publicacoes() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
 
   const { data: registrosLivro = [], isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
