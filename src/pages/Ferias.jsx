@@ -199,18 +199,40 @@ export default function Ferias() {
     if (!addDiasModal.ferias || !addDiasModal.dias) return;
     setSavingEdit(true);
     const f = addDiasModal.ferias;
-    const novaQtd = (f.dias || 0) + Number(addDiasModal.dias);
+    const qtdDias = Number(addDiasModal.dias);
+    const diasOriginais = f.dias_originais || f.dias || 0;
+    const novaQtd = (f.dias || 0) + qtdDias;
     const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
     const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
-    const novaLinha = `+${addDiasModal.dias}d: ${addDiasModal.motivo}`;
-    const obs = f.observacoes ? `${f.observacoes}\n${novaLinha}` : novaLinha;
+
+    // Criar evento real na cadeia (RegistroLivro)
+    await base44.entities.RegistroLivro.create({
+      militar_id: f.militar_id,
+      militar_nome: f.militar_nome,
+      militar_posto: f.militar_posto,
+      militar_matricula: f.militar_matricula,
+      ferias_id: f.id,
+      tipo_registro: 'Adição de Dias',
+      data_registro: new Date().toISOString().split('T')[0],
+      dias: qtdDias,
+      dias_evento: qtdDias,
+      motivo_dispensa: addDiasModal.motivo,
+      observacoes: addDiasModal.motivo,
+      status: 'Aguardando Nota',
+    });
+
+    // Atualizar férias — preservar dias_originais se não existir
+    const obsLine = `+${qtdDias}d: ${addDiasModal.motivo}`;
+    const novaObs = f.observacoes ? `${f.observacoes}\n${obsLine}` : obsLine;
     await base44.entities.Ferias.update(f.id, {
       dias: novaQtd,
+      dias_originais: diasOriginais,
       data_fim: novaDataFim,
       data_retorno: novaDataRetorno,
-      observacoes: obs,
+      observacoes: novaObs,
     });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
     setSavingEdit(false);
     setAddDiasModal({ open: false, ferias: null, dias: 1, motivo: '' });
   };
@@ -220,18 +242,38 @@ export default function Ferias() {
     setSavingEdit(true);
     const f = descontoModal.ferias;
     const diasDesconto = Number(descontoModal.dias);
+    const diasOriginais = f.dias_originais || f.dias || 0;
     const novaQtd = Math.max(0, (f.dias || 0) - diasDesconto);
     const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
     const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
-    const novaLinhaDesc = `-${diasDesconto}d: ${descontoModal.motivo}`;
-    const obsDesc = f.observacoes ? `${f.observacoes}\n${novaLinhaDesc}` : novaLinhaDesc;
+
+    // Criar evento real na cadeia (RegistroLivro)
+    await base44.entities.RegistroLivro.create({
+      militar_id: f.militar_id,
+      militar_nome: f.militar_nome,
+      militar_posto: f.militar_posto,
+      militar_matricula: f.militar_matricula,
+      ferias_id: f.id,
+      tipo_registro: 'Desconto em Férias',
+      data_registro: new Date().toISOString().split('T')[0],
+      dias: diasDesconto,
+      dias_evento: diasDesconto,
+      motivo_dispensa: descontoModal.motivo,
+      observacoes: descontoModal.motivo,
+      status: 'Aguardando Nota',
+    });
+
+    const obsLine = `-${diasDesconto}d: ${descontoModal.motivo}`;
+    const novaObs = f.observacoes ? `${f.observacoes}\n${obsLine}` : obsLine;
     await base44.entities.Ferias.update(f.id, {
       dias: novaQtd,
+      dias_originais: diasOriginais,
       data_fim: novaDataFim,
       data_retorno: novaDataRetorno,
-      observacoes: obsDesc,
+      observacoes: novaObs,
     });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
     setSavingEdit(false);
     setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' });
     // Abre o RegistroLivroModal para gerar a publicação via template
