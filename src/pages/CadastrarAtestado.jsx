@@ -69,19 +69,18 @@ export default function CadastrarAtestado() {
   }, [editingAtestado]);
 
   const handleChange = (name, value) => {
-    setFormData(prev => {
-      const updated = { ...prev, [name]: value };
-      // Status automático da publicação
-      if (name === 'nota_para_bg' || name === 'numero_bg' || name === 'data_bg') {
-        const nota = name === 'nota_para_bg' ? value : updated.nota_para_bg;
-        const numBg = name === 'numero_bg' ? value : updated.numero_bg;
-        const dataBg = name === 'data_bg' ? value : updated.data_bg;
-        if (numBg && dataBg) updated.status_publicacao = 'Publicado';
-        else if (nota) updated.status_publicacao = 'Aguardando Publicação';
-        else updated.status_publicacao = 'Aguardando Nota';
-      }
-      return updated;
-    });
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Ao escolher fluxo manualmente, sincronizar campos derivados
+  const handleFluxoChange = (fluxo) => {
+    setFormData(prev => ({
+      ...prev,
+      fluxo_homologacao: fluxo,
+      necessita_jiso: fluxo === 'jiso',
+      homologado_comandante: false,
+      encaminhado_jiso: fluxo === 'jiso',
+    }));
   };
 
   const handleMilitarSelect = (militarData) => {
