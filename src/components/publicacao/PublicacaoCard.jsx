@@ -341,6 +341,26 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     Ver Atestado
                   </a>
                 )}
+                {atestadosJISOIds && (
+                  atestadosJISOIds.length === 1 ? (
+                    <a
+                      href={`${createPageUrl('VerAtestado')}?id=${atestadosJISOIds[0]}`}
+                      className="flex items-center gap-1 text-blue-600 hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`${createPageUrl('VerAtestado')}?id=${atestadosJISOIds[0]}`);
+                      }}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Ver Atestado
+                    </a>
+                  ) : (
+                    <span className="flex items-center gap-1 text-blue-600 text-sm font-medium">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      {atestadosJISOIds.length} atestado(s) vinculado(s)
+                    </span>
+                  )
+                )}
               </div>
 
               {/* Vínculos rápidos — derivadas mostram a principal; original mostra quem a afetou */}
