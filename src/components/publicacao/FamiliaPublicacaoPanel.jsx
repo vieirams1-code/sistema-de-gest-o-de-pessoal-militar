@@ -49,42 +49,49 @@ function gerarCodigoTSE(baseId, idx) {
 // Card de um item da família
 function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, indent = false, variant = 'original' }) {
   const variantConfig = {
+    // Original: destaque maior — protagonista
     original: {
-      bg: 'bg-blue-50 border-blue-200',
-      selectedBg: 'bg-blue-100 border-blue-400',
+      bg: 'bg-white border-slate-300',
+      selectedBg: 'bg-blue-50 border-blue-400',
       badge: 'bg-blue-100 text-blue-700 border-blue-200',
       dot: 'bg-blue-500',
       ring: 'ring-blue-400',
+      labelSize: 'text-sm',
     },
+    // Apostila: discreta, derivada
     apostila: {
-      bg: 'bg-purple-50 border-purple-200',
-      selectedBg: 'bg-purple-100 border-purple-400',
-      badge: 'bg-purple-100 text-purple-700 border-purple-200',
-      dot: 'bg-purple-500',
-      ring: 'ring-purple-400',
+      bg: 'bg-white border-slate-200',
+      selectedBg: 'bg-purple-50 border-purple-300',
+      badge: 'bg-purple-50 text-purple-600 border-purple-200',
+      dot: 'bg-purple-400',
+      ring: 'ring-purple-300',
+      labelSize: 'text-xs',
     },
+    // TSE: discreta, tom vermelho suave
     tse: {
-      bg: 'bg-red-50 border-red-200',
-      selectedBg: 'bg-red-100 border-red-400',
-      badge: 'bg-red-100 text-red-700 border-red-200',
-      dot: 'bg-red-500',
-      ring: 'ring-red-400',
+      bg: 'bg-red-50/60 border-red-200',
+      selectedBg: 'bg-red-50 border-red-300',
+      badge: 'bg-red-50 text-red-600 border-red-200',
+      dot: 'bg-red-400',
+      ring: 'ring-red-300',
+      labelSize: 'text-xs',
     },
   };
   const cfg = variantConfig[variant] || variantConfig.original;
   const bgClass = isSelected ? cfg.selectedBg : cfg.bg;
+  const isOriginal = variant === 'original';
 
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-xl border-2 p-3 transition-all hover:shadow-md ${bgClass} ${isSelected ? `ring-2 ring-offset-1 ${cfg.ring} shadow-md` : ''} ${indent ? 'ml-4' : ''}`}
+      className={`w-full text-left rounded-lg border p-3 transition-all ${bgClass} ${isSelected ? `ring-2 ring-offset-1 ${cfg.ring} shadow-sm` : 'hover:shadow-sm'} ${indent ? 'ml-4' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <div className={`w-2.5 h-2.5 rounded-full ${cfg.dot} shrink-0 mt-0.5`} />
+          <div className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0 mt-1`} />
           <div className="min-w-0">
-            <p className="text-xs font-mono font-bold text-slate-500">{codigo}</p>
-            <p className="text-sm font-semibold text-slate-800 truncate">{tipoLabel}</p>
+            <p className="text-[10px] font-mono text-slate-400">{codigo}</p>
+            <p className={`${isOriginal ? 'text-sm font-semibold' : 'text-xs font-medium'} text-slate-800 truncate`}>{tipoLabel}</p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
@@ -92,9 +99,6 @@ function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, in
           <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[status] || 'bg-slate-100 text-slate-600'}`}>{status}</Badge>
         </div>
       </div>
-      {isSelected && (
-        <p className="text-[10px] text-slate-500 mt-1.5 pl-4">← item selecionado</p>
-      )}
     </button>
   );
 }
