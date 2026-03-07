@@ -213,21 +213,16 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
               <span className="text-xs text-slate-500">Status</span>
               <Badge className={`${statusColors[raizStatus] || 'bg-slate-100 text-slate-600'} text-xs`}>{raizStatus}</Badge>
             </div>
-            {/* Badges de estado da família */}
+            {/* Badges de estado da família — discretas */}
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {!foiApostilada && !foiInvalidada && (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200">
-                  ORIGINAL
-                </span>
-              )}
               {foiApostilada && (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-300">
-                  <Stamp className="w-3 h-3" /> APOSTILADA
+                <span className="flex items-center gap-1 text-[10px] font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                  <Stamp className="w-3 h-3" /> Apostilada
                 </span>
               )}
               {foiInvalidada && (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full border border-red-300">
-                  <Ban className="w-3 h-3" /> SEM VALIDADE
+                <span className="flex items-center gap-1 text-[10px] font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                  <Ban className="w-3 h-3" /> Sem Validade
                 </span>
               )}
             </div>
