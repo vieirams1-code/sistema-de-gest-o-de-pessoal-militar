@@ -214,6 +214,9 @@ export default function CadastrarPublicacao() {
     }
   }, [publicacaoExistente]);
 
+  // origemTipoParam: passado pelo card ao acionar Apostila/TSE para identificar a origem da referência
+  const origemTipoParam = searchParams.get('origem_tipo');
+
   // Pré-preencher via URL params (vindo do botão de ação rápida nas férias/atestados/cards)
   useEffect(() => {
     if (!publicacaoId && (tipoParam || militarIdParam || feriasIdParam || refIdParam)) {
@@ -223,9 +226,10 @@ export default function CadastrarPublicacao() {
         ...(militarIdParam ? { militar_id: militarIdParam } : {}),
         ...(feriasIdParam ? { ferias_interrompida_id: feriasIdParam } : {}),
         ...(refIdParam ? { publicacao_referencia_id: refIdParam } : {}),
+        ...(origemTipoParam ? { publicacao_referencia_origem_tipo: origemTipoParam } : {}),
       }));
     }
-  }, [tipoParam, militarIdParam, feriasIdParam, refIdParam, publicacaoId]);
+  }, [tipoParam, militarIdParam, feriasIdParam, refIdParam, origemTipoParam, publicacaoId]);
 
   const handleChange = (name, value) => {
     setFormData(prev => {
