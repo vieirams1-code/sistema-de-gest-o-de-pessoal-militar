@@ -94,24 +94,26 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const isPublicado = currentStatus === 'Publicado';
 
   // foiApostilada só é verdadeiro se a Apostila vinculada ainda é válida (não foi TSE)
+  // Tipo do registro: original, apostila ou TSE
+  const isApostila = registro.tipo === 'Apostila';
+  const isTSE = registro.tipo === 'Tornar sem Efeito';
+  const isDerivado = isApostila || isTSE;
+
   const apostilaVinculada = registro.apostilada_por_id
     ? todosRegistros.find(r => r.id === registro.apostilada_por_id)
     : null;
+  // Para Apostilas: verifica se a apostila vinculada ainda não foi tornada sem efeito
   const apostilaAindaValida = apostilaVinculada
-    ? !apostilaVinculada.tornada_sem_efeito_por_id
-    : !!registro.apostilada_por_id; // se não temos o array, confia no campo
+    ? !apostilaVinculada.tornada_sem_efeito_por_id && !todosRegistros.find(r => r.tipo === 'Tornar sem Efeito' && r.publicacao_referencia_id === apostilaVinculada.id)
+    : !!registro.apostilada_por_id;
   const foiApostilada = apostilaAindaValida;
-  // Para Apostilas: verifica também se existe um TSE derivado em todosRegistros
+
+  // Para Apostilas: verifica também se existe um TSE derivado em todosRegistros referenciando esta
   const tseDaApostila = isApostila
     ? todosRegistros.find(r => r.tipo === 'Tornar sem Efeito' && r.publicacao_referencia_id === registro.id)
     : null;
   const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id || !!tseDaApostila;
   const temFamilia = foiApostilada || foiTornadaSemEfeito || !!registro.publicacao_referencia_id;
-
-  // Tipo do registro: original, apostila ou TSE
-  const isApostila = registro.tipo === 'Apostila';
-  const isTSE = registro.tipo === 'Tornar sem Efeito';
-  const isDerivado = isApostila || isTSE;
 
   // Regras de ações por tipo:
   // 3.1 Original publicada e válida → Nota/BG + Apostila + TSE + Família
