@@ -494,16 +494,26 @@ export default function CadastrarPublicacao() {
       }
     }
 
-    // Apostila: marcar publicação original
+    // Apostila: marcar publicação original na entidade correta
     if (formData.tipo === 'Apostila' && formData.publicacao_referencia_id) {
-      await base44.entities.PublicacaoExOfficio.update(formData.publicacao_referencia_id, {
+      const origemTipoApostila = formData.publicacao_referencia_origem_tipo;
+      const entityApostila =
+        origemTipoApostila === 'atestado' ? base44.entities.Atestado :
+        origemTipoApostila === 'livro' ? base44.entities.RegistroLivro :
+        base44.entities.PublicacaoExOfficio;
+      await entityApostila.update(formData.publicacao_referencia_id, {
         apostilada_por_id: savedId,
       });
     }
 
-    // Tornar sem Efeito: marcar publicação original
+    // Tornar sem Efeito: marcar publicação original na entidade correta
     if (formData.tipo === 'Tornar sem Efeito' && formData.publicacao_referencia_id) {
-      await base44.entities.PublicacaoExOfficio.update(formData.publicacao_referencia_id, {
+      const origemTipoTSE = formData.publicacao_referencia_origem_tipo;
+      const entityTSE =
+        origemTipoTSE === 'atestado' ? base44.entities.Atestado :
+        origemTipoTSE === 'livro' ? base44.entities.RegistroLivro :
+        base44.entities.PublicacaoExOfficio;
+      await entityTSE.update(formData.publicacao_referencia_id, {
         tornada_sem_efeito_por_id: savedId,
       });
     }
