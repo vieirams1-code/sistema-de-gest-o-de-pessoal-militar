@@ -103,9 +103,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   // Regra de ações:
   // - Apostila e TSE: só Nota/BG e Família
-  // - Original invalidada (TSE): só Nota/BG e Família
+  // - Original invalidada (tornada_sem_efeito_por_id preenchido): só Nota/BG e Família
   // - Original válida e publicada: Nota/BG + Apostila + TSE + Família
-  const podeApostilarOuTSE = isPublicado && !foiTornadaSemEfeito && !isDerivado;
+  const jaFoiTornadaSemEfeito = foiTornadaSemEfeito; // alias legível
+  const podeApostilarOuTSE = isPublicado && !jaFoiTornadaSemEfeito && !isDerivado;
   const podeMarcarPrioridade = !isPublicado;
   const podeEditar = !isPublicado;
   const podeExcluir = !isPublicado;
