@@ -139,7 +139,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
       <div className="bg-[#1e3a5f] text-white px-5 py-4 flex items-start justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
-            <Link2 className="w-5 h-5 text-blue-200" />
+            <GitBranch className="w-5 h-5 text-blue-200" />
           </div>
           <div>
             <h2 className="font-bold text-base leading-tight">Família da Publicação</h2>
