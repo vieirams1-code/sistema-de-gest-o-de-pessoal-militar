@@ -217,6 +217,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
+                {/* Garantia: tipo sempre visível mesmo sem nome de militar */}
+                {!registro.militar_nome && tipoLabel && (
+                  <span className="text-sm font-semibold text-slate-700">{tipoLabel}</span>
+                )}
+
                 {foiTornadaSemEfeito && (
                   <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full border border-red-300">
                     <XCircle className="w-3 h-3" />
