@@ -402,7 +402,7 @@ export default function CadastrarPublicacao() {
             numero_bg_ref: formData.publicacao_referencia_numero_bg || '',
             data_bg_ref: formatarDataExtenso(formData.publicacao_referencia_data_bg),
             nota_ref: formData.publicacao_referencia_nota || '',
-            tipo_ref: pubRefTSE?.tipo || '',
+            tipo_ref: pubRefTSE?.tipo_label || pubRefTSE?.tipo || '',
           });
         } else if (formData.publicacao_referencia_numero_bg) {
           texto = `${cmd}, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna sem efeito a publicação constante no Boletim nº ${formData.publicacao_referencia_numero_bg}, de ${formatarDataExtenso(formData.publicacao_referencia_data_bg)}, referente à Nota nº ${formData.publicacao_referencia_nota}.`;
