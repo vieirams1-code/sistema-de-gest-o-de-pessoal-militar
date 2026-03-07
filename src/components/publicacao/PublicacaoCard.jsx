@@ -334,6 +334,39 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   </a>
                 )}
               </div>
+
+              {/* Vínculos rápidos — derivadas mostram a principal; original mostra quem a afetou */}
+              {isDerivado && codigoPrincipal && (
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs text-slate-400">Publicação principal:</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigate(urlPrincipal); }}
+                    className="flex items-center gap-1 text-xs font-mono font-semibold text-[#1e3a5f] hover:underline"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    {codigoPrincipal}
+                  </button>
+                </div>
+              )}
+
+              {!isDerivado && (foiTornadaSemEfeito || foiApostilada) && (
+                <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                  {foiApostilada && registro.apostilada_por_id && (
+                    <span className="flex items-center gap-1 text-[11px] text-slate-500 bg-purple-50 border border-purple-200 rounded px-2 py-0.5">
+                      <Stamp className="w-3 h-3 text-purple-400" />
+                      <span>Apostilada por:</span>
+                      <span className="font-mono font-semibold text-purple-700">{gerarCodigo(registro.apostilada_por_id)}</span>
+                    </span>
+                  )}
+                  {foiTornadaSemEfeito && registro.tornada_sem_efeito_por_id && (
+                    <span className="flex items-center gap-1 text-[11px] text-slate-500 bg-red-50 border border-red-200 rounded px-2 py-0.5">
+                      <XCircle className="w-3 h-3 text-red-400" />
+                      <span>Sem efeito por:</span>
+                      <span className="font-mono font-semibold text-red-600">{gerarCodigo(registro.tornada_sem_efeito_por_id)}</span>
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-1 flex-shrink-0">
