@@ -184,6 +184,7 @@ export async function executarExclusaoAdminCadeia({
 
 /**
  * Recalcula o estado da cadeia sem excluir nada (apenas corrige inconsistências).
+ * Reconstrói dias, datas, status e observações derivadas.
  */
 export async function recalcularCadeiaCompleta({ ferias, cadeia, queryClient }) {
   const atualizacaoFerias = recalcularEstadoFerias(ferias, cadeia);
