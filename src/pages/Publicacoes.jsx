@@ -1,19 +1,36 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 
-const statusColors = {
-  'Aguardando Nota': 'bg-amber-100 text-amber-700',
-  'Aguardando Publicação': 'bg-blue-100 text-blue-700',
-  'Publicado': 'bg-emerald-100 text-emerald-700'
-};
+function calcStatus(registro) {
+  if (registro.numero_bg && registro.data_bg) return 'Publicado';
+  if (registro.nota_para_bg) return 'Aguardando Publicação';
+  return 'Aguardando Nota';
+}
+
+function detectarOrigemTipo(registro) {
+  if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
+    return 'ex-officio';
+  }
+  if (registro.medico || registro.cid_10) {
+    return 'atestado';
+  }
+  return 'livro';
+}
+
+function normalizarRegistro(registro) {
+  return {
+    ...registro,
+    origem_tipo: detectarOrigemTipo(registro),
+    status_calculado: calcStatus(registro),
+  };
+}
 
 export default function Publicacoes() {
   const queryClient = useQueryClient();
@@ -34,19 +51,22 @@ export default function Publicacoes() {
     queryKey: ['atestados-publicacao'],
     queryFn: async () => {
       const all = await base44.entities.Atestado.list('-created_date');
-      return all.filter(a => a.homologado_comandante || a.encaminhado_jiso);
+      return all.filter(a => a.homologado_comandante || a.encaminhado_jiso || a.necessita_jiso);
     }
   });
 
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
-  const registros = [...registrosLivro, ...publicacoesExOfficio, ...atestados].sort((a, b) => 
-    new Date(b.created_date) - new Date(a.created_date)
-  );
+
+  const registros = useMemo(() => {
+    return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
+      .map(normalizarRegistro)
+      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+  }, [registrosLivro, publicacoesExOfficio, atestados]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data, tipo }) => {
       if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, data);
-      else if (tipo === 'atestado') return base44.entities.Atestado.update(id, data);
+      if (tipo === 'atestado') return base44.entities.Atestado.update(id, data);
       return base44.entities.RegistroLivro.update(id, data);
     },
     onSuccess: () => {
@@ -67,44 +87,104 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados'] });
     }
   });
 
-  const filteredRegistros = registros.filter(r => {
-    const status = r.status_publicacao || r.status;
-    const matchesStatus = statusFilter === 'all' || status === statusFilter;
-    const matchesSearch = 
-      r.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.numero_bg?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+  const filteredRegistros = useMemo(() => {
+    return registros.filter((r) => {
+      const matchesStatus =
+        statusFilter === 'all' || r.status_calculado === statusFilter;
 
-  const stats = {
-    total: registros.length,
-    aguardandoNota: registros.filter(r => (r.status_publicacao || r.status) === 'Aguardando Nota').length,
-    aguardandoPublicacao: registros.filter(r => (r.status_publicacao || r.status) === 'Aguardando Publicação').length,
-    publicados: registros.filter(r => (r.status_publicacao || r.status) === 'Publicado').length
-  };
+      const termo = searchTerm.toLowerCase().trim();
+      const matchesSearch =
+        !termo ||
+        r.militar_nome?.toLowerCase().includes(termo) ||
+        r.militar_matricula?.toLowerCase().includes(termo) ||
+        r.numero_bg?.toLowerCase().includes(termo) ||
+        r.nota_para_bg?.toLowerCase().includes(termo) ||
+        r.tipo?.toLowerCase().includes(termo) ||
+        r.tipo_registro?.toLowerCase().includes(termo);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [registros, statusFilter, searchTerm]);
+
+  const stats = useMemo(() => {
+    return {
+      total: registros.length,
+      aguardandoNota: registros.filter(r => r.status_calculado === 'Aguardando Nota').length,
+      aguardandoPublicacao: registros.filter(r => r.status_calculado === 'Aguardando Publicação').length,
+      publicados: registros.filter(r => r.status_calculado === 'Publicado').length
+    };
+  }, [registros]);
 
   const handleUpdate = (id, data, tipo) => {
     updateMutation.mutate({ id, data, tipo });
   };
 
   const handleDelete = (id, tipo) => {
+    const registro = registros.find(r => r.id === id);
+    if (!registro) return;
+
+    if (registro.status_calculado === 'Publicado') {
+      alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
+      return;
+    }
+
+    // Proteção conservadora para evitar bagunça em cadeias de férias/livro
+    if (
+      registro.origem_tipo === 'livro' &&
+      (
+        registro.ferias_id ||
+        registro.periodo_aquisitivo ||
+        registro.tipo_registro === 'Saída Férias' ||
+        registro.tipo_registro === 'Retorno Férias' ||
+        registro.tipo_registro === 'Interrupção de Férias'
+      )
+    ) {
+      alert(
+        'Este registro de férias/livro não será excluído automaticamente por segurança. ' +
+        'Pode haver movimentações posteriores dependentes dele, o que causaria inconsistência na cadeia.'
+      );
+      return;
+    }
+
     deleteMutation.mutate({ id, tipo });
   };
+
+  const grupos = [
+    {
+      key: 'Aguardando Nota',
+      label: 'Aguardando Nota',
+      color: 'text-amber-700',
+      border: 'border-amber-300',
+      bg: 'bg-amber-50'
+    },
+    {
+      key: 'Aguardando Publicação',
+      label: 'Aguardando Publicação',
+      color: 'text-blue-700',
+      border: 'border-blue-300',
+      bg: 'bg-blue-50'
+    },
+    {
+      key: 'Publicado',
+      label: 'Publicado',
+      color: 'text-emerald-700',
+      border: 'border-emerald-300',
+      bg: 'bg-emerald-50'
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#1e3a5f]">Publicações</h1>
           <p className="text-slate-500">Controle de notas e boletins gerais</p>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardContent className="p-4">
@@ -119,6 +199,7 @@ export default function Publicacoes() {
               </div>
             </CardContent>
           </Card>
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -132,6 +213,7 @@ export default function Publicacoes() {
               </div>
             </CardContent>
           </Card>
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -145,6 +227,7 @@ export default function Publicacoes() {
               </div>
             </CardContent>
           </Card>
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -160,19 +243,19 @@ export default function Publicacoes() {
           </Card>
         </div>
 
-        {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <Input
-                placeholder="Buscar por militar, matrícula ou número do BG..."
+                placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="border-slate-200"
               />
             </div>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-48">
+              <SelectTrigger className="w-full md:w-56">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -185,12 +268,10 @@ export default function Publicacoes() {
           </div>
         </div>
 
-        {/* Results */}
         <div className="mb-4 text-sm text-slate-500">
           {filteredRegistros.length} registro(s) encontrado(s)
         </div>
 
-        {/* Content */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
@@ -204,47 +285,39 @@ export default function Publicacoes() {
             <p className="text-slate-500">
               {searchTerm || statusFilter !== 'all'
                 ? 'Tente ajustar os filtros de busca'
-                : 'Os registros de livro aparecerão aqui'}
+                : 'Os registros de publicação aparecerão aqui'}
             </p>
           </div>
-        ) : (() => {
-          const grupos = [
-            { key: 'Aguardando Nota', label: 'Aguardando Nota', color: 'text-amber-700', border: 'border-amber-300', bg: 'bg-amber-50' },
-            { key: 'Aguardando Publicação', label: 'Aguardando Publicação', color: 'text-blue-700', border: 'border-blue-300', bg: 'bg-blue-50' },
-            { key: 'Publicado', label: 'Publicado', color: 'text-emerald-700', border: 'border-emerald-300', bg: 'bg-emerald-50' },
-          ];
-          const calcStatus = (r) => {
-            if (r.numero_bg && r.data_bg) return 'Publicado';
-            if (r.nota_para_bg) return 'Aguardando Publicação';
-            return 'Aguardando Nota';
-          };
-          return (
-            <div className="space-y-8">
-              {grupos.map(grupo => {
-                const items = filteredRegistros.filter(r => calcStatus(r) === grupo.key);
-                if (items.length === 0) return null;
-                return (
-                  <div key={grupo.key}>
-                    <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border ${grupo.border} ${grupo.bg}`}>
-                      <span className={`font-bold text-sm ${grupo.color}`}>{grupo.label}</span>
-                      <span className={`text-xs ${grupo.color} opacity-70`}>— {items.length} registro(s)</span>
-                    </div>
-                    <div className="space-y-3">
-                      {items.map((registro) => (
-                        <PublicacaoCard
-                          key={registro.id}
-                          registro={registro}
-                          onUpdate={handleUpdate}
-                          onDelete={handleDelete}
-                        />
-                      ))}
-                    </div>
+        ) : (
+          <div className="space-y-8">
+            {grupos.map((grupo) => {
+              const items = filteredRegistros.filter(r => r.status_calculado === grupo.key);
+              if (items.length === 0) return null;
+
+              return (
+                <div key={grupo.key}>
+                  <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border ${grupo.border} ${grupo.bg}`}>
+                    <span className={`font-bold text-sm ${grupo.color}`}>{grupo.label}</span>
+                    <span className={`text-xs ${grupo.color} opacity-70`}>
+                      — {items.length} registro(s)
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          );
-        })()}
+
+                  <div className="space-y-3">
+                    {items.map((registro) => (
+                      <PublicacaoCard
+                        key={registro.id}
+                        registro={registro}
+                        onUpdate={handleUpdate}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
