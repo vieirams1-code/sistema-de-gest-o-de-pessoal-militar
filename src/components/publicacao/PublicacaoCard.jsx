@@ -101,7 +101,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     ? !apostilaVinculada.tornada_sem_efeito_por_id
     : !!registro.apostilada_por_id; // se não temos o array, confia no campo
   const foiApostilada = apostilaAindaValida;
-  const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id;
+  // Para Apostilas: verifica também se existe um TSE derivado em todosRegistros
+  const tseDaApostila = isApostila
+    ? todosRegistros.find(r => r.tipo === 'Tornar sem Efeito' && r.publicacao_referencia_id === registro.id)
+    : null;
+  const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id || !!tseDaApostila;
   const temFamilia = foiApostilada || foiTornadaSemEfeito || !!registro.publicacao_referencia_id;
 
   // Tipo do registro: original, apostila ou TSE
