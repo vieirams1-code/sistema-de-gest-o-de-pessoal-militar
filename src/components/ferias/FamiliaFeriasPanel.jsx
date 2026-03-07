@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import AdminCadeiaPanel from './AdminCadeiaPanel';
 
 const statusColors = {
   'Prevista': 'bg-slate-100 text-slate-700',
