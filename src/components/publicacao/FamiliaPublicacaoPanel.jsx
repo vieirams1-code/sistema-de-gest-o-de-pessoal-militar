@@ -285,32 +285,46 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
               variant="original"
             />
 
-            {/* Apostilas */}
-            {apostilas.map((ap, idx) => (
-              <FamiliaItem
-                key={ap.id}
-                label="APOSTILA"
-                codigo={gerarCodigoApostila(raiz.id, idx + 1)}
-                tipoLabel={getTipoLabel(ap) || 'Apostila'}
-                status={calcStatus(ap)}
-                isSelected={selectedId === ap.id}
-                onClick={() => setSelectedId(ap.id)}
-                onNavigate={() => { navigate(getEditUrl(ap)); onClose(); }}
-                indent
-                variant="apostila"
-              />
+            {/* Apostilas + TSE de cada Apostila */}
+            {tsesPorApostila.map(({ apostila: ap, tse: tseAp }, idx) => (
+              <React.Fragment key={ap.id}>
+                <FamiliaItem
+                  label="APOSTILA"
+                  codigo={gerarCodigoApostila(raiz.id, idx + 1)}
+                  tipoLabel={getTipoLabel(ap) || 'Apostila'}
+                  status={calcStatus(ap)}
+                  isSelected={selectedId === ap.id}
+                  onClick={() => setSelectedId(ap.id)}
+                  onNavigate={() => { navigate(getEditUrl(ap)); onClose(); }}
+                  indent
+                  variant="apostila"
+                />
+                {tseAp && (
+                  <FamiliaItem
+                    label="TSE DA APOSTILA"
+                    codigo={`${gerarCodigoApostila(raiz.id, idx + 1)}-TSE`}
+                    tipoLabel={getTipoLabel(tseAp) || 'Tornar sem Efeito'}
+                    status={calcStatus(tseAp)}
+                    isSelected={selectedId === tseAp.id}
+                    onClick={() => setSelectedId(tseAp.id)}
+                    onNavigate={() => { navigate(getEditUrl(tseAp)); onClose(); }}
+                    indent
+                    variant="tse"
+                  />
+                )}
+              </React.Fragment>
             ))}
 
-            {/* TSE */}
-            {tseVinculado && (
+            {/* TSE direto da raiz */}
+            {tseRaiz && (
               <FamiliaItem
                 label="TORNAR S/ EFEITO"
                 codigo={gerarCodigoTSE(raiz.id, 1)}
-                tipoLabel={getTipoLabel(tseVinculado) || 'Tornar sem Efeito'}
-                status={calcStatus(tseVinculado)}
-                isSelected={selectedId === tseVinculado.id}
-                onClick={() => setSelectedId(tseVinculado.id)}
-                onNavigate={() => { navigate(getEditUrl(tseVinculado)); onClose(); }}
+                tipoLabel={getTipoLabel(tseRaiz) || 'Tornar sem Efeito'}
+                status={calcStatus(tseRaiz)}
+                isSelected={selectedId === tseRaiz.id}
+                onClick={() => setSelectedId(tseRaiz.id)}
+                onNavigate={() => { navigate(getEditUrl(tseRaiz)); onClose(); }}
                 indent
                 variant="tse"
               />
