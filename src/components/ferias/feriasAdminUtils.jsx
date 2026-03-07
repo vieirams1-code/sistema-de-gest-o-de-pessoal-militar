@@ -2,15 +2,31 @@ import { format, addDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 
 /**
+ * Tipos de eventos que representam operações na cadeia de férias.
+ */
+export const TIPOS_EVENTO_FERIAS = {
+  SAIDA: 'Saída Férias',
+  RETORNO: 'Retorno Férias',
+  INTERRUPCAO: 'Interrupção de Férias',
+  ADICAO: 'Adição de Dias',
+  DESCONTO: 'Desconto em Férias',
+  NOVA_SAIDA: 'Nova Saída / Retomada',
+};
+
+/**
  * Mapeia a cadeia de eventos de uma férias, ordenados cronologicamente.
+ * Ordena por data_registro (data do evento), depois por created_date.
  */
 export function montarCadeia(ferias, registrosLivro) {
   return registrosLivro
     .filter(r => r.ferias_id === ferias.id)
     .sort((a, b) => {
-      const da = new Date(a.data_registro || a.created_date || 0);
-      const db = new Date(b.data_registro || b.created_date || 0);
-      return da - db;
+      // Comparar por data_registro primeiro (mais preciso)
+      const da = new Date((a.data_registro || a.created_date || '2000-01-01') + 'T00:00:00');
+      const db = new Date((b.data_registro || b.created_date || '2000-01-01') + 'T00:00:00');
+      if (da - db !== 0) return da - db;
+      // Empate: created_date como desempate
+      return new Date(a.created_date || 0) - new Date(b.created_date || 0);
     });
 }
 
@@ -24,71 +40,91 @@ export function identificarDescendentes(eventoAlvo, cadeia) {
 }
 
 /**
- * Recalcula o estado da férias com base nos eventos restantes após remoção.
- * Retorna o objeto de atualização para base44.entities.Ferias.update()
+ * Recalcula o estado completo da férias com base nos eventos sobreviventes.
+ * Reconstrói dias, datas, observações derivadas e status.
+ * NÃO usa observações como fonte de verdade — usa os eventos reais.
  */
 export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
   if (eventosSobreviventes.length === 0) {
-    // Sem eventos → volta para Prevista, mantém dados originais
-    return {
-      status: 'Prevista',
-    };
+    return { status: 'Prevista', observacoes: '' };
   }
 
   const tipos = eventosSobreviventes.map(e => e.tipo_registro);
-  const temSaida = tipos.some(t => t === 'Saída Férias');
-  const temRetorno = tipos.some(t => t === 'Retorno Férias');
-  const temInterrupcao = tipos.some(t => t === 'Interrupção de Férias');
+  const temSaida = tipos.includes(TIPOS_EVENTO_FERIAS.SAIDA) || tipos.includes(TIPOS_EVENTO_FERIAS.NOVA_SAIDA);
+  const temRetorno = tipos.includes(TIPOS_EVENTO_FERIAS.RETORNO);
+  const temInterrupcao = tipos.includes(TIPOS_EVENTO_FERIAS.INTERRUPCAO);
 
-  let novoStatus = ferias.status;
-  let novaObs = ferias.observacoes || '';
-
+  // Determinar status
+  let novoStatus;
   if (!temSaida) {
     novoStatus = 'Prevista';
   } else if (temRetorno) {
     novoStatus = 'Gozada';
   } else if (temInterrupcao) {
-    novoStatus = 'Interrompida';
-  } else if (temSaida) {
+    // Verificar se depois da interrupção há nova saída
+    const idxInterrupcao = eventosSobreviventes.findLastIndex(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.INTERRUPCAO);
+    const idxNovaSaida = eventosSobreviventes.findLastIndex(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.NOVA_SAIDA);
+    if (idxNovaSaida > idxInterrupcao) {
+      novoStatus = 'Em Curso';
+    } else {
+      novoStatus = 'Interrompida';
+    }
+  } else {
     novoStatus = 'Em Curso';
   }
 
-  // Recalcular dias a partir dos eventos de desconto/adição restantes
-  let diasBase = ferias.dias || 30;
-  let linhasObs = [];
+  // Recalcular dias com base nos eventos de Adição e Desconto sobreviventes
+  const diasOriginais = ferias.dias_originais || ferias.dias || 30;
+  const eventosAdicao = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO);
+  const eventosDesconto = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO);
 
-  // Filtrar linhas de obs que correspondem a eventos ainda existentes
-  if (ferias.observacoes) {
-    const linhasExistentes = ferias.observacoes.split('\n').filter(l => l.match(/^[+-]\d+d:/));
-    // Manter apenas as linhas que correspondem a eventos de desconto/adição sobreviventes
-    const tiposDesconto = eventosSobreviventes
-      .filter(e => e.tipo_registro === 'Dispensa Desconto Férias')
-      .map(e => e.motivo_dispensa || '');
-    linhasObs = linhasExistentes; // conservamos as linhas dos sobreviventes
+  const totalAdicoes = eventosAdicao.reduce((sum, e) => sum + (e.dias_evento || 0), 0);
+  const totalDescontos = eventosDesconto.reduce((sum, e) => sum + (e.dias_evento || 0), 0);
+  const novosDias = Math.max(0, diasOriginais + totalAdicoes - totalDescontos);
+
+  // Recalcular datas com base nos dias calculados e na data de início original
+  let novaDataFim = ferias.data_fim;
+  let novaDataRetorno = ferias.data_retorno;
+  if (ferias.data_inicio && novosDias > 0) {
+    novaDataFim = format(addDays(new Date(ferias.data_inicio + 'T00:00:00'), novosDias - 1), 'yyyy-MM-dd');
+    novaDataRetorno = format(addDays(new Date(ferias.data_inicio + 'T00:00:00'), novosDias), 'yyyy-MM-dd');
   }
 
-  // Recalcular saldo de interrupção se houver interrupção
-  if (novoStatus === 'Interrompida') {
-    const ultimaInterrupcao = [...eventosSobreviventes]
-      .reverse()
-      .find(e => e.tipo_registro === 'Interrupção de Férias');
-    if (ultimaInterrupcao) {
-      const saida = eventosSobreviventes.find(e => e.tipo_registro === 'Saída Férias');
-      if (saida?.data_inicio && ultimaInterrupcao.data_inicio) {
-        const diasGozados = Math.round(
-          (new Date(ultimaInterrupcao.data_inicio + 'T00:00:00') - new Date(saida.data_inicio + 'T00:00:00')) / (1000 * 60 * 60 * 24)
-        );
-        const saldo = diasBase - diasGozados;
-        const semSaldoLinha = novaObs.replace(/Saldo: \d+ dias/g, '').trim();
-        novaObs = semSaldoLinha ? `${semSaldoLinha}\nSaldo: ${saldo} dias` : `Saldo: ${saldo} dias`;
-      }
+  // Reconstruir observações derivadas apenas dos eventos sobreviventes
+  const linhasObs = [];
+  eventosSobreviventes.forEach(e => {
+    if (e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO && e.dias_evento) {
+      linhasObs.push(`+${e.dias_evento}d: ${e.motivo_dispensa || e.observacoes || 'Adição de dias'}`);
+    } else if (e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO && e.dias_evento) {
+      linhasObs.push(`-${e.dias_evento}d: ${e.motivo_dispensa || e.observacoes || 'Desconto em férias'}`);
     }
-  } else if (novoStatus !== 'Interrompida') {
-    // Limpar linha de saldo se não for mais interrompida
-    novaObs = novaObs.replace(/\nSaldo: \d+ dias/g, '').replace(/^Saldo: \d+ dias\n?/g, '').trim();
+  });
+
+  // Calcular saldo de interrupção se necessário
+  if (novoStatus === 'Interrompida') {
+    const primeiroSaida = eventosSobreviventes.find(e =>
+      e.tipo_registro === TIPOS_EVENTO_FERIAS.SAIDA || e.tipo_registro === TIPOS_EVENTO_FERIAS.NOVA_SAIDA
+    );
+    const ultimaInterrupcao = [...eventosSobreviventes].reverse().find(e =>
+      e.tipo_registro === TIPOS_EVENTO_FERIAS.INTERRUPCAO
+    );
+    if (primeiroSaida?.data_inicio && ultimaInterrupcao?.data_inicio) {
+      const diasGozados = Math.round(
+        (new Date(ultimaInterrupcao.data_inicio + 'T00:00:00') - new Date(primeiroSaida.data_inicio + 'T00:00:00')) /
+        (1000 * 60 * 60 * 24)
+      );
+      const saldo = novosDias - diasGozados;
+      linhasObs.push(`Saldo: ${Math.max(0, saldo)} dias`);
+    }
   }
 
-  return { status: novoStatus, observacoes: novaObs };
+  return {
+    status: novoStatus,
+    dias: novosDias,
+    data_fim: novaDataFim,
+    data_retorno: novaDataRetorno,
+    observacoes: linhasObs.join('\n'),
+  };
 }
 
 /**
