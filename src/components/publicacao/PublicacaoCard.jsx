@@ -96,7 +96,16 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id;
   const temFamilia = foiApostilada || foiTornadaSemEfeito || !!registro.publicacao_referencia_id;
 
-  const podeApostilarOuTSE = isPublicado && !foiTornadaSemEfeito;
+  // Tipo do registro: original, apostila ou TSE
+  const isApostila = registro.tipo === 'Apostila';
+  const isTSE = registro.tipo === 'Tornar sem Efeito';
+  const isDerivado = isApostila || isTSE;
+
+  // Regra de ações:
+  // - Apostila e TSE: só Nota/BG e Família
+  // - Original invalidada (TSE): só Nota/BG e Família
+  // - Original válida e publicada: Nota/BG + Apostila + TSE + Família
+  const podeApostilarOuTSE = isPublicado && !foiTornadaSemEfeito && !isDerivado;
   const podeMarcarPrioridade = !isPublicado;
   const podeEditar = !isPublicado;
   const podeExcluir = !isPublicado;
@@ -202,15 +211,19 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
       <Card
         className={`border hover:shadow-md transition-shadow ${
-          foiTornadaSemEfeito
-            ? 'border-red-400 bg-red-50 opacity-70'
-            : foiApostilada
-              ? 'border-purple-400 bg-purple-50'
-              : !isPublicado && registro.urgente
-                ? 'border-red-400 bg-red-50'
-                : !isPublicado && registro.importante
-                  ? 'border-amber-400 bg-amber-50'
-                  : 'border-slate-200'
+          isTSE
+            ? 'border-red-200 bg-red-50/40'
+            : isApostila
+              ? 'border-purple-200 bg-purple-50/40'
+              : foiTornadaSemEfeito
+                ? 'border-red-200 bg-red-50/30'
+                : foiApostilada
+                  ? 'border-purple-200 bg-purple-50/30'
+                  : !isPublicado && registro.urgente
+                    ? 'border-red-400 bg-red-50'
+                    : !isPublicado && registro.importante
+                      ? 'border-amber-400 bg-amber-50'
+                      : 'border-slate-200'
         }`}
       >
         <CardHeader className="pb-3">
