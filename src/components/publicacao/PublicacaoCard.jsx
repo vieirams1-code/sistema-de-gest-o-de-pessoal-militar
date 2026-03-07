@@ -72,7 +72,7 @@ function getEditUrl(registro) {
   return `${createPageUrl('CadastrarRegistroLivro')}?id=${registro.id}`;
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [] }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditingBg, setIsEditingBg] = useState(false);
