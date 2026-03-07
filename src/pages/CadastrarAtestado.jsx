@@ -102,70 +102,29 @@ export default function CadastrarAtestado() {
     }
   };
 
-  const gerarTextoPublicacao = () => {
-    const postoNome = formData.militar_posto ? `${formData.militar_posto} QOBM` : '';
-    const nomeCompleto = formData.militar_nome || '';
-    const matricula = formData.militar_matricula || '';
-    
-    const formatarData = (dataStr) => {
-      if (!dataStr) return '';
-      const [ano, mes, dia] = dataStr.split('-');
-      return `${dia}/${mes}/${ano}`;
-    };
-
-    if (formData.necessita_jiso && formData.encaminhado_jiso && formData.ata_jiso) {
-      // Texto da Ata JISO
-      return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o seguinte: JISO ${formData.secao_jiso || ''}, realizada em ${formatarData(formData.data_jiso)}, com finalidade de ${formData.finalidade_jiso || ''}, NUP: ${formData.nup || ''}, Ata n° ${formData.ata_jiso}. Parecer: ${formData.parecer_jiso || ''}. ${postoNome} ${nomeCompleto}, matrícula ${matricula}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
-    } else if (formData.homologado_comandante) {
-      // Texto de Homologação do Comandante
-      const diasExtenso = {
-        1: 'um', 2: 'dois', 3: 'três', 4: 'quatro', 5: 'cinco',
-        6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove', 10: 'dez',
-        11: 'onze', 12: 'doze', 13: 'treze', 14: 'quatorze', 15: 'quinze'
-      };
-      const diasTexto = diasExtenso[formData.dias] || formData.dias;
-      
-      return `A Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, homologa o afastamento médico do ${postoNome} ${nomeCompleto}, matrícula ${matricula}, pelo período de ${formData.dias} (${diasTexto}) dias, ${formData.tipo_afastamento.toLowerCase()}, a contar de ${formatarData(formData.data_inicio)}, com término em ${formatarData(formData.data_termino)}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
-    }
-    
-    return '';
-  };
-
+  // Quando dias muda: forçar JISO se >15, limpar seleção se <=15
   React.useEffect(() => {
     const dias = parseInt(formData.dias) || 0;
-    // Auto-marcar JISO para >15 dias
-    if (dias > 15 && !formData.necessita_jiso) {
-      setFormData(prev => ({ ...prev, necessita_jiso: true, homologado_comandante: false }));
-    } else if (dias > 0 && dias <= 15 && !formData.homologado_comandante) {
-      setFormData(prev => ({ ...prev, homologado_comandante: true }));
+    if (dias > 15) {
+      // Forçar JISO — não pode ser Comandante
+      setFormData(prev => ({
+        ...prev,
+        fluxo_homologacao: 'jiso',
+        necessita_jiso: true,
+        homologado_comandante: false,
+        encaminhado_jiso: true,
+      }));
+    } else if (dias > 0 && dias <= 15 && formData.fluxo_homologacao === 'jiso') {
+      // Se voltou para <=15 e estava forçado como jiso, limpar para o usuário escolher
+      setFormData(prev => ({
+        ...prev,
+        fluxo_homologacao: '',
+        necessita_jiso: false,
+        homologado_comandante: false,
+        encaminhado_jiso: false,
+      }));
     }
   }, [formData.dias]);
-
-  React.useEffect(() => {
-    if (formData.militar_nome && formData.data_inicio && formData.dias) {
-      const textoGerado = gerarTextoPublicacao();
-      if (textoGerado && textoGerado !== formData.texto_publicacao) {
-        setFormData(prev => ({ ...prev, texto_publicacao: textoGerado }));
-      }
-    }
-  }, [
-    formData.militar_nome,
-    formData.militar_posto,
-    formData.militar_matricula,
-    formData.data_inicio,
-    formData.dias,
-    formData.data_termino,
-    formData.tipo_afastamento,
-    formData.necessita_jiso,
-    formData.encaminhado_jiso,
-    formData.homologado_comandante,
-    formData.ata_jiso,
-    formData.data_jiso,
-    formData.secao_jiso,
-    formData.finalidade_jiso,
-    formData.nup,
-    formData.parecer_jiso
-  ]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
