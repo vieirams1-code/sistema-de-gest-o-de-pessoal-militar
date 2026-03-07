@@ -269,11 +269,15 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                   ))}
                 </>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowJisoModal(true)}>
-                <History className="w-4 h-4 mr-2" />
-                Registrar decisão JISO
-              </DropdownMenuItem>
+              {(atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowJisoModal(true)}>
+                    <History className="w-4 h-4 mr-2" />
+                    Registrar decisão JISO
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuItem onClick={() => onDelete(atestado)} className="text-red-600 focus:text-red-600">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Excluir
