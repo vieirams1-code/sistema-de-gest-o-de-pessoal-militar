@@ -405,6 +405,7 @@ export default function Publicacoes() {
                          onUpdate={handleUpdate}
                          onDelete={handleDelete}
                          onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
+                         todosRegistros={registros}
                        />
                     ))}
                   </div>
