@@ -94,6 +94,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const isPublicado = currentStatus === 'Publicado';
   const foiApostilada = !!registro.apostilada_por_id;
   const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id;
+  const temFamilia = foiApostilada || foiTornadaSemEfeito || !!registro.publicacao_referencia_id;
 
   const podeApostilarOuTSE = isPublicado && !foiTornadaSemEfeito;
   const podeMarcarPrioridade = !isPublicado;
