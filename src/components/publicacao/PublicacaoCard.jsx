@@ -247,6 +247,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
         className={`border hover:shadow-md transition-shadow ${
           isTSE
             ? 'border-red-200 bg-red-50/40'
+            : isApostila && foiTornadaSemEfeito
+              ? 'border-red-200 bg-red-50/30'
             : isApostila
               ? 'border-purple-200 bg-purple-50/40'
               : foiTornadaSemEfeito
