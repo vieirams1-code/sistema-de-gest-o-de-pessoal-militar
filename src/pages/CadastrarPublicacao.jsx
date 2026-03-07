@@ -1192,6 +1192,7 @@ export default function CadastrarPublicacao() {
   };
 
   // Quando publicacao_referencia_id muda (e temos as publicações carregadas), preencher dados da referência
+  // Usa todasPublicacoes (não filtrada) para conseguir encontrar Apostilas vindas da URL
   useEffect(() => {
     if (!formData.publicacao_referencia_id || todasPublicacoes.length === 0) return;
     const pub = todasPublicacoes.find(p => p.id === formData.publicacao_referencia_id);
