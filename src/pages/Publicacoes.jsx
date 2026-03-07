@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
+import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 
 function calcStatus(registro) {
   if (registro.numero_bg && registro.data_bg) return 'Publicado';
