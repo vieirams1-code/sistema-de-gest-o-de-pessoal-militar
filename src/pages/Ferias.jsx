@@ -268,18 +268,18 @@ export default function Ferias() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Total', value: stats.total, icon: Calendar, color: '[#1e3a5f]', bg: '[#1e3a5f]/10' },
-            { label: 'Em Curso', value: stats.emCurso, icon: Clock, color: 'amber-600', bg: 'amber-100' },
-            { label: 'Previstas', value: stats.previstas, icon: Calendar, color: 'blue-600', bg: 'blue-100' },
-            { label: 'Gozadas', value: stats.gozadas, icon: CheckCircle, color: 'emerald-600', bg: 'emerald-100' },
+            { label: 'Total', value: stats.total, icon: Calendar, iconBg: 'bg-[#1e3a5f]/10', iconText: 'text-[#1e3a5f]', valueText: 'text-[#1e3a5f]' },
+            { label: 'Em Curso', value: stats.emCurso, icon: Clock, iconBg: 'bg-amber-100', iconText: 'text-amber-600', valueText: 'text-amber-600' },
+            { label: 'Previstas', value: stats.previstas, icon: Calendar, iconBg: 'bg-blue-100', iconText: 'text-blue-600', valueText: 'text-blue-600' },
+            { label: 'Gozadas', value: stats.gozadas, icon: CheckCircle, iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', valueText: 'text-emerald-600' },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg bg-${s.bg} flex items-center justify-center`}>
-                  <s.icon className={`w-5 h-5 text-${s.color}`} />
+                <div className={`w-10 h-10 rounded-lg ${s.iconBg} flex items-center justify-center`}>
+                  <s.icon className={`w-5 h-5 ${s.iconText}`} />
                 </div>
                 <div>
-                  <p className={`text-2xl font-bold text-${s.color}`}>{s.value}</p>
+                  <p className={`text-2xl font-bold ${s.valueText}`}>{s.value}</p>
                   <p className="text-xs text-slate-500">{s.label}</p>
                 </div>
               </div>

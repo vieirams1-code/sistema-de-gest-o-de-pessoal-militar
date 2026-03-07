@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, GitBranch, FileText, Stamp, Ban, CheckCircle, AlertTriangle, Link2 } from 'lucide-react';
+import { X, GitBranch, FileText, Stamp, Ban, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
