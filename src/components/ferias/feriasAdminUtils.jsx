@@ -62,8 +62,8 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
     novoStatus = 'Gozada';
   } else if (temInterrupcao) {
     // Verificar se depois da interrupção há nova saída
-    const idxInterrupcao = eventosSobreviventes.findLastIndex(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.INTERRUPCAO);
-    const idxNovaSaida = eventosSobreviventes.findLastIndex(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.NOVA_SAIDA);
+    const idxInterrupcao = [...eventosSobreviventes].map((e,i) => e.tipo_registro === TIPOS_EVENTO_FERIAS.INTERRUPCAO ? i : -1).filter(i => i >= 0).pop() ?? -1;
+    const idxNovaSaida = [...eventosSobreviventes].map((e,i) => e.tipo_registro === TIPOS_EVENTO_FERIAS.NOVA_SAIDA ? i : -1).filter(i => i >= 0).pop() ?? -1;
     if (idxNovaSaida > idxInterrupcao) {
       novoStatus = 'Em Curso';
     } else {
