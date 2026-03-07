@@ -243,11 +243,16 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleOpenHomologacao}>
-                <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
-                Homologação pelo Comandante
-              </DropdownMenuItem>
-              {atestado.necessita_jiso && (
+              {/* Fluxo exclusivo: mostrar apenas o botão do fluxo definido */}
+              {/* dias <= 15 e fluxo = comandante (ou não definido e dias <= 15): mostrar homologação */}
+              {atestado.fluxo_homologacao === 'comandante' && (
+                <DropdownMenuItem onClick={handleOpenHomologacao}>
+                  <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
+                  Homologação pelo Comandante
+                </DropdownMenuItem>
+              )}
+              {/* fluxo = jiso OU dias > 15: mostrar Ata JISO */}
+              {(atestado.fluxo_homologacao === 'jiso' || (atestado.dias > 15)) && (
                 <DropdownMenuItem onClick={handleOpenAtaJiso}>
                   <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
                   Ata JISO
