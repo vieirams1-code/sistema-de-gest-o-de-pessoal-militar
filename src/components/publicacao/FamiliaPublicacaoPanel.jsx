@@ -345,14 +345,13 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
         </div>
       </div>
 
-      {/* Alerta rodapé */}
+      {/* Nota de rodapé — discreta */}
       {foiInvalidada && tseVinculado && (
-        <div className="shrink-0 border-t border-slate-200 bg-red-50 px-5 py-3">
+        <div className="shrink-0 border-t border-slate-100 bg-slate-50 px-5 py-3">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-red-700">
-              <strong>Atenção:</strong> A publicação original foi tornada sem efeito.
-              Publicações já publicadas e tornadas sem efeito não devem ser excluídas para preservar o histórico.
+            <AlertTriangle className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-slate-500">
+              Esta publicação foi tornada sem efeito. Mantenha o registro para preservar o histórico.
             </p>
           </div>
         </div>
