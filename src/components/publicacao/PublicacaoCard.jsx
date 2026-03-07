@@ -195,13 +195,13 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const handleApostila = () => {
     navigate(
-      `${createPageUrl('CadastrarPublicacao')}?tipo=Apostila&militar_id=${registro.militar_id}&ref_id=${registro.id}`
+      `${createPageUrl('CadastrarPublicacao')}?tipo=Apostila&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`
     );
   };
 
   const handleTornarSemEfeito = () => {
     navigate(
-      `${createPageUrl('CadastrarPublicacao')}?tipo=Tornar+sem+Efeito&militar_id=${registro.militar_id}&ref_id=${registro.id}`
+      `${createPageUrl('CadastrarPublicacao')}?tipo=Tornar+sem+Efeito&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`
     );
   };
 
