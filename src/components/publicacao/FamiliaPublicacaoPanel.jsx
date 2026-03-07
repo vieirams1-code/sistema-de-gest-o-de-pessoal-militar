@@ -402,7 +402,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
       </div>
 
       {/* Nota de rodapé — discreta */}
-      {foiInvalidada && tseVinculado && (
+      {(foiInvalidada && tseRaiz) || tsesPorApostila.some(x => x.tse) ? (
         <div className="shrink-0 border-t border-slate-100 bg-slate-50 px-5 py-3">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
