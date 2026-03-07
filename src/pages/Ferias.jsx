@@ -745,6 +745,7 @@ export default function Ferias() {
             ferias={familiaPanel.ferias}
             registrosLivro={registrosLivro}
             onClose={() => setFamiliaPanel({ open: false, ferias: null })}
+            currentUser={currentUser}
           />
         </>
       )}
