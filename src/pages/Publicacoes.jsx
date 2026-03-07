@@ -87,9 +87,18 @@ export default function Publicacoes() {
       // Registros de atestado na lista são apenas para visualização — não devem ser excluídos aqui
       if (tipo === 'atestado') return;
 
+      // Helper: detectar origem_tipo de um registro a partir do array local ou por detecção
+      const detectarTipo = (refId) => {
+        const found = [...registrosLivro, ...publicacoesExOfficio, ...atestados].find(r => r.id === refId);
+        if (!found) return 'ex-officio';
+        return detectarOrigemTipo(found);
+      };
+
       // Helper: reverter vínculo Apostila/TSE na publicação original
-      const reverterVinculo = async (isApostila, isTSE, refId, origemTipo) => {
+      const reverterVinculo = async (isApostila, isTSE, refId, origemTipoHint) => {
         if (!refId) return;
+        // Usar hint se disponível, senão detectar pelo array local
+        const origemTipo = origemTipoHint || detectarTipo(refId);
         const entityOriginal =
           origemTipo === 'atestado' ? base44.entities.Atestado :
           origemTipo === 'livro' ? base44.entities.RegistroLivro :
