@@ -212,13 +212,24 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                               <span className="text-emerald-700 font-semibold">{evento.numero_bg}</span>
                             </>
                           )}
+                          {evento.data_bg && evento.numero_bg && (
+                            <>
+                              <span className="text-slate-400">Data BG</span>
+                              <span className="text-emerald-700 font-medium">{formatDate(evento.data_bg)}</span>
+                            </>
+                          )}
                           {evento.nota_para_bg && !evento.numero_bg && (
                             <>
-                              <span className="text-slate-400">Nota</span>
+                              <span className="text-slate-400">Nota BG</span>
                               <span className="text-blue-700 font-medium">{evento.nota_para_bg}</span>
                             </>
                           )}
                         </div>
+
+                        {/* Sem publicação vinculada */}
+                        {!evento.nota_para_bg && !evento.numero_bg && (
+                          <p className="mt-2 text-xs text-slate-400 italic">Sem publicação vinculada</p>
+                        )}
 
                         {evento.observacoes && (
                           <p className="mt-2 text-xs text-slate-500 italic border-t border-slate-100 pt-1">
