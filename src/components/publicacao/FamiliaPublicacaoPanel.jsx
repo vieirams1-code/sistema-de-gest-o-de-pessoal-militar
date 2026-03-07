@@ -95,24 +95,36 @@ function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, on
   const isOriginal = variant === 'original';
 
   return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left rounded-lg border p-3 transition-all ${bgClass} ${isSelected ? `ring-2 ring-offset-1 ${cfg.ring} shadow-sm` : 'hover:shadow-sm'} ${indent ? 'ml-4' : ''}`}
+    <div
+      className={`rounded-lg border p-3 transition-all ${bgClass} ${isSelected ? `ring-2 ring-offset-1 ${cfg.ring} shadow-sm` : 'hover:shadow-sm'} ${indent ? 'ml-4' : ''}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0 mt-1`} />
-          <div className="min-w-0">
-            <p className="text-[10px] font-mono text-slate-400">{codigo}</p>
-            <p className={`${isOriginal ? 'text-sm font-semibold' : 'text-xs font-medium'} text-slate-800 truncate`}>{tipoLabel}</p>
+      <button onClick={onClick} className="w-full text-left">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0 mt-1`} />
+            <div className="min-w-0">
+              <p className="text-[10px] font-mono text-slate-400">{codigo}</p>
+              <p className={`${isOriginal ? 'text-sm font-semibold' : 'text-xs font-medium'} text-slate-800 truncate`}>{tipoLabel}</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <Badge className={`text-[10px] px-1.5 py-0 border ${cfg.badge}`}>{label}</Badge>
+            <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[status] || 'bg-slate-100 text-slate-600'}`}>{status}</Badge>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <Badge className={`text-[10px] px-1.5 py-0 border ${cfg.badge}`}>{label}</Badge>
-          <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[status] || 'bg-slate-100 text-slate-600'}`}>{status}</Badge>
+      </button>
+      {onNavigate && (
+        <div className="mt-2 flex justify-end">
+          <button
+            onClick={(e) => { e.stopPropagation(); onNavigate(); }}
+            className="flex items-center gap-1 text-[10px] font-medium text-slate-500 hover:text-[#1e3a5f] transition-colors"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Abrir registro
+          </button>
         </div>
-      </div>
-    </button>
+      )}
+    </div>
   );
 }
 
