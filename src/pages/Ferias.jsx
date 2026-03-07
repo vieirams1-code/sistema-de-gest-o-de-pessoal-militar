@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format, parseISO, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const statusColors = {
   'Prevista': 'bg-slate-100 text-slate-700',
