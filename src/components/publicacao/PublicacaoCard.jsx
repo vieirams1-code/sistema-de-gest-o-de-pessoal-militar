@@ -435,30 +435,30 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 </Button>
               )}
 
-              {podeApostilarOuTSE && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Fazer Apostila"
-                    onClick={handleApostila}
-                    className="text-purple-500 hover:text-purple-700 text-xs gap-1"
-                  >
-                    <PenLine className="w-4 h-4" />
-                    <span className="hidden sm:inline">Apostila</span>
-                  </Button>
+              {podeApostilar && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Fazer Apostila"
+                  onClick={handleApostila}
+                  className="text-purple-500 hover:text-purple-700 text-xs gap-1"
+                >
+                  <PenLine className="w-4 h-4" />
+                  <span className="hidden sm:inline">Apostila</span>
+                </Button>
+              )}
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Tornar sem Efeito"
-                    onClick={handleTornarSemEfeito}
-                    className="text-red-500 hover:text-red-700 text-xs gap-1"
-                  >
-                    <Ban className="w-4 h-4" />
-                    <span className="hidden sm:inline">Tornar s/ Efeito</span>
-                  </Button>
-                </>
+              {podeTornarSemEfeito && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Tornar sem Efeito"
+                  onClick={handleTornarSemEfeito}
+                  className="text-red-500 hover:text-red-700 text-xs gap-1"
+                >
+                  <Ban className="w-4 h-4" />
+                  <span className="hidden sm:inline">Tornar s/ Efeito</span>
+                </Button>
               )}
 
               {podeExcluir && (
