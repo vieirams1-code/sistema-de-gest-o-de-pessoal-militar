@@ -293,7 +293,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
           {atestado.tipo_afastamento && (
             <Badge className="bg-blue-100 text-blue-700">{atestado.tipo_afastamento}</Badge>
           )}
-          {atestado.necessita_jiso && (
+          {(atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15) && (
             <Badge className={`flex items-center gap-1 ${
               atestado.status_jiso === 'Homologado pela JISO'
                 ? 'bg-green-100 text-green-700'
