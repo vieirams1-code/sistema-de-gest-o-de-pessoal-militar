@@ -84,13 +84,57 @@ export default function CadastrarPublicacao() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
 
-  // Para apostila / tornar sem efeito: buscar publicações do militar selecionado, filtrar Publicadas no client
+  // Para apostila / tornar sem efeito: buscar publicações publicadas do militar em todas as entidades
   const { data: todasPublicacoes = [] } = useQuery({
     queryKey: ['publicacoes-apostila', formData.militar_id],
     queryFn: async () => {
-      const all = await base44.entities.PublicacaoExOfficio.filter({ militar_id: formData.militar_id }, '-data_publicacao');
-      // Considerar Publicada: tem numero_bg e data_bg preenchidos
-      return all.filter(p => p.numero_bg && p.data_bg && p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito');
+      const [exOfficio, livro, atestados] = await Promise.all([
+        base44.entities.PublicacaoExOfficio.filter({ militar_id: formData.militar_id }, '-data_publicacao'),
+        base44.entities.RegistroLivro.filter({ militar_id: formData.militar_id }, '-data_registro'),
+        base44.entities.Atestado.filter({ militar_id: formData.militar_id }, '-data_inicio'),
+      ]);
+
+      const normalizar = (item) => {
+        let origem_tipo;
+        if (item.tipo && !item.tipo_registro && !item.medico && !item.cid_10) {
+          origem_tipo = 'ex-officio';
+        } else if (item.medico || item.cid_10) {
+          origem_tipo = 'atestado';
+        } else {
+          origem_tipo = 'livro';
+        }
+
+        const tipo_label =
+          item.tipo_registro ||
+          item.tipo ||
+          (item.medico || item.cid_10
+            ? item.necessita_jiso
+              ? 'Atestado - JISO'
+              : 'Atestado - Homologação'
+            : 'Publicação');
+
+        return {
+          ...item,
+          origem_tipo,
+          tipo_label,
+          status_calculado: item.numero_bg && item.data_bg ? 'Publicado' : item.nota_para_bg ? 'Aguardando Publicação' : 'Aguardando Nota',
+        };
+      };
+
+      const exOfficioFiltrado = exOfficio
+        .filter(p => p.numero_bg && p.data_bg && p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito')
+        .map(normalizar);
+
+      const livroFiltrado = livro
+        .filter(p => p.numero_bg && p.data_bg)
+        .map(normalizar);
+
+      const atestadosFiltrado = atestados
+        .filter(p => p.numero_bg && p.data_bg)
+        .map(normalizar);
+
+      return [...exOfficioFiltrado, ...livroFiltrado, ...atestadosFiltrado]
+        .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
     },
     enabled: (formData.tipo === 'Apostila' || formData.tipo === 'Tornar sem Efeito') && !!formData.militar_id,
   });
