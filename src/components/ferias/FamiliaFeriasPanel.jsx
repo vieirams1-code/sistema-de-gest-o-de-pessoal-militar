@@ -38,7 +38,7 @@ function calcPubStatus(r) {
   return 'Aguardando Nota';
 }
 
-export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) {
+export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, currentUser }) {
   if (!ferias) return null;
 
   // Eventos de livro vinculados a esta férias
