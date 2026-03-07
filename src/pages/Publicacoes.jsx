@@ -49,11 +49,14 @@ export default function Publicacoes() {
     queryFn: () => base44.entities.PublicacaoExOfficio.list('-created_date')
   });
 
+  // Atestados: apenas os que têm nota/BG preenchidos (foram publicados via Homologação/JISO em PublicacaoExOfficio)
+  // Não incluímos atestados crus — publicações de atestado são geradas como PublicacaoExOfficio
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
     queryKey: ['atestados-publicacao'],
     queryFn: async () => {
       const all = await base44.entities.Atestado.list('-created_date');
-      return all.filter(a => a.homologado_comandante || a.encaminhado_jiso || a.necessita_jiso);
+      // Só mostrar atestados que já possuem nota/BG (foram publicados como registro independente antes da refatoração)
+      return all.filter(a => a.nota_para_bg || a.numero_bg);
     }
   });
 
