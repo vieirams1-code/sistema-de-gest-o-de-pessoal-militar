@@ -134,11 +134,28 @@ export default function CadastrarPublicacao() {
         .filter(p => p.numero_bg && p.data_bg)
         .map(normalizar);
 
-      return [...exOfficioFiltrado, ...livroFiltrado, ...atestadosFiltrado]
+      const todas = [...exOfficioFiltrado, ...livroFiltrado, ...atestadosFiltrado]
         .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+
+      // Para Apostila: excluir Apostilas e TSEs (só originais)
+      // Para TSE: incluir Apostilas publicadas também (para poder tornar sem efeito uma apostila)
+      return todas;
     },
     enabled: (formData.tipo === 'Apostila' || formData.tipo === 'Tornar sem Efeito') && !!formData.militar_id,
   });
+
+  // Lista filtrada dependendo do tipo de ação
+  const publicacoesElegiveis = React.useMemo(() => {
+    if (formData.tipo === 'Apostila') {
+      // Só originais publicadas — sem Apostilas, sem TSEs
+      return todasPublicacoes.filter(p => p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito');
+    }
+    if (formData.tipo === 'Tornar sem Efeito') {
+      // Originais + Apostilas publicadas — sem TSEs
+      return todasPublicacoes.filter(p => p.tipo !== 'Tornar sem Efeito');
+    }
+    return todasPublicacoes;
+  }, [todasPublicacoes, formData.tipo]);
 
   // Templates para Ex Officio
   const { data: templatesExOfficio = [] } = useQuery({
