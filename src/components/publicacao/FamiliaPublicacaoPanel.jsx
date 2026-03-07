@@ -49,22 +49,41 @@ function gerarCodigoTSE(baseId, idx) {
 // Card de um item da família
 function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, indent = false, variant = 'original' }) {
   const variantConfig = {
-    original: { bg: 'bg-blue-50 border-blue-200', badge: 'bg-blue-100 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
-    apostila: { bg: 'bg-purple-50 border-purple-200', badge: 'bg-purple-100 text-purple-700 border-purple-200', dot: 'bg-purple-500' },
-    tse: { bg: 'bg-red-50 border-red-200', badge: 'bg-red-100 text-red-700 border-red-200', dot: 'bg-red-500' },
+    original: {
+      bg: 'bg-blue-50 border-blue-200',
+      selectedBg: 'bg-blue-100 border-blue-400',
+      badge: 'bg-blue-100 text-blue-700 border-blue-200',
+      dot: 'bg-blue-500',
+      ring: 'ring-blue-400',
+    },
+    apostila: {
+      bg: 'bg-purple-50 border-purple-200',
+      selectedBg: 'bg-purple-100 border-purple-400',
+      badge: 'bg-purple-100 text-purple-700 border-purple-200',
+      dot: 'bg-purple-500',
+      ring: 'ring-purple-400',
+    },
+    tse: {
+      bg: 'bg-red-50 border-red-200',
+      selectedBg: 'bg-red-100 border-red-400',
+      badge: 'bg-red-100 text-red-700 border-red-200',
+      dot: 'bg-red-500',
+      ring: 'ring-red-400',
+    },
   };
   const cfg = variantConfig[variant] || variantConfig.original;
+  const bgClass = isSelected ? cfg.selectedBg : cfg.bg;
 
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-xl border p-3 transition-all hover:shadow-md ${cfg.bg} ${isSelected ? 'ring-2 ring-offset-1 ring-blue-400' : ''} ${indent ? 'ml-5' : ''}`}
+      className={`w-full text-left rounded-xl border-2 p-3 transition-all hover:shadow-md ${bgClass} ${isSelected ? `ring-2 ring-offset-1 ${cfg.ring} shadow-md` : ''} ${indent ? 'ml-4' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <div className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0 mt-1`} />
+          <div className={`w-2.5 h-2.5 rounded-full ${cfg.dot} shrink-0 mt-0.5`} />
           <div className="min-w-0">
-            <p className="text-xs font-mono font-bold text-slate-600">{codigo}</p>
+            <p className="text-xs font-mono font-bold text-slate-500">{codigo}</p>
             <p className="text-sm font-semibold text-slate-800 truncate">{tipoLabel}</p>
           </div>
         </div>
@@ -73,6 +92,9 @@ function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, in
           <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[status] || 'bg-slate-100 text-slate-600'}`}>{status}</Badge>
         </div>
       </div>
+      {isSelected && (
+        <p className="text-[10px] text-slate-500 mt-1.5 pl-4">← item selecionado</p>
+      )}
     </button>
   );
 }
@@ -82,29 +104,29 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
 
   if (!registro) return null;
 
-  const origemTipo = detectarOrigemTipo(registro);
-
-  // Determinar raiz da família
-  const raizId = registro.publicacao_referencia_id
-    ? registro.publicacao_referencia_id
-    : registro.id;
+  // Determinar raiz da família — seguir referência até a raiz
+  let raizId = registro.publicacao_referencia_id || registro.id;
+  // Um nível a mais: se a referência também tem referência, subir
+  const refDaRef = todosRegistros.find(r => r.id === raizId);
+  if (refDaRef?.publicacao_referencia_id) {
+    raizId = refDaRef.publicacao_referencia_id;
+  }
 
   // Encontrar raiz
   const raiz = todosRegistros.find(r => r.id === raizId) || registro;
 
-  // Encontrar apostilas da raiz
+  // Apostilas da raiz
   const apostilas = todosRegistros.filter(r =>
-    (r.publicacao_referencia_id === raizId || r.publicacao_referencia_id === raiz.id) &&
-    (r.tipo === 'Apostila')
+    r.publicacao_referencia_id === raiz.id && r.tipo === 'Apostila'
   );
 
-  // Encontrar TSEs da raiz
-  const tornadasSemEfeito = todosRegistros.find(r =>
-    r.id === raiz.tornada_sem_efeito_por_id
-  );
+  // TSEs da raiz — buscar pelo campo tornada_sem_efeito_por_id OU por referência
+  const tseVinculado = raiz.tornada_sem_efeito_por_id
+    ? todosRegistros.find(r => r.id === raiz.tornada_sem_efeito_por_id)
+    : todosRegistros.find(r => r.publicacao_referencia_id === raiz.id && r.tipo === 'Tornar sem Efeito');
 
-  const foiApostilada = !!raiz.apostilada_por_id;
-  const foiInvalidada = !!raiz.tornada_sem_efeito_por_id;
+  const foiApostilada = !!raiz.apostilada_por_id || apostilas.length > 0;
+  const foiInvalidada = !!raiz.tornada_sem_efeito_por_id || !!tseVinculado;
 
   const raizStatus = calcStatus(raiz);
   const raizTipoLabel = getTipoLabel(raiz);
@@ -114,18 +136,23 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
   const itemSelecionado = todosRegistros.find(r => r.id === selectedId) || raiz;
   const itemStatus = calcStatus(itemSelecionado);
 
-  // Leitura operacional
+  // Determinar papel do item selecionado
+  const selectedIsOriginal = itemSelecionado.id === raiz.id;
+  const selectedIsApostila = itemSelecionado.tipo === 'Apostila';
+  const selectedIsTSE = itemSelecionado.tipo === 'Tornar sem Efeito';
+
+  // Leitura operacional baseada no item SELECIONADO (não apenas no registro inicial)
   function gerarLeituraOperacional() {
-    if (registro.id === raiz.id) {
-      const partes = ['Esta é a publicação original.'];
-      if (foiApostilada) partes.push(`Foi apostilada (${apostilas.length} apostila(s)).`);
+    if (selectedIsOriginal) {
+      const partes = ['Esta é a publicação original da família.'];
+      if (foiApostilada) partes.push(`Possui ${apostilas.length} apostila(s) vinculada(s).`);
       if (foiInvalidada) partes.push('Foi tornada sem efeito.');
       return partes.join(' ');
     }
-    if (registro.tipo === 'Apostila') {
-      return `Esta é uma apostila que corrige a publicação original ${raizCodigo}.`;
+    if (selectedIsApostila) {
+      return `Esta publicação é uma apostila que corrige a publicação original ${raizCodigo}.`;
     }
-    if (registro.tipo === 'Tornar sem Efeito') {
+    if (selectedIsTSE) {
       return `Esta publicação torna sem efeito a publicação original ${raizCodigo}.`;
     }
     return 'Publicação vinculada à família.';
