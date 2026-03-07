@@ -129,6 +129,7 @@ function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, on
 }
 
 export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClose }) {
+  const navigate = useNavigate();
   const [selectedId, setSelectedId] = React.useState(registro?.id);
 
   if (!registro) return null;
