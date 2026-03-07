@@ -1008,6 +1008,8 @@ export default function CadastrarPublicacao() {
                   setFormData(prev => ({
                     ...prev,
                     publicacao_referencia_id: v,
+                    publicacao_referencia_origem_tipo: pub?.origem_tipo || '',
+                    publicacao_referencia_tipo_label: pub?.tipo_label || '',
                     publicacao_referencia_numero_bg: pub?.numero_bg || '',
                     publicacao_referencia_data_bg: pub?.data_bg || '',
                     publicacao_referencia_nota: pub?.nota_para_bg || '',
@@ -1026,7 +1028,7 @@ export default function CadastrarPublicacao() {
                     )}
                     {todasPublicacoes.map(p => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.tipo} — BG {p.numero_bg} ({p.data_bg || ''})
+                        {p.tipo_label} — BG {p.numero_bg} ({p.data_bg || ''})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1034,7 +1036,7 @@ export default function CadastrarPublicacao() {
               </div>
               {pubRefTSE && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1">
-                  <p><span className="font-medium">Publicação:</span> {pubRefTSE.tipo} — {pubRefTSE.militar_nome}</p>
+                  <p><span className="font-medium">Publicação:</span> {pubRefTSE.tipo_label} — {pubRefTSE.militar_nome}</p>
                   {pubRefTSE.numero_bg && <p><span className="font-medium">BG Nº:</span> {pubRefTSE.numero_bg} de {pubRefTSE.data_bg}</p>}
                   {pubRefTSE.nota_para_bg && <p><span className="font-medium">Nota:</span> {pubRefTSE.nota_para_bg}</p>}
                   {pubRefTSE.texto_publicacao && (
