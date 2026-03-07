@@ -263,20 +263,20 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
             ))}
 
             {/* TSE */}
-            {tornadasSemEfeito && (
+            {tseVinculado && (
               <FamiliaItem
                 label="TORNAR S/ EFEITO"
                 codigo={gerarCodigoTSE(raiz.id, 1)}
-                tipoLabel={getTipoLabel(tornadasSemEfeito) || 'Tornar sem Efeito'}
-                status={calcStatus(tornadasSemEfeito)}
-                isSelected={selectedId === tornadasSemEfeito.id}
-                onClick={() => setSelectedId(tornadasSemEfeito.id)}
+                tipoLabel={getTipoLabel(tseVinculado) || 'Tornar sem Efeito'}
+                status={calcStatus(tseVinculado)}
+                isSelected={selectedId === tseVinculado.id}
+                onClick={() => setSelectedId(tseVinculado.id)}
                 indent
                 variant="tse"
               />
             )}
 
-            {!temFamilia && apostilas.length === 0 && !tornadasSemEfeito && (
+            {!temFamilia && apostilas.length === 0 && !tseVinculado && (
               <p className="text-sm text-slate-400 text-center py-3 italic">
                 Esta publicação não possui vínculos de família registrados.
               </p>
@@ -347,7 +347,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
       </div>
 
       {/* Alerta rodapé */}
-      {foiInvalidada && (
+      {foiInvalidada && tseVinculado && (
         <div className="shrink-0 border-t border-slate-200 bg-red-50 px-5 py-3">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
