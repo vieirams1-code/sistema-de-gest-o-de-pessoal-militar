@@ -322,6 +322,21 @@ export default function Publicacoes() {
           </div>
         )}
       </div>
+
+      {/* Painel Família Publicação */}
+      {familiaPanel.open && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-40"
+            onClick={() => setFamiliaPanel({ open: false, registro: null })}
+          />
+          <FamiliaPublicacaoPanel
+            registro={familiaPanel.registro}
+            todosRegistros={registros}
+            onClose={() => setFamiliaPanel({ open: false, registro: null })}
+          />
+        </>
+      )}
     </div>
   );
 }
