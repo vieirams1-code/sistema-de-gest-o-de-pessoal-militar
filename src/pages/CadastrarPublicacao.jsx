@@ -121,8 +121,9 @@ export default function CadastrarPublicacao() {
         };
       };
 
+      // Originais ex-officio publicadas (exceto TSE)
       const exOfficioFiltrado = exOfficio
-        .filter(p => p.numero_bg && p.data_bg && p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito')
+        .filter(p => p.numero_bg && p.data_bg && p.tipo !== 'Tornar sem Efeito')
         .map(normalizar);
 
       const livroFiltrado = livro
