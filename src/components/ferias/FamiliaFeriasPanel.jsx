@@ -182,9 +182,14 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                       {/* Card do evento */}
                       <div className="flex-1 bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
                         <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-500">#{idx + 1}</span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
                             <span className="text-sm font-semibold text-slate-800">{evento.tipo_registro}</span>
+                            {cfg.label && (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>
+                                {cfg.label}
+                              </span>
+                            )}
                           </div>
                           <Badge className={`${pubStatusColors[pubStatus] || 'bg-slate-100 text-slate-600'} text-xs shrink-0`}>
                             {pubStatus}
@@ -204,7 +209,17 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                               <span className="text-slate-700 font-medium">{formatDate(evento.data_inicio)}</span>
                             </>
                           )}
-                          {evento.dias && (
+                          {/* Para Adição/Desconto: mostrar impacto */}
+                          {(evento.tipo_registro === 'Adição de Dias' || evento.tipo_registro === 'Desconto em Férias' || evento.tipo_registro === 'Dispensa Desconto Férias') && (evento.dias_evento || evento.dias) && (
+                            <>
+                              <span className="text-slate-400">Impacto</span>
+                              <span className={`font-semibold ${evento.tipo_registro === 'Adição de Dias' ? 'text-purple-700' : 'text-rose-700'}`}>
+                                {evento.tipo_registro === 'Adição de Dias' ? '+' : '-'}{evento.dias_evento || evento.dias}d
+                              </span>
+                            </>
+                          )}
+                          {/* Para outros tipos: mostrar dias normalmente */}
+                          {evento.tipo_registro !== 'Adição de Dias' && evento.tipo_registro !== 'Desconto em Férias' && evento.tipo_registro !== 'Dispensa Desconto Férias' && evento.dias && (
                             <>
                               <span className="text-slate-400">Dias</span>
                               <span className="text-slate-700 font-medium">{evento.dias}d</span>
@@ -230,12 +245,19 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                           )}
                         </div>
 
+                        {/* Motivo para Adição/Desconto */}
+                        {(evento.tipo_registro === 'Adição de Dias' || evento.tipo_registro === 'Desconto em Férias') && evento.motivo_dispensa && (
+                          <p className="mt-2 text-xs text-slate-600 bg-slate-50 rounded px-2 py-1 border border-slate-100">
+                            {evento.motivo_dispensa}
+                          </p>
+                        )}
+
                         {/* Sem publicação vinculada */}
-                        {!evento.nota_para_bg && !evento.numero_bg && (
+                        {!evento.nota_para_bg && !evento.numero_bg && evento.tipo_registro !== 'Adição de Dias' && (
                           <p className="mt-2 text-xs text-slate-400 italic">Sem publicação vinculada</p>
                         )}
 
-                        {evento.observacoes && (
+                        {evento.observacoes && evento.tipo_registro !== 'Adição de Dias' && evento.tipo_registro !== 'Desconto em Férias' && (
                           <p className="mt-2 text-xs text-slate-500 italic border-t border-slate-100 pt-1">
                             {evento.observacoes}
                           </p>
