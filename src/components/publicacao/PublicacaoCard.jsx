@@ -30,7 +30,8 @@ import {
   Stamp,
   XCircle,
   PenLine,
-  Ban
+  Ban,
+  Link2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
