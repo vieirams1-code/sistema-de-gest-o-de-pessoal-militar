@@ -73,6 +73,7 @@ export default function Ferias() {
   // Modal interromper férias (publicação ex officio via popup)
   const [interromperModal, setInterromperModal] = useState({ open: false, ferias: null });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
   const { data: ferias = [], isLoading } = useQuery({
     queryKey: ['ferias'],
