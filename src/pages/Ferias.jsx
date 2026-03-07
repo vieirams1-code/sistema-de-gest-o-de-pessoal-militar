@@ -416,6 +416,24 @@ export default function Ferias() {
                           <td className="px-4 py-3">
                             <Badge className={`${statusColors[f.status] || 'bg-slate-100 text-slate-700'} text-xs`}>{f.status}</Badge>
                           </td>
+                          <td className="px-3 py-3 text-center">
+                            {(() => {
+                              const temEventos = registrosLivro.some(r => r.ferias_id === f.id);
+                              return temEventos ? (
+                                <button
+                                  title="Ver rastro da família"
+                                  onClick={() => setFamiliaPanel({ open: true, ferias: f })}
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#1e3a5f]/8 hover:bg-[#1e3a5f]/15 text-[#1e3a5f] transition-colors"
+                                >
+                                  <GitBranch className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
+                                <span className="text-slate-200">
+                                  <GitBranch className="w-3.5 h-3.5 mx-auto" />
+                                </span>
+                              );
+                            })()}
+                          </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <DropdownMenu>
