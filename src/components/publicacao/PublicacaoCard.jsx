@@ -230,22 +230,34 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
-                {/* Garantia: tipo sempre visível mesmo sem nome de militar */}
-                {!registro.militar_nome && tipoLabel && (
-                  <span className="text-sm font-semibold text-slate-700">{tipoLabel}</span>
-                )}
-
-                {foiTornadaSemEfeito && (
-                  <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full border border-red-300">
-                    <XCircle className="w-3 h-3" />
-                    TORNADA SEM EFEITO
+                {/* Badges de tipo derivado — discretas, antes do nome */}
+                {isTSE && (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                    <Ban className="w-3 h-3" />
+                    TSE
                   </span>
                 )}
 
-                {foiApostilada && !foiTornadaSemEfeito && (
-                  <span className="flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-300">
+                {isApostila && (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
                     <Stamp className="w-3 h-3" />
-                    APOSTILADA
+                    Apostila
+                  </span>
+                )}
+
+                {/* Badge na original: sem validade — discreta */}
+                {!isDerivado && foiTornadaSemEfeito && (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                    <XCircle className="w-3 h-3" />
+                    Sem Validade
+                  </span>
+                )}
+
+                {/* Badge na original: apostilada — discreta */}
+                {!isDerivado && foiApostilada && !foiTornadaSemEfeito && (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-purple-500 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                    <Stamp className="w-3 h-3" />
+                    Apostilada
                   </span>
                 )}
 
