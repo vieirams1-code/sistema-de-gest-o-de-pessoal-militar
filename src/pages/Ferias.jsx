@@ -50,6 +50,7 @@ const statusColors = {
 export default function Ferias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useCurrentUser();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
