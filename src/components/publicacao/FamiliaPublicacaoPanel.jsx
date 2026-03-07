@@ -269,6 +269,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
               status={raizStatus}
               isSelected={selectedId === raiz.id}
               onClick={() => setSelectedId(raiz.id)}
+              onNavigate={() => { navigate(getEditUrl(raiz)); onClose(); }}
               variant="original"
             />
 
@@ -282,6 +283,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                 status={calcStatus(ap)}
                 isSelected={selectedId === ap.id}
                 onClick={() => setSelectedId(ap.id)}
+                onNavigate={() => { navigate(getEditUrl(ap)); onClose(); }}
                 indent
                 variant="apostila"
               />
@@ -296,6 +298,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                 status={calcStatus(tseVinculado)}
                 isSelected={selectedId === tseVinculado.id}
                 onClick={() => setSelectedId(tseVinculado.id)}
+                onNavigate={() => { navigate(getEditUrl(tseVinculado)); onClose(); }}
                 indent
                 variant="tse"
               />
