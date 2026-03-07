@@ -60,6 +60,8 @@ const initialFormData = {
   status: 'Aguardando Nota',
   observacoes: '',
   publicacao_referencia_id: '',
+  publicacao_referencia_origem_tipo: '',
+  publicacao_referencia_tipo_label: '',
   publicacao_referencia_numero_bg: '',
   publicacao_referencia_data_bg: '',
   publicacao_referencia_nota: '',

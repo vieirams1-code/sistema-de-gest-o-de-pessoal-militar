@@ -59,6 +59,7 @@ import CadastrarPublicacao from './pages/CadastrarPublicacao';
 import CadastrarPunicao from './pages/CadastrarPunicao';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import Configuracoes from './pages/Configuracoes';
+import Contratos from './pages/Contratos';
 import DashboardAtestados from './pages/DashboardAtestados';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
@@ -71,13 +72,12 @@ import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import Processos from './pages/Processos';
 import Publicacoes from './pages/Publicacoes';
 import Punicoes from './pages/Punicoes';
+import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
 import Subgrupamentos from './pages/Subgrupamentos';
 import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
-import Contratos from './pages/Contratos';
-import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
 import __Layout from './Layout.jsx';
 
 
@@ -94,6 +94,7 @@ export const PAGES = {
     "CadastrarPunicao": CadastrarPunicao,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "Configuracoes": Configuracoes,
+    "Contratos": Contratos,
     "DashboardAtestados": DashboardAtestados,
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
@@ -106,13 +107,12 @@ export const PAGES = {
     "Processos": Processos,
     "Publicacoes": Publicacoes,
     "Punicoes": Punicoes,
+    "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
     "Subgrupamentos": Subgrupamentos,
     "TemplatesTexto": TemplatesTexto,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
-    "Contratos": Contratos,
-    "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
 }
 
 export const pagesConfig = {
