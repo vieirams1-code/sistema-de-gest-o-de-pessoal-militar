@@ -487,11 +487,15 @@ export default function Ferias() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56">
-                                  {/* Iniciar: Prevista ou Interrompida */}
+                                  {/* Prevista ou Interrompida: iniciar / reiniciar */}
                                   {(f.status === 'Prevista' || f.status === 'Autorizada' || f.status === 'Interrompida') && (
-                                    <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Saída Férias' })}>
+                                    <DropdownMenuItem onClick={() => setRegistroLivroModal({
+                                      open: true,
+                                      ferias: f,
+                                      tipo: f.status === 'Interrompida' ? 'Nova Saída / Retomada' : 'Saída Férias'
+                                    })}>
                                       <LogOut className="w-4 h-4 mr-2 text-emerald-600" />
-                                      <span>{f.status === 'Interrompida' ? 'Reiniciar Férias' : 'Iniciar Férias (Registrar Saída)'}</span>
+                                      <span>{f.status === 'Interrompida' ? 'Reiniciar / Nova Saída' : 'Iniciar Férias (Registrar Saída)'}</span>
                                     </DropdownMenuItem>
                                   )}
                                   {/* Em Curso: Retornar ou Interromper */}
@@ -507,30 +511,43 @@ export default function Ferias() {
                                       </DropdownMenuItem>
                                     </>
                                   )}
-                                  {/* Adicionar dias — sempre disponível */}
-                                  <DropdownMenuItem onClick={() => setAddDiasModal({ open: true, ferias: f, dias: 1, motivo: '' })}>
-                                   <PlusCircle className="w-4 h-4 mr-2 text-purple-600" />
-                                   <span>Adicionar Dias</span>
-                                  </DropdownMenuItem>
-                                  {/* Desconto em Férias */}
-                                  <DropdownMenuItem onClick={() => setDescontoModal({ open: true, ferias: f, dias: 1, motivo: '' })}>
-                                   <MinusCircle className="w-4 h-4 mr-2 text-orange-500" />
-                                   <span>Desconto em Férias</span>
-                                  </DropdownMenuItem>
-                                  {/* Editar data início */}
-                                  <DropdownMenuItem onClick={() => setEditDataModal({ open: true, ferias: f, novaData: f.data_inicio || '' })}>
-                                    <Pencil className="w-4 h-4 mr-2 text-slate-500" />
-                                    <span>Alterar Data de Início</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => navigate(createPageUrl('CadastrarFerias') + `?id=${f.id}`)}>
-                                    <Pencil className="w-4 h-4 mr-2 text-slate-500" />
-                                    <span>Editar Férias</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDelete(f)} className="text-red-600 focus:text-red-600">
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                    <span>Excluir Férias</span>
-                                  </DropdownMenuItem>
+                                  {/* Adicionar/Desconto: apenas Prevista, Em Curso ou Interrompida */}
+                                  {f.status !== 'Gozada' && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => setAddDiasModal({ open: true, ferias: f, dias: 1, motivo: '' })}>
+                                        <PlusCircle className="w-4 h-4 mr-2 text-purple-600" />
+                                        <span>Adicionar Dias</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => setDescontoModal({ open: true, ferias: f, dias: 1, motivo: '' })}>
+                                        <MinusCircle className="w-4 h-4 mr-2 text-orange-500" />
+                                        <span>Desconto em Férias</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => setEditDataModal({ open: true, ferias: f, novaData: f.data_inicio || '' })}>
+                                        <Pencil className="w-4 h-4 mr-2 text-slate-500" />
+                                        <span>Alterar Data de Início</span>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  {/* Editar e Excluir: apenas se não Gozada */}
+                                  {f.status !== 'Gozada' && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => navigate(createPageUrl('CadastrarFerias') + `?id=${f.id}`)}>
+                                        <Pencil className="w-4 h-4 mr-2 text-slate-500" />
+                                        <span>Editar Férias</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => handleDelete(f)} className="text-red-600 focus:text-red-600">
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        <span>Excluir Férias</span>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  {/* Gozada: somente leitura da família */}
+                                  {f.status === 'Gozada' && (
+                                    <DropdownMenuItem disabled className="text-slate-400 text-xs italic">
+                                      Férias encerrada — sem ações operacionais
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
