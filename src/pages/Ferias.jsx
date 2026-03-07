@@ -355,6 +355,9 @@ export default function Ferias() {
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Dias</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Fração</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
+                        <th className="text-center px-3 py-3 font-semibold text-slate-600 w-10" title="Rastro da família">
+                          <GitBranch className="w-4 h-4 mx-auto text-slate-400" />
+                        </th>
                         <th className="text-right px-4 py-3 font-semibold text-slate-600">Ações</th>
                       </tr>
                     </thead>
