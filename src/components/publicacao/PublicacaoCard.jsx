@@ -129,6 +129,17 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     ? `${createPageUrl('VerAtestado')}?id=${registro.atestado_homologado_id}`
     : null;
 
+  // Código funcional legível
+  function gerarCodigo(id) {
+    if (!id) return '—';
+    return `PUB-${id.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(-4)}`;
+  }
+
+  const codigoPrincipal = registro.publicacao_referencia_id ? gerarCodigo(registro.publicacao_referencia_id) : null;
+  const urlPrincipal = registro.publicacao_referencia_id
+    ? `${createPageUrl('CadastrarPublicacao')}?id=${registro.publicacao_referencia_id}`
+    : null;
+
   const formatDate = (d) => {
     if (!d) return '-';
     try {
