@@ -108,6 +108,7 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
     const ultimaInterrupcao = [...eventosSobreviventes].reverse().find(e =>
       e.tipo_registro === TIPOS_EVENTO_FERIAS.INTERRUPCAO
     );
+
     if (primeiroSaida?.data_inicio && ultimaInterrupcao?.data_inicio) {
       const diasGozados = Math.round(
         (new Date(ultimaInterrupcao.data_inicio + 'T00:00:00') - new Date(primeiroSaida.data_inicio + 'T00:00:00')) /
