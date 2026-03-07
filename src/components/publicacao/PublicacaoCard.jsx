@@ -92,7 +92,15 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   );
 
   const isPublicado = currentStatus === 'Publicado';
-  const foiApostilada = !!registro.apostilada_por_id;
+
+  // foiApostilada só é verdadeiro se a Apostila vinculada ainda é válida (não foi TSE)
+  const apostilaVinculada = registro.apostilada_por_id
+    ? todosRegistros.find(r => r.id === registro.apostilada_por_id)
+    : null;
+  const apostilaAindaValida = apostilaVinculada
+    ? !apostilaVinculada.tornada_sem_efeito_por_id
+    : !!registro.apostilada_por_id; // se não temos o array, confia no campo
+  const foiApostilada = apostilaAindaValida;
   const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id;
   const temFamilia = foiApostilada || foiTornadaSemEfeito || !!registro.publicacao_referencia_id;
 
