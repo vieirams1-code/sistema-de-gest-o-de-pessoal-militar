@@ -307,12 +307,13 @@ export default function Publicacoes() {
 
                   <div className="space-y-3">
                     {items.map((registro) => (
-                      <PublicacaoCard
-                        key={registro.id}
-                        registro={registro}
-                        onUpdate={handleUpdate}
-                        onDelete={handleDelete}
-                      />
+                       <PublicacaoCard
+                         key={registro.id}
+                         registro={registro}
+                         onUpdate={handleUpdate}
+                         onDelete={handleDelete}
+                         onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
+                       />
                     ))}
                   </div>
                 </div>
