@@ -112,7 +112,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     registro.tipo ||
     (registro.medico || registro.cid_10
       ? (registro.necessita_jiso ? 'Atestado - JISO' : 'Atestado - Homologação')
-      : '');
+      : '') ||
+    'Publicação';
 
   const atestadoLink = registro.atestado_homologado_id
     ? `${createPageUrl('VerAtestado')}?id=${registro.atestado_homologado_id}`
