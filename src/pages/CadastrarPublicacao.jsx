@@ -1018,7 +1018,7 @@ export default function CadastrarPublicacao() {
       }
 
       case 'Tornar sem Efeito': {
-        const pubRefTSE = todasPublicacoes.find(p => p.id === formData.publicacao_referencia_id);
+        const pubRefTSE = publicacoesElegiveis.find(p => p.id === formData.publicacao_referencia_id);
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Tornar sem Efeito</h3>
@@ -1026,7 +1026,7 @@ export default function CadastrarPublicacao() {
               <div>
                 <Label className="text-sm font-medium text-slate-700">Publicação a Tornar sem Efeito <span className="text-red-500">*</span></Label>
                 <Select value={formData.publicacao_referencia_id} onValueChange={v => {
-                  const pub = todasPublicacoes.find(p => p.id === v);
+                  const pub = publicacoesElegiveis.find(p => p.id === v);
                   setFormData(prev => ({
                     ...prev,
                     publicacao_referencia_id: v,
@@ -1045,10 +1045,10 @@ export default function CadastrarPublicacao() {
                     <SelectValue placeholder="Selecione a publicação a tornar sem efeito..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {todasPublicacoes.length === 0 && (
+                    {publicacoesElegiveis.length === 0 && (
                       <SelectItem value="_none" disabled>Nenhuma publicação publicada encontrada para este militar</SelectItem>
                     )}
-                    {todasPublicacoes.map(p => (
+                    {publicacoesElegiveis.map(p => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.tipo_label} — BG {p.numero_bg} ({p.data_bg || ''})
                       </SelectItem>
