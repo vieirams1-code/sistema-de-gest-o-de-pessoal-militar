@@ -407,11 +407,11 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
             <p className="text-xs text-slate-500">
-              Esta publicação foi tornada sem efeito. Mantenha o registro para preservar o histórico.
+              Esta família contém publicações tornadas sem efeito. Mantenha os registros para preservar o histórico.
             </p>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
