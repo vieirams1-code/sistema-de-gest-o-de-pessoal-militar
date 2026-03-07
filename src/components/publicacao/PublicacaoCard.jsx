@@ -129,8 +129,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
       : '') ||
     'Publicação';
 
+  // Ver Atestado: Homologação de Atestado tem atestado_homologado_id; Ata JISO tem atestados_jiso_ids
   const atestadoLink = registro.atestado_homologado_id
     ? `${createPageUrl('VerAtestado')}?id=${registro.atestado_homologado_id}`
+    : null;
+  const atestadosJISOIds = registro.tipo === 'Ata JISO' && registro.atestados_jiso_ids?.length
+    ? registro.atestados_jiso_ids
     : null;
 
   // Código funcional legível
