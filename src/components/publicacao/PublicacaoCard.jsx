@@ -393,6 +393,19 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 </Button>
               )}
 
+              {temFamilia && onVerFamilia && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  title="Ver família da publicação"
+                  onClick={onVerFamilia}
+                  className="text-[#1e3a5f] hover:text-[#1e3a5f] hover:bg-[#1e3a5f]/10 text-xs gap-1"
+                >
+                  <Link2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Família</span>
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 size="sm"
