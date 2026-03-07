@@ -34,22 +34,11 @@ const initialFormData = {
   data_termino: '',
   data_retorno: '',
   status: 'Ativo',
+  fluxo_homologacao: '', // 'comandante' ou 'jiso' — definido pelo usuário ou forçado quando dias > 15
   necessita_jiso: false,
   homologado_comandante: false,
   encaminhado_jiso: false,
-  data_jiso: '',
-  secao_jiso: '',
-  finalidade_jiso: '',
-  nup: '',
-  resultado_jiso: '',
-  dias_jiso: '',
-  ata_jiso: '',
-  parecer_jiso: '',
-  texto_publicacao: '',
-  nota_para_bg: '',
-  numero_bg: '',
-  data_bg: '',
-  status_publicacao: 'Aguardando Nota',
+  data_jiso_agendada: '',
   observacoes: ''
 };
 
