@@ -344,8 +344,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
           )}
         </div>
 
-        {/* JISO agendada - editável inline */}
-        {atestado.necessita_jiso && (
+        {/* JISO agendada - editável inline — só mostrar se fluxo é JISO ou dias > 15 */}
+        {(atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15) && (
           <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
