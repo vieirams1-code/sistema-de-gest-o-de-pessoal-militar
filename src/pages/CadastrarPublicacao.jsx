@@ -1162,16 +1162,18 @@ export default function CadastrarPublicacao() {
     if (!pub) return;
     setFormData(prev => ({
       ...prev,
-      publicacao_referencia_numero_bg: prev.publicacao_referencia_numero_bg || pub.numero_bg || '',
-      publicacao_referencia_data_bg: prev.publicacao_referencia_data_bg || pub.data_bg || '',
-      publicacao_referencia_nota: prev.publicacao_referencia_nota || pub.nota_para_bg || '',
-      texto_errado: prev.texto_errado || (prev.tipo === 'Apostila' ? pub.texto_publicacao || '' : ''),
+      publicacao_referencia_origem_tipo: pub.origem_tipo || '',
+      publicacao_referencia_tipo_label: pub.tipo_label || '',
+      publicacao_referencia_numero_bg: pub.numero_bg || '',
+      publicacao_referencia_data_bg: pub.data_bg || '',
+      publicacao_referencia_nota: pub.nota_para_bg || '',
+      texto_errado: prev.tipo === 'Apostila' ? (pub.texto_publicacao || '') : prev.texto_errado,
       // Para TSE: puxar dados do militar da publicação original
-      ...(prev.tipo === 'Tornar sem Efeito' && !prev.militar_id ? {
-        militar_id: pub.militar_id || '',
-        militar_nome: pub.militar_nome || '',
-        militar_posto: pub.militar_posto || '',
-        militar_matricula: pub.militar_matricula || '',
+      ...(prev.tipo === 'Tornar sem Efeito' ? {
+        militar_id: pub.militar_id || prev.militar_id,
+        militar_nome: pub.militar_nome || prev.militar_nome,
+        militar_posto: pub.militar_posto || prev.militar_posto,
+        militar_matricula: pub.militar_matricula || prev.militar_matricula,
       } : {}),
     }));
   }, [formData.publicacao_referencia_id, todasPublicacoes]);
