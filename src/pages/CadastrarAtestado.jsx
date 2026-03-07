@@ -310,119 +310,108 @@ export default function CadastrarAtestado() {
             />
           </FormSection>
 
-          {/* Afastamento e JISO */}
-          <FormSection title="Tipo de Afastamento e JISO" icon={Clipboard}>
-            <div className="space-y-4">
-              <FormField
-                label="Tipo de Afastamento"
-                name="tipo_afastamento"
-                value={formData.tipo_afastamento}
-                onChange={handleChange}
-                type="select"
-                options={['Afastamento Total', 'Esforço Físico']}
-              />
-
-              <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-lg">
-                <Checkbox
-                  id="necessita_jiso"
-                  checked={formData.necessita_jiso}
-                  onCheckedChange={(checked) => {
-                    handleChange('necessita_jiso', checked);
-                    if (!checked) handleChange('homologado_comandante', true);
-                    else handleChange('homologado_comandante', false);
-                  }}
-                />
-                <Label htmlFor="necessita_jiso" className="text-sm cursor-pointer">
-                  Encaminhar para JISO {parseInt(formData.dias) > 15 ? '(marcado automaticamente — mais de 15 dias)' : '(decisão do comandante)'}
-                </Label>
-              </div>
-
-              {formData.necessita_jiso && (
-                <div className="space-y-3">
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-900">ℹ️ Atestado encaminhado para JISO.</p>
-                  </div>
-                  <FormField
-                    label="Data JISO Agendada"
-                    name="data_jiso_agendada"
-                    value={formData.data_jiso_agendada || ''}
-                    onChange={handleChange}
-                    type="date"
-                  />
-                </div>
-              )}
-            </div>
+          {/* Tipo de Afastamento */}
+          <FormSection title="Tipo de Afastamento" icon={Clipboard}>
+            <FormField
+              label="Tipo de Afastamento"
+              name="tipo_afastamento"
+              value={formData.tipo_afastamento}
+              onChange={handleChange}
+              type="select"
+              options={['Afastamento Total', 'Esforço Físico']}
+            />
           </FormSection>
 
-          {/* Publicação e Status - Apenas para atestados sem JISO */}
-          {!formData.necessita_jiso && (
-            <FormSection title="Publicação e Status" icon={Clipboard}>
-              {formData.texto_publicacao && (
-                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <Label className="text-sm font-semibold text-blue-900 mb-2 block">
-                    Texto Gerado para Publicação
-                  </Label>
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {formData.texto_publicacao}
+          {/* Fluxo de Homologação — decisão do usuário ou forçada */}
+          {formData.dias > 0 && (
+            <FormSection title="Fluxo de Homologação" icon={Clipboard}>
+              {parseInt(formData.dias) > 15 ? (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-semibold text-blue-800">
+                    Atestado com mais de 15 dias — encaminhamento obrigatório para JISO.
                   </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    A publicação será gerada pelo módulo de Ata JISO após a realização da inspeção.
+                  </p>
+                  {formData.data_jiso_agendada !== undefined && (
+                    <div className="mt-3">
+                      <FormField
+                        label="Data JISO Agendada"
+                        name="data_jiso_agendada"
+                        value={formData.data_jiso_agendada || ''}
+                        onChange={handleChange}
+                        type="date"
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-slate-600">
+                    Atestado com até 15 dias. Selecione o fluxo de homologação:
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleFluxoChange('comandante')}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        formData.fluxo_homologacao === 'comandante'
+                          ? 'border-[#1e3a5f] bg-[#1e3a5f]/5'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <p className={`text-sm font-semibold ${formData.fluxo_homologacao === 'comandante' ? 'text-[#1e3a5f]' : 'text-slate-700'}`}>
+                        Comandante
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">Homologação direta pelo Comandante</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFluxoChange('jiso')}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        formData.fluxo_homologacao === 'jiso'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <p className={`text-sm font-semibold ${formData.fluxo_homologacao === 'jiso' ? 'text-blue-700' : 'text-slate-700'}`}>
+                        JISO
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">Encaminhar para inspeção de saúde</p>
+                    </button>
+                  </div>
+                  {formData.fluxo_homologacao === 'jiso' && (
+                    <FormField
+                      label="Data JISO Agendada"
+                      name="data_jiso_agendada"
+                      value={formData.data_jiso_agendada || ''}
+                      onChange={handleChange}
+                      type="date"
+                    />
+                  )}
+                  {formData.fluxo_homologacao === 'comandante' && (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                      <p className="text-xs text-slate-500">
+                        A publicação de Homologação pelo Comandante será gerada em <strong>Publicação Ex Officio → Homologação de Atestado</strong>.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  label="Status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Ativo', 'Encerrado']}
-                />
-                <div>
-                  <label className="text-sm font-medium text-slate-700">Status da Publicação</label>
-                  <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
-                    {formData.status_publicacao || 'Aguardando Nota'}
-                  </div>
-                </div>
-                <FormField
-                  label="Nota para BG"
-                  name="nota_para_bg"
-                  value={formData.nota_para_bg}
-                  onChange={handleChange}
-                  placeholder="Ex: 001/2025"
-                />
-                <FormField
-                  label="Número do BG"
-                  name="numero_bg"
-                  value={formData.numero_bg}
-                  onChange={handleChange}
-                  placeholder="Número do Boletim Geral"
-                />
-                <FormField
-                  label="Data do BG"
-                  name="data_bg"
-                  value={formData.data_bg}
-                  onChange={handleChange}
-                  type="date"
-                />
-              </div>
             </FormSection>
           )}
 
-          {formData.necessita_jiso && (
-            <FormSection title="Status" icon={Clipboard}>
-              <FormField
-                label="Status do Atestado"
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                type="select"
-                options={['Ativo', 'Encerrado']}
-                />
-                <p className="text-sm text-slate-500 mt-2">
-                A publicação deste atestado será gerenciada através da JISO.
-                </p>
-            </FormSection>
-          )}
+          {/* Status */}
+          <FormSection title="Status" icon={Clipboard}>
+            <FormField
+              label="Status do Atestado"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              type="select"
+              options={['Ativo', 'Encerrado']}
+            />
+          </FormSection>
 
           {/* Observações */}
           <FormSection title="Observações" icon={FileText}>
