@@ -1,57 +1,125 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { 
-  Users, 
-  Menu, 
-  X, 
+import {
+  Users,
+  Menu,
+  X,
   Home,
-  UserPlus,
   Shield,
   ChevronRight,
   ChevronDown,
   FileText,
   LogOut,
-  Settings
+  Settings,
+  HeartPulse,
+  CalendarDays,
+  BookOpen,
+  ClipboardList,
+  ScrollText,
+  Medal,
+  Sword,
+  FilePenLine,
+  Briefcase,
+  FolderKanban,
+  Wrench,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 
-const navItems = [
-  { name: 'Dashboard', page: 'Home', icon: Home },
-  { name: 'Efetivo', page: 'Militares', icon: Users },
-  { name: 'Medalhas', page: 'Medalhas', icon: Shield },
-  { name: 'Armamentos', page: 'Armamentos', icon: Shield },
-  { name: 'Atestados', page: 'DashboardAtestados', icon: Shield },
-  { name: 'Férias', page: 'Ferias', icon: Menu },
-  { name: 'Contratos Conv./Design.', page: 'Contratos', icon: FileText },
-  { name: 'Processos & Tarefas', page: 'Processos', icon: FileText },
-  { name: 'Livro', page: 'CadastrarRegistroLivro', icon: UserPlus },
-  { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: UserPlus },
-  { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
-  { name: 'Alterações Militar', page: 'FichaMilitar', icon: Shield },
-  { name: 'Templates de Texto', page: 'TemplatesTexto', icon: FileText },
-  { name: 'Configurações', page: 'Configuracoes', icon: Menu, children: [
-    { name: 'Permissões e Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
-    { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Settings, tab: 'adicoes' },
-    { name: 'Estrutura Organizacional', page: 'Subgrupamentos', icon: Shield },
-    { name: 'Solicitações de Atualização', page: 'SolicitacoesAtualizacao', icon: FileText },
-  ]},
+const menuGroups = [
+  {
+    title: 'Principal',
+    items: [
+      { name: 'Dashboard', page: 'Home', icon: Home },
+    ],
+  },
+  {
+    title: 'Pessoal',
+    items: [
+      { name: 'Efetivo', page: 'Militares', icon: Users },
+      { name: 'Alterações Militar', page: 'FichaMilitar', icon: FilePenLine },
+      { name: 'Contratos Conv./Design.', page: 'Contratos', icon: Briefcase },
+    ],
+  },
+  {
+    title: 'Saúde',
+    items: [
+      { name: 'Atestados', page: 'DashboardAtestados', icon: HeartPulse },
+      { name: 'Férias', page: 'Ferias', icon: CalendarDays },
+    ],
+  },
+  {
+    title: 'Gestão',
+    items: [
+      { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen },
+      { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText },
+      { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
+      { name: 'Processos & Tarefas', page: 'Processos', icon: FolderKanban },
+    ],
+  },
+  {
+    title: 'Patrimônio e Reconhecimento',
+    items: [
+      { name: 'Armamentos', page: 'Armamentos', icon: Sword },
+      { name: 'Medalhas', page: 'Medalhas', icon: Medal },
+    ],
+  },
+  {
+    title: 'Administração',
+    items: [
+      { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList },
+      {
+        name: 'Configurações',
+        page: 'Configuracoes',
+        icon: Settings,
+        children: [
+          { name: 'Permissões e Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
+          { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes' },
+          { name: 'Estrutura Organizacional', page: 'Subgrupamentos', icon: ScrollText },
+          { name: 'Solicitações de Atualização', page: 'SolicitacoesAtualizacao', icon: FileText },
+        ],
+      },
+    ],
+  },
 ];
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState(['Configurações']);
 
+  const toggleExpanded = (itemName) => {
+    setExpandedItems((prev) =>
+      prev.includes(itemName)
+        ? prev.filter((x) => x !== itemName)
+        : [...prev, itemName]
+    );
+  };
+
+  const isItemActive = (item) => {
+    if (item.children?.length) {
+      return item.page === currentPageName || item.children.some((c) => c.page === currentPageName);
+    }
+    return item.page === currentPageName;
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#1e3a5f] text-white z-40 px-4 flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-3">
-          <Shield className="w-8 h-8" />
-          <span className="font-bold text-lg">SGP Militar</span>
+      {/* Header Mobile */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#173764] text-white z-40 px-4 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="rounded-2xl border border-white/20 p-2 bg-white/5">
+            <Shield className="w-6 h-6 text-blue-300" />
+          </div>
+          <div className="min-w-0">
+            <span className="font-bold text-lg block leading-tight">SGP Militar</span>
+            <span className="text-[10px] text-white/60 uppercase tracking-wide">
+              Sistema de Gestão
+            </span>
+          </div>
         </div>
+
         <Button
           variant="ghost"
           size="icon"
@@ -62,7 +130,7 @@ export default function Layout({ children, currentPageName }) {
         </Button>
       </header>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Overlay Mobile */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
@@ -76,102 +144,145 @@ export default function Layout({ children, currentPageName }) {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <aside className={`
-        fixed top-0 left-0 h-full w-64 bg-[#1e3a5f] text-white z-50 flex flex-col
-        transform transition-transform duration-300 ease-in-out
-        lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <div className="p-6 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8" />
-            <div>
-              <span className="font-bold text-lg block">SGP Militar</span>
-              <span className="text-xs text-white/60">Sistema de Gestão</span>
+      <aside
+        className={`
+          fixed top-0 left-0 h-screen w-72 bg-[#173764] text-white z-50
+          flex flex-col
+          transform transition-transform duration-300 ease-in-out
+          lg:translate-x-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        {/* Topo */}
+        <div className="border-b border-white/10 px-5 py-5 shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="rounded-2xl border border-white/20 p-2 bg-white/5 shrink-0">
+                <Shield className="w-6 h-6 text-blue-300" />
+              </div>
+              <div className="min-w-0">
+                <span className="font-bold text-lg block leading-tight">SGP Militar</span>
+                <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">
+                  Sistema de Gestão de Pessoal
+                </span>
+              </div>
             </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden text-white hover:bg-white/10 shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-white hover:bg-white/10"
-          >
-            <X className="w-5 h-5" />
-          </Button>
         </div>
 
-        <nav className="px-4 space-y-1 overflow-y-auto flex-1 pb-4">
-          {navItems.map((item) => {
-            const isActive = currentPageName === item.page;
-            const hasChildren = item.children && item.children.length > 0;
-            const isExpanded = expandedItems.includes(item.name);
-            const isChildActive = hasChildren && item.children.some(c => c.page === currentPageName);
+        {/* Menu rolável */}
+        <nav className="flex-1 overflow-y-auto px-3 py-5 custom-scrollbar">
+          <div className="space-y-6">
+            {menuGroups.map((group) => (
+              <div key={group.title}>
+                <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">
+                  {group.title}
+                </p>
 
-            return (
-              <div key={item.page}>
-                {hasChildren ? (
-                  <button
-                    onClick={() => setExpandedItems(prev => prev.includes(item.name) ? prev.filter(x => x !== item.name) : [...prev, item.name])}
-                    className={`
-                      w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                      ${isActive || isChildActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}
-                    `}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    <span className="font-medium flex-1 text-left">{item.name}</span>
-                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                  </button>
-                ) : (
-                  <Link
-                    to={createPageUrl(item.page)}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`
-                      flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
-                      ${isActive ? 'bg-white/20 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}
-                    `}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    <span className="font-medium">{item.name}</span>
-                    {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
-                  </Link>
-                )}
-                {hasChildren && isExpanded && (
-                  <div className="ml-4 mt-1 space-y-1">
-                    {item.children.map(child => {
-                      const isChildActiveItem = currentPageName === child.page && !child.tab;
-                      const href = child.tab
-                        ? createPageUrl(child.page) + `?tab=${child.tab}`
-                        : createPageUrl(child.page);
+                <div className="space-y-1">
+                  {group.items.map((item) => {
+                    const hasChildren = item.children && item.children.length > 0;
+                    const active = isItemActive(item);
+                    const expanded = expandedItems.includes(item.name);
+                    const Icon = item.icon;
+
+                    if (hasChildren) {
                       return (
-                        <Link
-                          key={child.name}
-                          to={href}
-                          onClick={() => setSidebarOpen(false)}
-                          className={`
-                            flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200
-                            ${isChildActiveItem ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'}
-                          `}
-                        >
-                          <child.icon className="w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm font-medium">{child.name}</span>
-                        </Link>
+                        <div key={item.name}>
+                          <button
+                            onClick={() => toggleExpanded(item.name)}
+                            className={`
+                              flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-medium transition-all
+                              ${active ? 'bg-white/15 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'}
+                            `}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-blue-300' : ''}`} />
+                              <span className="truncate">{item.name}</span>
+                            </div>
+                            {expanded ? (
+                              <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 opacity-60 shrink-0" />
+                            )}
+                          </button>
+
+                          {expanded && (
+                            <div className="mt-1 ml-5 pl-5 border-l border-white/10 space-y-1">
+                              {item.children.map((child) => {
+                                const childActive = currentPageName === child.page && !child.tab;
+                                const href = child.tab
+                                  ? `${createPageUrl(child.page)}?tab=${child.tab}`
+                                  : createPageUrl(child.page);
+                                const ChildIcon = child.icon;
+
+                                return (
+                                  <Link
+                                    key={child.name}
+                                    to={href}
+                                    onClick={() => setSidebarOpen(false)}
+                                    className={`
+                                      flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-all
+                                      ${childActive
+                                        ? 'bg-white/12 text-white'
+                                        : 'text-white/55 hover:bg-white/8 hover:text-white'}
+                                    `}
+                                  >
+                                    <ChildIcon className="w-4 h-4 shrink-0" />
+                                    <span className="truncate">{child.name}</span>
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       );
-                    })}
-                  </div>
-                )}
+                    }
+
+                    return (
+                      <Link
+                        key={item.name}
+                        to={createPageUrl(item.page)}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`
+                          group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all
+                          ${active
+                            ? 'bg-white/15 text-white shadow-inner'
+                            : 'text-white/75 hover:bg-white/10 hover:text-white'}
+                        `}
+                      >
+                        <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-blue-300' : 'group-hover:text-blue-300'}`} />
+                        <span className="truncate flex-1">{item.name}</span>
+                        {active && <ChevronRight className="w-4 h-4 shrink-0" />}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4">
+        {/* Rodapé no fluxo normal */}
+        <div className="border-t border-white/10 p-4 shrink-0 bg-black/10">
           <button
             onClick={() => base44.auth.logout()}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200"
+            className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-red-300 transition-all hover:bg-red-500/10 hover:text-red-200"
           >
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Sair do Sistema</span>
+            <LogOut className="w-5 h-5 shrink-0" />
+            <span>Sair do Sistema</span>
           </button>
-          <div className="bg-white/10 rounded-lg p-3 mt-2">
+
+          <div className="mt-3 rounded-xl bg-white/10 p-3">
             <p className="text-xs text-white/60 text-center">
               Sistema de Gerenciamento de Pessoal
             </p>
@@ -179,10 +290,26 @@ export default function Layout({ children, currentPageName }) {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="lg:pl-64 pt-16 lg:pt-0 min-h-screen">
+      {/* Conteúdo */}
+      <main className="lg:pl-72 pt-16 lg:pt-0 min-h-screen">
         {children}
       </main>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.12);
+          border-radius: 999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.22);
+        }
+      `}</style>
     </div>
   );
 }
