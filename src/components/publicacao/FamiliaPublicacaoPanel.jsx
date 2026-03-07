@@ -189,6 +189,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
       const partes = ['Esta é a publicação original da família.'];
       if (foiApostilada) partes.push(`Possui ${apostilas.length} apostila(s) vinculada(s).`);
       if (foiInvalidada) partes.push('Foi tornada sem efeito.');
+      if (tsesPorApostila.some(x => x.tse)) partes.push('Uma ou mais apostilas foram tornadas sem efeito.');
       return partes.join(' ');
     }
     if (selectedIsApostila) {
