@@ -48,8 +48,19 @@ function gerarCodigoTSE(baseId, idx) {
   return `${gerarCodigo(baseId)}-TSE${String(idx).padStart(2, '0')}`;
 }
 
+function getEditUrl(registro) {
+  if (!registro) return '#';
+  if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
+    return `${createPageUrl('CadastrarPublicacao')}?id=${registro.id}`;
+  }
+  if (registro.medico || registro.cid_10) {
+    return `${createPageUrl('CadastrarAtestado')}?id=${registro.id}`;
+  }
+  return `${createPageUrl('CadastrarRegistroLivro')}?id=${registro.id}`;
+}
+
 // Card de um item da família
-function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, indent = false, variant = 'original' }) {
+function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, onNavigate, indent = false, variant = 'original' }) {
   const variantConfig = {
     // Original: destaque maior — protagonista
     original: {
