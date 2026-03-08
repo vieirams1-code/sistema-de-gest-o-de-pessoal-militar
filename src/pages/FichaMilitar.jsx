@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,9 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, User, Filter, ClipboardList, Shield, Award, Calendar, BookOpen, FileText, Activity, Search, ChevronDown, ChevronUp, Trash2, PenLine, Ban, ExternalLink } from 'lucide-react';
+import {
+  ArrowLeft, User, Filter, ClipboardList, Shield, Award, Calendar, BookOpen, FileText, Activity, Search, ChevronDown, ChevronUp, Trash2, PenLine, Ban, AlertTriangle, Star
+} from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } from '@/components/ferias/feriasAdminUtils';
@@ -38,15 +40,17 @@ const tipoConfig = {
   comportamento: { label: 'Comportamento', color: 'bg-slate-100 text-slate-700', icon: Activity },
 };
 
-// Dependências por tipo: quando excluir X, verificar Y
-const dependencias = {
-  atestado: ['publicacao', 'jiso'], // PublicacaoExOfficio com atestado_homologado_id, JISO
-  ferias: ['livro'],                // RegistroLivro com ferias_id
-};
+function getTipoDisplay(tipo) {
+  if (tipo === 'Saída Férias') return 'Início';
+  if (tipo === 'Interrupção de Férias') return 'Interrupção';
+  if (tipo === 'Nova Saída / Retomada') return 'Continuação';
+  if (tipo === 'Retorno Férias') return 'Término';
+  return tipo;
+}
 
 function formatDate(d) {
   if (!d) return '—';
-  try { return format(new Date(d + 'T00:00:00'), 'dd/MM/yyyy'); } catch { return d; }
+  try { return format(new Date(`${d}T00:00:00`), 'dd/MM/yyyy'); } catch { return d; }
 }
 
 function calcStatusPublicacao(registro) {
@@ -64,31 +68,42 @@ function isOperacaoFeriasLivro(registro) {
   ].includes(registro?.tipo_registro);
 }
 
+function isFeriasPublicacaoExOfficio(registro) {
+  return [
+    'Saída Férias',
+    'Interrupção de Férias',
+    'Nova Saída / Retomada',
+    'Retorno Férias',
+  ].includes(registro?.tipo);
+}
+
 function EventCard({ event, onDelete }) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const cfg = tipoConfig[event.tipo] || tipoConfig.publicacao;
   const Icon = cfg.icon;
 
-  // Para publicações ex-officio: verificar se está Publicada
   const isPublicacao = event.tipo === 'publicacao';
   const statusPublicacao = event.raw?.status || '';
   const isPublicada = isPublicacao && (statusPublicacao === 'Publicado' || (event.raw?.numero_bg && event.raw?.data_bg));
   const foiTornadaSemEfeito = isPublicacao && !!event.raw?.tornada_sem_efeito_por_id;
   const podeApostilarOuTSE = isPublicada && !foiTornadaSemEfeito;
-  const podeExcluir = !isPublicada; // publicadas não podem ser excluídas
+  const podeExcluir = !isPublicada;
 
-  // Status badge color para publicações
   const statusColors = {
     'Aguardando Nota': 'bg-amber-100 text-amber-700',
     'Aguardando Publicação': 'bg-blue-100 text-blue-700',
     'Publicado': 'bg-emerald-100 text-emerald-700',
   };
+
   const statusDisplay = isPublicacao
     ? (event.raw?.numero_bg && event.raw?.data_bg ? 'Publicado'
       : event.raw?.nota_para_bg ? 'Aguardando Publicação'
       : 'Aguardando Nota')
     : null;
+
+  const tipoLabelBruto = event.subtipo || event.titulo || '';
+  const tipoLabel = getTipoDisplay(tipoLabelBruto);
 
   return (
     <div className={`bg-white rounded-xl border shadow-sm overflow-hidden ${foiTornadaSemEfeito ? 'border-red-300 opacity-70' : isPublicada ? 'border-emerald-200' : 'border-slate-200'}`}>
@@ -99,21 +114,36 @@ function EventCard({ event, onDelete }) {
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${cfg.color}`}>
           <Icon className="w-5 h-5" />
         </div>
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <Badge className={cfg.color + ' text-xs'}>{cfg.label}</Badge>
-            {event.subtipo && <span className="text-xs text-slate-500 font-medium">{event.subtipo}</span>}
+            {event.subtipo && <span className="text-xs text-slate-500 font-medium">{tipoLabel}</span>}
             {statusDisplay && (
               <Badge className={`text-xs ${statusColors[statusDisplay] || ''}`}>{statusDisplay}</Badge>
             )}
             {foiTornadaSemEfeito && <Badge className="text-xs bg-red-100 text-red-700">TORNADA SEM EFEITO</Badge>}
+            {event.raw?.urgente && !isPublicada && (
+              <Badge className="text-xs bg-red-100 text-red-700">
+                <AlertTriangle className="w-3 h-3 mr-1" />
+                URGENTE
+              </Badge>
+            )}
+            {event.raw?.importante && !event.raw?.urgente && !isPublicada && (
+              <Badge className="text-xs bg-amber-100 text-amber-700">
+                <Star className="w-3 h-3 mr-1" />
+                IMPORTANTE
+              </Badge>
+            )}
           </div>
+
           <p className="font-medium text-slate-900 text-sm">{event.titulo}</p>
           {event.resumo && <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{event.resumo}</p>}
         </div>
+
         <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
           <span className="text-sm text-slate-500 whitespace-nowrap mr-1">{formatDate(event.data)}</span>
-          {/* Botões Apostila/TSE para publicações Publicadas */}
+
           {podeApostilarOuTSE && (
             <>
               <button
@@ -132,7 +162,7 @@ function EventCard({ event, onDelete }) {
               </button>
             </>
           )}
-          {/* Excluir apenas se não for Publicada */}
+
           {podeExcluir ? (
             <button
               className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
@@ -152,9 +182,11 @@ function EventCard({ event, onDelete }) {
               <Trash2 className="w-4 h-4" />
             </button>
           )}
+
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </div>
       </div>
+
       {expanded && event.detalhes && (
         <div className="border-t border-slate-100 px-4 pb-4 pt-3 bg-slate-50">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -165,7 +197,7 @@ function EventCard({ event, onDelete }) {
               </div>
             ) : null)}
           </div>
-          {/* Texto publicação para ex-officio */}
+
           {isPublicacao && event.raw?.texto_publicacao && (
             <div className="mt-3">
               <p className="text-xs text-slate-500 mb-1 font-medium">Texto para Publicação</p>
@@ -192,17 +224,18 @@ export default function FichaMilitar() {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
 
-  // Delete confirmation state
-  const [deleteTarget, setDeleteTarget] = useState(null); // { event }
-  const [deleteDeps, setDeleteDeps] = useState(null); // { event, deps: [{tipo, id, label}] }
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteDeps, setDeleteDeps] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDepsConfirm, setShowDepsConfirm] = useState(false);
-  const [deleteTambemDeps, setDeleteTambemDeps] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const { data: militar } = useQuery({
     queryKey: ['militar', militarId],
-    queryFn: async () => { const r = await base44.entities.Militar.filter({ id: militarId }); return r[0]; },
+    queryFn: async () => {
+      const r = await base44.entities.Militar.filter({ id: militarId });
+      return r[0];
+    },
     enabled: !!militarId
   });
 
@@ -243,8 +276,12 @@ export default function FichaMilitar() {
   });
 
   const refetchAll = () => {
-    refetchPunicoes(); refetchAtestados(); refetchLivro();
-    refetchPublicacoes(); refetchMedalhas(); refetchHistorico();
+    refetchPunicoes();
+    refetchAtestados();
+    refetchLivro();
+    refetchPublicacoes();
+    refetchMedalhas();
+    refetchHistorico();
   };
 
   const eventos = useMemo(() => {
@@ -279,34 +316,51 @@ export default function FichaMilitar() {
       ]
     }));
 
-    registrosLivro.forEach(r => lista.push({
-      tipo: 'livro', data: r.data_registro, id: r.id, raw: r,
-      titulo: r.tipo_registro, resumo: r.observacoes, subtipo: r.tipo_registro,
-      detalhes: [
-        { label: 'Tipo', valor: r.tipo_registro },
-        { label: 'Data', valor: formatDate(r.data_registro) },
-        { label: 'Início', valor: formatDate(r.data_inicio) },
-        { label: 'Término', valor: formatDate(r.data_termino) },
-        { label: 'Dias', valor: r.dias ? `${r.dias} dias` : null },
-        { label: 'Documento', valor: r.documento_referencia },
-        { label: 'BG', valor: r.numero_bg },
-        { label: 'Observações', valor: r.observacoes },
-      ]
-    }));
+    registrosLivro.forEach(r => {
+      const subtipo = isOperacaoFeriasLivro(r) ? getTipoDisplay(r.tipo_registro) : r.tipo_registro;
+      const titulo = isOperacaoFeriasLivro(r)
+        ? `Férias — ${getTipoDisplay(r.tipo_registro)}`
+        : r.tipo_registro;
 
-    publicacoes.forEach(p => lista.push({
-      tipo: 'publicacao', data: p.data_publicacao, id: p.id, raw: p,
-      titulo: `${p.tipo}${p.subtipo_geral ? ` — ${p.subtipo_geral}` : ''}`,
-      resumo: p.texto_publicacao?.substring(0, 120), subtipo: p.tipo,
-      detalhes: [
-        { label: 'Tipo', valor: p.tipo },
-        { label: 'Data', valor: formatDate(p.data_publicacao) },
-        { label: 'BG', valor: p.numero_bg },
-        { label: 'Status', valor: p.status },
-        { label: 'Portaria', valor: p.portaria },
-        { label: 'Texto', valor: p.texto_publicacao?.substring(0, 200) },
-      ]
-    }));
+      lista.push({
+        tipo: 'livro', data: r.data_registro, id: r.id, raw: r,
+        titulo,
+        resumo: r.observacoes,
+        subtipo,
+        detalhes: [
+          { label: 'Tipo', valor: subtipo },
+          { label: 'Data', valor: formatDate(r.data_registro) },
+          { label: 'Início', valor: formatDate(r.data_inicio) },
+          { label: 'Término', valor: formatDate(r.data_termino) },
+          { label: 'Dias', valor: r.dias ? `${r.dias} dias` : null },
+          { label: 'Documento', valor: r.documento_referencia },
+          { label: 'BG', valor: r.numero_bg },
+          { label: 'Observações', valor: r.observacoes },
+        ]
+      });
+    });
+
+    publicacoes.forEach(p => {
+      const subtipo = isFeriasPublicacaoExOfficio(p) ? getTipoDisplay(p.tipo) : p.tipo;
+      const titulo = isFeriasPublicacaoExOfficio(p)
+        ? `Férias — ${getTipoDisplay(p.tipo)}`
+        : `${p.tipo}${p.subtipo_geral ? ` — ${p.subtipo_geral}` : ''}`;
+
+      lista.push({
+        tipo: 'publicacao', data: p.data_publicacao, id: p.id, raw: p,
+        titulo,
+        resumo: p.texto_publicacao?.substring(0, 120),
+        subtipo,
+        detalhes: [
+          { label: 'Tipo', valor: subtipo },
+          { label: 'Data', valor: formatDate(p.data_publicacao) },
+          { label: 'BG', valor: p.numero_bg },
+          { label: 'Status', valor: p.status },
+          { label: 'Portaria', valor: p.portaria },
+          { label: 'Texto', valor: p.texto_publicacao?.substring(0, 200) },
+        ]
+      });
+    });
 
     medalhas.forEach(m => lista.push({
       tipo: 'medalha', data: m.data_indicacao, id: m.id, raw: m,
@@ -347,49 +401,58 @@ export default function FichaMilitar() {
   const eventosFiltrados = useMemo(() => {
     return eventos.filter(e => {
       if (tipoFiltro === 'elogios_punicoes') {
-        // Mostra: punições (tipo punicao) e publicações de elogio/punição/melhoria
         const isPunicao = e.tipo === 'punicao';
         const isElogioOuPunicaoPub = e.tipo === 'publicacao' && ELOGIOS_PUNICOES_TIPOS_PUB.includes(e.raw?.tipo);
         if (!isPunicao && !isElogioOuPunicaoPub) return false;
-      } else if (tipoFiltro !== 'todos' && e.tipo !== tipoFiltro) return false;
-      if (searchTerm && !e.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) && !e.resumo?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      } else if (tipoFiltro !== 'todos' && e.tipo !== tipoFiltro) {
+        return false;
+      }
+
+      if (searchTerm) {
+        const termo = searchTerm.toLowerCase();
+        const hit =
+          e.titulo?.toLowerCase().includes(termo) ||
+          e.resumo?.toLowerCase().includes(termo) ||
+          e.subtipo?.toLowerCase().includes(termo);
+        if (!hit) return false;
+      }
+
       if (dataInicio && e.data && e.data < dataInicio) return false;
       if (dataFim && e.data && e.data > dataFim) return false;
       return true;
     });
   }, [eventos, tipoFiltro, searchTerm, dataInicio, dataFim]);
 
-  // Calcula dependências do evento a excluir
   const calcularDependencias = (event) => {
     const deps = [];
+
     if (event.tipo === 'atestado') {
       publicacoes.forEach(p => {
         if (p.atestado_homologado_id === event.id || (p.atestados_jiso_ids || []).includes(event.id)) {
-          deps.push({ tipo: 'publicacao', id: p.id, raw: p, label: `Publicação Ex Officio: ${p.tipo} (${formatDate(p.data_publicacao)})` });
+          deps.push({
+            tipo: 'publicacao',
+            id: p.id,
+            raw: p,
+            label: `Publicação Ex Officio: ${p.tipo} (${formatDate(p.data_publicacao)})`
+          });
         }
       });
     }
-    if (event.tipo === 'ferias') {
-      registrosLivro.forEach(r => {
-        if (r.ferias_id === event.id) {
-          deps.push({ tipo: 'livro', id: r.id, raw: r, label: `Registro Livro: ${r.tipo_registro} (${formatDate(r.data_registro)})` });
-        }
-      });
-    }
+
     return deps;
   };
 
   const handleDeleteRequest = (event) => {
-    // Bloquear exclusão de publicações publicadas
     if (event.tipo === 'publicacao') {
       const isPublicada = (event.raw?.numero_bg && event.raw?.data_bg) || event.raw?.status === 'Publicado';
-      if (isPublicada) return; // Não deve chegar aqui, mas garantia extra
+      if (isPublicada) return;
     }
+
     const deps = calcularDependencias(event);
     setDeleteTarget(event);
+
     if (deps.length > 0) {
       setDeleteDeps({ event, deps });
-      setDeleteTambemDeps(false);
       setShowDepsConfirm(true);
     } else {
       setShowDeleteConfirm(true);
@@ -398,6 +461,7 @@ export default function FichaMilitar() {
 
   const executeDelete = async (event, incluirDeps = false, deps = []) => {
     setDeleting(true);
+
     try {
       const reverterExOfficio = async (registro) => {
         if (!registro) return;
@@ -418,20 +482,6 @@ export default function FichaMilitar() {
             });
           }
         }
-
-        if (registro.tipo === 'Interrupção de Férias' && registro.ferias_interrompida_id) {
-          const feriasList = await base44.entities.Ferias.filter({ id: registro.ferias_interrompida_id });
-          const ferias = feriasList[0];
-          if (ferias) {
-            await base44.entities.Ferias.update(ferias.id, {
-              status: 'Em Curso',
-              saldo_remanescente: null,
-              dias_gozados_interrupcao: null,
-              data_interrupcao: null,
-              observacoes: '',
-            });
-          }
-        }
       };
 
       const excluirLivroComReversao = async (registroLivro) => {
@@ -442,6 +492,7 @@ export default function FichaMilitar() {
 
         const feriasList = await base44.entities.Ferias.filter({ id: registroLivro.ferias_id });
         const ferias = feriasList[0];
+
         if (!ferias) {
           await base44.entities.RegistroLivro.delete(registroLivro.id);
           return;
@@ -471,26 +522,31 @@ export default function FichaMilitar() {
           if (dep.tipo === 'publicacao') {
             await reverterExOfficio(dep.raw);
             await base44.entities.PublicacaoExOfficio.delete(dep.id);
-          } else if (dep.tipo === 'livro') {
-            await excluirLivroComReversao(dep.raw || { id: dep.id });
           }
         }
       }
 
-      if (event.tipo === 'punicao') await base44.entities.Punicao.delete(event.id);
-      else if (event.tipo === 'atestado') await base44.entities.Atestado.delete(event.id);
-      else if (event.tipo === 'livro') await excluirLivroComReversao(event.raw || { id: event.id });
-      else if (event.tipo === 'publicacao') {
+      if (event.tipo === 'punicao') {
+        await base44.entities.Punicao.delete(event.id);
+      } else if (event.tipo === 'atestado') {
+        await base44.entities.Atestado.delete(event.id);
+      } else if (event.tipo === 'livro') {
+        await excluirLivroComReversao(event.raw || { id: event.id });
+      } else if (event.tipo === 'publicacao') {
         await reverterExOfficio(event.raw);
         await base44.entities.PublicacaoExOfficio.delete(event.id);
+      } else if (event.tipo === 'medalha') {
+        await base44.entities.Medalha.delete(event.id);
+      } else if (event.tipo === 'comportamento') {
+        await base44.entities.HistoricoComportamento.delete(event.id);
       }
-      else if (event.tipo === 'medalha') await base44.entities.Medalha.delete(event.id);
-      else if (event.tipo === 'comportamento') await base44.entities.HistoricoComportamento.delete(event.id);
 
       refetchAll();
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
     } catch (error) {
       alert(error?.message || 'Não foi possível excluir o registro com segurança.');
     } finally {
@@ -502,16 +558,18 @@ export default function FichaMilitar() {
     }
   };
 
-  if (!militarId) return <div className="p-8 text-center text-slate-500">Militar não especificado.</div>;
+  if (!militarId) {
+    return <div className="p-8 text-center text-slate-500">Militar não especificado.</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
+
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-[#1e3a5f]">Ficha Militar</h1>
             {militar && (
@@ -520,6 +578,7 @@ export default function FichaMilitar() {
               </p>
             )}
           </div>
+
           {militar && (
             <Button variant="outline" size="sm" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militarId}`)}>
               <User className="w-4 h-4 mr-2" />
@@ -528,12 +587,12 @@ export default function FichaMilitar() {
           )}
         </div>
 
-        {/* Filtros */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6 space-y-3">
           <div className="flex items-center gap-2 text-slate-600 font-medium text-sm">
             <Filter className="w-4 h-4" />
             Filtros
           </div>
+
           <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -544,6 +603,7 @@ export default function FichaMilitar() {
                 className="pl-9"
               />
             </div>
+
             <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
               <SelectTrigger className="w-full md:w-56">
                 <SelectValue />
@@ -555,20 +615,29 @@ export default function FichaMilitar() {
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex flex-col md:flex-row gap-3 items-center">
             <label className="text-sm text-slate-500 whitespace-nowrap">Período:</label>
             <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="flex-1" />
             <span className="text-slate-400 text-sm">até</span>
             <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="flex-1" />
             {(dataInicio || dataFim || tipoFiltro !== 'todos' || searchTerm) && (
-              <Button variant="ghost" size="sm" onClick={() => { setDataInicio(''); setDataFim(''); setTipoFiltro('todos'); setSearchTerm(''); }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDataInicio('');
+                  setDataFim('');
+                  setTipoFiltro('todos');
+                  setSearchTerm('');
+                }}
+              >
                 Limpar
               </Button>
             )}
           </div>
         </div>
 
-        {/* Contagem */}
         <div className="mb-4">
           <p className="text-sm text-slate-500">
             {eventosFiltrados.length} {eventosFiltrados.length === 1 ? 'registro' : 'registros'}
@@ -576,7 +645,6 @@ export default function FichaMilitar() {
           </p>
         </div>
 
-        {/* Timeline */}
         {eventosFiltrados.length === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
             <ClipboardList className="w-14 h-14 mx-auto text-slate-300 mb-4" />
@@ -584,7 +652,6 @@ export default function FichaMilitar() {
             <p className="text-slate-500 text-sm mt-1">Tente ajustar os filtros</p>
           </div>
         ) : (tipoFiltro === 'publicacao' || tipoFiltro === 'todos') && eventosFiltrados.some(e => e.tipo === 'publicacao') ? (
-          // Agrupamento por status quando há publicações visíveis
           (() => {
             const getStatusPub = (e) => {
               if (e.tipo !== 'publicacao') return null;
@@ -592,16 +659,18 @@ export default function FichaMilitar() {
               if (e.raw?.nota_para_bg) return 'Aguardando Publicação';
               return 'Aguardando Nota';
             };
+
             const grupos = [
               { key: 'Aguardando Nota', color: 'text-amber-700', border: 'border-amber-300', bg: 'bg-amber-50' },
               { key: 'Aguardando Publicação', color: 'text-blue-700', border: 'border-blue-300', bg: 'bg-blue-50' },
               { key: 'Publicado', color: 'text-emerald-700', border: 'border-emerald-300', bg: 'bg-emerald-50' },
             ];
+
             const pubEventos = eventosFiltrados.filter(e => e.tipo === 'publicacao');
             const outrosEventos = eventosFiltrados.filter(e => e.tipo !== 'publicacao');
+
             return (
               <div className="space-y-6">
-                {/* Outros registros (não publicação) */}
                 {outrosEventos.length > 0 && (
                   <div className="space-y-3">
                     {outrosEventos.map((event) => (
@@ -609,12 +678,13 @@ export default function FichaMilitar() {
                     ))}
                   </div>
                 )}
-                {/* Publicações agrupadas por status */}
+
                 {pubEventos.length > 0 && (
                   <div className="space-y-5">
                     {grupos.map(grupo => {
                       const items = pubEventos.filter(e => getStatusPub(e) === grupo.key);
                       if (items.length === 0) return null;
+
                       return (
                         <div key={grupo.key}>
                           <div className={`flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg border ${grupo.border} ${grupo.bg}`}>
@@ -643,7 +713,6 @@ export default function FichaMilitar() {
         )}
       </div>
 
-      {/* Confirmação simples de exclusão */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -666,7 +735,6 @@ export default function FichaMilitar() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Confirmação com dependências */}
       <AlertDialog open={showDepsConfirm} onOpenChange={setShowDepsConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
