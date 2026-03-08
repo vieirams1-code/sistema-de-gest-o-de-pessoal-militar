@@ -119,6 +119,7 @@ export default function FilaDemandas() {
                   const isChefe = ETAPAS_CHEFE.includes(d.etapa_fluxo);
                   const semResp = !d.responsavel_atual_nome;
 
+                  const semMilitar = !d.militar_nome_snapshot;
                   const isComando = d.etapa_fluxo === 'Aguardando comando superior';
                   const rowBg = atrasada ? 'bg-red-50/40' :
                     d.etapa_fluxo === 'Aguardando decisão do chefe' ? 'bg-amber-50/40' :
@@ -137,7 +138,8 @@ export default function FilaDemandas() {
                         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                           {atrasada && <Badge className="bg-red-100 text-red-700 text-[10px]">⚠ Atrasada</Badge>}
                           {venceHoje && !atrasada && <Badge className="bg-amber-100 text-amber-700 text-[10px]">Vence hoje</Badge>}
-                          {semResp && <Badge className="bg-slate-100 text-slate-500 text-[10px]">Sem resp.</Badge>}
+                          {semResp && <Badge className="bg-red-50 text-red-400 border border-red-200 text-[10px]">Sem responsável</Badge>}
+                          {semMilitar && <Badge className="bg-slate-50 text-slate-400 border border-slate-200 text-[10px]">Sem militar</Badge>}
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
