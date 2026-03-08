@@ -196,9 +196,15 @@ export async function executarExclusaoAdminCadeia({
 /**
  * Recalcula o estado da cadeia sem excluir nada (apenas corrige inconsistências).
  * Reconstrói dias, datas, status e observações derivadas.
+ * Relê a férias do banco para garantir dias_base atualizado.
  */
 export async function recalcularCadeiaCompleta({ ferias, cadeia, queryClient }) {
-  const atualizacaoFerias = recalcularEstadoFerias(ferias, cadeia);
+  let feriasFresh = ferias;
+  try {
+    const lista = await base44.entities.Ferias.filter({ id: ferias.id });
+    if (lista[0]) feriasFresh = lista[0];
+  } catch (_) { /* fallback */ }
+  const atualizacaoFerias = recalcularEstadoFerias(feriasFresh, cadeia);
   await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
 
   if (ferias.periodo_aquisitivo_id) {
