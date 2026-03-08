@@ -21,7 +21,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Plus,
@@ -453,7 +452,19 @@ export default function Ferias() {
                             <td className="px-4 py-3 text-slate-700">{formatDate(f.data_retorno)}</td>
 
                             <td className="px-4 py-3 text-slate-700">
-                              <span>{f.dias}d</span>
+                              <div className="flex flex-col">
+                                <span>{f.dias}d</span>
+                                {f.status === 'Interrompida' && f.saldo_remanescente != null && (
+                                  <span className="text-xs text-orange-600 font-medium">
+                                    Saldo: {f.saldo_remanescente}d
+                                  </span>
+                                )}
+                                {f.status === 'Interrompida' && f.dias_gozados_interrupcao != null && (
+                                  <span className="text-xs text-slate-500">
+                                    Gozados: {f.dias_gozados_interrupcao}d
+                                  </span>
+                                )}
+                              </div>
                             </td>
 
                             <td className="px-4 py-3">
