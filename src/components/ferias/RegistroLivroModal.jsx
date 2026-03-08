@@ -1,14 +1,26 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Save, User, FileText, AlertCircle } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { aplicarTemplate, buildVarsLivro, formatDateBR } from '@/components/utils/templateUtils';
-import { addDays, differenceInCalendarDays, format } from 'date-fns';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  LogOut,
+  LogIn,
+  PauseCircle,
+  RefreshCw,
+  FileText,
+  AlertCircle,
+} from 'lucide-react';
+import { addDays, differenceInDays, format } from 'date-fns';
 
 const NOMES_OPERACIONAIS = {
   'Saída Férias': 'Início',
@@ -17,338 +29,291 @@ const NOMES_OPERACIONAIS = {
   'Nova Saída / Retomada': 'Continuação',
 };
 
-export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial }) {
+const ICONES = {
+  'Saída Férias': LogOut,
+  'Retorno Férias': LogIn,
+  'Interrupção de Férias': PauseCircle,
+  'Nova Saída / Retomada': RefreshCw,
+};
+
+function toDateOnlyString(date) {
+  return format(date, 'yyyy-MM-dd');
+}
+
+function parseDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00');
+}
+
+function formatDateBR(dateStr) {
+  if (!dateStr) return '';
+  return format(parseDate(dateStr), 'dd/MM/yyyy');
+}
+
+function calcStatusPublicacao(nota, numeroBg, dataBg) {
+  if (numeroBg && dataBg) return 'Publicado';
+  if (nota) return 'Aguardando Publicação';
+  return 'Aguardando Nota';
+}
+
+export default function RegistroLivroModal({
+  open,
+  onClose,
+  ferias,
+  tipoInicial = 'Saída Férias',
+}) {
   const queryClient = useQueryClient();
 
-  const [loading, setLoading] = useState(false);
-  const [tipoRegistro, setTipoRegistro] = useState(tipoInicial || 'Saída Férias');
+  const [tipoRegistro, setTipoRegistro] = useState(tipoInicial);
   const [dataRegistro, setDataRegistro] = useState('');
-  const [notaBg, setNotaBg] = useState('');
+  const [notaParaBg, setNotaParaBg] = useState('');
   const [numeroBg, setNumeroBg] = useState('');
   const [dataBg, setDataBg] = useState('');
   const [observacoes, setObservacoes] = useState('');
-  const [textoGerado, setTextoGerado] = useState('');
-  const [semTemplate, setSemTemplate] = useState(false);
-
-  const { data: templates = [] } = useQuery({
-    queryKey: ['templates-texto'],
-    queryFn: () => base44.entities.TemplateTexto.list(),
-    staleTime: 30000,
-  });
-
-  const { data: periodosAquisitivos = [] } = useQuery({
-    queryKey: ['periodos-aquisitivos', ferias?.militar_id],
-    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: ferias?.militar_id }),
-    enabled: !!ferias?.militar_id,
-    staleTime: 60000,
-  });
-
-  const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['registros-livro-all'],
-    queryFn: () => base44.entities.RegistroLivro.list(),
-    enabled: open,
-    staleTime: 5000,
-  });
+  const [textoPublicacao, setTextoPublicacao] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (ferias && open) {
-      setTipoRegistro(tipoInicial || 'Saída Férias');
+    if (!open || !ferias) return;
 
-      const hoje = new Date().toISOString().split('T')[0];
-      const dataDefault =
-        tipoInicial === 'Retorno Férias'
-          ? ferias.data_retorno || hoje
-          : tipoInicial === 'Interrupção de Férias'
-            ? hoje
-            : tipoInicial === 'Nova Saída / Retomada'
-              ? hoje
-              : ferias.data_inicio || hoje;
+    setTipoRegistro(tipoInicial);
 
-      setDataRegistro(dataDefault);
-      setNotaBg('');
-      setNumeroBg('');
-      setDataBg('');
-      setObservacoes('');
-    }
-  }, [ferias, tipoInicial, open]);
-
-  const ultimoRegistroInterrupcao = useMemo(() => {
-    if (!ferias?.id) return null;
-
-    return (
-      registrosLivro
-        .filter(
-          (r) =>
-            r.ferias_id === ferias.id &&
-            r.tipo_registro === 'Interrupção de Férias'
-        )
-        .sort((a, b) => new Date(b.data_registro) - new Date(a.data_registro))[0] || null
-    );
-  }, [registrosLivro, ferias?.id]);
-
-  const saldoDisponivel = useMemo(() => {
-    if (!ferias) return 0;
-
-    if (tipoRegistro !== 'Nova Saída / Retomada') {
-      return Number(ferias.dias || 0);
+    if (tipoInicial === 'Saída Férias') {
+      setDataRegistro(ferias.data_inicio || '');
+    } else if (tipoInicial === 'Retorno Férias') {
+      setDataRegistro(ferias.data_retorno || '');
+    } else if (tipoInicial === 'Interrupção de Férias') {
+      setDataRegistro(toDateOnlyString(new Date()));
+    } else if (tipoInicial === 'Nova Saída / Retomada') {
+      setDataRegistro(toDateOnlyString(new Date()));
+    } else {
+      setDataRegistro(toDateOnlyString(new Date()));
     }
 
-    const saldoDireto = Number(ferias.saldo_remanescente);
-    if (!Number.isNaN(saldoDireto) && saldoDireto > 0) {
-      return saldoDireto;
-    }
+    setNotaParaBg('');
+    setNumeroBg('');
+    setDataBg('');
+    setObservacoes('');
+    setTextoPublicacao('');
+  }, [open, ferias, tipoInicial]);
 
-    const saldoUltimoRegistro = Number(ultimoRegistroInterrupcao?.saldo_remanescente);
-    if (!Number.isNaN(saldoUltimoRegistro) && saldoUltimoRegistro > 0) {
-      return saldoUltimoRegistro;
-    }
-
-    const diasGozadosUltimaInterrupcao = Number(
-      ultimoRegistroInterrupcao?.dias_gozados ??
-      ultimoRegistroInterrupcao?.dias ??
-      0
-    );
-
-    const diasTotais = Number(ferias.dias || 0);
-    const saldoFallback = Math.max(0, diasTotais - diasGozadosUltimaInterrupcao);
-
-    return saldoFallback;
-  }, [tipoRegistro, ferias, ultimoRegistroInterrupcao]);
-
-  const indicadores = useMemo(() => {
+  const resumo = useMemo(() => {
     if (!ferias || !dataRegistro) return null;
 
+    const baseDias = Number(ferias.dias || 0);
+    const inicioAtual = ferias.data_inicio ? parseDate(ferias.data_inicio) : null;
+    const dataRef = parseDate(dataRegistro);
+
+    if (tipoRegistro === 'Saída Férias') {
+      const novoFim = toDateOnlyString(addDays(dataRef, Math.max(baseDias - 1, 0)));
+      const novoRetorno = toDateOnlyString(addDays(dataRef, baseDias));
+      return {
+        titulo: 'Resumo do Início',
+        inicio: dataRegistro,
+        dias: baseDias,
+        fim: novoFim,
+        retorno: novoRetorno,
+      };
+    }
+
+    if (tipoRegistro === 'Retorno Férias') {
+      return {
+        titulo: 'Resumo do Término',
+        retorno: dataRegistro,
+        dias: baseDias,
+      };
+    }
+
     if (tipoRegistro === 'Interrupção de Férias') {
-      if (!ferias.data_inicio || !ferias.dias) return null;
+      if (!inicioAtual) return null;
 
-      const inicio = new Date(ferias.data_inicio + 'T00:00:00');
-      const interrupcao = new Date(dataRegistro + 'T00:00:00');
-
-      const diasGozados = Math.max(
-        1,
-        differenceInCalendarDays(interrupcao, inicio) + 1
-      );
-
-      const diasTotais = Number(ferias.dias || 0);
-      const saldoRemanescente = Math.max(0, diasTotais - diasGozados);
+      const gozados = Math.max(0, differenceInDays(dataRef, inicioAtual));
+      const saldo = Math.max(0, baseDias - gozados);
 
       return {
-        diasGozados,
-        saldoRemanescente,
+        titulo: 'Resumo da Interrupção',
+        dataInterrupcao: dataRegistro,
+        gozados,
+        saldo,
       };
     }
 
     if (tipoRegistro === 'Nova Saída / Retomada') {
-      const saldo = Number(saldoDisponivel || 0);
-
-      const dataFim =
-        saldo > 0
-          ? format(addDays(new Date(dataRegistro + 'T00:00:00'), saldo - 1), 'yyyy-MM-dd')
-          : '';
-
-      const dataRetorno =
-        saldo > 0
-          ? format(addDays(new Date(dataRegistro + 'T00:00:00'), saldo), 'yyyy-MM-dd')
-          : '';
+      const saldo = Number(ferias.saldo_remanescente || 0);
+      const novoFim = saldo > 0 ? toDateOnlyString(addDays(dataRef, saldo - 1)) : dataRegistro;
+      const novoRetorno = toDateOnlyString(addDays(dataRef, saldo));
 
       return {
-        saldoRetomado: saldo,
-        novaDataFim: dataFim,
-        novaDataRetorno: dataRetorno,
+        titulo: 'Resumo da Continuação',
+        saldo,
+        novoInicio: dataRegistro,
+        novoFim,
+        novoRetorno,
       };
     }
 
     return null;
-  }, [ferias, dataRegistro, tipoRegistro, saldoDisponivel]);
+  }, [ferias, dataRegistro, tipoRegistro]);
 
   useEffect(() => {
-    if (!ferias || !dataRegistro) return;
-    gerarTexto();
-  }, [ferias, tipoRegistro, dataRegistro, templates, periodosAquisitivos, indicadores]);
-
-  const gerarTexto = () => {
-    if (!ferias) return;
-
-    const periodo = periodosAquisitivos.find((p) => p.id === ferias.periodo_aquisitivo_id);
-
-    const diasTexto =
-      tipoRegistro === 'Nova Saída / Retomada' && indicadores?.saldoRetomado != null
-        ? indicadores.saldoRetomado
-        : tipoRegistro === 'Interrupção de Férias' && indicadores?.diasGozados != null
-          ? indicadores.diasGozados
-          : ferias.dias;
-
-    const templateCadastrado = templates.find(
-      (t) => t.modulo === 'Livro' && t.tipo_registro === tipoRegistro && t.ativo !== false
-    );
-
-    if (templateCadastrado?.template) {
-      const vars = buildVarsLivro({
-        ferias: {
-          ...ferias,
-          dias: diasTexto,
-        },
-        dataRegistro,
-        periodo,
-      });
-
-      const texto = aplicarTemplate(templateCadastrado.template, vars);
-      setTextoGerado(texto);
-      setSemTemplate(false);
-    } else {
-      setTextoGerado('');
-      setSemTemplate(true);
+    if (!ferias || !resumo) {
+      setTextoPublicacao('');
+      return;
     }
-  };
 
-  const calcularStatus = () => {
-    if (numeroBg && dataBg) return 'Publicado';
-    if (notaBg) return 'Aguardando Publicação';
-    return 'Aguardando Nota';
-  };
+    const militar = `${ferias.militar_posto ? ferias.militar_posto + ' ' : ''}${ferias.militar_nome || ''}`.trim();
+    const matricula = ferias.militar_matricula || '';
+
+    if (tipoRegistro === 'Saída Férias') {
+      setTextoPublicacao(
+        `O Comandante do 1º Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, onde consta o início do gozo de férias do militar ${militar}, matrícula ${matricula}, a contar de ${formatDateBR(dataRegistro)}, por ${resumo.dias} dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`
+      );
+      return;
+    }
+
+    if (tipoRegistro === 'Retorno Férias') {
+      setTextoPublicacao(
+        `O Comandante do 1º Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, onde consta o término do gozo de férias do militar ${militar}, matrícula ${matricula}, em ${formatDateBR(dataRegistro)}, após ${resumo.dias} dias de afastamento, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`
+      );
+      return;
+    }
+
+    if (tipoRegistro === 'Interrupção de Férias') {
+      setTextoPublicacao(
+        `O Comandante do 1º Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, onde consta a interrupção das férias do militar ${militar}, matrícula ${matricula}, em ${formatDateBR(dataRegistro)}, após ${resumo.gozados} dias gozados, restando saldo de ${resumo.saldo} dias.`
+      );
+      return;
+    }
+
+    if (tipoRegistro === 'Nova Saída / Retomada') {
+      setTextoPublicacao(
+        `O Comandante do 1º Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, onde consta a continuação das férias do militar ${militar}, matrícula ${matricula}, a contar de ${formatDateBR(dataRegistro)}, para gozo do saldo remanescente de ${resumo.saldo} dias.`
+      );
+      return;
+    }
+
+    setTextoPublicacao('');
+  }, [ferias, resumo, tipoRegistro, dataRegistro]);
+
+  const statusPublicacao = useMemo(
+    () => calcStatusPublicacao(notaParaBg, numeroBg, dataBg),
+    [notaParaBg, numeroBg, dataBg]
+  );
 
   const handleSalvar = async () => {
     if (!ferias || !dataRegistro) return;
-    setLoading(true);
 
-    const diasRegistro =
-      tipoRegistro === 'Nova Saída / Retomada' && indicadores?.saldoRetomado != null
-        ? indicadores.saldoRetomado
-        : tipoRegistro === 'Interrupção de Férias' && indicadores?.diasGozados != null
-          ? indicadores.diasGozados
-          : ferias.dias;
+    setSaving(true);
 
-    await base44.entities.RegistroLivro.create({
-      militar_id: ferias.militar_id,
-      militar_nome: ferias.militar_nome,
-      militar_posto: ferias.militar_posto,
-      militar_matricula: ferias.militar_matricula,
-      ferias_id: ferias.id,
-      tipo_registro: tipoRegistro,
-      data_registro: dataRegistro,
-      dias: diasRegistro,
-      dias_gozados:
-        tipoRegistro === 'Interrupção de Férias'
-          ? indicadores?.diasGozados ?? 0
-          : undefined,
-      saldo_remanescente:
-        tipoRegistro === 'Interrupção de Férias'
-          ? indicadores?.saldoRemanescente ?? 0
-          : tipoRegistro === 'Nova Saída / Retomada'
-            ? indicadores?.saldoRetomado ?? 0
-            : undefined,
-      texto_publicacao: textoGerado,
-      nota_para_bg: notaBg,
-      numero_bg: numeroBg,
-      data_bg: dataBg || undefined,
-      status: calcularStatus(),
-      observacoes,
-    });
+    try {
+      const registroPayload = {
+        militar_id: ferias.militar_id,
+        militar_nome: ferias.militar_nome,
+        militar_posto: ferias.militar_posto,
+        militar_matricula: ferias.militar_matricula,
+        ferias_id: ferias.id,
+        periodo_aquisitivo: ferias.periodo_aquisitivo_ref || '',
+        data_registro: dataRegistro,
+        tipo_registro: tipoRegistro,
+        dias: Number(ferias.dias || 0),
+        nota_para_bg: notaParaBg || '',
+        numero_bg: numeroBg || '',
+        data_bg: dataBg || '',
+        status: statusPublicacao,
+        observacoes: observacoes || '',
+        texto_publicacao: textoPublicacao || '',
+      };
 
-    if (tipoRegistro === 'Saída Férias') {
-      await base44.entities.Ferias.update(ferias.id, {
-        status: 'Em Curso',
-      });
-    } else if (tipoRegistro === 'Retorno Férias') {
-      await base44.entities.Ferias.update(ferias.id, {
-        status: 'Gozada',
-        saldo_remanescente: 0,
-      });
-    } else if (tipoRegistro === 'Interrupção de Férias') {
-      await base44.entities.Ferias.update(ferias.id, {
-        status: 'Interrompida',
-        data_interrupcao: dataRegistro,
-        dias_gozados_interrupcao: indicadores?.diasGozados ?? 0,
-        saldo_remanescente: indicadores?.saldoRemanescente ?? 0,
-      });
-    } else if (tipoRegistro === 'Nova Saída / Retomada') {
-      await base44.entities.Ferias.update(ferias.id, {
-        status: 'Em Curso',
-        data_inicio: dataRegistro,
-        data_fim: indicadores?.novaDataFim || ferias.data_fim,
-        data_retorno: indicadores?.novaDataRetorno || ferias.data_retorno,
-        dias: indicadores?.saldoRetomado ?? saldoDisponivel ?? ferias.dias,
-        saldo_remanescente: 0,
-      });
+      if (tipoRegistro === 'Interrupção de Férias' && resumo) {
+        registroPayload.dias = Number(ferias.dias || 0);
+        registroPayload.dias_gozados = Number(resumo.gozados || 0);
+        registroPayload.saldo_remanescente = Number(resumo.saldo || 0);
+
+        await base44.entities.RegistroLivro.create(registroPayload);
+
+        await base44.entities.Ferias.update(ferias.id, {
+          status: 'Interrompida',
+          dias_gozados_interrupcao: Number(resumo.gozados || 0),
+          saldo_remanescente: Number(resumo.saldo || 0),
+          data_interrupcao: dataRegistro,
+        });
+      } else if (tipoRegistro === 'Nova Saída / Retomada' && resumo) {
+        const saldo = Number(ferias.saldo_remanescente || 0);
+
+        registroPayload.dias = saldo;
+
+        await base44.entities.RegistroLivro.create(registroPayload);
+
+        await base44.entities.Ferias.update(ferias.id, {
+          status: 'Em Curso',
+          data_inicio: dataRegistro,
+          data_fim: resumo.novoFim,
+          data_retorno: resumo.novoRetorno,
+          dias: saldo,
+        });
+      } else if (tipoRegistro === 'Saída Férias' && resumo) {
+        registroPayload.dias = Number(resumo.dias || ferias.dias || 0);
+
+        await base44.entities.RegistroLivro.create(registroPayload);
+
+        await base44.entities.Ferias.update(ferias.id, {
+          status: 'Em Curso',
+          data_inicio: dataRegistro,
+          data_fim: resumo.fim,
+          data_retorno: resumo.retorno,
+        });
+      } else if (tipoRegistro === 'Retorno Férias') {
+        await base44.entities.RegistroLivro.create(registroPayload);
+
+        await base44.entities.Ferias.update(ferias.id, {
+          status: 'Gozada',
+        });
+      } else {
+        await base44.entities.RegistroLivro.create(registroPayload);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+
+      onClose();
+    } catch (error) {
+      console.error('Erro ao salvar registro de férias:', error);
+      alert('Erro ao salvar registro.');
+    } finally {
+      setSaving(false);
     }
-
-    queryClient.invalidateQueries({ queryKey: ['ferias'] });
-    queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-    queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-
-    setLoading(false);
-    onClose();
   };
+
+  const IconeTitulo = ICONES[tipoRegistro] || FileText;
 
   if (!ferias) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[#1e3a5f]">
-            <FileText className="w-5 h-5" />
-            Registrar no Livro
-          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <IconeTitulo className="w-5 h-5 text-[#1e3a5f]" />
+            <DialogTitle>{NOMES_OPERACIONAIS[tipoRegistro] || tipoRegistro}</DialogTitle>
+          </div>
+          <DialogDescription>
+            Registro de movimentação no Livro de Férias e Outras Concessões.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
-          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-            <div className="flex items-center gap-2 mb-2">
-              <User className="w-4 h-4 text-slate-500" />
-              <span className="font-semibold text-slate-800">
-                {ferias.militar_posto} {ferias.militar_nome}
-              </span>
-              <span className="text-slate-400 text-sm">Mat: {ferias.militar_matricula}</span>
+        <div className="space-y-5">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="font-semibold text-slate-800">
+              {ferias.militar_posto ? `${ferias.militar_posto} ` : ''}
+              {ferias.militar_nome}
             </div>
-
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div>
-                <p className="text-slate-400 text-xs">Período Aquisitivo</p>
-                <p className="font-medium text-slate-700">{ferias.periodo_aquisitivo_ref || '-'}</p>
-              </div>
-
-              <div>
-                <p className="text-slate-400 text-xs">Início das Férias</p>
-                <p className="font-medium text-slate-700">{formatDateBR(ferias.data_inicio)}</p>
-              </div>
-
-              <div>
-                <p className="text-slate-400 text-xs">Retorno Previsto</p>
-                <p className="font-medium text-slate-700">{formatDateBR(ferias.data_retorno)}</p>
-              </div>
-
-              <div>
-                <p className="text-slate-400 text-xs">
-                  {tipoRegistro === 'Nova Saída / Retomada' ? 'Saldo Atual' : 'Dias'}
-                </p>
-                <p className="font-medium text-slate-700">
-                  {tipoRegistro === 'Nova Saída / Retomada'
-                    ? saldoDisponivel
-                    : ferias.dias}
-                </p>
-              </div>
-
-              {ferias.fracionamento && (
-                <div>
-                  <p className="text-slate-400 text-xs">Fração</p>
-                  <p className="font-medium text-slate-700">{ferias.fracionamento}</p>
-                </div>
-              )}
+            <div className="text-sm text-slate-500 mt-1">
+              Base: {ferias.dias || 0}d | Período: {ferias.periodo_aquisitivo_ref || '—'}
             </div>
           </div>
 
           <div>
-            <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
-            <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-700 text-sm font-medium">
-              {NOMES_OPERACIONAIS[tipoRegistro] || tipoRegistro}
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-sm font-medium text-slate-700">
-              Data do Registro <span className="text-red-500">*</span>
-            </Label>
+            <Label>Data do Registro *</Label>
             <Input
               type="date"
               value={dataRegistro}
@@ -357,134 +322,161 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
             />
           </div>
 
-          {tipoRegistro === 'Interrupção de Férias' && indicadores && (
-            <div className="bg-orange-50 rounded-lg border border-orange-200 p-4">
-              <p className="text-sm font-semibold text-orange-700 mb-3">Resumo da Interrupção</p>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-orange-500 text-xs">Dias gozados</p>
-                  <p className="font-semibold text-orange-700">{indicadores.diasGozados}d</p>
-                </div>
-                <div>
-                  <p className="text-blue-500 text-xs">Saldo remanescente</p>
-                  <p className="font-semibold text-blue-700">{indicadores.saldoRemanescente}d</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {resumo && (
+            <div className="rounded-lg border p-4 bg-cyan-50 border-cyan-200">
+              <div className="font-semibold text-cyan-800 mb-3">{resumo.titulo}</div>
 
-          {tipoRegistro === 'Nova Saída / Retomada' && indicadores && (
-            <div className="bg-teal-50 rounded-lg border border-teal-200 p-4">
-              <p className="text-sm font-semibold text-teal-700 mb-3">Resumo da Continuação</p>
-              <div className="grid grid-cols-3 gap-3 text-sm">
-                <div>
-                  <p className="text-teal-500 text-xs">Saldo retomado</p>
-                  <p className="font-semibold text-teal-700">{indicadores.saldoRetomado}d</p>
+              {tipoRegistro === 'Saída Férias' && (
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-cyan-700">Início</div>
+                    <div className="font-semibold">{formatDateBR(resumo.inicio)}</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700">Novo fim</div>
+                    <div className="font-semibold">{formatDateBR(resumo.fim)}</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700">Novo retorno</div>
+                    <div className="font-semibold">{formatDateBR(resumo.retorno)}</div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-teal-500 text-xs">Novo fim</p>
-                  <p className="font-semibold text-teal-700">{formatDateBR(indicadores.novaDataFim)}</p>
+              )}
+
+              {tipoRegistro === 'Retorno Férias' && (
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <div className="text-cyan-700">Término</div>
+                    <div className="font-semibold">{formatDateBR(resumo.retorno)}</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700">Dias encerrados</div>
+                    <div className="font-semibold">{resumo.dias}d</div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-teal-500 text-xs">Novo retorno</p>
-                  <p className="font-semibold text-teal-700">{formatDateBR(indicadores.novaDataRetorno)}</p>
+              )}
+
+              {tipoRegistro === 'Interrupção de Férias' && (
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-cyan-700">Data interrupção</div>
+                    <div className="font-semibold">{formatDateBR(resumo.dataInterrupcao)}</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700">Dias gozados</div>
+                    <div className="font-semibold">{resumo.gozados}d</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700">Saldo remanescente</div>
+                    <div className="font-semibold">{resumo.saldo}d</div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {tipoRegistro === 'Nova Saída / Retomada' && (
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-cyan-700">Saldo retomado</div>
+                    <div className="font-semibold">{resumo.saldo}d</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700">Novo fim</div>
+                    <div className="font-semibold">{formatDateBR(resumo.novoFim)}</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700">Novo retorno</div>
+                    <div className="font-semibold">{formatDateBR(resumo.novoRetorno)}</div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           <div>
-            <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
-
-            {semTemplate ? (
-              <div className="mt-1.5 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm">
-                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>
-                  Nenhum template cadastrado para <strong>"{tipoRegistro}"</strong> no módulo Livro.
-                </span>
-              </div>
-            ) : (
-              <>
-                <Textarea
-                  value={textoGerado}
-                  onChange={(e) => setTextoGerado(e.target.value)}
-                  rows={5}
-                  className="mt-1.5 text-sm bg-blue-50 border-blue-200"
-                />
-                <p className="text-xs text-slate-400 mt-1">Você pode editar o texto antes de salvar.</p>
-              </>
-            )}
+            <Label>Texto para Publicação</Label>
+            <Textarea
+              value={textoPublicacao}
+              onChange={(e) => setTextoPublicacao(e.target.value)}
+              rows={5}
+              className="mt-1.5"
+            />
           </div>
 
-          <div className="border border-slate-200 rounded-lg p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">Publicação (opcional)</p>
+          <div className="rounded-lg border border-slate-200 p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-slate-500" />
+              <span className="font-medium text-slate-700">Publicação (opcional)</span>
+            </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs text-slate-600">Nota para BG</Label>
+                <Label>Nota para BG</Label>
                 <Input
-                  value={notaBg}
-                  onChange={(e) => setNotaBg(e.target.value)}
+                  value={notaParaBg}
+                  onChange={(e) => setNotaParaBg(e.target.value)}
+                  className="mt-1.5"
                   placeholder="001/2025"
-                  className="mt-1"
                 />
               </div>
 
               <div>
-                <Label className="text-xs text-slate-600">Número do BG</Label>
+                <Label>Número do BG</Label>
                 <Input
                   value={numeroBg}
                   onChange={(e) => setNumeroBg(e.target.value)}
-                  className="mt-1"
+                  className="mt-1.5"
                 />
               </div>
 
               <div>
-                <Label className="text-xs text-slate-600">Data do BG</Label>
+                <Label>Data do BG</Label>
                 <Input
                   type="date"
                   value={dataBg}
                   onChange={(e) => setDataBg(e.target.value)}
-                  className="mt-1"
+                  className="mt-1.5"
                 />
               </div>
 
               <div>
-                <Label className="text-xs text-slate-600">Status</Label>
-                <div className="mt-1 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
-                  {calcularStatus()}
-                </div>
+                <Label>Status</Label>
+                <Input
+                  value={statusPublicacao}
+                  readOnly
+                  className="mt-1.5 bg-slate-50"
+                />
               </div>
             </div>
+
+            {!textoPublicacao && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 flex gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>O texto da publicação está vazio. Revise antes de salvar.</span>
+              </div>
+            )}
           </div>
 
           <div>
-            <Label className="text-sm font-medium text-slate-700">Observações</Label>
+            <Label>Observações</Label>
             <Textarea
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
-              rows={2}
+              rows={3}
               className="mt-1.5"
               placeholder="Observações..."
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-            <Button variant="outline" onClick={onClose}>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose} disabled={saving}>
               Cancelar
             </Button>
-
             <Button
               onClick={handleSalvar}
-              disabled={loading || !dataRegistro}
+              disabled={saving || !dataRegistro}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
             >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              Salvar Registro
+              {saving ? 'Salvando...' : 'Salvar Registro'}
             </Button>
           </div>
         </div>
