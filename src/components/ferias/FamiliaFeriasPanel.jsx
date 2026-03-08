@@ -351,12 +351,12 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                           </p>
                         )}
 
-                        {/* Adição não requer publicação — desconto sim */}
+                                        {/* Adição não requer publicação — desconto e outros sim */}
                         {evento.tipo_registro === 'Adição de Dias' && (
                           <p className="mt-2 text-xs text-slate-400 italic">Evento interno — sem publicação formal</p>
                         )}
                         {evento.tipo_registro !== 'Adição de Dias' && !evento.nota_para_bg && !evento.numero_bg && (
-                          <p className="mt-2 text-xs text-slate-400 italic">Sem publicação vinculada</p>
+                          <p className="mt-2 text-xs text-amber-600 italic bg-amber-50 rounded px-2 py-1 border border-amber-100">Aguardando nota para publicação</p>
                         )}
 
                         {evento.observacoes && evento.tipo_registro !== 'Adição de Dias' && evento.tipo_registro !== 'Desconto em Férias' && (
