@@ -153,11 +153,19 @@ export async function executarExclusaoAdminCadeia({
     await base44.entities.RegistroLivro.delete(id);
   }
 
-  // Calcular eventos sobreviventes
+  // Calcular eventos sobreviventes (excluindo os removidos)
   const sobreviventes = cadeia.filter(e => !idsParaExcluir.includes(e.id));
 
-  // Recalcular estado da férias
-  const atualizacaoFerias = recalcularEstadoFerias(ferias, sobreviventes);
+  // Reler a férias do banco para garantir dias_base atualizado
+  // (evita usar objeto React stale que pode ter dias_base ausente)
+  let feriasFresh = ferias;
+  try {
+    const lista = await base44.entities.Ferias.filter({ id: ferias.id });
+    if (lista[0]) feriasFresh = lista[0];
+  } catch (_) { /* fallback para ferias da prop */ }
+
+  // Recalcular estado da férias usando dados frescos
+  const atualizacaoFerias = recalcularEstadoFerias(feriasFresh, sobreviventes);
   await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
 
   // Recalcular período aquisitivo se vinculado
