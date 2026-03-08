@@ -507,7 +507,7 @@ export default function Ferias() {
                                         <LogIn className="w-4 h-4 mr-2 text-blue-600" />
                                         <span>Registrar Retorno</span>
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => setInterromperModal({ open: true, ferias: f })}>
+                                      <DropdownMenuItem onClick={() => setRegistroLivroModal({ open: true, ferias: f, tipo: 'Interrupção de Férias' })}>
                                         <PauseCircle className="w-4 h-4 mr-2 text-orange-600" />
                                         <span>Interromper Férias</span>
                                       </DropdownMenuItem>
