@@ -11,7 +11,6 @@ import {
   prioridadeColors,
   criticidadeColors,
   statusColors,
-  etapaColors,
   isAtrasada,
   formatDate,
   ETAPAS_CHEFE,
