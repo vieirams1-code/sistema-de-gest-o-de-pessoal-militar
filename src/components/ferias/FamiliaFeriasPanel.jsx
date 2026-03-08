@@ -283,9 +283,13 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                               {NOMES_OPERACIONAIS[evento.tipo_registro] || evento.tipo_registro}
                             </span>
                           </div>
-                          <Badge className={`${pubStatusColors[pubStatus] || 'bg-slate-100 text-slate-600'} text-xs shrink-0`}>
-                            {pubStatus}
-                          </Badge>
+                          {evento.tipo_registro === 'Adição de Dias' ? (
+                            <Badge className="bg-slate-100 text-slate-500 text-xs shrink-0">Sem publicação</Badge>
+                          ) : (
+                            <Badge className={`${pubStatusColors[pubStatus] || 'bg-slate-100 text-slate-600'} text-xs shrink-0`}>
+                              {pubStatus}
+                            </Badge>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
