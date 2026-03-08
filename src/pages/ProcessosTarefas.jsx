@@ -150,6 +150,78 @@ export default function ProcessosTarefas() {
           </div>
         )}
 
+        {/* Demandas paradas por decisão */}
+        {(paradasPorDecisao.decisao.length > 0 || paradasPorDecisao.assinatura.length > 0 || paradasPorDecisao.comando.length > 0) && (
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm mb-6">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <h2 className="font-semibold text-slate-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                Demandas Paradas por Decisão
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">Aguardando ação de chefe ou comando superior</p>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {/* Aguardando decisão */}
+              {paradasPorDecisao.decisao.length > 0 && (
+                <div className="px-5 py-3">
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3 h-3" /> Aguardando decisão do chefe ({paradasPorDecisao.decisao.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {paradasPorDecisao.decisao.map(d => (
+                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-50 rounded-lg px-2 py-1.5 transition-colors">
+                        <span className="text-sm text-slate-800 truncate font-medium">{d.titulo}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {d.aguardando_decisao_de_nome && <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded">{d.aguardando_decisao_de_nome}</span>}
+                          {d.prazo_final && <span className={`text-xs ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Aguardando assinatura */}
+              {paradasPorDecisao.assinatura.length > 0 && (
+                <div className="px-5 py-3">
+                  <p className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <Pencil className="w-3 h-3" /> Aguardando assinatura do chefe ({paradasPorDecisao.assinatura.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {paradasPorDecisao.assinatura.map(d => (
+                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="flex items-center justify-between gap-3 cursor-pointer hover:bg-orange-50 rounded-lg px-2 py-1.5 transition-colors">
+                        <span className="text-sm text-slate-800 truncate font-medium">{d.titulo}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {d.aguardando_assinatura_de_nome && <span className="text-xs text-orange-700 bg-orange-100 px-2 py-0.5 rounded">{d.aguardando_assinatura_de_nome}</span>}
+                          {d.prazo_final && <span className={`text-xs ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Aguardando comando */}
+              {paradasPorDecisao.comando.length > 0 && (
+                <div className="px-5 py-3">
+                  <p className="text-xs font-bold text-rose-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" /> Aguardando comando superior ({paradasPorDecisao.comando.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {paradasPorDecisao.comando.map(d => (
+                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="flex items-center justify-between gap-3 cursor-pointer hover:bg-rose-50 rounded-lg px-2 py-1.5 transition-colors">
+                        <span className="text-sm text-slate-800 truncate font-medium">{d.titulo}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {d.aguardando_retorno_de && <span className="text-xs text-rose-700 bg-rose-100 px-2 py-0.5 rounded">{d.aguardando_retorno_de}</span>}
+                          {d.prazo_final && <span className={`text-xs ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Lista prioritária */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
