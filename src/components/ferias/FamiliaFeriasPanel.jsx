@@ -194,12 +194,9 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
-                            <span className="text-sm font-semibold text-slate-800">{evento.tipo_registro}</span>
-                            {cfg.label && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>
-                                {cfg.label}
-                              </span>
-                            )}
+                            <span className="text-sm font-semibold text-slate-800">
+                              {NOMES_OPERACIONAIS[evento.tipo_registro] || evento.tipo_registro}
+                            </span>
                           </div>
                           <Badge className={`${pubStatusColors[pubStatus] || 'bg-slate-100 text-slate-600'} text-xs shrink-0`}>
                             {pubStatus}
