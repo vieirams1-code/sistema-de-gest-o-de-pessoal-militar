@@ -123,7 +123,7 @@ export default function CadastrarRegistroLivro() {
   const [camposCustom, setCamposCustom] = useState({});
 
   const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
-    ? resolverOperacaoFerias(selectedFerias)
+    ? (selectedFerias ? operacaoFeriasSelecionada : 'Saída Férias')
     : formData.tipo_registro;
 
   const handleChange = (name, value) => {
