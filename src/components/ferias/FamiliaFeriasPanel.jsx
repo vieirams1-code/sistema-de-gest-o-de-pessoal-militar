@@ -9,10 +9,14 @@ import {
   RefreshCw,
   Timer,
   TrendingDown,
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -33,6 +37,13 @@ const NOMES_OPERACIONAIS = {
   'Interrupção de Férias': 'Interrupção',
   'Nova Saída / Retomada': 'Continuação',
 };
+
+const TIPOS_OPERACIONAIS = [
+  'Saída Férias',
+  'Retorno Férias',
+  'Interrupção de Férias',
+  'Nova Saída / Retomada',
+];
 
 const tipoEventoConfig = {
   'Saída Férias': {
@@ -70,20 +81,38 @@ const tipoEventoConfig = {
 function formatDate(d) {
   if (!d) return '—';
   try {
-    return format(new Date(d + 'T00:00:00'), 'dd/MM/yyyy');
+    return format(new Date(`${d}T00:00:00`), 'dd/MM/yyyy');
   } catch {
     return d;
   }
 }
 
 function parseDate(d) {
-  return new Date(d + 'T00:00:00');
+  return new Date(`${d}T00:00:00`);
 }
 
 function calcPubStatus(r) {
   if (r.numero_bg && r.data_bg) return 'Publicado';
   if (r.nota_para_bg) return 'Aguardando Publicação';
   return 'Aguardando Nota';
+}
+
+function getEventDate(evento) {
+  return evento?.data_registro || evento?.data_inicio || null;
+}
+
+function compareEvents(a, b) {
+  const da = getEventDate(a) || '2000-01-01';
+  const db = getEventDate(b) || '2000-01-01';
+
+  const dateA = new Date(`${da}T00:00:00`);
+  const dateB = new Date(`${db}T00:00:00`);
+
+  if (dateA.getTime() !== dateB.getTime()) {
+    return dateA - dateB;
+  }
+
+  return new Date(a?.created_date || 0) - new Date(b?.created_date || 0);
 }
 
 function deriveEventoInterrupcao(ferias, evento) {
@@ -93,9 +122,9 @@ function deriveEventoInterrupcao(ferias, evento) {
 
   const diasNoMomento = Number(
     evento.dias_no_momento ??
-    evento.dias ??
-    ferias.dias ??
-    0
+      evento.dias ??
+      ferias.dias ??
+      0
   );
 
   let gozados = null;
@@ -120,35 +149,123 @@ function deriveEventoInterrupcao(ferias, evento) {
   return { gozados, saldo, diasNoMomento };
 }
 
+function getEstadoAtualDaCadeia(cadeia) {
+  if (!cadeia.length) {
+    return {
+      status: 'Sem Eventos',
+      ultimoEvento: null,
+      ultimaSaidaOuContinuacao: null,
+      ultimaInterrupcao: null,
+      ultimoRetorno: null,
+    };
+  }
+
+  const ultimoEvento = cadeia[cadeia.length - 1];
+  const ultimaSaidaOuContinuacao = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Saída Férias' || e.tipo_registro === 'Nova Saída / Retomada');
+
+  const ultimaInterrupcao = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Interrupção de Férias');
+
+  const ultimoRetorno = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Retorno Férias');
+
+  let status = 'Sem Eventos';
+
+  if (
+    ultimoEvento.tipo_registro === 'Saída Férias' ||
+    ultimoEvento.tipo_registro === 'Nova Saída / Retomada'
+  ) {
+    status = 'Em Curso';
+  } else if (ultimoEvento.tipo_registro === 'Interrupção de Férias') {
+    status = 'Interrompida';
+  } else if (ultimoEvento.tipo_registro === 'Retorno Férias') {
+    status = 'Encerrada';
+  }
+
+  return {
+    status,
+    ultimoEvento,
+    ultimaSaidaOuContinuacao,
+    ultimaInterrupcao,
+    ultimoRetorno,
+  };
+}
+
+function detectarInconsistencias(cadeia) {
+  const inconsistencias = [];
+
+  if (!cadeia.length) return inconsistencias;
+
+  const primeiro = cadeia[0];
+  if (primeiro.tipo_registro !== 'Saída Férias') {
+    inconsistencias.push(
+      `A cadeia inicia com ${NOMES_OPERACIONAIS[primeiro.tipo_registro] || primeiro.tipo_registro}, e não com Início.`
+    );
+  }
+
+  for (let i = 1; i < cadeia.length; i += 1) {
+    const anterior = cadeia[i - 1];
+    const atual = cadeia[i];
+
+    const dataAnterior = getEventDate(anterior);
+    const dataAtual = getEventDate(atual);
+
+    if (dataAnterior && dataAtual && parseDate(dataAtual) < parseDate(dataAnterior)) {
+      inconsistencias.push(
+        `${NOMES_OPERACIONAIS[atual.tipo_registro] || atual.tipo_registro} em ${formatDate(dataAtual)} está anterior ao evento anterior (${NOMES_OPERACIONAIS[anterior.tipo_registro] || anterior.tipo_registro} em ${formatDate(dataAnterior)}).`
+      );
+    }
+
+    const tAnterior = anterior.tipo_registro;
+    const tAtual = atual.tipo_registro;
+
+    const transicaoValida =
+      (tAnterior === 'Saída Férias' && (tAtual === 'Interrupção de Férias' || tAtual === 'Retorno Férias')) ||
+      (tAnterior === 'Interrupção de Férias' && tAtual === 'Nova Saída / Retomada') ||
+      (tAnterior === 'Nova Saída / Retomada' && (tAtual === 'Interrupção de Férias' || tAtual === 'Retorno Férias'));
+
+    if (!transicaoValida) {
+      inconsistencias.push(
+        `Sequência incomum entre ${NOMES_OPERACIONAIS[tAnterior] || tAnterior} e ${NOMES_OPERACIONAIS[tAtual] || tAtual}.`
+      );
+    }
+  }
+
+  return [...new Set(inconsistencias)];
+}
+
 export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) {
   if (!ferias) return null;
 
   const eventosVinculados = useMemo(() => {
-    return registrosLivro
-      .filter(
-        (r) =>
-          r.ferias_id === ferias.id &&
-          [
-            'Saída Férias',
-            'Retorno Férias',
-            'Interrupção de Férias',
-            'Nova Saída / Retomada',
-          ].includes(r.tipo_registro)
+    return montarCadeia(
+      ferias,
+      registrosLivro.filter(
+        (r) => r.ferias_id === ferias.id && TIPOS_OPERACIONAIS.includes(r.tipo_registro)
       )
-      .sort((a, b) => {
-        const da = new Date(a.data_registro || a.created_date || 0);
-        const db = new Date(b.data_registro || b.created_date || 0);
-        return da - db;
-      });
-  }, [registrosLivro, ferias.id]);
+    ).sort(compareEvents);
+  }, [registrosLivro, ferias]);
 
   const totalEventos = eventosVinculados.length;
   const possuiEventosPendentes = eventosVinculados.some((e) => !e.numero_bg);
 
+  const estadoCadeia = useMemo(() => {
+    return getEstadoAtualDaCadeia(eventosVinculados);
+  }, [eventosVinculados]);
+
+  const inconsistencias = useMemo(() => {
+    return detectarInconsistencias(eventosVinculados);
+  }, [eventosVinculados]);
+
   const ultimaInterrupcao = useMemo(() => {
     return [...eventosVinculados]
       .filter((e) => e.tipo_registro === 'Interrupção de Férias')
-      .sort((a, b) => new Date(b.data_registro || 0) - new Date(a.data_registro || 0))[0];
+      .sort(compareEvents)
+      .pop();
   }, [eventosVinculados]);
 
   const indicadores = useMemo(() => {
@@ -157,7 +274,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
     hoje.setHours(0, 0, 0, 0);
 
     if (ferias.status === 'Em Curso' && ferias.data_inicio) {
-      const inicio = new Date(ferias.data_inicio + 'T00:00:00');
+      const inicio = new Date(`${ferias.data_inicio}T00:00:00`);
       const gozados = Math.min(Math.max(0, differenceInDays(hoje, inicio) + 1), diasTotais);
       const restantes = Math.max(0, diasTotais - gozados);
 
@@ -183,6 +300,18 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
 
     return null;
   }, [ferias, ultimaInterrupcao]);
+
+  const resumoCadeia = useMemo(() => {
+    const ultimo = estadoCadeia.ultimoEvento;
+    const dataUltimo = getEventDate(ultimo);
+
+    return {
+      statusAtual: estadoCadeia.status,
+      ultimoEventoNome: ultimo ? (NOMES_OPERACIONAIS[ultimo.tipo_registro] || ultimo.tipo_registro) : '—',
+      ultimoEventoData: dataUltimo ? formatDate(dataUltimo) : '—',
+      cadeiaSaudavel: inconsistencias.length === 0,
+    };
+  }, [estadoCadeia, inconsistencias]);
 
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-[460px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">
@@ -219,7 +348,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs text-slate-500">Militar</span>
-              <span className="text-sm font-semibold text-slate-800">
+              <span className="text-sm font-semibold text-slate-800 text-right">
                 {ferias.militar_posto ? `${ferias.militar_posto} ` : ''}
                 {ferias.militar_nome}
               </span>
@@ -262,6 +391,70 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
             </div>
           </div>
         </div>
+
+        <div
+          className={`rounded-xl border p-4 ${
+            resumoCadeia.cadeiaSaudavel
+              ? 'bg-emerald-50 border-emerald-200'
+              : 'bg-red-50 border-red-200'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            {resumoCadeia.cadeiaSaudavel ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+            )}
+            <span
+              className={`text-xs font-bold uppercase tracking-wide ${
+                resumoCadeia.cadeiaSaudavel ? 'text-emerald-700' : 'text-red-700'
+              }`}
+            >
+              Estado da Cadeia
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-white/70 rounded-lg border border-white/60 p-3">
+              <p className="text-xs text-slate-400 mb-1">Status atual</p>
+              <p className="font-semibold text-slate-800">{resumoCadeia.statusAtual}</p>
+            </div>
+
+            <div className="bg-white/70 rounded-lg border border-white/60 p-3">
+              <p className="text-xs text-slate-400 mb-1">Último evento válido</p>
+              <p className="font-semibold text-slate-800">{resumoCadeia.ultimoEventoNome}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{resumoCadeia.ultimoEventoData}</p>
+            </div>
+          </div>
+
+          {!resumoCadeia.cadeiaSaudavel && (
+            <div className="mt-3 text-xs text-red-700">
+              Foram encontradas inconsistências cronológicas ou de sequência nesta família.
+            </div>
+          )}
+        </div>
+
+        {inconsistencias.length > 0 && (
+          <div className="bg-red-50 rounded-xl border border-red-200 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+              <span className="text-xs font-bold text-red-700 uppercase tracking-wide">
+                Inconsistências Encontradas
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {inconsistencias.map((item, idx) => (
+                <div
+                  key={`${item}-${idx}`}
+                  className="text-sm text-red-700 bg-white/70 border border-red-100 rounded-lg p-3"
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {indicadores?.tipo === 'em_curso' && (
           <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
@@ -340,6 +533,13 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
               Sequência de Eventos ({totalEventos})
             </span>
+
+            {estadoCadeia.ultimoEvento && (
+              <div className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                <Clock3 className="w-3.5 h-3.5" />
+                <span>Atual: {NOMES_OPERACIONAIS[estadoCadeia.ultimoEvento.tipo_registro] || estadoCadeia.ultimoEvento.tipo_registro}</span>
+              </div>
+            )}
           </div>
 
           {totalEventos === 0 ? (
@@ -364,6 +564,9 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                       ? deriveEventoInterrupcao(ferias, evento)
                       : null;
 
+                  const isUltimoEvento =
+                    estadoCadeia.ultimoEvento && evento.id === estadoCadeia.ultimoEvento.id;
+
                   return (
                     <div key={evento.id} className="relative flex gap-3 z-10">
                       <div
@@ -372,13 +575,24 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                         <IconComp className={`w-4 h-4 ${cfg.color}`} />
                       </div>
 
-                      <div className="flex-1 bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+                      <div
+                        className={`flex-1 bg-white rounded-xl border p-3 shadow-sm ${
+                          isUltimoEvento
+                            ? 'border-[#1e3a5f] ring-2 ring-[#1e3a5f]/10'
+                            : 'border-slate-200'
+                        }`}
+                      >
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-bold text-slate-400">#{idx + 1}</span>
                             <span className="text-sm font-semibold text-slate-800">
                               {NOMES_OPERACIONAIS[evento.tipo_registro] || evento.tipo_registro}
                             </span>
+                            {isUltimoEvento && (
+                              <Badge className="bg-[#1e3a5f]/10 text-[#1e3a5f] text-[10px]">
+                                Atual
+                              </Badge>
+                            )}
                           </div>
 
                           <Badge
@@ -396,18 +610,21 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                             </>
                           )}
 
-                          {(evento.tipo_registro === 'Saída Férias' || evento.tipo_registro === 'Retorno Férias') && evento.dias != null && (
-                            <>
-                              <span className="text-slate-400">Dias</span>
-                              <span className="text-slate-700 font-medium">{Number(evento.dias)}d</span>
-                            </>
-                          )}
+                          {(evento.tipo_registro === 'Saída Férias' || evento.tipo_registro === 'Retorno Férias') &&
+                            evento.dias != null && (
+                              <>
+                                <span className="text-slate-400">Dias</span>
+                                <span className="text-slate-700 font-medium">{Number(evento.dias)}d</span>
+                              </>
+                            )}
 
                           {evento.tipo_registro === 'Interrupção de Férias' && (
                             <>
                               <span className="text-slate-400">Dias no momento</span>
                               <span className="text-slate-700 font-medium">
-                                {interrupcaoDerivada?.diasNoMomento != null ? `${interrupcaoDerivada.diasNoMomento}d` : '—'}
+                                {interrupcaoDerivada?.diasNoMomento != null
+                                  ? `${interrupcaoDerivada.diasNoMomento}d`
+                                  : '—'}
                               </span>
                             </>
                           )}
@@ -416,7 +633,9 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                             <>
                               <span className="text-slate-400">Gozados</span>
                               <span className="text-orange-700 font-medium">
-                                {interrupcaoDerivada?.gozados != null ? `${interrupcaoDerivada.gozados}d` : '—'}
+                                {interrupcaoDerivada?.gozados != null
+                                  ? `${interrupcaoDerivada.gozados}d`
+                                  : '—'}
                               </span>
                             </>
                           )}
@@ -425,7 +644,9 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                             <>
                               <span className="text-slate-400">Saldo</span>
                               <span className="text-blue-700 font-medium">
-                                {interrupcaoDerivada?.saldo != null ? `${interrupcaoDerivada.saldo}d` : '—'}
+                                {interrupcaoDerivada?.saldo != null
+                                  ? `${interrupcaoDerivada.saldo}d`
+                                  : '—'}
                               </span>
                             </>
                           )}
@@ -484,9 +705,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
         <div className="shrink-0 px-5 py-4 border-t border-slate-200 bg-amber-50">
           <div className="flex gap-2 text-amber-700 text-sm">
             <Calendar className="w-4 h-4 mt-0.5 shrink-0" />
-            <p>
-              Atenção: Existem eventos pendentes de publicação nesta família.
-            </p>
+            <p>Atenção: existem eventos pendentes de publicação nesta família.</p>
           </div>
         </div>
       )}
