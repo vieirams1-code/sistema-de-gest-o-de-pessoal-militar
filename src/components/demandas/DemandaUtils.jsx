@@ -56,10 +56,39 @@ export function isVencendoHoje(demanda) {
 
 export function sortDemandas(list) {
   const prio = { Urgente: 0, Alta: 1, Média: 2, Baixa: 3 };
+  const crit = {
+    'Prazo Vencido': 0,
+    'Determinação de Comando': 1,
+    'Impacta Efetivo': 2,
+    Sensível: 3,
+    'Prazo Próximo': 4,
+    Rotina: 5,
+  };
+
+  const today = new Date().toISOString().split('T')[0];
+
   return [...list].sort((a, b) => {
+    // 1. Prazo vencido primeiro
+    const aVencida = a.prazo_final && a.prazo_final < today ? 0 : 1;
+    const bVencida = b.prazo_final && b.prazo_final < today ? 0 : 1;
+    if (aVencida !== bVencida) return aVencida - bVencida;
+
+    // 2. Sem responsável sobe
+    const aSemResp = !a.responsavel_atual_nome ? 0 : 1;
+    const bSemResp = !b.responsavel_atual_nome ? 0 : 1;
+    if (aSemResp !== bSemResp) return aSemResp - bSemResp;
+
+    // 3. Prioridade
     const pa = prio[a.prioridade] ?? 4;
     const pb = prio[b.prioridade] ?? 4;
     if (pa !== pb) return pa - pb;
+
+    // 4. Criticidade
+    const ca = crit[a.criticidade] ?? 6;
+    const cb = crit[b.criticidade] ?? 6;
+    if (ca !== cb) return ca - cb;
+
+    // 5. Prazo mais próximo
     if (a.prazo_final && b.prazo_final) return a.prazo_final.localeCompare(b.prazo_final);
     if (a.prazo_final) return -1;
     if (b.prazo_final) return 1;
