@@ -112,6 +112,8 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
       await base44.entities.Ferias.update(ferias.id, { status: 'Em Curso' });
     } else if (tipoRegistro === 'Retorno Férias') {
       await base44.entities.Ferias.update(ferias.id, { status: 'Gozada' });
+    } else if (tipoRegistro === 'Interrupção de Férias') {
+      await base44.entities.Ferias.update(ferias.id, { status: 'Interrompida' });
     }
 
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
