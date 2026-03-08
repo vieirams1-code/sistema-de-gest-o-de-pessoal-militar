@@ -157,7 +157,7 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
         <div className={`rounded-xl border p-4 space-y-3 ${isChefe ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Situação Atual</p>
 
-          {/* Badges de status */}
+          {/* Badges */}
           <div className="flex flex-wrap gap-1.5">
             <Badge className={`${statusColors[demanda.status] || 'bg-slate-100 text-slate-600'} text-xs`}>{demanda.status}</Badge>
             <Badge className={`${prioridadeColors[demanda.prioridade]} text-xs`}>{demanda.prioridade}</Badge>
@@ -183,17 +183,37 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
             </Select>
           </div>
 
-          {/* Próxima ação */}
-          {proximaAcao && (
-            <div className="flex items-start gap-2">
-              <ArrowRight className="w-3.5 h-3.5 text-[#1e3a5f] mt-0.5 shrink-0" />
-              <p className="text-xs text-slate-700 leading-relaxed"><span className="font-semibold">Próxima ação:</span> {proximaAcao}</p>
+          {/* Próxima ação — destaque */}
+          {proximaAcao && demanda.status !== 'Concluída' && demanda.status !== 'Arquivada' && (
+            <div className={`rounded-lg px-3 py-2.5 flex items-start gap-2.5 border ${
+              depende.chefe ? 'bg-amber-100 border-amber-300' :
+              depende.assinatura ? 'bg-orange-100 border-orange-300' :
+              depende.comando ? 'bg-rose-100 border-rose-300' :
+              'bg-[#1e3a5f]/5 border-[#1e3a5f]/20'
+            }`}>
+              <ArrowRight className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${
+                depende.chefe ? 'text-amber-700' :
+                depende.assinatura ? 'text-orange-700' :
+                depende.comando ? 'text-rose-700' : 'text-[#1e3a5f]'
+              }`} />
+              <div>
+                <p className={`text-[10px] font-bold uppercase tracking-wide mb-0.5 ${
+                  depende.chefe ? 'text-amber-600' :
+                  depende.assinatura ? 'text-orange-600' :
+                  depende.comando ? 'text-rose-600' : 'text-[#1e3a5f]/60'
+                }`}>Próxima ação</p>
+                <p className={`text-xs font-semibold leading-relaxed ${
+                  depende.chefe ? 'text-amber-900' :
+                  depende.assinatura ? 'text-orange-900' :
+                  depende.comando ? 'text-rose-900' : 'text-[#1e3a5f]'
+                }`}>{proximaAcao}</p>
+              </div>
             </div>
           )}
 
-          {/* Indicadores de dependência */}
+          {/* Dependências */}
           {(depende.chefe || depende.assinatura || depende.comando) && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
+            <div className="flex flex-wrap gap-1.5">
               {depende.chefe && <Badge className="bg-amber-100 text-amber-800 text-[10px]">🔒 Depende do chefe</Badge>}
               {depende.assinatura && <Badge className="bg-orange-100 text-orange-800 text-[10px]">✍️ Depende de assinatura</Badge>}
               {depende.comando && <Badge className="bg-rose-100 text-rose-800 text-[10px]">⬆️ Depende do comando superior</Badge>}
@@ -201,8 +221,8 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           )}
         </div>
 
-        {/* ── BLOCO: Ações Rápidas ── */}
-        {acoes.length > 0 && (
+        {/* ── BLOCO: Ações Rápidas (só exibe se não estiver Concluído ou Arquivado) ── */}
+        {acoes.length > 0 && demanda.status !== 'Concluída' && demanda.status !== 'Arquivada' && (
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Ações Rápidas</p>
             <div className="grid grid-cols-2 gap-2">
@@ -213,7 +233,7 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
                     key={a.label}
                     onClick={a.acao}
                     disabled={salvando}
-                    className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border transition-colors disabled:opacity-50 text-left ${a.color}`}
+                    className={`flex items-center gap-2 text-xs font-medium px-3 py-2.5 rounded-lg border transition-colors disabled:opacity-50 text-left ${a.color}`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span className="leading-tight">{a.label}</span>
@@ -245,7 +265,6 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           {!demanda.responsavel_atual_nome && !demanda.criado_por_nome && (
             <p className="text-xs text-red-400 italic">Sem responsável definido</p>
           )}
-          {/* Datas de encaminhamento */}
           {demanda.data_ultimo_encaminhamento && (
             <div className="pt-1 border-t border-slate-100 flex justify-between">
               <span className="text-xs text-slate-400">Último encaminhamento</span>
@@ -259,6 +278,29 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
             </div>
           )}
         </div>
+
+        {/* ── BLOCO: Militar Vinculado ── */}
+        {demanda.militar_nome_snapshot ? (
+          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Militar Vinculado</p>
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-slate-400 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  {demanda.militar_posto_snapshot ? `${demanda.militar_posto_snapshot} ` : ''}{demanda.militar_nome_snapshot}
+                </p>
+                {demanda.militar_matricula_snapshot && (
+                  <p className="text-xs text-slate-400">Mat: {demanda.militar_matricula_snapshot}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-slate-50 rounded-xl border border-dashed border-slate-200 p-3 flex items-center gap-2">
+            <User className="w-4 h-4 text-slate-300 shrink-0" />
+            <p className="text-xs text-slate-400 italic">Nenhum militar vinculado</p>
+          </div>
+        )}
 
         {/* ── BLOCO: Origem ── */}
         <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
@@ -275,24 +317,6 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
             </div>
           ))}
         </div>
-
-        {/* ── BLOCO: Militar Vinculado ── */}
-        {demanda.militar_nome_snapshot && (
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Militar Vinculado</p>
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-400 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-slate-800">
-                  {demanda.militar_posto_snapshot ? `${demanda.militar_posto_snapshot} ` : ''}{demanda.militar_nome_snapshot}
-                </p>
-                {demanda.militar_matricula_snapshot && (
-                  <p className="text-xs text-slate-400">Mat: {demanda.militar_matricula_snapshot}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ── BLOCO: Prazos ── */}
         {(demanda.prazo_interno || demanda.prazo_final) && (
@@ -315,14 +339,6 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
                 </span>
               </div>
             )}
-          </div>
-        )}
-
-        {/* ── BLOCO: Descrição ── */}
-        {(demanda.descricao || demanda.assunto_resumido) && (
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Descrição</p>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{demanda.descricao || demanda.assunto_resumido}</p>
           </div>
         )}
 
