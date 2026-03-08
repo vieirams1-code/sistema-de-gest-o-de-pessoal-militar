@@ -220,7 +220,7 @@ export default function Ferias() {
     todosEventos.forEach(e => {
       if (e.tipo_registro === 'Adição de Dias' && e.dias_evento) {
         linhas.push(`+${e.dias_evento}d: ${e.motivo_dispensa || 'Adição de dias'}`);
-      } else if (e.tipo_registro === 'Desconto em Férias' && e.dias_evento) {
+      } else if ((e.tipo_registro === 'Desconto em Férias' || e.tipo_registro === 'Dispensa Desconto Férias') && e.dias_evento) {
         linhas.push(`-${e.dias_evento}d: ${e.motivo_dispensa || 'Desconto em férias'}`);
       }
     });
