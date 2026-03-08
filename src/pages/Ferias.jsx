@@ -815,7 +815,7 @@ export default function Ferias() {
               />
               {descontoModal.ferias && (
                 <p className="text-xs text-slate-500 mt-1">
-                  Saldo após desconto: <strong>{Math.max(0, (descontoModal.ferias.dias || 0) - descontoModal.dias)} dias</strong>
+                  Saldo após desconto: <strong>{Math.max(0, recalcularDiasLocalmente(descontoModal.ferias, { tipo_registro: 'Desconto em Férias', dias_evento: descontoModal.dias, ferias_id: descontoModal.ferias.id }))} dias</strong>
                 </p>
               )}
             </div>
