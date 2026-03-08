@@ -14,6 +14,7 @@ import {
 import { ArrowLeft, User, Filter, ClipboardList, Shield, Award, Calendar, BookOpen, FileText, Activity, Search, ChevronDown, ChevronUp, Trash2, PenLine, Ban, ExternalLink } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
+import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } from '@/components/ferias/feriasAdminUtils';
 
 const TIPOS = [
   { value: 'todos', label: 'Todos os Registros' },
@@ -46,6 +47,21 @@ const dependencias = {
 function formatDate(d) {
   if (!d) return '—';
   try { return format(new Date(d + 'T00:00:00'), 'dd/MM/yyyy'); } catch { return d; }
+}
+
+function calcStatusPublicacao(registro) {
+  if (registro?.numero_bg && registro?.data_bg) return 'Publicado';
+  if (registro?.nota_para_bg) return 'Aguardando Publicação';
+  return 'Aguardando Nota';
+}
+
+function isOperacaoFeriasLivro(registro) {
+  return [
+    'Saída Férias',
+    'Interrupção de Férias',
+    'Nova Saída / Retomada',
+    'Retorno Férias',
+  ].includes(registro?.tipo_registro);
 }
 
 function EventCard({ event, onDelete }) {
@@ -347,18 +363,16 @@ export default function FichaMilitar() {
   const calcularDependencias = (event) => {
     const deps = [];
     if (event.tipo === 'atestado') {
-      // Publicações vinculadas ao atestado
       publicacoes.forEach(p => {
         if (p.atestado_homologado_id === event.id || (p.atestados_jiso_ids || []).includes(event.id)) {
-          deps.push({ tipo: 'publicacao', id: p.id, label: `Publicação Ex Officio: ${p.tipo} (${formatDate(p.data_publicacao)})` });
+          deps.push({ tipo: 'publicacao', id: p.id, raw: p, label: `Publicação Ex Officio: ${p.tipo} (${formatDate(p.data_publicacao)})` });
         }
       });
     }
     if (event.tipo === 'ferias') {
-      // Registros de livro vinculados às férias
       registrosLivro.forEach(r => {
         if (r.ferias_id === event.id) {
-          deps.push({ tipo: 'livro', id: r.id, label: `Registro Livro: ${r.tipo_registro} (${formatDate(r.data_registro)})` });
+          deps.push({ tipo: 'livro', id: r.id, raw: r, label: `Registro Livro: ${r.tipo_registro} (${formatDate(r.data_registro)})` });
         }
       });
     }
@@ -385,21 +399,100 @@ export default function FichaMilitar() {
   const executeDelete = async (event, incluirDeps = false, deps = []) => {
     setDeleting(true);
     try {
-      // Excluir dependências se solicitado
+      const reverterExOfficio = async (registro) => {
+        if (!registro) return;
+
+        if (registro.tipo === 'Homologação de Atestado' && registro.atestado_homologado_id) {
+          await base44.entities.Atestado.update(registro.atestado_homologado_id, {
+            homologado_comandante: false,
+            status_jiso: null,
+            status_publicacao: 'Aguardando Nota',
+          });
+        }
+
+        if (registro.tipo === 'Ata JISO' && registro.atestados_jiso_ids?.length) {
+          for (const aid of registro.atestados_jiso_ids) {
+            await base44.entities.Atestado.update(aid, {
+              status_jiso: 'Aguardando JISO',
+              status_publicacao: 'Aguardando Nota',
+            });
+          }
+        }
+
+        if (registro.tipo === 'Interrupção de Férias' && registro.ferias_interrompida_id) {
+          const feriasList = await base44.entities.Ferias.filter({ id: registro.ferias_interrompida_id });
+          const ferias = feriasList[0];
+          if (ferias) {
+            await base44.entities.Ferias.update(ferias.id, {
+              status: 'Em Curso',
+              saldo_remanescente: null,
+              dias_gozados_interrupcao: null,
+              data_interrupcao: null,
+              observacoes: '',
+            });
+          }
+        }
+      };
+
+      const excluirLivroComReversao = async (registroLivro) => {
+        if (!registroLivro?.ferias_id || !isOperacaoFeriasLivro(registroLivro)) {
+          await base44.entities.RegistroLivro.delete(registroLivro.id);
+          return;
+        }
+
+        const feriasList = await base44.entities.Ferias.filter({ id: registroLivro.ferias_id });
+        const ferias = feriasList[0];
+        if (!ferias) {
+          await base44.entities.RegistroLivro.delete(registroLivro.id);
+          return;
+        }
+
+        const todosRegistrosFerias = await base44.entities.RegistroLivro.filter({ ferias_id: registroLivro.ferias_id });
+        const cadeia = montarCadeia(ferias, todosRegistrosFerias);
+        const eventoAlvo = cadeia.find(e => e.id === registroLivro.id) || registroLivro;
+        const descendentes = identificarDescendentes(eventoAlvo, cadeia);
+
+        const descendentesPublicados = descendentes.filter((d) => calcStatusPublicacao(d) === 'Publicado');
+        if (descendentesPublicados.length > 0) {
+          throw new Error('Não é possível excluir este registro porque existem eventos posteriores já publicados na cadeia de férias.');
+        }
+
+        await executarExclusaoAdminCadeia({
+          ferias,
+          eventoAlvo,
+          incluirDescendentes: descendentes.length > 0,
+          cadeia,
+          queryClient,
+        });
+      };
+
       if (incluirDeps && deps.length > 0) {
         for (const dep of deps) {
-          if (dep.tipo === 'publicacao') await base44.entities.PublicacaoExOfficio.delete(dep.id);
-          else if (dep.tipo === 'livro') await base44.entities.RegistroLivro.delete(dep.id);
+          if (dep.tipo === 'publicacao') {
+            await reverterExOfficio(dep.raw);
+            await base44.entities.PublicacaoExOfficio.delete(dep.id);
+          } else if (dep.tipo === 'livro') {
+            await excluirLivroComReversao(dep.raw || { id: dep.id });
+          }
         }
       }
-      // Excluir o registro principal
+
       if (event.tipo === 'punicao') await base44.entities.Punicao.delete(event.id);
       else if (event.tipo === 'atestado') await base44.entities.Atestado.delete(event.id);
-      else if (event.tipo === 'livro') await base44.entities.RegistroLivro.delete(event.id);
-      else if (event.tipo === 'publicacao') await base44.entities.PublicacaoExOfficio.delete(event.id);
+      else if (event.tipo === 'livro') await excluirLivroComReversao(event.raw || { id: event.id });
+      else if (event.tipo === 'publicacao') {
+        await reverterExOfficio(event.raw);
+        await base44.entities.PublicacaoExOfficio.delete(event.id);
+      }
       else if (event.tipo === 'medalha') await base44.entities.Medalha.delete(event.id);
       else if (event.tipo === 'comportamento') await base44.entities.HistoricoComportamento.delete(event.id);
+
       refetchAll();
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+    } catch (error) {
+      alert(error?.message || 'Não foi possível excluir o registro com segurança.');
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
