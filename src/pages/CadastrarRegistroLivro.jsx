@@ -73,11 +73,15 @@ function getPeriodoSortKey(periodoRef, fallbackDate = '') {
   return Number.MAX_SAFE_INTEGER;
 }
 
+function getOperacoesDisponiveisFerias(ferias) {
+  if (!ferias) return ['Saída Férias'];
+  if (ferias.status === 'Em Curso') return ['Retorno Férias', 'Interrupção de Férias'];
+  if (ferias.status === 'Interrompida') return ['Nova Saída / Retomada'];
+  return ['Saída Férias'];
+}
+
 function resolverOperacaoFerias(ferias) {
-  if (!ferias) return 'Saída Férias';
-  if (ferias.status === 'Em Curso') return 'Interrupção de Férias';
-  if (ferias.status === 'Interrompida') return 'Nova Saída / Retomada';
-  return 'Saída Férias';
+  return getOperacoesDisponiveisFerias(ferias)[0];
 }
 
 export default function CadastrarRegistroLivro() {
@@ -166,15 +170,40 @@ export default function CadastrarRegistroLivro() {
   const handleFeriasSelect = (ferias) => {
     const operacao = resolverOperacaoFerias(ferias);
     const hoje = new Date().toISOString().split('T')[0];
-    const dataRegistro = (operacao === 'Nova Saída / Retomada' || operacao === 'Interrupção de Férias')
-      ? (formData.data_registro || hoje)
-      : (ferias.data_inicio || formData.data_registro || hoje);
+    let dataRegistro = formData.data_registro || hoje;
+
+    if (operacao === 'Saída Férias') {
+      dataRegistro = ferias.data_inicio || formData.data_registro || hoje;
+    } else if (operacao === 'Retorno Férias') {
+      dataRegistro = ferias.data_retorno || formData.data_registro || hoje;
+    }
 
     setSelectedFerias(ferias);
     setOperacaoFeriasSelecionada(operacao);
     setFormData(prev => ({
       ...prev,
       ferias_id: ferias.id,
+      data_registro: dataRegistro,
+    }));
+  };
+
+  const handleOperacaoFeriasChange = (operacao) => {
+    if (!selectedFerias) return;
+
+    const hoje = new Date().toISOString().split('T')[0];
+    let dataRegistro = formData.data_registro || hoje;
+
+    if (operacao === 'Saída Férias') {
+      dataRegistro = selectedFerias.data_inicio || formData.data_registro || hoje;
+    } else if (operacao === 'Retorno Férias') {
+      dataRegistro = selectedFerias.data_retorno || formData.data_registro || hoje;
+    } else {
+      dataRegistro = formData.data_registro || hoje;
+    }
+
+    setOperacaoFeriasSelecionada(operacao);
+    setFormData(prev => ({
+      ...prev,
       data_registro: dataRegistro,
     }));
   };
@@ -294,6 +323,43 @@ export default function CadastrarRegistroLivro() {
             const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
             const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
             texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(selectedFerias.data_inicio)} entrará em gozo de férias regulamentares, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+          }
+        }
+        break;
+
+      case 'Interrupção de Férias':
+        if (selectedFerias) {
+          const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
+          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
+          const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Interrupção de Férias' && t.ativo !== false);
+          if (tmpl?.template) {
+            texto = aplicarTemplate(tmpl.template, vars);
+            setUsingCustomTemplate(true);
+          } else {
+            setUsingCustomTemplate(false);
+            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
+            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
+            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
+            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(formData.data_registro)}, teve interrompido o gozo de férias regulamentares, referente ao período aquisitivo ${periodoRef}.`;
+          }
+        }
+        break;
+
+      case 'Nova Saída / Retomada':
+        if (selectedFerias) {
+          const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
+          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
+          const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Nova Saída / Retomada' && t.ativo !== false);
+          if (tmpl?.template) {
+            texto = aplicarTemplate(tmpl.template, vars);
+            setUsingCustomTemplate(true);
+          } else {
+            setUsingCustomTemplate(false);
+            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
+            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
+            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
+            const saldo = selectedFerias.saldo_remanescente ?? selectedFerias.dias ?? 0;
+            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(formData.data_registro)} reiniciará o gozo do saldo remanescente de férias regulamentares, ${saldo} (${numeroPorExtenso(Number(saldo))}) dias, referente ao período aquisitivo ${periodoRef}.`;
           }
         }
         break;
@@ -501,8 +567,22 @@ export default function CadastrarRegistroLivro() {
           {selectedFerias && (
             <div className="mt-4 space-y-3">
               <div className="p-3 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800">
-                Ação operacional identificada para esta seleção: <strong>{operacaoFeriasSelecionada === 'Nova Saída / Retomada' ? 'Continuação de férias interrompida' : operacaoFeriasSelecionada === 'Interrupção de Férias' ? 'Interrupção de férias em curso' : 'Início de férias'}</strong>.
+                Ação operacional identificada para esta seleção: <strong>{operacaoFeriasSelecionada === 'Nova Saída / Retomada' ? 'Continuação de férias interrompida' : operacaoFeriasSelecionada === 'Interrupção de Férias' ? 'Interrupção de férias em curso' : operacaoFeriasSelecionada === 'Retorno Férias' ? 'Término de férias em curso' : 'Início de férias'}</strong>.
               </div>
+              {selectedFerias.status === 'Em Curso' && (
+                <div className="p-4 bg-white rounded-lg border border-slate-200">
+                  <Label className="text-sm font-medium text-slate-700">Ação para férias em curso</Label>
+                  <Select value={operacaoFeriasSelecionada} onValueChange={handleOperacaoFeriasChange}>
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Retorno Férias">Término</SelectItem>
+                      <SelectItem value="Interrupção de Férias">Interrupção</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
