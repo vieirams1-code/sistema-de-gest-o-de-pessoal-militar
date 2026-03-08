@@ -204,7 +204,7 @@ export default function Ferias() {
     const eventosExistentes = registrosLivro.filter(r => r.ferias_id === f.id && !idsExcluir.includes(r.id));
     const todosEventos = novoEvento ? [...eventosExistentes, novoEvento] : eventosExistentes;
     const totalAdicoes = todosEventos.filter(e => e.tipo_registro === 'Adição de Dias').reduce((s, e) => s + (e.dias_evento || 0), 0);
-    const totalDescontos = todosEventos.filter(e => e.tipo_registro === 'Desconto em Férias').reduce((s, e) => s + (e.dias_evento || 0), 0);
+    const totalDescontos = todosEventos.filter(e => e.tipo_registro === 'Desconto em Férias' || e.tipo_registro === 'Dispensa Desconto Férias').reduce((s, e) => s + (e.dias_evento || 0), 0);
     return Math.max(0, diasBase + totalAdicoes - totalDescontos);
   };
 
