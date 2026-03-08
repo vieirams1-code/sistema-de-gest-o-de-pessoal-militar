@@ -47,6 +47,12 @@ export default function ProcessosTarefas() {
 
   const prioritarias = useMemo(() => sortDemandas(abertas).slice(0, 8), [abertas]);
 
+  const paradasPorDecisao = useMemo(() => ({
+    decisao: abertas.filter(d => d.etapa_fluxo === 'Aguardando decisão do chefe'),
+    assinatura: abertas.filter(d => d.etapa_fluxo === 'Aguardando assinatura do chefe'),
+    comando: abertas.filter(d => d.etapa_fluxo === 'Aguardando comando superior'),
+  }), [abertas]);
+
   const handleDelete = async (d) => {
     if (!confirm(`Excluir demanda "${d.titulo}"?`)) return;
     await base44.entities.Demanda.delete(d.id);
