@@ -41,8 +41,11 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
   useEffect(() => {
     if (ferias && open) {
       setTipoRegistro(tipoInicial || 'Saída Férias');
-      const dataDefault = tipoInicial === 'Retorno Férias' ? ferias.data_retorno : ferias.data_inicio;
-      setDataRegistro(dataDefault || new Date().toISOString().split('T')[0]);
+      const hoje = new Date().toISOString().split('T')[0];
+      const dataDefault = tipoInicial === 'Retorno Férias' ? (ferias.data_retorno || hoje)
+        : tipoInicial === 'Interrupção de Férias' ? hoje
+        : (ferias.data_inicio || hoje);
+      setDataRegistro(dataDefault);
       setNotaBg('');
       setNumeroBg('');
       setDataBg('');
