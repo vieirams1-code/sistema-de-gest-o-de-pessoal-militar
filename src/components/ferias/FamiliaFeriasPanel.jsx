@@ -174,14 +174,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                 <p className="text-xs font-semibold text-slate-700">{formatDate(ferias.data_retorno)}</p>
               </div>
             </div>
-            {saldoDias !== null && (
-              <div className="pt-2 border-t border-slate-200">
-                <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
-                  <PauseCircle className="w-4 h-4 text-orange-600 shrink-0" />
-                  <p className="text-xs text-orange-700 font-medium">Saldo após interrupção: <strong>{saldoDias} dias</strong></p>
-                </div>
-              </div>
-            )}
+
           </div>
         </div>
 
