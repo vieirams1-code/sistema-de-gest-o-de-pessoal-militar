@@ -160,6 +160,11 @@ export default function FilaDemandas() {
                           {d.responsavel_atual_nome || 'Sem responsável'}
                         </span>
                       </td>
+                      <td className="px-4 py-3 hidden xl:table-cell max-w-[180px]">
+                        {d.proxima_acao ? (
+                          <span className="text-xs text-slate-600 line-clamp-2">{d.proxima_acao}</span>
+                        ) : <span className="text-slate-300 text-xs">—</span>}
+                      </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         {d.prazo_final ? (
                           <span className={`text-xs font-medium flex items-center gap-1 ${atrasada ? 'text-red-600' : venceHoje ? 'text-amber-600' : 'text-slate-500'}`}>
