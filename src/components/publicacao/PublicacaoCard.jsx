@@ -58,13 +58,31 @@ function detectarOrigemTipo(registro) {
   return 'livro';
 }
 
-
 function getTipoDisplay(tipo) {
   if (tipo === 'Saída Férias') return 'Início';
   if (tipo === 'Interrupção de Férias') return 'Interrupção';
   if (tipo === 'Nova Saída / Retomada') return 'Continuação';
   if (tipo === 'Retorno Férias') return 'Término';
   return tipo;
+}
+
+function getGrupoDisplay(registro) {
+  const tipoBase = registro.tipo_registro || registro.tipo || '';
+
+  if (
+    tipoBase === 'Saída Férias' ||
+    tipoBase === 'Interrupção de Férias' ||
+    tipoBase === 'Nova Saída / Retomada' ||
+    tipoBase === 'Retorno Férias'
+  ) {
+    return 'Férias';
+  }
+
+  if (registro.medico || registro.cid_10) {
+    return 'Atestado';
+  }
+
+  return '';
 }
 
 function getEditUrl(registro) {
@@ -153,6 +171,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     'Publicação';
 
   const tipoLabel = getTipoDisplay(tipoBase);
+  const grupoLabel = registro.grupo_display || getGrupoDisplay(registro);
 
   // Ver Atestado: Homologação de Atestado tem atestado_homologado_id; Ata JISO tem atestados_jiso_ids
   const atestadoLink = registro.atestado_homologado_id
@@ -262,15 +281,15 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               ? 'border-red-200 bg-red-50/30'
             : isApostila
               ? 'border-purple-200 bg-purple-50/40'
-              : foiTornadaSemEfeito
-                ? 'border-red-200 bg-red-50/30'
-                : foiApostilada
-                  ? 'border-purple-200 bg-purple-50/30'
-                  : !isPublicado && registro.urgente
-                    ? 'border-red-400 bg-red-50'
-                    : !isPublicado && registro.importante
-                      ? 'border-amber-400 bg-amber-50'
-                      : 'border-slate-200'
+            : foiTornadaSemEfeito
+              ? 'border-red-200 bg-red-50/30'
+            : foiApostilada
+              ? 'border-purple-200 bg-purple-50/30'
+            : !isPublicado && registro.urgente
+              ? 'border-red-400 bg-red-50'
+            : !isPublicado && registro.importante
+              ? 'border-amber-400 bg-amber-50'
+            : 'border-slate-200'
         }`}
       >
         <CardHeader className="pb-3">
@@ -351,12 +370,21 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   <span>Mat: {registro.militar_matricula}</span>
                 )}
 
-                {tipoLabel && (
+                {grupoLabel === 'Férias' ? (
+                  <span className="flex items-center gap-2 flex-wrap">
+                    <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200">
+                      Férias
+                    </Badge>
+                    <Badge className="bg-slate-100 text-slate-700 border-slate-200">
+                      {tipoLabel}
+                    </Badge>
+                  </span>
+                ) : tipoLabel ? (
                   <span className="flex items-center gap-1">
                     <FileText className="w-3.5 h-3.5" />
                     {tipoLabel}
                   </span>
-                )}
+                ) : null}
 
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
