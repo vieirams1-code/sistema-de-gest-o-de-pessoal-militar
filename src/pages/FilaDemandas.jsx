@@ -119,13 +119,17 @@ export default function FilaDemandas() {
                   const isChefe = ETAPAS_CHEFE.includes(d.etapa_fluxo);
                   const semResp = !d.responsavel_atual_nome;
 
+                  const isComando = d.etapa_fluxo === 'Aguardando comando superior';
+                  const rowBg = atrasada ? 'bg-red-50/40' :
+                    d.etapa_fluxo === 'Aguardando decisão do chefe' ? 'bg-amber-50/40' :
+                    d.etapa_fluxo === 'Aguardando assinatura do chefe' ? 'bg-orange-50/40' :
+                    isComando ? 'bg-rose-50/30' : '';
+
                   return (
                     <tr
                       key={d.id}
                       onClick={() => setDetalhePanel(d)}
-                      className={`border-b border-slate-50 cursor-pointer transition-colors hover:bg-slate-50 ${
-                        atrasada ? 'bg-red-50/30' : isChefe ? 'bg-amber-50/20' : ''
-                      }`}
+                      className={`border-b border-slate-50 cursor-pointer transition-colors hover:bg-slate-50 ${rowBg}`}
                     >
                       <td className="px-4 py-3 text-xs text-slate-400 font-mono">{idx + 1}</td>
                       <td className="px-4 py-3">
