@@ -197,6 +197,13 @@ function getEstadoAtualDaCadeia(cadeia) {
 }
 
 function getBlockingReasonForInicio(feriasAtual, todasFeriasDoMilitar) {
+  const emCurso = todasFeriasDoMilitar.find(
+    (f) => f.id !== feriasAtual.id && f.status === 'Em Curso'
+  );
+  if (emCurso) {
+    return `Existe férias em curso do período ${emCurso.periodo_aquisitivo_ref || '-'} para este militar. Não é permitido iniciar nova férias enquanto houver outra em curso.`;
+  }
+
   const interrompida = todasFeriasDoMilitar.find(
     (f) => f.id !== feriasAtual.id && f.status === 'Interrompida'
   );
