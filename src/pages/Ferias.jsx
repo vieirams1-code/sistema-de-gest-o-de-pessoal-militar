@@ -801,16 +801,21 @@ export default function Ferias() {
             <DialogTitle className="text-orange-600 flex items-center gap-2">
               <MinusCircle className="w-5 h-5" /> Desconto em Férias
             </DialogTitle>
-            <DialogDescription>Registra o desconto de dias nas férias e gera publicação no Livro.</DialogDescription>
+            <DialogDescription>
+              Registra o desconto e gera automaticamente a publicação <strong>Dispensa com Desconto em Férias</strong> (Aguardando Nota).
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {descontoModal.ferias && (
-              <p className="text-sm text-slate-500">
-                {descontoModal.ferias.militar_posto} {descontoModal.ferias.militar_nome} — Atual: {descontoModal.ferias.dias} dias
-              </p>
+              <div className="bg-slate-50 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                <p className="font-medium text-slate-800">{descontoModal.ferias.militar_posto} {descontoModal.ferias.militar_nome}</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Base: {descontoModal.ferias.dias_base || descontoModal.ferias.dias}d &nbsp;|&nbsp; Atual: {descontoModal.ferias.dias}d &nbsp;|&nbsp; Período: {descontoModal.ferias.periodo_aquisitivo_ref || '—'}
+                </p>
+              </div>
             )}
             <div>
-              <Label className="text-sm font-medium text-slate-700">Quantidade de dias a descontar</Label>
+              <Label className="text-sm font-medium text-slate-700">Dias a descontar</Label>
               <Input
                 type="number"
                 min={1}
@@ -821,19 +826,22 @@ export default function Ferias() {
               />
               {descontoModal.ferias && (
                 <p className="text-xs text-slate-500 mt-1">
-                  Saldo após desconto: <strong>{Math.max(0, recalcularDiasLocalmente(descontoModal.ferias, { tipo_registro: 'Desconto em Férias', dias_evento: descontoModal.dias, ferias_id: descontoModal.ferias.id }))} dias</strong>
+                  Resultado após desconto: <strong className="text-orange-700">{recalcularDiasLocalmente(descontoModal.ferias, { tipo_registro: 'Desconto em Férias', dias_evento: Number(descontoModal.dias), ferias_id: descontoModal.ferias.id })} dias</strong>
                 </p>
               )}
             </div>
             <div>
-              <Label className="text-sm font-medium text-slate-700">Motivo / Período Aquisitivo <span className="text-red-500">*</span></Label>
+              <Label className="text-sm font-medium text-slate-700">Motivo <span className="text-red-500">*</span></Label>
               <Textarea
                 value={descontoModal.motivo}
                 onChange={e => setDescontoModal(p => ({ ...p, motivo: e.target.value }))}
                 rows={2}
-                placeholder="Ex: Referente ao período aquisitivo 2023/2024 — Art. XX"
+                placeholder="Ex: Art. XX — desconto por falta injustificada"
                 className="mt-1.5"
               />
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+              Será gerada uma publicação <strong>Dispensa com Desconto em Férias</strong> com status <strong>Aguardando Nota</strong>.
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' })}>Cancelar</Button>
