@@ -83,7 +83,10 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
     return saida?.dias || 30;
   })();
   const eventosAdicao = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO);
-  const eventosDesconto = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO);
+  // Reconhecer ambos os tipos de desconto (legado 'Desconto em Férias' e novo 'Dispensa Desconto Férias')
+  const eventosDesconto = eventosSobreviventes.filter(e =>
+    e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO || e.tipo_registro === 'Dispensa Desconto Férias'
+  );
 
   // dias_evento armazena sempre o valor positivo do impacto individual
   const totalAdicoes = eventosAdicao.reduce((sum, e) => sum + (e.dias_evento || 0), 0);
