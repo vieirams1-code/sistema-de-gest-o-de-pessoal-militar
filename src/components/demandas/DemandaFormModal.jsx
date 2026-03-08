@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Save, User } from 'lucide-react';
+import { Save, User, ArrowRight, Search, X } from 'lucide-react';
 
 const EMPTY = {
   titulo: '',
