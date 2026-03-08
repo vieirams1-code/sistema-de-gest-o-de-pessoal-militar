@@ -289,8 +289,8 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                           {evento.tipo_registro === 'Adição de Dias' ? (
                             <Badge className="bg-slate-100 text-slate-500 text-xs shrink-0">Sem publicação</Badge>
                           ) : (
-                            <Badge className={`${pubStatusColors[pubStatus] || 'bg-slate-100 text-slate-600'} text-xs shrink-0`}>
-                              {pubStatus}
+                            <Badge className={`${pubStatusColors[calcPubStatus(evento)] || 'bg-slate-100 text-slate-600'} text-xs shrink-0`}>
+                              {calcPubStatus(evento)}
                             </Badge>
                           )}
                         </div>
