@@ -11,6 +11,13 @@ import { aplicarTemplate, buildVarsLivro, formatDateBR } from '@/components/util
 
 
 
+const NOMES_OPERACIONAIS = {
+  'Saída Férias':          'Início',
+  'Retorno Férias':        'Término',
+  'Interrupção de Férias': 'Interrupção',
+  'Nova Saída / Retomada': 'Continuação',
+};
+
 export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial }) {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
