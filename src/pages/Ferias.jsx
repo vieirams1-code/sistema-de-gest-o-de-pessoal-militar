@@ -858,21 +858,25 @@ export default function Ferias() {
         </DialogContent>
       </Dialog>
 
-      {/* Painel Família Férias */}
-      {familiaPanel.open && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/30 z-40"
-            onClick={() => setFamiliaPanel({ open: false, ferias: null })}
-          />
-          <FamiliaFeriasPanel
-            ferias={familiaPanel.ferias}
-            registrosLivro={registrosLivro}
-            onClose={() => setFamiliaPanel({ open: false, ferias: null })}
-            currentUser={currentUser}
-          />
-        </>
-      )}
+      {/* Painel Família Férias — sempre usa a versão mais atualizada da férias do cache */}
+      {familiaPanel.open && (() => {
+        // Sincroniza com o dado mais recente do cache (após invalidateQueries)
+        const feriasSinc = ferias.find(f => f.id === familiaPanel.ferias?.id) || familiaPanel.ferias;
+        return (
+          <>
+            <div
+              className="fixed inset-0 bg-black/30 z-40"
+              onClick={() => setFamiliaPanel({ open: false, ferias: null })}
+            />
+            <FamiliaFeriasPanel
+              ferias={feriasSinc}
+              registrosLivro={registrosLivro}
+              onClose={() => setFamiliaPanel({ open: false, ferias: null })}
+              currentUser={currentUser}
+            />
+          </>
+        );
+      })()}
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
