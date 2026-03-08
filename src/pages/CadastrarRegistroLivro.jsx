@@ -1,349 +1,1141 @@
-import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Calendar,
-  AlertCircle,
-  Lock,
-  CheckCircle2,
-  PauseCircle,
-  ArrowRightCircle,
-} from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
-import { format } from 'date-fns';
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
+import { createPageUrl } from '@/utils';
+import { addDays } from 'date-fns';
+import { aplicarTemplate, buildVarsLivro, formatDateBR, abreviarPosto } from '@/components/utils/templateUtils';
 
-const statusColors = {
-  Prevista: 'bg-slate-100 text-slate-700',
-  Autorizada: 'bg-blue-100 text-blue-700',
-  'Em Curso': 'bg-amber-100 text-amber-700',
-  Interrompida: 'bg-orange-100 text-orange-700',
-  Gozada: 'bg-emerald-100 text-emerald-700',
+import MilitarSelector from '@/components/atestado/MilitarSelector';
+import FeriasSelector from '@/components/livro/FeriasSelector';
+import FormField from '@/components/militar/FormField';
+
+const initialFormData = {
+  militar_id: '',
+  militar_nome: '',
+  militar_posto: '',
+  militar_matricula: '',
+  militar_sexo: '',
+  ferias_id: '',
+  tipo_registro: 'Saída Férias',
+  data_registro: new Date().toISOString().split('T')[0],
+  dias: 0,
+  data_inicio: '',
+  data_termino: '',
+  data_retorno: '',
+  conjuge_nome: '',
+  inicio_termino: 'Início',
+  falecido_nome: '',
+  falecido_certidao: '',
+  grau_parentesco: '',
+  origem: '',
+  destino: '',
+  data_cedencia: '',
+  obs_cedencia: '',
+  tipo_transferencia: 'Entrada',
+  publicacao_transferencia: '',
+  motivo_dispensa: '',
+  periodo_aquisitivo: '',
+  dias_restantes: '',
+  curso_nome: '',
+  curso_local: '',
+  edicao_ano: '',
+  missao_descricao: '',
+  documento_referencia: '',
+  documento_texto: '',
+  data_transferencia: '',
+  nota_para_bg: '',
+  numero_bg: '',
+  data_bg: '',
+  status: 'Aguardando Nota',
+  observacoes: ''
 };
 
-function formatDate(dateString) {
-  if (!dateString) return '-';
-  return format(new Date(`${dateString}T00:00:00`), 'dd/MM/yyyy');
-}
-
-function getPeriodoSortKey(ferias) {
-  const ref = ferias?.periodo_aquisitivo_ref || '';
-  const match = String(ref).match(/(\d{4})\s*\/\s*(\d{4})/);
-
-  if (match) {
-    return Number(match[1]);
+function getPeriodoSortKey(periodoRef, fallbackDate = '') {
+  if (periodoRef) {
+    const match = String(periodoRef).match(/(\d{4})\s*\/\s*(\d{4})/);
+    if (match) {
+      return Number(match[1]);
+    }
   }
 
-  if (ferias?.data_inicio) {
-    const d = new Date(`${ferias.data_inicio}T00:00:00`);
+  if (fallbackDate) {
+    const d = new Date(`${fallbackDate}T00:00:00`);
     if (!Number.isNaN(d.getTime())) return d.getTime();
   }
 
   return Number.MAX_SAFE_INTEGER;
 }
 
-function ordenarFerias(lista) {
-  return [...lista].sort((a, b) => {
-    const ka = getPeriodoSortKey(a);
-    const kb = getPeriodoSortKey(b);
-
-    if (ka !== kb) return ka - kb;
-
-    const da = a?.data_inicio ? new Date(`${a.data_inicio}T00:00:00`).getTime() : Number.MAX_SAFE_INTEGER;
-    const db = b?.data_inicio ? new Date(`${b.data_inicio}T00:00:00`).getTime() : Number.MAX_SAFE_INTEGER;
-    return da - db;
-  });
+function resolverOperacaoFerias(ferias) {
+  if (!ferias) return 'Saída Férias';
+  if (ferias.status === 'Interrompida') return 'Nova Saída / Retomada';
+  return 'Saída Férias';
 }
 
-function montarFeriasOpcoes(ferias, tipoRegistro) {
-  if (tipoRegistro === 'Retorno Férias') {
-    return ordenarFerias(
-      ferias
-        .filter((f) => f.status === 'Em Curso')
-        .map((f) => ({
-          ...f,
-          disabled: false,
-          bloqueioMotivo: '',
-          operacao_sugerida: 'Retorno Férias',
-          destaque: 'termino',
-        }))
-    );
-  }
+export default function CadastrarRegistroLivro() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  if (tipoRegistro === 'Interrupção de Férias') {
-    return ordenarFerias(
-      ferias
-        .filter((f) => f.status === 'Em Curso')
-        .map((f) => ({
-          ...f,
-          disabled: false,
-          bloqueioMotivo: '',
-          operacao_sugerida: 'Interrupção de Férias',
-          destaque: 'interrupcao',
-        }))
-    );
-  }
+  const [formData, setFormData] = useState(initialFormData);
+  const [loading, setLoading] = useState(false);
+  const [selectedFerias, setSelectedFerias] = useState(null);
+  const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState('Saída Férias');
+  const [textoPublicacao, setTextoPublicacao] = useState('');
+  const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
 
-  if (tipoRegistro === 'Nova Saída / Retomada') {
-    return ordenarFerias(
-      ferias
-        .filter((f) => f.status === 'Interrompida')
-        .map((f) => ({
-          ...f,
-          disabled: false,
-          bloqueioMotivo: '',
-          operacao_sugerida: 'Nova Saída / Retomada',
-          destaque: 'continuacao',
-        }))
-    );
-  }
-
-  const interrompidas = ordenarFerias(ferias.filter((f) => f.status === 'Interrompida'));
-  const previstas = ordenarFerias(ferias.filter((f) => f.status === 'Prevista' || f.status === 'Autorizada'));
-
-  if (interrompidas.length > 0) {
-    return [
-      ...interrompidas.map((f) => ({
-        ...f,
-        disabled: false,
-        bloqueioMotivo: '',
-        operacao_sugerida: 'Nova Saída / Retomada',
-        destaque: 'prioridade_interrompida',
-      })),
-      ...previstas.map((f) => ({
-        ...f,
-        disabled: true,
-        bloqueioMotivo: 'Existe férias interrompida pendente. Ela deve ser resolvida antes de iniciar outro período.',
-        operacao_sugerida: 'Saída Férias',
-        destaque: 'bloqueada_por_interrompida',
-      })),
-    ];
-  }
-
-  const periodoMaisAntigo = previstas[0]?.id;
-
-  return previstas.map((f) => ({
-    ...f,
-    disabled: f.id !== periodoMaisAntigo,
-    bloqueioMotivo:
-      f.id !== periodoMaisAntigo
-        ? 'Há período aquisitivo mais antigo pendente. O sistema força iniciar primeiro o mais antigo.'
-        : '',
-    operacao_sugerida: 'Saída Férias',
-    destaque: f.id === periodoMaisAntigo ? 'mais_antigo' : 'bloqueada_por_antiguidade',
-  }));
-}
-
-function getMensagemEstado(opcoes, tipoRegistro) {
-  if (tipoRegistro === 'Retorno Férias') {
-    return {
-      titulo: 'Nenhuma férias em curso',
-      texto: 'Este militar não possui férias em curso para término.',
-    };
-  }
-
-  if (tipoRegistro === 'Interrupção de Férias') {
-    return {
-      titulo: 'Nenhuma férias em curso',
-      texto: 'Este militar não possui férias em curso para interrupção.',
-    };
-  }
-
-  if (tipoRegistro === 'Nova Saída / Retomada') {
-    return {
-      titulo: 'Nenhuma férias interrompida',
-      texto: 'Este militar não possui férias interrompidas para continuação.',
-    };
-  }
-
-  return {
-    titulo: 'Nenhuma férias disponível',
-    texto: 'Este militar não possui férias previstas, autorizadas ou interrompidas compatíveis com o fluxo atual.',
-  };
-}
-
-export default function FeriasSelector({ militarId, value, onChange, tipoRegistro }) {
-  const { data: feriasRaw = [], isLoading } = useQuery({
-    queryKey: ['ferias-militar', militarId, tipoRegistro],
-    queryFn: async () => {
-      if (!militarId) return [];
-      return base44.entities.Ferias.filter({ militar_id: militarId });
-    },
-    enabled: !!militarId,
+  // Buscar templates cadastrados
+  const { data: templates = [] } = useQuery({
+    queryKey: ['templates-texto'],
+    queryFn: () => base44.entities.TemplateTexto.list(),
+    staleTime: 30000,
   });
 
-  const opcoes = useMemo(() => montarFeriasOpcoes(feriasRaw, tipoRegistro), [feriasRaw, tipoRegistro]);
-  const selectedFerias = useMemo(() => opcoes.find((item) => item.id === value) || null, [opcoes, value]);
-  const estado = getMensagemEstado(opcoes, tipoRegistro);
+  // Buscar períodos aquisitivos do militar
+  const { data: periodosAquisitivos = [] } = useQuery({
+    queryKey: ['periodos-aquisitivos-livro', formData.militar_id],
+    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: formData.militar_id }),
+    enabled: !!formData.militar_id,
+    staleTime: 0,
+  });
 
-  const existeInterrompidaPrioritaria = opcoes.some((f) => f.destaque === 'prioridade_interrompida');
-  const existeBloqueioPorAntiguidade = opcoes.some((f) => f.destaque === 'bloqueada_por_antiguidade');
+  // Mostra períodos Previsto OU Disponível (pode ter saldo para descontar)
+  const periodosParaDesconto = periodosAquisitivos.filter(p => !p.inativo && (p.status === 'Previsto' || p.status === 'Disponível' || p.status === 'Parcialmente Gozado'));
 
-  const handleSelect = (feriasId) => {
-    const ferias = opcoes.find((f) => f.id === feriasId);
-    if (!ferias || ferias.disabled) return;
-    if (onChange) onChange(ferias);
+  const { data: tiposCustom = [] } = useQuery({
+    queryKey: ['tipos-publicacao-custom-livro'],
+    queryFn: () => base44.entities.TipoPublicacaoCustom.filter({ modulo: 'Livro', ativo: true }),
+    staleTime: 30000,
+  });
+
+  // Dados extras para tipos customizados
+  const [camposCustom, setCamposCustom] = useState({});
+
+  const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
+    ? resolverOperacaoFerias(selectedFerias)
+    : formData.tipo_registro;
+
+  const handleChange = (name, value) => {
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'nota_para_bg' || name === 'numero_bg' || name === 'data_bg') {
+        const nota = name === 'nota_para_bg' ? value : updated.nota_para_bg;
+        const numBg = name === 'numero_bg' ? value : updated.numero_bg;
+        const dataBg = name === 'data_bg' ? value : updated.data_bg;
+        if (numBg && dataBg) updated.status = 'Publicado';
+        else if (nota) updated.status = 'Aguardando Publicação';
+        else updated.status = 'Aguardando Nota';
+      }
+      return updated;
+    });
   };
 
-  if (!militarId) {
-    return (
-      <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-        <p className="text-sm text-slate-600">
-          Selecione primeiro o militar para carregar as férias disponíveis.
-        </p>
-      </div>
-    );
-  }
+  const handleMilitarSelect = (militar) => {
+    const militarId = militar?.id || '';
+    const militarNome = militar?.militar_nome || militar?.nome_completo || '';
+    const militarPosto = militar?.militar_posto || militar?.posto_graduacao || '';
+    const militarMatricula = militar?.militar_matricula || militar?.matricula || '';
+    const militarSexo = militar?.sexo || '';
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-4">
-        <div className="w-6 h-6 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+    setFormData(prev => ({
+      ...prev,
+      militar_id: militarId,
+      militar_nome: militarNome,
+      militar_posto: militarPosto,
+      militar_matricula: militarMatricula,
+      militar_sexo: militarSexo,
+      ferias_id: '',
+      dias: 0,
+      data_inicio: '',
+      data_termino: '',
+      data_retorno: '',
+      periodo_aquisitivo: '',
+      dias_restantes: ''
+    }));
+    setSelectedFerias(null);
+    setOperacaoFeriasSelecionada('Saída Férias');
+  };
 
-  if (opcoes.length === 0) {
-    return (
-      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-amber-800">{estado.titulo}</p>
-          <p className="text-xs text-amber-700 mt-1">{estado.texto}</p>
+  const handleFeriasSelect = (ferias) => {
+    const operacao = resolverOperacaoFerias(ferias);
+    const hoje = new Date().toISOString().split('T')[0];
+    const dataRegistro = operacao === 'Nova Saída / Retomada'
+      ? (formData.data_registro || hoje)
+      : (ferias.data_inicio || formData.data_registro || hoje);
+
+    setSelectedFerias(ferias);
+    setOperacaoFeriasSelecionada(operacao);
+    setFormData(prev => ({
+      ...prev,
+      ferias_id: ferias.id,
+      data_registro: dataRegistro,
+    }));
+  };
+
+  const formatarDataExtenso = (dataString) => {
+    if (!dataString) return '';
+    const data = new Date(dataString + 'T00:00:00');
+    const dia = data.getDate();
+    const mes = data.getMonth() + 1;
+    const ano = data.getFullYear();
+    return `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${ano}`;
+  };
+
+  const numeroPorExtenso = (num) => {
+    const numeros = {
+      1: 'um', 2: 'dois', 3: 'três', 4: 'quatro', 5: 'cinco',
+      6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove', 10: 'dez',
+      11: 'onze', 12: 'doze', 13: 'treze', 14: 'quatorze', 15: 'quinze',
+      16: 'dezesseis', 17: 'dezessete', 18: 'dezoito', 19: 'dezenove', 20: 'vinte',
+      21: 'vinte e um', 22: 'vinte e dois', 23: 'vinte e três', 24: 'vinte e quatro',
+      25: 'vinte e cinco', 26: 'vinte e seis', 27: 'vinte e sete', 28: 'vinte e oito',
+      29: 'vinte e nove', 30: 'trinta', 60: 'sessenta', 120: 'cento e vinte'
+    };
+    return numeros[num] || num.toString();
+  };
+
+  const calcularDataTermino = () => {
+    if (formData.data_inicio && formData.dias > 0) {
+      const inicio = new Date(formData.data_inicio + 'T00:00:00');
+      const termino = addDays(inicio, formData.dias - 1);
+      return termino.toISOString().split('T')[0];
+    }
+    return '';
+  };
+
+  useEffect(() => {
+    const termino = calcularDataTermino();
+    if (termino) {
+      setFormData(prev => ({ ...prev, data_termino: termino }));
+    }
+  }, [formData.data_inicio, formData.dias]);
+
+  useEffect(() => {
+    if (formData.tipo_registro === 'Núpcias') {
+      setFormData(prev => ({ ...prev, dias: 8 }));
+    } else if (formData.tipo_registro === 'Luto') {
+      setFormData(prev => ({ ...prev, dias: 8 }));
+    } else if (formData.tipo_registro === 'Trânsito') {
+      setFormData(prev => ({ ...prev, dias: 30 }));
+    } else if (formData.tipo_registro === 'Instalação') {
+      setFormData(prev => ({ ...prev, dias: 10 }));
+    } else if (formData.tipo_registro === 'Licença Maternidade') {
+      setFormData(prev => ({ ...prev, dias: 120 }));
+    } else if (formData.tipo_registro === 'Licença Paternidade') {
+      setFormData(prev => ({ ...prev, dias: 5 }));
+    } else if (formData.tipo_registro === 'Dispensa Recompensa') {
+      setFormData(prev => ({ ...prev, dias: 4 }));
+    } else if (formData.tipo_registro === 'Dispensa Desconto Férias') {
+      setFormData(prev => ({ ...prev, dias: 6 }));
+    }
+  }, [formData.tipo_registro]);
+
+  useEffect(() => {
+    gerarTextoPublicacao();
+  }, [formData, selectedFerias, templates]);
+
+  const gerarTextoPublicacao = () => {
+    const abreviatura = abreviarPosto(formData.militar_posto);
+    const postoNome = abreviatura ? `${abreviatura} QOBM` : '';
+    const nomeCompleto = formData.militar_nome || '';
+    const matricula = formData.militar_matricula || '';
+    const dataRegistro = formatarDataExtenso(formData.data_registro);
+    const dataInicio = formatarDataExtenso(formData.data_inicio);
+    const dataTermino = formatarDataExtenso(formData.data_termino);
+    const dias = formData.dias || 0;
+    const diasExtenso = numeroPorExtenso(dias);
+
+    // Helper: tenta usar template cadastrado primeiro
+    const tentarTemplate = (tipoRegistro, varsExtras = {}) => {
+      const tmpl = templates.find(
+        t => t.modulo === 'Livro' && t.tipo_registro === tipoRegistro && t.ativo !== false
+      );
+      if (tmpl?.template) {
+        const vars = {
+          posto_nome: postoNome,
+          posto: abreviatura,
+          nome_completo: nomeCompleto,
+          matricula,
+          data_registro: dataRegistro,
+          data_inicio: dataInicio,
+          data_termino: dataTermino,
+          dias: String(dias),
+          dias_extenso: diasExtenso,
+          ...varsExtras,
+        };
+        setUsingCustomTemplate(true);
+        return aplicarTemplate(tmpl.template, vars);
+      }
+      setUsingCustomTemplate(false);
+      return null;
+    };
+
+    let texto = '';
+
+    switch (tipoRegistroEfetivo) {
+      case 'Saída Férias':
+        if (selectedFerias) {
+          const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
+          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
+          const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Saída Férias' && t.ativo !== false);
+          if (tmpl?.template) {
+            texto = aplicarTemplate(tmpl.template, vars);
+            setUsingCustomTemplate(true);
+          } else {
+            setUsingCustomTemplate(false);
+            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
+            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
+            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
+            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(selectedFerias.data_inicio)} entrará em gozo de férias regulamentares, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+          }
+        }
+        break;
+
+      case 'Retorno Férias':
+        if (selectedFerias) {
+          const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
+          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
+          const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Retorno Férias' && t.ativo !== false);
+          if (tmpl?.template) {
+            texto = aplicarTemplate(tmpl.template, vars);
+            setUsingCustomTemplate(true);
+          } else {
+            setUsingCustomTemplate(false);
+            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
+            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
+            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
+            const fracionamento = selectedFerias.fracionamento || '';
+            const tipoFeriaTexto = fracionamento ? `${fracionamento} de férias regulamentares` : 'férias regulamentares';
+            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(formData.data_registro)}, por término do gozo da ${tipoFeriaTexto}, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+          }
+        }
+        break;
+
+      case 'Licença Maternidade': {
+        const t = tentarTemplate('Licença Maternidade', { data_inicio: dataInicio, data_termino: dataTermino });
+        if (t) { texto = t; break; }
+        if (dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por término de ${dias} (${diasExtenso}) dias de Licença-Maternidade, acrescidos de 60 (sessenta) dias de prorrogação, a contar de ${dataInicio}, com término em ${dataTermino}.`;
+        break;
+      }
+
+      case 'Licença Paternidade': {
+        const t = tentarTemplate('Licença Paternidade', { data_inicio: dataInicio, data_termino: dataTermino });
+        if (t) { texto = t; break; }
+        if (dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 05 (cinco) dias de Licença-Paternidade, a contar de ${dataInicio}, com término em ${formatarDataExtenso(formData.data_termino || calcularDataTermino())}.`;
+        break;
+      }
+
+      case 'Núpcias': {
+        const tipoTexto = formData.inicio_termino === 'Início' ? 'início' : 'término';
+        const t = tentarTemplate('Núpcias', { data_inicio: dataInicio, tipo_texto: tipoTexto });
+        if (t) { texto = t; break; }
+        if (formData.conjuge_nome && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${tipoTexto} de 08 (oito) dias de afastamento, por ter contraído matrimônio, a contar de ${dataInicio}.`;
+        break;
+      }
+
+      case 'Luto': {
+        const t = tentarTemplate('Luto', { data_inicio: dataInicio, data_termino: dataTermino, falecido_nome: formData.falecido_nome, falecido_certidao: formData.falecido_certidao, grau_parentesco: formData.grau_parentesco });
+        if (t) { texto = t; break; }
+        if (formData.falecido_nome && formData.falecido_certidao && formData.grau_parentesco && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por término de 08 (oito) dias de luto, a contar de ${dataInicio}, com término em ${dataTermino}, referente ao falecimento de ${formData.falecido_nome}, conforme Certidão de Óbito n. ${formData.falecido_certidao}, que segue anexa ao presente boletim.`;
+        break;
+      }
+
+      case 'Cedência': {
+        const t = tentarTemplate('Cedência', { origem: formData.origem, destino: formData.destino, data_cedencia: formatarDataExtenso(formData.data_cedencia) });
+        if (t) { texto = t; break; }
+        if (formData.origem && formData.destino && formData.data_cedencia) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do Militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido cedido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_cedencia)}.`;
+        break;
+      }
+
+      case 'Transferência para RR': {
+        const t = tentarTemplate('Transferência para RR', { origem: formData.origem, destino: formData.destino, documento_referencia: formData.documento_referencia, publicacao_transferencia: formData.publicacao_transferencia, data_transferencia: formatarDataExtenso(formData.data_transferencia) });
+        if (t) { texto = t; break; }
+        if (formData.documento_referencia && formData.data_transferencia) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido transferido(a) do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${formatarDataExtenso(formData.data_transferencia)}, conforme ${formData.documento_referencia}.`;
+        break;
+      }
+
+      case 'Transferência': {
+        const t = tentarTemplate('Transferência', { origem: formData.origem, destino: formData.destino, publicacao_transferencia: formData.publicacao_transferencia, data_transferencia: formatarDataExtenso(formData.data_transferencia), tipo_transferencia: formData.tipo_transferencia });
+        if (t) { texto = t; break; }
+        if (formData.data_transferencia) {
+          const origemTexto = formData.tipo_transferencia === 'Entrada' ? `do(a) ${formData.origem || '___'}` : `do(a) ${formData.origem || '___'}`;
+          const destinoTexto = formData.tipo_transferencia === 'Entrada' ? `para o(a) ${formData.destino || '___'}` : `para o(a) ${formData.destino || '___'}`;
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do Militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ter sido transferido ${origemTexto} ${destinoTexto}, a contar de ${formatarDataExtenso(formData.data_transferencia)}${formData.publicacao_transferencia ? `, conforme ${formData.publicacao_transferencia}` : ''}.`;
+        }
+        break;
+      }
+
+      case 'Trânsito': {
+        const t = tentarTemplate('Trânsito', { origem: formData.origem, destino: formData.destino, data_inicio: dataInicio });
+        if (t) { texto = t; break; }
+        if (formData.origem && formData.destino && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 30 (trinta) dias de trânsito, por ter sido movimentado do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${dataInicio}.`;
+        break;
+      }
+
+      case 'Instalação': {
+        const t = tentarTemplate('Instalação', { origem: formData.origem, destino: formData.destino, data_inicio: dataInicio });
+        if (t) { texto = t; break; }
+        if (formData.origem && formData.destino && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue: Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; 2º ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de 10 (dez) dias de instalação, por ter sido movimentado do(a) ${formData.origem} para o(a) ${formData.destino}, a contar de ${dataInicio}.`;
+        break;
+      }
+
+      case 'Dispensa Recompensa': {
+        const t = tentarTemplate('Dispensa Recompensa', { data_inicio: dataInicio, motivo_dispensa: formData.motivo_dispensa });
+        if (t) { texto = t; break; }
+        if (formData.motivo_dispensa && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de dispensa total do serviço e expediente, a título de recompensa, a contar de ${dataInicio}.`;
+        break;
+      }
+
+      case 'Dispensa Desconto Férias': {
+        const diasRestantes = formData.dias_restantes || '';
+        const periodoLabel = formData.periodo_aquisitivo_label || formData.periodo_aquisitivo || '';
+        const t = tentarTemplate('Dispensa Desconto Férias', { data_inicio: dataInicio, periodo_aquisitivo: periodoLabel, dias_restantes: diasRestantes });
+        if (t) { texto = t; break; }
+        if (formData.periodo_aquisitivo && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de Dispensa para Desconto em Férias a contar de ${dataInicio}, referentes ao período aquisitivo de ${periodoLabel}, restando ${diasRestantes} dias.`;
+        break;
+      }
+
+      case 'Deslocamento Missão': {
+        const dataRetornoMissao = formatarDataExtenso(formData.data_retorno);
+        const t = tentarTemplate('Deslocamento Missão', { data_inicio: dataInicio, data_retorno: dataRetornoMissao, destino: formData.destino, missao_descricao: formData.missao_descricao, documento_referencia: formData.documento_referencia, inicio_termino: formData.inicio_termino });
+        if (t) { texto = t; break; }
+        if (formData.missao_descricao && formData.destino && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.missao_descricao}, conforme ${formData.documento_referencia}, a contar de ${dataInicio} ${formData.inicio_termino === 'Início' && dataRetornoMissao ? 'a ' + dataRetornoMissao : ''} em ${formData.destino}.`;
+        break;
+      }
+
+      case 'Curso/Estágio': {
+        const localTexto = formData.curso_local ? ` em ${formData.curso_local}` : '';
+        const t = tentarTemplate('Curso/Estágio', { data_inicio: dataInicio, curso_nome: formData.curso_nome, curso_local: formData.curso_local, edicao_ano: formData.edicao_ano, documento_referencia: formData.documento_referencia, inicio_termino: formData.inicio_termino });
+        if (t) { texto = t; break; }
+        if (formData.curso_nome && formData.inicio_termino && dataInicio) {
+          const eventoOuAno = formData.edicao_ano ? `, conforme ${formData.documento_referencia}, a contar de ${dataInicio}` : '';
+          texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Oficiais e Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por ${formData.inicio_termino === 'Início' ? 'início' : 'término'} de deslocamento para realização do(a) ${formData.curso_nome}${localTexto}${eventoOuAno}.`;
+        }
+        break;
+      }
+
+      case 'Designação de Função':
+      case 'Dispensa de Função': {
+        const tipoLabel = formData.tipo_registro === 'Designação de Função' ? 'designado(a)' : 'dispensado(a)';
+        const t = tentarTemplate(formData.tipo_registro, { funcao: formData.funcao || '', data_designacao: formatarDataExtenso(formData.data_designacao) });
+        if (t) { texto = t; break; }
+        if (formData.funcao && formData.data_designacao) texto = `${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${tipoLabel} da função de ${formData.funcao}, a contar de ${formatarDataExtenso(formData.data_designacao)}.`;
+        break;
+      }
+    }
+
+    setTextoPublicacao(texto);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const registroData = {
+      ...formData,
+      tipo_registro: tipoRegistroEfetivo,
+      texto_publicacao: textoPublicacao,
+      dias: formData.dias !== '' && formData.dias !== undefined ? Number(formData.dias) : undefined,
+      dias_restantes: formData.dias_restantes !== '' && formData.dias_restantes !== undefined ? Number(formData.dias_restantes) : undefined,
+    };
+
+    await base44.entities.RegistroLivro.create(registroData);
+
+    if (formData.ferias_id) {
+      if (tipoRegistroEfetivo === 'Nova Saída / Retomada' && selectedFerias) {
+        const saldo = Number(selectedFerias.saldo_remanescente || selectedFerias.dias || 0);
+        const novoFim = saldo > 0
+          ? addDays(new Date(`${formData.data_registro}T00:00:00`), saldo - 1).toISOString().split('T')[0]
+          : formData.data_registro;
+        const novoRetorno = addDays(new Date(`${formData.data_registro}T00:00:00`), saldo).toISOString().split('T')[0];
+
+        await base44.entities.Ferias.update(formData.ferias_id, {
+          status: 'Em Curso',
+          data_inicio: formData.data_registro,
+          data_fim: novoFim,
+          data_retorno: novoRetorno,
+          dias: saldo,
+          saldo_remanescente: null,
+          data_interrupcao: null,
+        });
+      } else if (tipoRegistroEfetivo === 'Retorno Férias') {
+        await base44.entities.Ferias.update(formData.ferias_id, {
+          status: 'Gozada',
+          data_retorno_registrada: new Date().toISOString()
+        });
+      } else if (tipoRegistroEfetivo === 'Saída Férias') {
+        await base44.entities.Ferias.update(formData.ferias_id, {
+          status: 'Em Curso',
+          data_saida_registrada: new Date().toISOString()
+        });
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+    queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    
+    setLoading(false);
+    navigate(createPageUrl('Publicacoes'));
+  };
+
+  const renderSpecificFields = () => {
+    if (formData.tipo_registro === 'Saída Férias') {
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Férias</h3>
+
+          <FeriasSelector
+            militarId={formData.militar_id}
+            value={formData.ferias_id}
+            onChange={handleFeriasSelect}
+            tipoRegistro={formData.tipo_registro}
+          />
+
+          {selectedFerias && (
+            <div className="mt-4 space-y-3">
+              <div className="p-3 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800">
+                Ação operacional identificada para esta seleção: <strong>{operacaoFeriasSelecionada === 'Nova Saída / Retomada' ? 'Continuação de férias interrompida' : 'Início de férias'}</strong>.
+              </div>
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-slate-500">Período Aquisitivo</p>
+                    <p className="font-medium">{selectedFerias.periodo_aquisitivo_ref}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Status</p>
+                    <p className="font-medium">{selectedFerias.status}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Data Base</p>
+                    <p className="font-medium">{formatarDataExtenso(selectedFerias.data_inicio)}</p>
+                  </div>
+                  {selectedFerias.saldo_remanescente != null && (
+                    <div>
+                      <p className="text-slate-500">Saldo Remanescente</p>
+                      <p className="font-medium text-blue-700">{selectedFerias.saldo_remanescente} dias</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    );
-  }
+      );
+    }
+
+    switch (tipoRegistroEfetivo) {
+      case 'Licença Maternidade':
+      case 'Prorrogação de Licença Maternidade':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{formData.tipo_registro}</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+              <FormField label="Data de Término" name="data_termino" value={formData.data_termino} onChange={handleChange} type="date" required />
+            </div>
+          </div>
+        );
+
+      case 'Licença Paternidade':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Licença Paternidade</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+              <FormField label="Data de Término" name="data_termino" value={formData.data_termino} onChange={handleChange} type="date" required />
+            </div>
+          </div>
+        );
+
+      case 'Transferência':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência</h3>
+            <div className="space-y-4">
+              <FormField
+                label="Tipo"
+                name="tipo_transferencia"
+                value={formData.tipo_transferencia}
+                onChange={handleChange}
+                type="select"
+                options={['Entrada', 'Saída', 'Ex Officio']}
+                required
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="1ºSGBM/3°GBM" required />
+                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="1° Grupamento de Bombeiros Militar" required />
+              </div>
+              <FormField label="Data da Transferência" name="data_transferencia" value={formData.data_transferencia} onChange={handleChange} type="date" required />
+              <div>
+                <Label className="text-sm font-medium text-slate-700">
+                  Publicação da Transferência
+                  <span className="ml-2 text-xs text-slate-400 font-normal">(Ex: DOEMS nº XX.XXX de XX de XXX de XXXX)</span>
+                </Label>
+                <Input
+                  value={formData.publicacao_transferencia || ''}
+                  onChange={(e) => handleChange('publicacao_transferencia', e.target.value)}
+                  className="mt-1.5"
+                  placeholder="DOEMS nº XX.XXX de XX de XXX de XXXX"
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Núpcias':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Núpcias</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Cônjuge" name="conjuge_nome" value={formData.conjuge_nome} onChange={handleChange} placeholder="Nome do cônjuge" required />
+                <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Luto':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Luto</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Falecido(a)"
+                  name="falecido_nome"
+                  value={formData.falecido_nome}
+                  onChange={handleChange}
+                  placeholder="Nome do falecido"
+                  required
+                />
+                <FormField
+                  label="Certidão de Óbito"
+                  name="falecido_certidao"
+                  value={formData.falecido_certidao}
+                  onChange={handleChange}
+                  placeholder="Número da certidão"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Grau de Parentesco (BM e Cônjuge)"
+                  name="grau_parentesco"
+                  value={formData.grau_parentesco}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Ascendentes', 'Descendentes', 'Cônjuge', 'Irmão(ã)']}
+                  required
+                />
+                <FormField
+                  label="Data de Início"
+                  name="data_inicio"
+                  value={formData.data_inicio}
+                  onChange={handleChange}
+                  type="date"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Cedência':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cedência</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Origem"
+                  name="origem"
+                  value={formData.origem}
+                  onChange={handleChange}
+                  placeholder="Unidade de origem"
+                  required
+                />
+                <FormField
+                  label="Destino"
+                  name="destino"
+                  value={formData.destino}
+                  onChange={handleChange}
+                  placeholder="Unidade de destino"
+                  required
+                />
+              </div>
+              <FormField
+                label="Data da Cedência"
+                name="data_cedencia"
+                value={formData.data_cedencia}
+                onChange={handleChange}
+                type="date"
+                required
+              />
+              <div>
+                <Label>OBS</Label>
+                <Textarea
+                  value={formData.obs_cedencia}
+                  onChange={(e) => handleChange('obs_cedencia', e.target.value)}
+                  className="mt-1.5"
+                  rows={3}
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Transferência para RR':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência para Reserva Remunerada</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="Unidade de origem" />
+                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="Unidade de destino" />
+              </div>
+              <FormField label="Data de Transferência" name="data_transferencia" value={formData.data_transferencia} onChange={handleChange} type="date" required />
+              <div>
+                <Label className="text-sm font-medium text-slate-700">
+                  Publicação da Transferência
+                  <span className="ml-2 text-xs text-slate-400 font-normal">(Ex: DOEMS nº XX.XXX de XX de XXX de XXXX)</span>
+                </Label>
+                <Input
+                  value={formData.publicacao_transferencia || ''}
+                  onChange={(e) => handleChange('publicacao_transferencia', e.target.value)}
+                  className="mt-1.5"
+                  placeholder="DOEMS nº XX.XXX de XX de XXX de XXXX"
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Trânsito':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Trânsito</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="Unidade de origem" required />
+                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="Unidade de destino" required />
+              </div>
+              <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+            </div>
+          </div>
+        );
+
+      case 'Instalação':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Instalação</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="Unidade de origem" required />
+                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="Unidade de destino" required />
+              </div>
+              <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+            </div>
+          </div>
+        );
+
+      case 'Dispensa Recompensa':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa como Recompensa</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Dias" name="dias" value={formData.dias} onChange={handleChange} type="number" required />
+                <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+              </div>
+              <div>
+                <Label>Motivo</Label>
+                <Textarea value={formData.motivo_dispensa} onChange={(e) => handleChange('motivo_dispensa', e.target.value)} className="mt-1.5" rows={2} placeholder="Motivo da dispensa..." />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Dispensa Desconto Férias': {
+        // Calcular dias restantes automaticamente baseado no período selecionado
+        // eslint-disable-next-line no-unused-vars
+        const periodoSelecionado = periodosParaDesconto.find(p => p.ano_referencia === formData.periodo_aquisitivo || p.id === formData.periodo_aquisitivo);
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa com Desconto em Férias</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  label="Início / Término"
+                  name="inicio_termino"
+                  value={formData.inicio_termino}
+                  onChange={handleChange}
+                  type="select"
+                  options={['Início', 'Término']}
+                  required
+                />
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Período Aquisitivo <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.periodo_aquisitivo}
+                    onValueChange={v => {
+                      const periodo = periodosParaDesconto.find(p => p.id === v);
+                      const saldo = periodo ? (periodo.dias_direito || 30) - (periodo.dias_gozados || 0) - (periodo.dias_previstos || 0) : 0;
+                      const diasRestantes = Math.max(0, saldo - (Number(formData.dias) || 0));
+                      const label = periodo ? (periodo.ano_referencia || `${periodo.inicio_aquisitivo} a ${periodo.fim_aquisitivo}`) : v;
+                      setFormData(prev => ({ ...prev, periodo_aquisitivo: v, periodo_aquisitivo_label: label, dias_restantes: diasRestantes }));
+                    }}
+                  >
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue placeholder={periodosParaDesconto.length === 0 ? 'Nenhum período Previsto disponível' : 'Selecione o período...'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {periodosParaDesconto.length === 0 && (
+                        <div className="px-3 py-2 text-sm text-slate-400">Nenhum período com status "Previsto"</div>
+                      )}
+                      {periodosParaDesconto.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.ano_referencia || `${p.inicio_aquisitivo} a ${p.fim_aquisitivo}`} — {p.dias_direito || 30}d direito — {(p.dias_gozados || 0) + (p.dias_previstos || 0)}d usados
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+              <FormField
+                label="Data de Início"
+                name="data_inicio"
+                value={formData.data_inicio}
+                onChange={handleChange}
+                type="date"
+                required
+              />
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Dias <span className="text-red-500">*</span></Label>
+                <Input
+                  type="number"
+                  value={formData.dias}
+                  onChange={(e) => {
+                    const diasVal = Number(e.target.value) || 0;
+                    const periodoSel = periodosParaDesconto.find(p => p.id === formData.periodo_aquisitivo);
+                    const saldo = periodoSel ? (periodoSel.dias_direito || 30) - (periodoSel.dias_gozados || 0) - (periodoSel.dias_previstos || 0) : 0;
+                    const restantes = Math.max(0, saldo - diasVal);
+                    setFormData(prev => ({ ...prev, dias: diasVal, dias_restantes: restantes }));
+                  }}
+                  className="mt-1.5"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Dias Restantes</Label>
+                <Input
+                  type="number"
+                  value={formData.dias_restantes}
+                  disabled
+                  className="mt-1.5 bg-slate-50"
+                  placeholder="Calculado automaticamente"
+                />
+                <p className="text-xs text-slate-400 mt-1">Saldo − dias a descontar</p>
+              </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      case 'Deslocamento Missão':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Deslocamento para Missões</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+                <FormField label="Data de Retorno" name="data_retorno" value={formData.data_retorno} onChange={handleChange} type="date" />
+              </div>
+              <FormField label="Documento de Referência" name="documento_referencia" value={formData.documento_referencia} onChange={handleChange} placeholder="Ex: OS nº 001/2025" />
+              <div>
+                <Label>Descrição da Missão</Label>
+                <Textarea value={formData.missao_descricao} onChange={(e) => handleChange('missao_descricao', e.target.value)} className="mt-1.5" rows={2} placeholder="Ex: CMAUT/2025" />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'Curso/Estágio':
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cursos / Estágios / Capacitações</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
+                <FormField label="Edição ou Ano" name="edicao_ano" value={formData.edicao_ano} onChange={handleChange} placeholder="Ex: 2025" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Cursos" name="curso_nome" value={formData.curso_nome} onChange={handleChange} placeholder="Ex: CMAUT/2025" required />
+                <FormField label="Localidade de Realização" name="curso_local" value={formData.curso_local} onChange={handleChange} placeholder="Ex: Manaus" />
+              </div>
+            </div>
+          </div>
+        );
+
+      
+
+      default:
+        // Verifica se é um tipo customizado
+        if (tipoAtualCustom) {
+          return (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{tipoAtualCustom.nome}</h3>
+              <div className="space-y-4">
+                {(tipoAtualCustom.campos || []).map((campo) => (
+                  <div key={campo.chave}>
+                    <Label className="text-sm font-medium text-slate-700">
+                      {campo.label}{campo.obrigatorio && <span className="text-red-500 ml-1">*</span>}
+                    </Label>
+                    {campo.tipo === 'textarea' ? (
+                      <Textarea
+                        className="mt-1.5"
+                        value={camposCustom[campo.chave] || ''}
+                        onChange={e => setCamposCustom(prev => ({ ...prev, [campo.chave]: e.target.value }))}
+                        rows={3}
+                      />
+                    ) : (
+                      <Input
+                        className="mt-1.5"
+                        type={campo.tipo === 'date' ? 'date' : campo.tipo === 'number' ? 'number' : 'text'}
+                        value={camposCustom[campo.chave] || ''}
+                        onChange={e => setCamposCustom(prev => ({ ...prev, [campo.chave]: e.target.value }))}
+                        required={campo.obrigatorio}
+                      />
+                    )}
+                  </div>
+                ))}
+                {(!tipoAtualCustom.campos || tipoAtualCustom.campos.length === 0) && (
+                  <p className="text-sm text-slate-400">Nenhum campo adicional para este tipo.</p>
+                )}
+              </div>
+            </div>
+          );
+        }
+        return null;
+    }
+  };
+
+  const tipoAtualCustom = tiposCustom.find(t => t.nome === formData.tipo_registro);
+
+  // Gerar texto para tipo customizado
+  useEffect(() => {
+    if (!tipoAtualCustom) return;
+    const vars = {
+      posto_nome: formData.militar_posto ? `${formData.militar_posto} QOBM` : '',
+      nome_completo: formData.militar_nome || '',
+      matricula: formData.militar_matricula || '',
+      data_registro: formatarDataExtenso(formData.data_registro),
+      data_inicio: formatarDataExtenso(formData.data_inicio),
+      data_termino: formatarDataExtenso(formData.data_termino),
+      ...(camposCustom),
+    };
+    let texto = tipoAtualCustom.template || '';
+    Object.entries(vars).forEach(([k, v]) => {
+      texto = texto.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v || '');
+    });
+    setTextoPublicacao(texto);
+  }, [tipoAtualCustom, formData, camposCustom]);
+
+  const tiposFiltrados = () => {
+    const tipos = [
+      { value: 'Saída Férias', label: 'Férias', sexo: null },
+      { value: 'Licença Maternidade', label: 'Licença Maternidade', sexo: 'Feminino' },
+      { value: 'Prorrogação de Licença Maternidade', label: 'Prorrogação de Licença Maternidade', sexo: 'Feminino' },
+      { value: 'Licença Paternidade', label: 'Licença Paternidade', sexo: 'Masculino' },
+      { value: 'Núpcias', label: 'Núpcias', sexo: null },
+      { value: 'Luto', label: 'Luto', sexo: null },
+      { value: 'Cedência', label: 'Cedência', sexo: null },
+      { value: 'Transferência', label: 'Transferência', sexo: null },
+      { value: 'Trânsito', label: 'Trânsito', sexo: null },
+      { value: 'Instalação', label: 'Instalação', sexo: null },
+      { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
+      { value: 'Dispensa Desconto Férias', label: 'Dispensa com Desconto em Férias', sexo: null },
+      { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
+      { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
+    ];
+    // Adicionar tipos customizados
+    const customTipos = tiposCustom.map(t => ({ value: t.nome, label: t.nome, sexo: null }));
+    return [...tipos, ...customTipos].filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
+  };
 
   return (
-    <div className="space-y-3">
-      {existeInterrompidaPrioritaria && tipoRegistro === 'Saída Férias' && (
-        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 flex items-start gap-2">
-          <PauseCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>
-            Existe férias <strong>interrompida</strong> pendente. Ela tem prioridade operacional e deve ser continuada antes do início de um novo período.
-          </span>
-        </div>
-      )}
-
-      {existeBloqueioPorAntiguidade && !existeInterrompidaPrioritaria && tipoRegistro === 'Saída Férias' && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
-          <ArrowRightCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>
-            Há mais de um período previsto. O sistema permite selecionar apenas o <strong>mais antigo</strong> primeiro.
-          </span>
-        </div>
-      )}
-
-      <div>
-        <Label className="text-sm font-medium text-slate-700">Selecionar Férias</Label>
-        <Select value={value || ''} onValueChange={handleSelect}>
-          <SelectTrigger className="mt-1.5">
-            <SelectValue placeholder="Selecione as férias..." />
-          </SelectTrigger>
-          <SelectContent>
-            {opcoes.map((f) => (
-              <SelectItem key={f.id} value={f.id} disabled={f.disabled}>
-                <div className="flex items-center gap-2">
-                  {f.disabled ? <Lock className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
-                  <span>
-                    {f.periodo_aquisitivo_ref || 'Sem período'} • {formatDate(f.data_inicio)} • {f.dias} dias
-                    {f.disabled ? ' — bloqueada' : ''}
-                  </span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        {opcoes.map((f) => (
-          <div
-            key={`hint-${f.id}`}
-            className={`p-3 rounded-lg border text-xs ${
-              f.disabled
-                ? 'bg-slate-50 border-slate-200 text-slate-500'
-                : f.destaque === 'prioridade_interrompida'
-                ? 'bg-orange-50 border-orange-200 text-orange-800'
-                : f.destaque === 'mais_antigo'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-slate-50 border-slate-200 text-slate-600'
-            }`}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+              className="hover:bg-slate-200"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">Cadastrar Livro</h1>
+              <p className="text-slate-500 text-sm">Registro de livro</p>
+            </div>
+          </div>
+          <Button
+            onClick={handleSubmit}
+            disabled={loading || !formData.militar_id}
+            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-6"
           >
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium">{f.periodo_aquisitivo_ref || 'Sem período'}</span>
-                <Badge className={`${statusColors[f.status] || 'bg-slate-100 text-slate-700'} text-[10px]`}>
-                  {f.status}
-                </Badge>
-                {f.destaque === 'prioridade_interrompida' && (
-                  <Badge className="bg-orange-100 text-orange-700 text-[10px]">Prioridade operacional</Badge>
-                )}
-                {f.destaque === 'mais_antigo' && (
-                  <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">Mais antigo liberado</Badge>
-                )}
-              </div>
-              <span>{formatDate(f.data_inicio)} → {formatDate(f.data_retorno)}</span>
-            </div>
-            {f.bloqueioMotivo && <div className="mt-1">{f.bloqueioMotivo}</div>}
-          </div>
-        ))}
-      </div>
-
-      {selectedFerias && (
-        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-          <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 className="w-4 h-4 text-[#1e3a5f]" />
-            <span className="font-medium text-sm text-slate-900">Férias Selecionada</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span className="text-slate-500">Período:</span>{' '}
-              <span className="font-medium">{selectedFerias.periodo_aquisitivo_ref || '-'}</span>
-            </div>
-            <div>
-              <span className="text-slate-500">Status:</span>{' '}
-              <span className="font-medium">{selectedFerias.status}</span>
-            </div>
-            <div>
-              <span className="text-slate-500">Início:</span>{' '}
-              <span className="font-medium">{formatDate(selectedFerias.data_inicio)}</span>
-            </div>
-            <div>
-              <span className="text-slate-500">Retorno:</span>{' '}
-              <span className="font-medium">{formatDate(selectedFerias.data_retorno)}</span>
-            </div>
-            <div>
-              <span className="text-slate-500">Dias atuais:</span>{' '}
-              <span className="font-medium">{selectedFerias.dias ?? '-'}</span>
-            </div>
-            {selectedFerias.saldo_remanescente != null && (
-              <div>
-                <span className="text-slate-500">Saldo:</span>{' '}
-                <span className="font-medium text-blue-700">{selectedFerias.saldo_remanescente}d</span>
-              </div>
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+            ) : (
+              <Save className="w-5 h-5 mr-2" />
             )}
+            Salvar
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Identificação */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Identificação</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <MilitarSelector
+                  value={formData.militar_id}
+                  onChange={(name, value) => handleChange(name, value)}
+                  onMilitarSelect={handleMilitarSelect}
+                />
+              </div>
+              <FormField
+                label="Data"
+                name="data_registro"
+                value={formData.data_registro}
+                onChange={handleChange}
+                type="date"
+                required
+              />
+            </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge className={`${statusColors[selectedFerias.status] || 'bg-slate-100 text-slate-700'} text-xs`}>
-              {selectedFerias.status}
-            </Badge>
-            <Badge className="bg-[#1e3a5f]/10 text-[#1e3a5f] text-xs">
-              Operação sugerida: {selectedFerias.operacao_sugerida === 'Nova Saída / Retomada' ? 'Continuação' : selectedFerias.operacao_sugerida === 'Retorno Férias' ? 'Término' : selectedFerias.operacao_sugerida === 'Interrupção de Férias' ? 'Interrupção' : 'Início'}
-            </Badge>
+          {/* Tipo de Registro */}
+          {formData.militar_id && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
+              <Select value={formData.tipo_registro} onValueChange={(v) => {
+                handleChange('tipo_registro', v);
+                setSelectedFerias(null);
+                setOperacaoFeriasSelecionada('Saída Férias');
+                setFormData(prev => ({
+                  ...prev,
+                  ferias_id: '',
+                  dias: 0,
+                  data_inicio: '',
+                  data_termino: '',
+                  data_retorno: '',
+                  periodo_aquisitivo: '',
+                  dias_restantes: ''
+                }));
+              }}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiposFiltrados().map(tipo => (
+                    <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Campos Específicos */}
+          {formData.militar_id && renderSpecificFields()}
+
+          {/* Texto para Publicação */}
+          {textoPublicacao && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium text-slate-700">Texto para publicação</Label>
+                {usingCustomTemplate && (
+                  <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3" /> Template personalizado aplicado
+                  </span>
+                )}
+              </div>
+              {['Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade'].includes(formData.tipo_registro) ? (
+                <Textarea
+                  value={textoPublicacao}
+                  onChange={e => setTextoPublicacao(e.target.value)}
+                  rows={6}
+                  className="text-sm text-slate-700 leading-relaxed"
+                />
+              ) : (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {textoPublicacao}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Publicação e Status */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Publicação e Status</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                label="Nota para BG"
+                name="nota_para_bg"
+                value={formData.nota_para_bg}
+                onChange={handleChange}
+                placeholder="Ex: 001/2025"
+              />
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Status</Label>
+                <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
+                  {formData.status || 'Aguardando Nota'}
+                </div>
+              </div>
+              <FormField
+                label="Número do BG"
+                name="numero_bg"
+                value={formData.numero_bg}
+                onChange={handleChange}
+              />
+              <FormField
+                label="Data do BG"
+                name="data_bg"
+                value={formData.data_bg}
+                onChange={handleChange}
+                type="date"
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          {/* Observações */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Observações para Alterações</h3>
+            <Textarea
+              value={formData.observacoes}
+              onChange={(e) => handleChange('observacoes', e.target.value)}
+              className="border-slate-200"
+              rows={4}
+              placeholder="Observações gerais..."
+            />
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
