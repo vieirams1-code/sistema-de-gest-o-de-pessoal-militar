@@ -72,8 +72,7 @@ export default function Ferias() {
   const [addDiasModal, setAddDiasModal] = useState({ open: false, ferias: null, dias: 1, motivo: '' });
   // Modal desconto férias
   const [descontoModal, setDescontoModal] = useState({ open: false, ferias: null, dias: 1, motivo: '' });
-  // Modal interromper férias (publicação ex officio via popup)
-  const [interromperModal, setInterromperModal] = useState({ open: false, ferias: null });
+  // interromperModal removido — usa diretamente RegistroLivroModal com tipo 'Interrupção de Férias'
   const [savingEdit, setSavingEdit] = useState(false);
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
