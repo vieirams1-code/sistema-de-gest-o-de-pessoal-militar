@@ -712,32 +712,7 @@ export default function Ferias() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal: Interromper Férias (abre CadastrarPublicacao inline como redirect) */}
-      <Dialog open={interromperModal.open} onOpenChange={v => !v && setInterromperModal({ open: false, ferias: null })}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-orange-600 flex items-center gap-2">
-              <PauseCircle className="w-5 h-5" /> Interromper Férias
-            </DialogTitle>
-            <DialogDescription>
-              Para registrar a interrupção de férias, você será redirecionado para a tela de Publicação Ex Officio com os dados preenchidos.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setInterromperModal({ open: false, ferias: null })}>Cancelar</Button>
-            <Button
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-              onClick={() => {
-                const f = interromperModal.ferias;
-                setInterromperModal({ open: false, ferias: null });
-                navigate(createPageUrl('CadastrarPublicacao') + `?tipo=Interrup%C3%A7%C3%A3o+de+F%C3%A9rias&militar_id=${f.militar_id}&ferias_id=${f.id}`);
-              }}
-            >
-              Ir para Publicação Ex Officio
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* interromperModal removido — agora usa RegistroLivroModal com tipo 'Interrupção de Férias' */}
 
       {/* Modal: Desconto em Férias */}
       <Dialog open={descontoModal.open} onOpenChange={v => !v && setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' })}>
