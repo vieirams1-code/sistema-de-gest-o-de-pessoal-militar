@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
+import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } from '@/components/ferias/feriasAdminUtils';
 
 function calcStatus(registro) {
   if (registro.numero_bg && registro.data_bg) return 'Publicado';
@@ -84,28 +85,29 @@ export default function Publicacoes() {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, tipo, registro }) => {
-      // Registros de atestado na lista são apenas para visualização — não devem ser excluídos aqui
       if (tipo === 'atestado') return;
 
-      // Helper: detectar origem_tipo de um registro a partir do array local ou por detecção
+      const todosLocais = [...registrosLivro, ...publicacoesExOfficio, ...atestados];
+
       const detectarTipo = (refId) => {
-        const found = [...registrosLivro, ...publicacoesExOfficio, ...atestados].find(r => r.id === refId);
+        const found = todosLocais.find(r => r.id === refId);
         if (!found) return 'ex-officio';
         return detectarOrigemTipo(found);
       };
 
-      // Helper: reverter vínculo Apostila/TSE na publicação original
       const reverterVinculo = async (isApostila, isTSE, refId, origemTipoHint) => {
         if (!refId) return;
-        // Usar hint se disponível, senão detectar pelo array local
+
         const origemTipo = origemTipoHint || detectarTipo(refId);
         const entityOriginal =
           origemTipo === 'atestado' ? base44.entities.Atestado :
           origemTipo === 'livro' ? base44.entities.RegistroLivro :
           base44.entities.PublicacaoExOfficio;
+
         const originais = await entityOriginal.filter({ id: refId });
         const original = originais[0];
         if (!original) return;
+
         if (isApostila && original.apostilada_por_id === id) {
           await entityOriginal.update(refId, { apostilada_por_id: null });
         } else if (isTSE && original.tornada_sem_efeito_por_id === id) {
@@ -113,16 +115,70 @@ export default function Publicacoes() {
         }
       };
 
+      const reverterExOfficioFerias = async (registroExOfficio) => {
+        if (registroExOfficio?.tipo !== 'Interrupção de Férias' || !registroExOfficio?.ferias_interrompida_id) return;
+
+        const feriasList = await base44.entities.Ferias.filter({ id: registroExOfficio.ferias_interrompida_id });
+        const ferias = feriasList[0];
+        if (!ferias) return;
+
+        await base44.entities.Ferias.update(ferias.id, {
+          status: 'Em Curso',
+          saldo_remanescente: null,
+          dias_gozados_interrupcao: null,
+          data_interrupcao: null,
+          observacoes: '',
+        });
+
+        if (ferias.periodo_aquisitivo_id) {
+          await base44.entities.PeriodoAquisitivo.update(ferias.periodo_aquisitivo_id, {
+            status: 'Previsto',
+          });
+        }
+      };
+
+      const excluirRegistroLivroFeriasComReversao = async (registroLivro) => {
+        const feriasId = registroLivro?.ferias_id;
+        if (!feriasId) {
+          await base44.entities.RegistroLivro.delete(id);
+          return;
+        }
+
+        const feriasList = await base44.entities.Ferias.filter({ id: feriasId });
+        const ferias = feriasList[0];
+        if (!ferias) {
+          await base44.entities.RegistroLivro.delete(id);
+          return;
+        }
+
+        const todosRegistrosFerias = await base44.entities.RegistroLivro.filter({ ferias_id: feriasId });
+        const cadeia = montarCadeia(ferias, todosRegistrosFerias);
+        const eventoAlvo = cadeia.find(e => e.id === id) || registroLivro;
+        const descendentes = identificarDescendentes(eventoAlvo, cadeia);
+
+        const descendentesPublicados = descendentes.filter((evento) => calcStatus(evento) === 'Publicado');
+
+        if (descendentesPublicados.length > 0) {
+          throw new Error('Não é possível excluir esta publicação de férias porque existem eventos posteriores já publicados na cadeia.');
+        }
+
+        await executarExclusaoAdminCadeia({
+          ferias,
+          eventoAlvo,
+          incluirDescendentes: descendentes.length > 0,
+          cadeia,
+          queryClient,
+        });
+      };
+
       if (tipo === 'ex-officio') {
         const isApostila = registro?.tipo === 'Apostila';
         const isTSE = registro?.tipo === 'Tornar sem Efeito';
 
-        // Reverter vínculos de Apostila/TSE
         if (isApostila || isTSE) {
           await reverterVinculo(isApostila, isTSE, registro?.publicacao_referencia_id, registro?.publicacao_referencia_origem_tipo);
         }
 
-        // Reverter campos do atestado ao excluir Homologação pelo Comandante
         if (registro?.tipo === 'Homologação de Atestado' && registro?.atestado_homologado_id) {
           const atList = await base44.entities.Atestado.filter({ id: registro.atestado_homologado_id });
           const at = atList[0];
@@ -135,7 +191,6 @@ export default function Publicacoes() {
           }
         }
 
-        // Reverter campos do atestado ao excluir Ata JISO
         if (registro?.tipo === 'Ata JISO' && registro?.atestados_jiso_ids?.length) {
           for (const aid of registro.atestados_jiso_ids) {
             const atList = await base44.entities.Atestado.filter({ id: aid });
@@ -149,23 +204,42 @@ export default function Publicacoes() {
           }
         }
 
+        await reverterExOfficioFerias(registro);
         return base44.entities.PublicacaoExOfficio.delete(id);
       }
 
       if (tipo === 'livro') {
         const isApostila = registro?.tipo === 'Apostila';
         const isTSE = registro?.tipo === 'Tornar sem Efeito';
+        const isOperacaoFerias = [
+          'Saída Férias',
+          'Interrupção de Férias',
+          'Nova Saída / Retomada',
+          'Retorno Férias',
+        ].includes(registro?.tipo_registro);
+
         if (isApostila || isTSE) {
           await reverterVinculo(isApostila, isTSE, registro?.publicacao_referencia_id, registro?.publicacao_referencia_origem_tipo);
         }
+
+        if (isOperacaoFerias && registro?.ferias_id) {
+          return excluirRegistroLivroFeriasComReversao(registro);
+        }
+
         return base44.entities.RegistroLivro.delete(id);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+    },
+    onError: (error) => {
+      alert(error?.message || 'Não foi possível excluir a publicação e reverter a cadeia vinculada.');
     }
   });
 
@@ -222,26 +296,6 @@ export default function Publicacoes() {
         alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
         return;
       }
-    }
-
-    // Proteção conservadora para evitar bagunça em cadeias de férias/livro
-    if (
-      registro.origem_tipo === 'livro' &&
-      registro.tipo !== 'Apostila' &&
-      registro.tipo !== 'Tornar sem Efeito' &&
-      (
-        registro.ferias_id ||
-        registro.periodo_aquisitivo ||
-        registro.tipo_registro === 'Saída Férias' ||
-        registro.tipo_registro === 'Retorno Férias' ||
-        registro.tipo_registro === 'Interrupção de Férias'
-      )
-    ) {
-      alert(
-        'Este registro de férias/livro não será excluído automaticamente por segurança. ' +
-        'Pode haver movimentações posteriores dependentes dele, o que causaria inconsistência na cadeia.'
-      );
-      return;
     }
 
     deleteMutation.mutate({ id, tipo, registro });
