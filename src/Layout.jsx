@@ -56,7 +56,16 @@ const menuGroups = [
       { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen },
       { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
-      { name: 'Processos & Tarefas', page: 'Processos', icon: FolderKanban },
+      {
+        name: 'Demandas & Tarefas',
+        page: 'ProcessosTarefas',
+        icon: FolderKanban,
+        children: [
+          { name: 'Painel Geral', page: 'ProcessosTarefas', icon: FolderKanban },
+          { name: 'Caixa de Entrada', page: 'InboxDemandas', icon: FileText },
+          { name: 'Fila de Trabalho', page: 'FilaDemandas', icon: ScrollText },
+        ],
+      },
     ],
   },
   {
