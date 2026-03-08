@@ -78,6 +78,9 @@ import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
+import ProcessosTarefas from './pages/ProcessosTarefas';
+import InboxDemandas from './pages/InboxDemandas';
+import FilaDemandas from './pages/FilaDemandas';
 import __Layout from './Layout.jsx';
 
 
@@ -113,6 +116,9 @@ export const PAGES = {
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
+    "ProcessosTarefas": ProcessosTarefas,
+    "InboxDemandas": InboxDemandas,
+    "FilaDemandas": FilaDemandas,
 }
 
 export const pagesConfig = {
