@@ -508,19 +508,26 @@ export default function Ferias() {
                             {saldoDias !== null && (
                               <p className="text-xs text-orange-600 font-medium">Saldo: {saldoDias}d</p>
                             )}
-                            {/* Indicativos de adições e descontos */}
-                            {f.observacoes && (() => {
-                              const linhas = f.observacoes.split('\n').filter(l => l.match(/^[+-]\d+d:/));
-                              return linhas.length > 0 ? (
+                            {/* Indicativos derivados em tempo real dos eventos do RegistroLivro */}
+                            {(() => {
+                              const ajustes = registrosLivro.filter(r =>
+                                r.ferias_id === f.id &&
+                                (r.tipo_registro === 'Adição de Dias' || r.tipo_registro === 'Desconto em Férias') &&
+                                r.dias_evento
+                              );
+                              if (ajustes.length === 0) return null;
+                              return (
                                 <div className="mt-1 space-y-0.5">
-                                  {linhas.map((linha, i) => {
-                                    const isAdd = linha.startsWith('+');
+                                  {ajustes.map(ev => {
+                                    const isAdd = ev.tipo_registro === 'Adição de Dias';
+                                    const motivo = ev.motivo_dispensa || '';
+                                    const label = `${isAdd ? '+' : '-'}${ev.dias_evento}d${motivo ? ': ' + motivo : ''}`;
                                     return (
-                                      <p key={i} className={`text-xs font-medium ${isAdd ? 'text-green-600' : 'text-orange-600'}`}>{linha}</p>
+                                      <p key={ev.id} className={`text-xs font-medium ${isAdd ? 'text-green-600' : 'text-orange-600'}`}>{label}</p>
                                     );
                                   })}
                                 </div>
-                              ) : null;
+                              );
                             })()}
                           </td>
                           <td className="px-4 py-3">
