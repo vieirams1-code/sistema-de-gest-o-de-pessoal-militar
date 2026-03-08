@@ -19,15 +19,25 @@ const pubStatusColors = {
   'Publicado': 'bg-emerald-100 text-emerald-700',
 };
 
+// Nomes operacionais para exibição (renomeação visual)
+const NOMES_OPERACIONAIS = {
+  'Saída Férias':          'Início',
+  'Retorno Férias':        'Término',
+  'Interrupção de Férias': 'Interrupção',
+  'Nova Saída / Retomada': 'Continuação',
+  'Adição de Dias':        'Adição de Dias',
+  'Desconto em Férias':    'Desconto em Férias',
+};
+
 const tipoEventoConfig = {
-  'Saída Férias':             { icon: LogOut,      color: 'text-emerald-600', bg: 'bg-emerald-100', border: 'border-emerald-300', label: 'Saída' },
-  'Retorno Férias':           { icon: LogIn,       color: 'text-blue-600',    bg: 'bg-blue-100',    border: 'border-blue-300',    label: 'Retorno' },
-  'Interrupção de Férias':    { icon: PauseCircle, color: 'text-orange-600',  bg: 'bg-orange-100',  border: 'border-orange-300',  label: 'Interrupção' },
-  'Nova Saída / Retomada':    { icon: RefreshCw,   color: 'text-teal-600',    bg: 'bg-teal-100',    border: 'border-teal-300',    label: 'Retomada' },
-  'Adição de Dias':           { icon: PlusCircle,  color: 'text-purple-600',  bg: 'bg-purple-100',  border: 'border-purple-300',  label: 'Adição' },
-  'Desconto em Férias':       { icon: MinusCircle, color: 'text-rose-600',    bg: 'bg-rose-100',    border: 'border-rose-300',    label: 'Desconto' },
-  'Dispensa Desconto Férias': { icon: MinusCircle, color: 'text-rose-600',    bg: 'bg-rose-100',    border: 'border-rose-300',    label: 'Desconto' },
-  'default':                  { icon: FileText,    color: 'text-slate-600',   bg: 'bg-slate-100',   border: 'border-slate-300',   label: null },
+  'Saída Férias':             { icon: LogOut,      color: 'text-emerald-600', bg: 'bg-emerald-100', border: 'border-emerald-300' },
+  'Retorno Férias':           { icon: LogIn,       color: 'text-blue-600',    bg: 'bg-blue-100',    border: 'border-blue-300'    },
+  'Interrupção de Férias':    { icon: PauseCircle, color: 'text-orange-600',  bg: 'bg-orange-100',  border: 'border-orange-300'  },
+  'Nova Saída / Retomada':    { icon: RefreshCw,   color: 'text-teal-600',    bg: 'bg-teal-100',    border: 'border-teal-300'    },
+  'Adição de Dias':           { icon: PlusCircle,  color: 'text-purple-600',  bg: 'bg-purple-100',  border: 'border-purple-300'  },
+  'Desconto em Férias':       { icon: MinusCircle, color: 'text-rose-600',    bg: 'bg-rose-100',    border: 'border-rose-300'    },
+  'Dispensa Desconto Férias': { icon: MinusCircle, color: 'text-rose-600',    bg: 'bg-rose-100',    border: 'border-rose-300'    },
+  'default':                  { icon: FileText,    color: 'text-slate-600',   bg: 'bg-slate-100',   border: 'border-slate-300'   },
 };
 
 function formatDate(d) {
