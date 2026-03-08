@@ -196,6 +196,11 @@ export default function ProcessosTarefas() {
                         <EtapaBadge etapa={d.etapa_fluxo} size="sm" />
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
+                        <span className={`text-xs ${!d.responsavel_atual_nome ? 'text-red-400 italic' : 'text-slate-500'}`}>
+                          {d.responsavel_atual_nome || 'Sem responsável'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell">
                         {d.prazo_final ? (
                           <span className={`text-xs ${atrasada ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
                             {formatDate(d.prazo_final)}
@@ -204,9 +209,6 @@ export default function ProcessosTarefas() {
                       </td>
                       <td className="px-4 py-3">
                         <Badge className={`${prioridadeColors[d.prioridade]} text-[10px]`}>{d.prioridade}</Badge>
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className="text-slate-300 text-xs">›</span>
                       </td>
                     </tr>
                   );
