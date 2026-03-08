@@ -265,6 +265,7 @@ export default function Ferias() {
 
     // 2. Criar evento no RegistroLivro e atualizar Ferias em paralelo
     await Promise.all([
+      // Adição NÃO gera publicação — evento interno/administrativo apenas
       base44.entities.RegistroLivro.create({
         militar_id: f.militar_id,
         militar_nome: f.militar_nome,
@@ -275,7 +276,7 @@ export default function Ferias() {
         data_registro: hoje,
         dias_evento: qtdDias,
         motivo_dispensa: addDiasModal.motivo,
-        status: 'Aguardando Nota',
+        status: 'Publicado', // marcado como publicado pois não requer publicação formal
       }),
       base44.entities.Ferias.update(f.id, {
         dias: novaQtd,
