@@ -105,8 +105,35 @@ function montarFeriasOpcoes(ferias, tipoRegistro) {
     );
   }
 
+  const emCurso = ordenarFerias(ferias.filter((f) => f.status === 'Em Curso'));
   const interrompidas = ordenarFerias(ferias.filter((f) => f.status === 'Interrompida'));
   const previstas = ordenarFerias(ferias.filter((f) => f.status === 'Prevista' || f.status === 'Autorizada'));
+
+  if (emCurso.length > 0) {
+    return [
+      ...emCurso.map((f) => ({
+        ...f,
+        disabled: false,
+        bloqueioMotivo: '',
+        operacao_sugerida: 'Interrupção de Férias',
+        destaque: 'prioridade_em_curso',
+      })),
+      ...interrompidas.map((f) => ({
+        ...f,
+        disabled: true,
+        bloqueioMotivo: 'Existe férias em curso deste militar. Resolva a cadeia em curso antes de atuar em uma férias interrompida diferente.',
+        operacao_sugerida: 'Nova Saída / Retomada',
+        destaque: 'bloqueada_por_em_curso',
+      })),
+      ...previstas.map((f) => ({
+        ...f,
+        disabled: true,
+        bloqueioMotivo: 'Existe férias em curso deste militar. Não é permitido iniciar novo período enquanto houver férias em curso.',
+        operacao_sugerida: 'Saída Férias',
+        destaque: 'bloqueada_por_em_curso',
+      })),
+    ];
+  }
 
   if (interrompidas.length > 0) {
     return [
@@ -183,6 +210,7 @@ export default function FeriasSelector({ militarId, value, onChange, tipoRegistr
   const selectedFerias = useMemo(() => opcoes.find((item) => item.id === value) || null, [opcoes, value]);
   const estado = getMensagemEstado(opcoes, tipoRegistro);
 
+  const existeEmCursoPrioritaria = opcoes.some((f) => f.destaque === 'prioridade_em_curso');
   const existeInterrompidaPrioritaria = opcoes.some((f) => f.destaque === 'prioridade_interrompida');
   const existeBloqueioPorAntiguidade = opcoes.some((f) => f.destaque === 'bloqueada_por_antiguidade');
 
@@ -224,6 +252,15 @@ export default function FeriasSelector({ militarId, value, onChange, tipoRegistr
 
   return (
     <div className="space-y-3">
+      {existeEmCursoPrioritaria && tipoRegistro === 'Saída Férias' && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
+          <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>
+            Existe férias <strong>em curso</strong>. Ela tem prioridade operacional e o Livro vai assumir, por padrão, a ação de <strong>Interrupção</strong> para essa cadeia.
+          </span>
+        </div>
+      )}
+
       {existeInterrompidaPrioritaria && tipoRegistro === 'Saída Férias' && (
         <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 flex items-start gap-2">
           <PauseCircle className="w-4 h-4 mt-0.5 shrink-0" />
