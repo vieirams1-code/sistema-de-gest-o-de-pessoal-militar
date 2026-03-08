@@ -169,16 +169,18 @@ export async function executarExclusaoAdminCadeia({
   await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
 
   // Recalcular período aquisitivo se vinculado
+  // IMPORTANTE: usar atualizacaoFerias.dias (recalculado) — nunca ferias.dias (stale)
   if (ferias.periodo_aquisitivo_id) {
     const novoStatus = atualizacaoFerias.status;
+    const novosDias = atualizacaoFerias.dias ?? feriasFresh.dias_base ?? feriasFresh.dias ?? 0;
     let periodoUpdate = {};
 
     if (novoStatus === 'Prevista') {
-      periodoUpdate = { status: 'Disponível', dias_gozados: 0, dias_previstos: ferias.dias || 0 };
+      periodoUpdate = { status: 'Disponível', dias_gozados: 0, dias_previstos: novosDias };
     } else if (novoStatus === 'Em Curso') {
-      periodoUpdate = { status: 'Previsto', dias_gozados: 0, dias_previstos: ferias.dias || 0 };
+      periodoUpdate = { status: 'Previsto', dias_gozados: 0, dias_previstos: novosDias };
     } else if (novoStatus === 'Gozada') {
-      periodoUpdate = { status: 'Gozado', dias_gozados: ferias.dias || 0, dias_previstos: 0 };
+      periodoUpdate = { status: 'Gozado', dias_gozados: novosDias, dias_previstos: 0 };
     } else if (novoStatus === 'Interrompida') {
       periodoUpdate = { status: 'Parcialmente Gozado' };
     }
