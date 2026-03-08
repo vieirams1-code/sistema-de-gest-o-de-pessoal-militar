@@ -173,7 +173,7 @@ export default function RegistroLivroModal({ open, onClose, ferias, tipoInicial 
           <div>
             <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
             <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-700 text-sm font-medium">
-              {tipoRegistro === 'Saída Férias' ? 'Início de Férias (Saída)' : tipoRegistro === 'Retorno Férias' ? 'Retorno de Férias' : tipoRegistro}
+              {NOMES_OPERACIONAIS[tipoRegistro] || tipoRegistro}
             </div>
           </div>
 
