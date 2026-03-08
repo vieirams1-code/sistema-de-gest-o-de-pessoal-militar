@@ -78,8 +78,9 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
   const eventosAdicao = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO);
   const eventosDesconto = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO);
 
-  const totalAdicoes = eventosAdicao.reduce((sum, e) => sum + (e.dias_evento || 0), 0);
-  const totalDescontos = eventosDesconto.reduce((sum, e) => sum + (e.dias_evento || 0), 0);
+  // dias_evento é o impacto individual (sempre positivo); fallback para dias se não preenchido
+  const totalAdicoes = eventosAdicao.reduce((sum, e) => sum + (e.dias_evento || e.dias || 0), 0);
+  const totalDescontos = eventosDesconto.reduce((sum, e) => sum + (e.dias_evento || e.dias || 0), 0);
   const novosDias = Math.max(0, diasOriginais + totalAdicoes - totalDescontos);
 
   // Recalcular datas com base nos dias calculados e na data de início original
