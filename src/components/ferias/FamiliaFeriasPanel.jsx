@@ -76,10 +76,48 @@ function formatDate(d) {
   }
 }
 
+function parseDate(d) {
+  return new Date(d + 'T00:00:00');
+}
+
 function calcPubStatus(r) {
   if (r.numero_bg && r.data_bg) return 'Publicado';
   if (r.nota_para_bg) return 'Aguardando Publicação';
   return 'Aguardando Nota';
+}
+
+function deriveEventoInterrupcao(ferias, evento) {
+  if (!ferias || !evento) {
+    return { gozados: null, saldo: null, diasNoMomento: null };
+  }
+
+  const diasNoMomento = Number(
+    evento.dias_no_momento ??
+    evento.dias ??
+    ferias.dias ??
+    0
+  );
+
+  let gozados = null;
+  let saldo = null;
+
+  if (ferias.data_inicio && evento.data_registro) {
+    const inicio = parseDate(ferias.data_inicio);
+    const dataInterrupcao = parseDate(evento.data_registro);
+    gozados = Math.max(0, differenceInDays(dataInterrupcao, inicio) + 1);
+    gozados = Math.min(gozados, diasNoMomento);
+    saldo = Math.max(0, diasNoMomento - gozados);
+  }
+
+  if (evento.dias_gozados != null && !Number.isNaN(Number(evento.dias_gozados))) {
+    gozados = Number(evento.dias_gozados);
+  }
+
+  if (evento.saldo_remanescente != null && !Number.isNaN(Number(evento.saldo_remanescente))) {
+    saldo = Number(evento.saldo_remanescente);
+  }
+
+  return { gozados, saldo, diasNoMomento };
 }
 
 export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) {
@@ -122,27 +160,25 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
       const inicio = new Date(ferias.data_inicio + 'T00:00:00');
       const gozados = Math.min(Math.max(0, differenceInDays(hoje, inicio) + 1), diasTotais);
       const restantes = Math.max(0, diasTotais - gozados);
-      return { tipo: 'em_curso', diasTotais, gozados, restantes };
+
+      return {
+        tipo: 'em_curso',
+        diasTotais,
+        gozados,
+        restantes,
+      };
     }
 
     if (ferias.status === 'Interrompida') {
-      const gozados =
-        ferias.dias_gozados_interrupcao != null
-          ? Number(ferias.dias_gozados_interrupcao)
-          : ultimaInterrupcao?.dias_gozados != null
-            ? Number(ultimaInterrupcao.dias_gozados)
-            : null;
+      const derivado = deriveEventoInterrupcao(ferias, ultimaInterrupcao);
 
-      const saldo =
-        ferias.saldo_remanescente != null
-          ? Number(ferias.saldo_remanescente)
-          : ultimaInterrupcao?.saldo_remanescente != null
-            ? Number(ultimaInterrupcao.saldo_remanescente)
-            : null;
-
-      const dataInterrupcao = ferias.data_interrupcao || ultimaInterrupcao?.data_registro;
-
-      return { tipo: 'interrompida', diasTotais, gozados, saldo, dataInterrupcao };
+      return {
+        tipo: 'interrompida',
+        diasTotais: derivado.diasNoMomento ?? diasTotais,
+        gozados: derivado.gozados,
+        saldo: derivado.saldo,
+        dataInterrupcao: ultimaInterrupcao?.data_registro || null,
+      };
     }
 
     return null;
@@ -239,19 +275,19 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-white rounded-lg border border-amber-100 p-2">
                 <p className="text-xs text-slate-400 mb-0.5">Atual</p>
-                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}d</p>
+                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}</p>
                 <p className="text-[10px] text-slate-400">dias</p>
               </div>
 
               <div className="bg-amber-100 rounded-lg border border-amber-200 p-2">
                 <p className="text-xs text-amber-600 mb-0.5">Gozados</p>
-                <p className="text-xl font-bold text-amber-700">{indicadores.gozados}d</p>
+                <p className="text-xl font-bold text-amber-700">{indicadores.gozados}</p>
                 <p className="text-[10px] text-amber-500">até hoje</p>
               </div>
 
               <div className="bg-emerald-50 rounded-lg border border-emerald-200 p-2">
                 <p className="text-xs text-emerald-600 mb-0.5">Restantes</p>
-                <p className="text-xl font-bold text-emerald-700">{indicadores.restantes}d</p>
+                <p className="text-xl font-bold text-emerald-700">{indicadores.restantes}</p>
                 <p className="text-[10px] text-emerald-500">dias</p>
               </div>
             </div>
@@ -270,7 +306,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-white rounded-lg border border-orange-100 p-2">
                 <p className="text-xs text-slate-400 mb-0.5">Atual</p>
-                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}d</p>
+                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}</p>
                 <p className="text-[10px] text-slate-400">dias</p>
               </div>
 
@@ -323,6 +359,10 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                   const cfg = tipoEventoConfig[evento.tipo_registro] || tipoEventoConfig.default;
                   const IconComp = cfg.icon;
                   const pubStatus = calcPubStatus(evento);
+                  const interrupcaoDerivada =
+                    evento.tipo_registro === 'Interrupção de Férias'
+                      ? deriveEventoInterrupcao(ferias, evento)
+                      : null;
 
                   return (
                     <div key={evento.id} className="relative flex gap-3 z-10">
@@ -356,30 +396,46 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                             </>
                           )}
 
-                          {evento.dias != null && (
+                          {(evento.tipo_registro === 'Saída Férias' || evento.tipo_registro === 'Retorno Férias') && evento.dias != null && (
                             <>
-                              <span className="text-slate-400">
-                                {evento.tipo_registro === 'Interrupção de Férias'
-                                  ? 'Dias no momento'
-                                  : evento.tipo_registro === 'Nova Saída / Retomada'
-                                    ? 'Saldo retomado'
-                                    : 'Dias'}
-                              </span>
-                              <span className="text-slate-700 font-medium">{evento.dias}d</span>
+                              <span className="text-slate-400">Dias</span>
+                              <span className="text-slate-700 font-medium">{Number(evento.dias)}d</span>
                             </>
                           )}
 
-                          {evento.tipo_registro === 'Interrupção de Férias' && evento.dias_gozados != null && (
+                          {evento.tipo_registro === 'Interrupção de Férias' && (
+                            <>
+                              <span className="text-slate-400">Dias no momento</span>
+                              <span className="text-slate-700 font-medium">
+                                {interrupcaoDerivada?.diasNoMomento != null ? `${interrupcaoDerivada.diasNoMomento}d` : '—'}
+                              </span>
+                            </>
+                          )}
+
+                          {evento.tipo_registro === 'Interrupção de Férias' && (
                             <>
                               <span className="text-slate-400">Gozados</span>
-                              <span className="text-orange-700 font-medium">{evento.dias_gozados}d</span>
+                              <span className="text-orange-700 font-medium">
+                                {interrupcaoDerivada?.gozados != null ? `${interrupcaoDerivada.gozados}d` : '—'}
+                              </span>
                             </>
                           )}
 
-                          {evento.tipo_registro === 'Interrupção de Férias' && evento.saldo_remanescente != null && (
+                          {evento.tipo_registro === 'Interrupção de Férias' && (
                             <>
                               <span className="text-slate-400">Saldo</span>
-                              <span className="text-blue-700 font-medium">{evento.saldo_remanescente}d</span>
+                              <span className="text-blue-700 font-medium">
+                                {interrupcaoDerivada?.saldo != null ? `${interrupcaoDerivada.saldo}d` : '—'}
+                              </span>
+                            </>
+                          )}
+
+                          {evento.tipo_registro === 'Nova Saída / Retomada' && (
+                            <>
+                              <span className="text-slate-400">Saldo retomado</span>
+                              <span className="text-slate-700 font-medium">
+                                {evento.dias != null ? `${Number(evento.dias)}d` : '—'}
+                              </span>
                             </>
                           )}
 
