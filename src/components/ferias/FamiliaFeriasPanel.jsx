@@ -345,7 +345,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                         </div>
 
                         {/* Motivo para Adição/Desconto */}
-                        {(evento.tipo_registro === 'Adição de Dias' || evento.tipo_registro === 'Desconto em Férias') && evento.motivo_dispensa && (
+                        {(['Adição de Dias', 'Desconto em Férias', 'Dispensa Desconto Férias'].includes(evento.tipo_registro)) && evento.motivo_dispensa && (
                           <p className="mt-2 text-xs text-slate-600 bg-slate-50 rounded px-2 py-1 border border-slate-100">
                             {evento.motivo_dispensa}
                           </p>
