@@ -25,7 +25,6 @@ function detectarOrigemTipo(registro) {
   return 'livro';
 }
 
-
 function getTipoDisplay(tipo) {
   if (tipo === 'Saída Férias') return 'Início';
   if (tipo === 'Interrupção de Férias') return 'Interrupção';
@@ -34,12 +33,40 @@ function getTipoDisplay(tipo) {
   return tipo;
 }
 
+function getGrupoDisplay(registro) {
+  const tipoBase = registro.tipo_registro || registro.tipo || '';
+
+  if (
+    tipoBase === 'Saída Férias' ||
+    tipoBase === 'Interrupção de Férias' ||
+    tipoBase === 'Nova Saída / Retomada' ||
+    tipoBase === 'Retorno Férias'
+  ) {
+    return 'Férias';
+  }
+
+  if (registro.medico || registro.cid_10) {
+    return 'Atestado';
+  }
+
+  return '';
+}
+
 function normalizarRegistro(registro) {
+  const tipoBase = registro.tipo_registro || registro.tipo || '';
+  const tipoDisplay = getTipoDisplay(tipoBase);
+  const grupoDisplay = getGrupoDisplay(registro);
+  const tipoCompostoDisplay = grupoDisplay
+    ? `${grupoDisplay} • ${tipoDisplay}`
+    : tipoDisplay;
+
   return {
     ...registro,
     origem_tipo: detectarOrigemTipo(registro),
     status_calculado: calcStatus(registro),
-    tipo_display: getTipoDisplay(registro.tipo_registro || registro.tipo || ''),
+    tipo_display: tipoDisplay,
+    grupo_display: grupoDisplay,
+    tipo_composto_display: tipoCompostoDisplay,
   };
 }
 
@@ -193,7 +220,9 @@ export default function Publicacoes() {
         r.nota_para_bg?.toLowerCase().includes(termo) ||
         r.tipo?.toLowerCase().includes(termo) ||
         r.tipo_registro?.toLowerCase().includes(termo) ||
-        r.tipo_display?.toLowerCase().includes(termo);
+        r.tipo_display?.toLowerCase().includes(termo) ||
+        r.grupo_display?.toLowerCase().includes(termo) ||
+        r.tipo_composto_display?.toLowerCase().includes(termo);
 
       return matchesStatus && matchesSearch;
     });
@@ -410,14 +439,14 @@ export default function Publicacoes() {
 
                   <div className="space-y-3">
                     {items.map((registro) => (
-                       <PublicacaoCard
-                         key={registro.id}
-                         registro={registro}
-                         onUpdate={handleUpdate}
-                         onDelete={handleDelete}
-                         onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
-                         todosRegistros={registros}
-                       />
+                      <PublicacaoCard
+                        key={registro.id}
+                        registro={registro}
+                        onUpdate={handleUpdate}
+                        onDelete={handleDelete}
+                        onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
+                        todosRegistros={registros}
+                      />
                     ))}
                   </div>
                 </div>
