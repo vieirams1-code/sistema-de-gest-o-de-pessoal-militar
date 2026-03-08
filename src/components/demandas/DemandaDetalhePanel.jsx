@@ -4,16 +4,14 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X, User, Calendar, FileText, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
+import {
+  X, User, Calendar, FileText, AlertTriangle, Pencil, Trash2,
+  ArrowRight, CheckCircle2, Archive, RotateCcw, SendHorizonal, UserCheck
+} from 'lucide-react';
 import EtapaBadge from './EtapaBadge';
 import TarefaPanel from './TarefaPanel';
 import {
-  prioridadeColors,
-  criticidadeColors,
-  statusColors,
-  isAtrasada,
-  formatDate,
-  ETAPAS_CHEFE,
+  prioridadeColors, criticidadeColors, statusColors, isAtrasada, formatDate, ETAPAS_CHEFE,
 } from './DemandaUtils';
 
 const ETAPAS = [
@@ -22,24 +20,93 @@ const ETAPAS = [
   'Retornado para execução', 'Concluído', 'Arquivado',
 ];
 
+// Mapa de próxima ação esperada por etapa
+const PROXIMA_ACAO_POR_ETAPA = {
+  'Recebido': 'Realizar triagem e definir responsável',
+  'Triagem': 'Classificar e encaminhar para elaboração ou decisão',
+  'Aguardando decisão do chefe': 'Aguardar decisão do chefe da seção',
+  'Aguardando assinatura do chefe': 'Aguardar assinatura do chefe',
+  'Em elaboração': 'Elaborar documento / executar ação necessária',
+  'Aguardando documento': 'Aguardar entrega de documentação',
+  'Aguardando comando superior': 'Aguardar retorno do comando superior',
+  'Retornado para execução': 'Retomar elaboração conforme orientação recebida',
+  'Concluído': 'Demanda concluída',
+  'Arquivado': 'Demanda arquivada',
+};
+
 export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete }) {
   const queryClient = useQueryClient();
-  const [atualizandoEtapa, setAtualizandoEtapa] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   if (!demanda) return null;
 
   const atrasada = isAtrasada(demanda);
   const isChefe = ETAPAS_CHEFE.includes(demanda.etapa_fluxo);
 
-  const handleEtapaChange = async (novaEtapa) => {
-    setAtualizandoEtapa(true);
-    await base44.entities.Demanda.update(demanda.id, { etapa_fluxo: novaEtapa });
+  const salvar = async (dados) => {
+    setSalvando(true);
+    await base44.entities.Demanda.update(demanda.id, dados);
     queryClient.invalidateQueries({ queryKey: ['demandas'] });
-    setAtualizandoEtapa(false);
+    setSalvando(false);
+  };
+
+  const handleEtapaChange = (novaEtapa) => salvar({ etapa_fluxo: novaEtapa });
+
+  // Ações rápidas de fluxo
+  const acoes = [
+    {
+      label: 'Enc. p/ decisão do chefe',
+      icon: SendHorizonal,
+      color: 'border-amber-300 text-amber-800 hover:bg-amber-50',
+      show: !['Aguardando decisão do chefe', 'Concluído', 'Arquivado'].includes(demanda.etapa_fluxo),
+      acao: () => salvar({ etapa_fluxo: 'Aguardando decisão do chefe', data_ultimo_encaminhamento: new Date().toISOString() }),
+    },
+    {
+      label: 'Enc. p/ assinatura do chefe',
+      icon: Pencil,
+      color: 'border-orange-300 text-orange-800 hover:bg-orange-50',
+      show: !['Aguardando assinatura do chefe', 'Concluído', 'Arquivado'].includes(demanda.etapa_fluxo),
+      acao: () => salvar({ etapa_fluxo: 'Aguardando assinatura do chefe', data_ultimo_encaminhamento: new Date().toISOString() }),
+    },
+    {
+      label: 'Marcar retorno recebido',
+      icon: UserCheck,
+      color: 'border-teal-300 text-teal-800 hover:bg-teal-50',
+      show: ['Aguardando decisão do chefe', 'Aguardando assinatura do chefe', 'Aguardando comando superior', 'Aguardando documento'].includes(demanda.etapa_fluxo),
+      acao: () => salvar({ etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: new Date().toISOString() }),
+    },
+    {
+      label: 'Retornar p/ elaboração',
+      icon: RotateCcw,
+      color: 'border-blue-300 text-blue-800 hover:bg-blue-50',
+      show: demanda.etapa_fluxo === 'Retornado para execução',
+      acao: () => salvar({ etapa_fluxo: 'Em elaboração' }),
+    },
+    {
+      label: 'Concluir demanda',
+      icon: CheckCircle2,
+      color: 'border-emerald-300 text-emerald-800 hover:bg-emerald-50',
+      show: demanda.status !== 'Concluída' && demanda.status !== 'Arquivada',
+      acao: () => salvar({ etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] }),
+    },
+    {
+      label: 'Arquivar demanda',
+      icon: Archive,
+      color: 'border-slate-300 text-slate-600 hover:bg-slate-50',
+      show: demanda.status !== 'Arquivada',
+      acao: () => salvar({ etapa_fluxo: 'Arquivado', status: 'Arquivada' }),
+    },
+  ].filter(a => a.show);
+
+  const proximaAcao = demanda.proxima_acao || PROXIMA_ACAO_POR_ETAPA[demanda.etapa_fluxo] || '';
+  const depende = {
+    chefe: demanda.etapa_fluxo === 'Aguardando decisão do chefe',
+    assinatura: demanda.etapa_fluxo === 'Aguardando assinatura do chefe',
+    comando: demanda.etapa_fluxo === 'Aguardando comando superior',
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full md:w-[520px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">
+    <div className="fixed inset-y-0 right-0 w-full md:w-[540px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">
       {/* Header */}
       <div className={`px-5 py-4 flex items-start justify-between shrink-0 ${isChefe ? 'bg-amber-700' : 'bg-[#1e3a5f]'} text-white`}>
         <div className="flex items-start gap-3 min-w-0">
@@ -49,7 +116,7 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           <div className="min-w-0">
             <p className="font-bold text-base leading-tight line-clamp-2">{demanda.titulo}</p>
             <p className="text-xs text-white/60 mt-0.5">
-              {demanda.origem_tipo} {demanda.origem_numero_protocolo ? `• ${demanda.origem_numero_protocolo}` : ''}
+              {demanda.origem_tipo}{demanda.origem_numero_protocolo ? ` • ${demanda.origem_numero_protocolo}` : ''}
             </p>
           </div>
         </div>
@@ -58,46 +125,55 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
         </Button>
       </div>
 
-      {/* Banner de atenção para etapas críticas */}
-      {demanda.etapa_fluxo === 'Aguardando decisão do chefe' && (
-        <div className="bg-amber-500 px-5 py-2.5 flex items-center gap-2 shrink-0">
+      {/* Banners críticos */}
+      {depende.chefe && (
+        <div className="bg-amber-500 px-5 py-2 flex items-center gap-2 shrink-0">
           <AlertTriangle className="w-4 h-4 text-white shrink-0" />
-          <p className="text-xs font-bold text-white uppercase tracking-wide">Aguardando decisão do chefe</p>
+          <p className="text-xs font-bold text-white uppercase tracking-wide">Aguardando decisão do chefe
+            {demanda.aguardando_decisao_de_nome && ` — ${demanda.aguardando_decisao_de_nome}`}
+          </p>
         </div>
       )}
-      {demanda.etapa_fluxo === 'Aguardando assinatura do chefe' && (
-        <div className="bg-orange-500 px-5 py-2.5 flex items-center gap-2 shrink-0">
+      {depende.assinatura && (
+        <div className="bg-orange-500 px-5 py-2 flex items-center gap-2 shrink-0">
           <Pencil className="w-4 h-4 text-white shrink-0" />
-          <p className="text-xs font-bold text-white uppercase tracking-wide">Aguardando assinatura do chefe</p>
+          <p className="text-xs font-bold text-white uppercase tracking-wide">Aguardando assinatura do chefe
+            {demanda.aguardando_assinatura_de_nome && ` — ${demanda.aguardando_assinatura_de_nome}`}
+          </p>
         </div>
       )}
-      {demanda.etapa_fluxo === 'Aguardando comando superior' && (
-        <div className="bg-rose-500 px-5 py-2.5 flex items-center gap-2 shrink-0">
-          <Calendar className="w-4 h-4 text-white shrink-0" />
-          <p className="text-xs font-bold text-white uppercase tracking-wide">Aguardando comando superior</p>
+      {depende.comando && (
+        <div className="bg-rose-500 px-5 py-2 flex items-center gap-2 shrink-0">
+          <ArrowRight className="w-4 h-4 text-white shrink-0" />
+          <p className="text-xs font-bold text-white uppercase tracking-wide">Aguardando comando superior
+            {demanda.aguardando_retorno_de && ` — ${demanda.aguardando_retorno_de}`}
+          </p>
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-        {/* Badges de status */}
-        <div className="flex flex-wrap gap-2">
-          <Badge className={`${statusColors[demanda.status] || 'bg-slate-100 text-slate-600'} text-xs`}>{demanda.status}</Badge>
-          <Badge className={`${prioridadeColors[demanda.prioridade]} text-xs`}>{demanda.prioridade}</Badge>
-          {demanda.criticidade && demanda.criticidade !== 'Rotina' && (
-            <Badge className={`${criticidadeColors[demanda.criticidade]} text-xs`}>{demanda.criticidade}</Badge>
-          )}
-          {atrasada && <Badge className="bg-red-100 text-red-700 text-xs font-semibold">⚠ Atrasada</Badge>}
-          {demanda.exige_assinatura && <Badge className="bg-orange-100 text-orange-700 text-xs">Exige assinatura</Badge>}
-          {demanda.exige_documentacao && <Badge className="bg-purple-100 text-purple-700 text-xs">Exige documentação</Badge>}
-          {demanda.impacto_no_efetivo && <Badge className="bg-rose-100 text-rose-700 text-xs">Impacta efetivo</Badge>}
-        </div>
 
-        {/* Seção: Andamento — etapa + responsável */}
-        <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Andamento</p>
+        {/* ── BLOCO: Situação Atual ── */}
+        <div className={`rounded-xl border p-4 space-y-3 ${isChefe ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Situação Atual</p>
+
+          {/* Badges de status */}
+          <div className="flex flex-wrap gap-1.5">
+            <Badge className={`${statusColors[demanda.status] || 'bg-slate-100 text-slate-600'} text-xs`}>{demanda.status}</Badge>
+            <Badge className={`${prioridadeColors[demanda.prioridade]} text-xs`}>{demanda.prioridade}</Badge>
+            {demanda.criticidade && demanda.criticidade !== 'Rotina' && (
+              <Badge className={`${criticidadeColors[demanda.criticidade]} text-xs`}>{demanda.criticidade}</Badge>
+            )}
+            {atrasada && <Badge className="bg-red-100 text-red-700 text-xs font-semibold">⚠ Atrasada</Badge>}
+            {demanda.exige_assinatura && <Badge className="bg-orange-100 text-orange-700 text-xs">Exige assinatura</Badge>}
+            {demanda.exige_documentacao && <Badge className="bg-purple-100 text-purple-700 text-xs">Exige documentação</Badge>}
+            {demanda.impacto_no_efetivo && <Badge className="bg-rose-100 text-rose-700 text-xs">Impacta efetivo</Badge>}
+          </div>
+
+          {/* Etapa (select) */}
           <div>
             <p className="text-xs text-slate-400 mb-1.5">Etapa do Fluxo</p>
-            <Select value={demanda.etapa_fluxo} onValueChange={handleEtapaChange} disabled={atualizandoEtapa}>
+            <Select value={demanda.etapa_fluxo} onValueChange={handleEtapaChange} disabled={salvando}>
               <SelectTrigger className="bg-white h-9 text-sm">
                 <SelectValue />
               </SelectTrigger>
@@ -105,19 +181,88 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
                 {ETAPAS.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
               </SelectContent>
             </Select>
-            {atualizandoEtapa && <p className="text-xs text-slate-400 mt-1">Atualizando...</p>}
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <User className="w-4 h-4 text-slate-400 shrink-0" />
-            {demanda.responsavel_atual_nome
-              ? <span className="text-slate-700">Responsável: <strong>{demanda.responsavel_atual_nome}</strong></span>
-              : <span className="text-red-400 italic text-xs">Sem responsável definido</span>}
-          </div>
+
+          {/* Próxima ação */}
+          {proximaAcao && (
+            <div className="flex items-start gap-2">
+              <ArrowRight className="w-3.5 h-3.5 text-[#1e3a5f] mt-0.5 shrink-0" />
+              <p className="text-xs text-slate-700 leading-relaxed"><span className="font-semibold">Próxima ação:</span> {proximaAcao}</p>
+            </div>
+          )}
+
+          {/* Indicadores de dependência */}
+          {(depende.chefe || depende.assinatura || depende.comando) && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {depende.chefe && <Badge className="bg-amber-100 text-amber-800 text-[10px]">🔒 Depende do chefe</Badge>}
+              {depende.assinatura && <Badge className="bg-orange-100 text-orange-800 text-[10px]">✍️ Depende de assinatura</Badge>}
+              {depende.comando && <Badge className="bg-rose-100 text-rose-800 text-[10px]">⬆️ Depende do comando superior</Badge>}
+            </div>
+          )}
         </div>
 
-        {/* Seção: Origem e identificação */}
+        {/* ── BLOCO: Ações Rápidas ── */}
+        {acoes.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Ações Rápidas</p>
+            <div className="grid grid-cols-2 gap-2">
+              {acoes.map(a => {
+                const Icon = a.icon;
+                return (
+                  <button
+                    key={a.label}
+                    onClick={a.acao}
+                    disabled={salvando}
+                    className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg border transition-colors disabled:opacity-50 text-left ${a.color}`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="leading-tight">{a.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── BLOCO: Responsáveis ── */}
         <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Origem e Identificação</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Responsáveis</p>
+          {[
+            ['Responsável Atual', demanda.responsavel_atual_nome],
+            ['Criado por', demanda.criado_por_nome],
+            ['Encaminhado por', demanda.encaminhado_por_nome],
+            ['Aguard. decisão de', demanda.aguardando_decisao_de_nome],
+            ['Aguard. assinatura de', demanda.aguardando_assinatura_de_nome],
+            ['Aguard. retorno de', demanda.aguardando_retorno_de],
+          ].filter(([, v]) => v).map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-400 shrink-0">{k}</span>
+              <span className="text-xs font-medium text-slate-700 flex items-center gap-1 truncate">
+                <User className="w-3 h-3 text-slate-400 shrink-0" />{v}
+              </span>
+            </div>
+          ))}
+          {!demanda.responsavel_atual_nome && !demanda.criado_por_nome && (
+            <p className="text-xs text-red-400 italic">Sem responsável definido</p>
+          )}
+          {/* Datas de encaminhamento */}
+          {demanda.data_ultimo_encaminhamento && (
+            <div className="pt-1 border-t border-slate-100 flex justify-between">
+              <span className="text-xs text-slate-400">Último encaminhamento</span>
+              <span className="text-xs text-slate-500">{formatDate(demanda.data_ultimo_encaminhamento.split('T')[0])}</span>
+            </div>
+          )}
+          {demanda.data_ultimo_retorno && (
+            <div className="flex justify-between">
+              <span className="text-xs text-slate-400">Último retorno</span>
+              <span className="text-xs text-slate-500">{formatDate(demanda.data_ultimo_retorno.split('T')[0])}</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── BLOCO: Origem ── */}
+        <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Origem</p>
           {[
             ['Tipo de Demanda', demanda.tipo_demanda],
             ['Origem', demanda.origem_tipo],
@@ -131,28 +276,7 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           ))}
         </div>
 
-        {/* Seção: Prazos */}
-        {(demanda.prazo_interno || demanda.prazo_final) && (
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Prazos</p>
-            {demanda.prazo_interno && (
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-slate-400">Prazo Interno</span>
-                <span className="text-sm text-slate-700 font-medium">{formatDate(demanda.prazo_interno)}</span>
-              </div>
-            )}
-            {demanda.prazo_final && (
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-slate-400">Prazo Final</span>
-                <span className={`text-sm font-semibold ${atrasada ? 'text-red-600' : 'text-slate-700'}`}>
-                  {formatDate(demanda.prazo_final)}{atrasada ? ' — VENCIDO' : ''}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Seção: Militar */}
+        {/* ── BLOCO: Militar Vinculado ── */}
         {demanda.militar_nome_snapshot && (
           <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Militar Vinculado</p>
@@ -170,7 +294,31 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           </div>
         )}
 
-        {/* Seção: Descrição */}
+        {/* ── BLOCO: Prazos ── */}
+        {(demanda.prazo_interno || demanda.prazo_final) && (
+          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Prazos</p>
+            {demanda.prazo_interno && (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-slate-400">Prazo Interno</span>
+                <span className="text-sm text-slate-700 font-medium flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-slate-400" />{formatDate(demanda.prazo_interno)}
+                </span>
+              </div>
+            )}
+            {demanda.prazo_final && (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-slate-400">Prazo Final</span>
+                <span className={`text-sm font-semibold flex items-center gap-1 ${atrasada ? 'text-red-600' : 'text-slate-700'}`}>
+                  <Calendar className={`w-3 h-3 ${atrasada ? 'text-red-500' : 'text-slate-400'}`} />
+                  {formatDate(demanda.prazo_final)}{atrasada ? ' — VENCIDO' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── BLOCO: Descrição ── */}
         {(demanda.descricao || demanda.assunto_resumido) && (
           <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Descrição</p>
@@ -178,7 +326,7 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           </div>
         )}
 
-        {/* Seção: Observações internas */}
+        {/* ── BLOCO: Observações Internas ── */}
         {demanda.observacoes_internas && (
           <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
             <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">Observações Internas</p>
@@ -186,13 +334,13 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           </div>
         )}
 
-        {/* Seção: Tarefas */}
+        {/* ── BLOCO: Tarefas Vinculadas ── */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <TarefaPanel demandaId={demanda.id} />
         </div>
       </div>
 
-      {/* Rodapé ações */}
+      {/* Rodapé */}
       <div className="shrink-0 border-t border-slate-200 px-5 py-3 flex items-center justify-between bg-slate-50">
         <Button variant="outline" size="sm" onClick={() => onDelete(demanda)} className="text-red-600 border-red-200 hover:bg-red-50">
           <Trash2 className="w-4 h-4 mr-1" /> Excluir
