@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -49,7 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format, parseISO, addDays } from 'date-fns';
+import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const statusColors = {
@@ -58,6 +58,72 @@ const statusColors = {
   Gozada: 'bg-emerald-100 text-emerald-700',
   Interrompida: 'bg-orange-100 text-orange-700',
 };
+
+function parseDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00');
+}
+
+function deriveInterrupcaoData(ferias, registrosLivro) {
+  if (!ferias || !Array.isArray(registrosLivro)) {
+    return {
+      diasNoMomento: Number(ferias?.dias || 0),
+      gozados: null,
+      saldo: null,
+      dataInterrupcao: null,
+    };
+  }
+
+  const ultimaInterrupcao = registrosLivro
+    .filter(
+      (r) =>
+        r.ferias_id === ferias.id &&
+        r.tipo_registro === 'Interrupção de Férias'
+    )
+    .sort((a, b) => new Date(b.data_registro || 0) - new Date(a.data_registro || 0))[0];
+
+  if (!ultimaInterrupcao) {
+    return {
+      diasNoMomento: Number(ferias.dias || 0),
+      gozados: null,
+      saldo: null,
+      dataInterrupcao: null,
+    };
+  }
+
+  const diasNoMomento = Number(
+    ultimaInterrupcao.dias_no_momento ??
+    ultimaInterrupcao.dias ??
+    ferias.dias ??
+    0
+  );
+
+  let gozados = null;
+  let saldo = null;
+
+  if (ferias.data_inicio && ultimaInterrupcao.data_registro) {
+    const inicio = parseDate(ferias.data_inicio);
+    const dataInterrupcao = parseDate(ultimaInterrupcao.data_registro);
+
+    gozados = Math.max(0, differenceInDays(dataInterrupcao, inicio) + 1);
+    gozados = Math.min(gozados, diasNoMomento);
+    saldo = Math.max(0, diasNoMomento - gozados);
+  }
+
+  if (ultimaInterrupcao.dias_gozados != null && !Number.isNaN(Number(ultimaInterrupcao.dias_gozados))) {
+    gozados = Number(ultimaInterrupcao.dias_gozados);
+  }
+
+  if (ultimaInterrupcao.saldo_remanescente != null && !Number.isNaN(Number(ultimaInterrupcao.saldo_remanescente))) {
+    saldo = Number(ultimaInterrupcao.saldo_remanescente);
+  }
+
+  return {
+    diasNoMomento,
+    gozados,
+    saldo,
+    dataInterrupcao: ultimaInterrupcao.data_registro || null,
+  };
+}
 
 export default function Ferias() {
   const navigate = useNavigate();
@@ -126,36 +192,42 @@ export default function Ferias() {
     },
   });
 
-  const filteredFerias = ferias.filter((f) => {
-    const matchesSearch =
-      f.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.periodo_aquisitivo_ref?.includes(searchTerm);
+  const filteredFerias = useMemo(() => {
+    return ferias.filter((f) => {
+      const matchesSearch =
+        f.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        f.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        f.periodo_aquisitivo_ref?.includes(searchTerm);
 
-    const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+      const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [ferias, searchTerm, statusFilter]);
 
-  const feriasAgrupadas = filteredFerias.reduce((acc, f) => {
-    if (!f.data_inicio) {
-      const key = 'Sem data';
-      if (!acc[key]) acc[key] = { label: 'Sem data', items: [], sortKey: '9999-99' };
+  const feriasAgrupadas = useMemo(() => {
+    return filteredFerias.reduce((acc, f) => {
+      if (!f.data_inicio) {
+        const key = 'Sem data';
+        if (!acc[key]) acc[key] = { label: 'Sem data', items: [], sortKey: '9999-99' };
+        acc[key].items.push(f);
+        return acc;
+      }
+
+      const d = parseISO(f.data_inicio + 'T00:00:00');
+      const key = format(d, 'yyyy-MM');
+      const label = format(d, "MMMM 'de' yyyy", { locale: ptBR });
+
+      if (!acc[key]) acc[key] = { label, items: [], sortKey: key };
       acc[key].items.push(f);
       return acc;
-    }
+    }, {});
+  }, [filteredFerias]);
 
-    const d = parseISO(f.data_inicio + 'T00:00:00');
-    const key = format(d, 'yyyy-MM');
-    const label = format(d, "MMMM 'de' yyyy", { locale: ptBR });
-
-    if (!acc[key]) acc[key] = { label, items: [], sortKey: key };
-    acc[key].items.push(f);
-    return acc;
-  }, {});
-
-  const gruposOrdenados = Object.values(feriasAgrupadas).sort((a, b) =>
-    a.sortKey.localeCompare(b.sortKey)
-  );
+  const gruposOrdenados = useMemo(() => {
+    return Object.values(feriasAgrupadas).sort((a, b) =>
+      a.sortKey.localeCompare(b.sortKey)
+    );
+  }, [feriasAgrupadas]);
 
   const handleDelete = async (f) => {
     setFeriasToDelete(f);
@@ -412,6 +484,11 @@ export default function Ferias() {
                             ].includes(r.tipo_registro)
                         );
 
+                        const interrupcaoInfo =
+                          f.status === 'Interrompida'
+                            ? deriveInterrupcaoData(f, registrosLivro)
+                            : null;
+
                         return (
                           <tr
                             key={f.id}
@@ -456,15 +533,15 @@ export default function Ferias() {
                               <div className="flex flex-col">
                                 <span>{f.dias}d</span>
 
-                                {f.status === 'Interrompida' && (
+                                {f.status === 'Interrompida' && interrupcaoInfo?.saldo != null && (
                                   <span className="text-xs text-orange-600 font-medium">
-                                    Saldo: {Number(f.saldo_remanescente || 0)}d
+                                    Saldo: {interrupcaoInfo.saldo}d
                                   </span>
                                 )}
 
-                                {f.status === 'Interrompida' && f.dias_gozados_interrupcao != null && (
+                                {f.status === 'Interrompida' && interrupcaoInfo?.gozados != null && (
                                   <span className="text-xs text-slate-500">
-                                    Gozados: {Number(f.dias_gozados_interrupcao || 0)}d
+                                    Gozados: {interrupcaoInfo.gozados}d
                                   </span>
                                 )}
                               </div>
