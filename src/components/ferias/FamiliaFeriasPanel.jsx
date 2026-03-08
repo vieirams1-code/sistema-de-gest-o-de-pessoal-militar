@@ -309,7 +309,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                             </>
                           )}
                           {/* Para Adição/Desconto: mostrar impacto */}
-                          {(evento.tipo_registro === 'Adição de Dias' || evento.tipo_registro === 'Desconto em Férias' || evento.tipo_registro === 'Dispensa Desconto Férias') && (evento.dias_evento || evento.dias) && (
+                          {(['Adição de Dias', 'Desconto em Férias', 'Dispensa Desconto Férias'].includes(evento.tipo_registro)) && (evento.dias_evento || evento.dias) && (
                             <>
                               <span className="text-slate-400">Impacto</span>
                               <span className={`font-semibold ${evento.tipo_registro === 'Adição de Dias' ? 'text-purple-700' : 'text-rose-700'}`}>
@@ -318,7 +318,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
                             </>
                           )}
                           {/* Para outros tipos: mostrar dias normalmente */}
-                          {evento.tipo_registro !== 'Adição de Dias' && evento.tipo_registro !== 'Desconto em Férias' && evento.tipo_registro !== 'Dispensa Desconto Férias' && evento.dias && (
+                          {!['Adição de Dias', 'Desconto em Férias', 'Dispensa Desconto Férias'].includes(evento.tipo_registro) && evento.dias && (
                             <>
                               <span className="text-slate-400">Dias</span>
                               <span className="text-slate-700 font-medium">{evento.dias}d</span>
