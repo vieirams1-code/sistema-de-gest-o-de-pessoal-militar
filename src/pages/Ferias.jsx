@@ -290,7 +290,6 @@ export default function Ferias() {
     const diasDesconto = Number(descontoModal.dias);
     const hoje = new Date().toISOString().split('T')[0];
 
-    // Novo evento (ainda não persistido, usado para cálculo local imediato)
     const novoEvento = {
       ferias_id: f.id,
       tipo_registro: 'Desconto em Férias',
@@ -298,7 +297,7 @@ export default function Ferias() {
       motivo_dispensa: descontoModal.motivo,
     };
 
-    // 1. Calcular novo total ANTES de fazer qualquer request
+    // Calcular novo total antes de qualquer request
     const novaQtd = recalcularDiasLocalmente(f, novoEvento);
     const novaDataFim = f.data_inicio
       ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd')
@@ -308,7 +307,10 @@ export default function Ferias() {
       : f.data_retorno;
     const novasObs = reconstruirObservacoesDerivadas(f, novoEvento);
 
-    // 2. Criar evento no RegistroLivro e atualizar Ferias em paralelo
+    // Texto padrão da publicação de desconto
+    const textoPublicacao = `DESCONTO EM FÉRIAS — ${f.militar_posto ? f.militar_posto + ' ' : ''}${f.militar_nome}${f.militar_matricula ? `, Mat. ${f.militar_matricula}` : ''}: desconto de ${diasDesconto} (${diasDesconto === 1 ? 'um' : diasDesconto + ' dias'}) dia(s) nas férias referentes ao período aquisitivo ${f.periodo_aquisitivo_ref || ''}. Motivo: ${descontoModal.motivo || 'não informado'}.`;
+
+    // Criar evento de desconto no Livro + PublicacaoExOfficio + atualizar Férias em paralelo
     await Promise.all([
       base44.entities.RegistroLivro.create({
         militar_id: f.militar_id,
@@ -320,11 +322,24 @@ export default function Ferias() {
         data_registro: hoje,
         dias_evento: diasDesconto,
         motivo_dispensa: descontoModal.motivo,
+        periodo_aquisitivo: f.periodo_aquisitivo_ref,
         status: 'Aguardando Nota',
+      }),
+      base44.entities.PublicacaoExOfficio.create({
+        militar_id: f.militar_id,
+        militar_nome: f.militar_nome,
+        militar_posto: f.militar_posto,
+        militar_matricula: f.militar_matricula,
+        tipo: 'Geral',
+        subtipo_geral: 'Dispensa Desconto Férias',
+        data_publicacao: hoje,
+        texto_publicacao: textoPublicacao,
+        observacoes: `Desconto de ${diasDesconto}d nas férias (período ${f.periodo_aquisitivo_ref || ''}). Motivo: ${descontoModal.motivo}`,
+        status: 'Aguardando Nota',
+        ferias_interrompida_id: f.id,
       }),
       base44.entities.Ferias.update(f.id, {
         dias: novaQtd,
-        // Garantir que dias_base está gravado (migração de registros antigos)
         ...(f.dias_base ? {} : { dias_base: f.dias_originais || f.dias }),
         data_fim: novaDataFim,
         data_retorno: novaDataRetorno,
@@ -334,6 +349,7 @@ export default function Ferias() {
 
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
     setSavingEdit(false);
     setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' });
   };
