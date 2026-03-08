@@ -185,6 +185,69 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
           </div>
         </div>
 
+        {/* Indicadores Operacionais */}
+        {indicadores?.tipo === 'em_curso' && (
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Timer className="w-4 h-4 text-amber-600" />
+              <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Em Curso — Indicadores</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-white rounded-lg border border-amber-100 p-2">
+                <p className="text-xs text-slate-400 mb-0.5">Total</p>
+                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}</p>
+                <p className="text-[10px] text-slate-400">dias</p>
+              </div>
+              <div className="bg-amber-100 rounded-lg border border-amber-200 p-2">
+                <p className="text-xs text-amber-600 mb-0.5">Gozados</p>
+                <p className="text-xl font-bold text-amber-700">{indicadores.gozados}</p>
+                <p className="text-[10px] text-amber-500">até hoje</p>
+              </div>
+              <div className="bg-emerald-50 rounded-lg border border-emerald-200 p-2">
+                <p className="text-xs text-emerald-600 mb-0.5">Restantes</p>
+                <p className="text-xl font-bold text-emerald-700">{indicadores.restantes}</p>
+                <p className="text-[10px] text-emerald-500">dias</p>
+              </div>
+            </div>
+            {indicadores.restantes === 0 && (
+              <p className="text-xs text-amber-700 bg-amber-100 rounded-lg px-3 py-1.5 mt-2 text-center font-medium">
+                ⚠ Período encerrado — aguardando registro de retorno
+              </p>
+            )}
+          </div>
+        )}
+
+        {indicadores?.tipo === 'interrompida' && (
+          <div className="bg-orange-50 rounded-xl border border-orange-200 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingDown className="w-4 h-4 text-orange-600" />
+              <span className="text-xs font-bold text-orange-700 uppercase tracking-wide">Interrompida — Indicadores</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-white rounded-lg border border-orange-100 p-2">
+                <p className="text-xs text-slate-400 mb-0.5">Previsto</p>
+                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}</p>
+                <p className="text-[10px] text-slate-400">dias</p>
+              </div>
+              <div className="bg-orange-100 rounded-lg border border-orange-200 p-2">
+                <p className="text-xs text-orange-600 mb-0.5">Gozados</p>
+                <p className="text-xl font-bold text-orange-700">{indicadores.gozados ?? '—'}</p>
+                <p className="text-[10px] text-orange-500">até interrupção</p>
+              </div>
+              <div className="bg-blue-50 rounded-lg border border-blue-200 p-2">
+                <p className="text-xs text-blue-600 mb-0.5">Saldo</p>
+                <p className="text-xl font-bold text-blue-700">{indicadores.saldo ?? '—'}</p>
+                <p className="text-[10px] text-blue-500">remanescente</p>
+              </div>
+            </div>
+            {indicadores.dataInterrupcao && (
+              <p className="text-xs text-orange-600 mt-2 text-center">
+                Interrompida em: <strong>{formatDate(indicadores.dataInterrupcao)}</strong>
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Sequência de Eventos */}
         <div>
           <div className="flex items-center justify-between mb-3">
