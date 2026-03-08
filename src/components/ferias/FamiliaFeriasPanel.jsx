@@ -107,6 +107,12 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
   const totalEventos = eventosVinculados.length;
   const possuiEventosPendentes = eventosVinculados.some((e) => !e.numero_bg);
 
+  const ultimaInterrupcao = useMemo(() => {
+    return [...eventosVinculados]
+      .filter((e) => e.tipo_registro === 'Interrupção de Férias')
+      .sort((a, b) => new Date(b.data_registro || 0) - new Date(a.data_registro || 0))[0];
+  }, [eventosVinculados]);
+
   const indicadores = useMemo(() => {
     const diasTotais = ferias.dias || 0;
     const hoje = new Date();
@@ -120,28 +126,30 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
     }
 
     if (ferias.status === 'Interrompida') {
-      const interrupcao = eventosVinculados
-        .filter((e) => e.tipo_registro === 'Interrupção de Férias')
-        .sort((a, b) => new Date(b.data_registro || 0) - new Date(a.data_registro || 0))[0];
+      const gozados =
+        ferias.dias_gozados_interrupcao != null
+          ? Number(ferias.dias_gozados_interrupcao)
+          : ultimaInterrupcao?.dias_gozados != null
+            ? Number(ultimaInterrupcao.dias_gozados)
+            : null;
 
-      const dataInterrupcao = interrupcao?.data_registro;
-      let gozados = null;
+      const saldo =
+        ferias.saldo_remanescente != null
+          ? Number(ferias.saldo_remanescente)
+          : ultimaInterrupcao?.saldo_remanescente != null
+            ? Number(ultimaInterrupcao.saldo_remanescente)
+            : null;
 
-      if (ferias.data_inicio && dataInterrupcao) {
-        const inicio = new Date(ferias.data_inicio + 'T00:00:00');
-        const fim = new Date(dataInterrupcao + 'T00:00:00');
-        gozados = Math.max(0, differenceInDays(fim, inicio));
-      }
+      const dataInterrupcao = ferias.data_interrupcao || ultimaInterrupcao?.data_registro;
 
-      const saldo = gozados !== null ? Math.max(0, diasTotais - gozados) : null;
       return { tipo: 'interrompida', diasTotais, gozados, saldo, dataInterrupcao };
     }
 
     return null;
-  }, [ferias, eventosVinculados]);
+  }, [ferias, ultimaInterrupcao]);
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full md:w-[440px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">
+    <div className="fixed inset-y-0 right-0 w-full md:w-[460px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">
       <div className="bg-[#1e3a5f] text-white px-5 py-4 flex items-start justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
@@ -204,7 +212,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
 
             <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200 mt-2">
               <div className="text-center">
-                <p className="text-xs text-slate-400">Total</p>
+                <p className="text-xs text-slate-400">Atual</p>
                 <p className="text-lg font-bold text-[#1e3a5f]">{ferias.dias || 0}d</p>
               </div>
               <div className="text-center">
@@ -230,7 +238,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-white rounded-lg border border-amber-100 p-2">
-                <p className="text-xs text-slate-400 mb-0.5">Total</p>
+                <p className="text-xs text-slate-400 mb-0.5">Atual</p>
                 <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}</p>
                 <p className="text-[10px] text-slate-400">dias</p>
               </div>
@@ -261,7 +269,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-white rounded-lg border border-orange-100 p-2">
-                <p className="text-xs text-slate-400 mb-0.5">Previsto</p>
+                <p className="text-xs text-slate-400 mb-0.5">Atual</p>
                 <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}</p>
                 <p className="text-[10px] text-slate-400">dias</p>
               </div>
@@ -346,8 +354,28 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
 
                           {evento.dias && (
                             <>
-                              <span className="text-slate-400">Dias</span>
+                              <span className="text-slate-400">
+                                {evento.tipo_registro === 'Interrupção de Férias'
+                                  ? 'Dias no momento'
+                                  : evento.tipo_registro === 'Nova Saída / Retomada'
+                                    ? 'Saldo retomado'
+                                    : 'Dias'}
+                              </span>
                               <span className="text-slate-700 font-medium">{evento.dias}d</span>
+                            </>
+                          )}
+
+                          {evento.tipo_registro === 'Interrupção de Férias' && evento.dias_gozados != null && (
+                            <>
+                              <span className="text-slate-400">Gozados</span>
+                              <span className="text-orange-700 font-medium">{evento.dias_gozados}d</span>
+                            </>
+                          )}
+
+                          {evento.tipo_registro === 'Interrupção de Férias' && evento.saldo_remanescente != null && (
+                            <>
+                              <span className="text-slate-400">Saldo</span>
+                              <span className="text-blue-700 font-medium">{evento.saldo_remanescente}d</span>
                             </>
                           )}
 
