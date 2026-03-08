@@ -290,14 +290,16 @@ export default function Ferias() {
     const diasDesconto = Number(descontoModal.dias);
     const hoje = new Date().toISOString().split('T')[0];
 
+    // dias_base: fonte de verdade imutável — garantir que está gravado antes do desconto
+    const diasBase = f.dias_base || f.dias_originais || recalcularDiasLocalmente(f, null);
+
     const novoEvento = {
       ferias_id: f.id,
-      tipo_registro: 'Desconto em Férias',
+      tipo_registro: 'Dispensa Desconto Férias',
       dias_evento: diasDesconto,
       motivo_dispensa: descontoModal.motivo,
     };
 
-    // Calcular novo total antes de qualquer request
     const novaQtd = recalcularDiasLocalmente(f, novoEvento);
     const novaDataFim = f.data_inicio
       ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd')
