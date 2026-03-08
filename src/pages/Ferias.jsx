@@ -329,7 +329,7 @@ export default function Ferias() {
       }),
       base44.entities.Ferias.update(f.id, {
         dias: novaQtd,
-        ...(f.dias_base ? {} : { dias_base: f.dias_originais || f.dias }),
+        dias_base: diasBase, // sempre gravar
         data_fim: novaDataFim,
         data_retorno: novaDataRetorno,
         observacoes: novasObs,
