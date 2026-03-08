@@ -13,7 +13,6 @@ import DemandaDetalhePanel from '@/components/demandas/DemandaDetalhePanel';
 import DemandaFormModal from '@/components/demandas/DemandaFormModal';
 import {
   prioridadeColors,
-  etapaColors,
   ETAPAS_CHEFE,
   isAtrasada,
   isVencendoHoje,
