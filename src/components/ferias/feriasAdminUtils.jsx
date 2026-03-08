@@ -107,7 +107,7 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
   eventosSobreviventes.forEach(e => {
     if (e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO && e.dias_evento) {
       linhasObs.push(`+${e.dias_evento}d: ${e.motivo_dispensa || 'Adição de dias'}`);
-    } else if (e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO && e.dias_evento) {
+    } else if ((e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO || e.tipo_registro === 'Dispensa Desconto Férias') && e.dias_evento) {
       linhasObs.push(`-${e.dias_evento}d: ${e.motivo_dispensa || 'Desconto em férias'}`);
     }
   });
