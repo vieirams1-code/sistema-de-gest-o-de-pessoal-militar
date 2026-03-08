@@ -58,6 +58,15 @@ function detectarOrigemTipo(registro) {
   return 'livro';
 }
 
+
+function getTipoDisplay(tipo) {
+  if (tipo === 'Saída Férias') return 'Início';
+  if (tipo === 'Interrupção de Férias') return 'Interrupção';
+  if (tipo === 'Nova Saída / Retomada') return 'Continuação';
+  if (tipo === 'Retorno Férias') return 'Término';
+  return tipo;
+}
+
 function getEditUrl(registro) {
   const tipo = detectarOrigemTipo(registro);
 
@@ -135,13 +144,15 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     bgData.data_bg
   );
 
-  const tipoLabel =
+  const tipoBase =
     registro.tipo_registro ||
     registro.tipo ||
     (registro.medico || registro.cid_10
       ? (registro.necessita_jiso ? 'Atestado - JISO' : 'Atestado - Homologação')
       : '') ||
     'Publicação';
+
+  const tipoLabel = getTipoDisplay(tipoBase);
 
   // Ver Atestado: Homologação de Atestado tem atestado_homologado_id; Ata JISO tem atestados_jiso_ids
   const atestadoLink = registro.atestado_homologado_id
