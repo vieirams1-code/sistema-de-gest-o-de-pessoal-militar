@@ -194,17 +194,48 @@ export default function Ferias() {
     setEditDataModal({ open: false, ferias: null, novaData: '' });
   };
 
-  // Função auxiliar: recalcula dias totais a partir dos eventos existentes + novo impacto
-  const calcularNovosDias = (f, impacto) => {
-    const diasOriginais = f.dias_originais || f.dias || 0;
-    const eventosFerias = registrosLivro.filter(r => r.ferias_id === f.id);
-    const totalAdicoes = eventosFerias
+  /**
+   * Calcula dias totais a partir da base imutável + todos os eventos existentes na cache
+   * + um novo evento extra (passado como objeto com tipo_registro e dias_evento).
+   * NÃO depende de refetch — opera sobre o estado local atual.
+   */
+  const recalcularDiasLocalmente = (f, novoEvento) => {
+    // dias_base é a fonte de verdade; nunca usar f.dias como base
+    const diasBase = f.dias_base || f.dias_originais || f.dias || 0;
+
+    // Eventos já persistidos para esta férias
+    const eventosExistentes = registrosLivro.filter(r => r.ferias_id === f.id);
+    // Incluir o novo evento localmente para o cálculo ser correto de imediato
+    const todosEventos = novoEvento ? [...eventosExistentes, novoEvento] : eventosExistentes;
+
+    const totalAdicoes = todosEventos
       .filter(e => e.tipo_registro === 'Adição de Dias')
       .reduce((s, e) => s + (e.dias_evento || 0), 0);
-    const totalDescontos = eventosFerias
+    const totalDescontos = todosEventos
       .filter(e => e.tipo_registro === 'Desconto em Férias')
       .reduce((s, e) => s + (e.dias_evento || 0), 0);
-    return Math.max(0, diasOriginais + totalAdicoes + totalDescontos + impacto);
+
+    return Math.max(0, diasBase + totalAdicoes - totalDescontos);
+  };
+
+  /**
+   * Reconstrói as observações derivadas de adições/descontos a partir dos eventos
+   * existentes na cache + um novo evento (antes do refetch).
+   */
+  const reconstruirObservacoesDerivadas = (f, novoEvento) => {
+    const eventosExistentes = registrosLivro.filter(r => r.ferias_id === f.id);
+    const todosEventos = novoEvento ? [...eventosExistentes, novoEvento] : eventosExistentes;
+    const linhas = [];
+    todosEventos.forEach(e => {
+      if (e.tipo_registro === 'Adição de Dias' && e.dias_evento) {
+        linhas.push(`+${e.dias_evento}d: ${e.motivo_dispensa || 'Adição de dias'}`);
+      } else if (e.tipo_registro === 'Desconto em Férias' && e.dias_evento) {
+        linhas.push(`-${e.dias_evento}d: ${e.motivo_dispensa || 'Desconto em férias'}`);
+      }
+    });
+    // Manter outras observações não derivadas (ex: Saldo, dados de interrupção)
+    const obsAtuais = (f.observacoes || '').split('\n').filter(l => !l.match(/^[+-]\d+d:/));
+    return [...obsAtuais.filter(Boolean), ...linhas].join('\n');
   };
 
   const handleSalvarAddDias = async () => {
@@ -212,35 +243,50 @@ export default function Ferias() {
     setSavingEdit(true);
     const f = addDiasModal.ferias;
     const qtdDias = Number(addDiasModal.dias);
-    const diasOriginais = f.dias_originais || f.dias || 0;
+    const hoje = new Date().toISOString().split('T')[0];
 
-    // Criar evento atômico na cadeia — armazena apenas o impacto individual
-    await base44.entities.RegistroLivro.create({
-      militar_id: f.militar_id,
-      militar_nome: f.militar_nome,
-      militar_posto: f.militar_posto,
-      militar_matricula: f.militar_matricula,
+    // Novo evento (ainda não persistido, usado para cálculo local imediato)
+    const novoEvento = {
       ferias_id: f.id,
       tipo_registro: 'Adição de Dias',
-      data_registro: new Date().toISOString().split('T')[0],
-      dias: qtdDias,
       dias_evento: qtdDias,
       motivo_dispensa: addDiasModal.motivo,
-      observacoes: addDiasModal.motivo,
-      status: 'Aguardando Nota',
-    });
+    };
 
-    // Recalcular total do zero: base + todas adições - todos descontos + nova adição
-    const novaQtd = calcularNovosDias(f, qtdDias);
-    const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
-    const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
+    // 1. Calcular novo total ANTES de fazer qualquer request (usando dados locais + novo evento)
+    const novaQtd = recalcularDiasLocalmente(f, novoEvento);
+    const novaDataFim = f.data_inicio
+      ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd')
+      : f.data_fim;
+    const novaDataRetorno = f.data_inicio
+      ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd')
+      : f.data_retorno;
+    const novasObs = reconstruirObservacoesDerivadas(f, novoEvento);
 
-    await base44.entities.Ferias.update(f.id, {
-      dias: novaQtd,
-      dias_originais: diasOriginais,
-      data_fim: novaDataFim,
-      data_retorno: novaDataRetorno,
-    });
+    // 2. Criar evento no RegistroLivro e atualizar Ferias em paralelo
+    await Promise.all([
+      base44.entities.RegistroLivro.create({
+        militar_id: f.militar_id,
+        militar_nome: f.militar_nome,
+        militar_posto: f.militar_posto,
+        militar_matricula: f.militar_matricula,
+        ferias_id: f.id,
+        tipo_registro: 'Adição de Dias',
+        data_registro: hoje,
+        dias_evento: qtdDias,
+        motivo_dispensa: addDiasModal.motivo,
+        status: 'Aguardando Nota',
+      }),
+      base44.entities.Ferias.update(f.id, {
+        dias: novaQtd,
+        // Garantir que dias_base está gravado (migração de registros antigos)
+        ...(f.dias_base ? {} : { dias_base: f.dias_originais || f.dias }),
+        data_fim: novaDataFim,
+        data_retorno: novaDataRetorno,
+        observacoes: novasObs,
+      }),
+    ]);
+
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
     setSavingEdit(false);
@@ -252,35 +298,50 @@ export default function Ferias() {
     setSavingEdit(true);
     const f = descontoModal.ferias;
     const diasDesconto = Number(descontoModal.dias);
-    const diasOriginais = f.dias_originais || f.dias || 0;
+    const hoje = new Date().toISOString().split('T')[0];
 
-    // Criar evento atômico na cadeia — armazena apenas o impacto individual (negativo)
-    await base44.entities.RegistroLivro.create({
-      militar_id: f.militar_id,
-      militar_nome: f.militar_nome,
-      militar_posto: f.militar_posto,
-      militar_matricula: f.militar_matricula,
+    // Novo evento (ainda não persistido, usado para cálculo local imediato)
+    const novoEvento = {
       ferias_id: f.id,
       tipo_registro: 'Desconto em Férias',
-      data_registro: new Date().toISOString().split('T')[0],
-      dias: diasDesconto,
       dias_evento: diasDesconto,
       motivo_dispensa: descontoModal.motivo,
-      observacoes: descontoModal.motivo,
-      status: 'Aguardando Nota',
-    });
+    };
 
-    // Recalcular total do zero: base + todas adições - todos descontos - novo desconto
-    const novaQtd = calcularNovosDias(f, -diasDesconto);
-    const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
-    const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
+    // 1. Calcular novo total ANTES de fazer qualquer request
+    const novaQtd = recalcularDiasLocalmente(f, novoEvento);
+    const novaDataFim = f.data_inicio
+      ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd')
+      : f.data_fim;
+    const novaDataRetorno = f.data_inicio
+      ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd')
+      : f.data_retorno;
+    const novasObs = reconstruirObservacoesDerivadas(f, novoEvento);
 
-    await base44.entities.Ferias.update(f.id, {
-      dias: novaQtd,
-      dias_originais: diasOriginais,
-      data_fim: novaDataFim,
-      data_retorno: novaDataRetorno,
-    });
+    // 2. Criar evento no RegistroLivro e atualizar Ferias em paralelo
+    await Promise.all([
+      base44.entities.RegistroLivro.create({
+        militar_id: f.militar_id,
+        militar_nome: f.militar_nome,
+        militar_posto: f.militar_posto,
+        militar_matricula: f.militar_matricula,
+        ferias_id: f.id,
+        tipo_registro: 'Desconto em Férias',
+        data_registro: hoje,
+        dias_evento: diasDesconto,
+        motivo_dispensa: descontoModal.motivo,
+        status: 'Aguardando Nota',
+      }),
+      base44.entities.Ferias.update(f.id, {
+        dias: novaQtd,
+        // Garantir que dias_base está gravado (migração de registros antigos)
+        ...(f.dias_base ? {} : { dias_base: f.dias_originais || f.dias }),
+        data_fim: novaDataFim,
+        data_retorno: novaDataRetorno,
+        observacoes: novasObs,
+      }),
+    ]);
+
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
     setSavingEdit(false);
