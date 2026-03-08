@@ -11,10 +11,14 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Save, User, ArrowRight, Search, X } from 'lucide-react';
 
+const TODAY = new Date().toISOString().split('T')[0];
+
 const EMPTY = {
   titulo: '',
-  assunto_resumido: '',
   descricao: '',
+  tipo_demanda: '',
+  categoria: '',
+  subtipo: '',
   origem_tipo: '',
   origem_numero_protocolo: '',
   origem_data: '',
@@ -28,15 +32,25 @@ const EMPTY = {
   criticidade: 'Rotina',
   status: 'Aberta',
   etapa_fluxo: 'Recebido',
-  data_entrada: new Date().toISOString().split('T')[0],
+  data_entrada: TODAY,
+  proxima_acao: '',
   prazo_interno: '',
   prazo_final: '',
-  tipo_demanda: '',
   exige_documentacao: false,
   exige_assinatura: false,
   impacto_no_efetivo: false,
   observacoes_internas: '',
 };
+
+const SectionTitle = ({ children }) => (
+  <p className="text-xs font-bold text-[#1e3a5f]/60 uppercase tracking-widest mb-3">{children}</p>
+);
+
+const FormBlock = ({ children, className = '' }) => (
+  <div className={`bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3 ${className}`}>
+    {children}
+  </div>
+);
 
 export default function DemandaFormModal({ open, onClose, demanda, onSaved }) {
   const [form, setForm] = useState(EMPTY);
