@@ -307,10 +307,8 @@ export default function Ferias() {
       : f.data_retorno;
     const novasObs = reconstruirObservacoesDerivadas(f, novoEvento);
 
-    // Texto padrão da publicação de desconto
-    const textoPublicacao = `DESCONTO EM FÉRIAS — ${f.militar_posto ? f.militar_posto + ' ' : ''}${f.militar_nome}${f.militar_matricula ? `, Mat. ${f.militar_matricula}` : ''}: desconto de ${diasDesconto} (${diasDesconto === 1 ? 'um' : diasDesconto + ' dias'}) dia(s) nas férias referentes ao período aquisitivo ${f.periodo_aquisitivo_ref || ''}. Motivo: ${descontoModal.motivo || 'não informado'}.`;
-
-    // Criar evento de desconto no Livro + PublicacaoExOfficio + atualizar Férias em paralelo
+    // Gerar APENAS um registro no Livro com tipo 'Dispensa Desconto Férias'
+    // NÃO criar PublicacaoExOfficio — desconto gera somente este lançamento no Livro
     await Promise.all([
       base44.entities.RegistroLivro.create({
         militar_id: f.militar_id,
@@ -318,25 +316,14 @@ export default function Ferias() {
         militar_posto: f.militar_posto,
         militar_matricula: f.militar_matricula,
         ferias_id: f.id,
-        tipo_registro: 'Desconto em Férias',
+        tipo_registro: 'Dispensa Desconto Férias',
         data_registro: hoje,
         dias_evento: diasDesconto,
+        dias: diasDesconto,
         motivo_dispensa: descontoModal.motivo,
         periodo_aquisitivo: f.periodo_aquisitivo_ref,
+        dias_restantes: novaQtd,
         status: 'Aguardando Nota',
-      }),
-      base44.entities.PublicacaoExOfficio.create({
-        militar_id: f.militar_id,
-        militar_nome: f.militar_nome,
-        militar_posto: f.militar_posto,
-        militar_matricula: f.militar_matricula,
-        tipo: 'Geral',
-        subtipo_geral: 'Dispensa Desconto Férias',
-        data_publicacao: hoje,
-        texto_publicacao: textoPublicacao,
-        observacoes: `Desconto de ${diasDesconto}d nas férias (período ${f.periodo_aquisitivo_ref || ''}). Motivo: ${descontoModal.motivo}`,
-        status: 'Aguardando Nota',
-        ferias_interrompida_id: f.id,
       }),
       base44.entities.Ferias.update(f.id, {
         dias: novaQtd,
@@ -349,7 +336,6 @@ export default function Ferias() {
 
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
     setSavingEdit(false);
     setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' });
   };
