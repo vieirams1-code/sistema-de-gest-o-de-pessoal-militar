@@ -69,12 +69,40 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
   const totalEventos = eventosVinculados.length;
   const possuiEventosPendentes = eventosVinculados.some(e => !e.numero_bg);
 
-  // Saldo de dias se interrompida
-  let saldoDias = null;
-  if (ferias.status === 'Interrompida' && ferias.observacoes) {
-    const match = ferias.observacoes.match(/Saldo: (\d+) dias/);
-    if (match) saldoDias = parseInt(match[1]);
-  }
+  // ── Indicadores operacionais ─────────────────────────────────────
+  const indicadores = useMemo(() => {
+    const diasTotais = ferias.dias || 0;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    if (ferias.status === 'Em Curso' && ferias.data_inicio) {
+      const inicio = new Date(ferias.data_inicio + 'T00:00:00');
+      const gozados = Math.min(Math.max(0, differenceInDays(hoje, inicio) + 1), diasTotais);
+      const restantes = Math.max(0, diasTotais - gozados);
+      return { tipo: 'em_curso', diasTotais, gozados, restantes };
+    }
+
+    if (ferias.status === 'Interrompida') {
+      // Buscar data da interrupção nos eventos
+      const interrupcao = eventosVinculados
+        .filter(e => e.tipo_registro === 'Interrupção de Férias')
+        .sort((a, b) => new Date(b.data_registro || 0) - new Date(a.data_registro || 0))[0];
+
+      const dataInterrupcao = interrupcao?.data_inicio || interrupcao?.data_registro;
+      let gozados = null;
+
+      if (ferias.data_inicio && dataInterrupcao) {
+        const inicio = new Date(ferias.data_inicio + 'T00:00:00');
+        const fim = new Date(dataInterrupcao + 'T00:00:00');
+        gozados = Math.max(0, differenceInDays(fim, inicio));
+      }
+
+      const saldo = gozados !== null ? Math.max(0, diasTotais - gozados) : null;
+      return { tipo: 'interrompida', diasTotais, gozados, saldo, dataInterrupcao };
+    }
+
+    return null;
+  }, [ferias, eventosVinculados]);
 
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-[440px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">
