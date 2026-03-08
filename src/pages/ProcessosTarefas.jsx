@@ -147,7 +147,7 @@ export default function ProcessosTarefas() {
         {/* Lista prioritária */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800">Demandas Prioritárias do Dia</h2>
+            <h2 className="font-semibold text-slate-800">Fila Prioritária do Dia</h2>
             <Button variant="ghost" size="sm" onClick={() => navigate(createPageUrl('FilaDemandas'))}>
               Ver todas <List className="w-3.5 h-3.5 ml-1" />
             </Button>
@@ -169,9 +169,9 @@ export default function ProcessosTarefas() {
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500">Título</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 hidden md:table-cell">Militar</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Etapa</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 hidden lg:table-cell">Responsável</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 hidden lg:table-cell">Prazo</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Prioridade</th>
-                  <th className="w-8" />
                 </tr>
               </thead>
               <tbody>
