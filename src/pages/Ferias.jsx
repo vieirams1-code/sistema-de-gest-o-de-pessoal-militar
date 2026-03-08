@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -59,8 +60,31 @@ const statusColors = {
   Interrompida: 'bg-orange-100 text-orange-700',
 };
 
+const TIPOS_OPERACIONAIS = [
+  'Saída Férias',
+  'Retorno Férias',
+  'Interrupção de Férias',
+  'Nova Saída / Retomada',
+];
+
+const NOMES_OPERACIONAIS = {
+  'Saída Férias': 'Início',
+  'Retorno Férias': 'Término',
+  'Interrupção de Férias': 'Interrupção',
+  'Nova Saída / Retomada': 'Continuação',
+};
+
 function parseDate(dateStr) {
-  return new Date(dateStr + 'T00:00:00');
+  return new Date(`${dateStr}T00:00:00`);
+}
+
+function formatDateBR(dateStr) {
+  if (!dateStr) return '-';
+  return format(parseDate(dateStr), 'dd/MM/yyyy');
+}
+
+function getEventDate(evento) {
+  return evento?.data_registro || evento?.data_inicio || null;
 }
 
 function deriveInterrupcaoData(ferias, registrosLivro) {
@@ -123,6 +147,105 @@ function deriveInterrupcaoData(ferias, registrosLivro) {
     saldo,
     dataInterrupcao: ultimaInterrupcao.data_registro || null,
   };
+}
+
+function getCadeiaOperacional(ferias, registrosLivro) {
+  if (!ferias) return [];
+
+  return montarCadeia(ferias, registrosLivro).filter((r) =>
+    TIPOS_OPERACIONAIS.includes(r.tipo_registro)
+  );
+}
+
+function getEstadoAtualDaCadeia(cadeia) {
+  if (!cadeia.length) {
+    return {
+      status: 'Sem Eventos',
+      ultimoEvento: null,
+      ultimaSaidaOuContinuacao: null,
+      ultimaInterrupcao: null,
+      ultimoRetorno: null,
+    };
+  }
+
+  const ultimoEvento = cadeia[cadeia.length - 1];
+  const ultimaSaidaOuContinuacao = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Saída Férias' || e.tipo_registro === 'Nova Saída / Retomada');
+
+  const ultimaInterrupcao = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Interrupção de Férias');
+
+  const ultimoRetorno = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Retorno Férias');
+
+  let status = 'Sem Eventos';
+
+  if (
+    ultimoEvento.tipo_registro === 'Saída Férias' ||
+    ultimoEvento.tipo_registro === 'Nova Saída / Retomada'
+  ) {
+    status = 'Em Curso';
+  } else if (ultimoEvento.tipo_registro === 'Interrupção de Férias') {
+    status = 'Interrompida';
+  } else if (ultimoEvento.tipo_registro === 'Retorno Férias') {
+    status = 'Encerrada';
+  }
+
+  return {
+    status,
+    ultimoEvento,
+    ultimaSaidaOuContinuacao,
+    ultimaInterrupcao,
+    ultimoRetorno,
+  };
+}
+
+function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
+  if (!ferias || !novaData) return null;
+
+  const novaDataDate = parseDate(novaData);
+  const cadeia = getCadeiaOperacional(ferias, registrosLivro);
+
+  if (!cadeia.length) return null;
+
+  const primeiroEvento = cadeia[0];
+  const ultimoEvento = cadeia[cadeia.length - 1];
+  const primeiroEventoDataStr = getEventDate(primeiroEvento);
+  const ultimoEventoDataStr = getEventDate(ultimoEvento);
+  const estadoAtual = getEstadoAtualDaCadeia(cadeia);
+
+  if (primeiroEvento?.tipo_registro !== 'Saída Férias') {
+    return 'A cadeia possui eventos sem um início operacional consistente. Revise os lançamentos antes de alterar a data de início.';
+  }
+
+  if (primeiroEventoDataStr && novaDataDate > parseDate(primeiroEventoDataStr)) {
+    return `A data de início não pode ser posterior ao primeiro evento da cadeia (${NOMES_OPERACIONAIS[primeiroEvento.tipo_registro] || primeiroEvento.tipo_registro} em ${formatDateBR(primeiroEventoDataStr)}).`;
+  }
+
+  if (
+    estadoAtual.ultimaInterrupcao &&
+    getEventDate(estadoAtual.ultimaInterrupcao) &&
+    novaDataDate > parseDate(getEventDate(estadoAtual.ultimaInterrupcao))
+  ) {
+    return `A data de início não pode ser posterior à interrupção de ${formatDateBR(getEventDate(estadoAtual.ultimaInterrupcao))}.`;
+  }
+
+  if (
+    estadoAtual.ultimoRetorno &&
+    getEventDate(estadoAtual.ultimoRetorno) &&
+    novaDataDate > parseDate(getEventDate(estadoAtual.ultimoRetorno))
+  ) {
+    return `A data de início não pode ser posterior ao término de ${formatDateBR(getEventDate(estadoAtual.ultimoRetorno))}.`;
+  }
+
+  if (ultimoEventoDataStr && novaDataDate > parseDate(ultimoEventoDataStr)) {
+    return `A data de início não pode ser posterior ao último evento da cadeia (${NOMES_OPERACIONAIS[ultimoEvento.tipo_registro] || ultimoEvento.tipo_registro} em ${formatDateBR(ultimoEventoDataStr)}).`;
+  }
+
+  return null;
 }
 
 export default function Ferias() {
@@ -213,7 +336,7 @@ export default function Ferias() {
         return acc;
       }
 
-      const d = parseISO(f.data_inicio + 'T00:00:00');
+      const d = parseISO(`${f.data_inicio}T00:00:00`);
       const key = format(d, 'yyyy-MM');
       const label = format(d, "MMMM 'de' yyyy", { locale: ptBR });
 
@@ -228,6 +351,27 @@ export default function Ferias() {
       a.sortKey.localeCompare(b.sortKey)
     );
   }, [feriasAgrupadas]);
+
+  const editDataError = useMemo(() => {
+    return validarEdicaoDataInicio({
+      ferias: editDataModal.ferias,
+      novaData: editDataModal.novaData,
+      registrosLivro,
+    });
+  }, [editDataModal, registrosLivro]);
+
+  const previewEditData = useMemo(() => {
+    if (!editDataModal.ferias || !editDataModal.novaData) return null;
+
+    const f = editDataModal.ferias;
+    const dias = Number(f.dias || 0);
+
+    return {
+      inicio: editDataModal.novaData,
+      fim: format(addDays(parseDate(editDataModal.novaData), Math.max(dias - 1, 0)), 'yyyy-MM-dd'),
+      retorno: format(addDays(parseDate(editDataModal.novaData), dias), 'yyyy-MM-dd'),
+    };
+  }, [editDataModal]);
 
   const handleDelete = async (f) => {
     setFeriasToDelete(f);
@@ -266,33 +410,39 @@ export default function Ferias() {
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return format(new Date(dateString + 'T00:00:00'), 'dd/MM/yyyy');
+    return format(new Date(`${dateString}T00:00:00`), 'dd/MM/yyyy');
   };
 
   const handleSalvarEditData = async () => {
-    if (!editDataModal.ferias || !editDataModal.novaData) return;
+    if (!editDataModal.ferias || !editDataModal.novaData || editDataError) return;
 
     setSavingEdit(true);
 
-    const f = editDataModal.ferias;
-    const novaDataFim = format(
-      addDays(new Date(editDataModal.novaData + 'T00:00:00'), (f.dias || 0) - 1),
-      'yyyy-MM-dd'
-    );
-    const novaDataRetorno = format(
-      addDays(new Date(editDataModal.novaData + 'T00:00:00'), f.dias || 0),
-      'yyyy-MM-dd'
-    );
+    try {
+      const f = editDataModal.ferias;
+      const novaDataFim = format(
+        addDays(parseDate(editDataModal.novaData), (f.dias || 0) - 1),
+        'yyyy-MM-dd'
+      );
+      const novaDataRetorno = format(
+        addDays(parseDate(editDataModal.novaData), f.dias || 0),
+        'yyyy-MM-dd'
+      );
 
-    await base44.entities.Ferias.update(f.id, {
-      data_inicio: editDataModal.novaData,
-      data_fim: novaDataFim,
-      data_retorno: novaDataRetorno,
-    });
+      await base44.entities.Ferias.update(f.id, {
+        data_inicio: editDataModal.novaData,
+        data_fim: novaDataFim,
+        data_retorno: novaDataRetorno,
+      });
 
-    queryClient.invalidateQueries({ queryKey: ['ferias'] });
-    setSavingEdit(false);
-    setEditDataModal({ open: false, ferias: null, novaData: '' });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      setEditDataModal({ open: false, ferias: null, novaData: '' });
+    } catch (error) {
+      console.error('Erro ao alterar data de início das férias:', error);
+      alert('Erro ao alterar data de início.');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const stats = {
@@ -793,17 +943,24 @@ export default function Ferias() {
         open={editDataModal.open}
         onOpenChange={(v) => !v && setEditDataModal({ open: false, ferias: null, novaData: '' })}
       >
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-[#1e3a5f]">Alterar Data de Início</DialogTitle>
+            <DialogDescription>
+              A alteração manual respeita a cronologia da cadeia já existente.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             {editDataModal.ferias && (
-              <p className="text-sm text-slate-500">
-                {editDataModal.ferias.militar_posto} {editDataModal.ferias.militar_nome} —{' '}
-                {editDataModal.ferias.dias} dias
-              </p>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-sm font-medium text-slate-700">
+                  {editDataModal.ferias.militar_posto} {editDataModal.ferias.militar_nome}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {editDataModal.ferias.dias} dias • Período {editDataModal.ferias.periodo_aquisitivo_ref || '-'}
+                </p>
+              </div>
             )}
 
             <div>
@@ -815,22 +972,33 @@ export default function Ferias() {
                 }
                 className="mt-1.5"
               />
-
-              {editDataModal.novaData && editDataModal.ferias && (
-                <p className="text-xs text-slate-500 mt-1">
-                  Retorno:{' '}
-                  {formatDate(
-                    format(
-                      addDays(
-                        new Date(editDataModal.novaData + 'T00:00:00'),
-                        editDataModal.ferias.dias
-                      ),
-                      'yyyy-MM-dd'
-                    )
-                  )}
-                </p>
-              )}
             </div>
+
+            {previewEditData && !editDataError && (
+              <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm">
+                <div className="font-medium text-cyan-800 mb-2">Prévia da atualização</div>
+                <div className="grid grid-cols-3 gap-3 text-cyan-900">
+                  <div>
+                    <div className="text-cyan-700 text-xs">Início</div>
+                    <div className="font-semibold">{formatDate(previewEditData.inicio)}</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700 text-xs">Fim</div>
+                    <div className="font-semibold">{formatDate(previewEditData.fim)}</div>
+                  </div>
+                  <div>
+                    <div className="text-cyan-700 text-xs">Retorno</div>
+                    <div className="font-semibold">{formatDate(previewEditData.retorno)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {editDataError && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {editDataError}
+              </div>
+            )}
 
             <div className="flex justify-end gap-2">
               <Button
@@ -841,7 +1009,7 @@ export default function Ferias() {
               </Button>
 
               <Button
-                disabled={savingEdit || !editDataModal.novaData}
+                disabled={savingEdit || !editDataModal.novaData || !!editDataError}
                 onClick={handleSalvarEditData}
                 className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
               >
