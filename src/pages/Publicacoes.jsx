@@ -8,6 +8,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
+import { addDays, differenceInDays, format } from 'date-fns';
+
+const TIPOS_FERIAS = [
+  'Saída Férias',
+  'Interrupção de Férias',
+  'Nova Saída / Retomada',
+  'Retorno Férias',
+];
 
 function calcStatus(registro) {
   if (registro.numero_bg && registro.data_bg) return 'Publicado';
@@ -36,12 +44,7 @@ function getTipoDisplay(tipo) {
 function getGrupoDisplay(registro) {
   const tipoBase = registro.tipo_registro || registro.tipo || '';
 
-  if (
-    tipoBase === 'Saída Férias' ||
-    tipoBase === 'Interrupção de Férias' ||
-    tipoBase === 'Nova Saída / Retomada' ||
-    tipoBase === 'Retorno Férias'
-  ) {
+  if (TIPOS_FERIAS.includes(tipoBase)) {
     return 'Férias';
   }
 
@@ -70,6 +73,122 @@ function normalizarRegistro(registro) {
   };
 }
 
+function parseDate(dateStr) {
+  return new Date(`${dateStr}T00:00:00`);
+}
+
+function toDateOnly(date) {
+  return format(date, 'yyyy-MM-dd');
+}
+
+function getEventDate(registro) {
+  return registro?.data_registro || registro?.data_inicio || null;
+}
+
+function compareEventos(a, b) {
+  const da = getEventDate(a) || '2000-01-01';
+  const db = getEventDate(b) || '2000-01-01';
+
+  const dateA = new Date(`${da}T00:00:00`);
+  const dateB = new Date(`${db}T00:00:00`);
+
+  if (dateA.getTime() !== dateB.getTime()) {
+    return dateA - dateB;
+  }
+
+  return new Date(a?.created_date || 0) - new Date(b?.created_date || 0);
+}
+
+function isFeriasOperacional(registro) {
+  return (
+    detectarOrigemTipo(registro) === 'livro' &&
+    !!registro.ferias_id &&
+    TIPOS_FERIAS.includes(registro.tipo_registro)
+  );
+}
+
+function buildFeriasStateFromChain(feriasAtual, remainingOps) {
+  if (!remainingOps.length) {
+    return {
+      status: 'Prevista',
+      saldo_remanescente: null,
+      dias_gozados_interrupcao: null,
+      data_interrupcao: null,
+    };
+  }
+
+  const ordenados = [...remainingOps].sort(compareEventos);
+  const ultimo = ordenados[ordenados.length - 1];
+  const tipo = ultimo.tipo_registro;
+  const dataBase = ultimo.data_registro;
+
+  if (tipo === 'Saída Férias') {
+    const dias = Number(ultimo.dias ?? feriasAtual.dias ?? 0);
+    return {
+      status: 'Em Curso',
+      data_inicio: dataBase,
+      data_fim: toDateOnly(addDays(parseDate(dataBase), Math.max(dias - 1, 0))),
+      data_retorno: toDateOnly(addDays(parseDate(dataBase), dias)),
+      dias,
+      saldo_remanescente: null,
+      dias_gozados_interrupcao: null,
+      data_interrupcao: null,
+    };
+  }
+
+  if (tipo === 'Interrupção de Férias') {
+    const diasNoMomento = Number(ultimo.dias_no_momento ?? ultimo.dias ?? feriasAtual.dias ?? 0);
+
+    let gozados = Number(ultimo.dias_gozados ?? 0);
+    let saldo = Number(ultimo.saldo_remanescente ?? 0);
+
+    if ((!ultimo.dias_gozados && ultimo.dias_gozados !== 0) || (!ultimo.saldo_remanescente && ultimo.saldo_remanescente !== 0)) {
+      const inicioReferencia = [...ordenados]
+        .reverse()
+        .find((r) => r.tipo_registro === 'Saída Férias' || r.tipo_registro === 'Nova Saída / Retomada');
+
+      if (inicioReferencia?.data_registro && ultimo.data_registro) {
+        gozados = Math.max(0, differenceInDays(parseDate(ultimo.data_registro), parseDate(inicioReferencia.data_registro)) + 1);
+        gozados = Math.min(gozados, diasNoMomento);
+        saldo = Math.max(0, diasNoMomento - gozados);
+      }
+    }
+
+    return {
+      status: 'Interrompida',
+      dias: diasNoMomento,
+      saldo_remanescente: saldo,
+      dias_gozados_interrupcao: gozados,
+      data_interrupcao: ultimo.data_registro,
+    };
+  }
+
+  if (tipo === 'Nova Saída / Retomada') {
+    const dias = Number(ultimo.dias ?? feriasAtual.dias ?? 0);
+    return {
+      status: 'Em Curso',
+      data_inicio: dataBase,
+      data_fim: toDateOnly(addDays(parseDate(dataBase), Math.max(dias - 1, 0))),
+      data_retorno: toDateOnly(addDays(parseDate(dataBase), dias)),
+      dias,
+      saldo_remanescente: null,
+      dias_gozados_interrupcao: null,
+      data_interrupcao: null,
+    };
+  }
+
+  if (tipo === 'Retorno Férias') {
+    return {
+      status: 'Gozada',
+      saldo_remanescente: null,
+      dias_gozados_interrupcao: null,
+      data_interrupcao: null,
+    };
+  }
+
+  return {};
+}
+
 export default function Publicacoes() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('all');
@@ -86,13 +205,10 @@ export default function Publicacoes() {
     queryFn: () => base44.entities.PublicacaoExOfficio.list('-created_date')
   });
 
-  // Atestados: apenas os que têm nota/BG preenchidos (foram publicados via Homologação/JISO em PublicacaoExOfficio)
-  // Não incluímos atestados crus — publicações de atestado são geradas como PublicacaoExOfficio
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
     queryKey: ['atestados-publicacao'],
     queryFn: async () => {
       const all = await base44.entities.Atestado.list('-created_date');
-      // Só mostrar atestados que já possuem nota/BG (foram publicados como registro independente antes da refatoração)
       return all.filter(a => a.nota_para_bg || a.numero_bg);
     }
   });
@@ -116,33 +232,32 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
     }
   });
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, tipo, registro }) => {
-      // Registros de atestado na lista são apenas para visualização — não devem ser excluídos aqui
       if (tipo === 'atestado') return;
 
-      // Helper: detectar origem_tipo de um registro a partir do array local ou por detecção
       const detectarTipo = (refId) => {
         const found = [...registrosLivro, ...publicacoesExOfficio, ...atestados].find(r => r.id === refId);
         if (!found) return 'ex-officio';
         return detectarOrigemTipo(found);
       };
 
-      // Helper: reverter vínculo Apostila/TSE na publicação original
       const reverterVinculo = async (isApostila, isTSE, refId, origemTipoHint) => {
         if (!refId) return;
-        // Usar hint se disponível, senão detectar pelo array local
         const origemTipo = origemTipoHint || detectarTipo(refId);
         const entityOriginal =
           origemTipo === 'atestado' ? base44.entities.Atestado :
           origemTipo === 'livro' ? base44.entities.RegistroLivro :
           base44.entities.PublicacaoExOfficio;
+
         const originais = await entityOriginal.filter({ id: refId });
         const original = originais[0];
         if (!original) return;
+
         if (isApostila && original.apostilada_por_id === id) {
           await entityOriginal.update(refId, { apostilada_por_id: null });
         } else if (isTSE && original.tornada_sem_efeito_por_id === id) {
@@ -154,12 +269,10 @@ export default function Publicacoes() {
         const isApostila = registro?.tipo === 'Apostila';
         const isTSE = registro?.tipo === 'Tornar sem Efeito';
 
-        // Reverter vínculos de Apostila/TSE
         if (isApostila || isTSE) {
           await reverterVinculo(isApostila, isTSE, registro?.publicacao_referencia_id, registro?.publicacao_referencia_origem_tipo);
         }
 
-        // Reverter campos do atestado ao excluir Homologação pelo Comandante
         if (registro?.tipo === 'Homologação de Atestado' && registro?.atestado_homologado_id) {
           const atList = await base44.entities.Atestado.filter({ id: registro.atestado_homologado_id });
           const at = atList[0];
@@ -172,7 +285,6 @@ export default function Publicacoes() {
           }
         }
 
-        // Reverter campos do atestado ao excluir Ata JISO
         if (registro?.tipo === 'Ata JISO' && registro?.atestados_jiso_ids?.length) {
           for (const aid of registro.atestados_jiso_ids) {
             const atList = await base44.entities.Atestado.filter({ id: aid });
@@ -192,9 +304,58 @@ export default function Publicacoes() {
       if (tipo === 'livro') {
         const isApostila = registro?.tipo === 'Apostila';
         const isTSE = registro?.tipo === 'Tornar sem Efeito';
+
         if (isApostila || isTSE) {
           await reverterVinculo(isApostila, isTSE, registro?.publicacao_referencia_id, registro?.publicacao_referencia_origem_tipo);
+          return base44.entities.RegistroLivro.delete(id);
         }
+
+        if (isFeriasOperacional(registro)) {
+          const feriasList = await base44.entities.Ferias.filter({ id: registro.ferias_id });
+          const feriasAtual = feriasList[0];
+
+          if (!feriasAtual) {
+            return base44.entities.RegistroLivro.delete(id);
+          }
+
+          const registrosDaFerias = (await base44.entities.RegistroLivro.filter({ ferias_id: registro.ferias_id }))
+            .filter(r => TIPOS_FERIAS.includes(r.tipo_registro))
+            .sort(compareEventos);
+
+          const idx = registrosDaFerias.findIndex(r => r.id === id);
+          if (idx === -1) {
+            return base44.entities.RegistroLivro.delete(id);
+          }
+
+          const posteriores = registrosDaFerias.slice(idx + 1);
+          const posterioresPublicados = posteriores.filter(r => calcStatus(r) === 'Publicado');
+
+          if (posterioresPublicados.length > 0) {
+            throw new Error(
+              'Há registros posteriores já publicados nesta cadeia. Exclua ou trate os eventos mais recentes antes de remover este item.'
+            );
+          }
+
+          const idsParaExcluir = registrosDaFerias.slice(idx).map(r => r.id);
+
+          for (const rid of idsParaExcluir.reverse()) {
+            try {
+              await base44.entities.RegistroLivro.delete(rid);
+            } catch (error) {
+              const msg = String(error?.message || error || '');
+              if (!msg.toLowerCase().includes('not found')) {
+                throw error;
+              }
+            }
+          }
+
+          const remainingOps = registrosDaFerias.filter(r => !idsParaExcluir.includes(r.id));
+          const novoEstado = buildFeriasStateFromChain(feriasAtual, remainingOps);
+
+          await base44.entities.Ferias.update(feriasAtual.id, novoEstado);
+          return;
+        }
+
         return base44.entities.RegistroLivro.delete(id);
       }
     },
@@ -203,6 +364,10 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    },
+    onError: (error) => {
+      alert(error?.message || 'Erro ao excluir registro.');
     }
   });
 
@@ -245,43 +410,20 @@ export default function Publicacoes() {
     const registro = registros.find(r => r.id === id);
     if (!registro) return;
 
-    // Registros de atestado não podem ser excluídos daqui
     if (tipo === 'atestado') {
       alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
       return;
     }
 
     if (registro.status_calculado === 'Publicado') {
-      // Apostila publicada de Apostila pode ser TSE — mas excluir não é permitido
       if (registro.tipo !== 'Apostila' && registro.tipo !== 'Tornar sem Efeito') {
         alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
         return;
       }
-      // TSE publicado: não pode excluir
       if (registro.tipo === 'Tornar sem Efeito') {
         alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
         return;
       }
-    }
-
-    // Proteção conservadora para evitar bagunça em cadeias de férias/livro
-    if (
-      registro.origem_tipo === 'livro' &&
-      registro.tipo !== 'Apostila' &&
-      registro.tipo !== 'Tornar sem Efeito' &&
-      (
-        registro.ferias_id ||
-        registro.periodo_aquisitivo ||
-        registro.tipo_registro === 'Saída Férias' ||
-        registro.tipo_registro === 'Retorno Férias' ||
-        registro.tipo_registro === 'Interrupção de Férias'
-      )
-    ) {
-      alert(
-        'Este registro de férias/livro não será excluído automaticamente por segurança. ' +
-        'Pode haver movimentações posteriores dependentes dele, o que causaria inconsistência na cadeia.'
-      );
-      return;
     }
 
     deleteMutation.mutate({ id, tipo, registro });
@@ -456,7 +598,6 @@ export default function Publicacoes() {
         )}
       </div>
 
-      {/* Painel Família Publicação */}
       {familiaPanel.open && (
         <>
           <div
