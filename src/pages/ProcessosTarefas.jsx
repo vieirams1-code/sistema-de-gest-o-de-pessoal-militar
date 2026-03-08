@@ -60,7 +60,7 @@ export default function ProcessosTarefas() {
   };
 
   const statCards = [
-    { label: 'Abertas', value: stats.abertas, color: 'text-[#1e3a5f]', bg: 'bg-[#1e3a5f]/10', icon: Inbox },
+    { label: 'Pendentes', value: stats.abertas, color: 'text-[#1e3a5f]', bg: 'bg-[#1e3a5f]/10', icon: Inbox },
     { label: 'Aguard. Decisão', value: stats.aguardandoDecisao, color: 'text-amber-700', bg: 'bg-amber-100', icon: AlertTriangle },
     { label: 'Aguard. Assinatura', value: stats.aguardandoAssinatura, color: 'text-orange-700', bg: 'bg-orange-100', icon: Pencil },
     { label: 'Aguard. Comando', value: stats.aguardandoComando, color: 'text-rose-700', bg: 'bg-rose-100', icon: Clock },
@@ -168,11 +168,15 @@ export default function ProcessosTarefas() {
                   </p>
                   <div className="space-y-1.5">
                     {paradasPorDecisao.decisao.map(d => (
-                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-50 rounded-lg px-2 py-1.5 transition-colors">
-                        <span className="text-sm text-slate-800 truncate font-medium">{d.titulo}</span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {d.aguardando_decisao_de_nome && <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded">{d.aguardando_decisao_de_nome}</span>}
-                          {d.prazo_final && <span className={`text-xs ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="cursor-pointer hover:bg-amber-50 rounded-lg px-2 py-2 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm text-slate-800 font-medium leading-tight">{d.titulo}</p>
+                          {d.prazo_final && <span className={`text-xs shrink-0 ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                          {d.militar_nome_snapshot && <span className="text-xs text-slate-500">{d.militar_posto_snapshot ? `${d.militar_posto_snapshot} ` : ''}{d.militar_nome_snapshot}</span>}
+                          {d.responsavel_atual_nome && <span className="text-xs text-slate-400">Resp: {d.responsavel_atual_nome}</span>}
+                          {d.proxima_acao && <span className="text-xs text-amber-700 italic">→ {d.proxima_acao}</span>}
                         </div>
                       </div>
                     ))}
@@ -187,11 +191,15 @@ export default function ProcessosTarefas() {
                   </p>
                   <div className="space-y-1.5">
                     {paradasPorDecisao.assinatura.map(d => (
-                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="flex items-center justify-between gap-3 cursor-pointer hover:bg-orange-50 rounded-lg px-2 py-1.5 transition-colors">
-                        <span className="text-sm text-slate-800 truncate font-medium">{d.titulo}</span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {d.aguardando_assinatura_de_nome && <span className="text-xs text-orange-700 bg-orange-100 px-2 py-0.5 rounded">{d.aguardando_assinatura_de_nome}</span>}
-                          {d.prazo_final && <span className={`text-xs ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="cursor-pointer hover:bg-orange-50 rounded-lg px-2 py-2 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm text-slate-800 font-medium leading-tight">{d.titulo}</p>
+                          {d.prazo_final && <span className={`text-xs shrink-0 ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                          {d.militar_nome_snapshot && <span className="text-xs text-slate-500">{d.militar_posto_snapshot ? `${d.militar_posto_snapshot} ` : ''}{d.militar_nome_snapshot}</span>}
+                          {d.responsavel_atual_nome && <span className="text-xs text-slate-400">Resp: {d.responsavel_atual_nome}</span>}
+                          {d.proxima_acao && <span className="text-xs text-orange-700 italic">→ {d.proxima_acao}</span>}
                         </div>
                       </div>
                     ))}
@@ -206,11 +214,15 @@ export default function ProcessosTarefas() {
                   </p>
                   <div className="space-y-1.5">
                     {paradasPorDecisao.comando.map(d => (
-                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="flex items-center justify-between gap-3 cursor-pointer hover:bg-rose-50 rounded-lg px-2 py-1.5 transition-colors">
-                        <span className="text-sm text-slate-800 truncate font-medium">{d.titulo}</span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {d.aguardando_retorno_de && <span className="text-xs text-rose-700 bg-rose-100 px-2 py-0.5 rounded">{d.aguardando_retorno_de}</span>}
-                          {d.prazo_final && <span className={`text-xs ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                      <div key={d.id} onClick={() => setDetalhePanel(d)} className="cursor-pointer hover:bg-rose-50 rounded-lg px-2 py-2 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm text-slate-800 font-medium leading-tight">{d.titulo}</p>
+                          {d.prazo_final && <span className={`text-xs shrink-0 ${isAtrasada(d) ? 'text-red-600 font-semibold' : 'text-slate-400'}`}>{formatDate(d.prazo_final)}</span>}
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                          {d.militar_nome_snapshot && <span className="text-xs text-slate-500">{d.militar_posto_snapshot ? `${d.militar_posto_snapshot} ` : ''}{d.militar_nome_snapshot}</span>}
+                          {d.responsavel_atual_nome && <span className="text-xs text-slate-400">Resp: {d.responsavel_atual_nome}</span>}
+                          {d.proxima_acao && <span className="text-xs text-rose-700 italic">→ {d.proxima_acao}</span>}
                         </div>
                       </div>
                     ))}
