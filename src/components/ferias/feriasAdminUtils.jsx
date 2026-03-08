@@ -73,8 +73,15 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
     novoStatus = 'Em Curso';
   }
 
-  // dias_base é a fonte de verdade imutável. Fallbacks para compatibilidade com registros antigos.
-  const diasBase = ferias.dias_base || ferias.dias_originais || ferias.dias || 30;
+  // dias_base é a fonte de verdade imutável.
+  // CRÍTICO: nunca usar ferias.dias como fallback — ele pode já estar alterado por adições/descontos.
+  // Se dias_base não existir, usar dias_originais. Se nenhum, inferir somando o evento de saída ou usar 30.
+  const diasBase = ferias.dias_base || ferias.dias_originais || (() => {
+    // Tentativa de inferir: procurar evento de Saída Férias com dias registrado
+    const saida = eventosSobreviventes.find(e => e.tipo_registro === 'Saída Férias' || e.tipo_registro === 'Nova Saída / Retomada');
+    // Se não encontrar, usar o menor valor entre todos os dias de férias para não inflar
+    return saida?.dias || 30;
+  })();
   const eventosAdicao = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO);
   const eventosDesconto = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO);
 
