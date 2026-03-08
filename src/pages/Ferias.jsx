@@ -195,17 +195,27 @@ export default function Ferias() {
     setEditDataModal({ open: false, ferias: null, novaData: '' });
   };
 
+  // Função auxiliar: recalcula dias totais a partir dos eventos existentes + novo impacto
+  const calcularNovosDias = (f, impacto) => {
+    const diasOriginais = f.dias_originais || f.dias || 0;
+    const eventosFerias = registrosLivro.filter(r => r.ferias_id === f.id);
+    const totalAdicoes = eventosFerias
+      .filter(e => e.tipo_registro === 'Adição de Dias')
+      .reduce((s, e) => s + (e.dias_evento || 0), 0);
+    const totalDescontos = eventosFerias
+      .filter(e => e.tipo_registro === 'Desconto em Férias')
+      .reduce((s, e) => s + (e.dias_evento || 0), 0);
+    return Math.max(0, diasOriginais + totalAdicoes + totalDescontos + impacto);
+  };
+
   const handleSalvarAddDias = async () => {
     if (!addDiasModal.ferias || !addDiasModal.dias) return;
     setSavingEdit(true);
     const f = addDiasModal.ferias;
     const qtdDias = Number(addDiasModal.dias);
     const diasOriginais = f.dias_originais || f.dias || 0;
-    const novaQtd = (f.dias || 0) + qtdDias;
-    const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
-    const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
 
-    // Criar evento real na cadeia (RegistroLivro)
+    // Criar evento atômico na cadeia — armazena apenas o impacto individual
     await base44.entities.RegistroLivro.create({
       militar_id: f.militar_id,
       militar_nome: f.militar_nome,
@@ -221,15 +231,16 @@ export default function Ferias() {
       status: 'Aguardando Nota',
     });
 
-    // Atualizar férias — preservar dias_originais se não existir
-    const obsLine = `+${qtdDias}d: ${addDiasModal.motivo}`;
-    const novaObs = f.observacoes ? `${f.observacoes}\n${obsLine}` : obsLine;
+    // Recalcular total do zero: base + todas adições - todos descontos + nova adição
+    const novaQtd = calcularNovosDias(f, qtdDias);
+    const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
+    const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
+
     await base44.entities.Ferias.update(f.id, {
       dias: novaQtd,
       dias_originais: diasOriginais,
       data_fim: novaDataFim,
       data_retorno: novaDataRetorno,
-      observacoes: novaObs,
     });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
@@ -243,11 +254,8 @@ export default function Ferias() {
     const f = descontoModal.ferias;
     const diasDesconto = Number(descontoModal.dias);
     const diasOriginais = f.dias_originais || f.dias || 0;
-    const novaQtd = Math.max(0, (f.dias || 0) - diasDesconto);
-    const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
-    const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
 
-    // Criar evento real na cadeia (RegistroLivro)
+    // Criar evento atômico na cadeia — armazena apenas o impacto individual (negativo)
     await base44.entities.RegistroLivro.create({
       militar_id: f.militar_id,
       militar_nome: f.militar_nome,
@@ -263,22 +271,21 @@ export default function Ferias() {
       status: 'Aguardando Nota',
     });
 
-    const obsLine = `-${diasDesconto}d: ${descontoModal.motivo}`;
-    const novaObs = f.observacoes ? `${f.observacoes}\n${obsLine}` : obsLine;
+    // Recalcular total do zero: base + todas adições - todos descontos - novo desconto
+    const novaQtd = calcularNovosDias(f, -diasDesconto);
+    const novaDataFim = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd') : f.data_fim;
+    const novaDataRetorno = f.data_inicio ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd), 'yyyy-MM-dd') : f.data_retorno;
+
     await base44.entities.Ferias.update(f.id, {
       dias: novaQtd,
       dias_originais: diasOriginais,
       data_fim: novaDataFim,
       data_retorno: novaDataRetorno,
-      observacoes: novaObs,
     });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
     setSavingEdit(false);
     setDescontoModal({ open: false, ferias: null, dias: 1, motivo: '' });
-    // Abre o RegistroLivroModal para gerar a publicação via template
-    const feriasAtualizada = { ...f, dias: novaQtd, data_fim: novaDataFim, data_retorno: novaDataRetorno, _diasDesconto: diasDesconto };
-    setRegistroLivroModal({ open: true, ferias: feriasAtualizada, tipo: 'Dispensa Desconto Férias' });
   };
 
   const stats = {
