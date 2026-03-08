@@ -184,6 +184,8 @@ export default function CadastrarFerias() {
       await base44.entities.Ferias.update(editId, {
         ...formData,
         dias: f.dias,
+        // Gravar dias_base apenas se ainda não existir (não sobrescrever base imutável)
+        ...(editingFerias?.dias_base ? {} : { dias_base: f.dias }),
         data_inicio: f.data_inicio,
         data_fim: f.data_fim,
         data_retorno: f.data_retorno,
@@ -197,6 +199,7 @@ export default function CadastrarFerias() {
         await base44.entities.Ferias.create({
           ...formData,
           dias: f.dias,
+          dias_base: f.dias,       // base imutável — nunca alterada por adição/desconto
           data_inicio: f.data_inicio,
           data_fim: f.data_fim,
           data_retorno: f.data_retorno,
