@@ -92,12 +92,13 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
   }
 
   // Reconstruir observações derivadas apenas dos eventos sobreviventes
+  // Apenas linhas de ajuste — nunca linhas residuais de observacoes antigas
   const linhasObs = [];
   eventosSobreviventes.forEach(e => {
     if (e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO && e.dias_evento) {
-      linhasObs.push(`+${e.dias_evento}d: ${e.motivo_dispensa || e.observacoes || 'Adição de dias'}`);
+      linhasObs.push(`+${e.dias_evento}d: ${e.motivo_dispensa || 'Adição de dias'}`);
     } else if (e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO && e.dias_evento) {
-      linhasObs.push(`-${e.dias_evento}d: ${e.motivo_dispensa || e.observacoes || 'Desconto em férias'}`);
+      linhasObs.push(`-${e.dias_evento}d: ${e.motivo_dispensa || 'Desconto em férias'}`);
     }
   });
 
