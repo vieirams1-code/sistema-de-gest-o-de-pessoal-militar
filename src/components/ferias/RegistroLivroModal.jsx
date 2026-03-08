@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,42 @@ function calcStatusPublicacao(nota, numeroBg, dataBg) {
   return 'Aguardando Nota';
 }
 
+function deriveUltimaInterrupcao(ferias, registros) {
+  const ultima = [...registros]
+    .filter((r) => r.tipo_registro === 'Interrupção de Férias')
+    .sort((a, b) => new Date(b.data_registro || 0) - new Date(a.data_registro || 0))[0];
+
+  if (!ultima) return null;
+
+  const diasNoMomento = Number(ultima.dias_no_momento ?? ultima.dias ?? ferias?.dias ?? 0);
+
+  let gozados = null;
+  let saldo = null;
+
+  if (ferias?.data_inicio && ultima.data_registro) {
+    const inicio = parseDate(ferias.data_inicio);
+    const interrupcao = parseDate(ultima.data_registro);
+    gozados = Math.max(0, differenceInDays(interrupcao, inicio) + 1);
+    gozados = Math.min(gozados, diasNoMomento);
+    saldo = Math.max(0, diasNoMomento - gozados);
+  }
+
+  if (ultima.dias_gozados != null && !Number.isNaN(Number(ultima.dias_gozados))) {
+    gozados = Number(ultima.dias_gozados);
+  }
+
+  if (ultima.saldo_remanescente != null && !Number.isNaN(Number(ultima.saldo_remanescente))) {
+    saldo = Number(ultima.saldo_remanescente);
+  }
+
+  return {
+    ...ultima,
+    diasNoMomento,
+    gozados,
+    saldo,
+  };
+}
+
 export default function RegistroLivroModal({
   open,
   onClose,
@@ -71,6 +107,15 @@ export default function RegistroLivroModal({
   const [observacoes, setObservacoes] = useState('');
   const [textoPublicacao, setTextoPublicacao] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const { data: registrosDaFerias = [] } = useQuery({
+    queryKey: ['registros-livro-ferias-modal', ferias?.id],
+    queryFn: async () => {
+      if (!ferias?.id) return [];
+      return base44.entities.RegistroLivro.filter({ ferias_id: ferias.id });
+    },
+    enabled: open && !!ferias?.id,
+  });
 
   useEffect(() => {
     if (!open || !ferias) return;
@@ -106,6 +151,7 @@ export default function RegistroLivroModal({
     if (tipoRegistro === 'Saída Férias') {
       const novoFim = toDateOnlyString(addDays(dataRef, Math.max(baseDias - 1, 0)));
       const novoRetorno = toDateOnlyString(addDays(dataRef, baseDias));
+
       return {
         titulo: 'Resumo do Início',
         inicio: dataRegistro,
@@ -126,7 +172,8 @@ export default function RegistroLivroModal({
     if (tipoRegistro === 'Interrupção de Férias') {
       if (!inicioAtual) return null;
 
-      const gozados = Math.max(0, differenceInDays(dataRef, inicioAtual));
+      let gozados = Math.max(0, differenceInDays(dataRef, inicioAtual) + 1);
+      gozados = Math.min(gozados, baseDias);
       const saldo = Math.max(0, baseDias - gozados);
 
       return {
@@ -134,11 +181,13 @@ export default function RegistroLivroModal({
         dataInterrupcao: dataRegistro,
         gozados,
         saldo,
+        diasNoMomento: baseDias,
       };
     }
 
     if (tipoRegistro === 'Nova Saída / Retomada') {
-      const saldo = Number(ferias.saldo_remanescente || 0);
+      const ultimaInterrupcao = deriveUltimaInterrupcao(ferias, registrosDaFerias);
+      const saldo = Number(ultimaInterrupcao?.saldo ?? ferias.saldo_remanescente ?? 0);
       const novoFim = saldo > 0 ? toDateOnlyString(addDays(dataRef, saldo - 1)) : dataRegistro;
       const novoRetorno = toDateOnlyString(addDays(dataRef, saldo));
 
@@ -152,7 +201,7 @@ export default function RegistroLivroModal({
     }
 
     return null;
-  }, [ferias, dataRegistro, tipoRegistro]);
+  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias]);
 
   useEffect(() => {
     if (!ferias || !resumo) {
@@ -224,7 +273,8 @@ export default function RegistroLivroModal({
       };
 
       if (tipoRegistro === 'Interrupção de Férias' && resumo) {
-        registroPayload.dias = Number(ferias.dias || 0);
+        registroPayload.dias = Number(resumo.diasNoMomento || ferias.dias || 0);
+        registroPayload.dias_no_momento = Number(resumo.diasNoMomento || ferias.dias || 0);
         registroPayload.dias_gozados = Number(resumo.gozados || 0);
         registroPayload.saldo_remanescente = Number(resumo.saldo || 0);
 
@@ -237,7 +287,7 @@ export default function RegistroLivroModal({
           data_interrupcao: dataRegistro,
         });
       } else if (tipoRegistro === 'Nova Saída / Retomada' && resumo) {
-        const saldo = Number(ferias.saldo_remanescente || 0);
+        const saldo = Number(resumo.saldo || 0);
 
         registroPayload.dias = saldo;
 
@@ -249,6 +299,9 @@ export default function RegistroLivroModal({
           data_fim: resumo.novoFim,
           data_retorno: resumo.novoRetorno,
           dias: saldo,
+          dias_gozados_interrupcao: null,
+          saldo_remanescente: null,
+          data_interrupcao: null,
         });
       } else if (tipoRegistro === 'Saída Férias' && resumo) {
         registroPayload.dias = Number(resumo.dias || ferias.dias || 0);
@@ -274,6 +327,7 @@ export default function RegistroLivroModal({
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-ferias-modal', ferias.id] });
 
       onClose();
     } catch (error) {
