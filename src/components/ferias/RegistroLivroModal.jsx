@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { addDays, differenceInDays, format } from 'date-fns';
+import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 
 const NOMES_OPERACIONAIS = {
   'Saída Férias': 'Início',
@@ -36,12 +37,19 @@ const ICONES = {
   'Nova Saída / Retomada': RefreshCw,
 };
 
+const TIPOS_OPERACIONAIS = [
+  'Saída Férias',
+  'Retorno Férias',
+  'Interrupção de Férias',
+  'Nova Saída / Retomada',
+];
+
 function toDateOnlyString(date) {
   return format(date, 'yyyy-MM-dd');
 }
 
 function parseDate(dateStr) {
-  return new Date(dateStr + 'T00:00:00');
+  return new Date(`${dateStr}T00:00:00`);
 }
 
 function formatDateBR(dateStr) {
@@ -55,10 +63,29 @@ function calcStatusPublicacao(nota, numeroBg, dataBg) {
   return 'Aguardando Nota';
 }
 
+function getEventDate(evento) {
+  return evento?.data_registro || evento?.data_inicio || null;
+}
+
+function compareEvents(a, b) {
+  const da = getEventDate(a) || '2000-01-01';
+  const db = getEventDate(b) || '2000-01-01';
+
+  const dateA = new Date(`${da}T00:00:00`);
+  const dateB = new Date(`${db}T00:00:00`);
+
+  if (dateA.getTime() !== dateB.getTime()) {
+    return dateA - dateB;
+  }
+
+  return new Date(a?.created_date || 0) - new Date(b?.created_date || 0);
+}
+
 function deriveUltimaInterrupcao(ferias, registros) {
   const ultima = [...registros]
     .filter((r) => r.tipo_registro === 'Interrupção de Férias')
-    .sort((a, b) => new Date(b.data_registro || 0) - new Date(a.data_registro || 0))[0];
+    .sort(compareEvents)
+    .pop();
 
   if (!ultima) return null;
 
@@ -89,6 +116,145 @@ function deriveUltimaInterrupcao(ferias, registros) {
     gozados,
     saldo,
   };
+}
+
+function getCadeiaOperacional(ferias, registrosDaFerias) {
+  if (!ferias) return [];
+
+  return montarCadeia(ferias, registrosDaFerias).filter((r) =>
+    TIPOS_OPERACIONAIS.includes(r.tipo_registro)
+  );
+}
+
+function getEstadoAtualDaCadeia(cadeia) {
+  if (!cadeia.length) {
+    return {
+      status: 'Sem Eventos',
+      ultimoEvento: null,
+      ultimaSaidaOuContinuacao: null,
+      ultimaInterrupcao: null,
+      ultimoRetorno: null,
+    };
+  }
+
+  const ultimoEvento = cadeia[cadeia.length - 1];
+  const ultimaSaidaOuContinuacao = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Saída Férias' || e.tipo_registro === 'Nova Saída / Retomada');
+
+  const ultimaInterrupcao = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Interrupção de Férias');
+
+  const ultimoRetorno = [...cadeia]
+    .reverse()
+    .find((e) => e.tipo_registro === 'Retorno Férias');
+
+  let status = 'Sem Eventos';
+
+  if (
+    ultimoEvento.tipo_registro === 'Saída Férias' ||
+    ultimoEvento.tipo_registro === 'Nova Saída / Retomada'
+  ) {
+    status = 'Em Curso';
+  } else if (ultimoEvento.tipo_registro === 'Interrupção de Férias') {
+    status = 'Interrompida';
+  } else if (ultimoEvento.tipo_registro === 'Retorno Férias') {
+    status = 'Encerrada';
+  }
+
+  return {
+    status,
+    ultimoEvento,
+    ultimaSaidaOuContinuacao,
+    ultimaInterrupcao,
+    ultimoRetorno,
+  };
+}
+
+function validarCronologia({
+  tipoRegistro,
+  dataRegistro,
+  cadeia,
+  estadoAtual,
+  resumo,
+}) {
+  if (!dataRegistro) {
+    return 'Informe a data do registro.';
+  }
+
+  const dataNova = parseDate(dataRegistro);
+
+  if (cadeia.length > 0 && estadoAtual.ultimoEvento) {
+    const dataUltimoEventoStr = getEventDate(estadoAtual.ultimoEvento);
+
+    if (dataUltimoEventoStr) {
+      const dataUltimoEvento = parseDate(dataUltimoEventoStr);
+
+      if (dataNova < dataUltimoEvento) {
+        return `${NOMES_OPERACIONAIS[tipoRegistro] || tipoRegistro} não pode ter data anterior ao evento anterior da cadeia (${NOMES_OPERACIONAIS[estadoAtual.ultimoEvento.tipo_registro] || estadoAtual.ultimoEvento.tipo_registro} em ${formatDateBR(dataUltimoEventoStr)}).`;
+      }
+    }
+  }
+
+  if (tipoRegistro === 'Saída Férias') {
+    if (cadeia.length > 0) {
+      return 'Esta cadeia já possui evento operacional. O início só pode ser lançado como primeiro evento.';
+    }
+    return null;
+  }
+
+  if (tipoRegistro === 'Interrupção de Férias') {
+    if (estadoAtual.status !== 'Em Curso' || !estadoAtual.ultimaSaidaOuContinuacao) {
+      return 'A interrupção só pode ser lançada quando as férias estiverem em curso.';
+    }
+
+    const dataBaseStr = getEventDate(estadoAtual.ultimaSaidaOuContinuacao);
+
+    if (dataBaseStr && dataNova < parseDate(dataBaseStr)) {
+      return `A interrupção não pode ser anterior ao início/continuação de ${formatDateBR(dataBaseStr)}.`;
+    }
+
+    if (resumo && Number(resumo.saldo) <= 0) {
+      return 'Não há saldo remanescente para interromper estas férias.';
+    }
+
+    return null;
+  }
+
+  if (tipoRegistro === 'Nova Saída / Retomada') {
+    if (estadoAtual.status !== 'Interrompida' || !estadoAtual.ultimaInterrupcao) {
+      return 'A continuação só pode ser lançada após uma interrupção válida.';
+    }
+
+    const dataInterrupcaoStr = getEventDate(estadoAtual.ultimaInterrupcao);
+
+    if (dataInterrupcaoStr && dataNova < parseDate(dataInterrupcaoStr)) {
+      return `A continuação não pode ser anterior à interrupção de ${formatDateBR(dataInterrupcaoStr)}.`;
+    }
+
+    if (resumo && Number(resumo.saldo) <= 0) {
+      return 'Não existe saldo remanescente para continuação.';
+    }
+
+    return null;
+  }
+
+  if (tipoRegistro === 'Retorno Férias') {
+    if (estadoAtual.status !== 'Em Curso' || !estadoAtual.ultimaSaidaOuContinuacao) {
+      return 'O término só pode ser lançado quando as férias estiverem em curso.';
+    }
+
+    const dataBaseStr = getEventDate(estadoAtual.ultimaSaidaOuContinuacao);
+
+    if (dataBaseStr && dataNova < parseDate(dataBaseStr)) {
+      return `O término não pode ser anterior ao início/continuação de ${formatDateBR(dataBaseStr)}.`;
+    }
+
+    return null;
+  }
+
+  return null;
 }
 
 export default function RegistroLivroModal({
@@ -126,10 +292,6 @@ export default function RegistroLivroModal({
       setDataRegistro(ferias.data_inicio || '');
     } else if (tipoInicial === 'Retorno Férias') {
       setDataRegistro(ferias.data_retorno || '');
-    } else if (tipoInicial === 'Interrupção de Férias') {
-      setDataRegistro(toDateOnlyString(new Date()));
-    } else if (tipoInicial === 'Nova Saída / Retomada') {
-      setDataRegistro(toDateOnlyString(new Date()));
     } else {
       setDataRegistro(toDateOnlyString(new Date()));
     }
@@ -140,6 +302,15 @@ export default function RegistroLivroModal({
     setObservacoes('');
     setTextoPublicacao('');
   }, [open, ferias, tipoInicial]);
+
+  const cadeiaOperacional = useMemo(() => {
+    if (!ferias) return [];
+    return getCadeiaOperacional(ferias, registrosDaFerias);
+  }, [ferias, registrosDaFerias]);
+
+  const estadoAtualCadeia = useMemo(() => {
+    return getEstadoAtualDaCadeia(cadeiaOperacional);
+  }, [cadeiaOperacional]);
 
   const resumo = useMemo(() => {
     if (!ferias || !dataRegistro) return null;
@@ -170,9 +341,15 @@ export default function RegistroLivroModal({
     }
 
     if (tipoRegistro === 'Interrupção de Férias') {
-      if (!inicioAtual) return null;
+      const eventoBase = estadoAtualCadeia.ultimaSaidaOuContinuacao;
+      const dataBaseStr =
+        getEventDate(eventoBase) || ferias.data_inicio || null;
 
-      let gozados = Math.max(0, differenceInDays(dataRef, inicioAtual) + 1);
+      if (!dataBaseStr) return null;
+
+      const inicioBase = parseDate(dataBaseStr);
+
+      let gozados = Math.max(0, differenceInDays(dataRef, inicioBase) + 1);
       gozados = Math.min(gozados, baseDias);
       const saldo = Math.max(0, baseDias - gozados);
 
@@ -201,15 +378,25 @@ export default function RegistroLivroModal({
     }
 
     return null;
-  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias]);
+  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia]);
+
+  const erroCronologia = useMemo(() => {
+    return validarCronologia({
+      tipoRegistro,
+      dataRegistro,
+      cadeia: cadeiaOperacional,
+      estadoAtual: estadoAtualCadeia,
+      resumo,
+    });
+  }, [tipoRegistro, dataRegistro, cadeiaOperacional, estadoAtualCadeia, resumo]);
 
   useEffect(() => {
-    if (!ferias || !resumo) {
+    if (!ferias || !resumo || erroCronologia) {
       setTextoPublicacao('');
       return;
     }
 
-    const militar = `${ferias.militar_posto ? ferias.militar_posto + ' ' : ''}${ferias.militar_nome || ''}`.trim();
+    const militar = `${ferias.militar_posto ? `${ferias.militar_posto} ` : ''}${ferias.militar_nome || ''}`.trim();
     const matricula = ferias.militar_matricula || '';
 
     if (tipoRegistro === 'Saída Férias') {
@@ -241,7 +428,7 @@ export default function RegistroLivroModal({
     }
 
     setTextoPublicacao('');
-  }, [ferias, resumo, tipoRegistro, dataRegistro]);
+  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia]);
 
   const statusPublicacao = useMemo(
     () => calcStatusPublicacao(notaParaBg, numeroBg, dataBg),
@@ -249,7 +436,7 @@ export default function RegistroLivroModal({
   );
 
   const handleSalvar = async () => {
-    if (!ferias || !dataRegistro) return;
+    if (!ferias || !dataRegistro || erroCronologia) return;
 
     setSaving(true);
 
@@ -366,6 +553,28 @@ export default function RegistroLivroModal({
             </div>
           </div>
 
+          {cadeiaOperacional.length > 0 && (
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="text-sm font-semibold text-slate-700 mb-2">
+                Situação atual da cadeia
+              </div>
+              <div className="text-sm text-slate-600 space-y-1">
+                <div>
+                  <span className="font-medium">Status atual:</span> {estadoAtualCadeia.status}
+                </div>
+                {estadoAtualCadeia.ultimoEvento && (
+                  <div>
+                    <span className="font-medium">Último evento:</span>{' '}
+                    {NOMES_OPERACIONAIS[estadoAtualCadeia.ultimoEvento.tipo_registro] ||
+                      estadoAtualCadeia.ultimoEvento.tipo_registro}
+                    {' — '}
+                    {formatDateBR(getEventDate(estadoAtualCadeia.ultimoEvento))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div>
             <Label>Data do Registro *</Label>
             <Input
@@ -376,7 +585,14 @@ export default function RegistroLivroModal({
             />
           </div>
 
-          {resumo && (
+          {erroCronologia && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{erroCronologia}</span>
+            </div>
+          )}
+
+          {resumo && !erroCronologia && (
             <div className="rounded-lg border p-4 bg-cyan-50 border-cyan-200">
               <div className="font-semibold text-cyan-800 mb-3">{resumo.titulo}</div>
 
@@ -502,7 +718,7 @@ export default function RegistroLivroModal({
               </div>
             </div>
 
-            {!textoPublicacao && (
+            {!textoPublicacao && !erroCronologia && (
               <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 flex gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>O texto da publicação está vazio. Revise antes de salvar.</span>
@@ -527,7 +743,7 @@ export default function RegistroLivroModal({
             </Button>
             <Button
               onClick={handleSalvar}
-              disabled={saving || !dataRegistro}
+              disabled={saving || !dataRegistro || !!erroCronologia}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
             >
               {saving ? 'Salvando...' : 'Salvar Registro'}
