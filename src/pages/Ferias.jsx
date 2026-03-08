@@ -195,35 +195,26 @@ export default function Ferias() {
   };
 
   /**
-   * Calcula dias totais a partir da base imutável + todos os eventos existentes na cache
-   * + um novo evento extra (passado como objeto com tipo_registro e dias_evento).
-   * NÃO depende de refetch — opera sobre o estado local atual.
+   * Calcula dias totais a partir da base imutável + eventos persistidos + novo evento opcional.
+   * Usa SEMPRE dias_base como ponto de partida — nunca f.dias.
+   * idsExcluir: lista de IDs de eventos a ignorar (para cálculo pós-exclusão antes do refetch).
    */
-  const recalcularDiasLocalmente = (f, novoEvento) => {
-    // dias_base é a fonte de verdade; nunca usar f.dias como base
+  const recalcularDiasLocalmente = (f, novoEvento, idsExcluir = []) => {
     const diasBase = f.dias_base || f.dias_originais || f.dias || 0;
-
-    // Eventos já persistidos para esta férias
-    const eventosExistentes = registrosLivro.filter(r => r.ferias_id === f.id);
-    // Incluir o novo evento localmente para o cálculo ser correto de imediato
+    const eventosExistentes = registrosLivro.filter(r => r.ferias_id === f.id && !idsExcluir.includes(r.id));
     const todosEventos = novoEvento ? [...eventosExistentes, novoEvento] : eventosExistentes;
-
-    const totalAdicoes = todosEventos
-      .filter(e => e.tipo_registro === 'Adição de Dias')
-      .reduce((s, e) => s + (e.dias_evento || 0), 0);
-    const totalDescontos = todosEventos
-      .filter(e => e.tipo_registro === 'Desconto em Férias')
-      .reduce((s, e) => s + (e.dias_evento || 0), 0);
-
+    const totalAdicoes = todosEventos.filter(e => e.tipo_registro === 'Adição de Dias').reduce((s, e) => s + (e.dias_evento || 0), 0);
+    const totalDescontos = todosEventos.filter(e => e.tipo_registro === 'Desconto em Férias').reduce((s, e) => s + (e.dias_evento || 0), 0);
     return Math.max(0, diasBase + totalAdicoes - totalDescontos);
   };
 
   /**
-   * Reconstrói as observações derivadas de adições/descontos a partir dos eventos
-   * existentes na cache + um novo evento (antes do refetch).
+   * Reconstrói observações SOMENTE a partir dos eventos persistidos + novo evento.
+   * Não reaproveia texto livre — apenas linhas derivadas de Adição/Desconto.
+   * idsExcluir: lista de IDs de eventos a ignorar.
    */
-  const reconstruirObservacoesDerivadas = (f, novoEvento) => {
-    const eventosExistentes = registrosLivro.filter(r => r.ferias_id === f.id);
+  const reconstruirObservacoesDerivadas = (f, novoEvento, idsExcluir = []) => {
+    const eventosExistentes = registrosLivro.filter(r => r.ferias_id === f.id && !idsExcluir.includes(r.id));
     const todosEventos = novoEvento ? [...eventosExistentes, novoEvento] : eventosExistentes;
     const linhas = [];
     todosEventos.forEach(e => {
@@ -233,9 +224,7 @@ export default function Ferias() {
         linhas.push(`-${e.dias_evento}d: ${e.motivo_dispensa || 'Desconto em férias'}`);
       }
     });
-    // Manter outras observações não derivadas (ex: Saldo, dados de interrupção)
-    const obsAtuais = (f.observacoes || '').split('\n').filter(l => !l.match(/^[+-]\d+d:/));
-    return [...obsAtuais.filter(Boolean), ...linhas].join('\n');
+    return linhas.join('\n');
   };
 
   const handleSalvarAddDias = async () => {
