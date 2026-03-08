@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, GitBranch, FileText, Stamp, Ban, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react';
 import { createPageUrl } from '@/utils';
@@ -18,19 +18,62 @@ function calcStatus(r) {
   return 'Aguardando Nota';
 }
 
-function detectarOrigemTipo(registro) {
-  if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) return 'ex-officio';
-  if (registro.medico || registro.cid_10) return 'atestado';
-  return 'livro';
+function getTipoDisplay(tipo) {
+  if (tipo === 'Saída Férias') return 'Início';
+  if (tipo === 'Interrupção de Férias') return 'Interrupção';
+  if (tipo === 'Nova Saída / Retomada') return 'Continuação';
+  if (tipo === 'Retorno Férias') return 'Término';
+  return tipo;
+}
+
+function getGrupoDisplay(registro) {
+  const tipoBase = registro?.tipo_registro || registro?.tipo || '';
+
+  if (
+    tipoBase === 'Saída Férias' ||
+    tipoBase === 'Interrupção de Férias' ||
+    tipoBase === 'Nova Saída / Retomada' ||
+    tipoBase === 'Retorno Férias'
+  ) {
+    return 'Férias';
+  }
+
+  if (registro?.medico || registro?.cid_10) {
+    return 'Atestado';
+  }
+
+  return '';
 }
 
 function getTipoLabel(r) {
-  return r.tipo_registro || r.tipo || (r.medico || r.cid_10 ? (r.necessita_jiso ? 'Atestado - JISO' : 'Atestado - Homologação') : '');
+  const tipoBase =
+    r.tipo_registro ||
+    r.tipo ||
+    (r.medico || r.cid_10
+      ? (r.necessita_jiso ? 'Atestado - JISO' : 'Atestado - Homologação')
+      : '');
+
+  return getTipoDisplay(tipoBase);
+}
+
+function getTipoCompostoLabel(r) {
+  const grupo = getGrupoDisplay(r);
+  const tipo = getTipoLabel(r);
+
+  if (grupo === 'Férias' && tipo) {
+    return `${grupo} • ${tipo}`;
+  }
+
+  return tipo || grupo || 'Publicação';
 }
 
 function formatDate(d) {
   if (!d) return '—';
-  try { return format(new Date(d + 'T00:00:00'), 'dd/MM/yyyy'); } catch { return d; }
+  try {
+    return format(new Date(`${d}T00:00:00`), 'dd/MM/yyyy');
+  } catch {
+    return d;
+  }
 }
 
 // Gerar código funcional legível ex: PUB-XXXX
@@ -60,36 +103,42 @@ function getEditUrl(registro) {
 }
 
 // Card de um item da família
-function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, onNavigate, indent = false, variant = 'original' }) {
+function FamiliaItem({
+  label,
+  codigo,
+  tipoLabel,
+  grupoLabel,
+  status,
+  isSelected,
+  onClick,
+  onNavigate,
+  indent = false,
+  variant = 'original'
+}) {
   const variantConfig = {
-    // Original: destaque maior — protagonista
     original: {
       bg: 'bg-white border-slate-300',
       selectedBg: 'bg-blue-50 border-blue-400',
       badge: 'bg-blue-100 text-blue-700 border-blue-200',
       dot: 'bg-blue-500',
       ring: 'ring-blue-400',
-      labelSize: 'text-sm',
     },
-    // Apostila: discreta, derivada
     apostila: {
       bg: 'bg-white border-slate-200',
       selectedBg: 'bg-purple-50 border-purple-300',
       badge: 'bg-purple-50 text-purple-600 border-purple-200',
       dot: 'bg-purple-400',
       ring: 'ring-purple-300',
-      labelSize: 'text-xs',
     },
-    // TSE: discreta, tom vermelho suave
     tse: {
       bg: 'bg-red-50/60 border-red-200',
       selectedBg: 'bg-red-50 border-red-300',
       badge: 'bg-red-50 text-red-600 border-red-200',
       dot: 'bg-red-400',
       ring: 'ring-red-300',
-      labelSize: 'text-xs',
     },
   };
+
   const cfg = variantConfig[variant] || variantConfig.original;
   const bgClass = isSelected ? cfg.selectedBg : cfg.bg;
   const isOriginal = variant === 'original';
@@ -104,19 +153,42 @@ function FamiliaItem({ label, codigo, tipoLabel, status, isSelected, onClick, on
             <div className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0 mt-1`} />
             <div className="min-w-0">
               <p className="text-[10px] font-mono text-slate-400">{codigo}</p>
-              <p className={`${isOriginal ? 'text-sm font-semibold' : 'text-xs font-medium'} text-slate-800 truncate`}>{tipoLabel}</p>
+
+              <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                {grupoLabel === 'Férias' ? (
+                  <>
+                    <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200 text-[10px] px-1.5 py-0">
+                      Férias
+                    </Badge>
+                    <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] px-1.5 py-0">
+                      {tipoLabel}
+                    </Badge>
+                  </>
+                ) : (
+                  <p className={`${isOriginal ? 'text-sm font-semibold' : 'text-xs font-medium'} text-slate-800 truncate`}>
+                    {tipoLabel}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
+
           <div className="flex flex-col items-end gap-1 shrink-0">
             <Badge className={`text-[10px] px-1.5 py-0 border ${cfg.badge}`}>{label}</Badge>
-            <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[status] || 'bg-slate-100 text-slate-600'}`}>{status}</Badge>
+            <Badge className={`text-[10px] px-1.5 py-0 ${statusColors[status] || 'bg-slate-100 text-slate-600'}`}>
+              {status}
+            </Badge>
           </div>
         </div>
       </button>
+
       {onNavigate && (
         <div className="mt-2 flex justify-end">
           <button
-            onClick={(e) => { e.stopPropagation(); onNavigate(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate();
+            }}
             className="flex items-center gap-1 text-[10px] font-medium text-slate-500 hover:text-[#1e3a5f] transition-colors"
           >
             <ExternalLink className="w-3 h-3" />
@@ -136,18 +208,17 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
 
   // Determinar raiz da família — seguir referência até a raiz
   let raizId = registro.publicacao_referencia_id || registro.id;
-  // Um nível a mais: se a referência também tem referência, subir
+
   const refDaRef = todosRegistros.find(r => r.id === raizId);
   if (refDaRef?.publicacao_referencia_id) {
     raizId = refDaRef.publicacao_referencia_id;
   }
 
-  // Encontrar raiz
   const raiz = todosRegistros.find(r => r.id === raizId) || registro;
 
   // Apostilas da raiz
-  const apostilas = todosRegistros.filter(r =>
-    r.publicacao_referencia_id === raiz.id && r.tipo === 'Apostila'
+  const apostilas = todosRegistros.filter(
+    r => r.publicacao_referencia_id === raiz.id && r.tipo === 'Apostila'
   );
 
   // TSE direto da raiz
@@ -155,12 +226,12 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
     ? todosRegistros.find(r => r.id === raiz.tornada_sem_efeito_por_id)
     : todosRegistros.find(r => r.publicacao_referencia_id === raiz.id && r.tipo === 'Tornar sem Efeito');
 
-  // TSEs das Apostilas (cadeia: Apostila → TSE da Apostila)
-  // Para cada apostila, buscar seu TSE
+  // TSEs das Apostilas
   const tsesPorApostila = apostilas.map(ap => {
     const tse = ap.tornada_sem_efeito_por_id
       ? todosRegistros.find(r => r.id === ap.tornada_sem_efeito_por_id)
       : todosRegistros.find(r => r.publicacao_referencia_id === ap.id && r.tipo === 'Tornar sem Efeito');
+
     return { apostila: ap, tse: tse || null };
   });
 
@@ -168,10 +239,14 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
 
   // foiApostilada: só se houver apostila ativa (sem TSE)
   const apostilaAtiva = apostilas.find(ap => !ap.tornada_sem_efeito_por_id);
-  const foiApostilada = !!apostilaAtiva || (!!raiz.apostilada_por_id && !tsesPorApostila.some(x => x.apostila.id === raiz.apostilada_por_id && x.tse));
+  const foiApostilada =
+    !!apostilaAtiva ||
+    (!!raiz.apostilada_por_id &&
+      !tsesPorApostila.some(x => x.apostila.id === raiz.apostilada_por_id && x.tse));
 
   const raizStatus = calcStatus(raiz);
   const raizTipoLabel = getTipoLabel(raiz);
+  const raizGrupoLabel = getGrupoDisplay(raiz);
   const raizCodigo = gerarCodigo(raiz.id);
 
   // Item selecionado para detalhes
@@ -183,7 +258,6 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
   const selectedIsApostila = itemSelecionado.tipo === 'Apostila';
   const selectedIsTSE = itemSelecionado.tipo === 'Tornar sem Efeito';
 
-  // Leitura operacional baseada no item SELECIONADO (não apenas no registro inicial)
   function gerarLeituraOperacional() {
     if (selectedIsOriginal) {
       const partes = ['Esta é a publicação original da família.'];
@@ -201,7 +275,11 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
     return 'Publicação vinculada à família.';
   }
 
-  const temFamilia = apostilas.length > 0 || foiInvalidada || !!registro.publicacao_referencia_id || tsesPorApostila.some(x => x.tse);
+  const temFamilia =
+    apostilas.length > 0 ||
+    foiInvalidada ||
+    !!registro.publicacao_referencia_id ||
+    tsesPorApostila.some(x => x.tse);
 
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-[440px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">
@@ -231,27 +309,47 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
         <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
           <div className="flex items-center gap-2 mb-3">
             <FileText className="w-4 h-4 text-[#1e3a5f]" />
-            <span className="text-xs font-bold text-[#1e3a5f] uppercase tracking-wide">Publicação Base</span>
+            <span className="text-xs font-bold text-[#1e3a5f] uppercase tracking-wide">
+              Publicação Base
+            </span>
           </div>
+
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs text-slate-500">Código</span>
               <span className="font-mono font-bold text-slate-700 text-sm">{raizCodigo}</span>
             </div>
+
             <div className="flex justify-between items-center">
               <span className="text-xs text-slate-500">Militar</span>
               <span className="text-sm font-semibold text-slate-800">
                 {raiz.militar_posto ? `${raiz.militar_posto} ` : ''}{raiz.militar_nome}
               </span>
             </div>
+
             <div className="flex justify-between items-center">
               <span className="text-xs text-slate-500">Tipo</span>
-              <span className="text-sm text-slate-700">{raizTipoLabel}</span>
+              {raizGrupoLabel === 'Férias' ? (
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200 text-[10px]">
+                    Férias
+                  </Badge>
+                  <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-[10px]">
+                    {raizTipoLabel}
+                  </Badge>
+                </div>
+              ) : (
+                <span className="text-sm text-slate-700">{raizTipoLabel}</span>
+              )}
             </div>
+
             <div className="flex justify-between items-center">
               <span className="text-xs text-slate-500">Status</span>
-              <Badge className={`${statusColors[raizStatus] || 'bg-slate-100 text-slate-600'} text-xs`}>{raizStatus}</Badge>
+              <Badge className={`${statusColors[raizStatus] || 'bg-slate-100 text-slate-600'} text-xs`}>
+                {raizStatus}
+              </Badge>
             </div>
+
             {/* Badges de estado da família — discretas */}
             <div className="flex flex-wrap gap-1.5 pt-1">
               {foiApostilada && (
@@ -273,16 +371,21 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-3">
             Estrutura da Família
           </span>
+
           <div className="space-y-2">
             {/* Original */}
             <FamiliaItem
               label="ORIGINAL"
               codigo={raizCodigo}
               tipoLabel={raizTipoLabel}
+              grupoLabel={raizGrupoLabel}
               status={raizStatus}
               isSelected={selectedId === raiz.id}
               onClick={() => setSelectedId(raiz.id)}
-              onNavigate={() => { navigate(getEditUrl(raiz)); onClose(); }}
+              onNavigate={() => {
+                navigate(getEditUrl(raiz));
+                onClose();
+              }}
               variant="original"
             />
 
@@ -293,22 +396,31 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                   label="APOSTILA"
                   codigo={gerarCodigoApostila(raiz.id, idx + 1)}
                   tipoLabel={getTipoLabel(ap) || 'Apostila'}
+                  grupoLabel={getGrupoDisplay(ap)}
                   status={calcStatus(ap)}
                   isSelected={selectedId === ap.id}
                   onClick={() => setSelectedId(ap.id)}
-                  onNavigate={() => { navigate(getEditUrl(ap)); onClose(); }}
+                  onNavigate={() => {
+                    navigate(getEditUrl(ap));
+                    onClose();
+                  }}
                   indent
                   variant="apostila"
                 />
+
                 {tseAp && (
                   <FamiliaItem
                     label="TSE DA APOSTILA"
                     codigo={`${gerarCodigoApostila(raiz.id, idx + 1)}-TSE`}
                     tipoLabel={getTipoLabel(tseAp) || 'Tornar sem Efeito'}
+                    grupoLabel={getGrupoDisplay(tseAp)}
                     status={calcStatus(tseAp)}
                     isSelected={selectedId === tseAp.id}
                     onClick={() => setSelectedId(tseAp.id)}
-                    onNavigate={() => { navigate(getEditUrl(tseAp)); onClose(); }}
+                    onNavigate={() => {
+                      navigate(getEditUrl(tseAp));
+                      onClose();
+                    }}
                     indent
                     variant="tse"
                   />
@@ -322,16 +434,20 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                 label="TORNAR S/ EFEITO"
                 codigo={gerarCodigoTSE(raiz.id, 1)}
                 tipoLabel={getTipoLabel(tseRaiz) || 'Tornar sem Efeito'}
+                grupoLabel={getGrupoDisplay(tseRaiz)}
                 status={calcStatus(tseRaiz)}
                 isSelected={selectedId === tseRaiz.id}
                 onClick={() => setSelectedId(tseRaiz.id)}
-                onNavigate={() => { navigate(getEditUrl(tseRaiz)); onClose(); }}
+                onNavigate={() => {
+                  navigate(getEditUrl(tseRaiz));
+                  onClose();
+                }}
                 indent
                 variant="tse"
               />
             )}
 
-            {!temFamilia && apostilas.length === 0 && !tseVinculado && (
+            {!temFamilia && (
               <p className="text-sm text-slate-400 text-center py-3 italic">
                 Esta publicação não possui vínculos de família registrados.
               </p>
@@ -345,45 +461,71 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-3">
               Detalhes do Item Selecionado
             </span>
+
             <div className="space-y-1.5 text-sm">
               {itemSelecionado.militar_nome && (
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-400">Militar</span>
-                  <span className="text-slate-700 font-medium text-xs text-right">{itemSelecionado.militar_posto} {itemSelecionado.militar_nome}</span>
+                  <span className="text-slate-700 font-medium text-xs text-right">
+                    {itemSelecionado.militar_posto} {itemSelecionado.militar_nome}
+                  </span>
                 </div>
               )}
-              {getTipoLabel(itemSelecionado) && (
-                <div className="flex justify-between">
+
+              {getTipoCompostoLabel(itemSelecionado) && (
+                <div className="flex justify-between items-start gap-3">
                   <span className="text-xs text-slate-400">Tipo</span>
-                  <span className="text-slate-700 text-xs font-medium">{getTipoLabel(itemSelecionado)}</span>
+                  {getGrupoDisplay(itemSelecionado) === 'Férias' ? (
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                      <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200 text-[10px]">
+                        Férias
+                      </Badge>
+                      <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-[10px]">
+                        {getTipoLabel(itemSelecionado)}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <span className="text-slate-700 text-xs font-medium">
+                      {getTipoCompostoLabel(itemSelecionado)}
+                    </span>
+                  )}
                 </div>
               )}
+
               <div className="flex justify-between">
                 <span className="text-xs text-slate-400">Status</span>
-                <Badge className={`${statusColors[itemStatus]} text-xs`}>{itemStatus}</Badge>
+                <Badge className={`${statusColors[itemStatus] || 'bg-slate-100 text-slate-600'} text-xs`}>
+                  {itemStatus}
+                </Badge>
               </div>
+
               {itemSelecionado.nota_para_bg && (
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-400">Nota BG</span>
                   <span className="text-slate-700 text-xs font-medium">{itemSelecionado.nota_para_bg}</span>
                 </div>
               )}
+
               {itemSelecionado.numero_bg && (
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-400">BG Nº</span>
                   <span className="text-emerald-700 text-xs font-bold">{itemSelecionado.numero_bg}</span>
                 </div>
               )}
+
               {itemSelecionado.data_bg && (
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-400">Data BG</span>
                   <span className="text-slate-700 text-xs font-medium">{formatDate(itemSelecionado.data_bg)}</span>
                 </div>
               )}
+
               {itemSelecionado.publicacao_referencia_id && (
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-400">Referência Base</span>
-                  <span className="font-mono text-xs text-purple-700 font-bold">{gerarCodigo(itemSelecionado.publicacao_referencia_id)}</span>
+                  <span className="font-mono text-xs text-purple-700 font-bold">
+                    {gerarCodigo(itemSelecionado.publicacao_referencia_id)}
+                  </span>
                 </div>
               )}
             </div>
