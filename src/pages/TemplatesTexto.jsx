@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
@@ -15,17 +15,80 @@ import { aplicarTemplate, VARS_PREVIEW } from '@/components/utils/templateUtils'
 
 const MODULOS = ['Livro', 'Publicação Ex Officio', 'Atestado', 'JISO'];
 
+const FERIAS_CANONICAL_TYPES = [
+  'Saída Férias',
+  'Interrupção de Férias',
+  'Nova Saída / Retomada',
+  'Retorno Férias',
+];
+
+const FERIAS_LABELS = {
+  'Saída Férias': 'Início',
+  'Interrupção de Férias': 'Interrupção',
+  'Nova Saída / Retomada': 'Continuação',
+  'Retorno Férias': 'Término',
+};
+
 const TIPOS_POR_MODULO = {
-  'Livro': ['Saída Férias', 'Retorno Férias', 'Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade', 'Núpcias', 'Luto', 'Cedência', 'Transferência', 'Transferência para RR', 'Trânsito', 'Instalação', 'Dispensa Recompensa', 'Dispensa Desconto Férias', 'Deslocamento Missão', 'Curso/Estágio', 'Designação de Função', 'Dispensa de Função'],
-  'Publicação Ex Officio': ['Elogio Individual', 'Melhoria de Comportamento', 'Punição', 'Geral', 'Designação de Função', 'Dispensa de Função', 'Ata JISO', 'Transcrição de Documentos', 'Interrupção de Férias', 'Transferência para RR', 'Homologação de Atestado', 'Apostila', 'Tornar sem Efeito'],
+  'Livro': [
+    'Saída Férias',
+    'Interrupção de Férias',
+    'Nova Saída / Retomada',
+    'Retorno Férias',
+    'Licença Maternidade',
+    'Prorrogação de Licença Maternidade',
+    'Licença Paternidade',
+    'Núpcias',
+    'Luto',
+    'Cedência',
+    'Transferência',
+    'Transferência para RR',
+    'Trânsito',
+    'Instalação',
+    'Dispensa Recompensa',
+    'Dispensa Desconto Férias',
+    'Deslocamento Missão',
+    'Curso/Estágio',
+    'Designação de Função',
+    'Dispensa de Função'
+  ],
+  'Publicação Ex Officio': [
+    'Elogio Individual',
+    'Melhoria de Comportamento',
+    'Punição',
+    'Geral',
+    'Designação de Função',
+    'Dispensa de Função',
+    'Ata JISO',
+    'Transcrição de Documentos',
+    'Interrupção de Férias',
+    'Transferência para RR',
+    'Homologação de Atestado',
+    'Apostila',
+    'Tornar sem Efeito'
+  ],
   'Atestado': ['Homologação pelo Comandante', 'Encaminhamento JISO'],
   'JISO': ['Ata JISO', 'Resultado JISO'],
 };
 
-// Variáveis agrupadas por tipo de registro
+function getTipoDisplay(tipo) {
+  return FERIAS_LABELS[tipo] || tipo;
+}
+
+function getTipoSelectLabel(modulo, tipo) {
+  if (modulo === 'Livro' && FERIAS_LABELS[tipo]) {
+    return `${getTipoDisplay(tipo)} (${tipo})`;
+  }
+  return getTipoDisplay(tipo);
+}
+
+function isLivroFeriasTipo(tipo) {
+  return FERIAS_CANONICAL_TYPES.includes(tipo);
+}
+
 const VARS_POR_TIPO = {
   'Saída Férias': {
-    grupo: 'Saída Férias',
+    grupo: 'Início',
     cor: 'green',
     variaveis: [
       { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
@@ -40,14 +103,46 @@ const VARS_POR_TIPO = {
       { v: '{{fracionamento}}', desc: 'Fração das férias (ex: 1ª parcela)' },
     ]
   },
+  'Interrupção de Férias': {
+    grupo: 'Interrupção',
+    cor: 'orange',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_registro}}', desc: 'Data do registro / interrupção' },
+      { v: '{{data_interrupcao}}', desc: 'Data da interrupção' },
+      { v: '{{dias}}', desc: 'Dias da cadeia no momento da interrupção' },
+      { v: '{{dias_gozados}}', desc: 'Dias efetivamente gozados até a interrupção' },
+      { v: '{{dias_gozados_interrupcao}}', desc: 'Dias efetivamente gozados até a interrupção' },
+      { v: '{{saldo_remanescente}}', desc: 'Saldo remanescente após a interrupção' },
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+    ]
+  },
+  'Nova Saída / Retomada': {
+    grupo: 'Continuação',
+    cor: 'teal',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_registro}}', desc: 'Data do registro / continuação' },
+      { v: '{{data_inicio}}', desc: 'Nova data de início da continuação' },
+      { v: '{{data_retorno}}', desc: 'Nova data de retorno' },
+      { v: '{{dias}}', desc: 'Dias retomados / saldo retomado' },
+      { v: '{{saldo_remanescente}}', desc: 'Saldo remanescente da interrupção anterior' },
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+    ]
+  },
   'Retorno Férias': {
-    grupo: 'Retorno Férias',
+    grupo: 'Término',
     cor: 'green',
     variaveis: [
       { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
-      { v: '{{data_registro}}', desc: 'Data de retorno' },
+      { v: '{{data_registro}}', desc: 'Data do término / retorno' },
+      { v: '{{data_retorno}}', desc: 'Data de retorno' },
       { v: '{{dias}}', desc: 'Dias' },
       { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
       { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
@@ -307,17 +402,6 @@ const VARS_POR_TIPO = {
       { v: '{{assunto}}', desc: 'Assunto do documento' },
     ]
   },
-  'Interrupção de Férias': {
-    grupo: 'Interrupção de Férias',
-    cor: 'orange',
-    variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
-      { v: '{{nome_completo}}', desc: 'Nome completo' },
-      { v: '{{matricula}}', desc: 'Matrícula' },
-      { v: '{{data_interrupcao}}', desc: 'Data da interrupção' },
-      { v: '{{dias_gozados_interrupcao}}', desc: 'Dias efetivamente gozados' },
-    ]
-  },
   'Homologação de Atestado': {
     grupo: 'Homologação de Atestado',
     cor: 'blue',
@@ -356,7 +440,6 @@ const VARS_POR_TIPO = {
   },
 };
 
-// Quais grupos mostrar por módulo (fallback genérico quando tipo não selecionado)
 const GRUPOS_GENERICOS_LIVRO = [
   { grupo: 'Militar (Geral)', cor: 'blue', variaveis: [
     { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
@@ -414,9 +497,11 @@ export default function TemplatesTexto() {
 
   const filtered = templates.filter(t => {
     const matchesModulo = moduloFiltro === 'all' || t.modulo === moduloFiltro;
+    const tipoBusca = getTipoDisplay(t.tipo_registro || '');
     const matchesSearch = !searchTerm || 
       t.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.tipo_registro?.toLowerCase().includes(searchTerm.toLowerCase());
+      t.tipo_registro?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tipoBusca?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesModulo && matchesSearch;
   });
 
@@ -437,6 +522,8 @@ export default function TemplatesTexto() {
     'JISO': 'bg-orange-100 text-orange-700',
   };
 
+  const selectedTipoVars = editingTemplate?.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
@@ -450,21 +537,20 @@ export default function TemplatesTexto() {
           </Button>
         </div>
 
-        {/* Info */}
         <Card className="mb-6 border-blue-200 bg-blue-50">
           <CardContent className="p-4">
             <div className="flex gap-3">
               <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-800">
                 <p className="font-semibold mb-1">Como funcionam os templates</p>
-                <p>Use variáveis entre chaves duplas para dados dinâmicos. Exemplo: <code className="bg-blue-100 px-1 rounded">{'{{nome_completo}}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{{dias}}'}</code>.</p>
+                <p>Use variáveis entre chaves duplas para dados dinâmicos. Exemplo: <code className="bg-blue-100 px-1 rounded">{{'{{nome_completo}}'}}</code>, <code className="bg-blue-100 px-1 rounded">{{'{{dias}}'}}</code>.</p>
                 <p className="mt-1">Quando um template está cadastrado para um tipo de registro, ele é usado como base — os dados do registro preenchem as variáveis automaticamente.</p>
+                <p className="mt-1">Nas férias, o usuário verá sempre <strong>Início</strong>, <strong>Interrupção</strong>, <strong>Continuação</strong> e <strong>Término</strong>, mas o sistema continuará salvando os tipos canônicos internamente.</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Filtros */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6 flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Input
@@ -503,7 +589,10 @@ export default function TemplatesTexto() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-semibold text-slate-800">{t.nome}</span>
                       <Badge className={moduloColor[t.modulo] || 'bg-slate-100 text-slate-700'}>{t.modulo}</Badge>
-                      <Badge variant="outline" className="text-xs">{t.tipo_registro}</Badge>
+                      <Badge variant="outline" className="text-xs">{getTipoDisplay(t.tipo_registro)}</Badge>
+                      {isLivroFeriasTipo(t.tipo_registro) && (
+                        <Badge className="bg-slate-100 text-slate-600 text-[10px]">{t.tipo_registro}</Badge>
+                      )}
                       {!t.ativo && <Badge className="bg-red-100 text-red-600">Inativo</Badge>}
                     </div>
                     <p className="text-sm text-slate-500 line-clamp-2 mt-1">{t.template}</p>
@@ -524,7 +613,6 @@ export default function TemplatesTexto() {
         )}
       </div>
 
-      {/* Confirmação de exclusão */}
       <AlertDialog open={!!confirmDeleteId} onOpenChange={(v) => { if (!v) setConfirmDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -545,7 +633,6 @@ export default function TemplatesTexto() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modal de edição */}
       <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingTemplate(null); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -556,7 +643,6 @@ export default function TemplatesTexto() {
 
           {editingTemplate && (
             <div className="space-y-4 py-2">
-              {/* Preview ao vivo */}
               {editingTemplate.template && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -584,15 +670,23 @@ export default function TemplatesTexto() {
                   <Select value={editingTemplate.tipo_registro} onValueChange={v => setEditingTemplate(p => ({ ...p, tipo_registro: v }))}>
                     <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      {(TIPOS_POR_MODULO[editingTemplate.modulo] || []).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      {(TIPOS_POR_MODULO[editingTemplate.modulo] || []).map(t => (
+                        <SelectItem key={t} value={t}>{getTipoSelectLabel(editingTemplate.modulo, t)}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
+              {editingTemplate.modulo === 'Livro' && isLivroFeriasTipo(editingTemplate.tipo_registro) && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                  Este template será exibido ao usuário como <strong>{getTipoDisplay(editingTemplate.tipo_registro)}</strong>, mas será salvo internamente como <strong>{editingTemplate.tipo_registro}</strong> para manter compatibilidade com o sistema.
+                </div>
+              )}
+
               <div>
                 <Label className="text-sm font-medium text-slate-700">Nome do Template <span className="text-red-500">*</span></Label>
-                <Input value={editingTemplate.nome} onChange={e => setEditingTemplate(p => ({ ...p, nome: e.target.value }))} className="mt-1.5" placeholder="Ex: Saída de Férias Padrão" />
+                <Input value={editingTemplate.nome} onChange={e => setEditingTemplate(p => ({ ...p, nome: e.target.value }))} className="mt-1.5" placeholder="Ex: Início de Férias Padrão" />
               </div>
 
               <div>
@@ -608,7 +702,6 @@ export default function TemplatesTexto() {
                 />
               </div>
 
-              {/* Variáveis disponíveis por tipo de registro */}
               {(() => {
                 const inserirVar = (v) => {
                   const textArea = document.querySelector('textarea.font-mono');
@@ -627,9 +720,8 @@ export default function TemplatesTexto() {
                   }
                 };
 
-                const tipoVars = editingTemplate.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
-                const gruposParaMostrar = tipoVars
-                  ? [tipoVars]
+                const gruposParaMostrar = selectedTipoVars
+                  ? [selectedTipoVars]
                   : (editingTemplate.modulo === 'Livro' ? GRUPOS_GENERICOS_LIVRO : editingTemplate.modulo === 'Publicação Ex Officio' ? GRUPOS_GENERICOS_EXOFFICIO : []);
 
                 if (gruposParaMostrar.length === 0) return null;
@@ -637,7 +729,7 @@ export default function TemplatesTexto() {
                 return (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-slate-600">
-                      {tipoVars ? `Variáveis para "${editingTemplate.tipo_registro}" (clique para inserir):` : 'Selecione um tipo para ver as variáveis específicas:'}
+                      {selectedTipoVars ? `Variáveis para "${getTipoDisplay(editingTemplate.tipo_registro)}" (clique para inserir):` : 'Selecione um tipo para ver as variáveis específicas:'}
                     </p>
                     {gruposParaMostrar.map(g => {
                       const cores = COR_GRUPO[g.cor] || COR_GRUPO['blue'];
