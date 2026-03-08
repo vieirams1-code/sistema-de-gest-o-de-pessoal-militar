@@ -114,7 +114,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
   }, [eventosVinculados]);
 
   const indicadores = useMemo(() => {
-    const diasTotais = ferias.dias || 0;
+    const diasTotais = Number(ferias.dias || 0);
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
@@ -239,19 +239,19 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-white rounded-lg border border-amber-100 p-2">
                 <p className="text-xs text-slate-400 mb-0.5">Atual</p>
-                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}</p>
+                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}d</p>
                 <p className="text-[10px] text-slate-400">dias</p>
               </div>
 
               <div className="bg-amber-100 rounded-lg border border-amber-200 p-2">
                 <p className="text-xs text-amber-600 mb-0.5">Gozados</p>
-                <p className="text-xl font-bold text-amber-700">{indicadores.gozados}</p>
+                <p className="text-xl font-bold text-amber-700">{indicadores.gozados}d</p>
                 <p className="text-[10px] text-amber-500">até hoje</p>
               </div>
 
               <div className="bg-emerald-50 rounded-lg border border-emerald-200 p-2">
                 <p className="text-xs text-emerald-600 mb-0.5">Restantes</p>
-                <p className="text-xl font-bold text-emerald-700">{indicadores.restantes}</p>
+                <p className="text-xl font-bold text-emerald-700">{indicadores.restantes}d</p>
                 <p className="text-[10px] text-emerald-500">dias</p>
               </div>
             </div>
@@ -270,19 +270,23 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-white rounded-lg border border-orange-100 p-2">
                 <p className="text-xs text-slate-400 mb-0.5">Atual</p>
-                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}</p>
+                <p className="text-xl font-bold text-[#1e3a5f]">{indicadores.diasTotais}d</p>
                 <p className="text-[10px] text-slate-400">dias</p>
               </div>
 
               <div className="bg-orange-100 rounded-lg border border-orange-200 p-2">
                 <p className="text-xs text-orange-600 mb-0.5">Gozados</p>
-                <p className="text-xl font-bold text-orange-700">{indicadores.gozados ?? '—'}</p>
+                <p className="text-xl font-bold text-orange-700">
+                  {indicadores.gozados != null ? `${indicadores.gozados}d` : '—'}
+                </p>
                 <p className="text-[10px] text-orange-500">até interrupção</p>
               </div>
 
               <div className="bg-blue-50 rounded-lg border border-blue-200 p-2">
                 <p className="text-xs text-blue-600 mb-0.5">Saldo</p>
-                <p className="text-xl font-bold text-blue-700">{indicadores.saldo ?? '—'}</p>
+                <p className="text-xl font-bold text-blue-700">
+                  {indicadores.saldo != null ? `${indicadores.saldo}d` : '—'}
+                </p>
                 <p className="text-[10px] text-blue-500">remanescente</p>
               </div>
             </div>
@@ -352,7 +356,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                             </>
                           )}
 
-                          {evento.dias && (
+                          {evento.dias != null && (
                             <>
                               <span className="text-slate-400">
                                 {evento.tipo_registro === 'Interrupção de Férias'
