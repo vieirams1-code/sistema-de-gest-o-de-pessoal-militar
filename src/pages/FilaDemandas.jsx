@@ -107,6 +107,7 @@ export default function FilaDemandas() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 hidden lg:table-cell">Origem</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Etapa</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 hidden lg:table-cell">Responsável</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 hidden xl:table-cell">Próxima Ação</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 hidden sm:table-cell">Prazo</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Prioridade</th>
                 </tr>

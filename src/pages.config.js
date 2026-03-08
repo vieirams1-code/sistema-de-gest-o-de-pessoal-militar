@@ -64,12 +64,15 @@ import DashboardAtestados from './pages/DashboardAtestados';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
 import FichaMilitar from './pages/FichaMilitar';
+import FilaDemandas from './pages/FilaDemandas';
 import Home from './pages/Home';
+import InboxDemandas from './pages/InboxDemandas';
 import Medalhas from './pages/Medalhas';
 import Militares from './pages/Militares';
 import PeriodosAquisitivos from './pages/PeriodosAquisitivos';
 import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import Processos from './pages/Processos';
+import ProcessosTarefas from './pages/ProcessosTarefas';
 import Publicacoes from './pages/Publicacoes';
 import Punicoes from './pages/Punicoes';
 import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
@@ -78,9 +81,6 @@ import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
-import ProcessosTarefas from './pages/ProcessosTarefas';
-import InboxDemandas from './pages/InboxDemandas';
-import FilaDemandas from './pages/FilaDemandas';
 import __Layout from './Layout.jsx';
 
 
@@ -102,12 +102,15 @@ export const PAGES = {
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
     "FichaMilitar": FichaMilitar,
+    "FilaDemandas": FilaDemandas,
     "Home": Home,
+    "InboxDemandas": InboxDemandas,
     "Medalhas": Medalhas,
     "Militares": Militares,
     "PeriodosAquisitivos": PeriodosAquisitivos,
     "PlanoAnualFerias": PlanoAnualFerias,
     "Processos": Processos,
+    "ProcessosTarefas": ProcessosTarefas,
     "Publicacoes": Publicacoes,
     "Punicoes": Punicoes,
     "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
@@ -116,9 +119,6 @@ export const PAGES = {
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
-    "ProcessosTarefas": ProcessosTarefas,
-    "InboxDemandas": InboxDemandas,
-    "FilaDemandas": FilaDemandas,
 }
 
 export const pagesConfig = {
