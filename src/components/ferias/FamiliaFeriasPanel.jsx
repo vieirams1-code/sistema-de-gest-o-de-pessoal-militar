@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { X, GitBranch, Calendar, AlertTriangle, CheckCircle, Clock, PauseCircle, LogOut, LogIn, FileText, PlusCircle, MinusCircle, RefreshCw } from 'lucide-react';
+import { X, GitBranch, Calendar, AlertTriangle, CheckCircle, Clock, PauseCircle, LogOut, LogIn, FileText, PlusCircle, MinusCircle, RefreshCw, TrendingDown, Timer } from 'lucide-react';
+import { differenceInDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
