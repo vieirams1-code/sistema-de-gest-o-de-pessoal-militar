@@ -234,7 +234,10 @@ export default function Ferias() {
     const qtdDias = Number(addDiasModal.dias);
     const hoje = new Date().toISOString().split('T')[0];
 
-    // Novo evento (ainda não persistido, usado para cálculo local imediato)
+    // dias_base: fonte de verdade imutável — se não existir, calcular agora sem adicionar o novo evento
+    // Isso garante que dias_base seja gravado corretamente antes de qualquer adição futura
+    const diasBase = f.dias_base || f.dias_originais || recalcularDiasLocalmente(f, null);
+
     const novoEvento = {
       ferias_id: f.id,
       tipo_registro: 'Adição de Dias',
@@ -242,7 +245,6 @@ export default function Ferias() {
       motivo_dispensa: addDiasModal.motivo,
     };
 
-    // 1. Calcular novo total ANTES de fazer qualquer request (usando dados locais + novo evento)
     const novaQtd = recalcularDiasLocalmente(f, novoEvento);
     const novaDataFim = f.data_inicio
       ? format(addDays(new Date(f.data_inicio + 'T00:00:00'), novaQtd - 1), 'yyyy-MM-dd')
@@ -252,9 +254,8 @@ export default function Ferias() {
       : f.data_retorno;
     const novasObs = reconstruirObservacoesDerivadas(f, novoEvento);
 
-    // 2. Criar evento no RegistroLivro e atualizar Ferias em paralelo
+    // Adição NÃO gera publicação — apenas evento interno da cadeia
     await Promise.all([
-      // Adição NÃO gera publicação — evento interno/administrativo apenas
       base44.entities.RegistroLivro.create({
         militar_id: f.militar_id,
         militar_nome: f.militar_nome,
@@ -265,12 +266,11 @@ export default function Ferias() {
         data_registro: hoje,
         dias_evento: qtdDias,
         motivo_dispensa: addDiasModal.motivo,
-        status: 'Publicado', // marcado como publicado pois não requer publicação formal
+        status: 'Publicado',
       }),
       base44.entities.Ferias.update(f.id, {
         dias: novaQtd,
-        // Garantir que dias_base está gravado (migração de registros antigos)
-        ...(f.dias_base ? {} : { dias_base: f.dias_originais || f.dias }),
+        dias_base: diasBase, // sempre gravar para garantir fonte de verdade
         data_fim: novaDataFim,
         data_retorno: novaDataRetorno,
         observacoes: novasObs,
