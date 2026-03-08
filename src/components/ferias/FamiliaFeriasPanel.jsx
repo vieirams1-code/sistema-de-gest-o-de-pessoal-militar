@@ -67,7 +67,10 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, cu
   }, [registrosLivro, ferias.id]);
 
   const totalEventos = eventosVinculados.length;
-  const possuiEventosPendentes = eventosVinculados.some(e => !e.numero_bg);
+  // Adição não gera publicação — ignorar para alerta de pendência
+  const possuiEventosPendentes = eventosVinculados.some(
+    e => e.tipo_registro !== 'Adição de Dias' && !e.numero_bg
+  );
 
   // ── Indicadores operacionais ─────────────────────────────────────
   const indicadores = useMemo(() => {
