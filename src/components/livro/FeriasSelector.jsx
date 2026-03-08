@@ -37,9 +37,7 @@ function getPeriodoSortKey(ferias) {
   const ref = ferias?.periodo_aquisitivo_ref || '';
   const match = String(ref).match(/(\d{4})\s*\/\s*(\d{4})/);
 
-  if (match) {
-    return Number(match[1]);
-  }
+  if (match) return Number(match[1]);
 
   if (ferias?.data_inicio) {
     const d = new Date(`${ferias.data_inicio}T00:00:00`);
@@ -53,7 +51,6 @@ function ordenarFerias(lista) {
   return [...lista].sort((a, b) => {
     const ka = getPeriodoSortKey(a);
     const kb = getPeriodoSortKey(b);
-
     if (ka !== kb) return ka - kb;
 
     const da = a?.data_inicio ? new Date(`${a.data_inicio}T00:00:00`).getTime() : Number.MAX_SAFE_INTEGER;
@@ -65,43 +62,37 @@ function ordenarFerias(lista) {
 function montarFeriasOpcoes(ferias, tipoRegistro) {
   if (tipoRegistro === 'Retorno Férias') {
     return ordenarFerias(
-      ferias
-        .filter((f) => f.status === 'Em Curso')
-        .map((f) => ({
-          ...f,
-          disabled: false,
-          bloqueioMotivo: '',
-          operacao_sugerida: 'Retorno Férias',
-          destaque: 'termino',
-        }))
+      ferias.filter((f) => f.status === 'Em Curso').map((f) => ({
+        ...f,
+        disabled: false,
+        bloqueioMotivo: '',
+        operacao_sugerida: 'Retorno Férias',
+        destaque: 'termino',
+      }))
     );
   }
 
   if (tipoRegistro === 'Interrupção de Férias') {
     return ordenarFerias(
-      ferias
-        .filter((f) => f.status === 'Em Curso')
-        .map((f) => ({
-          ...f,
-          disabled: false,
-          bloqueioMotivo: '',
-          operacao_sugerida: 'Interrupção de Férias',
-          destaque: 'interrupcao',
-        }))
+      ferias.filter((f) => f.status === 'Em Curso').map((f) => ({
+        ...f,
+        disabled: false,
+        bloqueioMotivo: '',
+        operacao_sugerida: 'Interrupção de Férias',
+        destaque: 'interrupcao',
+      }))
     );
   }
 
   if (tipoRegistro === 'Nova Saída / Retomada') {
     return ordenarFerias(
-      ferias
-        .filter((f) => f.status === 'Interrompida')
-        .map((f) => ({
-          ...f,
-          disabled: false,
-          bloqueioMotivo: '',
-          operacao_sugerida: 'Nova Saída / Retomada',
-          destaque: 'continuacao',
-        }))
+      ferias.filter((f) => f.status === 'Interrompida').map((f) => ({
+        ...f,
+        disabled: false,
+        bloqueioMotivo: '',
+        operacao_sugerida: 'Nova Saída / Retomada',
+        destaque: 'continuacao',
+      }))
     );
   }
 
@@ -121,7 +112,7 @@ function montarFeriasOpcoes(ferias, tipoRegistro) {
       ...interrompidas.map((f) => ({
         ...f,
         disabled: true,
-        bloqueioMotivo: 'Existe férias em curso deste militar. Resolva a cadeia em curso antes de atuar em uma férias interrompida diferente.',
+        bloqueioMotivo: 'Existe férias em curso deste militar. Resolva primeiro a cadeia em curso.',
         operacao_sugerida: 'Nova Saída / Retomada',
         destaque: 'bloqueada_por_em_curso',
       })),
@@ -155,14 +146,12 @@ function montarFeriasOpcoes(ferias, tipoRegistro) {
   }
 
   const periodoMaisAntigo = previstas[0]?.id;
-
   return previstas.map((f) => ({
     ...f,
     disabled: f.id !== periodoMaisAntigo,
-    bloqueioMotivo:
-      f.id !== periodoMaisAntigo
-        ? 'Há período aquisitivo mais antigo pendente. O sistema força iniciar primeiro o mais antigo.'
-        : '',
+    bloqueioMotivo: f.id !== periodoMaisAntigo
+      ? 'Há período aquisitivo mais antigo pendente. O sistema força iniciar primeiro o mais antigo.'
+      : '',
     operacao_sugerida: 'Saída Férias',
     destaque: f.id === periodoMaisAntigo ? 'mais_antigo' : 'bloqueada_por_antiguidade',
   }));
@@ -170,26 +159,14 @@ function montarFeriasOpcoes(ferias, tipoRegistro) {
 
 function getMensagemEstado(tipoRegistro) {
   if (tipoRegistro === 'Retorno Férias') {
-    return {
-      titulo: 'Nenhuma férias em curso',
-      texto: 'Este militar não possui férias em curso para término.',
-    };
+    return { titulo: 'Nenhuma férias em curso', texto: 'Este militar não possui férias em curso para término.' };
   }
-
   if (tipoRegistro === 'Interrupção de Férias') {
-    return {
-      titulo: 'Nenhuma férias em curso',
-      texto: 'Este militar não possui férias em curso para interrupção.',
-    };
+    return { titulo: 'Nenhuma férias em curso', texto: 'Este militar não possui férias em curso para interrupção.' };
   }
-
   if (tipoRegistro === 'Nova Saída / Retomada') {
-    return {
-      titulo: 'Nenhuma férias interrompida',
-      texto: 'Este militar não possui férias interrompidas para continuação.',
-    };
+    return { titulo: 'Nenhuma férias interrompida', texto: 'Este militar não possui férias interrompidas para continuação.' };
   }
-
   return {
     titulo: 'Nenhuma férias disponível',
     texto: 'Este militar não possui férias previstas, autorizadas ou interrompidas compatíveis com o fluxo atual.',
@@ -231,9 +208,7 @@ export default function FeriasSelector({ militarId, value, onChange, tipoRegistr
   if (!militarId) {
     return (
       <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-        <p className="text-sm text-slate-600">
-          Selecione primeiro o militar para carregar as férias disponíveis.
-        </p>
+        <p className="text-sm text-slate-600">Selecione primeiro o militar para carregar as férias disponíveis.</p>
       </div>
     );
   }
@@ -259,31 +234,25 @@ export default function FeriasSelector({ militarId, value, onChange, tipoRegistr
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {existeEmCursoPrioritaria && tipoRegistro === 'Saída Férias' && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
           <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>
-            Existe férias <strong>em curso</strong>. Ela tem prioridade operacional. Após selecionar essa cadeia, o operador poderá escolher entre <strong>Término</strong> ou <strong>Interrupção</strong>.
-          </span>
+          <span>Existe férias <strong>em curso</strong>. Ela tem prioridade operacional. Depois de selecionar a cadeia, você escolhe entre <strong>Término</strong> ou <strong>Interrupção</strong>.</span>
         </div>
       )}
 
       {existeInterrompidaPrioritaria && tipoRegistro === 'Saída Férias' && (
         <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 flex items-start gap-2">
           <PauseCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>
-            Existe férias <strong>interrompida</strong> pendente. Ela tem prioridade operacional e deve ser continuada antes do início de um novo período.
-          </span>
+          <span>Existe férias <strong>interrompida</strong> pendente. Ela tem prioridade operacional e deve ser continuada antes de iniciar outro período.</span>
         </div>
       )}
 
       {existeBloqueioPorAntiguidade && !existeInterrompidaPrioritaria && !existeEmCursoPrioritaria && tipoRegistro === 'Saída Férias' && (
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
           <ArrowRightCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>
-            Há mais de um período previsto. O sistema permite selecionar apenas o <strong>mais antigo</strong> primeiro.
-          </span>
+          <span>Há mais de um período previsto. O sistema permite selecionar apenas o <strong>mais antigo</strong> primeiro.</span>
         </div>
       )}
 
@@ -298,10 +267,7 @@ export default function FeriasSelector({ militarId, value, onChange, tipoRegistr
               <SelectItem key={f.id} value={f.id} disabled={f.disabled}>
                 <div className="flex items-center gap-2">
                   {f.disabled ? <Lock className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
-                  <span>
-                    {f.periodo_aquisitivo_ref || 'Sem período'} • {formatDate(f.data_inicio)} • {f.dias} dias
-                    {f.disabled ? ' — bloqueada' : ''}
-                  </span>
+                  <span>{f.periodo_aquisitivo_ref || 'Sem período'} • {formatDate(f.data_inicio)} • {f.dias} dias{f.disabled ? ' — bloqueada' : ''}</span>
                 </div>
               </SelectItem>
             ))}
@@ -309,91 +275,54 @@ export default function FeriasSelector({ militarId, value, onChange, tipoRegistr
         </Select>
       </div>
 
-      <div className="space-y-2">
-        {opcoes.map((f) => (
-          <div
-            key={`hint-${f.id}`}
-            className={`p-3 rounded-lg border text-xs ${
-              f.disabled
-                ? 'bg-slate-50 border-slate-200 text-slate-500'
-                : f.destaque === 'prioridade_interrompida'
-                ? 'bg-orange-50 border-orange-200 text-orange-800'
-                : f.destaque === 'prioridade_em_curso'
-                ? 'bg-amber-50 border-amber-200 text-amber-800'
-                : f.destaque === 'mais_antigo'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : 'bg-slate-50 border-slate-200 text-slate-600'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium">{f.periodo_aquisitivo_ref || 'Sem período'}</span>
-                <Badge className={`${statusColors[f.status] || 'bg-slate-100 text-slate-700'} text-[10px]`}>
-                  {f.status}
-                </Badge>
-                {f.destaque === 'prioridade_interrompida' && (
-                  <Badge className="bg-orange-100 text-orange-700 text-[10px]">Prioridade operacional</Badge>
-                )}
-                {f.destaque === 'prioridade_em_curso' && (
-                  <Badge className="bg-amber-100 text-amber-700 text-[10px]">Cadeia ativa prioritária</Badge>
-                )}
-                {f.destaque === 'mais_antigo' && (
-                  <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">Mais antigo liberado</Badge>
-                )}
-              </div>
-              <span>{formatDate(f.data_inicio)} → {formatDate(f.data_retorno)}</span>
-            </div>
-            {f.bloqueioMotivo && <div className="mt-1">{f.bloqueioMotivo}</div>}
-          </div>
-        ))}
-      </div>
-
       {selectedFerias && (
-        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-          <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 className="w-4 h-4 text-[#1e3a5f]" />
-            <span className="font-medium text-sm text-slate-900">Férias Selecionada</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
             <div>
-              <span className="text-slate-500">Período:</span>{' '}
-              <span className="font-medium">{selectedFerias.periodo_aquisitivo_ref || '-'}</span>
+              <div className="text-xs uppercase tracking-wide text-slate-500">Férias identificada</div>
+              <div className="text-lg font-semibold text-slate-900 mt-1">{selectedFerias.periodo_aquisitivo_ref || 'Sem período'}</div>
             </div>
-            <div>
-              <span className="text-slate-500">Status:</span>{' '}
-              <span className="font-medium">{selectedFerias.status}</span>
-            </div>
-            <div>
-              <span className="text-slate-500">Início:</span>{' '}
-              <span className="font-medium">{formatDate(selectedFerias.data_inicio)}</span>
-            </div>
-            <div>
-              <span className="text-slate-500">Retorno:</span>{' '}
-              <span className="font-medium">{formatDate(selectedFerias.data_retorno)}</span>
-            </div>
-            <div>
-              <span className="text-slate-500">Dias atuais:</span>{' '}
-              <span className="font-medium">{selectedFerias.dias ?? '-'}</span>
-            </div>
-            {selectedFerias.saldo_remanescente != null && (
-              <div>
-                <span className="text-slate-500">Saldo:</span>{' '}
-                <span className="font-medium text-blue-700">{selectedFerias.saldo_remanescente}d</span>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
             <Badge className={`${statusColors[selectedFerias.status] || 'bg-slate-100 text-slate-700'} text-xs`}>
               {selectedFerias.status}
             </Badge>
-            <Badge className="bg-[#1e3a5f]/10 text-[#1e3a5f] text-xs">
-              Operação sugerida: {labelOperacao(selectedFerias.operacao_sugerida)}
-            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="rounded-lg border bg-white p-3">
+              <div className="text-slate-500">Início</div>
+              <div className="font-medium mt-1">{formatDate(selectedFerias.data_inicio)}</div>
+            </div>
+            <div className="rounded-lg border bg-white p-3">
+              <div className="text-slate-500">Retorno</div>
+              <div className="font-medium mt-1">{formatDate(selectedFerias.data_retorno)}</div>
+            </div>
+            <div className="rounded-lg border bg-white p-3">
+              <div className="text-slate-500">Dias</div>
+              <div className="font-medium mt-1">{selectedFerias.dias ?? '-'}</div>
+            </div>
+            <div className="rounded-lg border bg-white p-3">
+              <div className="text-slate-500">Saldo</div>
+              <div className="font-medium mt-1 text-blue-700">{selectedFerias.saldo_remanescente != null ? `${selectedFerias.saldo_remanescente}d` : '—'}</div>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <Badge className="bg-[#1e3a5f]/10 text-[#1e3a5f] text-xs">Operação sugerida: {labelOperacao(selectedFerias.operacao_sugerida)}</Badge>
           </div>
         </div>
       )}
+
+      <div className="space-y-2">
+        {opcoes.filter((f) => f.disabled).map((f) => (
+          <div key={`hint-${f.id}`} className="p-3 rounded-lg border bg-slate-50 text-xs text-slate-600">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="font-medium">{f.periodo_aquisitivo_ref || 'Sem período'}</div>
+              <Badge className="bg-red-100 text-red-700 text-[10px]">Bloqueada</Badge>
+            </div>
+            <div className="mt-2">{f.bloqueioMotivo}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
