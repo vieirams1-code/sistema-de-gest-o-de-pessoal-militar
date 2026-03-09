@@ -6,10 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   X, User, Calendar, FileText, AlertTriangle, Pencil, Trash2,
-  ArrowRight, CheckCircle2, Archive, RotateCcw, SendHorizonal, UserCheck
+  ArrowRight, CheckCircle2, Archive, RotateCcw, SendHorizonal, UserCheck, History,
 } from 'lucide-react';
 import EtapaBadge from './EtapaBadge';
 import TarefaPanel from './TarefaPanel';
+import { BlocoDecisaoChefe, BlocoAssinaturaChefe, BlocoRetornoComando } from './BlocoDecisao';
 import {
   prioridadeColors, criticidadeColors, statusColors, isAtrasada, formatDate, ETAPAS_CHEFE,
 } from './DemandaUtils';
