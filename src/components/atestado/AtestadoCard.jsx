@@ -34,6 +34,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
+import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -196,8 +197,13 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       data_jiso_agendada: jisoDate,
       status_jiso: 'Aguardando JISO'
     });
+    await sincronizarAtestadoJisoNoQuadro({
+      ...atestado,
+      data_jiso_agendada: jisoDate,
+    });
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
     queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['cards'] });
     setSavingJiso(false);
     setEditingJiso(false);
   };

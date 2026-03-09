@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente'];
+const PRESETS = ['Nenhum', 'JISO', 'Atestado', 'Férias', 'Processo', 'Assinatura'];
 const ETIQUETAS = [
   { cor: '#ef4444', label: 'Urgente' },
   { cor: '#f97316', label: 'Atenção' },
@@ -27,9 +28,10 @@ export default function NovoCardModal({ coluna, onSalvar, onClose, salvando }) {
     responsavel_nome: '',
     protocolo: '',
     origem_tipo: 'Manual',
+    preset: 'Nenhum',
   });
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -50,7 +52,7 @@ export default function NovoCardModal({ coluna, onSalvar, onClose, salvando }) {
             <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Título *</label>
             <Input
               value={form.titulo}
-              onChange={e => set('titulo', e.target.value)}
+              onChange={(e) => set('titulo', e.target.value)}
               placeholder="Descreva o card..."
               className="text-sm"
               autoFocus
@@ -59,43 +61,50 @@ export default function NovoCardModal({ coluna, onSalvar, onClose, salvando }) {
 
           <div>
             <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Descrição</label>
-            <Textarea value={form.descricao} onChange={e => set('descricao', e.target.value)} rows={2} className="text-sm resize-none" placeholder="Detalhes..." />
+            <Textarea value={form.descricao} onChange={(e) => set('descricao', e.target.value)} rows={2} className="text-sm resize-none" placeholder="Detalhes..." />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Prioridade</label>
-              <Select value={form.prioridade} onValueChange={v => set('prioridade', v)}>
+              <Select value={form.prioridade} onValueChange={(v) => set('prioridade', v)}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>{PRIORIDADES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                <SelectContent>{PRIORIDADES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
               <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Prazo</label>
-              <Input type="date" value={form.prazo} onChange={e => set('prazo', e.target.value)} className="h-8 text-xs" />
+              <Input type="date" value={form.prazo} onChange={(e) => set('prazo', e.target.value)} className="h-8 text-xs" />
             </div>
           </div>
 
           <div>
+            <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Preset</label>
+            <Select value={form.preset} onValueChange={(v) => set('preset', v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>{PRESETS.map((preset) => <SelectItem key={preset} value={preset}>{preset}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+
+          <div>
             <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Militar</label>
-            <Input value={form.militar_nome_snapshot} onChange={e => set('militar_nome_snapshot', e.target.value)} placeholder="Nome do militar..." className="text-sm" />
+            <Input value={form.militar_nome_snapshot} onChange={(e) => set('militar_nome_snapshot', e.target.value)} placeholder="Nome do militar..." className="text-sm" />
           </div>
 
           <div>
             <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Responsável</label>
-            <Input value={form.responsavel_nome} onChange={e => set('responsavel_nome', e.target.value)} placeholder="Nome do responsável..." className="text-sm" />
+            <Input value={form.responsavel_nome} onChange={(e) => set('responsavel_nome', e.target.value)} placeholder="Nome do responsável..." className="text-sm" />
           </div>
 
           <div>
             <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Protocolo</label>
-            <Input value={form.protocolo} onChange={e => set('protocolo', e.target.value)} placeholder="Nº protocolo ou referência..." className="text-sm" />
+            <Input value={form.protocolo} onChange={(e) => set('protocolo', e.target.value)} placeholder="Nº protocolo ou referência..." className="text-sm" />
           </div>
 
-          {/* Etiqueta */}
           <div>
             <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Etiqueta</label>
             <div className="flex flex-wrap gap-2">
-              {ETIQUETAS.map(et => (
+              {ETIQUETAS.map((et) => (
                 <button
                   key={et.cor}
                   onClick={() => { set('etiqueta_cor', et.cor); set('etiqueta_texto', et.label); }}
