@@ -20,10 +20,8 @@ import {
   Medal,
   Sword,
   FilePenLine,
-  Briefcase,
   FolderKanban,
   Wrench,
-  Shirt,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,7 +39,6 @@ const menuGroups = [
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users },
       { name: 'Alterações Militar', page: 'FichaMilitar', icon: FilePenLine },
-      { name: 'Contratos Conv./Design.', page: 'Contratos', icon: Briefcase },
     ],
   },
   {
@@ -58,23 +55,12 @@ const menuGroups = [
       { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen },
       { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
-      {
-        name: 'Demandas & Tarefas',
-        page: 'ProcessosTarefas',
-        icon: FolderKanban,
-        children: [
-          { name: 'Painel Geral', page: 'ProcessosTarefas', icon: FolderKanban },
-          { name: 'Caixa de Entrada', page: 'InboxDemandas', icon: FileText },
-          { name: 'Fila de Trabalho', page: 'FilaDemandas', icon: ScrollText },
-        ],
-      },
     ],
   },
   {
     title: 'Patrimônio e Reconhecimento',
     items: [
       { name: 'Armamentos', page: 'Armamentos', icon: Sword },
-      { name: 'Recebimento de Fardamento', page: 'RecebimentoFardamento', icon: Shirt },
       { name: 'Medalhas', page: 'Medalhas', icon: Medal },
     ],
   },

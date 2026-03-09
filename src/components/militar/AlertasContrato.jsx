@@ -3,8 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
-import { createPageUrl } from '@/utils';
-import { Link } from 'react-router-dom';
 
 function calcStatus(data_fim) {
   if (!data_fim) return null;
@@ -41,7 +39,6 @@ export default function AlertasContrato({ militarId }) {
               : `Contrato de ${c.tipo_contrato} vence em ${c.alerta.dias} dia(s). Iniciar processo de renovação!`
             }
           </span>
-          <Link to={createPageUrl('Contratos')} className="ml-auto text-xs underline whitespace-nowrap">Ver contratos</Link>
         </div>
       ))}
     </div>
