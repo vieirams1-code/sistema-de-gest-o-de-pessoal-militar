@@ -363,6 +363,52 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           </div>
         )}
 
+        {/* ── BLOCO: Histórico Resumido ── */}
+        {(demanda.decisao_texto || demanda.assinatura_data || demanda.retorno_externo_texto) && (
+          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-2">
+              <History className="w-3.5 h-3.5" /> Histórico de Decisões
+            </p>
+            {demanda.decisao_texto && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">
+                    Última decisão {demanda.decisao_tipo ? `— ${demanda.decisao_tipo}` : ''}
+                  </span>
+                  {demanda.decisao_data && (
+                    <span className="text-[10px] text-amber-500">{formatDate(demanda.decisao_data.split('T')[0])}</span>
+                  )}
+                </div>
+                <p className="text-xs text-amber-900 leading-relaxed">{demanda.decisao_texto}</p>
+              </div>
+            )}
+            {demanda.assinatura_data && (
+              <div className="rounded-lg bg-orange-50 border border-orange-200 px-3 py-2">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">
+                    Assinatura {demanda.assinatura_status ? `— ${demanda.assinatura_status}` : ''}
+                  </span>
+                  <span className="text-[10px] text-orange-500">{formatDate(demanda.assinatura_data.split('T')[0])}</span>
+                </div>
+                {demanda.assinatura_observacao && (
+                  <p className="text-xs text-orange-900 leading-relaxed">{demanda.assinatura_observacao}</p>
+                )}
+              </div>
+            )}
+            {demanda.retorno_externo_texto && (
+              <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wide">Retorno do Comando Superior</span>
+                  {demanda.retorno_externo_data && (
+                    <span className="text-[10px] text-rose-500">{formatDate(demanda.retorno_externo_data.split('T')[0])}</span>
+                  )}
+                </div>
+                <p className="text-xs text-rose-900 leading-relaxed">{demanda.retorno_externo_texto}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── BLOCO: Tarefas Vinculadas ── */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <TarefaPanel demandaId={demanda.id} />
