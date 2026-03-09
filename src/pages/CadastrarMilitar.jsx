@@ -268,7 +268,7 @@ export default function CadastrarMilitar() {
                   onChange={handleChange}
                   type="select"
                   options={['Ativa', 'Reserva Remunerada', 'Reformado', 'Designado', 'Convocado']}
-                  hint={['Designado', 'Convocado'].includes(formData.situacao_militar) ? 'Gerencie contratos na página Contratos' : ''}
+                  hint={['Designado', 'Convocado'].includes(formData.situacao_militar) ? 'Situação vinculada a vínculo temporário.' : ''}
                 />
                 <LotacaoSelector
                   value={formData.lotacao}

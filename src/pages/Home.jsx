@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Award, Shield, AlertTriangle, Calendar, Star, FileText, Shirt } from 'lucide-react';
+import { Users, Award, Shield, AlertTriangle, Calendar, Star, FileText } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 
 export default function Home() {
@@ -176,12 +176,7 @@ export default function Home() {
             <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(createPageUrl('Armamentos'))}>
               <Shield className="w-6 h-6 mb-2" />
               <span>Armamentos</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(createPageUrl('RecebimentoFardamento'))}>
-              <Shirt className="w-6 h-6 mb-2" />
-              <span>Recebimento de Fardamento</span>
-            </Button>
-          </div>
+            </Button>          </div>
         </div>
       </div>
     </div>
