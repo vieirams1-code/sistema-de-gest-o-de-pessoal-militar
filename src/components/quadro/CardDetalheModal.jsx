@@ -191,6 +191,12 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const queryClient = useQueryClient();
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [encaminhadoParaNome, setEncaminhadoParaNome] = useState('');
+  const [encaminhadoPorNome, setEncaminhadoPorNome] = useState('');
+  const [observacaoEncaminhamento, setObservacaoEncaminhamento] = useState('');
+  const [devolvidoPorNome, setDevolvidoPorNome] = useState('');
+  const [observacaoDevolucao, setObservacaoDevolucao] = useState('');
+  const [salvandoDecisao, setSalvandoDecisao] = useState(false);
 
 
   const [jisoDate, setJisoDate] = useState(card.prazo || '');
@@ -221,6 +227,14 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
       etiqueta_cor: card.etiqueta_cor || '#6366f1',
     });
   }, [card.id, card.prioridade, card.tipo, card.etiqueta_texto, card.etiqueta_cor]);
+
+  useEffect(() => {
+    setEncaminhadoParaNome(card.encaminhado_para_nome || '');
+    setEncaminhadoPorNome(card.encaminhado_por_nome || card.responsavel_nome || '');
+    setObservacaoEncaminhamento('');
+    setDevolvidoPorNome('');
+    setObservacaoDevolucao('');
+  }, [card.id, card.encaminhado_para_nome, card.encaminhado_por_nome, card.responsavel_nome]);
 
   const vinculoAtestado = vinculos.find((v) => v.tipo_vinculo === 'Atestado');
   const permiteEditarDataJiso = card.origem_tipo === 'Atestado/JISO' && !!vinculoAtestado?.referencia_id;
@@ -288,6 +302,77 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
       onCardUpdate?.({ id: card.id, ...payload });
     } finally {
       setSalvandoClassificacao(false);
+    }
+  };
+
+  const encaminharParaDecisao = async () => {
+    if (salvandoDecisao || !encaminhadoParaNome.trim() || !encaminhadoPorNome.trim()) return;
+    setSalvandoDecisao(true);
+    const agora = new Date().toISOString();
+    const payload = {
+      aguardando_decisao: true,
+      encaminhado_por_nome: encaminhadoPorNome.trim(),
+      encaminhado_para_nome: encaminhadoParaNome.trim(),
+      encaminhado_em: agora,
+      observacao_encaminhamento: observacaoEncaminhamento.trim(),
+      devolvido_por_nome: '',
+      devolvido_em: null,
+      observacao_devolucao: '',
+      status_decisao: 'Aguardando decisão',
+      comentarios_count: (card.comentarios_count || 0) + 1,
+    };
+
+    try {
+      await base44.entities.CardOperacional.update(card.id, payload);
+      await base44.entities.CardComentario.create({
+        card_id: card.id,
+        mensagem: `Card encaminhado para decisão de ${encaminhadoParaNome.trim()}, por ${encaminhadoPorNome.trim()}.`,
+        tipo_registro: 'Sistema',
+        data_hora: agora,
+        origem_automatica: true,
+        autor_nome: 'Sistema',
+      });
+
+      onCardUpdate?.({ id: card.id, ...payload });
+      queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
+      setObservacaoEncaminhamento('');
+    } finally {
+      setSalvandoDecisao(false);
+    }
+  };
+
+  const devolverDecisao = async () => {
+    if (salvandoDecisao || !devolvidoPorNome.trim()) return;
+    setSalvandoDecisao(true);
+    const agora = new Date().toISOString();
+    const payload = {
+      aguardando_decisao: false,
+      devolvido_por_nome: devolvidoPorNome.trim(),
+      devolvido_em: agora,
+      observacao_devolucao: observacaoDevolucao.trim(),
+      status_decisao: 'Devolvido com orientação',
+      comentarios_count: (card.comentarios_count || 0) + 1,
+    };
+
+    try {
+      await base44.entities.CardOperacional.update(card.id, payload);
+      await base44.entities.CardComentario.create({
+        card_id: card.id,
+        mensagem: `Card devolvido por ${devolvidoPorNome.trim()} com orientação.`,
+        tipo_registro: 'Sistema',
+        data_hora: agora,
+        origem_automatica: true,
+        autor_nome: 'Sistema',
+      });
+
+      onCardUpdate?.({ id: card.id, ...payload });
+      queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
+      setObservacaoDevolucao('');
+      setDevolvidoPorNome('');
+    } finally {
+      setSalvandoDecisao(false);
     }
   };
 
@@ -426,6 +511,109 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 {salvandoClassificacao ? 'Salvando...' : 'Salvar classificação'}
               </Button>
             </div>
+          </div>
+
+          <div className="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-100">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Decisão</p>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${card.aguardando_decisao ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                {card.aguardando_decisao ? 'Aguardando decisão' : (card.status_decisao || 'Sem pendência')}
+              </span>
+            </div>
+
+            {(card.encaminhado_em || card.devolvido_em) && (
+              <div className="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-md p-2 space-y-1">
+                {card.encaminhado_em && (
+                  <p>
+                    Encaminhado para <strong>{card.encaminhado_para_nome || '-'}</strong> por <strong>{card.encaminhado_por_nome || '-'}</strong> em {formatDateTime(card.encaminhado_em)}.
+                  </p>
+                )}
+                {card.observacao_encaminhamento && <p>Obs. encaminhamento: {card.observacao_encaminhamento}</p>}
+                {card.devolvido_em && (
+                  <p>
+                    Devolvido por <strong>{card.devolvido_por_nome || '-'}</strong> em {formatDateTime(card.devolvido_em)}.
+                  </p>
+                )}
+                {card.observacao_devolucao && <p>Orientação: {card.observacao_devolucao}</p>}
+              </div>
+            )}
+
+            {!card.aguardando_decisao ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Para quem</label>
+                    <Input
+                      value={encaminhadoParaNome}
+                      onChange={(e) => setEncaminhadoParaNome(e.target.value)}
+                      placeholder="Nome do decisor"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Encaminhado por</label>
+                    <Input
+                      value={encaminhadoPorNome}
+                      onChange={(e) => setEncaminhadoPorNome(e.target.value)}
+                      placeholder="Seu nome"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Observação</label>
+                  <Textarea
+                    rows={2}
+                    value={observacaoEncaminhamento}
+                    onChange={(e) => setObservacaoEncaminhamento(e.target.value)}
+                    placeholder="Contexto para decisão..."
+                    className="text-xs resize-none"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs"
+                    disabled={salvandoDecisao || !encaminhadoParaNome.trim() || !encaminhadoPorNome.trim()}
+                    onClick={encaminharParaDecisao}
+                  >
+                    {salvandoDecisao ? 'Salvando...' : 'Encaminhar para decisão'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Devolvido por</label>
+                  <Input
+                    value={devolvidoPorNome}
+                    onChange={(e) => setDevolvidoPorNome(e.target.value)}
+                    placeholder="Nome de quem decidiu"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Orientação</label>
+                  <Textarea
+                    rows={2}
+                    value={observacaoDevolucao}
+                    onChange={(e) => setObservacaoDevolucao(e.target.value)}
+                    placeholder="Orientação da devolução..."
+                    className="text-xs resize-none"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs"
+                    disabled={salvandoDecisao || !devolvidoPorNome.trim()}
+                    onClick={devolverDecisao}
+                  >
+                    {salvandoDecisao ? 'Salvando...' : 'Devolver decisão'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {permiteEditarDataJiso && (
