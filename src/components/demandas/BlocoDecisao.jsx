@@ -79,11 +79,15 @@ export function BlocoDecisaoChefe({ onSalvar, salvando, onHistorico, etapa }) {
   );
 }
 
-export function BlocoAssinaturaChefe({ onSalvar, salvando }) {
+export function BlocoAssinaturaChefe({ onSalvar, salvando, onHistorico, etapa }) {
   const [obs, setObs] = useState('');
 
-  const agora = new Date().toISOString();
-  const base = { assinatura_observacao: obs, assinatura_data: agora };
+  const executar = async (dadosDemanda, msgHistorico) => {
+    const agora = new Date().toISOString();
+    const base = { assinatura_observacao: obs, assinatura_data: agora };
+    await onSalvar({ ...base, ...dadosDemanda });
+    if (onHistorico) await onHistorico({ tipo_registro: 'Assinatura', mensagem: msgHistorico + (obs ? `\n\n"${obs}"` : ''), etapa_no_momento: etapa });
+  };
 
   return (
     <div className="rounded-xl border-2 border-orange-300 bg-orange-50 p-4 space-y-3">
@@ -106,39 +110,43 @@ export function BlocoAssinaturaChefe({ onSalvar, salvando }) {
           label="Assinado — retornar p/ execução"
           color="border-emerald-300 text-emerald-800 hover:bg-emerald-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, assinatura_status: 'Assinado', etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: agora })}
+          onClick={() => executar({ assinatura_status: 'Assinado', etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: new Date().toISOString() }, 'Assinado — demanda retornada para execução.')}
         />
         <ActionBtn
           icon={ArrowDownLeft}
           label="Devolver para ajuste"
           color="border-blue-300 text-blue-800 hover:bg-blue-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, assinatura_status: 'Devolvido', etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: agora })}
+          onClick={() => executar({ assinatura_status: 'Devolvido', etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: new Date().toISOString() }, 'Devolvido para ajuste — demanda retornada para execução.')}
         />
         <ActionBtn
           icon={CheckCircle2}
           label="Concluir demanda"
           color="border-teal-300 text-teal-800 hover:bg-teal-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, assinatura_status: 'Assinado', etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] })}
+          onClick={() => executar({ assinatura_status: 'Assinado', etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] }, 'Assinado — demanda concluída.')}
         />
         <ActionBtn
           icon={Archive}
           label="Arquivar demanda"
           color="border-slate-300 text-slate-600 hover:bg-slate-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, assinatura_status: 'Devolvido', etapa_fluxo: 'Arquivado', status: 'Arquivada' })}
+          onClick={() => executar({ assinatura_status: 'Devolvido', etapa_fluxo: 'Arquivado', status: 'Arquivada' }, 'Demanda arquivada.')}
         />
       </div>
     </div>
   );
 }
 
-export function BlocoRetornoComando({ onSalvar, salvando }) {
+export function BlocoRetornoComando({ onSalvar, salvando, onHistorico, etapa }) {
   const [texto, setTexto] = useState('');
 
-  const agora = new Date().toISOString();
-  const base = { retorno_externo_texto: texto, retorno_externo_data: agora, retorno_externo_status: 'Recebido', data_ultimo_retorno: agora };
+  const executar = async (dadosDemanda, msgHistorico) => {
+    const agora = new Date().toISOString();
+    const base = { retorno_externo_texto: texto, retorno_externo_data: agora, retorno_externo_status: 'Recebido', data_ultimo_retorno: agora };
+    await onSalvar({ ...base, ...dadosDemanda });
+    if (onHistorico) await onHistorico({ tipo_registro: 'Retorno externo', mensagem: msgHistorico + (texto ? `\n\n"${texto}"` : ''), etapa_no_momento: etapa });
+  };
 
   return (
     <div className="rounded-xl border-2 border-rose-300 bg-rose-50 p-4 space-y-3">
@@ -161,21 +169,21 @@ export function BlocoRetornoComando({ onSalvar, salvando }) {
           label="Retorno recebido — devolver p/ execução"
           color="border-emerald-300 text-emerald-800 hover:bg-emerald-50 bg-white sm:col-span-2"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, etapa_fluxo: 'Retornado para execução' })}
+          onClick={() => executar({ etapa_fluxo: 'Retornado para execução' }, 'Retorno do comando superior recebido — demanda devolvida para execução.')}
         />
         <ActionBtn
           icon={CheckCircle2}
           label="Concluir demanda"
           color="border-teal-300 text-teal-800 hover:bg-teal-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] })}
+          onClick={() => executar({ etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] }, 'Retorno recebido — demanda concluída.')}
         />
         <ActionBtn
           icon={Archive}
           label="Arquivar demanda"
           color="border-slate-300 text-slate-600 hover:bg-slate-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, etapa_fluxo: 'Arquivado', status: 'Arquivada' })}
+          onClick={() => executar({ etapa_fluxo: 'Arquivado', status: 'Arquivada' }, 'Demanda arquivada.')}
         />
       </div>
     </div>
