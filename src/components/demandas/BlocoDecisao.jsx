@@ -13,11 +13,15 @@ const ActionBtn = ({ icon: Icon, label, color, onClick, disabled }) => (
   </button>
 );
 
-export function BlocoDecisaoChefe({ onSalvar, salvando }) {
+export function BlocoDecisaoChefe({ onSalvar, salvando, onHistorico, etapa }) {
   const [texto, setTexto] = useState('');
 
-  const agora = new Date().toISOString();
-  const base = { decisao_texto: texto, decisao_data: agora, data_ultima_decisao: agora };
+  const executar = async (dadosDemanda, tipoHistorico, msgHistorico) => {
+    const agora = new Date().toISOString();
+    const base = { decisao_texto: texto, decisao_data: agora, data_ultima_decisao: agora };
+    await onSalvar({ ...base, ...dadosDemanda });
+    if (onHistorico) await onHistorico({ tipo_registro: 'Decisão', mensagem: msgHistorico + (texto ? `\n\n"${texto}"` : ''), etapa_no_momento: etapa });
+  };
 
   return (
     <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3">
@@ -40,35 +44,35 @@ export function BlocoDecisaoChefe({ onSalvar, salvando }) {
           label="Aprovar e retornar p/ execução"
           color="border-emerald-300 text-emerald-800 hover:bg-emerald-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, decisao_tipo: 'Aprovado', etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: agora })}
+          onClick={() => executar({ decisao_tipo: 'Aprovado', etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: new Date().toISOString() }, 'Decisão', 'Decisão: Aprovado — demanda retornada para execução.')}
         />
         <ActionBtn
           icon={ArrowDownLeft}
           label="Solicitar ajuste"
           color="border-blue-300 text-blue-800 hover:bg-blue-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, decisao_tipo: 'Solicitar ajuste', etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: agora })}
+          onClick={() => executar({ decisao_tipo: 'Solicitar ajuste', etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: new Date().toISOString() }, 'Decisão', 'Decisão: Solicitado ajuste — demanda retornada para execução.')}
         />
         <ActionBtn
           icon={Pencil}
           label="Encaminhar para assinatura"
           color="border-orange-300 text-orange-800 hover:bg-orange-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, decisao_tipo: 'Encaminhar para assinatura', etapa_fluxo: 'Aguardando assinatura do chefe', data_ultimo_encaminhamento: agora })}
+          onClick={() => executar({ decisao_tipo: 'Encaminhar para assinatura', etapa_fluxo: 'Aguardando assinatura do chefe', data_ultimo_encaminhamento: new Date().toISOString() }, 'Encaminhamento', 'Decisão: Encaminhado para assinatura do chefe.')}
         />
         <ActionBtn
           icon={CheckCircle2}
           label="Concluir demanda"
           color="border-teal-300 text-teal-800 hover:bg-teal-50 bg-white"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, decisao_tipo: 'Concluir', etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] })}
+          onClick={() => executar({ decisao_tipo: 'Concluir', etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] }, 'Decisão', 'Decisão: Demanda concluída.')}
         />
         <ActionBtn
           icon={Archive}
           label="Arquivar demanda"
           color="border-slate-300 text-slate-600 hover:bg-slate-50 bg-white sm:col-span-2"
           disabled={salvando}
-          onClick={() => onSalvar({ ...base, decisao_tipo: 'Arquivar', etapa_fluxo: 'Arquivado', status: 'Arquivada' })}
+          onClick={() => executar({ decisao_tipo: 'Arquivar', etapa_fluxo: 'Arquivado', status: 'Arquivada' }, 'Decisão', 'Decisão: Demanda arquivada.')}
         />
       </div>
     </div>

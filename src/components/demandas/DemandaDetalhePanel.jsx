@@ -11,6 +11,7 @@ import {
 import EtapaBadge from './EtapaBadge';
 import TarefaPanel from './TarefaPanel';
 import { BlocoDecisaoChefe, BlocoAssinaturaChefe, BlocoRetornoComando } from './BlocoDecisao';
+import DemandaHistorico, { useDemandaHistoricoRegistrar } from './DemandaHistorico';
 import {
   prioridadeColors, criticidadeColors, statusColors, isAtrasada, formatDate, ETAPAS_CHEFE,
 } from './DemandaUtils';
