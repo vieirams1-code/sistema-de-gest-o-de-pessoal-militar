@@ -39,6 +39,7 @@ const PROXIMA_ACAO_POR_ETAPA = {
 export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete }) {
   const queryClient = useQueryClient();
   const [salvando, setSalvando] = useState(false);
+  const registrarHistorico = useDemandaHistoricoRegistrar(demanda?.id, demanda?.etapa_fluxo);
 
   if (!demanda) return null;
 
