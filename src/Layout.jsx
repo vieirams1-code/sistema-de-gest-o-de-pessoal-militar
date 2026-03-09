@@ -53,6 +53,7 @@ const menuGroups = [
   {
     title: 'Gestão',
     items: [
+      { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban },
       { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen },
       { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
