@@ -181,7 +181,19 @@ export default function QuadroOperacionalPage() {
     );
 
     try {
-      await Promise.all(updates.map((update) => base44.entities.CardOperacional.update(update.id, update.payload)));
+      if (sourceColunaId === destinationColunaId) {
+        const baseTemporaria = Date.now();
+
+        for (const [index, card] of destinationCards.entries()) {
+          await base44.entities.CardOperacional.update(card.id, { ordem: baseTemporaria + index });
+        }
+
+        for (const [index, card] of destinationCards.entries()) {
+          await base44.entities.CardOperacional.update(card.id, { ordem: index + 1 });
+        }
+      } else {
+        await Promise.all(updates.map((update) => base44.entities.CardOperacional.update(update.id, update.payload)));
+      }
 
       if (destinationColunaId !== sourceColunaId) {
         const origem = colunas.find((coluna) => coluna.id === sourceColunaId);
