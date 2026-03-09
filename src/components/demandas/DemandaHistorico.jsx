@@ -64,7 +64,7 @@ function HistoricoItem({ item, isLast }) {
   );
 }
 
-export default function DemandaHistorico({ demanda, onRegistrar }) {
+export default function DemandaHistorico({ demanda }) {
   const queryClient = useQueryClient();
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -90,9 +90,6 @@ export default function DemandaHistorico({ demanda, onRegistrar }) {
     });
     queryClient.invalidateQueries({ queryKey: ['demanda-historico', demanda.id] });
   };
-
-  // Expõe para o pai registrar eventos automáticos
-  React.useImperativeHandle(onRegistrar, () => ({ registrar }), [demanda.id, demanda.etapa_fluxo]);
 
   const handleComentario = async () => {
     if (!mensagem.trim()) return;
