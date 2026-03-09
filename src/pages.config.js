@@ -82,6 +82,7 @@ import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
 import QuadroOperacional from './pages/QuadroOperacional';
+import RecebimentoFardamento from './pages/RecebimentoFardamento';
 import __Layout from './Layout.jsx';
 
 
@@ -121,6 +122,7 @@ export const PAGES = {
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
     "QuadroOperacional": QuadroOperacional,
+    "RecebimentoFardamento": RecebimentoFardamento,
 }
 
 export const pagesConfig = {
