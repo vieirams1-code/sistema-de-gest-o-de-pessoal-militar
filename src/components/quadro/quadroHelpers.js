@@ -74,6 +74,21 @@ function montarDescricaoAtestado(atestado) {
   return `Atestado com necessidade de JISO.\nPeríodo: ${inicio} até ${termino}.\nDuração: ${dias}.`;
 }
 
+async function sincronizarCamposCardJiso(card, atestado) {
+  if (!card?.id) return;
+
+  const payload = {
+    titulo: `JISO - ${atestado.militar_nome || 'Militar'}`,
+    descricao: montarDescricaoAtestado(atestado),
+    militar_nome_snapshot: atestado.militar_nome || '',
+    prazo: atestado.data_jiso_agendada || '',
+    referencia_externa_id: atestado.id,
+    protocolo: `ATESTADO:${atestado.id}`,
+  };
+
+  await base44.entities.CardOperacional.update(card.id, payload);
+}
+
 export async function sincronizarAtestadoJisoNoQuadro(atestado) {
   if (!atestado?.id || !precisaAutomacaoJiso(atestado)) return;
 
@@ -86,7 +101,17 @@ export async function sincronizarAtestadoJisoNoQuadro(atestado) {
   if (!colunaJiso?.id) return;
 
   const vinculosExistentes = await base44.entities.CardVinculo.filter({ tipo_vinculo: 'Atestado', referencia_id: atestado.id });
-  if (vinculosExistentes.length > 0) return;
+  if (vinculosExistentes.length > 0) {
+    const cardsVinculados = await base44.entities.CardOperacional.filter({
+      id: { in: vinculosExistentes.map((vinculo) => vinculo.card_id).filter(Boolean) },
+    });
+
+    const cardJisoVinculado = cardsVinculados.find((card) => !card.arquivado);
+    if (cardJisoVinculado?.id) {
+      await sincronizarCamposCardJiso(cardJisoVinculado, atestado);
+      return;
+    }
+  }
 
   const cards = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
   const cardJaCriado = cards.find((card) =>
@@ -95,6 +120,8 @@ export async function sincronizarAtestadoJisoNoQuadro(atestado) {
   );
 
   if (cardJaCriado?.id) {
+    await sincronizarCamposCardJiso(cardJaCriado, atestado);
+
     await base44.entities.CardVinculo.create({
       card_id: cardJaCriado.id,
       tipo_vinculo: 'Atestado',
