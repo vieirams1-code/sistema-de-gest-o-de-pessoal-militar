@@ -82,13 +82,20 @@ export default function CardItem({ card, onClick }) {
       </div>
 
       {/* Origem badge */}
-      {card.origem_tipo && card.origem_tipo !== 'Manual' && (
-        <div className="mt-2 ml-4">
+      {(card.origem_tipo && card.origem_tipo !== 'Manual') || card.aguardando_decisao ? (
+        <div className="mt-2 ml-4 flex flex-wrap gap-1.5">
+          {card.aguardando_decisao && (
+            <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-semibold border border-amber-200">
+              Aguardando decisão
+            </span>
+          )}
+          {card.origem_tipo && card.origem_tipo !== 'Manual' && (
           <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded font-medium">
             {card.origem_tipo}
           </span>
+          )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
