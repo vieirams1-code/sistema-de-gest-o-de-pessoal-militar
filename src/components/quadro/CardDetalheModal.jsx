@@ -5,6 +5,7 @@ import { sincronizarDataJisoCardAtestado } from '@/components/quadro/quadroHelpe
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   X, Calendar, User, Tag, MessageSquare, Link2,
   Send, Plus, Check, Trash2, AlertTriangle, Cpu, ArrowRightLeft,
@@ -20,6 +21,7 @@ const TIPO_COMENTARIO_CONFIG = {
 };
 
 const PRIORIDADE_COR = { Urgente: 'text-red-600', Alta: 'text-orange-500', Média: 'text-blue-500', Baixa: 'text-slate-400' };
+const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente'];
 
 function formatDateTime(iso) {
   if (!iso) return '';
@@ -172,7 +174,7 @@ function VinculosSection({ cardId }) {
   );
 }
 
-export default function CardDetalheModal({ card, colunaNome, onClose }) {
+export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpdate }) {
   const queryClient = useQueryClient();
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -180,6 +182,13 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
 
   const [jisoDate, setJisoDate] = useState(card.prazo || '');
   const [savingJisoDate, setSavingJisoDate] = useState(false);
+  const [classificacao, setClassificacao] = useState({
+    prioridade: card.prioridade || 'Média',
+    tipo: card.tipo || '',
+    etiqueta_texto: card.etiqueta_texto || '',
+    etiqueta_cor: card.etiqueta_cor || '#6366f1',
+  });
+  const [salvandoClassificacao, setSalvandoClassificacao] = useState(false);
 
   const { data: vinculos = [] } = useQuery({
     queryKey: ['vinculos', card.id],
@@ -190,6 +199,15 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
   useEffect(() => {
     setJisoDate(card.prazo || '');
   }, [card.id, card.prazo]);
+
+  useEffect(() => {
+    setClassificacao({
+      prioridade: card.prioridade || 'Média',
+      tipo: card.tipo || '',
+      etiqueta_texto: card.etiqueta_texto || '',
+      etiqueta_cor: card.etiqueta_cor || '#6366f1',
+    });
+  }, [card.id, card.prioridade, card.tipo, card.etiqueta_texto, card.etiqueta_cor]);
 
   const vinculoAtestado = vinculos.find((v) => v.tipo_vinculo === 'Atestado');
   const permiteEditarDataJiso = card.origem_tipo === 'Atestado/JISO' && !!vinculoAtestado?.referencia_id;
@@ -239,6 +257,24 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
       queryClient.invalidateQueries({ queryKey: ['atestado', vinculoAtestado.referencia_id] });
     } finally {
       setSavingJisoDate(false);
+    }
+  };
+
+  const salvarClassificacao = async () => {
+    if (salvandoClassificacao) return;
+    setSalvandoClassificacao(true);
+    try {
+      const payload = {
+        prioridade: classificacao.prioridade,
+        tipo: classificacao.tipo.trim(),
+        etiqueta_texto: classificacao.etiqueta_texto.trim(),
+        etiqueta_cor: classificacao.etiqueta_texto.trim() ? (classificacao.etiqueta_cor || '#6366f1') : '',
+      };
+
+      await base44.entities.CardOperacional.update(card.id, payload);
+      onCardUpdate?.({ id: card.id, ...payload });
+    } finally {
+      setSalvandoClassificacao(false);
     }
   };
 
@@ -314,6 +350,70 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
               <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 rounded-lg p-3 border border-slate-100">{card.descricao}</p>
             </div>
           )}
+
+          <div className="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-100">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Classificação operacional</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Prioridade</label>
+                <Select
+                  value={classificacao.prioridade}
+                  onValueChange={(value) => setClassificacao((prev) => ({ ...prev, prioridade: value }))}
+                >
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PRIORIDADES.map((prioridade) => (
+                      <SelectItem key={prioridade} value={prioridade}>{prioridade}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Tipo</label>
+                <Input
+                  value={classificacao.tipo}
+                  onChange={(e) => setClassificacao((prev) => ({ ...prev, tipo: e.target.value }))}
+                  placeholder="Ex: JISO, Atestado..."
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] text-slate-400 uppercase tracking-wide block">Etiqueta</label>
+              <div className="flex gap-2">
+                <Input
+                  value={classificacao.etiqueta_texto}
+                  onChange={(e) => setClassificacao((prev) => ({ ...prev, etiqueta_texto: e.target.value }))}
+                  placeholder="Texto da etiqueta"
+                  className="h-8 text-xs"
+                />
+                <Input
+                  type="color"
+                  value={classificacao.etiqueta_cor || '#6366f1'}
+                  onChange={(e) => setClassificacao((prev) => ({ ...prev, etiqueta_cor: e.target.value }))}
+                  className="h-8 w-12 p-1"
+                  title="Cor da etiqueta"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setClassificacao((prev) => ({ ...prev, etiqueta_texto: '', etiqueta_cor: '#6366f1' }))}
+                >
+                  Limpar
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button size="sm" onClick={salvarClassificacao} disabled={salvandoClassificacao} className="h-8 text-xs">
+                {salvandoClassificacao ? 'Salvando...' : 'Salvar classificação'}
+              </Button>
+            </div>
+          </div>
 
           {permiteEditarDataJiso && (
             <div className="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-100">

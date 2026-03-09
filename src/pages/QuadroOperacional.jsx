@@ -304,6 +304,13 @@ export default function QuadroOperacionalPage() {
           card={cardAberto}
           colunaNome={colunaDoCardAberto?.nome || ''}
           onClose={() => setCardAberto(null)}
+          onCardUpdate={(payload) => {
+            setCardAberto((prev) => (prev ? { ...prev, ...payload } : prev));
+            queryClient.setQueryData(['cards', quadro?.id], (old = []) => (
+              Array.isArray(old) ? old.map((item) => (item.id === payload.id ? { ...item, ...payload } : item)) : old
+            ));
+            queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
+          }}
         />
       )}
 
