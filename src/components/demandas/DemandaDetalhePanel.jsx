@@ -416,6 +416,9 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           </div>
         )}
 
+        {/* ── BLOCO: Histórico da Demanda ── */}
+        <DemandaHistorico demanda={demanda} />
+
         {/* ── BLOCO: Tarefas Vinculadas ── */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <TarefaPanel demandaId={demanda.id} />
