@@ -55,6 +55,11 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
 
   const handleEtapaChange = (novaEtapa) => salvar({ etapa_fluxo: novaEtapa });
 
+  const salvarComHistorico = async (dadosDemanda, tipoHistorico, mensagemHistorico) => {
+    await salvar(dadosDemanda);
+    await registrarHistorico({ tipo_registro: tipoHistorico, mensagem: mensagemHistorico, etapa_no_momento: dadosDemanda.etapa_fluxo || demanda.etapa_fluxo });
+  };
+
   // Ações rápidas de fluxo
   const acoes = [
     {
@@ -62,42 +67,42 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
       icon: SendHorizonal,
       color: 'border-amber-300 text-amber-800 hover:bg-amber-50',
       show: !['Aguardando decisão do chefe', 'Concluído', 'Arquivado'].includes(demanda.etapa_fluxo),
-      acao: () => salvar({ etapa_fluxo: 'Aguardando decisão do chefe', data_ultimo_encaminhamento: new Date().toISOString() }),
+      acao: () => salvarComHistorico({ etapa_fluxo: 'Aguardando decisão do chefe', data_ultimo_encaminhamento: new Date().toISOString() }, 'Encaminhamento', 'Demanda encaminhada para decisão do chefe.'),
     },
     {
       label: 'Enc. p/ assinatura do chefe',
       icon: Pencil,
       color: 'border-orange-300 text-orange-800 hover:bg-orange-50',
       show: !['Aguardando assinatura do chefe', 'Concluído', 'Arquivado'].includes(demanda.etapa_fluxo),
-      acao: () => salvar({ etapa_fluxo: 'Aguardando assinatura do chefe', data_ultimo_encaminhamento: new Date().toISOString() }),
+      acao: () => salvarComHistorico({ etapa_fluxo: 'Aguardando assinatura do chefe', data_ultimo_encaminhamento: new Date().toISOString() }, 'Encaminhamento', 'Demanda encaminhada para assinatura do chefe.'),
     },
     {
       label: 'Marcar retorno recebido',
       icon: UserCheck,
       color: 'border-teal-300 text-teal-800 hover:bg-teal-50',
       show: ['Aguardando decisão do chefe', 'Aguardando assinatura do chefe', 'Aguardando comando superior', 'Aguardando documento'].includes(demanda.etapa_fluxo),
-      acao: () => salvar({ etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: new Date().toISOString() }),
+      acao: () => salvarComHistorico({ etapa_fluxo: 'Retornado para execução', data_ultimo_retorno: new Date().toISOString() }, 'Atualização interna', 'Retorno recebido e demanda devolvida para execução.'),
     },
     {
       label: 'Retornar p/ elaboração',
       icon: RotateCcw,
       color: 'border-blue-300 text-blue-800 hover:bg-blue-50',
       show: demanda.etapa_fluxo === 'Retornado para execução',
-      acao: () => salvar({ etapa_fluxo: 'Em elaboração' }),
+      acao: () => salvarComHistorico({ etapa_fluxo: 'Em elaboração' }, 'Atualização interna', 'Demanda retornada para elaboração.'),
     },
     {
       label: 'Concluir demanda',
       icon: CheckCircle2,
       color: 'border-emerald-300 text-emerald-800 hover:bg-emerald-50',
       show: demanda.status !== 'Concluída' && demanda.status !== 'Arquivada',
-      acao: () => salvar({ etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] }),
+      acao: () => salvarComHistorico({ etapa_fluxo: 'Concluído', status: 'Concluída', concluida_em: new Date().toISOString().split('T')[0] }, 'Sistema', 'Demanda concluída.'),
     },
     {
       label: 'Arquivar demanda',
       icon: Archive,
       color: 'border-slate-300 text-slate-600 hover:bg-slate-50',
       show: demanda.status !== 'Arquivada',
-      acao: () => salvar({ etapa_fluxo: 'Arquivado', status: 'Arquivada' }),
+      acao: () => salvarComHistorico({ etapa_fluxo: 'Arquivado', status: 'Arquivada' }, 'Sistema', 'Demanda arquivada.'),
     },
   ].filter(a => a.show);
 
