@@ -255,13 +255,13 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
 
         {/* ── BLOCO CONTEXTUAL: Decisão / Assinatura / Retorno ── */}
         {depende.chefe && (
-          <BlocoDecisaoChefe onSalvar={salvar} salvando={salvando} />
+          <BlocoDecisaoChefe onSalvar={salvar} salvando={salvando} onHistorico={registrarHistorico} etapa={demanda.etapa_fluxo} />
         )}
         {depende.assinatura && (
-          <BlocoAssinaturaChefe onSalvar={salvar} salvando={salvando} />
+          <BlocoAssinaturaChefe onSalvar={salvar} salvando={salvando} onHistorico={registrarHistorico} etapa={demanda.etapa_fluxo} />
         )}
         {depende.comando && (
-          <BlocoRetornoComando onSalvar={salvar} salvando={salvando} />
+          <BlocoRetornoComando onSalvar={salvar} salvando={salvando} onHistorico={registrarHistorico} etapa={demanda.etapa_fluxo} />
         )}
 
         {/* ── BLOCO: Responsáveis ── */}
