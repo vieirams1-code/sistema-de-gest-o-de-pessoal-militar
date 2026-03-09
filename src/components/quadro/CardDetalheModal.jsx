@@ -1,40 +1,39 @@
-import React, { useState } from 'react';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import React, { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import {
-  X, Calendar, User, Tag, CheckSquare, MessageSquare, Link2,
+  X, Calendar, User, Tag, MessageSquare, Link2,
   Send, Plus, Check, Trash2, AlertTriangle, Cpu, ArrowRightLeft,
   RefreshCw, Bell, SquareCheckBig,
 } from 'lucide-react';
 
 const TIPO_COMENTARIO_CONFIG = {
-  'Comentário':    { dot: 'bg-slate-400',  badge: 'bg-slate-100 text-slate-600', icon: MessageSquare },
-  'Atualização':   { dot: 'bg-blue-400',   badge: 'bg-blue-100 text-blue-700',   icon: RefreshCw },
-  'Encaminhamento':{ dot: 'bg-amber-400',  badge: 'bg-amber-100 text-amber-700', icon: ArrowRightLeft },
-  'Lembrete':      { dot: 'bg-purple-400', badge: 'bg-purple-100 text-purple-700', icon: Bell },
-  'Sistema':       { dot: 'bg-slate-200',  badge: 'bg-slate-50 text-slate-400 italic', icon: Cpu },
+  Comentário: { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600', icon: MessageSquare },
+  Atualização: { dot: 'bg-blue-400', badge: 'bg-blue-100 text-blue-700', icon: RefreshCw },
+  Encaminhamento: { dot: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700', icon: ArrowRightLeft },
+  Lembrete: { dot: 'bg-purple-400', badge: 'bg-purple-100 text-purple-700', icon: Bell },
+  Sistema: { dot: 'bg-slate-200', badge: 'bg-slate-50 text-slate-400 italic', icon: Cpu },
 };
 
-const PRIORIDADE_COR = { 'Urgente': 'text-red-600', 'Alta': 'text-orange-500', 'Média': 'text-blue-500', 'Baixa': 'text-slate-400' };
+const PRIORIDADE_COR = { Urgente: 'text-red-600', Alta: 'text-orange-500', Média: 'text-blue-500', Baixa: 'text-slate-400' };
 
 function formatDateTime(iso) {
   if (!iso) return '';
   const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-    + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 function ComentarioItem({ item, isLast }) {
-  const cfg = TIPO_COMENTARIO_CONFIG[item.tipo_registro] || TIPO_COMENTARIO_CONFIG['Comentário'];
+  const cfg = TIPO_COMENTARIO_CONFIG[item.tipo_registro] || TIPO_COMENTARIO_CONFIG.Comentário;
   const Icon = cfg.icon;
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center shrink-0">
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${cfg.dot} bg-opacity-20 border ${cfg.dot.replace('bg-','border-')}`}>
-          <Icon className={`w-3 h-3 ${cfg.dot.replace('bg-','text-')}`} />
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${cfg.dot} bg-opacity-20 border ${cfg.dot.replace('bg-', 'border-')}`}>
+          <Icon className={`w-3 h-3 ${cfg.dot.replace('bg-', 'text-')}`} />
         </div>
         {!isLast && <div className="w-px flex-1 bg-slate-100 mt-0.5" />}
       </div>
@@ -46,7 +45,7 @@ function ComentarioItem({ item, isLast }) {
         <div className="flex gap-1.5 mt-1">
           <span className="text-[10px] font-medium text-slate-400">{item.autor_nome || 'Sistema'}</span>
           <span className="text-[10px] text-slate-300">·</span>
-          <span className="text-[10px] text-slate-400">{formatDateTime(item.data_hora)}</span>
+          <span className="text-[10px] text-slate-400">{formatDateTime(item.data_hora || item.created_date)}</span>
         </div>
       </div>
     </div>
@@ -56,30 +55,45 @@ function ComentarioItem({ item, isLast }) {
 function ChecklistSection({ cardId }) {
   const queryClient = useQueryClient();
   const [novoItem, setNovoItem] = useState('');
+
   const { data: itens = [] } = useQuery({
     queryKey: ['checklist', cardId],
     queryFn: () => base44.entities.CardChecklistItem.filter({ card_id: cardId }, 'ordem', 100),
     enabled: !!cardId,
   });
-  const concluidos = itens.filter(i => i.concluido).length;
+
+  const concluidos = itens.filter((item) => item.concluido).length;
   const pct = itens.length ? Math.round((concluidos / itens.length) * 100) : 0;
+
+  const invalidateChecklist = () => {
+    queryClient.invalidateQueries({ queryKey: ['checklist', cardId] });
+    queryClient.invalidateQueries({ queryKey: ['checklist-board'] });
+    queryClient.invalidateQueries({ queryKey: ['cards'] });
+  };
 
   const toggle = async (item) => {
     await base44.entities.CardChecklistItem.update(item.id, {
       concluido: !item.concluido,
       data_conclusao: !item.concluido ? new Date().toISOString().split('T')[0] : null,
     });
-    queryClient.invalidateQueries({ queryKey: ['checklist', cardId] });
+    invalidateChecklist();
   };
+
   const excluir = async (id) => {
     await base44.entities.CardChecklistItem.delete(id);
-    queryClient.invalidateQueries({ queryKey: ['checklist', cardId] });
+    invalidateChecklist();
   };
+
   const adicionar = async () => {
     if (!novoItem.trim()) return;
-    await base44.entities.CardChecklistItem.create({ card_id: cardId, titulo: novoItem.trim(), ordem: itens.length });
+    await base44.entities.CardChecklistItem.create({
+      card_id: cardId,
+      titulo: novoItem.trim(),
+      ordem: itens.length + 1,
+      concluido: false,
+    });
     setNovoItem('');
-    queryClient.invalidateQueries({ queryKey: ['checklist', cardId] });
+    invalidateChecklist();
   };
 
   return (
@@ -89,17 +103,17 @@ function ChecklistSection({ cardId }) {
           <SquareCheckBig className="w-4 h-4 text-slate-400" />
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Checklist</span>
         </div>
-        {itens.length > 0 && (
-          <span className="text-[10px] text-slate-400">{concluidos}/{itens.length} · {pct}%</span>
-        )}
+        {itens.length > 0 && <span className="text-[10px] text-slate-400">{concluidos}/{itens.length} · {pct}%</span>}
       </div>
+
       {itens.length > 0 && (
         <div className="w-full bg-slate-100 rounded-full h-1.5 mb-2">
           <div className="bg-emerald-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
         </div>
       )}
+
       <div className="space-y-1">
-        {itens.map(item => (
+        {itens.map((item) => (
           <div key={item.id} className="flex items-center gap-2 group">
             <button onClick={() => toggle(item)} className="shrink-0">
               <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${item.concluido ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-slate-400'}`}>
@@ -113,15 +127,16 @@ function ChecklistSection({ cardId }) {
           </div>
         ))}
       </div>
+
       <div className="flex gap-2">
         <Input
           value={novoItem}
-          onChange={e => setNovoItem(e.target.value)}
+          onChange={(e) => setNovoItem(e.target.value)}
           placeholder="Novo item..."
           className="h-7 text-xs"
-          onKeyDown={e => e.key === 'Enter' && adicionar()}
+          onKeyDown={(e) => e.key === 'Enter' && adicionar()}
         />
-        <Button size="sm" variant="outline" onClick={adicionar} className="h-7 px-2 text-xs">
+        <Button variant="outline" size="sm" className="h-7 px-2" onClick={adicionar}>
           <Plus className="w-3 h-3" />
         </Button>
       </div>
@@ -135,7 +150,9 @@ function VinculosSection({ cardId }) {
     queryFn: () => base44.entities.CardVinculo.filter({ card_id: cardId }),
     enabled: !!cardId,
   });
-  if (!vinculos.length) return null;
+
+  if (vinculos.length === 0) return null;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -143,10 +160,10 @@ function VinculosSection({ cardId }) {
         <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Vínculos</span>
       </div>
       <div className="space-y-1">
-        {vinculos.map(v => (
-          <div key={v.id} className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5">
-            <span className="text-indigo-500 font-semibold">{v.tipo_vinculo}</span>
-            <span className="text-slate-600 truncate">{v.titulo_vinculo}</span>
+        {vinculos.map((vinculo) => (
+          <div key={vinculo.id} className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5">
+            <span className="text-indigo-500 font-semibold">{vinculo.tipo_vinculo}</span>
+            <span className="text-slate-600 truncate">{vinculo.titulo_vinculo}</span>
           </div>
         ))}
       </div>
@@ -164,6 +181,11 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
     queryFn: () => base44.entities.CardComentario.filter({ card_id: card.id }, '-data_hora', 100),
     enabled: !!card.id,
   });
+
+  const comentariosOrdenados = useMemo(
+    () => [...comentarios].sort((a, b) => new Date(a.data_hora || a.created_date || 0) - new Date(b.data_hora || b.created_date || 0)),
+    [comentarios]
+  );
 
   const enviarComentario = async () => {
     if (!mensagem.trim()) return;
@@ -184,41 +206,29 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
     setSalvando(false);
   };
 
-  const prazoFormatado = card.prazo
-    ? new Date(card.prazo + 'T00:00:00').toLocaleDateString('pt-BR')
-    : null;
-  const hoje = new Date(); hoje.setHours(0,0,0,0);
-  const prazoAtrasado = card.prazo && new Date(card.prazo + 'T00:00:00') < hoje;
+  const prazoFormatado = card.prazo ? new Date(`${card.prazo}T00:00:00`).toLocaleDateString('pt-BR') : null;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const prazoAtrasado = card.prazo && new Date(`${card.prazo}T00:00:00`) < hoje;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative h-full w-full max-w-[560px] bg-white shadow-2xl flex flex-col overflow-hidden border-l border-slate-200">
-
-        {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               {card.etiqueta_texto && (
-                <div
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mb-1.5 text-white"
-                  style={{ backgroundColor: card.etiqueta_cor || '#6366f1' }}
-                >
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mb-1.5 text-white" style={{ backgroundColor: card.etiqueta_cor || '#6366f1' }}>
                   <Tag className="w-2.5 h-2.5" /> {card.etiqueta_texto}
                 </div>
               )}
               <h2 className="text-base font-bold text-slate-800 leading-tight">{card.titulo}</h2>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-xs text-slate-400">{colunaNome}</span>
-                {card.prioridade && (
-                  <span className={`text-xs font-semibold ${PRIORIDADE_COR[card.prioridade]}`}>
-                    · {card.prioridade}
-                  </span>
-                )}
+                {card.prioridade && <span className={`text-xs font-semibold ${PRIORIDADE_COR[card.prioridade]}`}>· {card.prioridade}</span>}
                 {card.origem_tipo && card.origem_tipo !== 'Manual' && (
-                  <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded font-medium">
-                    {card.origem_tipo}
-                  </span>
+                  <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded font-medium">{card.origem_tipo}</span>
                 )}
               </div>
             </div>
@@ -228,10 +238,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
           </div>
         </div>
 
-        {/* Corpo */}
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-
-          {/* Meta: militar, prazo, responsável */}
           <div className="grid grid-cols-2 gap-3">
             {card.militar_nome_snapshot && (
               <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
@@ -263,56 +270,41 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
                 </div>
               </div>
             )}
-            {card.protocolo && (
-              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Protocolo</p>
-                <span className="text-xs font-medium text-slate-700">{card.protocolo}</span>
-              </div>
-            )}
           </div>
 
-          {/* Descrição */}
           {card.descricao && (
             <div className="space-y-1.5">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Descrição</p>
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 rounded-lg p-3 border border-slate-100">
-                {card.descricao}
-              </p>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 rounded-lg p-3 border border-slate-100">{card.descricao}</p>
             </div>
           )}
 
-          {/* Checklist */}
           <ChecklistSection cardId={card.id} />
-
-          {/* Vínculos */}
           <VinculosSection cardId={card.id} />
 
-          {/* Histórico / Comentários */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-slate-400" />
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Comentários e Atividade</span>
             </div>
 
-            {/* Timeline */}
             <div className="space-y-0">
-              {comentarios.length === 0 && (
-                <p className="text-xs text-slate-400 italic text-center py-3">Nenhum registro ainda.</p>
-              )}
-              {comentarios.map((item, idx) => (
-                <ComentarioItem key={item.id} item={item} isLast={idx === comentarios.length - 1} />
+              {comentariosOrdenados.length === 0 && <p className="text-xs text-slate-400 italic text-center py-3">Nenhum registro ainda.</p>}
+              {comentariosOrdenados.map((item, idx) => (
+                <ComentarioItem key={item.id} item={item} isLast={idx === comentariosOrdenados.length - 1} />
               ))}
             </div>
 
-            {/* Input comentário */}
             <div className="space-y-2 pt-1">
               <Textarea
                 value={mensagem}
-                onChange={e => setMensagem(e.target.value)}
+                onChange={(e) => setMensagem(e.target.value)}
                 rows={2}
                 placeholder="Escrever comentário ou anotação... (Ctrl+Enter para enviar)"
                 className="text-sm resize-none"
-                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarComentario(); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarComentario();
+                }}
               />
               <div className="flex justify-end">
                 <Button

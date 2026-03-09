@@ -16,6 +16,7 @@ import FormField from '@/components/militar/FormField';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import CidSelector from '@/components/atestado/CidSelector';
 import DateCalculator from '@/components/atestado/DateCalculator';
+import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 
 const initialFormData = {
   militar_id: '',
@@ -150,13 +151,18 @@ export default function CadastrarAtestado() {
     delete dataToSave.ata_jiso;
     delete dataToSave.parecer_jiso;
 
+    let atestadoSalvo;
     if (editId) {
       await base44.entities.Atestado.update(editId, dataToSave);
+      atestadoSalvo = { id: editId, ...formData, ...dataToSave };
     } else {
-      await base44.entities.Atestado.create(dataToSave);
+      atestadoSalvo = await base44.entities.Atestado.create(dataToSave);
     }
-    
+
+    await sincronizarAtestadoJisoNoQuadro(atestadoSalvo);
+
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
+    queryClient.invalidateQueries({ queryKey: ['cards'] });
     setLoading(false);
     navigate(createPageUrl('Atestados'));
   };
