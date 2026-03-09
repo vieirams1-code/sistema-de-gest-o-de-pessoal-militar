@@ -154,7 +154,20 @@ function VinculosSection({ cardId }) {
     enabled: !!cardId,
   });
 
-  if (vinculos.length === 0) return null;
+  const vinculosUnicos = useMemo(() => {
+    const mapa = new Map();
+
+    vinculos.forEach((vinculo) => {
+      const chave = `${vinculo.card_id || ''}:${vinculo.tipo_vinculo || ''}:${vinculo.referencia_id || ''}`;
+      if (!mapa.has(chave)) {
+        mapa.set(chave, vinculo);
+      }
+    });
+
+    return Array.from(mapa.values());
+  }, [vinculos]);
+
+  if (vinculosUnicos.length === 0) return null;
 
   return (
     <div className="space-y-2">
@@ -163,7 +176,7 @@ function VinculosSection({ cardId }) {
         <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Vínculos</span>
       </div>
       <div className="space-y-1">
-        {vinculos.map((vinculo) => (
+        {vinculosUnicos.map((vinculo) => (
           <div key={vinculo.id} className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5">
             <span className="text-indigo-500 font-semibold">{vinculo.tipo_vinculo}</span>
             <span className="text-slate-600 truncate">{vinculo.titulo_vinculo}</span>

@@ -99,6 +99,43 @@ async function encontrarCardJisoVinculado(atestadoId) {
   );
 }
 
+function isMesmoVinculo(vinculo, { cardId, tipoVinculo, referenciaId }) {
+  return vinculo.card_id === cardId && vinculo.tipo_vinculo === tipoVinculo && vinculo.referencia_id === referenciaId;
+}
+
+async function garantirVinculoUnico({ cardId, tipoVinculo, referenciaId, tituloVinculo }) {
+  const vinculosMesmoTipoRef = await base44.entities.CardVinculo.filter({
+    tipo_vinculo: tipoVinculo,
+    referencia_id: referenciaId,
+  });
+
+  const vinculosNoCard = vinculosMesmoTipoRef.filter((vinculo) =>
+    isMesmoVinculo(vinculo, { cardId, tipoVinculo, referenciaId })
+  );
+
+  if (vinculosNoCard.length === 0) {
+    await base44.entities.CardVinculo.create({
+      card_id: cardId,
+      tipo_vinculo: tipoVinculo,
+      referencia_id: referenciaId,
+      titulo_vinculo: tituloVinculo,
+    });
+    return;
+  }
+
+  const [vinculoPrincipal, ...duplicados] = vinculosNoCard;
+
+  if (vinculoPrincipal.titulo_vinculo !== tituloVinculo) {
+    await base44.entities.CardVinculo.update(vinculoPrincipal.id, {
+      titulo_vinculo: tituloVinculo,
+    });
+  }
+
+  if (duplicados.length > 0) {
+    await Promise.all(duplicados.map((vinculo) => base44.entities.CardVinculo.delete(vinculo.id)));
+  }
+}
+
 export async function sincronizarDataJisoCardAtestado({ cardId, atestadoId, dataJiso }) {
   if (!cardId || !atestadoId) return;
 
@@ -135,16 +172,12 @@ export async function sincronizarAtestadoJisoNoQuadro(atestado) {
 
     await base44.entities.CardOperacional.update(cardExistente.id, payloadAtualizacao);
 
-    const vinculosExistentes = await base44.entities.CardVinculo.filter({ tipo_vinculo: 'Atestado', referencia_id: atestado.id });
-    const jaVinculado = vinculosExistentes.some((v) => v.card_id === cardExistente.id);
-    if (!jaVinculado) {
-      await base44.entities.CardVinculo.create({
-        card_id: cardExistente.id,
-        tipo_vinculo: 'Atestado',
-        referencia_id: atestado.id,
-        titulo_vinculo: `Atestado ${atestado.militar_nome || ''}`.trim(),
-      });
-    }
+    await garantirVinculoUnico({
+      cardId: cardExistente.id,
+      tipoVinculo: 'Atestado',
+      referenciaId: atestado.id,
+      tituloVinculo: `Atestado ${atestado.militar_nome || ''}`.trim(),
+    });
     return;
   }
 
@@ -174,10 +207,10 @@ export async function sincronizarAtestadoJisoNoQuadro(atestado) {
 
   await criarChecklistPreset(card.id, 'JISO');
 
-  await base44.entities.CardVinculo.create({
-    card_id: card.id,
-    tipo_vinculo: 'Atestado',
-    referencia_id: atestado.id,
-    titulo_vinculo: `Atestado ${atestado.militar_nome || ''}`.trim(),
+  await garantirVinculoUnico({
+    cardId: card.id,
+    tipoVinculo: 'Atestado',
+    referenciaId: atestado.id,
+    tituloVinculo: `Atestado ${atestado.militar_nome || ''}`.trim(),
   });
 }
