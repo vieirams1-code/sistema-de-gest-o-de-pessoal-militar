@@ -23,6 +23,7 @@ import {
   Briefcase,
   FolderKanban,
   Wrench,
+  Shirt,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -73,6 +74,7 @@ const menuGroups = [
     title: 'Patrimônio e Reconhecimento',
     items: [
       { name: 'Armamentos', page: 'Armamentos', icon: Sword },
+      { name: 'Recebimento de Fardamento', page: 'RecebimentoFardamento', icon: Shirt },
       { name: 'Medalhas', page: 'Medalhas', icon: Medal },
     ],
   },

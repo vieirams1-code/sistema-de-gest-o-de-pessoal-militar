@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Award, Shield, AlertTriangle, Calendar, Star, FileText } from 'lucide-react';
+import { Users, Award, Shield, AlertTriangle, Calendar, Star, FileText, Shirt } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 
 export default function Home() {
@@ -164,7 +164,7 @@ export default function Home() {
         {/* Atalhos Rápidos */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Atalhos Rápidos</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(createPageUrl('Militares'))}>
               <Users className="w-6 h-6 mb-2" />
               <span>Efetivo</span>
@@ -176,6 +176,10 @@ export default function Home() {
             <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(createPageUrl('Armamentos'))}>
               <Shield className="w-6 h-6 mb-2" />
               <span>Armamentos</span>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col" onClick={() => navigate(createPageUrl('RecebimentoFardamento'))}>
+              <Shirt className="w-6 h-6 mb-2" />
+              <span>Recebimento de Fardamento</span>
             </Button>
           </div>
         </div>
