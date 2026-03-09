@@ -103,26 +103,16 @@ export default function CadastrarAtestado() {
     }
   };
 
-  // Quando dias muda: forçar JISO se >15, limpar seleção se <=15
+  // Quando dias muda: forçar JISO se >15, sem sobrescrever decisão manual para <=15
   React.useEffect(() => {
     const dias = parseInt(formData.dias) || 0;
     if (dias > 15) {
-      // Forçar JISO — não pode ser Comandante
       setFormData(prev => ({
         ...prev,
         fluxo_homologacao: 'jiso',
         necessita_jiso: true,
         homologado_comandante: false,
         encaminhado_jiso: true,
-      }));
-    } else if (dias > 0 && dias <= 15 && formData.fluxo_homologacao === 'jiso') {
-      // Se voltou para <=15 e estava forçado como jiso, limpar para o usuário escolher
-      setFormData(prev => ({
-        ...prev,
-        fluxo_homologacao: '',
-        necessita_jiso: false,
-        homologado_comandante: false,
-        encaminhado_jiso: false,
       }));
     }
   }, [formData.dias]);

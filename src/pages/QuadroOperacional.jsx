@@ -127,21 +127,30 @@ export default function QuadroOperacionalPage() {
     const grouped = groupCardsByColuna(cardsComResumo, colunas);
 
     const sourceCards = [...(grouped[sourceColunaId] || [])];
-    const destinationCards = sourceColunaId === destinationColunaId
-      ? sourceCards
-      : [...(grouped[destinationColunaId] || [])];
 
-    const [movedCard] = sourceCards.splice(source.index, 1);
-    destinationCards.splice(destination.index, 0, movedCard);
+    let movedCard;
+    let destinationCards;
+    if (sourceColunaId === destinationColunaId) {
+      const reorderedCards = [...sourceCards];
+      [movedCard] = reorderedCards.splice(source.index, 1);
+      reorderedCards.splice(destination.index, 0, movedCard);
+      destinationCards = reorderedCards;
+    } else {
+      destinationCards = [...(grouped[destinationColunaId] || [])];
+      [movedCard] = sourceCards.splice(source.index, 1);
+      destinationCards.splice(destination.index, 0, movedCard);
+    }
 
     if (!movedCard) return;
 
     const updates = [];
 
-    sourceCards.forEach((card, index) => {
-      const ordem = index + 1;
-      if (card.ordem !== ordem) updates.push({ id: card.id, payload: { ordem } });
-    });
+    if (sourceColunaId !== destinationColunaId) {
+      sourceCards.forEach((card, index) => {
+        const ordem = index + 1;
+        if (card.ordem !== ordem) updates.push({ id: card.id, payload: { ordem } });
+      });
+    }
 
     destinationCards.forEach((card, index) => {
       const ordem = index + 1;

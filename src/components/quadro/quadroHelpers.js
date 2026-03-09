@@ -74,6 +74,40 @@ function montarDescricaoAtestado(atestado) {
   return `Atestado com necessidade de JISO.\nPeríodo: ${inicio} até ${termino}.\nDuração: ${dias}.`;
 }
 
+function buildCardPayloadFromAtestado(atestado) {
+  return {
+    titulo: `JISO - ${atestado.militar_nome || 'Militar'}`,
+    descricao: montarDescricaoAtestado(atestado),
+    militar_nome_snapshot: atestado.militar_nome || '',
+    prazo: atestado.data_jiso_agendada || '',
+    protocolo: `ATESTADO:${atestado.id}`,
+    referencia_externa_id: atestado.id,
+  };
+}
+
+async function encontrarCardJisoVinculado(atestadoId) {
+  const vinculos = await base44.entities.CardVinculo.filter({ tipo_vinculo: 'Atestado', referencia_id: atestadoId });
+  if (vinculos.length > 0) {
+    const card = await base44.entities.CardOperacional.get(vinculos[0].card_id);
+    if (card?.id) return card;
+  }
+
+  const cards = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
+  return cards.find((card) =>
+    card.origem_tipo === 'Atestado/JISO' &&
+    (card.referencia_externa_id === atestadoId || card.protocolo === `ATESTADO:${atestadoId}`)
+  );
+}
+
+export async function sincronizarDataJisoCardAtestado({ cardId, atestadoId, dataJiso }) {
+  if (!cardId || !atestadoId) return;
+
+  await Promise.all([
+    base44.entities.CardOperacional.update(cardId, { prazo: dataJiso || '' }),
+    base44.entities.Atestado.update(atestadoId, { data_jiso_agendada: dataJiso || '' }),
+  ]);
+}
+
 export async function sincronizarAtestadoJisoNoQuadro(atestado) {
   if (!atestado?.id || !precisaAutomacaoJiso(atestado)) return;
 
@@ -85,42 +119,48 @@ export async function sincronizarAtestadoJisoNoQuadro(atestado) {
   const colunaJiso = colunas.find((coluna) => (coluna.nome || '').trim().toUpperCase() === 'JISO');
   if (!colunaJiso?.id) return;
 
-  const vinculosExistentes = await base44.entities.CardVinculo.filter({ tipo_vinculo: 'Atestado', referencia_id: atestado.id });
-  if (vinculosExistentes.length > 0) return;
+  const cardExistente = await encontrarCardJisoVinculado(atestado.id);
+  const payloadBase = buildCardPayloadFromAtestado(atestado);
 
-  const cards = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
-  const cardJaCriado = cards.find((card) =>
-    card.origem_tipo === 'Atestado/JISO' &&
-    (card.referencia_externa_id === atestado.id || card.protocolo === `ATESTADO:${atestado.id}`)
-  );
+  if (cardExistente?.id) {
+    const payloadAtualizacao = {
+      ...payloadBase,
+      origem_tipo: 'Atestado/JISO',
+      criado_automaticamente: true,
+    };
 
-  if (cardJaCriado?.id) {
-    await base44.entities.CardVinculo.create({
-      card_id: cardJaCriado.id,
-      tipo_vinculo: 'Atestado',
-      referencia_id: atestado.id,
-      titulo_vinculo: `Atestado ${atestado.militar_nome || ''}`.trim(),
-    });
+    if (cardExistente.coluna_id !== colunaJiso.id) {
+      payloadAtualizacao.coluna_id = colunaJiso.id;
+    }
+
+    await base44.entities.CardOperacional.update(cardExistente.id, payloadAtualizacao);
+
+    const vinculosExistentes = await base44.entities.CardVinculo.filter({ tipo_vinculo: 'Atestado', referencia_id: atestado.id });
+    const jaVinculado = vinculosExistentes.some((v) => v.card_id === cardExistente.id);
+    if (!jaVinculado) {
+      await base44.entities.CardVinculo.create({
+        card_id: cardExistente.id,
+        tipo_vinculo: 'Atestado',
+        referencia_id: atestado.id,
+        titulo_vinculo: `Atestado ${atestado.militar_nome || ''}`.trim(),
+      });
+    }
     return;
   }
 
+  const cards = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
   const cardsDaColuna = cards.filter((card) => card.coluna_id === colunaJiso.id);
   const ordem = cardsDaColuna.length + 1;
 
   const card = await base44.entities.CardOperacional.create({
-    titulo: `JISO - ${atestado.militar_nome || 'Militar'}`,
-    descricao: montarDescricaoAtestado(atestado),
+    ...payloadBase,
     coluna_id: colunaJiso.id,
     ordem,
     status: 'Ativo',
     arquivado: false,
     criado_automaticamente: true,
     origem_tipo: 'Atestado/JISO',
-    militar_nome_snapshot: atestado.militar_nome || '',
-    prazo: atestado.data_jiso_agendada || '',
     comentarios_count: 1,
-    protocolo: `ATESTADO:${atestado.id}`,
-    referencia_externa_id: atestado.id,
   });
 
   await base44.entities.CardComentario.create({

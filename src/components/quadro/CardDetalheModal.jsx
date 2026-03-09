@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { sincronizarDataJisoCardAtestado } from '@/components/quadro/quadroHelpers';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -176,6 +177,23 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
 
+
+  const [jisoDate, setJisoDate] = useState(card.prazo || '');
+  const [savingJisoDate, setSavingJisoDate] = useState(false);
+
+  const { data: vinculos = [] } = useQuery({
+    queryKey: ['vinculos', card.id],
+    queryFn: () => base44.entities.CardVinculo.filter({ card_id: card.id }),
+    enabled: !!card.id,
+  });
+
+  useEffect(() => {
+    setJisoDate(card.prazo || '');
+  }, [card.id, card.prazo]);
+
+  const vinculoAtestado = vinculos.find((v) => v.tipo_vinculo === 'Atestado');
+  const permiteEditarDataJiso = card.origem_tipo === 'Atestado/JISO' && !!vinculoAtestado?.referencia_id;
+
   const { data: comentarios = [] } = useQuery({
     queryKey: ['card-comentarios', card.id],
     queryFn: () => base44.entities.CardComentario.filter({ card_id: card.id }, '-data_hora', 100),
@@ -204,6 +222,24 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
     queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
     queryClient.invalidateQueries({ queryKey: ['cards'] });
     setSalvando(false);
+  };
+
+
+  const salvarDataJiso = async () => {
+    if (!permiteEditarDataJiso || savingJisoDate) return;
+    setSavingJisoDate(true);
+    try {
+      await sincronizarDataJisoCardAtestado({
+        cardId: card.id,
+        atestadoId: vinculoAtestado.referencia_id,
+        dataJiso: jisoDate,
+      });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['atestado', vinculoAtestado.referencia_id] });
+    } finally {
+      setSavingJisoDate(false);
+    }
   };
 
   const prazoFormatado = card.prazo ? new Date(`${card.prazo}T00:00:00`).toLocaleDateString('pt-BR') : null;
@@ -276,6 +312,30 @@ export default function CardDetalheModal({ card, colunaNome, onClose }) {
             <div className="space-y-1.5">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Descrição</p>
               <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50 rounded-lg p-3 border border-slate-100">{card.descricao}</p>
+            </div>
+          )}
+
+          {permiteEditarDataJiso && (
+            <div className="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-100">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Data JISO</p>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Input
+                    type="date"
+                    value={jisoDate || ''}
+                    onChange={(e) => setJisoDate(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={salvarDataJiso}
+                  disabled={savingJisoDate}
+                  className="h-8 text-xs"
+                >
+                  {savingJisoDate ? 'Salvando...' : 'Salvar data'}
+                </Button>
+              </div>
             </div>
           )}
 
