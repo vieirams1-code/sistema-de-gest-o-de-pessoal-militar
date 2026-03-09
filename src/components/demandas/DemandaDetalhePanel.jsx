@@ -222,8 +222,9 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
           )}
         </div>
 
-        {/* ── BLOCO: Ações Rápidas (só exibe se não estiver Concluído ou Arquivado) ── */}
-        {acoes.length > 0 && demanda.status !== 'Concluída' && demanda.status !== 'Arquivada' && (
+        {/* ── BLOCO: Ações Rápidas (só exibe se não estiver em etapa de decisão/assinatura/comando nem finalizado) ── */}
+        {acoes.length > 0 && demanda.status !== 'Concluída' && demanda.status !== 'Arquivada'
+          && !depende.chefe && !depende.assinatura && !depende.comando && (
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Ações Rápidas</p>
             <div className="grid grid-cols-2 gap-2">
@@ -243,6 +244,17 @@ export default function DemandaDetalhePanel({ demanda, onClose, onEdit, onDelete
               })}
             </div>
           </div>
+        )}
+
+        {/* ── BLOCO CONTEXTUAL: Decisão / Assinatura / Retorno ── */}
+        {depende.chefe && (
+          <BlocoDecisaoChefe onSalvar={salvar} salvando={salvando} />
+        )}
+        {depende.assinatura && (
+          <BlocoAssinaturaChefe onSalvar={salvar} salvando={salvando} />
+        )}
+        {depende.comando && (
+          <BlocoRetornoComando onSalvar={salvar} salvando={salvando} />
         )}
 
         {/* ── BLOCO: Responsáveis ── */}
