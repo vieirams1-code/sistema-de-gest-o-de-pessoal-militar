@@ -144,11 +144,20 @@ export default function QuadroOperacionalPage() {
     if (!movedCard) return;
 
     const updates = [];
+    const cardsAtualizados = new Map();
+
+    const registrarAtualizacao = (card, payload) => {
+      if (!Object.keys(payload).length) return;
+      updates.push({ id: card.id, payload });
+      cardsAtualizados.set(card.id, { ...card, ...payload });
+    };
 
     if (sourceColunaId !== destinationColunaId) {
       sourceCards.forEach((card, index) => {
         const ordem = index + 1;
-        if (card.ordem !== ordem) updates.push({ id: card.id, payload: { ordem } });
+        const payload = {};
+        if (card.ordem !== ordem) payload.ordem = ordem;
+        registrarAtualizacao(card, payload);
       });
     }
 
@@ -159,12 +168,18 @@ export default function QuadroOperacionalPage() {
       if (card.ordem !== ordem) payload.ordem = ordem;
       if (mudouColuna) payload.coluna_id = destinationColunaId;
       if (mudouColuna) payload.comentarios_count = (card.comentarios_count || 0) + 1;
-      if (Object.keys(payload).length > 0) updates.push({ id: card.id, payload });
+      registrarAtualizacao(card, payload);
     });
 
     if (!updates.length) return;
 
     setMovendo(true);
+    const previousCards = queryClient.getQueryData(['cards', quadro?.id]);
+
+    queryClient.setQueryData(['cards', quadro?.id], (currentCards = []) =>
+      currentCards.map((card) => cardsAtualizados.get(card.id) || card)
+    );
+
     try {
       await Promise.all(updates.map((update) => base44.entities.CardOperacional.update(update.id, update.payload)));
 
@@ -183,6 +198,9 @@ export default function QuadroOperacionalPage() {
 
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       queryClient.invalidateQueries({ queryKey: ['card-comentarios', movedCard.id] });
+    } catch (error) {
+      queryClient.setQueryData(['cards', quadro?.id], previousCards);
+      throw error;
     } finally {
       setMovendo(false);
     }
