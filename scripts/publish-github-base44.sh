@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/vieirams1-code/sistema-de-gest-o-de-pessoal-militar.git"
-BRANCH="${1:-work}"
+BRANCH="${1:-main}"
 MESSAGE="${2:-chore: publicar alterações no github para sincronizar com Base44}"
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
