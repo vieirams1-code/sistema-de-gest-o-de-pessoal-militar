@@ -121,6 +121,99 @@ function normalizarTextoExtraido(texto = '') {
     .trim();
 }
 
+function normalizarTextoComparacao(texto = '') {
+  return (texto || '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\x00-\x1F\x7F]/g, ' ')
+    .replace(/\r/g, '\n')
+    .replace(/[^\p{L}\p{N}\n ]/gu, ' ')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function calcularSimilaridadeDice(tokensA = [], tokensB = []) {
+  if (!tokensA.length || !tokensB.length) return 0;
+
+  const frequenciaA = new Map();
+  const frequenciaB = new Map();
+
+  tokensA.forEach((token) => frequenciaA.set(token, (frequenciaA.get(token) || 0) + 1));
+  tokensB.forEach((token) => frequenciaB.set(token, (frequenciaB.get(token) || 0) + 1));
+
+  let intersecao = 0;
+  frequenciaA.forEach((countA, token) => {
+    const countB = frequenciaB.get(token) || 0;
+    intersecao += Math.min(countA, countB);
+  });
+
+  return (2 * intersecao) / (tokensA.length + tokensB.length);
+}
+
+function classificarCorrespondencia(percentual) {
+  if (percentual >= 80) {
+    return { label: 'Alta correspondência', className: 'bg-emerald-100 text-emerald-700' };
+  }
+
+  if (percentual >= 55) {
+    return { label: 'Média correspondência', className: 'bg-amber-100 text-amber-700' };
+  }
+
+  return { label: 'Baixa correspondência', className: 'bg-rose-100 text-rose-700' };
+}
+
+function calcularCorrespondenciaTextual(textoSistema = '', trechoBoletim = '') {
+  const sistemaNormalizado = normalizarTextoComparacao(textoSistema);
+  const boletimNormalizado = normalizarTextoComparacao(trechoBoletim);
+
+  if (!sistemaNormalizado || !boletimNormalizado) {
+    return {
+      percentual: 0,
+      trechoComparadoBoletim: boletimNormalizado,
+      trechoComparadoSistema: sistemaNormalizado,
+    };
+  }
+
+  if (boletimNormalizado.includes(sistemaNormalizado)) {
+    return {
+      percentual: 100,
+      trechoComparadoBoletim: sistemaNormalizado,
+      trechoComparadoSistema: sistemaNormalizado,
+    };
+  }
+
+  const tokensSistema = sistemaNormalizado.split(' ').filter(Boolean);
+  const tokensBoletim = boletimNormalizado.split(' ').filter(Boolean);
+
+  let melhorPercentual = Math.round(calcularSimilaridadeDice(tokensSistema, tokensBoletim) * 100);
+  let melhorTrecho = boletimNormalizado;
+
+  const tamanhoSistema = tokensSistema.length;
+  const minJanela = Math.max(5, tamanhoSistema - 8);
+  const maxJanela = Math.min(tokensBoletim.length, tamanhoSistema + 8);
+
+  for (let janela = minJanela; janela <= maxJanela; janela += 1) {
+    for (let inicio = 0; inicio <= tokensBoletim.length - janela; inicio += 1) {
+      const trechoTokens = tokensBoletim.slice(inicio, inicio + janela);
+      const percentualAtual = Math.round(calcularSimilaridadeDice(tokensSistema, trechoTokens) * 100);
+
+      if (percentualAtual > melhorPercentual) {
+        melhorPercentual = percentualAtual;
+        melhorTrecho = trechoTokens.join(' ');
+      }
+    }
+  }
+
+  return {
+    percentual: melhorPercentual,
+    trechoComparadoBoletim: melhorTrecho,
+    trechoComparadoSistema: sistemaNormalizado,
+  };
+}
+
 function textoPareceEstrutural(linha) {
   if (!linha) return true;
   const limpo = linha.trim();
@@ -174,6 +267,10 @@ function extrairNotasDoTexto(textoPagina, pagina) {
       const contextoCru = linha.slice(inicioMatch, finalMatch).replace(/\s+/g, ' ').trim();
       const contexto = contextoCru.length > 170 ? `${contextoCru.slice(0, 170)}...` : contextoCru;
 
+      const inicioComparacao = Math.max((match.index || 0) - 1800, 0);
+      const finalComparacao = Math.min((match.index || 0) + match[0].length + 1800, linha.length);
+      const contextoComparacao = linha.slice(inicioComparacao, finalComparacao).replace(/\s+/g, ' ').trim();
+
       const key = `${notaNorm}-${contexto.slice(0, 80)}`;
       if (vistos.has(key)) continue;
 
@@ -183,6 +280,7 @@ function extrairNotasDoTexto(textoPagina, pagina) {
         nota: notaNorm,
         nota_normalizada: notaNorm,
         contexto,
+        contexto_comparacao: contextoComparacao || contexto,
         pagina,
       });
     }
@@ -350,6 +448,21 @@ export default function ConciliacaoBoletim() {
   const pendentesSemCorrespondencia = pendentes.filter((pub) => !vinculosEfetivos[pub.id]);
   const publicacoesConciliadas = pendentes.filter((pub) => !!vinculosEfetivos[pub.id]);
   const notasSemItem = notasEncontradas.filter((nota) => !notasConciliadasIds.has(nota.id));
+
+  const correspondenciaPorPublicacao = useMemo(() => {
+    const mapa = {};
+
+    publicacoesConciliadas.forEach((pub) => {
+      const notaId = vinculosEfetivos[pub.id];
+      const nota = notasEncontradas.find((item) => item.id === notaId);
+      const textoSistema = (pub.texto_publicacao || pub.texto || '').trim();
+      const textoBoletim = nota?.contexto_comparacao || nota?.contexto || '';
+
+      mapa[pub.id] = calcularCorrespondenciaTextual(textoSistema, textoBoletim);
+    });
+
+    return mapa;
+  }, [publicacoesConciliadas, vinculosEfetivos, notasEncontradas]);
 
   const confirmarMutation = useMutation({
     mutationFn: async () => {
@@ -535,7 +648,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.5</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.6</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
@@ -623,6 +736,8 @@ export default function ConciliacaoBoletim() {
             {publicacoesConciliadas.map((pub) => {
               const nota = notasEncontradas.find((n) => n.id === vinculosEfetivos[pub.id]);
               const automatico = conciliacaoAutomatica[pub.id] === vinculosEfetivos[pub.id];
+              const correspondencia = correspondenciaPorPublicacao[pub.id] || { percentual: 0, trechoComparadoSistema: '', trechoComparadoBoletim: '' };
+              const faixa = classificarCorrespondencia(correspondencia.percentual);
               return (
                 <div key={pub.id} className="rounded-lg border p-3 space-y-2 bg-slate-50">
                 <div className="flex items-center justify-between">
@@ -634,6 +749,19 @@ export default function ConciliacaoBoletim() {
                   )}
                 </div>
                 <p className="text-xs text-slate-600">↔ Nota no boletim: {nota?.nota || '-'}</p>
+                {automatico ? (
+                  <div className="flex items-center gap-2 text-xs">
+                    <Badge variant="outline">Correspondência textual: {correspondencia.percentual}%</Badge>
+                    <Badge className={faixa.className}>{faixa.label}</Badge>
+                  </div>
+                ) : null}
+                {automatico ? (
+                  <details className="text-xs text-slate-600 rounded border border-slate-200 bg-white px-2 py-1">
+                    <summary className="cursor-pointer font-medium">Ver trechos usados na comparação</summary>
+                    <p className="mt-2"><span className="font-semibold">Publicação:</span> {correspondencia.trechoComparadoSistema || 'Sem texto.'}</p>
+                    <p className="mt-1"><span className="font-semibold">Boletim:</span> {correspondencia.trechoComparadoBoletim || 'Sem trecho.'}</p>
+                  </details>
+                ) : null}
                 <TextoExpansivel texto={`Sistema: ${getReferenciaPrincipal(pub)} — ${(pub.texto_publicacao || pub.texto || '').replace(/\s+/g, ' ').trim() || 'Sem texto de publicação'}`} />
                 <TextoExpansivel texto={`Boletim: ${nota?.contexto || 'Sem contexto identificado.'}`} />
                 <div className="flex justify-end">
