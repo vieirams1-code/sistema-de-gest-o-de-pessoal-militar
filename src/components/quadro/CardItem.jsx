@@ -85,8 +85,16 @@ export default function CardItem({ card, onClick }) {
       {(card.origem_tipo && card.origem_tipo !== 'Manual') || card.aguardando_decisao ? (
         <div className="mt-2 ml-4 flex flex-wrap gap-1.5">
           {card.aguardando_decisao && (
-            <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-semibold border border-amber-200">
+            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold border border-amber-300">
               Aguardando decisão
+            </span>
+          )}
+          {card.aguardando_decisao && card.encaminhado_para_nome && (
+            <span
+              title={`Encaminhado para: ${card.encaminhado_para_nome}`}
+              className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium border border-amber-200 max-w-[180px] truncate"
+            >
+              Para: {card.encaminhado_para_nome}
             </span>
           )}
           {card.origem_tipo && card.origem_tipo !== 'Manual' && (
