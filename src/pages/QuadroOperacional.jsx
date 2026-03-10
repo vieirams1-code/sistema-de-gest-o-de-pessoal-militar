@@ -9,7 +9,6 @@ import ColunaBoard from '@/components/quadro/ColunaBoard';
 import CardDetalheModal from '@/components/quadro/CardDetalheModal';
 import NovoCardModal from '@/components/quadro/NovoCardModal';
 import { buildChecklistResumo, criarChecklistPreset } from '@/components/quadro/quadroHelpers';
-import { normalizeCardDecisao } from '@/components/quadro/decisaoHelpers';
 
 const QUADRO_NOME = 'Operacional';
 
@@ -49,9 +48,7 @@ export default function QuadroOperacionalPage() {
       if (!colunas.length) return [];
       const cardsBrutos = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
       const colunasIds = new Set(colunas.map((coluna) => coluna.id));
-      return cardsBrutos
-        .map((card) => normalizeCardDecisao(card))
-        .filter((card) => colunasIds.has(card.coluna_id));
+      return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
     },
     enabled: !!quadro?.id && colunas.length > 0,
   });
@@ -74,7 +71,7 @@ export default function QuadroOperacionalPage() {
     return cards.map((card) => {
       const itens = checklistPorCard[card.id] || [];
       return {
-        ...normalizeCardDecisao(card),
+        ...card,
         checklist_resumo: itens.length ? buildChecklistResumo(itens) : card.checklist_resumo,
       };
     });
@@ -168,7 +165,7 @@ export default function QuadroOperacionalPage() {
       const ordem = index + 1;
       const mudouColuna = card.id === movedCard.id && destinationColunaId !== sourceColunaId;
       const payload = {};
-      if (card.ordem !== ordem) payload.ordem = ordem;
+      if (Number(card.ordem) !== ordem) payload.ordem = ordem;
       if (mudouColuna) payload.coluna_id = destinationColunaId;
       if (mudouColuna) payload.comentarios_count = (card.comentarios_count || 0) + 1;
       registrarAtualizacao(card, payload);
@@ -191,8 +188,8 @@ export default function QuadroOperacionalPage() {
           await base44.entities.CardOperacional.update(card.id, { ordem: baseTemporaria + index });
         }
 
-        for (const [index, card] of destinationCards.entries()) {
-          await base44.entities.CardOperacional.update(card.id, { ordem: index + 1 });
+        for (const update of updates) {
+          await base44.entities.CardOperacional.update(update.id, update.payload);
         }
       } else {
         await Promise.all(updates.map((update) => base44.entities.CardOperacional.update(update.id, update.payload)));
@@ -334,15 +331,14 @@ export default function QuadroOperacionalPage() {
 
       {cardAberto && (
         <CardDetalheModal
-          card={normalizeCardDecisao(cardAberto)}
+          card={cardAberto}
           colunaNome={colunaDoCardAberto?.nome || ''}
           onClose={() => setCardAberto(null)}
           onCardUpdate={(payload) => {
-            const payloadNormalizado = normalizeCardDecisao(payload);
-            setCardAberto((prev) => (prev ? normalizeCardDecisao({ ...prev, ...payloadNormalizado }) : prev));
+            setCardAberto((prev) => (prev ? { ...prev, ...payload } : prev));
             queryClient.setQueryData(['cards', quadro?.id], (old = []) => (
               Array.isArray(old)
-                ? old.map((item) => (item.id === payloadNormalizado.id ? normalizeCardDecisao({ ...item, ...payloadNormalizado }) : item))
+                ? old.map((item) => (item.id === payload.id ? { ...item, ...payload } : item))
                 : old
             ));
             queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, MessageSquare, User, CheckSquare, AlertTriangle, Tag, Gavel } from 'lucide-react';
+import { Calendar, MessageSquare, User, CheckSquare, AlertTriangle, Tag } from 'lucide-react';
 
 const PRIORIDADE_COR = {
   'Urgente': 'bg-red-500',
@@ -48,20 +48,6 @@ export default function CardItem({ card, onClick }) {
         </p>
       </div>
 
-      {card.aguardando_decisao && (
-        <div className="mt-2 ml-4 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-            <Gavel className="w-3 h-3" />
-            Aguardando decisão
-          </div>
-          {card.encaminhado_para_nome && (
-            <p className="text-[10px] text-amber-700 mt-0.5 truncate">
-              Para: <span className="font-semibold">{card.encaminhado_para_nome}</span>
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Militar */}
       {card.militar_nome_snapshot && (
         <div className="flex items-center gap-1 mt-1.5 ml-4">
@@ -96,7 +82,7 @@ export default function CardItem({ card, onClick }) {
       </div>
 
       {/* Origem badge */}
-      {(card.origem_tipo && card.origem_tipo !== 'Manual') || card.aguardando_decisao ? (
+      {card.origem_tipo && card.origem_tipo !== 'Manual' ? (
         <div className="mt-2 ml-4 flex flex-wrap gap-1.5">
           {card.origem_tipo && card.origem_tipo !== 'Manual' && (
           <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded font-medium">
