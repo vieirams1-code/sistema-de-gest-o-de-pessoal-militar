@@ -36,10 +36,33 @@ function detectarOrigemTipo(registro) {
   return 'livro';
 }
 
-function TextoExpansivel({ texto = '', textoVazio = 'Sem conteúdo para exibir.' }) {
+function obterTrechosComDestaque(texto, termosRelevantes = []) {
+  if (!texto?.trim() || !termosRelevantes.length) {
+    return [{ texto, destaque: false }];
+  }
+
+  const termosOrdenados = [...new Set(termosRelevantes)]
+    .filter((termo) => termo.length >= 4)
+    .sort((a, b) => b.length - a.length)
+    .slice(0, 16)
+    .map((termo) => termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+  if (!termosOrdenados.length) {
+    return [{ texto, destaque: false }];
+  }
+
+  const regex = new RegExp(`(${termosOrdenados.join('|')})`, 'gi');
+  return texto.split(regex).filter(Boolean).map((parte) => ({
+    texto: parte,
+    destaque: termosOrdenados.some((termo) => new RegExp(`^${termo}$`, 'i').test(parte)),
+  }));
+}
+
+function TextoExpansivel({ texto = '', textoVazio = 'Sem conteúdo para exibir.', termosRelevantes = [] }) {
   const [expandido, setExpandido] = useState(false);
   const textoFinal = texto?.trim() || textoVazio;
   const podeExpandir = textoFinal.length > 170;
+  const partes = obterTrechosComDestaque(textoFinal, termosRelevantes);
 
   return (
     <div className="space-y-1">
@@ -52,7 +75,14 @@ function TextoExpansivel({ texto = '', textoVazio = 'Sem conteúdo para exibir.'
           overflow: 'hidden',
         }}
       >
-        {textoFinal}
+        {partes.map((parte, index) => (
+          <span
+            key={`${parte.texto}-${index}`}
+            className={parte.destaque ? 'bg-yellow-200/80 px-0.5 rounded-sm' : ''}
+          >
+            {parte.texto}
+          </span>
+        ))}
       </p>
       {podeExpandir ? (
         <button
@@ -60,11 +90,21 @@ function TextoExpansivel({ texto = '', textoVazio = 'Sem conteúdo para exibir.'
           onClick={() => setExpandido((prev) => !prev)}
           className="text-[11px] font-medium text-blue-700 hover:underline"
         >
-          {expandido ? 'Ver menos' : 'Ver mais'}
+          {expandido ? 'Ver menos' : 'Ver texto completo'}
         </button>
       ) : null}
     </div>
   );
+}
+
+function obterTermosRelevantesComparacao(correspondencia) {
+  const textoCombinado = `${correspondencia?.trechoComparadoSistema || ''} ${correspondencia?.trechoComparadoBoletim || ''}`;
+
+  return [...new Set(
+    normalizarTextoComparacao(textoCombinado)
+      .split(' ')
+      .filter((token) => token.length >= 4)
+  )];
 }
 
 function getReferenciaPrincipal(registro) {
@@ -669,7 +709,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.7</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v2.0</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
@@ -714,108 +754,97 @@ export default function ConciliacaoBoletim() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Publicações pendentes (sistema)</CardTitle></CardHeader>
-          <CardContent className="space-y-3 max-h-[520px] overflow-auto">
-            {!conciliacaoIniciada ? <p className="text-sm text-slate-500">Inicie a Etapa 2 para conciliar.</p> : null}
-            {pendentes.map((pub) => (
-              <div key={pub.id} className="rounded-lg border p-3 bg-white space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <Badge variant="outline">Nota {pub.nota_para_bg}</Badge>
-                  {vinculosRemovidos[pub.id] ? (
-                    <Badge className="bg-rose-100 text-rose-700">Desvinculada manualmente</Badge>
-                  ) : (
-                    <Badge className="bg-blue-100 text-blue-700">{pub.status_calculado}</Badge>
-                  )}
-                </div>
-                <p className="text-sm font-medium text-slate-800">{getReferenciaPrincipal(pub)}</p>
-                <TextoExpansivel texto={(pub.texto_publicacao || pub.texto || '').replace(/\s+/g, ' ').trim() || 'Sem texto de publicação'} />
-                <div>
-                  <Label className="text-xs">Vincular nota encontrada</Label>
-                  <select
-                    className="w-full mt-1 border rounded-md h-9 px-2 text-sm"
-                    value={vinculosEfetivos[pub.id] || ''}
-                    onChange={(e) => handleVinculoManual(pub.id, e.target.value)}
-                    disabled={!conciliacaoIniciada}
-                  >
-                    <option value="">Sem vínculo</option>
-                    {notasEncontradas.map((nota) => (
-                      <option key={nota.id} value={nota.id}>Nota {nota.nota}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><ArrowLeftRight className="w-4 h-4" />Comparação lado a lado (Sistema × Boletim)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {publicacoesConciliadas.length === 0 && <p className="text-sm text-slate-500">Nenhum vínculo criado.</p>}
+          {publicacoesConciliadas.map((pub) => {
+            const nota = notasEncontradas.find((n) => n.id === vinculosEfetivos[pub.id]);
+            const automatico = conciliacaoAutomatica[pub.id] === vinculosEfetivos[pub.id];
+            const correspondencia = correspondenciaPorPublicacao[pub.id] || { percentual: 0, trechoComparadoSistema: '', trechoComparadoBoletim: '' };
+            const faixa = classificarCorrespondencia(correspondencia.percentual);
+            const termosRelevantes = obterTermosRelevantesComparacao(correspondencia);
+            return (
+              <div key={pub.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr]">
+                  <div className="rounded-lg border bg-white p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge className="bg-blue-100 text-blue-700">Sistema</Badge>
+                      <Badge variant="outline">Nota {pub.nota_para_bg}</Badge>
+                    </div>
+                    <p className="text-sm font-medium text-slate-800">{getReferenciaPrincipal(pub)}</p>
+                    <TextoExpansivel
+                      texto={(pub.texto_publicacao || pub.texto || '').replace(/\s+/g, ' ').trim() || 'Sem texto de publicação'}
+                      termosRelevantes={termosRelevantes}
+                    />
+                  </div>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><ArrowLeftRight className="w-4 h-4" />Vínculos</CardTitle></CardHeader>
-          <CardContent className="space-y-3 max-h-[520px] overflow-auto">
-            {publicacoesConciliadas.length === 0 && <p className="text-sm text-slate-500">Nenhum vínculo criado.</p>}
-            {publicacoesConciliadas.map((pub) => {
-              const nota = notasEncontradas.find((n) => n.id === vinculosEfetivos[pub.id]);
-              const automatico = conciliacaoAutomatica[pub.id] === vinculosEfetivos[pub.id];
-              const correspondencia = correspondenciaPorPublicacao[pub.id] || { percentual: 0, trechoComparadoSistema: '', trechoComparadoBoletim: '' };
-              const faixa = classificarCorrespondencia(correspondencia.percentual);
-              return (
-                <div key={pub.id} className="rounded-lg border p-3 space-y-2 bg-slate-50">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Nota sistema {pub.nota_para_bg}</span>
-                  {automatico ? (
+                  <div className="flex flex-col items-center justify-center gap-2 min-w-[170px]">
+                    <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">↔</div>
+                    <p className="text-3xl font-extrabold text-blue-700 leading-none">{correspondencia.percentual}%</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Percentual de correspondência</p>
+                    <Badge className={faixa.className}>{faixa.label}</Badge>
+                    {automatico ? (
                       <Badge className="bg-emerald-100 text-emerald-700"><Link2 className="w-3 h-3 mr-1" />Automática</Badge>
                     ) : (
                       <Badge className="bg-amber-100 text-amber-700"><Unlink2 className="w-3 h-3 mr-1" />Manual</Badge>
-                  )}
-                </div>
-                <p className="text-xs text-slate-600">↔ Nota no boletim: {nota?.nota || '-'}</p>
-                {automatico ? (
-                  <div className="flex items-center gap-2 text-xs">
-                    <Badge variant="outline">Correspondência textual: {correspondencia.percentual}%</Badge>
-                    <Badge className={faixa.className}>{faixa.label}</Badge>
+                    )}
+                    <Button type="button" variant="outline" size="sm" onClick={() => removerVinculo(pub)}>
+                      Desvincular
+                    </Button>
                   </div>
-                ) : null}
-                {automatico ? (
-                  <details className="text-xs text-slate-600 rounded border border-slate-200 bg-white px-2 py-1">
-                    <summary className="cursor-pointer font-medium">Ver trechos usados na comparação</summary>
-                    <p className="mt-2"><span className="font-semibold">Publicação:</span> {correspondencia.trechoComparadoSistema || 'Sem texto.'}</p>
-                    <p className="mt-1"><span className="font-semibold">Boletim:</span> {correspondencia.trechoComparadoBoletim || 'Sem trecho.'}</p>
-                  </details>
-                ) : null}
-                <TextoExpansivel texto={`Sistema: ${getReferenciaPrincipal(pub)} — ${(pub.texto_publicacao || pub.texto || '').replace(/\s+/g, ' ').trim() || 'Sem texto de publicação'}`} />
-                <TextoExpansivel texto={`Boletim: ${nota?.contexto || 'Sem contexto identificado.'}`} />
-                <div className="flex justify-end">
-                  <Button type="button" variant="outline" size="sm" onClick={() => removerVinculo(pub)}>
-                    Remover vínculo
-                  </Button>
+
+                  <div className="rounded-lg border bg-white p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge className="bg-indigo-100 text-indigo-700">Boletim</Badge>
+                      <Badge variant="outline">Nota {nota?.nota || '-'}</Badge>
+                    </div>
+                    <p className="text-xs text-slate-500">{nota?.pagina ? `Página ${nota.pagina}` : 'Página não identificada'}</p>
+                    <TextoExpansivel texto={nota?.contexto || 'Sem contexto identificado.'} termosRelevantes={termosRelevantes} />
+                  </div>
                 </div>
               </div>
             );
           })}
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Notas encontradas no boletim</CardTitle></CardHeader>
-          <CardContent className="space-y-3 max-h-[520px] overflow-auto">
-            {notasEncontradas.map((nota) => (
-              <div key={nota.id} className="rounded-lg border p-3 bg-white space-y-1">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline">Nota {nota.nota}</Badge>
-                  {notasConciliadasIds.has(nota.id) ? (
-                    <Badge className="bg-emerald-100 text-emerald-700">Conciliada</Badge>
-                  ) : (
-                    <Badge className="bg-amber-100 text-amber-700">Sem vínculo</Badge>
-                  )}
-                </div>
-                <TextoExpansivel texto={nota.contexto} />
-                {nota.pagina ? <p className="text-[11px] text-slate-500">Página: {nota.pagina}</p> : null}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Pendências de vínculo manual</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {!conciliacaoIniciada ? <p className="text-sm text-slate-500">Inicie a Etapa 2 para revisar e vincular manualmente.</p> : null}
+          {pendentes.map((pub) => (
+            <div key={pub.id} className="rounded-lg border p-3 bg-white space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Badge variant="outline">Nota {pub.nota_para_bg}</Badge>
+                {vinculosRemovidos[pub.id] ? (
+                  <Badge className="bg-rose-100 text-rose-700">Desvinculada manualmente</Badge>
+                ) : (
+                  <Badge className="bg-blue-100 text-blue-700">{pub.status_calculado}</Badge>
+                )}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+              <p className="text-sm font-medium text-slate-800">{getReferenciaPrincipal(pub)}</p>
+              <TextoExpansivel texto={(pub.texto_publicacao || pub.texto || '').replace(/\s+/g, ' ').trim() || 'Sem texto de publicação'} />
+              <div>
+                <Label className="text-xs">Vincular nota encontrada</Label>
+                <select
+                  className="w-full mt-1 border rounded-md h-9 px-2 text-sm"
+                  value={vinculosEfetivos[pub.id] || ''}
+                  onChange={(e) => handleVinculoManual(pub.id, e.target.value)}
+                  disabled={!conciliacaoIniciada}
+                >
+                  <option value="">Sem vínculo</option>
+                  {notasEncontradas.map((nota) => (
+                    <option key={nota.id} value={nota.id}>Nota {nota.nota}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {desvinculosManuais.length > 0 ? (
         <Card>
@@ -842,6 +871,36 @@ export default function ConciliacaoBoletim() {
         <Card>
           <CardHeader><CardTitle className="text-sm">Encontradas sem item no sistema</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold text-blue-700">{notasSemItem.length}</p></CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Pendentes do sistema sem correspondência</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {pendentesSemCorrespondencia.length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhum item pendente sem correspondência.</p>
+            ) : pendentesSemCorrespondencia.map((pub) => (
+              <div key={pub.id} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-sm font-medium text-slate-800">{getReferenciaPrincipal(pub)}</p>
+                <p className="text-xs text-slate-600">Nota do sistema: {pub.nota_para_bg}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Notas encontradas sem item no sistema</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {notasSemItem.length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhuma nota sem item correspondente.</p>
+            ) : notasSemItem.map((nota) => (
+              <div key={nota.id} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
+                <p className="text-sm font-medium text-slate-800">Nota {nota.nota}</p>
+                <TextoExpansivel texto={nota.contexto || 'Sem contexto identificado.'} />
+              </div>
+            ))}
+          </CardContent>
         </Card>
       </div>
 
