@@ -311,29 +311,21 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     setSalvandoDecisao(true);
     const agora = new Date().toISOString();
     const payload = {
-      aguardando_decisao: true,
-      aguardandoDecisao: true,
-      encaminhado_por_nome: encaminhadoPorNome.trim(),
-      encaminhadoPorNome: encaminhadoPorNome.trim(),
-      encaminhado_para_nome: encaminhadoParaNome.trim(),
-      encaminhadoParaNome: encaminhadoParaNome.trim(),
-      encaminhado_em: agora,
-      encaminhadoEm: agora,
-      observacao_encaminhamento: observacaoEncaminhamento.trim(),
-      observacaoEncaminhamento: observacaoEncaminhamento.trim(),
-      devolvido_por_nome: '',
-      devolvidoPorNome: '',
-      devolvido_em: null,
-      devolvidoEm: null,
-      observacao_devolucao: '',
-      observacaoDevolucao: '',
-      status_decisao: 'Aguardando decisão',
-      statusDecisao: 'Aguardando decisão',
+      decisao_pendente: true,
+      decisao_encaminhado_por_nome: encaminhadoPorNome.trim(),
+      decisao_encaminhado_para_nome: encaminhadoParaNome.trim(),
+      decisao_encaminhado_em: agora,
+      decisao_observacao_encaminhamento: observacaoEncaminhamento.trim(),
+      decisao_devolvido_por_nome: '',
+      decisao_devolvido_em: null,
+      decisao_observacao_devolucao: '',
+      decisao_status: 'Aguardando decisão',
       comentarios_count: (card.comentarios_count || 0) + 1,
     };
 
     try {
-      const cardAtualizado = await base44.entities.CardOperacional.update(card.id, payload);
+      await base44.entities.CardOperacional.update(card.id, payload);
+      const cardAtualizado = await base44.entities.CardOperacional.get(card.id);
       await base44.entities.CardComentario.create({
         card_id: card.id,
         mensagem: `Card encaminhado para decisão de ${encaminhadoParaNome.trim()}, por ${encaminhadoPorNome.trim()}${observacaoEncaminhamento.trim() ? `. Contexto: ${observacaoEncaminhamento.trim()}` : ''}.`,
@@ -357,21 +349,17 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     setSalvandoDecisao(true);
     const agora = new Date().toISOString();
     const payload = {
-      aguardando_decisao: false,
-      aguardandoDecisao: false,
-      devolvido_por_nome: devolvidoPorNome.trim(),
-      devolvidoPorNome: devolvidoPorNome.trim(),
-      devolvido_em: agora,
-      devolvidoEm: agora,
-      observacao_devolucao: observacaoDevolucao.trim(),
-      observacaoDevolucao: observacaoDevolucao.trim(),
-      status_decisao: 'Devolvido com orientação',
-      statusDecisao: 'Devolvido com orientação',
+      decisao_pendente: false,
+      decisao_devolvido_por_nome: devolvidoPorNome.trim(),
+      decisao_devolvido_em: agora,
+      decisao_observacao_devolucao: observacaoDevolucao.trim(),
+      decisao_status: 'Devolvido com orientação',
       comentarios_count: (card.comentarios_count || 0) + 1,
     };
 
     try {
-      const cardAtualizado = await base44.entities.CardOperacional.update(card.id, payload);
+      await base44.entities.CardOperacional.update(card.id, payload);
+      const cardAtualizado = await base44.entities.CardOperacional.get(card.id);
       await base44.entities.CardComentario.create({
         card_id: card.id,
         mensagem: `Card devolvido por ${devolvidoPorNome.trim()} com orientação${observacaoDevolucao.trim() ? `: ${observacaoDevolucao.trim()}` : '.'}`,
