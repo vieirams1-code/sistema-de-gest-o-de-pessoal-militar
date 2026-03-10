@@ -8,6 +8,22 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeftRight, FileSearch, Link2, Unlink2 } from 'lucide-react';
 
+const PDFJS_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
+const PDFJS_WORKER_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+
+let pdfJsLibPromise;
+
+async function carregarPdfJs() {
+  if (!pdfJsLibPromise) {
+    pdfJsLibPromise = import(/* @vite-ignore */ PDFJS_CDN_URL).then((mod) => {
+      mod.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_CDN_URL;
+      return mod;
+    });
+  }
+
+  return pdfJsLibPromise;
+}
+
 function calcStatus(registro) {
   if (registro.numero_bg && registro.data_bg) return 'Publicado';
   if (registro.nota_para_bg) return 'Aguardando Publicação';
@@ -42,19 +58,13 @@ function normalizarNota(valor = '') {
   return valor.toString().replace(/[^\d]/g, '').trim();
 }
 
-function extrairTextoLegivel(raw) {
-  return raw
+function normalizarTextoExtraido(texto = '') {
+  return texto
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ')
     .replace(/[\uFFFD]/g, ' ')
-    .replace(/\(([^)]{0,180})\)\s*Tj/g, ' $1\n')
-    .replace(/\[(.*?)\]\s*TJ/gs, (_, bloco = '') => bloco.replace(/\(([^)]{0,180})\)/g, ' $1'))
     .replace(/\r/g, '\n')
-    .replace(/\f/g, '\n')
-    .replace(/[{}<>\[\]\\/]{2,}/g, ' ')
-    .replace(/[^\p{L}\d\n.,:;\-º°()/ ]/gu, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\s*\n\s*/g, '\n')
-    .replace(/(NOTA\s+N(?:\.|º|°)?\s*\d{4,8})/gi, '\n$1\n')
     .trim();
 }
 
@@ -83,10 +93,10 @@ function notaValida(notaNorm) {
   return true;
 }
 
-function extrairNotasDoTexto(rawText) {
-  if (!rawText?.length) return [];
+function extrairNotasDoTexto(textoPagina, pagina) {
+  if (!textoPagina?.length) return [];
 
-  const texto = extrairTextoLegivel(rawText);
+  const texto = normalizarTextoExtraido(textoPagina);
   const linhas = texto
     .split(/\n+/)
     .flatMap((linha) => linha.split(/(?<=[.;:])\s+(?=NOTA\s+N)/gi))
@@ -120,7 +130,7 @@ function extrairNotasDoTexto(rawText) {
         nota: notaNorm,
         nota_normalizada: notaNorm,
         contexto,
-        pagina: null,
+        pagina,
       });
     }
   }
@@ -128,11 +138,54 @@ function extrairNotasDoTexto(rawText) {
   return encontrados;
 }
 
-async function extrairNotasPdf(file) {
+async function extrairTextoPorPagina(file) {
+  const pdfJs = await carregarPdfJs();
   const buffer = await file.arrayBuffer();
-  const latin = new TextDecoder('latin1').decode(buffer);
-  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
-  const notas = [...extrairNotasDoTexto(latin), ...extrairNotasDoTexto(utf8)];
+  const loadingTask = pdfJs.getDocument({ data: buffer, useWorkerFetch: false });
+  const pdf = await loadingTask.promise;
+  const paginas = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+
+    const itensOrdenados = [...content.items].sort((a, b) => {
+      const yA = a.transform?.[5] || 0;
+      const yB = b.transform?.[5] || 0;
+      if (Math.abs(yB - yA) > 2) return yB - yA;
+      const xA = a.transform?.[4] || 0;
+      const xB = b.transform?.[4] || 0;
+      return xA - xB;
+    });
+
+    let ultimoY = null;
+    let textoPagina = '';
+
+    for (const item of itensOrdenados) {
+      const textoItem = item.str || '';
+      const x = item.transform?.[4] || 0;
+      const y = item.transform?.[5] || 0;
+      const quebraLinha = ultimoY !== null && Math.abs(y - ultimoY) > 2;
+
+      if (quebraLinha) {
+        textoPagina += '\n';
+      } else if (textoPagina && x > 0) {
+        textoPagina += ' ';
+      }
+
+      textoPagina += textoItem;
+      ultimoY = y;
+    }
+
+    paginas.push({ pagina: pageNum, texto: normalizarTextoExtraido(textoPagina) });
+  }
+
+  return paginas;
+}
+
+async function extrairNotasPdf(file) {
+  const paginas = await extrairTextoPorPagina(file);
+  const notas = paginas.flatMap(({ pagina, texto }) => extrairNotasDoTexto(texto, pagina));
 
   const porNota = new Map();
   for (const nota of notas) {
@@ -275,7 +328,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.2</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.3</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
