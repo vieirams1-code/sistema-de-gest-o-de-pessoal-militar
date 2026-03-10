@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { CalendarClock, Clock3, AlertTriangle, ExternalLink } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarClock, Clock3, AlertTriangle, ExternalLink, Check } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { listAllCardAcoes } from '@/components/quadro/cardAcoesService';
+import CardDetalheModal from '@/components/quadro/CardDetalheModal';
+import { listAllCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
 import { Button } from '@/components/ui/button';
 
 function getPrimeiroValor(item, campos = []) {
@@ -21,6 +21,8 @@ function normalizarAcao(acao) {
     data_prevista: getPrimeiroValor(acao, ['data_prevista', 'data', 'prazo', 'data_acao']) || null,
     status: getPrimeiroValor(acao, ['status', 'situacao', 'estado']) || 'Pendente',
     responsavel: getPrimeiroValor(acao, ['responsavel', 'responsavel_nome', 'responsavel_acao']) || '',
+    observacao: getPrimeiroValor(acao, ['observacao', 'descricao', 'detalhes']) || '',
+    anotacoes: getPrimeiroValor(acao, ['anotacoes', 'comentarios', 'comentario_acao']) || '',
   };
 }
 
@@ -43,46 +45,112 @@ function formatarData(valor) {
   return `${d}/${m}/${y}`;
 }
 
-function isConcluida(status) {
-  const normalizado = (status || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  return ['concluida', 'concluido', 'finalizada', 'finalizado', 'cancelada', 'cancelado'].includes(normalizado);
+function normalizarStatus(status) {
+  return (status || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-function GrupoAcoes({ titulo, descricao, icon: Icon, acoes }) {
+function isConcluida(status) {
+  return ['concluida', 'concluido', 'finalizada', 'finalizado', 'cancelada', 'cancelado'].includes(normalizarStatus(status));
+}
+
+function montarPayloadAcao(payload) {
+  const titulo = payload.titulo?.trim() || '';
+  const observacao = payload.observacao?.trim() || '';
+  const dataPrevista = payload.data_prevista || null;
+  const status = payload.status || 'Pendente';
+  const responsavel = payload.responsavel?.trim() || '';
+  const anotacoes = payload.anotacoes?.trim() || '';
+
+  return {
+    ...(titulo ? { titulo, nome: titulo, title: titulo } : {}),
+    data_prevista: dataPrevista,
+    data: dataPrevista,
+    prazo: dataPrevista,
+    data_acao: dataPrevista,
+    status,
+    situacao: status,
+    estado: status,
+    responsavel,
+    responsavel_nome: responsavel,
+    responsavel_acao: responsavel,
+    observacao,
+    descricao: observacao,
+    detalhes: observacao,
+    anotacoes,
+    comentarios: anotacoes,
+    comentario_acao: anotacoes,
+    concluida: status === 'Concluída',
+  };
+}
+
+function GrupoAcoes({ titulo, descricao, icon: Icon, grupos, onOpenCard, onToggleConcluir, togglingAcaoId }) {
   return (
     <section className="bg-white border border-slate-200 rounded-xl shadow-sm">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-slate-500" />
           <h2 className="text-sm font-semibold text-slate-800">{titulo}</h2>
-          <span className="text-xs text-slate-400">({acoes.length})</span>
+          <span className="text-xs text-slate-400">({grupos.length})</span>
         </div>
         <span className="text-[11px] text-slate-400">{descricao}</span>
       </div>
 
-      {acoes.length === 0 ? (
+      {grupos.length === 0 ? (
         <p className="px-4 py-5 text-xs text-slate-400">Nenhuma ação neste grupo.</p>
       ) : (
-        <div className="divide-y divide-slate-100">
-          {acoes.map((acao) => (
-            <div key={acao.id} className="px-4 py-3 flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-800 truncate">{acao.titulo}</p>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                  <span>Prazo: {formatarData(acao.data_prevista)}</span>
-                  <span>Card: {acao.card_titulo}</span>
-                  <span>Status: {acao.status}</span>
-                  {acao.responsavel && <span>Resp.: {acao.responsavel}</span>}
+        <div className="p-3 space-y-3">
+          {grupos.map((grupo) => (
+            <article key={grupo.card.id} className="rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden">
+              <header className="px-3 py-2.5 border-b border-slate-200 bg-white flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-indigo-50 px-1.5 text-[10px] font-bold text-indigo-600 border border-indigo-100">
+                      #{(grupo.card.codigo || grupo.card.id || '').slice(-4).toUpperCase()}
+                    </span>
+                    <h3 className="text-sm font-semibold text-slate-800 truncate">{grupo.card.titulo || grupo.card.militar_nome_snapshot || 'Card sem título'}</h3>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{grupo.acoes.length} ação(ões) vinculada(s) a este card</p>
                 </div>
-              </div>
 
-              <Button asChild variant="outline" size="sm" className="h-8 shrink-0">
-                <Link to={`/QuadroOperacional?cardId=${acao.card_id}`}>
+                <Button variant="outline" size="sm" className="h-8 shrink-0" onClick={() => onOpenCard(grupo.card.id)}>
                   Abrir card
                   <ExternalLink className="w-3.5 h-3.5 ml-1" />
-                </Link>
-              </Button>
-            </div>
+                </Button>
+              </header>
+
+              <div className="px-3 py-2.5">
+                <div className="border-l-2 border-indigo-100 pl-3 space-y-2">
+                  {grupo.acoes.map((acao) => (
+                    <div key={acao.id} className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{acao.titulo}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                          <span>Prazo: {formatarData(acao.data_prevista)}</span>
+                          <span>Status: {acao.status}</span>
+                          {acao.responsavel && <span>Resp.: {acao.responsavel}</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => onToggleConcluir(acao)}
+                          disabled={togglingAcaoId === acao.id}
+                        >
+                          <Check className="w-3.5 h-3.5 mr-1" />
+                          {isConcluida(acao.status) ? 'Desmarcar' : 'Concluir'}
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenCard(grupo.card.id)}>
+                          Abrir card
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
           ))}
         </div>
       )}
@@ -91,6 +159,9 @@ function GrupoAcoes({ titulo, descricao, icon: Icon, acoes }) {
 }
 
 export default function AgendaAcoesOperacionaisPage() {
+  const queryClient = useQueryClient();
+  const [cardAbertoId, setCardAbertoId] = useState(null);
+
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
     queryFn: () => base44.entities.QuadroOperacional.filter({ ativo: true }, 'ordem'),
@@ -120,8 +191,26 @@ export default function AgendaAcoesOperacionaisPage() {
     queryFn: () => listAllCardAcoes(3000),
   });
 
-  const { atrasadas, hoje, proximas } = useMemo(() => {
+  const atualizarStatusMutation = useMutation({
+    mutationFn: async ({ acao, status }) => {
+      await updateCardAcao(acao.id, montarPayloadAcao({
+        titulo: acao.titulo,
+        data_prevista: acao.data_prevista,
+        status,
+        responsavel: acao.responsavel,
+        observacao: acao.observacao,
+        anotacoes: acao.anotacoes,
+      }));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
+      queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
+    },
+  });
+
+  const { atrasadas, hoje, proximas, cardSelecionado, colunaCardSelecionado } = useMemo(() => {
     const mapaCards = new Map(cards.map((card) => [card.id, card]));
+    const mapaColunas = new Map(colunas.map((coluna) => [coluna.id, coluna]));
     const hojeKey = toDateKey(new Date());
 
     const agrupadas = { atrasadas: [], hoje: [], proximas: [] };
@@ -136,7 +225,7 @@ export default function AgendaAcoesOperacionaisPage() {
         const dataKey = toDateKey(acao.data_prevista);
         const acaoComCard = {
           ...acao,
-          card_titulo: card.titulo || card.militar_nome_snapshot || 'Card sem título',
+          card,
         };
 
         if (!dataKey || dataKey > hojeKey) {
@@ -155,17 +244,35 @@ export default function AgendaAcoesOperacionaisPage() {
       return a.titulo.localeCompare(b.titulo, 'pt-BR');
     };
 
-    agrupadas.atrasadas.sort(ordenar);
-    agrupadas.hoje.sort(ordenar);
-    agrupadas.proximas.sort(ordenar);
+    const agruparPorCard = (acoes) => {
+      const gruposMap = new Map();
+      acoes.sort(ordenar).forEach((acao) => {
+        if (!gruposMap.has(acao.card.id)) {
+          gruposMap.set(acao.card.id, { card: acao.card, acoes: [] });
+        }
+        gruposMap.get(acao.card.id).acoes.push(acao);
+      });
+      return Array.from(gruposMap.values()).sort((a, b) =>
+        (a.card.titulo || '').localeCompare(b.card.titulo || '', 'pt-BR')
+      );
+    };
 
-    return agrupadas;
-  }, [acoesRaw, cards]);
+    const cardSelecionadoAtual = mapaCards.get(cardAbertoId) || null;
+    const colunaSelecionadaAtual = cardSelecionadoAtual ? mapaColunas.get(cardSelecionadoAtual.coluna_id) : null;
+
+    return {
+      atrasadas: agruparPorCard(agrupadas.atrasadas),
+      hoje: agruparPorCard(agrupadas.hoje),
+      proximas: agruparPorCard(agrupadas.proximas),
+      cardSelecionado: cardSelecionadoAtual,
+      colunaCardSelecionado: colunaSelecionadaAtual,
+    };
+  }, [acoesRaw, cards, colunas, cardAbertoId]);
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-4">
       <header className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Agenda de Ações v1.0</p>
+        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Agenda de Ações v1.1</p>
         <div className="mt-1 flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-slate-500" />
           <h1 className="text-lg font-bold text-slate-800">Ações Operacionais</h1>
@@ -173,9 +280,42 @@ export default function AgendaAcoesOperacionaisPage() {
         <p className="text-xs text-slate-500 mt-1">Visão consolidada de ações abertas do Quadro Operacional.</p>
       </header>
 
-      <GrupoAcoes titulo="Atrasadas" descricao="Prazo menor que hoje" icon={AlertTriangle} acoes={atrasadas} />
-      <GrupoAcoes titulo="Hoje" descricao="Prazo do dia" icon={Clock3} acoes={hoje} />
-      <GrupoAcoes titulo="Próximas" descricao="Sem prazo vencido" icon={CalendarClock} acoes={proximas} />
+      <GrupoAcoes
+        titulo="Atrasadas"
+        descricao="Prazo menor que hoje"
+        icon={AlertTriangle}
+        grupos={atrasadas}
+        onOpenCard={setCardAbertoId}
+        onToggleConcluir={(acao) => atualizarStatusMutation.mutate({ acao, status: isConcluida(acao.status) ? 'Pendente' : 'Concluída' })}
+        togglingAcaoId={atualizarStatusMutation.variables?.acao?.id}
+      />
+      <GrupoAcoes
+        titulo="Hoje"
+        descricao="Prazo do dia"
+        icon={Clock3}
+        grupos={hoje}
+        onOpenCard={setCardAbertoId}
+        onToggleConcluir={(acao) => atualizarStatusMutation.mutate({ acao, status: isConcluida(acao.status) ? 'Pendente' : 'Concluída' })}
+        togglingAcaoId={atualizarStatusMutation.variables?.acao?.id}
+      />
+      <GrupoAcoes
+        titulo="Próximas"
+        descricao="Sem prazo vencido"
+        icon={CalendarClock}
+        grupos={proximas}
+        onOpenCard={setCardAbertoId}
+        onToggleConcluir={(acao) => atualizarStatusMutation.mutate({ acao, status: isConcluida(acao.status) ? 'Pendente' : 'Concluída' })}
+        togglingAcaoId={atualizarStatusMutation.variables?.acao?.id}
+      />
+
+      {cardSelecionado && (
+        <CardDetalheModal
+          card={cardSelecionado}
+          colunaNome={colunaCardSelecionado?.nome || 'Coluna'}
+          onClose={() => setCardAbertoId(null)}
+          onCardUpdate={() => queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] })}
+        />
+      )}
     </div>
   );
 }
