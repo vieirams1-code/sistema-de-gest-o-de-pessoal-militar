@@ -36,10 +36,35 @@ function detectarOrigemTipo(registro) {
   return 'livro';
 }
 
-function resumirTexto(texto = '') {
-  const limpo = texto.replace(/\s+/g, ' ').trim();
-  if (!limpo) return 'Sem texto de publicação';
-  return limpo.length > 110 ? `${limpo.slice(0, 110)}...` : limpo;
+function TextoExpansivel({ texto = '', textoVazio = 'Sem conteúdo para exibir.' }) {
+  const [expandido, setExpandido] = useState(false);
+  const textoFinal = texto?.trim() || textoVazio;
+  const podeExpandir = textoFinal.length > 170;
+
+  return (
+    <div className="space-y-1">
+      <p
+        className="text-xs text-slate-600"
+        style={expandido ? undefined : {
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}
+      >
+        {textoFinal}
+      </p>
+      {podeExpandir ? (
+        <button
+          type="button"
+          onClick={() => setExpandido((prev) => !prev)}
+          className="text-[11px] font-medium text-blue-700 hover:underline"
+        >
+          {expandido ? 'Ver menos' : 'Ver mais'}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function getReferenciaPrincipal(registro) {
@@ -207,6 +232,9 @@ export default function ConciliacaoBoletim() {
   const [processandoPdf, setProcessandoPdf] = useState(false);
   const [erroProcessamento, setErroProcessamento] = useState('');
   const [mensagemProcessamento, setMensagemProcessamento] = useState('');
+  const [conciliacaoIniciada, setConciliacaoIniciada] = useState(false);
+  const [vinculosRemovidos, setVinculosRemovidos] = useState({});
+  const [desvinculosManuais, setDesvinculosManuais] = useState([]);
 
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['conciliacao-registros-livro'],
@@ -239,7 +267,7 @@ export default function ConciliacaoBoletim() {
   }, [registrosLivro, publicacoesExOfficio, atestados]);
 
   const conciliacaoAutomatica = useMemo(() => {
-    if (!pendentes.length || !notasEncontradas.length) return {};
+    if (!conciliacaoIniciada || !pendentes.length || !notasEncontradas.length) return {};
     const mapaNotas = new Map(notasEncontradas.map((nota) => [nota.nota_normalizada, nota.id]));
     const auto = {};
 
@@ -249,9 +277,27 @@ export default function ConciliacaoBoletim() {
       }
     }
     return auto;
-  }, [pendentes, notasEncontradas]);
+  }, [conciliacaoIniciada, pendentes, notasEncontradas]);
 
-  const vinculosEfetivos = useMemo(() => ({ ...conciliacaoAutomatica, ...vinculos }), [conciliacaoAutomatica, vinculos]);
+  const vinculosEfetivos = useMemo(() => {
+    const combinados = { ...conciliacaoAutomatica };
+
+    Object.keys(vinculosRemovidos).forEach((pubId) => {
+      if (vinculosRemovidos[pubId]) {
+        delete combinados[pubId];
+      }
+    });
+
+    Object.entries(vinculos).forEach(([pubId, notaId]) => {
+      if (notaId) {
+        combinados[pubId] = notaId;
+      } else {
+        delete combinados[pubId];
+      }
+    });
+
+    return combinados;
+  }, [conciliacaoAutomatica, vinculos, vinculosRemovidos]);
 
   const notasConciliadasIds = useMemo(() => new Set(Object.values(vinculosEfetivos)), [vinculosEfetivos]);
 
@@ -304,6 +350,9 @@ export default function ConciliacaoBoletim() {
       const notas = await extrairNotasPdf(arquivoPdf);
       setNotasEncontradas(notas);
       setVinculos({});
+      setVinculosRemovidos({});
+      setDesvinculosManuais([]);
+      setConciliacaoIniciada(false);
 
       if (notas.length === 0) {
         setMensagemProcessamento('PDF processado, mas nenhuma nota válida foi identificada.');
@@ -314,13 +363,44 @@ export default function ConciliacaoBoletim() {
       setErroProcessamento(error?.message || 'Não foi possível processar o PDF enviado. Verifique o arquivo e tente novamente.');
       setNotasEncontradas([]);
       setVinculos({});
+      setVinculosRemovidos({});
+      setDesvinculosManuais([]);
+      setConciliacaoIniciada(false);
     } finally {
       setProcessandoPdf(false);
     }
   };
 
   const handleVinculoManual = (pubId, notaId) => {
+    if (!notaId) {
+      setVinculos((prev) => ({ ...prev, [pubId]: '' }));
+      setVinculosRemovidos((prev) => ({ ...prev, [pubId]: true }));
+      return;
+    }
+
     setVinculos((prev) => ({ ...prev, [pubId]: notaId }));
+    setVinculosRemovidos((prev) => ({ ...prev, [pubId]: false }));
+  };
+
+  const iniciarConciliacao = () => {
+    setConciliacaoIniciada(true);
+  };
+
+  const removerVinculo = (pub) => {
+    const notaId = vinculosEfetivos[pub.id];
+    if (!notaId) return;
+
+    setVinculos((prev) => ({ ...prev, [pub.id]: '' }));
+    setVinculosRemovidos((prev) => ({ ...prev, [pub.id]: true }));
+    setDesvinculosManuais((prev) => ([
+      {
+        pubId: pub.id,
+        referencia: getReferenciaPrincipal(pub),
+        notaSistema: pub.nota_para_bg,
+        notaBoletim: notasEncontradas.find((nota) => nota.id === notaId)?.nota || '-',
+      },
+      ...prev.filter((item) => item.pubId !== pub.id),
+    ]));
   };
 
   return (
@@ -328,7 +408,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.3</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.4</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
@@ -346,7 +426,7 @@ export default function ConciliacaoBoletim() {
           <div className="flex items-end">
             <Button type="button" onClick={processarBoletim} disabled={processandoPdf} className="w-full">
               <FileSearch className="w-4 h-4 mr-2" />
-              {processandoPdf ? 'Processando...' : 'Buscar notas'}
+              {processandoPdf ? 'Lendo boletim...' : 'Etapa 1: Ler boletim'}
             </Button>
           </div>
         </CardContent>
@@ -357,24 +437,45 @@ export default function ConciliacaoBoletim() {
         </div>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Etapa 2 — Conciliação</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1 text-sm text-slate-600">
+            <p>1) Faça a leitura do PDF na Etapa 1.</p>
+            <p>2) Inicie a conciliação para aplicar os vínculos automáticos e revisar manualmente.</p>
+          </div>
+          <Button type="button" onClick={iniciarConciliacao} disabled={notasEncontradas.length === 0 || conciliacaoIniciada}>
+            {conciliacaoIniciada ? 'Conciliação iniciada' : 'Iniciar conciliação'}
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader><CardTitle className="text-base">Publicações pendentes (sistema)</CardTitle></CardHeader>
           <CardContent className="space-y-3 max-h-[520px] overflow-auto">
+            {!conciliacaoIniciada ? <p className="text-sm text-slate-500">Inicie a Etapa 2 para conciliar.</p> : null}
             {pendentes.map((pub) => (
               <div key={pub.id} className="rounded-lg border p-3 bg-white space-y-1">
                 <div className="flex items-center justify-between gap-2">
                   <Badge variant="outline">Nota {pub.nota_para_bg}</Badge>
-                  <Badge className="bg-blue-100 text-blue-700">{pub.status_calculado}</Badge>
+                  {vinculosRemovidos[pub.id] ? (
+                    <Badge className="bg-rose-100 text-rose-700">Desvinculada manualmente</Badge>
+                  ) : (
+                    <Badge className="bg-blue-100 text-blue-700">{pub.status_calculado}</Badge>
+                  )}
                 </div>
                 <p className="text-sm font-medium text-slate-800">{getReferenciaPrincipal(pub)}</p>
-                <p className="text-xs text-slate-600">{resumirTexto(pub.texto_publicacao || pub.texto || '')}</p>
+                <TextoExpansivel texto={(pub.texto_publicacao || pub.texto || '').replace(/\s+/g, ' ').trim() || 'Sem texto de publicação'} />
                 <div>
                   <Label className="text-xs">Vincular nota encontrada</Label>
                   <select
                     className="w-full mt-1 border rounded-md h-9 px-2 text-sm"
                     value={vinculosEfetivos[pub.id] || ''}
                     onChange={(e) => handleVinculoManual(pub.id, e.target.value)}
+                    disabled={!conciliacaoIniciada}
                   >
                     <option value="">Sem vínculo</option>
                     {notasEncontradas.map((nota) => (
@@ -396,18 +497,25 @@ export default function ConciliacaoBoletim() {
               const automatico = conciliacaoAutomatica[pub.id] === vinculosEfetivos[pub.id];
               return (
                 <div key={pub.id} className="rounded-lg border p-3 space-y-2 bg-slate-50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Nota sistema {pub.nota_para_bg}</span>
-                    {automatico ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Nota sistema {pub.nota_para_bg}</span>
+                  {automatico ? (
                       <Badge className="bg-emerald-100 text-emerald-700"><Link2 className="w-3 h-3 mr-1" />Automática</Badge>
                     ) : (
                       <Badge className="bg-amber-100 text-amber-700"><Unlink2 className="w-3 h-3 mr-1" />Manual</Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-600">↔ Nota no boletim: {nota?.nota || '-'}</p>
+                  )}
                 </div>
-              );
-            })}
+                <p className="text-xs text-slate-600">↔ Nota no boletim: {nota?.nota || '-'}</p>
+                <TextoExpansivel texto={`Sistema: ${getReferenciaPrincipal(pub)} — ${(pub.texto_publicacao || pub.texto || '').replace(/\s+/g, ' ').trim() || 'Sem texto de publicação'}`} />
+                <TextoExpansivel texto={`Boletim: ${nota?.contexto || 'Sem contexto identificado.'}`} />
+                <div className="flex justify-end">
+                  <Button type="button" variant="outline" size="sm" onClick={() => removerVinculo(pub)}>
+                    Remover vínculo
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
           </CardContent>
         </Card>
 
@@ -424,13 +532,26 @@ export default function ConciliacaoBoletim() {
                     <Badge className="bg-amber-100 text-amber-700">Sem vínculo</Badge>
                   )}
                 </div>
-                <p className="text-xs text-slate-600">{nota.contexto}</p>
+                <TextoExpansivel texto={nota.contexto} />
                 {nota.pagina ? <p className="text-[11px] text-slate-500">Página: {nota.pagina}</p> : null}
               </div>
             ))}
           </CardContent>
         </Card>
       </div>
+
+      {desvinculosManuais.length > 0 ? (
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Auditoria de desvínculos manuais</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {desvinculosManuais.map((evento) => (
+              <div key={evento.pubId} className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                Publicação "{evento.referencia}" (nota sistema {evento.notaSistema}) desvinculada da nota {evento.notaBoletim} do boletim.
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
