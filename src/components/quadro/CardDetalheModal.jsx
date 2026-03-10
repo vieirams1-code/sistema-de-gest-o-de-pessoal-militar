@@ -536,24 +536,22 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
               </span>
             </div>
 
-            {(card.encaminhado_em || card.devolvido_em || card.observacao_encaminhamento || card.observacao_devolucao) && (
-              <div className="text-[11px] text-slate-700 bg-white border border-slate-200 rounded-md p-2.5 space-y-2">
-                <p><span className="font-semibold text-slate-500">Status:</span> {card.aguardando_decisao ? 'Aguardando decisão' : (card.status_decisao || 'Sem pendência')}</p>
-                <p><span className="font-semibold text-slate-500">Encaminhado para:</span> {card.encaminhado_para_nome || '-'}</p>
-                <p><span className="font-semibold text-slate-500">Encaminhado por:</span> {card.encaminhado_por_nome || '-'}</p>
-                <p><span className="font-semibold text-slate-500">Encaminhado em:</span> {card.encaminhado_em ? formatDateTime(card.encaminhado_em) : '-'}</p>
-                <p className="whitespace-pre-wrap"><span className="font-semibold text-slate-500">Observação do encaminhamento:</span> {card.observacao_encaminhamento || '-'}</p>
+            <div className={`rounded-md border p-2.5 space-y-2 text-[11px] ${card.aguardando_decisao ? 'bg-white border-amber-200' : 'bg-white border-slate-200'}`}>
+              <p><span className="font-semibold text-slate-500">Status:</span> {card.aguardando_decisao ? 'Aguardando decisão' : (card.status_decisao || 'Sem pendência')}</p>
+              <p><span className="font-semibold text-slate-500">Encaminhado para:</span> {card.encaminhado_para_nome || '-'}</p>
+              <p><span className="font-semibold text-slate-500">Encaminhado por:</span> {card.encaminhado_por_nome || '-'}</p>
+              <p><span className="font-semibold text-slate-500">Data/hora do encaminhamento:</span> {card.encaminhado_em ? formatDateTime(card.encaminhado_em) : '-'}</p>
+              <p className="whitespace-pre-wrap"><span className="font-semibold text-slate-500">Observação/contexto:</span> {card.observacao_encaminhamento || '-'}</p>
 
-                {card.devolvido_em && (
-                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                    <p className="font-semibold text-slate-500">Última devolução registrada</p>
-                    <p><span className="font-semibold text-slate-500">Devolvido por:</span> {card.devolvido_por_nome || '-'}</p>
-                    <p><span className="font-semibold text-slate-500">Devolvido em:</span> {formatDateTime(card.devolvido_em)}</p>
-                    <p className="whitespace-pre-wrap"><span className="font-semibold text-slate-500">Orientação:</span> {card.observacao_devolucao || '-'}</p>
-                  </div>
-                )}
-              </div>
-            )}
+              {card.devolvido_em && (
+                <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                  <p className="font-semibold text-slate-500">Última devolução registrada</p>
+                  <p><span className="font-semibold text-slate-500">Devolvido por:</span> {card.devolvido_por_nome || '-'}</p>
+                  <p><span className="font-semibold text-slate-500">Data/hora da devolução:</span> {formatDateTime(card.devolvido_em)}</p>
+                  <p className="whitespace-pre-wrap"><span className="font-semibold text-slate-500">Orientação:</span> {card.observacao_devolucao || '-'}</p>
+                </div>
+              )}
+            </div>
 
             {!card.aguardando_decisao ? (
               <div className="space-y-2.5">
@@ -600,32 +598,32 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 </div>
               </div>
             ) : (
-              <div className="space-y-2.5 border border-amber-200 bg-white rounded-md p-2.5">
+              <div className="space-y-2.5 border-2 border-amber-300 bg-amber-100/40 rounded-md p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold text-amber-800 uppercase tracking-wide">Ação necessária</p>
-                  <span className="text-[10px] text-amber-700 inline-flex items-center gap-1">
+                  <p className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">Devolver decisão</p>
+                  <span className="text-[10px] text-amber-800 inline-flex items-center gap-1 font-semibold">
                     <ArrowUpRight className="w-3 h-3" />
-                    Registrar devolução
+                    Ação obrigatória para concluir este ciclo
                   </span>
                 </div>
-                <p className="text-[11px] text-amber-800">Este card está aguardando decisão. Preencha os campos abaixo para devolver decisão de forma explícita.</p>
+                <p className="text-[11px] text-amber-900">Este card está aguardando decisão. Registre abaixo a devolução para retirar o card desse estado.</p>
                 <div>
-                  <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Devolvido por</label>
+                  <label className="text-[10px] text-slate-500 uppercase tracking-wide mb-1 block">Devolvido por</label>
                   <Input
                     value={devolvidoPorNome}
                     onChange={(e) => setDevolvidoPorNome(e.target.value)}
                     placeholder="Nome de quem decidiu"
-                    className="h-8 text-xs"
+                    className="h-8 text-xs bg-white"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Orientação</label>
+                  <label className="text-[10px] text-slate-500 uppercase tracking-wide mb-1 block">Orientação da decisão</label>
                   <Textarea
                     rows={2}
                     value={observacaoDevolucao}
                     onChange={(e) => setObservacaoDevolucao(e.target.value)}
                     placeholder="Orientação da devolução..."
-                    className="text-xs resize-none"
+                    className="text-xs resize-none bg-white"
                   />
                 </div>
                 <div className="flex justify-end">
