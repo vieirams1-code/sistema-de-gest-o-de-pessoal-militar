@@ -96,13 +96,14 @@ function montarPayloadAcao(payload) {
   };
 }
 
+
 function GrupoAcoes({
   titulo,
   descricao,
   icon: Icon,
   grupos,
   onOpenCard,
-  onMarkConcluida,
+  onToggleConcluida,
   onDelete,
   onStartEdit,
   onChangeDraft,
@@ -112,7 +113,7 @@ function GrupoAcoes({
   editingAcaoId,
   acaoDrafts,
   commentDrafts,
-  loadingMarkConcluidaId,
+  loadingToggleId,
   loadingDeleteId,
   loadingSaveId,
   loadingSaveCommentId,
@@ -153,119 +154,124 @@ function GrupoAcoes({
 
               <div className="px-3 py-2.5">
                 <div className="border-l-2 border-indigo-100 pl-3 space-y-2">
-                  {grupo.acoes.map((acao) => (
-                    <div key={acao.id} className={`bg-white border rounded-lg px-3 py-2.5 ${isConcluida(acao.status) ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                        <p className={`text-sm font-medium truncate ${isConcluida(acao.status) ? 'text-emerald-700 line-through' : 'text-slate-800'}`}>{acao.titulo}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                          <span>Prazo: {formatarData(acao.data_prevista)}</span>
-                          <span>Status: {acao.status}</span>
-                          {acao.responsavel && <span>Resp.: {acao.responsavel}</span>}
-                          {isConcluida(acao.status) && <span className="font-semibold text-emerald-700">Concluída</span>}
-                        </div>
-                        </div>
+                  {grupo.acoes.map((acao) => {
+                    const draft = acaoDrafts[acao.id] || acao;
+                    const concluida = isConcluida(draft.status);
+                    const comentarios = extrairComentarios(draft.anotacoes);
+                    return (
+                      <div key={acao.id} className={`bg-white border rounded-lg px-3 py-2.5 ${concluida ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className={`text-sm font-medium truncate ${concluida ? 'text-emerald-700 line-through' : 'text-slate-800'}`}>{draft.titulo}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                              <span>Prazo: {formatarData(draft.data_prevista)}</span>
+                              {!!(draft.responsavel || '').trim() && <span>Resp.: {draft.responsavel}</span>}
+                              <span className={concluida ? 'font-semibold text-emerald-700' : ''}>{concluida ? 'Concluída' : (draft.status || 'Pendente')}</span>
+                            </div>
+                            {!!(draft.observacao || '').trim() && (
+                              <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">{draft.observacao}</p>
+                            )}
+                          </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {editingAcaoId === acao.id ? (
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => onSaveEdit(acao)}
-                              disabled={loadingSaveId === acao.id}
-                            >
-                              Salvar
-                            </Button>
-                          ) : (
-                            !isConcluida(acao.status) && (
+                          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                            {editingAcaoId === acao.id ? (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="h-8"
+                                onClick={() => onSaveEdit(acao)}
+                                disabled={loadingSaveId === acao.id}
+                              >
+                                Salvar
+                              </Button>
+                            ) : (
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                className="h-8"
-                                onClick={() => onMarkConcluida(acao)}
-                                disabled={loadingMarkConcluidaId === acao.id}
+                                className={`h-8 ${concluida ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : ''}`}
+                                onClick={() => onToggleConcluida(acao, !concluida)}
+                                disabled={loadingToggleId === acao.id}
                               >
                                 <Check className="w-3.5 h-3.5 mr-1" />
-                                Marcar concluída
+                                {concluida ? 'Desmarcar concluída' : 'Marcar concluída'}
                               </Button>
-                            )
-                          )}
-                          {editingAcaoId !== acao.id && (
-                            <Button variant="outline" size="sm" className="h-8" onClick={() => onStartEdit(acao)}>
-                              Editar
+                            )}
+                            {editingAcaoId !== acao.id && (
+                              <Button variant="outline" size="sm" className="h-8" onClick={() => onStartEdit(acao)}>
+                                Editar
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-rose-600"
+                              onClick={() => onDelete(acao)}
+                              disabled={loadingDeleteId === acao.id}
+                            >
+                              Excluir
                             </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-rose-600"
-                            onClick={() => onDelete(acao)}
-                            disabled={loadingDeleteId === acao.id}
-                          >
-                            Excluir
-                          </Button>
-                          <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenCard(grupo.card.id)}>
-                            Abrir card
-                          </Button>
+                            <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenCard(grupo.card.id)}>
+                              Abrir card
+                            </Button>
+                          </div>
                         </div>
-                      </div>
 
-                      {editingAcaoId === acao.id && (
-                        <div className="mt-2 border-t border-slate-100 pt-2 grid gap-2">
-                          <Input
-                            value={acaoDrafts[acao.id]?.titulo ?? acao.titulo}
-                            onChange={(event) => onChangeDraft(acao.id, 'titulo', event.target.value)}
-                            placeholder="Título da ação"
-                          />
-                          <div className="grid sm:grid-cols-2 gap-2">
+                        {editingAcaoId === acao.id && (
+                          <div className="mt-2 border-t border-slate-100 pt-2 grid gap-2">
                             <Input
-                              type="date"
-                              value={toDateKey(acaoDrafts[acao.id]?.data_prevista ?? acao.data_prevista) || ''}
-                              onChange={(event) => onChangeDraft(acao.id, 'data_prevista', event.target.value)}
+                              value={draft.titulo || ''}
+                              onChange={(event) => onChangeDraft(acao.id, 'titulo', event.target.value)}
+                              placeholder="Título da ação"
                             />
-                            <Input
-                              value={acaoDrafts[acao.id]?.responsavel ?? acao.responsavel}
-                              onChange={(event) => onChangeDraft(acao.id, 'responsavel', event.target.value)}
-                              placeholder="Responsável"
+                            <div className="grid sm:grid-cols-2 gap-2">
+                              <Input
+                                type="date"
+                                value={toDateKey(draft.data_prevista) || ''}
+                                onChange={(event) => onChangeDraft(acao.id, 'data_prevista', event.target.value)}
+                              />
+                              <Input
+                                value={draft.responsavel || ''}
+                                onChange={(event) => onChangeDraft(acao.id, 'responsavel', event.target.value)}
+                                placeholder="Responsável"
+                              />
+                            </div>
+                            <Textarea
+                              value={draft.observacao || ''}
+                              onChange={(event) => onChangeDraft(acao.id, 'observacao', event.target.value)}
+                              placeholder="Observações da ação"
+                              rows={2}
                             />
                           </div>
-                          <Textarea
-                            value={acaoDrafts[acao.id]?.observacao ?? acao.observacao}
-                            onChange={(event) => onChangeDraft(acao.id, 'observacao', event.target.value)}
-                            placeholder="Observações da ação"
-                            rows={2}
-                          />
-                        </div>
-                      )}
+                        )}
 
-                      <div className="mt-2 border-t border-slate-100 pt-2 space-y-1.5">
-                        <div className="flex gap-2">
-                          <Input
-                            value={commentDrafts[acao.id] || ''}
-                            onChange={(event) => onChangeComment(acao.id, event.target.value)}
-                            placeholder="Digite um comentário"
-                          />
-                          <Button
-                            size="sm"
-                            className="h-9"
-                            onClick={() => onSaveComment(acao)}
-                            disabled={loadingSaveCommentId === acao.id || !(commentDrafts[acao.id] || '').trim()}
-                          >
-                            Salvar comentário
-                          </Button>
-                        </div>
-                        <div className="space-y-0.5">
-                          {extrairComentarios(acao.anotacoes).length === 0 && <p className="text-[11px] text-slate-400">Sem comentários.</p>}
-                          {extrairComentarios(acao.anotacoes).map((comentario, index) => (
-                            <p key={`${acao.id}-comentario-${index}`} className="text-[11px] text-slate-500 truncate">
-                              {index + 1} - {comentario}
-                            </p>
-                          ))}
+                        <div className="mt-2 border-t border-slate-100 pt-2 space-y-1.5">
+                          <div className="flex gap-2">
+                            <Input
+                              value={commentDrafts[acao.id] || ''}
+                              onChange={(event) => onChangeComment(acao.id, event.target.value)}
+                              placeholder="Digite um comentário"
+                            />
+                            <Button
+                              size="sm"
+                              className="h-9"
+                              onClick={() => onSaveComment(acao)}
+                              disabled={loadingSaveCommentId === acao.id || !(commentDrafts[acao.id] || '').trim()}
+                            >
+                              Salvar comentário
+                            </Button>
+                          </div>
+                          <div className="space-y-0.5">
+                            {comentarios.length === 0 && <p className="text-[11px] text-slate-400">Sem comentários.</p>}
+                            {comentarios.map((comentario, index) => (
+                              <p key={`${acao.id}-comentario-${index}`} className="text-[11px] text-slate-500 truncate">
+                                {index + 1} - {comentario}
+                              </p>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </article>
@@ -312,7 +318,7 @@ export default function AgendaAcoesOperacionaisPage() {
     queryFn: () => listAllCardAcoes(3000),
   });
 
-  const atualizarStatusMutation = useMutation({
+  const toggleConclusaoMutation = useMutation({
     mutationFn: async ({ acao, status }) => {
       await updateCardAcao(acao.id, montarPayloadAcao({
         titulo: acao.titulo,
@@ -428,7 +434,7 @@ export default function AgendaAcoesOperacionaisPage() {
 
   const propsComunsGrupo = {
     onOpenCard: setCardAbertoId,
-    onMarkConcluida: (acao) => atualizarStatusMutation.mutate({ acao, status: 'Concluída' }),
+    onToggleConcluida: (acao, concluir) => toggleConclusaoMutation.mutate({ acao, status: concluir ? 'Concluída' : 'Pendente' }),
     onDelete: (acao) => excluirAcaoMutation.mutate(acao.id),
     onStartEdit: (acao) => {
       setEditingAcaoId(acao.id);
@@ -443,7 +449,7 @@ export default function AgendaAcoesOperacionaisPage() {
     editingAcaoId,
     acaoDrafts,
     commentDrafts,
-    loadingMarkConcluidaId: atualizarStatusMutation.isPending ? atualizarStatusMutation.variables?.acao?.id : null,
+    loadingToggleId: toggleConclusaoMutation.isPending ? toggleConclusaoMutation.variables?.acao?.id : null,
     loadingDeleteId: excluirAcaoMutation.isPending ? excluirAcaoMutation.variables : null,
     loadingSaveId: salvarEdicaoMutation.isPending ? salvarEdicaoMutation.variables?.acaoId : null,
     loadingSaveCommentId: salvarComentarioMutation.isPending ? salvarComentarioMutation.variables?.acao?.id : null,
@@ -452,7 +458,7 @@ export default function AgendaAcoesOperacionaisPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-4">
       <header className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Agenda de Ações v1.3</p>
+        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Agenda de Ações v2.0</p>
         <div className="mt-1 flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-slate-500" />
           <h1 className="text-lg font-bold text-slate-800">Ações Operacionais</h1>
