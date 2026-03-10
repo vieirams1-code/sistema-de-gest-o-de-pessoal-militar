@@ -42,6 +42,11 @@ export async function listCardAcoes(cardId) {
   return entity.filter({ card_id: cardId }, 'ordem', 200);
 }
 
+export async function listAllCardAcoes(limit = 2000) {
+  const { entity } = await resolveCardAcoesEntity();
+  return entity.list('-created_date', limit);
+}
+
 export async function createCardAcao(payload) {
   const { entity } = await resolveCardAcoesEntity();
   return entity.create(payload);
@@ -56,4 +61,3 @@ export async function deleteCardAcao(acaoId) {
   const { entity } = await resolveCardAcoesEntity();
   return entity.delete(acaoId);
 }
-

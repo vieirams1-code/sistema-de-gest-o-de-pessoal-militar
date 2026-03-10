@@ -47,6 +47,7 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import AgendaAcoesOperacionais from './pages/AgendaAcoesOperacionais';
 import AgendarJISO from './pages/AgendarJISO';
 import Armamentos from './pages/Armamentos';
 import Atestados from './pages/Atestados';
@@ -82,6 +83,7 @@ import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AgendarJISO": AgendarJISO,
     "Armamentos": Armamentos,
     "Atestados": Atestados,

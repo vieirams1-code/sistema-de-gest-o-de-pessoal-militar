@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext } from '@hello-pangea/dnd';
+import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,7 @@ export default function QuadroOperacionalPage() {
   const [colunaNovoCard, setColunaNovoCard] = useState(null);
   const [salvandoCard, setSalvandoCard] = useState(false);
   const [movendo, setMovendo] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: quadros = [], isLoading: loadQ } = useQuery({
     queryKey: ['quadros'],
@@ -91,6 +93,19 @@ export default function QuadroOperacionalPage() {
     const base = busca.trim() ? cardsFiltrados : cardsComResumo;
     return groupCardsByColuna(base, colunas);
   }, [cardsFiltrados, cardsComResumo, colunas, busca]);
+
+  useEffect(() => {
+    const cardId = searchParams.get('cardId');
+    if (!cardId || !cardsComResumo.length) return;
+
+    const alvo = cardsComResumo.find((card) => card.id === cardId);
+    if (!alvo) return;
+
+    setCardAberto(alvo);
+    const next = new URLSearchParams(searchParams);
+    next.delete('cardId');
+    setSearchParams(next, { replace: true });
+  }, [cardsComResumo, searchParams, setSearchParams]);
 
   const criarCard = async (form) => {
     setSalvandoCard(true);

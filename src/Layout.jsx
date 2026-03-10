@@ -21,6 +21,7 @@ import {
   Sword,
   FilePenLine,
   FolderKanban,
+  CalendarClock,
   Wrench,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ const menuGroups = [
     title: 'Gestão',
     items: [
       { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban },
+      { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock },
       { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen },
       { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
