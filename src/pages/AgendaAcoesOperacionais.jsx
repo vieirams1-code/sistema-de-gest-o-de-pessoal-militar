@@ -3,8 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Clock3, AlertTriangle, ExternalLink, Check } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import CardDetalheModal from '@/components/quadro/CardDetalheModal';
-import { listAllCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
+import { deleteCardAcao, listAllCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 function getPrimeiroValor(item, campos = []) {
   for (const campo of campos) {
@@ -94,7 +96,27 @@ function montarPayloadAcao(payload) {
   };
 }
 
-function GrupoAcoes({ titulo, descricao, icon: Icon, grupos, onOpenCard, onToggleConcluir, togglingAcaoId }) {
+function GrupoAcoes({
+  titulo,
+  descricao,
+  icon: Icon,
+  grupos,
+  onOpenCard,
+  onMarkConcluida,
+  onDelete,
+  onStartEdit,
+  onChangeDraft,
+  onSaveEdit,
+  onChangeComment,
+  onSaveComment,
+  editingAcaoId,
+  acaoDrafts,
+  commentDrafts,
+  loadingMarkConcluidaId,
+  loadingDeleteId,
+  loadingSaveId,
+  loadingSaveCommentId,
+}) {
   return (
     <section className="bg-white border border-slate-200 rounded-xl shadow-sm">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -132,27 +154,56 @@ function GrupoAcoes({ titulo, descricao, icon: Icon, grupos, onOpenCard, onToggl
               <div className="px-3 py-2.5">
                 <div className="border-l-2 border-indigo-100 pl-3 space-y-2">
                   {grupo.acoes.map((acao) => (
-                    <div key={acao.id} className="bg-white border border-slate-200 rounded-lg px-3 py-2.5">
+                    <div key={acao.id} className={`bg-white border rounded-lg px-3 py-2.5 ${isConcluida(acao.status) ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{acao.titulo}</p>
+                        <p className={`text-sm font-medium truncate ${isConcluida(acao.status) ? 'text-emerald-700 line-through' : 'text-slate-800'}`}>{acao.titulo}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                           <span>Prazo: {formatarData(acao.data_prevista)}</span>
                           <span>Status: {acao.status}</span>
                           {acao.responsavel && <span>Resp.: {acao.responsavel}</span>}
+                          {isConcluida(acao.status) && <span className="font-semibold text-emerald-700">Concluída</span>}
                         </div>
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {editingAcaoId === acao.id ? (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => onSaveEdit(acao)}
+                              disabled={loadingSaveId === acao.id}
+                            >
+                              Salvar
+                            </Button>
+                          ) : (
+                            !isConcluida(acao.status) && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="h-8"
+                                onClick={() => onMarkConcluida(acao)}
+                                disabled={loadingMarkConcluidaId === acao.id}
+                              >
+                                <Check className="w-3.5 h-3.5 mr-1" />
+                                Marcar concluída
+                              </Button>
+                            )
+                          )}
+                          {editingAcaoId !== acao.id && (
+                            <Button variant="outline" size="sm" className="h-8" onClick={() => onStartEdit(acao)}>
+                              Editar
+                            </Button>
+                          )}
                           <Button
-                            variant="secondary"
+                            variant="outline"
                             size="sm"
-                            className="h-8"
-                            onClick={() => onToggleConcluir(acao)}
-                            disabled={togglingAcaoId === acao.id}
+                            className="h-8 text-rose-600"
+                            onClick={() => onDelete(acao)}
+                            disabled={loadingDeleteId === acao.id}
                           >
-                            <Check className="w-3.5 h-3.5 mr-1" />
-                            {isConcluida(acao.status) ? 'Desmarcar' : 'Concluir'}
+                            Excluir
                           </Button>
                           <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenCard(grupo.card.id)}>
                             Abrir card
@@ -160,15 +211,59 @@ function GrupoAcoes({ titulo, descricao, icon: Icon, grupos, onOpenCard, onToggl
                         </div>
                       </div>
 
-                      {extrairComentarios(acao.anotacoes).length > 0 && (
-                        <div className="mt-2 border-t border-slate-100 pt-1.5 space-y-0.5">
+                      {editingAcaoId === acao.id && (
+                        <div className="mt-2 border-t border-slate-100 pt-2 grid gap-2">
+                          <Input
+                            value={acaoDrafts[acao.id]?.titulo ?? acao.titulo}
+                            onChange={(event) => onChangeDraft(acao.id, 'titulo', event.target.value)}
+                            placeholder="Título da ação"
+                          />
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <Input
+                              type="date"
+                              value={toDateKey(acaoDrafts[acao.id]?.data_prevista ?? acao.data_prevista) || ''}
+                              onChange={(event) => onChangeDraft(acao.id, 'data_prevista', event.target.value)}
+                            />
+                            <Input
+                              value={acaoDrafts[acao.id]?.responsavel ?? acao.responsavel}
+                              onChange={(event) => onChangeDraft(acao.id, 'responsavel', event.target.value)}
+                              placeholder="Responsável"
+                            />
+                          </div>
+                          <Textarea
+                            value={acaoDrafts[acao.id]?.observacao ?? acao.observacao}
+                            onChange={(event) => onChangeDraft(acao.id, 'observacao', event.target.value)}
+                            placeholder="Observações da ação"
+                            rows={2}
+                          />
+                        </div>
+                      )}
+
+                      <div className="mt-2 border-t border-slate-100 pt-2 space-y-1.5">
+                        <div className="flex gap-2">
+                          <Input
+                            value={commentDrafts[acao.id] || ''}
+                            onChange={(event) => onChangeComment(acao.id, event.target.value)}
+                            placeholder="Digite um comentário"
+                          />
+                          <Button
+                            size="sm"
+                            className="h-9"
+                            onClick={() => onSaveComment(acao)}
+                            disabled={loadingSaveCommentId === acao.id || !(commentDrafts[acao.id] || '').trim()}
+                          >
+                            Salvar comentário
+                          </Button>
+                        </div>
+                        <div className="space-y-0.5">
+                          {extrairComentarios(acao.anotacoes).length === 0 && <p className="text-[11px] text-slate-400">Sem comentários.</p>}
                           {extrairComentarios(acao.anotacoes).map((comentario, index) => (
                             <p key={`${acao.id}-comentario-${index}`} className="text-[11px] text-slate-500 truncate">
                               {index + 1} - {comentario}
                             </p>
                           ))}
                         </div>
-                      )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -184,6 +279,9 @@ function GrupoAcoes({ titulo, descricao, icon: Icon, grupos, onOpenCard, onToggl
 export default function AgendaAcoesOperacionaisPage() {
   const queryClient = useQueryClient();
   const [cardAbertoId, setCardAbertoId] = useState(null);
+  const [editingAcaoId, setEditingAcaoId] = useState(null);
+  const [acaoDrafts, setAcaoDrafts] = useState({});
+  const [commentDrafts, setCommentDrafts] = useState({});
 
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
@@ -231,6 +329,43 @@ export default function AgendaAcoesOperacionaisPage() {
     },
   });
 
+  const salvarEdicaoMutation = useMutation({
+    mutationFn: async ({ acaoId, payload }) => updateCardAcao(acaoId, montarPayloadAcao(payload)),
+    onSuccess: () => {
+      setEditingAcaoId(null);
+      queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
+      queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
+    },
+  });
+
+  const excluirAcaoMutation = useMutation({
+    mutationFn: (acaoId) => deleteCardAcao(acaoId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
+      queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
+    },
+  });
+
+  const salvarComentarioMutation = useMutation({
+    mutationFn: async ({ acao, comentario }) => {
+      const comentariosAtuais = extrairComentarios(acao.anotacoes);
+      const anotacoesAtualizadas = [...comentariosAtuais, comentario].join('\n');
+      await updateCardAcao(acao.id, montarPayloadAcao({
+        titulo: acao.titulo,
+        data_prevista: acao.data_prevista,
+        status: acao.status,
+        responsavel: acao.responsavel,
+        observacao: acao.observacao,
+        anotacoes: anotacoesAtualizadas,
+      }));
+    },
+    onSuccess: (_, variables) => {
+      setCommentDrafts((anterior) => ({ ...anterior, [variables.acao.id]: '' }));
+      queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
+      queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
+    },
+  });
+
   const { atrasadas, hoje, proximas, cardSelecionado, colunaCardSelecionado } = useMemo(() => {
     const mapaCards = new Map(cards.map((card) => [card.id, card]));
     const mapaColunas = new Map(colunas.map((coluna) => [coluna.id, coluna]));
@@ -240,7 +375,6 @@ export default function AgendaAcoesOperacionaisPage() {
 
     acoesRaw
       .map(normalizarAcao)
-      .filter((acao) => !isConcluida(acao.status))
       .forEach((acao) => {
         const card = mapaCards.get(acao.card_id);
         if (!card) return;
@@ -292,10 +426,33 @@ export default function AgendaAcoesOperacionaisPage() {
     };
   }, [acoesRaw, cards, colunas, cardAbertoId]);
 
+  const propsComunsGrupo = {
+    onOpenCard: setCardAbertoId,
+    onMarkConcluida: (acao) => atualizarStatusMutation.mutate({ acao, status: 'Concluída' }),
+    onDelete: (acao) => excluirAcaoMutation.mutate(acao.id),
+    onStartEdit: (acao) => {
+      setEditingAcaoId(acao.id);
+      setAcaoDrafts((anterior) => ({ ...anterior, [acao.id]: { ...acao } }));
+    },
+    onChangeDraft: (acaoId, campo, valor) => {
+      setAcaoDrafts((anterior) => ({ ...anterior, [acaoId]: { ...(anterior[acaoId] || {}), [campo]: valor } }));
+    },
+    onSaveEdit: (acao) => salvarEdicaoMutation.mutate({ acaoId: acao.id, payload: acaoDrafts[acao.id] || acao }),
+    onChangeComment: (acaoId, valor) => setCommentDrafts((anterior) => ({ ...anterior, [acaoId]: valor })),
+    onSaveComment: (acao) => salvarComentarioMutation.mutate({ acao, comentario: (commentDrafts[acao.id] || '').trim() }),
+    editingAcaoId,
+    acaoDrafts,
+    commentDrafts,
+    loadingMarkConcluidaId: atualizarStatusMutation.isPending ? atualizarStatusMutation.variables?.acao?.id : null,
+    loadingDeleteId: excluirAcaoMutation.isPending ? excluirAcaoMutation.variables : null,
+    loadingSaveId: salvarEdicaoMutation.isPending ? salvarEdicaoMutation.variables?.acaoId : null,
+    loadingSaveCommentId: salvarComentarioMutation.isPending ? salvarComentarioMutation.variables?.acao?.id : null,
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-4">
       <header className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Agenda de Ações v1.1</p>
+        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Agenda de Ações v1.3</p>
         <div className="mt-1 flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-slate-500" />
           <h1 className="text-lg font-bold text-slate-800">Ações Operacionais</h1>
@@ -308,27 +465,21 @@ export default function AgendaAcoesOperacionaisPage() {
         descricao="Prazo menor que hoje"
         icon={AlertTriangle}
         grupos={atrasadas}
-        onOpenCard={setCardAbertoId}
-        onToggleConcluir={(acao) => atualizarStatusMutation.mutate({ acao, status: isConcluida(acao.status) ? 'Pendente' : 'Concluída' })}
-        togglingAcaoId={atualizarStatusMutation.variables?.acao?.id}
+        {...propsComunsGrupo}
       />
       <GrupoAcoes
         titulo="Hoje"
         descricao="Prazo do dia"
         icon={Clock3}
         grupos={hoje}
-        onOpenCard={setCardAbertoId}
-        onToggleConcluir={(acao) => atualizarStatusMutation.mutate({ acao, status: isConcluida(acao.status) ? 'Pendente' : 'Concluída' })}
-        togglingAcaoId={atualizarStatusMutation.variables?.acao?.id}
+        {...propsComunsGrupo}
       />
       <GrupoAcoes
         titulo="Próximas"
         descricao="Sem prazo vencido"
         icon={CalendarClock}
         grupos={proximas}
-        onOpenCard={setCardAbertoId}
-        onToggleConcluir={(acao) => atualizarStatusMutation.mutate({ acao, status: isConcluida(acao.status) ? 'Pendente' : 'Concluída' })}
-        togglingAcaoId={atualizarStatusMutation.variables?.acao?.id}
+        {...propsComunsGrupo}
       />
 
       {cardSelecionado && (
