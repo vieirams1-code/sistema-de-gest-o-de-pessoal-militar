@@ -59,8 +59,8 @@ import CadastrarMilitar from './pages/CadastrarMilitar';
 import CadastrarPublicacao from './pages/CadastrarPublicacao';
 import CadastrarPunicao from './pages/CadastrarPunicao';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
-import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import Configuracoes from './pages/Configuracoes';
+import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import DashboardAtestados from './pages/DashboardAtestados';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
@@ -73,13 +73,13 @@ import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import Processos from './pages/Processos';
 import Publicacoes from './pages/Publicacoes';
 import Punicoes from './pages/Punicoes';
-import QuadroOperacional from './pages/QuadroOperacional';
 import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
 import Subgrupamentos from './pages/Subgrupamentos';
 import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
+import QuadroOperacional from './pages/QuadroOperacional';
 import __Layout from './Layout.jsx';
 
 
@@ -96,8 +96,8 @@ export const PAGES = {
     "CadastrarPublicacao": CadastrarPublicacao,
     "CadastrarPunicao": CadastrarPunicao,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
-    "ConciliacaoBoletim": ConciliacaoBoletim,
     "Configuracoes": Configuracoes,
+    "ConciliacaoBoletim": ConciliacaoBoletim,
     "DashboardAtestados": DashboardAtestados,
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
@@ -110,13 +110,13 @@ export const PAGES = {
     "Processos": Processos,
     "Publicacoes": Publicacoes,
     "Punicoes": Punicoes,
-    "QuadroOperacional": QuadroOperacional,
     "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
     "Subgrupamentos": Subgrupamentos,
     "TemplatesTexto": TemplatesTexto,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
+    "QuadroOperacional": QuadroOperacional,
 }
 
 export const pagesConfig = {
