@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { sincronizarDataJisoCardAtestado } from '@/components/quadro/quadroHelpers';
+import { createCardAcao, deleteCardAcao, listCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -202,7 +203,7 @@ function AcoesSection({ cardId }) {
 
   const { data: acoes = [] } = useQuery({
     queryKey: ['card-acoes', cardId],
-    queryFn: () => base44.entities.CardAcao.filter({ card_id: cardId }, 'ordem', 200),
+    queryFn: () => listCardAcoes(cardId),
     enabled: !!cardId,
   });
 
@@ -227,7 +228,7 @@ function AcoesSection({ cardId }) {
     if (!novaAcao.titulo.trim() || criando) return;
     setCriando(true);
     try {
-      await base44.entities.CardAcao.create({
+      await createCardAcao({
         card_id: cardId,
         titulo: novaAcao.titulo.trim(),
         data_prevista: novaAcao.data_prevista || null,
@@ -247,7 +248,7 @@ function AcoesSection({ cardId }) {
     if (savingId === acao.id) return;
     setSavingId(acao.id);
     try {
-      await base44.entities.CardAcao.update(acao.id, payload);
+      await updateCardAcao(acao.id, payload);
       invalidateAcoes();
     } finally {
       setSavingId('');
@@ -258,7 +259,7 @@ function AcoesSection({ cardId }) {
     if (savingId === acaoId) return;
     setSavingId(acaoId);
     try {
-      await base44.entities.CardAcao.delete(acaoId);
+      await deleteCardAcao(acaoId);
       invalidateAcoes();
     } finally {
       setSavingId('');
