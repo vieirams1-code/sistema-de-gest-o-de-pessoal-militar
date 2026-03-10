@@ -74,23 +74,21 @@ function extrairNotasDoBoletim(texto) {
   return notas;
 }
 
-// Lê o PDF e retorna o texto
+// Lê o PDF e retorna o texto via LLM (evita import CDN que conflita com React)
 async function lerPDF(file) {
-  const pdfjsLib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.mjs');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.mjs';
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let textoCompleto = '';
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items.map(item => item.str).join(' ');
-    textoCompleto += pageText + '\n';
-  }
-
-  return textoCompleto;
+  const { base44 } = await import('@/api/base44Client');
+  const { file_url } = await base44.integrations.Core.UploadFile({ file });
+  const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
+    file_url,
+    json_schema: {
+      type: 'object',
+      properties: {
+        texto: { type: 'string', description: 'Todo o texto extraído do PDF, mantendo a estrutura de parágrafos com quebras de linha' }
+      }
+    }
+  });
+  if (result.status !== 'success') throw new Error(result.details || 'Falha ao extrair texto do PDF');
+  return result.output?.texto || '';
 }
 
 export default function ConciliacaoBoletim() {
