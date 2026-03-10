@@ -317,34 +317,34 @@ function AcoesSection({ cardId }) {
   };
 
   return (
-    <section className="rounded-xl border-2 border-blue-100 bg-gradient-to-b from-blue-50/80 to-white p-4 space-y-4 shadow-sm">
+    <section className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-3 shadow-sm">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+        <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
           <ListTodo className="w-4 h-4" />
         </div>
-        <h3 className="text-sm font-bold text-blue-900 tracking-wide">Ações <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">v2.1</span></h3>
+        <h3 className="text-sm font-bold text-blue-900 tracking-wide">Ações <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">v2.2</span></h3>
       </div>
 
-      <div className="rounded-xl border border-blue-200 bg-white p-3 space-y-2">
-        <p className="text-xs font-bold text-blue-800 uppercase tracking-wide">Nova ação</p>
+      <div className="rounded-lg border border-blue-200 bg-white p-2.5 space-y-2">
+        <p className="text-[11px] font-bold text-blue-800 uppercase tracking-wide">Nova ação</p>
         <Input
           value={novaAcao.titulo}
           onChange={(e) => setNovaAcao((prev) => ({ ...prev, titulo: e.target.value }))}
-          placeholder="Título da ação"
-          className="h-9 text-sm bg-slate-50 border-slate-200"
+          placeholder="Título"
+          className="h-8 text-xs bg-slate-50 border-slate-200"
         />
         <div className="grid grid-cols-2 gap-2">
           <Input
             type="date"
             value={novaAcao.data_prevista}
             onChange={(e) => setNovaAcao((prev) => ({ ...prev, data_prevista: e.target.value }))}
-            className="h-9 text-sm bg-slate-50 border-slate-200"
+            className="h-8 text-xs bg-slate-50 border-slate-200"
           />
           <Select
             value={novaAcao.status}
             onValueChange={(value) => setNovaAcao((prev) => ({ ...prev, status: value }))}
           >
-            <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
             <SelectContent>
               {ACOES_STATUS.map((status) => (
                 <SelectItem key={status} value={status}>{status}</SelectItem>
@@ -355,27 +355,32 @@ function AcoesSection({ cardId }) {
         <Textarea
           value={novaAcao.observacao}
           onChange={(e) => setNovaAcao((prev) => ({ ...prev, observacao: e.target.value }))}
-          rows={3}
-          placeholder="Observação da ação"
-          className="text-sm resize-none min-h-20 bg-slate-50 border-slate-200"
+          rows={2}
+          placeholder="Descrição curta"
+          className="text-xs resize-none min-h-14 bg-slate-50 border-slate-200"
         />
         <div className="flex justify-end">
-          <Button onClick={criarAcao} size="sm" disabled={criando || !novaAcao.titulo.trim()} className="h-9 text-sm gap-1.5 bg-blue-600 hover:bg-blue-700">
+          <Button onClick={criarAcao} size="sm" disabled={criando || !novaAcao.titulo.trim()} className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700">
             <Plus className="w-3.5 h-3.5" /> {criando ? 'Adicionando...' : 'Adicionar ação'}
           </Button>
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
-        <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">Ações cadastradas</p>
+      <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2">
+        <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Ações cadastradas</p>
         {acoes.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">Nenhuma ação cadastrada.</p>}
         {acoes.map((acao) => (
-          <div key={acao.id} className="bg-white border border-slate-200 rounded-lg p-3 space-y-3 shadow-sm">
+          <div key={acao.id} className="bg-white border border-slate-200 rounded-md p-2.5 space-y-2">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-bold text-slate-900 leading-tight">{acao.titulo}</p>
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-semibold text-slate-900 leading-tight truncate">{acao.titulo}</p>
+                <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">
+                  {acao.observacao?.trim() ? acao.observacao : 'Sem descrição curta.'}
+                </p>
+              </div>
               <button
                 onClick={() => excluirAcao(acao.id)}
-                className="text-slate-300 hover:text-red-400 transition-colors"
+                className="text-slate-300 hover:text-red-500 transition-colors shrink-0"
                 disabled={savingId === acao.id}
                 title="Excluir ação"
               >
@@ -383,7 +388,7 @@ function AcoesSection({ cardId }) {
               </button>
             </div>
 
-            <div className="flex flex-wrap gap-2 text-[11px]">
+            <div className="flex flex-wrap gap-1.5 text-[10px]">
               <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
                 {acao.data_prevista ? `Prevista: ${new Date(`${acao.data_prevista}T00:00:00`).toLocaleDateString('pt-BR')}` : 'Sem data'}
               </span>
@@ -392,11 +397,7 @@ function AcoesSection({ cardId }) {
               </span>
             </div>
 
-            <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-2 leading-relaxed">
-              {acao.observacao?.trim() ? acao.observacao : 'Sem observação.'}
-            </p>
-
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid grid-cols-1 gap-1.5">
               <Textarea
                 value={editingAcao[acao.id]?.observacao || ''}
                 onChange={(e) => setEditingAcao((prev) => ({
@@ -404,13 +405,13 @@ function AcoesSection({ cardId }) {
                   [acao.id]: { ...(prev[acao.id] || {}), observacao: e.target.value },
                 }))}
                 rows={2}
-                className="text-xs resize-none min-h-16 bg-white"
-                placeholder="Editar observação"
+                className="text-[11px] resize-none min-h-12 bg-white"
+                placeholder="Descrição curta"
                 disabled={savingId === acao.id}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               <Input
                 type="date"
                 value={editingAcao[acao.id]?.data_prevista || ''}
@@ -418,7 +419,7 @@ function AcoesSection({ cardId }) {
                   ...prev,
                   [acao.id]: { ...(prev[acao.id] || {}), data_prevista: e.target.value },
                 }))}
-                className="h-7 text-xs bg-white"
+                className="h-7 text-[11px] bg-white"
                 disabled={savingId === acao.id}
               />
               <Select
@@ -429,7 +430,7 @@ function AcoesSection({ cardId }) {
                 }))}
                 disabled={savingId === acao.id}
               >
-                <SelectTrigger className="h-7 text-xs bg-white"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-7 text-[11px] bg-white"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {ACOES_STATUS.map((status) => (
                     <SelectItem key={status} value={status}>{status}</SelectItem>
@@ -440,24 +441,8 @@ function AcoesSection({ cardId }) {
 
             <div className="flex justify-end gap-2">
               <Button
-                variant="outline"
                 size="sm"
-                className="h-7 text-xs"
-                onClick={() => setEditingAcao((prev) => ({
-                  ...prev,
-                  [acao.id]: {
-                    data_prevista: acao.data_prevista || '',
-                    status: acao.status || 'Pendente',
-                    observacao: acao.observacao || '',
-                  },
-                }))}
-                disabled={savingId === acao.id}
-              >
-                Reverter
-              </Button>
-              <Button
-                size="sm"
-                className="h-7 text-xs"
+                className="h-7 text-[11px]"
                 onClick={() => atualizarAcao(acao)}
                 disabled={savingId === acao.id}
               >
@@ -467,7 +452,7 @@ function AcoesSection({ cardId }) {
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="h-7 text-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                  className="h-7 text-[11px] bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
                   onClick={async () => {
                     if (savingId === acao.id) return;
                     const draft = editingAcao[acao.id] || {};
