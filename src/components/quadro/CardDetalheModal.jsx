@@ -74,11 +74,6 @@ function montarPayloadAcao(payload) {
   };
 }
 
-function extrairComentarios(anotacoes) {
-  if (!anotacoes) return [];
-  return anotacoes.split('\n').map((c) => c.trim()).filter(Boolean);
-}
-
 function SectionCard({ title, children, icon: Icon }) {
   return (
     <section className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 shadow-sm">
@@ -924,3 +919,4 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     </div>
   );
 }
+
