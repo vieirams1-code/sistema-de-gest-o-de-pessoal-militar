@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   X, Calendar, User, Tag, MessageSquare, Link2,
   Send, Plus, Check, Trash2, AlertTriangle, Cpu, ArrowRightLeft,
-  RefreshCw, Bell, SquareCheckBig,
+  RefreshCw, Bell, SquareCheckBig, ArrowUpRight,
 } from 'lucide-react';
 
 const TIPO_COMENTARIO_CONFIG = {
@@ -336,7 +336,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
       const cardAtualizado = await base44.entities.CardOperacional.update(card.id, payload);
       await base44.entities.CardComentario.create({
         card_id: card.id,
-        mensagem: `Card encaminhado para decisão de ${encaminhadoParaNome.trim()}, por ${encaminhadoPorNome.trim()}.`,
+        mensagem: `Card encaminhado para decisão de ${encaminhadoParaNome.trim()}, por ${encaminhadoPorNome.trim()}${observacaoEncaminhamento.trim() ? `. Contexto: ${observacaoEncaminhamento.trim()}` : ''}.`,
         tipo_registro: 'Sistema',
         data_hora: agora,
         origem_automatica: true,
@@ -374,7 +374,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
       const cardAtualizado = await base44.entities.CardOperacional.update(card.id, payload);
       await base44.entities.CardComentario.create({
         card_id: card.id,
-        mensagem: `Card devolvido por ${devolvidoPorNome.trim()} com orientação.`,
+        mensagem: `Card devolvido por ${devolvidoPorNome.trim()} com orientação${observacaoDevolucao.trim() ? `: ${observacaoDevolucao.trim()}` : '.'}`,
         tipo_registro: 'Sistema',
         data_hora: agora,
         origem_automatica: true,
@@ -528,33 +528,36 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
             </div>
           </div>
 
-          <div className="space-y-2 bg-slate-50 rounded-lg p-3 border border-slate-100">
+          <div className={`space-y-3 rounded-lg p-3 border ${card.aguardando_decisao ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Decisão</p>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${card.aguardando_decisao ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Status de decisão</p>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${card.aguardando_decisao ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-700'}`}>
                 {card.aguardando_decisao ? 'Aguardando decisão' : (card.status_decisao || 'Sem pendência')}
               </span>
             </div>
 
-            {(card.encaminhado_em || card.devolvido_em) && (
-              <div className="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-md p-2 space-y-1">
-                {card.encaminhado_em && (
-                  <p>
-                    Encaminhado para <strong>{card.encaminhado_para_nome || '-'}</strong> por <strong>{card.encaminhado_por_nome || '-'}</strong> em {formatDateTime(card.encaminhado_em)}.
-                  </p>
-                )}
-                {card.observacao_encaminhamento && <p>Obs. encaminhamento: {card.observacao_encaminhamento}</p>}
+            {(card.encaminhado_em || card.devolvido_em || card.observacao_encaminhamento || card.observacao_devolucao) && (
+              <div className="text-[11px] text-slate-700 bg-white border border-slate-200 rounded-md p-2.5 space-y-2">
+                <p><span className="font-semibold text-slate-500">Status:</span> {card.aguardando_decisao ? 'Aguardando decisão' : (card.status_decisao || 'Sem pendência')}</p>
+                <p><span className="font-semibold text-slate-500">Encaminhado para:</span> {card.encaminhado_para_nome || '-'}</p>
+                <p><span className="font-semibold text-slate-500">Encaminhado por:</span> {card.encaminhado_por_nome || '-'}</p>
+                <p><span className="font-semibold text-slate-500">Encaminhado em:</span> {card.encaminhado_em ? formatDateTime(card.encaminhado_em) : '-'}</p>
+                <p className="whitespace-pre-wrap"><span className="font-semibold text-slate-500">Observação do encaminhamento:</span> {card.observacao_encaminhamento || '-'}</p>
+
                 {card.devolvido_em && (
-                  <p>
-                    Devolvido por <strong>{card.devolvido_por_nome || '-'}</strong> em {formatDateTime(card.devolvido_em)}.
-                  </p>
+                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                    <p className="font-semibold text-slate-500">Última devolução registrada</p>
+                    <p><span className="font-semibold text-slate-500">Devolvido por:</span> {card.devolvido_por_nome || '-'}</p>
+                    <p><span className="font-semibold text-slate-500">Devolvido em:</span> {formatDateTime(card.devolvido_em)}</p>
+                    <p className="whitespace-pre-wrap"><span className="font-semibold text-slate-500">Orientação:</span> {card.observacao_devolucao || '-'}</p>
+                  </div>
                 )}
-                {card.observacao_devolucao && <p>Orientação: {card.observacao_devolucao}</p>}
               </div>
             )}
 
             {!card.aguardando_decisao ? (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
+                <p className="text-[11px] text-slate-500">Encaminhe este card para decisão e registre o contexto para que o estado operacional fique explícito.</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Para quem</label>
@@ -597,7 +600,15 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5 border border-amber-200 bg-white rounded-md p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold text-amber-800 uppercase tracking-wide">Ação necessária</p>
+                  <span className="text-[10px] text-amber-700 inline-flex items-center gap-1">
+                    <ArrowUpRight className="w-3 h-3" />
+                    Registrar devolução
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-800">Este card está aguardando decisão. Preencha os campos abaixo para devolver decisão de forma explícita.</p>
                 <div>
                   <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Devolvido por</label>
                   <Input
@@ -620,7 +631,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 <div className="flex justify-end">
                   <Button
                     size="sm"
-                    className="h-8 text-xs"
+                    className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white"
                     disabled={salvandoDecisao || !devolvidoPorNome.trim()}
                     onClick={devolverDecisao}
                   >
