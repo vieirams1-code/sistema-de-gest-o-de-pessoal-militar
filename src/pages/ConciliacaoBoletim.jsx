@@ -45,11 +45,16 @@ function normalizarNota(valor = '') {
 function extrairTextoLegivel(raw) {
   return raw
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ')
-    .replace(/[{}<>\[\]\\/]{3,}/g, ' ')
+    .replace(/[\uFFFD]/g, ' ')
+    .replace(/\(([^)]{0,180})\)\s*Tj/g, ' $1\n')
+    .replace(/\[(.*?)\]\s*TJ/gs, (_, bloco = '') => bloco.replace(/\(([^)]{0,180})\)/g, ' $1'))
     .replace(/\r/g, '\n')
     .replace(/\f/g, '\n')
-    .replace(/(nota(?:\s+para\s+boletim)?\s*(?:n[º°o\.]|numero)?\s*[:\-]?\s*\d{4,8})/gi, '\n$1')
-    .replace(/\n{2,}/g, '\n')
+    .replace(/[{}<>\[\]\\/]{2,}/g, ' ')
+    .replace(/[^\p{L}\d\n.,:;\-º°()/ ]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .replace(/(NOTA\s+N(?:\.|º|°)?\s*\d{4,8})/gi, '\n$1\n')
     .trim();
 }
 
@@ -78,44 +83,35 @@ function notaValida(notaNorm) {
   return true;
 }
 
-function extrairNotasDoTexto(rawText, notasSistema = []) {
+function extrairNotasDoTexto(rawText) {
   if (!rawText?.length) return [];
 
   const texto = extrairTextoLegivel(rawText);
   const linhas = texto
     .split(/\n+/)
-    .flatMap((linha) => linha.split(/(?<=[.;:])\s+(?=[A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ])/g))
+    .flatMap((linha) => linha.split(/(?<=[.;:])\s+(?=NOTA\s+N)/gi))
     .map((linha) => linha.replace(/\s+/g, ' ').trim())
     .filter((linha) => linha && !textoPareceEstrutural(linha));
 
-  const keywordRegex = /\b(nota(?:\s+para\s+boletim)?|n[º°o\.]|boletim|bg)\b/i;
-  const regexContextual = /(?:nota(?:\s+para\s+boletim)?\s*(?:n(?:[º°o\.]|umero)?\s*)?[:\-]?\s*)(\d{4,8})(?!\d)/gi;
-  const regexNumeros = /(?<!\d)(\d{4,8})(?!\d)/g;
+  const regexContextual = /\bNOTA\s+N(?:\.|º|°)?\s*[:\-]?\s*([1-9]\d{3,7})\b/gi;
   const encontrados = [];
   const vistos = new Set();
 
   for (const linha of linhas) {
-    const numerosDaLinha = [...linha.matchAll(regexNumeros)].map((match) => match[1]);
-    const notasContextuais = [...linha.matchAll(regexContextual)].map((match) => match[1]);
+    const notasContextuais = [...linha.matchAll(regexContextual)];
 
-    const linhaTemContexto = keywordRegex.test(linha);
-    const candidatos = new Set(notasContextuais);
-
-    if (linhaTemContexto) {
-      numerosDaLinha.forEach((numero) => candidatos.add(numero));
-    }
-
-    if (notasSistema.length) {
-      const notasDaLinha = numerosDaLinha.filter((numero) => notasSistema.includes(normalizarNota(numero)));
-      notasDaLinha.forEach((numero) => candidatos.add(numero));
-    }
-
-    for (const candidato of candidatos) {
+    for (const match of notasContextuais) {
+      const candidato = match[1];
       const notaNorm = normalizarNota(candidato);
       if (!notaValida(notaNorm)) continue;
-      if (!linhaTemContexto && !notasSistema.includes(notaNorm)) continue;
+      if (notaNorm === '00000') continue;
 
-      const key = `${notaNorm}-${linha.slice(0, 70)}`;
+      const inicioMatch = Math.max((match.index || 0) - 55, 0);
+      const finalMatch = Math.min((match.index || 0) + match[0].length + 55, linha.length);
+      const contextoCru = linha.slice(inicioMatch, finalMatch).replace(/\s+/g, ' ').trim();
+      const contexto = contextoCru.length > 170 ? `${contextoCru.slice(0, 170)}...` : contextoCru;
+
+      const key = `${notaNorm}-${contexto.slice(0, 80)}`;
       if (vistos.has(key)) continue;
 
       vistos.add(key);
@@ -123,7 +119,7 @@ function extrairNotasDoTexto(rawText, notasSistema = []) {
         id: key,
         nota: notaNorm,
         nota_normalizada: notaNorm,
-        contexto: linha.length > 160 ? `${linha.slice(0, 160)}...` : linha,
+        contexto,
         pagina: null,
       });
     }
@@ -132,11 +128,11 @@ function extrairNotasDoTexto(rawText, notasSistema = []) {
   return encontrados;
 }
 
-async function extrairNotasPdf(file, notasSistema = []) {
+async function extrairNotasPdf(file) {
   const buffer = await file.arrayBuffer();
   const latin = new TextDecoder('latin1').decode(buffer);
   const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
-  const notas = [...extrairNotasDoTexto(latin, notasSistema), ...extrairNotasDoTexto(utf8, notasSistema)];
+  const notas = [...extrairNotasDoTexto(latin), ...extrairNotasDoTexto(utf8)];
 
   const porNota = new Map();
   for (const nota of notas) {
@@ -252,8 +248,7 @@ export default function ConciliacaoBoletim() {
 
     setProcessandoPdf(true);
     try {
-      const notasSistema = pendentes.map((item) => item.nota_normalizada).filter(Boolean);
-      const notas = await extrairNotasPdf(arquivoPdf, notasSistema);
+      const notas = await extrairNotasPdf(arquivoPdf);
       setNotasEncontradas(notas);
       setVinculos({});
 
@@ -280,7 +275,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.1</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.2</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
