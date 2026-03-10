@@ -153,6 +153,32 @@ function calcularSimilaridadeDice(tokensA = [], tokensB = []) {
   return (2 * intersecao) / (tokensA.length + tokensB.length);
 }
 
+function calcularCoberturaReferencia(tokensReferencia = [], tokensComparados = []) {
+  if (!tokensReferencia.length || !tokensComparados.length) return 0;
+
+  const frequenciaReferencia = new Map();
+  const frequenciaComparados = new Map();
+
+  tokensReferencia.forEach((token) => frequenciaReferencia.set(token, (frequenciaReferencia.get(token) || 0) + 1));
+  tokensComparados.forEach((token) => frequenciaComparados.set(token, (frequenciaComparados.get(token) || 0) + 1));
+
+  let termosCobertos = 0;
+  frequenciaReferencia.forEach((countRef, token) => {
+    const countComp = frequenciaComparados.get(token) || 0;
+    termosCobertos += Math.min(countRef, countComp);
+  });
+
+  return termosCobertos / tokensReferencia.length;
+}
+
+function calcularPercentualTrechos(tokensSistema = [], tokensBoletim = []) {
+  const coberturaPublicacao = calcularCoberturaReferencia(tokensSistema, tokensBoletim);
+  const similaridadeDice = calcularSimilaridadeDice(tokensSistema, tokensBoletim);
+  const combinado = (coberturaPublicacao * 0.75) + (similaridadeDice * 0.25);
+
+  return Math.round(combinado * 100);
+}
+
 function classificarCorrespondencia(percentual) {
   if (percentual >= 80) {
     return { label: 'Alta correspondência', className: 'bg-emerald-100 text-emerald-700' };
@@ -177,6 +203,9 @@ function calcularCorrespondenciaTextual(textoSistema = '', trechoBoletim = '') {
     };
   }
 
+  const tokensSistema = sistemaNormalizado.split(' ').filter(Boolean);
+  const tokensBoletim = boletimNormalizado.split(' ').filter(Boolean);
+
   if (boletimNormalizado.includes(sistemaNormalizado)) {
     return {
       percentual: 100,
@@ -185,20 +214,17 @@ function calcularCorrespondenciaTextual(textoSistema = '', trechoBoletim = '') {
     };
   }
 
-  const tokensSistema = sistemaNormalizado.split(' ').filter(Boolean);
-  const tokensBoletim = boletimNormalizado.split(' ').filter(Boolean);
-
-  let melhorPercentual = Math.round(calcularSimilaridadeDice(tokensSistema, tokensBoletim) * 100);
+  let melhorPercentual = calcularPercentualTrechos(tokensSistema, tokensBoletim);
   let melhorTrecho = boletimNormalizado;
 
   const tamanhoSistema = tokensSistema.length;
-  const minJanela = Math.max(5, tamanhoSistema - 8);
-  const maxJanela = Math.min(tokensBoletim.length, tamanhoSistema + 8);
+  const minJanela = Math.max(5, Math.floor(tamanhoSistema * 0.6));
+  const maxJanela = Math.min(tokensBoletim.length, Math.max(minJanela, Math.ceil(tamanhoSistema * 1.4)));
 
   for (let janela = minJanela; janela <= maxJanela; janela += 1) {
     for (let inicio = 0; inicio <= tokensBoletim.length - janela; inicio += 1) {
       const trechoTokens = tokensBoletim.slice(inicio, inicio + janela);
-      const percentualAtual = Math.round(calcularSimilaridadeDice(tokensSistema, trechoTokens) * 100);
+      const percentualAtual = calcularPercentualTrechos(tokensSistema, trechoTokens);
 
       if (percentualAtual > melhorPercentual) {
         melhorPercentual = percentualAtual;
@@ -643,7 +669,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.6</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.7</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
