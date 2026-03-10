@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   X, Calendar, User, Tag, MessageSquare, Link2,
   Send, Plus, Check, Trash2, AlertTriangle, Cpu, ArrowRightLeft,
@@ -86,6 +90,35 @@ function formatDateTime(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function AcaoDatePicker({ value, onChange, disabled, placeholder = 'Selecionar data' }) {
+  const dataSelecionada = value ? parseISO(`${value}T00:00:00`) : undefined;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-8 w-full justify-start bg-white border-slate-200 text-[11px] font-normal"
+          disabled={disabled}
+        >
+          <Calendar className="mr-1.5 h-3.5 w-3.5 text-slate-500" />
+          {dataSelecionada ? format(dataSelecionada, 'dd/MM/yyyy', { locale: ptBR }) : <span className="text-slate-400">{placeholder}</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <CalendarPicker
+          mode="single"
+          selected={dataSelecionada}
+          onSelect={(date) => onChange(date ? format(date, 'yyyy-MM-dd') : '')}
+          initialFocus
+          locale={ptBR}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function ComentarioItem({ item, isLast }) {
@@ -355,11 +388,10 @@ function AcoesSection({ cardId }) {
             placeholder="Título da ação"
             className="h-8 text-xs bg-white border-slate-200 sm:col-span-2"
           />
-          <Input
-            type="date"
+          <AcaoDatePicker
             value={novaAcao.data_prevista}
-            onChange={(e) => setNovaAcao((prev) => ({ ...prev, data_prevista: e.target.value }))}
-            className="h-8 text-xs bg-white border-slate-200"
+            onChange={(value) => setNovaAcao((prev) => ({ ...prev, data_prevista: value }))}
+            disabled={criando}
           />
           <Input
             value={novaAcao.responsavel}
@@ -496,14 +528,12 @@ function AcoesSection({ cardId }) {
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                  <Input
-                    type="date"
+                  <AcaoDatePicker
                     value={editingAcao[acao.id]?.data_prevista || ''}
-                    onChange={(e) => setEditingAcao((prev) => ({
+                    onChange={(value) => setEditingAcao((prev) => ({
                       ...prev,
-                      [acao.id]: { ...(prev[acao.id] || {}), data_prevista: e.target.value },
+                      [acao.id]: { ...(prev[acao.id] || {}), data_prevista: value },
                     }))}
-                    className="h-7 text-[11px] bg-white"
                     disabled={savingId === acao.id}
                   />
                   <Input
