@@ -43,36 +43,87 @@ function normalizarNota(valor = '') {
 }
 
 function extrairTextoLegivel(raw) {
-  const semControle = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ');
-  return semControle.replace(/\s+/g, ' ').trim();
+  return raw
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ')
+    .replace(/[{}<>\[\]\\/]{3,}/g, ' ')
+    .replace(/\r/g, '\n')
+    .replace(/\f/g, '\n')
+    .replace(/(nota(?:\s+para\s+boletim)?\s*(?:n[º°o\.]|numero)?\s*[:\-]?\s*\d{4,8})/gi, '\n$1')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
 }
 
-function extrairNotasDoTexto(rawText) {
-  if (!rawText) return [];
+function textoPareceEstrutural(linha) {
+  if (!linha) return true;
+  const limpo = linha.trim();
+  if (!limpo) return true;
+
+  const semEspacos = limpo.replace(/\s+/g, '');
+  const proporcaoDigitos = (semEspacos.match(/\d/g) || []).length / Math.max(semEspacos.length, 1);
+  const proporcaoSimbolos = (semEspacos.match(/[^\p{L}\d]/gu) || []).length / Math.max(semEspacos.length, 1);
+
+  if (/^\d{1,12}$/.test(semEspacos) && semEspacos.startsWith('0')) return true;
+  if (/^[0\-_.]{4,}$/.test(semEspacos)) return true;
+  if (proporcaoDigitos > 0.85 && !/[\p{L}]/u.test(semEspacos)) return true;
+  if (proporcaoSimbolos > 0.5 && !/[\p{L}]/u.test(semEspacos)) return true;
+
+  return false;
+}
+
+function notaValida(notaNorm) {
+  if (!notaNorm) return false;
+  if (!/^\d{4,8}$/.test(notaNorm)) return false;
+  if (notaNorm.startsWith('0')) return false;
+  if (/^(\d)\1{3,}$/.test(notaNorm)) return false;
+  return true;
+}
+
+function extrairNotasDoTexto(rawText, notasSistema = []) {
+  if (!rawText?.length) return [];
 
   const texto = extrairTextoLegivel(rawText);
-  const regex = /(nota\s*(?:n[º°o\.]*)?\s*)?(\d{1,6}\s*\/\s*\d{2,4}|\d{2,8})/gi;
+  const linhas = texto
+    .split(/\n+/)
+    .flatMap((linha) => linha.split(/(?<=[.;:])\s+(?=[A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ])/g))
+    .map((linha) => linha.replace(/\s+/g, ' ').trim())
+    .filter((linha) => linha && !textoPareceEstrutural(linha));
+
+  const keywordRegex = /\b(nota(?:\s+para\s+boletim)?|n[º°o\.]|boletim|bg)\b/i;
+  const regexContextual = /(?:nota(?:\s+para\s+boletim)?\s*(?:n(?:[º°o\.]|umero)?\s*)?[:\-]?\s*)(\d{4,8})(?!\d)/gi;
+  const regexNumeros = /(?<!\d)(\d{4,8})(?!\d)/g;
   const encontrados = [];
   const vistos = new Set();
-  let match;
 
-  while ((match = regex.exec(texto)) !== null) {
-    const notaBruta = match[2]?.replace(/\s+/g, '') || '';
-    const notaNorm = normalizarNota(notaBruta);
-    if (!notaNorm || notaNorm.length < 3) continue;
+  for (const linha of linhas) {
+    const numerosDaLinha = [...linha.matchAll(regexNumeros)].map((match) => match[1]);
+    const notasContextuais = [...linha.matchAll(regexContextual)].map((match) => match[1]);
 
-    const inicio = Math.max(0, match.index - 50);
-    const fim = Math.min(texto.length, match.index + 80);
-    const contexto = texto.slice(inicio, fim).trim();
-    const key = `${notaNorm}-${contexto.slice(0, 50)}`;
+    const linhaTemContexto = keywordRegex.test(linha);
+    const candidatos = new Set(notasContextuais);
 
-    if (!vistos.has(key)) {
+    if (linhaTemContexto) {
+      numerosDaLinha.forEach((numero) => candidatos.add(numero));
+    }
+
+    if (notasSistema.length) {
+      const notasDaLinha = numerosDaLinha.filter((numero) => notasSistema.includes(normalizarNota(numero)));
+      notasDaLinha.forEach((numero) => candidatos.add(numero));
+    }
+
+    for (const candidato of candidatos) {
+      const notaNorm = normalizarNota(candidato);
+      if (!notaValida(notaNorm)) continue;
+      if (!linhaTemContexto && !notasSistema.includes(notaNorm)) continue;
+
+      const key = `${notaNorm}-${linha.slice(0, 70)}`;
+      if (vistos.has(key)) continue;
+
       vistos.add(key);
       encontrados.push({
         id: key,
-        nota: notaBruta,
+        nota: notaNorm,
         nota_normalizada: notaNorm,
-        contexto,
+        contexto: linha.length > 160 ? `${linha.slice(0, 160)}...` : linha,
         pagina: null,
       });
     }
@@ -81,11 +132,11 @@ function extrairNotasDoTexto(rawText) {
   return encontrados;
 }
 
-async function extrairNotasPdf(file) {
+async function extrairNotasPdf(file, notasSistema = []) {
   const buffer = await file.arrayBuffer();
   const latin = new TextDecoder('latin1').decode(buffer);
   const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
-  const notas = [...extrairNotasDoTexto(latin), ...extrairNotasDoTexto(utf8)];
+  const notas = [...extrairNotasDoTexto(latin, notasSistema), ...extrairNotasDoTexto(utf8, notasSistema)];
 
   const porNota = new Map();
   for (const nota of notas) {
@@ -192,7 +243,8 @@ export default function ConciliacaoBoletim() {
     if (!arquivoPdf) return;
     setProcessandoPdf(true);
     try {
-      const notas = await extrairNotasPdf(arquivoPdf);
+      const notasSistema = pendentes.map((item) => item.nota_normalizada).filter(Boolean);
+      const notas = await extrairNotasPdf(arquivoPdf, notasSistema);
       setNotasEncontradas(notas);
       setVinculos({});
     } finally {
