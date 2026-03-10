@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { sincronizarDataJisoCardAtestado } from '@/components/quadro/quadroHelpers';
+import { normalizeCardDecisao } from '@/components/quadro/decisaoHelpers';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -311,19 +312,28 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     const agora = new Date().toISOString();
     const payload = {
       aguardando_decisao: true,
+      aguardandoDecisao: true,
       encaminhado_por_nome: encaminhadoPorNome.trim(),
+      encaminhadoPorNome: encaminhadoPorNome.trim(),
       encaminhado_para_nome: encaminhadoParaNome.trim(),
+      encaminhadoParaNome: encaminhadoParaNome.trim(),
       encaminhado_em: agora,
+      encaminhadoEm: agora,
       observacao_encaminhamento: observacaoEncaminhamento.trim(),
+      observacaoEncaminhamento: observacaoEncaminhamento.trim(),
       devolvido_por_nome: '',
+      devolvidoPorNome: '',
       devolvido_em: null,
+      devolvidoEm: null,
       observacao_devolucao: '',
+      observacaoDevolucao: '',
       status_decisao: 'Aguardando decisão',
+      statusDecisao: 'Aguardando decisão',
       comentarios_count: (card.comentarios_count || 0) + 1,
     };
 
     try {
-      await base44.entities.CardOperacional.update(card.id, payload);
+      const cardAtualizado = await base44.entities.CardOperacional.update(card.id, payload);
       await base44.entities.CardComentario.create({
         card_id: card.id,
         mensagem: `Card encaminhado para decisão de ${encaminhadoParaNome.trim()}, por ${encaminhadoPorNome.trim()}.`,
@@ -333,7 +343,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
         autor_nome: 'Sistema',
       });
 
-      onCardUpdate?.({ id: card.id, ...payload });
+      onCardUpdate?.(normalizeCardDecisao({ id: card.id, ...payload, ...(cardAtualizado || {}) }));
       queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       setObservacaoEncaminhamento('');
@@ -348,15 +358,20 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     const agora = new Date().toISOString();
     const payload = {
       aguardando_decisao: false,
+      aguardandoDecisao: false,
       devolvido_por_nome: devolvidoPorNome.trim(),
+      devolvidoPorNome: devolvidoPorNome.trim(),
       devolvido_em: agora,
+      devolvidoEm: agora,
       observacao_devolucao: observacaoDevolucao.trim(),
+      observacaoDevolucao: observacaoDevolucao.trim(),
       status_decisao: 'Devolvido com orientação',
+      statusDecisao: 'Devolvido com orientação',
       comentarios_count: (card.comentarios_count || 0) + 1,
     };
 
     try {
-      await base44.entities.CardOperacional.update(card.id, payload);
+      const cardAtualizado = await base44.entities.CardOperacional.update(card.id, payload);
       await base44.entities.CardComentario.create({
         card_id: card.id,
         mensagem: `Card devolvido por ${devolvidoPorNome.trim()} com orientação.`,
@@ -366,7 +381,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
         autor_nome: 'Sistema',
       });
 
-      onCardUpdate?.({ id: card.id, ...payload });
+      onCardUpdate?.(normalizeCardDecisao({ id: card.id, ...payload, ...(cardAtualizado || {}) }));
       queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       setObservacaoDevolucao('');
