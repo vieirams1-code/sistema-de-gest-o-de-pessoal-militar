@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import { Plus, Pencil, Trash2, Lock } from 'lucide-react';
 import { Droppable, Draggable } from '@hello-pangea/dnd';
 import CardItem from './CardItem';
 
-export default function ColunaBoard({ coluna, cards, onCardClick, onAddCard, dragDisabled = false }) {
+export default function ColunaBoard({
+  coluna,
+  cards,
+  onCardClick,
+  onAddCard,
+  onRenomearColuna,
+  onExcluirColuna,
+  dragDisabled = false,
+}) {
   const [hover, setHover] = useState(false);
   const ativos = cards.filter((c) => !c.arquivado);
   const cor = coluna.cor || '#64748b';
+  const colunaFixa = coluna.fixa || coluna.origem_coluna === 'automacao' || (coluna.nome || '').trim().toUpperCase() === 'JISO';
 
   return (
     <div
@@ -16,13 +25,33 @@ export default function ColunaBoard({ coluna, cards, onCardClick, onAddCard, dra
       <div className="flex items-center justify-between px-3 py-2.5 bg-white border-b border-slate-100">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-bold text-slate-600 uppercase tracking-wider truncate">{coluna.nome}</span>
+          {colunaFixa && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full shrink-0">
+              <Lock className="w-2.5 h-2.5" /> Fixa
+            </span>
+          )}
           <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full shrink-0">
             {ativos.length}
           </span>
         </div>
-        <button className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-          <MoreHorizontal className="w-3.5 h-3.5" />
-        </button>
+        {!colunaFixa && (
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => onRenomearColuna?.(coluna)}
+              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              title="Renomear coluna"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onExcluirColuna?.(coluna)}
+              className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+              title="Excluir coluna"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       <Droppable droppableId={coluna.id} isDropDisabled={dragDisabled}>
