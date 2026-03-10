@@ -80,7 +80,35 @@ function getReferenciaPrincipal(registro) {
 }
 
 function normalizarNota(valor = '') {
-  return valor.toString().replace(/[^\d]/g, '').trim();
+  const bruto = valor?.toString?.() || '';
+  const limpo = bruto.replace(/\u00A0/g, ' ').trim();
+
+  if (!limpo) return '';
+
+  const matchContextual = limpo.match(/NOTA\s*N(?:\.|º|°)?\s*[:\-]?\s*([0-9]{1,8})/i);
+  if (matchContextual?.[1]) {
+    const semZeros = matchContextual[1].replace(/^0+/, '');
+    if (semZeros.length >= 4 && semZeros.length <= 8) return semZeros;
+  }
+
+  const gruposNumericos = limpo.match(/\d{1,8}/g) || [];
+  for (const grupo of gruposNumericos) {
+    const semZeros = grupo.replace(/^0+/, '');
+    if (semZeros.length >= 4 && semZeros.length <= 8) {
+      return semZeros;
+    }
+  }
+
+  return '';
+}
+
+function getNotaConciliadaPersistida(registro) {
+  return normalizarNota(
+    registro.nota_conciliada_boletim
+    || registro.nota_boletim_vinculada
+    || registro.nota_conciliada
+    || ''
+  );
 }
 
 function normalizarTextoExtraido(texto = '') {
@@ -235,6 +263,7 @@ export default function ConciliacaoBoletim() {
   const [conciliacaoIniciada, setConciliacaoIniciada] = useState(false);
   const [vinculosRemovidos, setVinculosRemovidos] = useState({});
   const [desvinculosManuais, setDesvinculosManuais] = useState([]);
+  const [erroVinculo, setErroVinculo] = useState('');
 
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['conciliacao-registros-livro'],
@@ -261,6 +290,7 @@ export default function ConciliacaoBoletim() {
         origem_tipo: detectarOrigemTipo(registro),
         status_calculado: calcStatus(registro),
         nota_normalizada: normalizarNota(registro.nota_para_bg),
+        nota_conciliada_persistida: getNotaConciliadaPersistida(registro),
       }))
       .filter((registro) => registro.status_calculado === 'Aguardando Publicação' && registro.nota_para_bg)
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
@@ -279,8 +309,24 @@ export default function ConciliacaoBoletim() {
     return auto;
   }, [conciliacaoIniciada, pendentes, notasEncontradas]);
 
+  const vinculosPersistidos = useMemo(() => {
+    if (!notasEncontradas.length) return {};
+    const porNumero = new Map(notasEncontradas.map((nota) => [nota.nota_normalizada, nota.id]));
+    const resultado = {};
+
+    for (const pub of pendentes) {
+      if (!pub.nota_conciliada_persistida) continue;
+      const notaId = porNumero.get(pub.nota_conciliada_persistida);
+      if (notaId) {
+        resultado[pub.id] = notaId;
+      }
+    }
+
+    return resultado;
+  }, [pendentes, notasEncontradas]);
+
   const vinculosEfetivos = useMemo(() => {
-    const combinados = { ...conciliacaoAutomatica };
+    const combinados = { ...vinculosPersistidos, ...conciliacaoAutomatica };
 
     Object.keys(vinculosRemovidos).forEach((pubId) => {
       if (vinculosRemovidos[pubId]) {
@@ -297,7 +343,7 @@ export default function ConciliacaoBoletim() {
     });
 
     return combinados;
-  }, [conciliacaoAutomatica, vinculos, vinculosRemovidos]);
+  }, [conciliacaoAutomatica, vinculosPersistidos, vinculos, vinculosRemovidos]);
 
   const notasConciliadasIds = useMemo(() => new Set(Object.values(vinculosEfetivos)), [vinculosEfetivos]);
 
@@ -336,9 +382,26 @@ export default function ConciliacaoBoletim() {
     },
   });
 
+  const atualizarPersistenciaVinculo = async (pub, notaNormalizada) => {
+    const payload = { nota_conciliada_boletim: notaNormalizada || '' };
+
+    if (pub.origem_tipo === 'atestado') {
+      await base44.entities.Atestado.update(pub.id, payload);
+      return;
+    }
+
+    if (pub.origem_tipo === 'ex-officio') {
+      await base44.entities.PublicacaoExOfficio.update(pub.id, payload);
+      return;
+    }
+
+    await base44.entities.RegistroLivro.update(pub.id, payload);
+  };
+
   const processarBoletim = async () => {
     setErroProcessamento('');
     setMensagemProcessamento('');
+    setErroVinculo('');
 
     if (!arquivoPdf) {
       setErroProcessamento('Selecione um arquivo PDF antes de buscar notas.');
@@ -371,24 +434,77 @@ export default function ConciliacaoBoletim() {
     }
   };
 
-  const handleVinculoManual = (pubId, notaId) => {
+  const handleVinculoManual = async (pubId, notaId) => {
+    const pub = pendentes.find((item) => item.id === pubId);
+    if (!pub) return;
+
+    setErroVinculo('');
+
+    const estadoAnteriorVinculo = vinculos[pubId] || '';
+    const estadoAnteriorRemocao = !!vinculosRemovidos[pubId];
+
     if (!notaId) {
       setVinculos((prev) => ({ ...prev, [pubId]: '' }));
       setVinculosRemovidos((prev) => ({ ...prev, [pubId]: true }));
+      try {
+        await atualizarPersistenciaVinculo(pub, '');
+      } catch (error) {
+        setVinculos((prev) => ({ ...prev, [pubId]: estadoAnteriorVinculo }));
+        setVinculosRemovidos((prev) => ({ ...prev, [pubId]: estadoAnteriorRemocao }));
+        setErroVinculo('Falha ao remover vínculo. Tente novamente.');
+      }
+      return;
+    }
+
+    const notaSelecionada = notasEncontradas.find((nota) => nota.id === notaId);
+    if (!notaSelecionada) {
+      setErroVinculo('Nota selecionada não encontrada na leitura atual do boletim.');
       return;
     }
 
     setVinculos((prev) => ({ ...prev, [pubId]: notaId }));
     setVinculosRemovidos((prev) => ({ ...prev, [pubId]: false }));
+
+    try {
+      await atualizarPersistenciaVinculo(pub, notaSelecionada.nota_normalizada);
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
+    } catch (error) {
+      setVinculos((prev) => ({ ...prev, [pubId]: estadoAnteriorVinculo }));
+      setVinculosRemovidos((prev) => ({ ...prev, [pubId]: estadoAnteriorRemocao }));
+      setErroVinculo('Falha ao salvar vínculo manual. Tente novamente.');
+    }
   };
 
-  const iniciarConciliacao = () => {
+  const iniciarConciliacao = async () => {
+    setErroVinculo('');
     setConciliacaoIniciada(true);
+
+    try {
+      const porNumero = new Map(notasEncontradas.map((nota) => [nota.nota_normalizada, nota]));
+      const pendentesAuto = pendentes.filter((pub) => porNumero.has(pub.nota_normalizada));
+
+      await Promise.all(
+        pendentesAuto.map((pub) => atualizarPersistenciaVinculo(pub, pub.nota_normalizada))
+      );
+
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
+    } catch (error) {
+      setErroVinculo('A conciliação automática foi aplicada na tela, mas houve falha ao persistir todos os vínculos.');
+    }
   };
 
-  const removerVinculo = (pub) => {
+  const removerVinculo = async (pub) => {
     const notaId = vinculosEfetivos[pub.id];
     if (!notaId) return;
+
+    setErroVinculo('');
+
+    const estadoAnteriorVinculo = vinculos[pub.id] || '';
+    const estadoAnteriorRemocao = !!vinculosRemovidos[pub.id];
 
     setVinculos((prev) => ({ ...prev, [pub.id]: '' }));
     setVinculosRemovidos((prev) => ({ ...prev, [pub.id]: true }));
@@ -401,6 +517,17 @@ export default function ConciliacaoBoletim() {
       },
       ...prev.filter((item) => item.pubId !== pub.id),
     ]));
+
+    try {
+      await atualizarPersistenciaVinculo(pub, '');
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
+    } catch (error) {
+      setVinculos((prev) => ({ ...prev, [pub.id]: estadoAnteriorVinculo }));
+      setVinculosRemovidos((prev) => ({ ...prev, [pub.id]: estadoAnteriorRemocao }));
+      setErroVinculo('Falha ao remover vínculo.');
+    }
   };
 
   return (
@@ -408,7 +535,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.4</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.5</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
@@ -434,6 +561,7 @@ export default function ConciliacaoBoletim() {
           {processandoPdf && <p className="text-xs text-blue-600 font-medium">Processando PDF para buscar notas...</p>}
           {erroProcessamento && <p className="text-xs text-red-600 font-medium">{erroProcessamento}</p>}
           {!erroProcessamento && mensagemProcessamento && <p className="text-xs text-emerald-700 font-medium">{mensagemProcessamento}</p>}
+          {erroVinculo && <p className="text-xs text-red-600 font-medium">{erroVinculo}</p>}
         </div>
       </Card>
 
