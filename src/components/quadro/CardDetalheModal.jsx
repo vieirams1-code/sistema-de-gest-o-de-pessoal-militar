@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { sincronizarDataJisoCardAtestado } from '@/components/quadro/quadroHelpers';
-import { normalizeCardDecisao } from '@/components/quadro/decisaoHelpers';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -10,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   X, Calendar, User, Tag, MessageSquare, Link2,
   Send, Plus, Check, Trash2, AlertTriangle, Cpu, ArrowRightLeft,
-  RefreshCw, Bell, SquareCheckBig, ArrowUpRight,
+  RefreshCw, Bell, SquareCheckBig,
 } from 'lucide-react';
 
 const TIPO_COMENTARIO_CONFIG = {
@@ -192,12 +191,6 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const queryClient = useQueryClient();
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
-  const [encaminhadoParaNome, setEncaminhadoParaNome] = useState('');
-  const [encaminhadoPorNome, setEncaminhadoPorNome] = useState('');
-  const [observacaoEncaminhamento, setObservacaoEncaminhamento] = useState('');
-  const [devolvidoPorNome, setDevolvidoPorNome] = useState('');
-  const [observacaoDevolucao, setObservacaoDevolucao] = useState('');
-  const [salvandoDecisao, setSalvandoDecisao] = useState(false);
 
 
   const [jisoDate, setJisoDate] = useState(card.prazo || '');
@@ -228,14 +221,6 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
       etiqueta_cor: card.etiqueta_cor || '#6366f1',
     });
   }, [card.id, card.prioridade, card.tipo, card.etiqueta_texto, card.etiqueta_cor]);
-
-  useEffect(() => {
-    setEncaminhadoParaNome(card.encaminhado_para_nome || '');
-    setEncaminhadoPorNome(card.encaminhado_por_nome || card.responsavel_nome || '');
-    setObservacaoEncaminhamento('');
-    setDevolvidoPorNome('');
-    setObservacaoDevolucao('');
-  }, [card.id, card.encaminhado_para_nome, card.encaminhado_por_nome, card.responsavel_nome]);
 
   const vinculoAtestado = vinculos.find((v) => v.tipo_vinculo === 'Atestado');
   const permiteEditarDataJiso = card.origem_tipo === 'Atestado/JISO' && !!vinculoAtestado?.referencia_id;
@@ -303,79 +288,6 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
       onCardUpdate?.({ id: card.id, ...payload });
     } finally {
       setSalvandoClassificacao(false);
-    }
-  };
-
-  const encaminharParaDecisao = async () => {
-    if (salvandoDecisao || !encaminhadoParaNome.trim() || !encaminhadoPorNome.trim()) return;
-    setSalvandoDecisao(true);
-    const agora = new Date().toISOString();
-    const payload = {
-      decisao_pendente: true,
-      decisao_encaminhado_por_nome: encaminhadoPorNome.trim(),
-      decisao_encaminhado_para_nome: encaminhadoParaNome.trim(),
-      decisao_encaminhado_em: agora,
-      decisao_observacao_encaminhamento: observacaoEncaminhamento.trim(),
-      decisao_devolvido_por_nome: '',
-      decisao_devolvido_em: null,
-      decisao_observacao_devolucao: '',
-      decisao_status: 'Aguardando decisão',
-      comentarios_count: (card.comentarios_count || 0) + 1,
-    };
-
-    try {
-      await base44.entities.CardOperacional.update(card.id, payload);
-      const cardAtualizado = await base44.entities.CardOperacional.get(card.id);
-      await base44.entities.CardComentario.create({
-        card_id: card.id,
-        mensagem: `Card encaminhado para decisão de ${encaminhadoParaNome.trim()}, por ${encaminhadoPorNome.trim()}${observacaoEncaminhamento.trim() ? `. Contexto: ${observacaoEncaminhamento.trim()}` : ''}.`,
-        tipo_registro: 'Sistema',
-        data_hora: agora,
-        origem_automatica: true,
-        autor_nome: 'Sistema',
-      });
-
-      onCardUpdate?.(normalizeCardDecisao({ id: card.id, ...payload, ...(cardAtualizado || {}) }));
-      queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
-      setObservacaoEncaminhamento('');
-    } finally {
-      setSalvandoDecisao(false);
-    }
-  };
-
-  const devolverDecisao = async () => {
-    if (salvandoDecisao || !devolvidoPorNome.trim()) return;
-    setSalvandoDecisao(true);
-    const agora = new Date().toISOString();
-    const payload = {
-      decisao_pendente: false,
-      decisao_devolvido_por_nome: devolvidoPorNome.trim(),
-      decisao_devolvido_em: agora,
-      decisao_observacao_devolucao: observacaoDevolucao.trim(),
-      decisao_status: 'Devolvido com orientação',
-      comentarios_count: (card.comentarios_count || 0) + 1,
-    };
-
-    try {
-      await base44.entities.CardOperacional.update(card.id, payload);
-      const cardAtualizado = await base44.entities.CardOperacional.get(card.id);
-      await base44.entities.CardComentario.create({
-        card_id: card.id,
-        mensagem: `Card devolvido por ${devolvidoPorNome.trim()} com orientação${observacaoDevolucao.trim() ? `: ${observacaoDevolucao.trim()}` : '.'}`,
-        tipo_registro: 'Sistema',
-        data_hora: agora,
-        origem_automatica: true,
-        autor_nome: 'Sistema',
-      });
-
-      onCardUpdate?.(normalizeCardDecisao({ id: card.id, ...payload, ...(cardAtualizado || {}) }));
-      queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
-      setObservacaoDevolucao('');
-      setDevolvidoPorNome('');
-    } finally {
-      setSalvandoDecisao(false);
     }
   };
 
@@ -514,118 +426,6 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 {salvandoClassificacao ? 'Salvando...' : 'Salvar classificação'}
               </Button>
             </div>
-          </div>
-
-          <div className={`space-y-3 rounded-lg p-3 border ${card.aguardando_decisao ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Status de decisão</p>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${card.aguardando_decisao ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-700'}`}>
-                {card.aguardando_decisao ? 'Aguardando decisão' : (card.status_decisao || 'Sem pendência')}
-              </span>
-            </div>
-
-            <div className={`rounded-md border p-2.5 space-y-2 text-[11px] ${card.aguardando_decisao ? 'bg-white border-amber-200' : 'bg-white border-slate-200'}`}>
-              <p><span className="font-semibold text-slate-500">Status:</span> {card.aguardando_decisao ? 'Aguardando decisão' : (card.status_decisao || 'Sem pendência')}</p>
-              <p><span className="font-semibold text-slate-500">Encaminhado para:</span> {card.encaminhado_para_nome || '-'}</p>
-              <p><span className="font-semibold text-slate-500">Encaminhado por:</span> {card.encaminhado_por_nome || '-'}</p>
-              <p><span className="font-semibold text-slate-500">Data/hora do encaminhamento:</span> {card.encaminhado_em ? formatDateTime(card.encaminhado_em) : '-'}</p>
-              <p className="whitespace-pre-wrap"><span className="font-semibold text-slate-500">Observação/contexto:</span> {card.observacao_encaminhamento || '-'}</p>
-
-              {card.devolvido_em && (
-                <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                  <p className="font-semibold text-slate-500">Última devolução registrada</p>
-                  <p><span className="font-semibold text-slate-500">Devolvido por:</span> {card.devolvido_por_nome || '-'}</p>
-                  <p><span className="font-semibold text-slate-500">Data/hora da devolução:</span> {formatDateTime(card.devolvido_em)}</p>
-                  <p className="whitespace-pre-wrap"><span className="font-semibold text-slate-500">Orientação:</span> {card.observacao_devolucao || '-'}</p>
-                </div>
-              )}
-            </div>
-
-            {!card.aguardando_decisao ? (
-              <div className="space-y-2.5">
-                <p className="text-[11px] text-slate-500">Encaminhe este card para decisão e registre o contexto para que o estado operacional fique explícito.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Para quem</label>
-                    <Input
-                      value={encaminhadoParaNome}
-                      onChange={(e) => setEncaminhadoParaNome(e.target.value)}
-                      placeholder="Nome do decisor"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Encaminhado por</label>
-                    <Input
-                      value={encaminhadoPorNome}
-                      onChange={(e) => setEncaminhadoPorNome(e.target.value)}
-                      placeholder="Seu nome"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-400 uppercase tracking-wide mb-1 block">Observação</label>
-                  <Textarea
-                    rows={2}
-                    value={observacaoEncaminhamento}
-                    onChange={(e) => setObservacaoEncaminhamento(e.target.value)}
-                    placeholder="Contexto para decisão..."
-                    className="text-xs resize-none"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs"
-                    disabled={salvandoDecisao || !encaminhadoParaNome.trim() || !encaminhadoPorNome.trim()}
-                    onClick={encaminharParaDecisao}
-                  >
-                    {salvandoDecisao ? 'Salvando...' : 'Encaminhar para decisão'}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2.5 border-2 border-amber-300 bg-amber-100/40 rounded-md p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-bold text-amber-900 uppercase tracking-wide">Devolver decisão</p>
-                  <span className="text-[10px] text-amber-800 inline-flex items-center gap-1 font-semibold">
-                    <ArrowUpRight className="w-3 h-3" />
-                    Ação obrigatória para concluir este ciclo
-                  </span>
-                </div>
-                <p className="text-[11px] text-amber-900">Este card está aguardando decisão. Registre abaixo a devolução para retirar o card desse estado.</p>
-                <div>
-                  <label className="text-[10px] text-slate-500 uppercase tracking-wide mb-1 block">Devolvido por</label>
-                  <Input
-                    value={devolvidoPorNome}
-                    onChange={(e) => setDevolvidoPorNome(e.target.value)}
-                    placeholder="Nome de quem decidiu"
-                    className="h-8 text-xs bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 uppercase tracking-wide mb-1 block">Orientação da decisão</label>
-                  <Textarea
-                    rows={2}
-                    value={observacaoDevolucao}
-                    onChange={(e) => setObservacaoDevolucao(e.target.value)}
-                    placeholder="Orientação da devolução..."
-                    className="text-xs resize-none bg-white"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white"
-                    disabled={salvandoDecisao || !devolvidoPorNome.trim()}
-                    onClick={devolverDecisao}
-                  >
-                    {salvandoDecisao ? 'Salvando...' : 'Devolver decisão'}
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
 
           {permiteEditarDataJiso && (
