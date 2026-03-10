@@ -60,6 +60,7 @@ import CadastrarPublicacao from './pages/CadastrarPublicacao';
 import CadastrarPunicao from './pages/CadastrarPunicao';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import Configuracoes from './pages/Configuracoes';
+import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import DashboardAtestados from './pages/DashboardAtestados';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
@@ -96,6 +97,7 @@ export const PAGES = {
     "CadastrarPunicao": CadastrarPunicao,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "Configuracoes": Configuracoes,
+    "ConciliacaoBoletim": ConciliacaoBoletim,
     "DashboardAtestados": DashboardAtestados,
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
