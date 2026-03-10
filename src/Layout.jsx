@@ -23,6 +23,7 @@ import {
   FolderKanban,
   CalendarClock,
   Wrench,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -57,6 +58,7 @@ const menuGroups = [
       { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen },
       { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
+      { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight },
     ],
   },
   {
