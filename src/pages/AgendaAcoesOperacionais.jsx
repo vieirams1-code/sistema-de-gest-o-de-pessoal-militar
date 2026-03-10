@@ -53,6 +53,17 @@ function isConcluida(status) {
   return ['concluida', 'concluido', 'finalizada', 'finalizado', 'cancelada', 'cancelado'].includes(normalizarStatus(status));
 }
 
+function extrairComentarios(anotacoes) {
+  if (!anotacoes) return [];
+  if (Array.isArray(anotacoes)) {
+    return anotacoes.map((item) => `${item ?? ''}`.trim()).filter(Boolean);
+  }
+  return `${anotacoes}`
+    .split(/\r?\n+/)
+    .map((linha) => linha.trim())
+    .filter(Boolean);
+}
+
 function montarPayloadAcao(payload) {
   const titulo = payload.titulo?.trim() || '';
   const observacao = payload.observacao?.trim() || '';
@@ -121,31 +132,43 @@ function GrupoAcoes({ titulo, descricao, icon: Icon, grupos, onOpenCard, onToggl
               <div className="px-3 py-2.5">
                 <div className="border-l-2 border-indigo-100 pl-3 space-y-2">
                   {grupo.acoes.map((acao) => (
-                    <div key={acao.id} className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                    <div key={acao.id} className="bg-white border border-slate-200 rounded-lg px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">{acao.titulo}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                           <span>Prazo: {formatarData(acao.data_prevista)}</span>
                           <span>Status: {acao.status}</span>
                           {acao.responsavel && <span>Resp.: {acao.responsavel}</span>}
                         </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => onToggleConcluir(acao)}
+                            disabled={togglingAcaoId === acao.id}
+                          >
+                            <Check className="w-3.5 h-3.5 mr-1" />
+                            {isConcluida(acao.status) ? 'Desmarcar' : 'Concluir'}
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenCard(grupo.card.id)}>
+                            Abrir card
+                          </Button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="h-8"
-                          onClick={() => onToggleConcluir(acao)}
-                          disabled={togglingAcaoId === acao.id}
-                        >
-                          <Check className="w-3.5 h-3.5 mr-1" />
-                          {isConcluida(acao.status) ? 'Desmarcar' : 'Concluir'}
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenCard(grupo.card.id)}>
-                          Abrir card
-                        </Button>
-                      </div>
+                      {extrairComentarios(acao.anotacoes).length > 0 && (
+                        <div className="mt-2 border-t border-slate-100 pt-1.5 space-y-0.5">
+                          {extrairComentarios(acao.anotacoes).map((comentario, index) => (
+                            <p key={`${acao.id}-comentario-${index}`} className="text-[11px] text-slate-500 truncate">
+                              {index + 1} - {comentario}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
