@@ -6,7 +6,6 @@ import CardDetalheModal from '@/components/quadro/CardDetalheModal';
 import { deleteCardAcao, listAllCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 
 function getPrimeiroValor(item, campos = []) {
   for (const campo of campos) {
@@ -22,9 +21,6 @@ function normalizarAcao(acao) {
     titulo: getPrimeiroValor(acao, ['titulo', 'nome', 'title']) || 'Ação sem título',
     data_prevista: getPrimeiroValor(acao, ['data_prevista', 'data', 'prazo', 'data_acao']) || null,
     status: getPrimeiroValor(acao, ['status', 'situacao', 'estado']) || 'Pendente',
-    responsavel: getPrimeiroValor(acao, ['responsavel', 'responsavel_nome', 'responsavel_acao']) || '',
-    observacao: getPrimeiroValor(acao, ['observacao', 'descricao', 'detalhes']) || '',
-    anotacoes: getPrimeiroValor(acao, ['anotacoes', 'comentarios', 'comentario_acao']) || '',
   };
 }
 
@@ -55,24 +51,10 @@ function isConcluida(status) {
   return ['concluida', 'concluido', 'finalizada', 'finalizado', 'cancelada', 'cancelado'].includes(normalizarStatus(status));
 }
 
-function extrairComentarios(anotacoes) {
-  if (!anotacoes) return [];
-  if (Array.isArray(anotacoes)) {
-    return anotacoes.map((item) => `${item ?? ''}`.trim()).filter(Boolean);
-  }
-  return `${anotacoes}`
-    .split(/\r?\n+/)
-    .map((linha) => linha.trim())
-    .filter(Boolean);
-}
-
 function montarPayloadAcao(payload) {
   const titulo = payload.titulo?.trim() || '';
-  const observacao = payload.observacao?.trim() || '';
   const dataPrevista = payload.data_prevista || null;
   const status = payload.status || 'Pendente';
-  const responsavel = payload.responsavel?.trim() || '';
-  const anotacoes = payload.anotacoes?.trim() || '';
 
   return {
     ...(titulo ? { titulo, nome: titulo, title: titulo } : {}),
@@ -83,15 +65,15 @@ function montarPayloadAcao(payload) {
     status,
     situacao: status,
     estado: status,
-    responsavel,
-    responsavel_nome: responsavel,
-    responsavel_acao: responsavel,
-    observacao,
-    descricao: observacao,
-    detalhes: observacao,
-    anotacoes,
-    comentarios: anotacoes,
-    comentario_acao: anotacoes,
+    responsavel: '',
+    responsavel_nome: '',
+    responsavel_acao: '',
+    observacao: '',
+    descricao: '',
+    detalhes: '',
+    anotacoes: '',
+    comentarios: '',
+    comentario_acao: '',
     concluida: status === 'Concluída',
   };
 }
@@ -108,15 +90,11 @@ function GrupoAcoes({
   onStartEdit,
   onChangeDraft,
   onSaveEdit,
-  onChangeComment,
-  onSaveComment,
   editingAcaoId,
   acaoDrafts,
-  commentDrafts,
   loadingToggleId,
   loadingDeleteId,
   loadingSaveId,
-  loadingSaveCommentId,
 }) {
   return (
     <section className="bg-white border border-slate-200 rounded-xl shadow-sm">
@@ -157,7 +135,6 @@ function GrupoAcoes({
                   {grupo.acoes.map((acao) => {
                     const draft = acaoDrafts[acao.id] || acao;
                     const concluida = isConcluida(draft.status);
-                    const comentarios = extrairComentarios(draft.anotacoes);
                     return (
                       <div key={acao.id} className={`bg-white border rounded-lg px-3 py-2.5 ${concluida ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
                         <div className="flex items-start justify-between gap-3">
@@ -165,12 +142,8 @@ function GrupoAcoes({
                             <p className={`text-sm font-medium truncate ${concluida ? 'text-emerald-700 line-through' : 'text-slate-800'}`}>{draft.titulo}</p>
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                               <span>Prazo: {formatarData(draft.data_prevista)}</span>
-                              {!!(draft.responsavel || '').trim() && <span>Resp.: {draft.responsavel}</span>}
                               <span className={concluida ? 'font-semibold text-emerald-700' : ''}>{concluida ? 'Concluída' : (draft.status || 'Pendente')}</span>
                             </div>
-                            {!!(draft.observacao || '').trim() && (
-                              <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">{draft.observacao}</p>
-                            )}
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
@@ -223,52 +196,14 @@ function GrupoAcoes({
                               onChange={(event) => onChangeDraft(acao.id, 'titulo', event.target.value)}
                               placeholder="Título da ação"
                             />
-                            <div className="grid sm:grid-cols-2 gap-2">
-                              <Input
-                                type="date"
-                                value={toDateKey(draft.data_prevista) || ''}
-                                onChange={(event) => onChangeDraft(acao.id, 'data_prevista', event.target.value)}
-                              />
-                              <Input
-                                value={draft.responsavel || ''}
-                                onChange={(event) => onChangeDraft(acao.id, 'responsavel', event.target.value)}
-                                placeholder="Responsável"
-                              />
-                            </div>
-                            <Textarea
-                              value={draft.observacao || ''}
-                              onChange={(event) => onChangeDraft(acao.id, 'observacao', event.target.value)}
-                              placeholder="Observações da ação"
-                              rows={2}
+                            <Input
+                              type="date"
+                              value={toDateKey(draft.data_prevista) || ''}
+                              onChange={(event) => onChangeDraft(acao.id, 'data_prevista', event.target.value)}
                             />
                           </div>
                         )}
 
-                        <div className="mt-2 border-t border-slate-100 pt-2 space-y-1.5">
-                          <div className="flex gap-2">
-                            <Input
-                              value={commentDrafts[acao.id] || ''}
-                              onChange={(event) => onChangeComment(acao.id, event.target.value)}
-                              placeholder="Digite um comentário"
-                            />
-                            <Button
-                              size="sm"
-                              className="h-9"
-                              onClick={() => onSaveComment(acao)}
-                              disabled={loadingSaveCommentId === acao.id || !(commentDrafts[acao.id] || '').trim()}
-                            >
-                              Salvar comentário
-                            </Button>
-                          </div>
-                          <div className="space-y-0.5">
-                            {comentarios.length === 0 && <p className="text-[11px] text-slate-400">Sem comentários.</p>}
-                            {comentarios.map((comentario, index) => (
-                              <p key={`${acao.id}-comentario-${index}`} className="text-[11px] text-slate-500 truncate">
-                                {index + 1} - {comentario}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
                       </div>
                     );
                   })}
@@ -287,7 +222,6 @@ export default function AgendaAcoesOperacionaisPage() {
   const [cardAbertoId, setCardAbertoId] = useState(null);
   const [editingAcaoId, setEditingAcaoId] = useState(null);
   const [acaoDrafts, setAcaoDrafts] = useState({});
-  const [commentDrafts, setCommentDrafts] = useState({});
 
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
@@ -324,9 +258,6 @@ export default function AgendaAcoesOperacionaisPage() {
         titulo: acao.titulo,
         data_prevista: acao.data_prevista,
         status,
-        responsavel: acao.responsavel,
-        observacao: acao.observacao,
-        anotacoes: acao.anotacoes,
       }));
     },
     onSuccess: () => {
@@ -347,26 +278,6 @@ export default function AgendaAcoesOperacionaisPage() {
   const excluirAcaoMutation = useMutation({
     mutationFn: (acaoId) => deleteCardAcao(acaoId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
-      queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
-    },
-  });
-
-  const salvarComentarioMutation = useMutation({
-    mutationFn: async ({ acao, comentario }) => {
-      const comentariosAtuais = extrairComentarios(acao.anotacoes);
-      const anotacoesAtualizadas = [...comentariosAtuais, comentario].join('\n');
-      await updateCardAcao(acao.id, montarPayloadAcao({
-        titulo: acao.titulo,
-        data_prevista: acao.data_prevista,
-        status: acao.status,
-        responsavel: acao.responsavel,
-        observacao: acao.observacao,
-        anotacoes: anotacoesAtualizadas,
-      }));
-    },
-    onSuccess: (_, variables) => {
-      setCommentDrafts((anterior) => ({ ...anterior, [variables.acao.id]: '' }));
       queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
       queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
     },
@@ -444,15 +355,11 @@ export default function AgendaAcoesOperacionaisPage() {
       setAcaoDrafts((anterior) => ({ ...anterior, [acaoId]: { ...(anterior[acaoId] || {}), [campo]: valor } }));
     },
     onSaveEdit: (acao) => salvarEdicaoMutation.mutate({ acaoId: acao.id, payload: acaoDrafts[acao.id] || acao }),
-    onChangeComment: (acaoId, valor) => setCommentDrafts((anterior) => ({ ...anterior, [acaoId]: valor })),
-    onSaveComment: (acao) => salvarComentarioMutation.mutate({ acao, comentario: (commentDrafts[acao.id] || '').trim() }),
     editingAcaoId,
     acaoDrafts,
-    commentDrafts,
-    loadingToggleId: toggleConclusaoMutation.isPending ? toggleConclusaoMutation.variables?.acao?.id : null,
+      loadingToggleId: toggleConclusaoMutation.isPending ? toggleConclusaoMutation.variables?.acao?.id : null,
     loadingDeleteId: excluirAcaoMutation.isPending ? excluirAcaoMutation.variables : null,
     loadingSaveId: salvarEdicaoMutation.isPending ? salvarEdicaoMutation.variables?.acaoId : null,
-    loadingSaveCommentId: salvarComentarioMutation.isPending ? salvarComentarioMutation.variables?.acao?.id : null,
   };
 
   return (
