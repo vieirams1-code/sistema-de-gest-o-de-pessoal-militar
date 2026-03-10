@@ -269,6 +269,7 @@ function VinculosSection({ cardId }) {
   );
 }
 
+
 function AcoesSection({ cardId }) {
   const queryClient = useQueryClient();
   const [novaAcao, setNovaAcao] = useState({
@@ -284,6 +285,7 @@ function AcoesSection({ cardId }) {
   const [editingAcao, setEditingAcao] = useState({});
   const [expandedComentarios, setExpandedComentarios] = useState({});
   const [expandedEdicao, setExpandedEdicao] = useState({});
+  const [novoComentario, setNovoComentario] = useState({});
 
   const { data: acoesRaw = [] } = useQuery({
     queryKey: ['card-acoes', cardId],
@@ -312,6 +314,7 @@ function AcoesSection({ cardId }) {
 
   const invalidateAcoes = () => {
     queryClient.invalidateQueries({ queryKey: ['card-acoes', cardId] });
+    queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
   };
 
   const criarAcao = async () => {
@@ -321,12 +324,12 @@ function AcoesSection({ cardId }) {
       await createCardAcao(montarPayloadAcao({
         card_id: cardId,
         titulo: novaAcao.titulo,
-        data_prevista: novaAcao.data_prevista,
+        data_prevista: novaAcao.data_prevista || null,
         responsavel: novaAcao.responsavel,
         status: novaAcao.status,
         observacao: novaAcao.observacao,
         anotacoes: novaAcao.anotacoes,
-        concluida: novaAcao.status === 'Concluída',
+        concluida: (novaAcao.status || 'Pendente') === 'Concluída',
         ordem: acoes.length + 1,
       }));
       setNovaAcao({ titulo: '', data_prevista: '', responsavel: '', status: 'Pendente', observacao: '', anotacoes: '' });
@@ -336,24 +339,50 @@ function AcoesSection({ cardId }) {
     }
   };
 
-  const atualizarAcao = async (acao) => {
+  const atualizarAcao = async (acao, patch = null) => {
     if (savingId === acao.id) return;
     setSavingId(acao.id);
     try {
-      const draft = editingAcao[acao.id] || {};
+      const baseDraft = editingAcao[acao.id] || {};
+      const draft = { ...baseDraft, ...(patch || {}) };
+      const status = draft.status || 'Pendente';
       await updateCardAcao(acao.id, montarPayloadAcao({
         titulo: draft.titulo || acao.titulo,
         data_prevista: draft.data_prevista || null,
         responsavel: draft.responsavel || '',
-        status: draft.status || 'Pendente',
+        status,
         observacao: draft.observacao || '',
         anotacoes: draft.anotacoes || '',
-        concluida: (draft.status || 'Pendente') === 'Concluída',
+        concluida: status === 'Concluída',
+      }));
+      setEditingAcao((prev) => ({
+        ...prev,
+        [acao.id]: {
+          ...(prev[acao.id] || {}),
+          ...draft,
+          status,
+        },
       }));
       invalidateAcoes();
     } finally {
       setSavingId('');
     }
+  };
+
+  const toggleConclusao = async (acao) => {
+    const draft = editingAcao[acao.id] || {};
+    const proximoStatus = (draft.status || acao.status || 'Pendente') === 'Concluída' ? 'Pendente' : 'Concluída';
+    await atualizarAcao(acao, { status: proximoStatus });
+  };
+
+  const salvarComentario = async (acao) => {
+    const comentario = (novoComentario[acao.id] || '').trim();
+    if (!comentario || savingId === acao.id) return;
+    const comentariosAtuais = extrairComentarios((editingAcao[acao.id] || {}).anotacoes || acao.anotacoes);
+    const anotacoesAtualizadas = [...comentariosAtuais, comentario].join('\n');
+    await atualizarAcao(acao, { anotacoes: anotacoesAtualizadas });
+    setNovoComentario((prev) => ({ ...prev, [acao.id]: '' }));
+    setExpandedComentarios((prev) => ({ ...prev, [acao.id]: true }));
   };
 
   const excluirAcao = async (acaoId) => {
@@ -372,11 +401,11 @@ function AcoesSection({ cardId }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-          <ListTodo className="w-4 h-4" />
+            <ListTodo className="w-4 h-4" />
           </div>
           <h3 className="text-sm font-bold text-slate-800 tracking-wide">Ações</h3>
         </div>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold">Ações v3.0</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold">Ações v2.0</span>
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 space-y-2">
@@ -400,22 +429,6 @@ function AcoesSection({ cardId }) {
             className="h-8 text-xs bg-white border-slate-200"
           />
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-          <Select
-            value={novaAcao.status}
-            onValueChange={(value) => setNovaAcao((prev) => ({ ...prev, status: value }))}
-          >
-            <SelectTrigger className="h-8 text-xs bg-white border-slate-200"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {ACOES_STATUS.map((status) => (
-                <SelectItem key={status} value={status}>{status}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={criarAcao} size="sm" disabled={criando || !novaAcao.titulo.trim()} className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700">
-            <Plus className="w-3.5 h-3.5" /> {criando ? 'Adicionando...' : 'Adicionar'}
-          </Button>
-        </div>
         <Textarea
           value={novaAcao.observacao}
           onChange={(e) => setNovaAcao((prev) => ({ ...prev, observacao: e.target.value }))}
@@ -423,189 +436,180 @@ function AcoesSection({ cardId }) {
           placeholder="Descrição curta"
           className="text-xs resize-none min-h-9 bg-white border-slate-200"
         />
+        <div className="flex justify-end">
+          <Button onClick={criarAcao} size="sm" disabled={criando || !novaAcao.titulo.trim()} className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700">
+            <Plus className="w-3.5 h-3.5" /> {criando ? 'Adicionando...' : 'Adicionar'}
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">
         {acoes.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">Nenhuma ação cadastrada.</p>}
-        {acoes.map((acao) => (
-          <div key={acao.id} className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-900 leading-tight">{acao.titulo}</p>
-                {editingAcao[acao.id]?.observacao?.trim() && (
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{editingAcao[acao.id]?.observacao}</p>
+        {acoes.map((acao) => {
+          const draft = editingAcao[acao.id] || {};
+          const comentarios = extrairComentarios(draft.anotacoes || acao.anotacoes);
+          const concluida = (draft.status || acao.status || 'Pendente') === 'Concluída';
+          return (
+            <div key={acao.id} className={`bg-white border rounded-lg p-2.5 space-y-2 shadow-sm ${concluida ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className={`text-xs font-semibold leading-tight ${concluida ? 'text-emerald-700 line-through' : 'text-slate-900'}`}>{draft.titulo || acao.titulo}</p>
+                  {(draft.observacao || '').trim() && (
+                    <p className="text-[11px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{draft.observacao}</p>
+                  )}
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${concluida ? ACOES_STATUS_ESTILO['Concluída'] : (ACOES_STATUS_ESTILO[draft.status] || ACOES_STATUS_ESTILO.Pendente)}`}>
+                  {concluida ? 'Concluída' : (draft.status || 'Pendente')}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
+                  <Calendar className="w-3 h-3" />
+                  {draft.data_prevista ? new Date(`${draft.data_prevista}T00:00:00`).toLocaleDateString('pt-BR') : 'Sem data'}
+                </span>
+                {!!(draft.responsavel || '').trim() && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
+                    <User className="w-3 h-3" />
+                    {draft.responsavel}
+                  </span>
                 )}
               </div>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
-                <Calendar className="w-3 h-3" />
-                {editingAcao[acao.id]?.data_prevista ? new Date(`${editingAcao[acao.id]?.data_prevista}T00:00:00`).toLocaleDateString('pt-BR') : 'Sem data'}
-              </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
-                <User className="w-3 h-3" />
-                {editingAcao[acao.id]?.responsavel?.trim() || 'Sem responsável'}
-              </span>
-              <span className={`px-2 py-0.5 rounded-full font-bold ${ACOES_STATUS_ESTILO[editingAcao[acao.id]?.status] || ACOES_STATUS_ESTILO.Pendente}`}>
-                {editingAcao[acao.id]?.status || 'Pendente'}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-1.5">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-[11px] px-2"
-                onClick={() => setExpandedComentarios((prev) => ({ ...prev, [acao.id]: !prev[acao.id] }))}
-              >
-                <MessageSquare className="w-3.5 h-3.5 mr-1" />
-                Comentários/anotações
-                {expandedComentarios[acao.id] ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
-              </Button>
-
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
                 <Button
                   size="sm"
-                  variant="secondary"
+                  variant="ghost"
                   className="h-7 text-[11px] px-2"
-                  onClick={() => setExpandedEdicao((prev) => ({ ...prev, [acao.id]: !prev[acao.id] }))}
-                  disabled={savingId === acao.id}
+                  onClick={() => setExpandedComentarios((prev) => ({ ...prev, [acao.id]: !prev[acao.id] }))}
                 >
-                  <Pencil className="w-3.5 h-3.5 mr-1" /> {expandedEdicao[acao.id] ? 'Fechar edição' : 'Editar'}
+                  <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                  Comentários
+                  {expandedComentarios[acao.id] ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-7 text-[11px] px-2 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                  onClick={() => excluirAcao(acao.id)}
-                  disabled={savingId === acao.id}
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Excluir
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-7 text-[11px] px-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                  onClick={async () => {
-                    if (savingId === acao.id) return;
-                    const draft = editingAcao[acao.id] || {};
-                    const proximoStatus = (draft.status || 'Pendente') === 'Concluída' ? 'Pendente' : 'Concluída';
-                    setSavingId(acao.id);
-                    try {
-                      await updateCardAcao(acao.id, montarPayloadAcao({
-                        titulo: draft.titulo || acao.titulo,
-                        data_prevista: draft.data_prevista || null,
-                        responsavel: draft.responsavel || '',
-                        observacao: draft.observacao || '',
-                        anotacoes: draft.anotacoes || '',
-                        status: proximoStatus,
-                        concluida: proximoStatus === 'Concluída',
-                      }));
-                      invalidateAcoes();
-                    } finally {
-                      setSavingId('');
-                    }
-                  }}
-                  disabled={savingId === acao.id}
-                >
-                  <Check className="w-3.5 h-3.5 mr-1" /> {(editingAcao[acao.id]?.status || 'Pendente') === 'Concluída' ? 'Desmarcar' : 'Concluir'}
-                </Button>
-              </div>
-            </div>
 
-            {expandedEdicao[acao.id] && (
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-2 space-y-1.5">
-                <Input
-                  value={editingAcao[acao.id]?.titulo || ''}
-                  onChange={(e) => setEditingAcao((prev) => ({
-                    ...prev,
-                    [acao.id]: { ...(prev[acao.id] || {}), titulo: e.target.value },
-                  }))}
-                  className="h-7 text-[11px] bg-white"
-                  placeholder="Título"
-                  disabled={savingId === acao.id}
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                  <AcaoDatePicker
-                    value={editingAcao[acao.id]?.data_prevista || ''}
-                    onChange={(value) => setEditingAcao((prev) => ({
-                      ...prev,
-                      [acao.id]: { ...(prev[acao.id] || {}), data_prevista: value },
-                    }))}
-                    disabled={savingId === acao.id}
-                  />
-                  <Input
-                    value={editingAcao[acao.id]?.responsavel || ''}
-                    onChange={(e) => setEditingAcao((prev) => ({
-                      ...prev,
-                      [acao.id]: { ...(prev[acao.id] || {}), responsavel: e.target.value },
-                    }))}
-                    className="h-7 text-[11px] bg-white"
-                    placeholder="Responsável"
-                    disabled={savingId === acao.id}
-                  />
-                  <Select
-                    value={editingAcao[acao.id]?.status || 'Pendente'}
-                    onValueChange={(value) => setEditingAcao((prev) => ({
-                      ...prev,
-                      [acao.id]: { ...(prev[acao.id] || {}), status: value },
-                    }))}
-                    disabled={savingId === acao.id}
-                  >
-                    <SelectTrigger className="h-7 text-[11px] bg-white"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ACOES_STATUS.map((status) => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Textarea
-                  value={editingAcao[acao.id]?.observacao || ''}
-                  onChange={(e) => setEditingAcao((prev) => ({
-                    ...prev,
-                    [acao.id]: { ...(prev[acao.id] || {}), observacao: e.target.value },
-                  }))}
-                  rows={1}
-                  className="text-[11px] resize-none min-h-8 bg-white"
-                  placeholder="Descrição curta"
-                  disabled={savingId === acao.id}
-                />
-
-                <div className="flex justify-end">
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   <Button
                     size="sm"
-                    className="h-7 text-[11px]"
-                    onClick={async () => {
-                      await atualizarAcao(acao);
-                      setExpandedEdicao((prev) => ({ ...prev, [acao.id]: false }));
-                    }}
+                    variant="secondary"
+                    className="h-7 text-[11px] px-2"
+                    onClick={() => setExpandedEdicao((prev) => ({ ...prev, [acao.id]: !prev[acao.id] }))}
                     disabled={savingId === acao.id}
                   >
-                    {savingId === acao.id ? 'Salvando...' : 'Salvar edição'}
+                    <Pencil className="w-3.5 h-3.5 mr-1" /> {expandedEdicao[acao.id] ? 'Fechar edição' : 'Editar'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-7 text-[11px] px-2 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                    onClick={() => excluirAcao(acao.id)}
+                    disabled={savingId === acao.id}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Excluir
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className={`h-7 text-[11px] px-2 ${concluida ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+                    onClick={() => toggleConclusao(acao)}
+                    disabled={savingId === acao.id}
+                  >
+                    <Check className="w-3.5 h-3.5 mr-1" /> {concluida ? 'Desmarcar concluída' : 'Marcar concluída'}
                   </Button>
                 </div>
               </div>
-            )}
 
-            {expandedComentarios[acao.id] && (
-              <Textarea
-                value={editingAcao[acao.id]?.anotacoes || ''}
-                onChange={(e) => setEditingAcao((prev) => ({
-                  ...prev,
-                  [acao.id]: { ...(prev[acao.id] || {}), anotacoes: e.target.value },
-                }))}
-                rows={3}
-                className="text-[11px] resize-y min-h-16 bg-white"
-                placeholder="Adicionar comentário ou anotação da ação"
-                disabled={savingId === acao.id}
-              />
-            )}
-          </div>
-        ))}
+              {expandedEdicao[acao.id] && (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-2 space-y-1.5">
+                  <Input
+                    value={draft.titulo || ''}
+                    onChange={(e) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), titulo: e.target.value } }))}
+                    className="h-7 text-[11px] bg-white"
+                    placeholder="Título"
+                    disabled={savingId === acao.id}
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                    <AcaoDatePicker
+                      value={draft.data_prevista || ''}
+                      onChange={(value) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), data_prevista: value } }))}
+                      disabled={savingId === acao.id}
+                    />
+                    <Input
+                      value={draft.responsavel || ''}
+                      onChange={(e) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), responsavel: e.target.value } }))}
+                      className="h-7 text-[11px] bg-white"
+                      placeholder="Responsável"
+                      disabled={savingId === acao.id}
+                    />
+                    <Select
+                      value={draft.status || 'Pendente'}
+                      onValueChange={(value) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), status: value } }))}
+                      disabled={savingId === acao.id}
+                    >
+                      <SelectTrigger className="h-7 text-[11px] bg-white"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {ACOES_STATUS.map((status) => (
+                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Textarea
+                    value={draft.observacao || ''}
+                    onChange={(e) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), observacao: e.target.value } }))}
+                    rows={1}
+                    className="text-[11px] resize-none min-h-8 bg-white"
+                    placeholder="Descrição curta"
+                    disabled={savingId === acao.id}
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      className="h-7 text-[11px]"
+                      onClick={async () => {
+                        await atualizarAcao(acao);
+                        setExpandedEdicao((prev) => ({ ...prev, [acao.id]: false }));
+                      }}
+                      disabled={savingId === acao.id}
+                    >
+                      {savingId === acao.id ? 'Salvando...' : 'Salvar'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {expandedComentarios[acao.id] && (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-2 space-y-1.5">
+                  <div className="flex gap-2">
+                    <Input
+                      value={novoComentario[acao.id] || ''}
+                      onChange={(e) => setNovoComentario((prev) => ({ ...prev, [acao.id]: e.target.value }))}
+                      placeholder="Novo comentário"
+                      className="h-8 text-[11px] bg-white"
+                      disabled={savingId === acao.id}
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8 text-[11px]"
+                      onClick={() => salvarComentario(acao)}
+                      disabled={savingId === acao.id || !(novoComentario[acao.id] || '').trim()}
+                    >
+                      Salvar comentário
+                    </Button>
+                  </div>
+                  <div className="space-y-0.5">
+                    {comentarios.length === 0 && <p className="text-[11px] text-slate-400">Sem comentários.</p>}
+                    {comentarios.map((comentario, index) => (
+                      <p key={`${acao.id}-comentario-${index}`} className="text-[11px] text-slate-500 truncate">
+                        {index + 1} - {comentario}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
