@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { DragDropContext } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ export default function QuadroOperacionalPage() {
   const [colunaNovoCard, setColunaNovoCard] = useState(null);
   const [salvandoCard, setSalvandoCard] = useState(false);
   const [movendo, setMovendo] = useState(false);
+  const [novaColuna, setNovaColuna] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: quadros = [], isLoading: loadQ } = useQuery({
@@ -233,6 +234,88 @@ export default function QuadroOperacionalPage() {
     }
   };
 
+  const onDragEndColuna = async ({ source, destination }) => {
+    if (!destination || busca.trim()) return;
+    if (source.index === destination.index) return;
+
+    const ordemOriginal = new Map(colunas.map((coluna) => [coluna.id, Number(coluna.ordem)]));
+    const reordered = [...colunas];
+    const [moved] = reordered.splice(source.index, 1);
+    reordered.splice(destination.index, 0, moved);
+
+    const colunasComNovaOrdem = reordered.map((coluna, index) => ({ ...coluna, ordem: index + 1 }));
+    queryClient.setQueryData(['colunas', quadro?.id], colunasComNovaOrdem);
+
+    try {
+      const updates = colunasComNovaOrdem
+        .filter((coluna) => ordemOriginal.get(coluna.id) !== coluna.ordem)
+        .map((coluna) => base44.entities.ColunaOperacional.update(coluna.id, { ordem: coluna.ordem }));
+
+      if (updates.length) {
+        await Promise.all(updates);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
+    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
+      throw error;
+    }
+  };
+
+  const criarColunaManual = async () => {
+    const nome = novaColuna.trim();
+    if (!nome || !quadro?.id) return;
+
+    const jaExiste = colunas.some((coluna) => (coluna.nome || '').trim().toUpperCase() === nome.toUpperCase());
+    if (jaExiste) {
+      window.alert('Já existe uma coluna com esse nome.');
+      return;
+    }
+
+    await base44.entities.ColunaOperacional.create({
+      quadro_id: quadro.id,
+      nome,
+      cor: '#64748b',
+      ordem: (colunas.at(-1)?.ordem || colunas.length || 0) + 1,
+      ativa: true,
+      fixa: false,
+      origem_coluna: 'manual',
+    });
+
+    setNovaColuna('');
+    queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
+  };
+
+  const renomearColunaManual = async (coluna) => {
+    if (coluna.fixa || coluna.origem_coluna === 'automacao') return;
+    const novoNome = window.prompt('Novo nome da coluna:', coluna.nome || '');
+    if (!novoNome) return;
+    const nome = novoNome.trim();
+    if (!nome || nome === coluna.nome) return;
+    await base44.entities.ColunaOperacional.update(coluna.id, { nome });
+    queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
+  };
+
+  const excluirColunaManual = async (coluna) => {
+    const colunaFixa = coluna.fixa || coluna.origem_coluna === 'automacao' || (coluna.nome || '').trim().toUpperCase() === 'JISO';
+    if (colunaFixa) {
+      window.alert('Colunas fixas/automáticas não podem ser excluídas.');
+      return;
+    }
+
+    const cardsDaColuna = cardsComResumo.filter((card) => card.coluna_id === coluna.id && !card.arquivado);
+    if (cardsDaColuna.length > 0) {
+      window.alert('Só é permitido excluir coluna manual vazia. Mova ou arquive os cards antes de excluir.');
+      return;
+    }
+
+    const confirmar = window.confirm(`Excluir a coluna "${coluna.nome}"?`);
+    if (!confirmar) return;
+
+    await base44.entities.ColunaOperacional.update(coluna.id, { ativa: false });
+    queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
+  };
+
   const setupInicial = async () => {
     const q = await base44.entities.QuadroOperacional.create({
       nome: QUADRO_NOME,
@@ -242,16 +325,16 @@ export default function QuadroOperacionalPage() {
       cor_tema: '#1e3a5f',
     });
     const colunasPadrao = [
-      { nome: 'PENDENTE', cor: '#94a3b8', ordem: 1 },
-      { nome: 'ATENÇÃO AO PRAZO', cor: '#f59e0b', ordem: 2 },
-      { nome: 'JISO', cor: '#8b5cf6', ordem: 3 },
-      { nome: 'ATESTADOS', cor: '#ef4444', ordem: 4 },
-      { nome: 'FÉRIAS', cor: '#10b981', ordem: 5 },
-      { nome: 'NOTAS BG', cor: '#3b82f6', ordem: 6 },
-      { nome: 'ASSINATURAS', cor: '#f97316', ordem: 7 },
-      { nome: 'PROCESSOS E-MS', cor: '#6366f1', ordem: 8 },
-      { nome: 'ACESSOS', cor: '#0ea5e9', ordem: 9 },
-      { nome: 'COBRANÇAS', cor: '#dc2626', ordem: 10 },
+      { nome: 'PENDENTE', cor: '#94a3b8', ordem: 1, fixa: false, origem_coluna: 'manual' },
+      { nome: 'ATENÇÃO AO PRAZO', cor: '#f59e0b', ordem: 2, fixa: false, origem_coluna: 'manual' },
+      { nome: 'JISO', cor: '#8b5cf6', ordem: 3, fixa: true, origem_coluna: 'automacao' },
+      { nome: 'ATESTADOS', cor: '#ef4444', ordem: 4, fixa: false, origem_coluna: 'manual' },
+      { nome: 'FÉRIAS', cor: '#10b981', ordem: 5, fixa: false, origem_coluna: 'manual' },
+      { nome: 'NOTAS BG', cor: '#3b82f6', ordem: 6, fixa: false, origem_coluna: 'manual' },
+      { nome: 'ASSINATURAS', cor: '#f97316', ordem: 7, fixa: false, origem_coluna: 'manual' },
+      { nome: 'PROCESSOS E-MS', cor: '#6366f1', ordem: 8, fixa: false, origem_coluna: 'manual' },
+      { nome: 'ACESSOS', cor: '#0ea5e9', ordem: 9, fixa: false, origem_coluna: 'manual' },
+      { nome: 'COBRANÇAS', cor: '#dc2626', ordem: 10, fixa: false, origem_coluna: 'manual' },
     ];
     await base44.entities.ColunaOperacional.bulkCreate(
       colunasPadrao.map((coluna) => ({ ...coluna, quadro_id: q.id, ativa: true }))
@@ -304,6 +387,17 @@ export default function QuadroOperacionalPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Input
+              value={novaColuna}
+              onChange={(e) => setNovaColuna(e.target.value)}
+              placeholder="Nova coluna manual"
+              className="h-8 text-xs w-44 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:bg-white/15"
+            />
+            <Button onClick={criarColunaManual} className="h-8 text-xs bg-white text-[#1e3a5f] hover:bg-white/90">
+              <Plus className="w-3.5 h-3.5 mr-1" /> Coluna
+            </Button>
+          </div>
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
             <Input
@@ -327,20 +421,42 @@ export default function QuadroOperacionalPage() {
         </div>
       </div>
 
-      <DragDropContext onDragEnd={onDragEnd}>
+      <DragDropContext
+        onDragEnd={(result) => {
+          if (result.type === 'COLUMN') {
+            onDragEndColuna(result);
+            return;
+          }
+          onDragEnd(result);
+        }}
+      >
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <div className="flex gap-3 p-4 h-full items-start">
-            {colunas.map((coluna) => (
-              <ColunaBoard
-                key={coluna.id}
-                coluna={coluna}
-                cards={cardsPorColuna[coluna.id] || []}
-                onCardClick={setCardAberto}
-                onAddCard={setColunaNovoCard}
-                dragDisabled={!!busca.trim() || movendo}
-              />
-            ))}
-          </div>
+          <Droppable droppableId="board-columns" direction="horizontal" type="COLUMN" isDropDisabled={!!busca.trim()}>
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps} className="flex gap-3 p-4 h-full items-start">
+                {colunas.map((coluna, index) => (
+                  <Draggable key={coluna.id} draggableId={`col-${coluna.id}`} index={index} isDragDisabled={!!busca.trim()}>
+                    {(dragProvided) => (
+                      <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
+                        <div {...dragProvided.dragHandleProps}>
+                          <ColunaBoard
+                            coluna={coluna}
+                            cards={cardsPorColuna[coluna.id] || []}
+                            onCardClick={setCardAberto}
+                            onAddCard={setColunaNovoCard}
+                            onRenomearColuna={renomearColunaManual}
+                            onExcluirColuna={excluirColunaManual}
+                            dragDisabled={!!busca.trim() || movendo}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
         </div>
       </DragDropContext>
 
