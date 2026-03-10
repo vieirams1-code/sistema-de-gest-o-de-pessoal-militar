@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   X, Calendar, User, Tag, MessageSquare, Link2,
   Send, Plus, Check, Trash2, AlertTriangle, Cpu, ArrowRightLeft,
-  RefreshCw, Bell, SquareCheckBig,
+  RefreshCw, Bell, SquareCheckBig, ListTodo,
 } from 'lucide-react';
 
 const TIPO_COMENTARIO_CONFIG = {
@@ -22,6 +22,7 @@ const TIPO_COMENTARIO_CONFIG = {
 
 const PRIORIDADE_COR = { Urgente: 'text-red-600', Alta: 'text-orange-500', Média: 'text-blue-500', Baixa: 'text-slate-400' };
 const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente'];
+const ACOES_STATUS = ['Pendente', 'Em andamento', 'Concluída', 'Cancelada'];
 
 function formatDateTime(iso) {
   if (!iso) return '';
@@ -180,6 +181,206 @@ function VinculosSection({ cardId }) {
           <div key={vinculo.id} className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5">
             <span className="text-indigo-500 font-semibold">{vinculo.tipo_vinculo}</span>
             <span className="text-slate-600 truncate">{vinculo.titulo_vinculo}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AcoesSection({ cardId }) {
+  const queryClient = useQueryClient();
+  const [novaAcao, setNovaAcao] = useState({
+    titulo: '',
+    data_prevista: '',
+    status: 'Pendente',
+    observacao: '',
+  });
+  const [savingId, setSavingId] = useState('');
+  const [criando, setCriando] = useState(false);
+  const [observacoesDraft, setObservacoesDraft] = useState({});
+
+  const { data: acoes = [] } = useQuery({
+    queryKey: ['card-acoes', cardId],
+    queryFn: () => base44.entities.CardAcao.filter({ card_id: cardId }, 'ordem', 200),
+    enabled: !!cardId,
+  });
+
+  const invalidateAcoes = () => {
+    queryClient.invalidateQueries({ queryKey: ['card-acoes', cardId] });
+  };
+
+  useEffect(() => {
+    setObservacoesDraft((prev) => {
+      const next = { ...prev };
+      acoes.forEach((acao) => {
+        if (next[acao.id] === undefined) next[acao.id] = acao.observacao || '';
+      });
+      Object.keys(next).forEach((id) => {
+        if (!acoes.some((acao) => acao.id === id)) delete next[id];
+      });
+      return next;
+    });
+  }, [acoes]);
+
+  const criarAcao = async () => {
+    if (!novaAcao.titulo.trim() || criando) return;
+    setCriando(true);
+    try {
+      await base44.entities.CardAcao.create({
+        card_id: cardId,
+        titulo: novaAcao.titulo.trim(),
+        data_prevista: novaAcao.data_prevista || null,
+        status: novaAcao.status,
+        observacao: novaAcao.observacao.trim(),
+        concluida: novaAcao.status === 'Concluída',
+        ordem: acoes.length + 1,
+      });
+      setNovaAcao({ titulo: '', data_prevista: '', status: 'Pendente', observacao: '' });
+      invalidateAcoes();
+    } finally {
+      setCriando(false);
+    }
+  };
+
+  const atualizarAcao = async (acao, payload) => {
+    if (savingId === acao.id) return;
+    setSavingId(acao.id);
+    try {
+      await base44.entities.CardAcao.update(acao.id, payload);
+      invalidateAcoes();
+    } finally {
+      setSavingId('');
+    }
+  };
+
+  const excluirAcao = async (acaoId) => {
+    if (savingId === acaoId) return;
+    setSavingId(acaoId);
+    try {
+      await base44.entities.CardAcao.delete(acaoId);
+      invalidateAcoes();
+    } finally {
+      setSavingId('');
+    }
+  };
+
+  return (
+    <div className="space-y-3 bg-slate-50 rounded-lg p-3 border border-slate-100">
+      <div className="flex items-center gap-2">
+        <ListTodo className="w-4 h-4 text-slate-400" />
+        <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Ações</span>
+      </div>
+
+      <div className="space-y-2 bg-white border border-slate-200 rounded-lg p-2.5">
+        <Input
+          value={novaAcao.titulo}
+          onChange={(e) => setNovaAcao((prev) => ({ ...prev, titulo: e.target.value }))}
+          placeholder="Título da ação"
+          className="h-8 text-xs"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            type="date"
+            value={novaAcao.data_prevista}
+            onChange={(e) => setNovaAcao((prev) => ({ ...prev, data_prevista: e.target.value }))}
+            className="h-8 text-xs"
+          />
+          <Select
+            value={novaAcao.status}
+            onValueChange={(value) => setNovaAcao((prev) => ({ ...prev, status: value }))}
+          >
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {ACOES_STATUS.map((status) => (
+                <SelectItem key={status} value={status}>{status}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Textarea
+          value={novaAcao.observacao}
+          onChange={(e) => setNovaAcao((prev) => ({ ...prev, observacao: e.target.value }))}
+          rows={2}
+          placeholder="Observação (opcional)"
+          className="text-xs resize-none min-h-14"
+        />
+        <div className="flex justify-end">
+          <Button onClick={criarAcao} size="sm" disabled={criando || !novaAcao.titulo.trim()} className="h-8 text-xs gap-1">
+            <Plus className="w-3 h-3" /> {criando ? 'Criando...' : 'Adicionar ação'}
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {acoes.length === 0 && <p className="text-xs text-slate-400 italic text-center py-1">Nenhuma ação cadastrada.</p>}
+        {acoes.map((acao) => (
+          <div key={acao.id} className="bg-white border border-slate-200 rounded-lg p-2.5 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs font-semibold text-slate-700 leading-tight">{acao.titulo}</p>
+              <button
+                onClick={() => excluirAcao(acao.id)}
+                className="text-slate-300 hover:text-red-400 transition-colors"
+                disabled={savingId === acao.id}
+                title="Excluir ação"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="date"
+                value={acao.data_prevista || ''}
+                onChange={(e) => atualizarAcao(acao, { data_prevista: e.target.value || null })}
+                className="h-7 text-xs"
+                disabled={savingId === acao.id}
+              />
+              <Select
+                value={acao.status || 'Pendente'}
+                onValueChange={(value) => atualizarAcao(acao, { status: value, concluida: value === 'Concluída' })}
+                disabled={savingId === acao.id}
+              >
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ACOES_STATUS.map((status) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Textarea
+              value={observacoesDraft[acao.id] ?? ''}
+              onChange={(e) => setObservacoesDraft((prev) => ({ ...prev, [acao.id]: e.target.value }))}
+              onBlur={() => {
+                const valor = (observacoesDraft[acao.id] ?? '').trim();
+                if ((acao.observacao || '').trim() !== valor) {
+                  atualizarAcao(acao, { observacao: valor });
+                }
+              }}
+              rows={2}
+              placeholder="Observação/resultado"
+              className="text-xs resize-none min-h-12"
+              disabled={savingId === acao.id}
+            />
+
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-slate-400">
+                {acao.data_prevista ? `Prevista: ${new Date(`${acao.data_prevista}T00:00:00`).toLocaleDateString('pt-BR')}` : 'Sem data prevista'}
+              </span>
+              <Button
+                type="button"
+                variant={acao.concluida ? 'secondary' : 'outline'}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => atualizarAcao(acao, { concluida: !acao.concluida, status: !acao.concluida ? 'Concluída' : 'Pendente' })}
+                disabled={savingId === acao.id}
+              >
+                <Check className="w-3 h-3 mr-1" />
+                {acao.concluida ? 'Concluída' : 'Marcar concluída'}
+              </Button>
+            </div>
           </div>
         ))}
       </div>
@@ -453,6 +654,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
           )}
 
           <ChecklistSection cardId={card.id} />
+          <AcoesSection cardId={card.id} />
           <VinculosSection cardId={card.id} />
 
           <div className="space-y-3">
