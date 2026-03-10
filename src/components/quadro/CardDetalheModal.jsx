@@ -13,17 +13,9 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   X, Calendar, User, Tag, MessageSquare, Link2,
-  Send, Plus, Check, Trash2, AlertTriangle, Cpu, ArrowRightLeft,
-  RefreshCw, Bell, SquareCheckBig, ListTodo, Pencil, ChevronDown, ChevronUp,
+  Send, Plus, Check, Trash2, AlertTriangle,
+  SquareCheckBig, ListTodo, Pencil, ChevronDown, ChevronUp,
 } from 'lucide-react';
-
-const TIPO_COMENTARIO_CONFIG = {
-  Comentário: { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600', icon: MessageSquare },
-  Atualização: { dot: 'bg-blue-400', badge: 'bg-blue-100 text-blue-700', icon: RefreshCw },
-  Encaminhamento: { dot: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700', icon: ArrowRightLeft },
-  Lembrete: { dot: 'bg-purple-400', badge: 'bg-purple-100 text-purple-700', icon: Bell },
-  Sistema: { dot: 'bg-slate-200', badge: 'bg-slate-50 text-slate-400 italic', icon: Cpu },
-};
 
 const PRIORIDADE_COR = { Urgente: 'text-red-600', Alta: 'text-orange-500', Média: 'text-blue-500', Baixa: 'text-slate-400' };
 const PRIORIDADES = ['Baixa', 'Média', 'Alta', 'Urgente'];
@@ -49,34 +41,29 @@ function normalizarAcao(acao) {
     titulo: getPrimeiroValor(acao, ['titulo', 'nome', 'title']),
     data_prevista: getPrimeiroValor(acao, ['data_prevista', 'data', 'prazo', 'data_acao']) || null,
     status: getPrimeiroValor(acao, ['status', 'situacao', 'estado']) || 'Pendente',
-    responsavel: getPrimeiroValor(acao, ['responsavel', 'responsavel_nome', 'responsavel_acao']) || '',
-    observacao: getPrimeiroValor(acao, ['observacao', 'descricao', 'detalhes']),
-    anotacoes: getPrimeiroValor(acao, ['anotacoes', 'comentarios', 'comentario_acao']) || '',
   };
 }
 
 function montarPayloadAcao(payload) {
   const titulo = payload.titulo?.trim();
-  const observacao = payload.observacao?.trim() || '';
   const dataPrevista = payload.data_prevista || null;
   const status = payload.status || 'Pendente';
-  const responsavel = payload.responsavel?.trim() || '';
-  const anotacoes = payload.anotacoes?.trim() || '';
 
   return {
     ...payload,
     ...(titulo !== undefined ? { titulo, nome: titulo, title: titulo } : {}),
     ...(payload.data_prevista !== undefined ? { data_prevista: dataPrevista, data: dataPrevista, prazo: dataPrevista, data_acao: dataPrevista } : {}),
     ...(payload.status !== undefined ? { status, situacao: status, estado: status } : {}),
-    ...(payload.responsavel !== undefined ? { responsavel, responsavel_nome: responsavel, responsavel_acao: responsavel } : {}),
-    ...(payload.observacao !== undefined ? { observacao, descricao: observacao, detalhes: observacao } : {}),
-    ...(payload.anotacoes !== undefined ? { anotacoes, comentarios: anotacoes, comentario_acao: anotacoes } : {}),
+    observacao: '',
+    descricao: '',
+    detalhes: '',
+    responsavel: '',
+    responsavel_nome: '',
+    responsavel_acao: '',
+    anotacoes: '',
+    comentarios: '',
+    comentario_acao: '',
   };
-}
-
-function extrairComentarios(anotacoes) {
-  if (!anotacoes) return [];
-  return anotacoes.split('\n').map((c) => c.trim()).filter(Boolean);
 }
 
 function SectionCard({ title, children, icon: Icon }) {
@@ -126,26 +113,16 @@ function AcaoDatePicker({ value, onChange, disabled, placeholder = 'Selecionar d
   );
 }
 
-function ComentarioItem({ item, isLast }) {
-  const cfg = TIPO_COMENTARIO_CONFIG[item.tipo_registro] || TIPO_COMENTARIO_CONFIG.Comentário;
-  const Icon = cfg.icon;
+function MensagemComentario({ item, index }) {
+  const alinhadoDireita = index % 2 === 1;
   return (
-    <div className="flex gap-3">
-      <div className="flex flex-col items-center shrink-0">
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${cfg.dot} bg-opacity-20 border ${cfg.dot.replace('bg-', 'border-')}`}>
-          <Icon className={`w-3 h-3 ${cfg.dot.replace('bg-', 'text-')}`} />
-        </div>
-        {!isLast && <div className="w-px flex-1 bg-slate-100 mt-0.5" />}
-      </div>
-      <div className="pb-3 flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${cfg.badge}`}>{item.tipo_registro}</span>
-        </div>
-        <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">{item.mensagem}</p>
-        <div className="flex gap-1.5 mt-1">
-          <span className="text-[10px] font-medium text-slate-400">{item.autor_nome || 'Sistema'}</span>
-          <span className="text-[10px] text-slate-300">·</span>
-          <span className="text-[10px] text-slate-400">{formatDateTime(item.data_hora || item.created_date)}</span>
+    <div className={`flex ${alinhadoDireita ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[85%] rounded-2xl px-3 py-2 border shadow-sm ${alinhadoDireita ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white text-slate-800 border-slate-200'}`}>
+        <p className="text-xs leading-relaxed whitespace-pre-wrap">{item.mensagem}</p>
+        <div className={`mt-1 flex items-center gap-1 text-[10px] ${alinhadoDireita ? 'text-indigo-100' : 'text-slate-400'}`}>
+          <span className="font-semibold">{item.autor_nome || 'Usuário'}</span>
+          <span>·</span>
+          <span>{formatDateTime(item.data_hora || item.created_date)}</span>
         </div>
       </div>
     </div>
@@ -277,20 +254,11 @@ function VinculosSection({ cardId }) {
 
 function AcoesSection({ cardId }) {
   const queryClient = useQueryClient();
-  const [novaAcao, setNovaAcao] = useState({
-    titulo: '',
-    data_prevista: '',
-    responsavel: '',
-    status: 'Pendente',
-    observacao: '',
-    anotacoes: '',
-  });
+  const [novaAcao, setNovaAcao] = useState({ titulo: '', data_prevista: '' });
   const [savingId, setSavingId] = useState('');
   const [criando, setCriando] = useState(false);
   const [editingAcao, setEditingAcao] = useState({});
-  const [expandedComentarios, setExpandedComentarios] = useState({});
   const [expandedEdicao, setExpandedEdicao] = useState({});
-  const [novoComentario, setNovoComentario] = useState({});
 
   const { data: acoesRaw = [] } = useQuery({
     queryKey: ['card-acoes', cardId],
@@ -307,10 +275,7 @@ function AcoesSection({ cardId }) {
         next[acao.id] = prev[acao.id] || {
           titulo: acao.titulo || '',
           data_prevista: acao.data_prevista || '',
-          responsavel: acao.responsavel || '',
           status: acao.status || 'Pendente',
-          observacao: acao.observacao || '',
-          anotacoes: acao.anotacoes || '',
         };
       });
       return next;
@@ -330,14 +295,11 @@ function AcoesSection({ cardId }) {
         card_id: cardId,
         titulo: novaAcao.titulo,
         data_prevista: novaAcao.data_prevista || null,
-        responsavel: novaAcao.responsavel,
-        status: novaAcao.status,
-        observacao: novaAcao.observacao,
-        anotacoes: novaAcao.anotacoes,
-        concluida: (novaAcao.status || 'Pendente') === 'Concluída',
+        status: 'Pendente',
+        concluida: false,
         ordem: acoes.length + 1,
       }));
-      setNovaAcao({ titulo: '', data_prevista: '', responsavel: '', status: 'Pendente', observacao: '', anotacoes: '' });
+      setNovaAcao({ titulo: '', data_prevista: '' });
       invalidateAcoes();
     } finally {
       setCriando(false);
@@ -354,20 +316,10 @@ function AcoesSection({ cardId }) {
       await updateCardAcao(acao.id, montarPayloadAcao({
         titulo: draft.titulo || acao.titulo,
         data_prevista: draft.data_prevista || null,
-        responsavel: draft.responsavel || '',
         status,
-        observacao: draft.observacao || '',
-        anotacoes: draft.anotacoes || '',
         concluida: status === 'Concluída',
       }));
-      setEditingAcao((prev) => ({
-        ...prev,
-        [acao.id]: {
-          ...(prev[acao.id] || {}),
-          ...draft,
-          status,
-        },
-      }));
+      setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), ...draft, status } }));
       invalidateAcoes();
     } finally {
       setSavingId('');
@@ -378,16 +330,6 @@ function AcoesSection({ cardId }) {
     const draft = editingAcao[acao.id] || {};
     const proximoStatus = (draft.status || acao.status || 'Pendente') === 'Concluída' ? 'Pendente' : 'Concluída';
     await atualizarAcao(acao, { status: proximoStatus });
-  };
-
-  const salvarComentario = async (acao) => {
-    const comentario = (novoComentario[acao.id] || '').trim();
-    if (!comentario || savingId === acao.id) return;
-    const comentariosAtuais = extrairComentarios((editingAcao[acao.id] || {}).anotacoes || acao.anotacoes);
-    const anotacoesAtualizadas = [...comentariosAtuais, comentario].join('\n');
-    await atualizarAcao(acao, { anotacoes: anotacoesAtualizadas });
-    setNovoComentario((prev) => ({ ...prev, [acao.id]: '' }));
-    setExpandedComentarios((prev) => ({ ...prev, [acao.id]: true }));
   };
 
   const excluirAcao = async (acaoId) => {
@@ -403,45 +345,27 @@ function AcoesSection({ cardId }) {
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-3 space-y-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-            <ListTodo className="w-4 h-4" />
-          </div>
-          <h3 className="text-sm font-bold text-slate-800 tracking-wide">Ações</h3>
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+          <ListTodo className="w-4 h-4" />
         </div>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold">Ações v2.0</span>
+        <h3 className="text-sm font-bold text-slate-800 tracking-wide">Ações</h3>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 space-y-2">
-        <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Nova ação</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_auto] gap-2">
           <Input
             value={novaAcao.titulo}
             onChange={(e) => setNovaAcao((prev) => ({ ...prev, titulo: e.target.value }))}
-            placeholder="Título da ação"
-            className="h-8 text-xs bg-white border-slate-200 sm:col-span-2"
+            placeholder="Nova ação"
+            className="h-8 text-xs bg-white border-slate-200"
           />
           <AcaoDatePicker
             value={novaAcao.data_prevista}
             onChange={(value) => setNovaAcao((prev) => ({ ...prev, data_prevista: value }))}
             disabled={criando}
+            placeholder="Data"
           />
-          <Input
-            value={novaAcao.responsavel}
-            onChange={(e) => setNovaAcao((prev) => ({ ...prev, responsavel: e.target.value }))}
-            placeholder="Responsável"
-            className="h-8 text-xs bg-white border-slate-200"
-          />
-        </div>
-        <Textarea
-          value={novaAcao.observacao}
-          onChange={(e) => setNovaAcao((prev) => ({ ...prev, observacao: e.target.value }))}
-          rows={1}
-          placeholder="Descrição curta"
-          className="text-xs resize-none min-h-9 bg-white border-slate-200"
-        />
-        <div className="flex justify-end">
           <Button onClick={criarAcao} size="sm" disabled={criando || !novaAcao.titulo.trim()} className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700">
             <Plus className="w-3.5 h-3.5" /> {criando ? 'Adicionando...' : 'Adicionar'}
           </Button>
@@ -452,105 +376,39 @@ function AcoesSection({ cardId }) {
         {acoes.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">Nenhuma ação cadastrada.</p>}
         {acoes.map((acao) => {
           const draft = editingAcao[acao.id] || {};
-          const comentarios = extrairComentarios(draft.anotacoes || acao.anotacoes);
           const concluida = (draft.status || acao.status || 'Pendente') === 'Concluída';
           return (
-            <div key={acao.id} className={`bg-white border rounded-lg p-2.5 space-y-2 shadow-sm ${concluida ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
+            <div key={acao.id} className={`rounded-lg border p-2.5 space-y-2 ${concluida ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white'}`}>
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className={`text-xs font-semibold leading-tight ${concluida ? 'text-emerald-700 line-through' : 'text-slate-900'}`}>{draft.titulo || acao.titulo}</p>
-                  {(draft.observacao || '').trim() && (
-                    <p className="text-[11px] text-slate-500 leading-snug mt-0.5 line-clamp-2">{draft.observacao}</p>
-                  )}
-                </div>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${concluida ? ACOES_STATUS_ESTILO['Concluída'] : (ACOES_STATUS_ESTILO[draft.status] || ACOES_STATUS_ESTILO.Pendente)}`}>
+                <p className={`text-xs font-semibold leading-snug ${concluida ? 'line-through text-emerald-700' : 'text-slate-900'}`}>{draft.titulo || acao.titulo}</p>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${concluida ? ACOES_STATUS_ESTILO.Concluída : (ACOES_STATUS_ESTILO[draft.status] || ACOES_STATUS_ESTILO.Pendente)}`}>
                   {concluida ? 'Concluída' : (draft.status || 'Pendente')}
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
-                  <Calendar className="w-3 h-3" />
-                  {draft.data_prevista ? new Date(`${draft.data_prevista}T00:00:00`).toLocaleDateString('pt-BR') : 'Sem data'}
-                </span>
-                {!!(draft.responsavel || '').trim() && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
-                    <User className="w-3 h-3" />
-                    {draft.responsavel}
-                  </span>
-                )}
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-medium">
+                <Calendar className="w-3 h-3" />
+                {draft.data_prevista ? new Date(`${draft.data_prevista}T00:00:00`).toLocaleDateString('pt-BR') : 'Sem data'}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-1.5">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 text-[11px] px-2"
-                  onClick={() => setExpandedComentarios((prev) => ({ ...prev, [acao.id]: !prev[acao.id] }))}
-                >
-                  <MessageSquare className="w-3.5 h-3.5 mr-1" />
-                  Comentários
-                  {expandedComentarios[acao.id] ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+              <div className="flex items-center flex-wrap gap-1.5">
+                <Button size="sm" variant="secondary" className="h-7 text-[11px] px-2" onClick={() => setExpandedEdicao((prev) => ({ ...prev, [acao.id]: !prev[acao.id] }))} disabled={savingId === acao.id}>
+                  <Pencil className="w-3.5 h-3.5 mr-1" /> {expandedEdicao[acao.id] ? 'Fechar edição' : 'Editar'}
                 </Button>
-
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-7 text-[11px] px-2"
-                    onClick={() => setExpandedEdicao((prev) => ({ ...prev, [acao.id]: !prev[acao.id] }))}
-                    disabled={savingId === acao.id}
-                  >
-                    <Pencil className="w-3.5 h-3.5 mr-1" /> {expandedEdicao[acao.id] ? 'Fechar edição' : 'Editar'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-7 text-[11px] px-2 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                    onClick={() => excluirAcao(acao.id)}
-                    disabled={savingId === acao.id}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Excluir
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className={`h-7 text-[11px] px-2 ${concluida ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
-                    onClick={() => toggleConclusao(acao)}
-                    disabled={savingId === acao.id}
-                  >
-                    <Check className="w-3.5 h-3.5 mr-1" /> {concluida ? 'Desmarcar concluída' : 'Marcar concluída'}
-                  </Button>
-                </div>
+                <Button size="sm" variant="secondary" className="h-7 text-[11px] px-2 bg-rose-50 text-rose-700 hover:bg-rose-100" onClick={() => excluirAcao(acao.id)} disabled={savingId === acao.id}>
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Excluir
+                </Button>
+                <Button size="sm" variant="secondary" className={`h-7 text-[11px] px-2 ${concluida ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`} onClick={() => toggleConclusao(acao)} disabled={savingId === acao.id}>
+                  <Check className="w-3.5 h-3.5 mr-1" /> {concluida ? 'Desmarcar concluída' : 'Marcar concluída'}
+                </Button>
               </div>
 
               {expandedEdicao[acao.id] && (
                 <div className="rounded-md border border-slate-200 bg-slate-50 p-2 space-y-1.5">
-                  <Input
-                    value={draft.titulo || ''}
-                    onChange={(e) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), titulo: e.target.value } }))}
-                    className="h-7 text-[11px] bg-white"
-                    placeholder="Título"
-                    disabled={savingId === acao.id}
-                  />
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                    <AcaoDatePicker
-                      value={draft.data_prevista || ''}
-                      onChange={(value) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), data_prevista: value } }))}
-                      disabled={savingId === acao.id}
-                    />
-                    <Input
-                      value={draft.responsavel || ''}
-                      onChange={(e) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), responsavel: e.target.value } }))}
-                      className="h-7 text-[11px] bg-white"
-                      placeholder="Responsável"
-                      disabled={savingId === acao.id}
-                    />
-                    <Select
-                      value={draft.status || 'Pendente'}
-                      onValueChange={(value) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), status: value } }))}
-                      disabled={savingId === acao.id}
-                    >
+                  <Input value={draft.titulo || ''} onChange={(e) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), titulo: e.target.value } }))} className="h-7 text-[11px] bg-white" placeholder="Título" disabled={savingId === acao.id} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <AcaoDatePicker value={draft.data_prevista || ''} onChange={(value) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), data_prevista: value } }))} disabled={savingId === acao.id} />
+                    <Select value={draft.status || 'Pendente'} onValueChange={(value) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), status: value } }))} disabled={savingId === acao.id}>
                       <SelectTrigger className="h-7 text-[11px] bg-white"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {ACOES_STATUS.map((status) => (
@@ -559,56 +417,10 @@ function AcoesSection({ cardId }) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Textarea
-                    value={draft.observacao || ''}
-                    onChange={(e) => setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), observacao: e.target.value } }))}
-                    rows={1}
-                    className="text-[11px] resize-none min-h-8 bg-white"
-                    placeholder="Descrição curta"
-                    disabled={savingId === acao.id}
-                  />
                   <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      className="h-7 text-[11px]"
-                      onClick={async () => {
-                        await atualizarAcao(acao);
-                        setExpandedEdicao((prev) => ({ ...prev, [acao.id]: false }));
-                      }}
-                      disabled={savingId === acao.id}
-                    >
+                    <Button size="sm" className="h-7 text-[11px]" onClick={async () => { await atualizarAcao(acao); setExpandedEdicao((prev) => ({ ...prev, [acao.id]: false })); }} disabled={savingId === acao.id}>
                       {savingId === acao.id ? 'Salvando...' : 'Salvar'}
                     </Button>
-                  </div>
-                </div>
-              )}
-
-              {expandedComentarios[acao.id] && (
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-2 space-y-1.5">
-                  <div className="flex gap-2">
-                    <Input
-                      value={novoComentario[acao.id] || ''}
-                      onChange={(e) => setNovoComentario((prev) => ({ ...prev, [acao.id]: e.target.value }))}
-                      placeholder="Novo comentário"
-                      className="h-8 text-[11px] bg-white"
-                      disabled={savingId === acao.id}
-                    />
-                    <Button
-                      size="sm"
-                      className="h-8 text-[11px]"
-                      onClick={() => salvarComentario(acao)}
-                      disabled={savingId === acao.id || !(novoComentario[acao.id] || '').trim()}
-                    >
-                      Salvar comentário
-                    </Button>
-                  </div>
-                  <div className="space-y-0.5">
-                    {comentarios.length === 0 && <p className="text-[11px] text-slate-400">Sem comentários.</p>}
-                    {comentarios.map((comentario, index) => (
-                      <p key={`${acao.id}-comentario-${index}`} className="text-[11px] text-slate-500 truncate">
-                        {index + 1} - {comentario}
-                      </p>
-                    ))}
                   </div>
                 </div>
               )}
@@ -624,7 +436,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const queryClient = useQueryClient();
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
-
+  const [showSystemActivity, setShowSystemActivity] = useState(false);
 
   const [jisoDate, setJisoDate] = useState(card.prazo || '');
   const [savingJisoDate, setSavingJisoDate] = useState(false);
@@ -664,10 +476,22 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     enabled: !!card.id,
   });
 
-  const comentariosOrdenados = useMemo(
-    () => [...comentarios].sort((a, b) => new Date(a.data_hora || a.created_date || 0) - new Date(b.data_hora || b.created_date || 0)),
-    [comentarios]
-  );
+  const { comentariosHumanos, comentariosSistema } = useMemo(() => {
+    const ordenados = [...comentarios].sort((a, b) => new Date(a.data_hora || a.created_date || 0) - new Date(b.data_hora || b.created_date || 0));
+    const humanos = [];
+    const sistema = [];
+
+    ordenados.forEach((item) => {
+      const ehSistema = item.origem_automatica || item.tipo_registro === 'Sistema';
+      if (ehSistema) {
+        sistema.push(item);
+      } else {
+        humanos.push(item);
+      }
+    });
+
+    return { comentariosHumanos: humanos, comentariosSistema: sistema };
+  }, [comentarios]);
 
   const enviarComentario = async () => {
     if (!mensagem.trim()) return;
@@ -888,21 +712,51 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
           <AcoesSection cardId={card.id} />
           <VinculosSection cardId={card.id} />
 
-          <SectionCard title="Comentários e atividade" icon={MessageSquare}>
-            <div className="space-y-0">
-              {comentariosOrdenados.length === 0 && <p className="text-xs text-slate-400 italic text-center py-3">Nenhum registro ainda.</p>}
-              {comentariosOrdenados.map((item, idx) => (
-                <ComentarioItem key={item.id} item={item} isLast={idx === comentariosOrdenados.length - 1} />
+          <SectionCard title="Comentários v3.0" icon={MessageSquare}>
+            <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-indigo-500" />
+                <p className="text-xs font-semibold text-slate-700">Conversa entre usuários</p>
+              </div>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-semibold">Comentários v3.0</span>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              {comentariosHumanos.length === 0 && <p className="text-xs text-slate-400 italic text-center py-3">Nenhuma mensagem humana ainda.</p>}
+              {comentariosHumanos.map((item, idx) => (
+                <MensagemComentario key={item.id} item={item} index={idx} />
               ))}
             </div>
 
-            <div className="space-y-2 pt-1">
+            {comentariosSistema.length > 0 && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 mt-2">
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 flex items-center justify-between text-[11px] font-semibold text-slate-600"
+                  onClick={() => setShowSystemActivity((prev) => !prev)}
+                >
+                  Atividades do sistema ({comentariosSistema.length})
+                  {showSystemActivity ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+                {showSystemActivity && (
+                  <div className="px-3 pb-2 space-y-1.5">
+                    {comentariosSistema.map((item) => (
+                      <p key={item.id} className="text-[11px] text-slate-500">
+                        {item.mensagem} · {formatDateTime(item.data_hora || item.created_date)}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2 pt-1 border-t border-slate-100 mt-2">
               <Textarea
                 value={mensagem}
                 onChange={(e) => setMensagem(e.target.value)}
-                rows={2}
-                placeholder="Escrever comentário ou anotação... (Ctrl+Enter para enviar)"
-                className="text-sm resize-none"
+                rows={3}
+                placeholder="Escreva uma mensagem..."
+                className="text-sm resize-none rounded-xl border-slate-200"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarComentario();
                 }}
@@ -914,7 +768,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                   disabled={!mensagem.trim() || salvando}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white gap-1.5 text-xs"
                 >
-                  <Send className="w-3.5 h-3.5" /> Registrar
+                  <Send className="w-3.5 h-3.5" /> Enviar
                 </Button>
               </div>
             </div>
