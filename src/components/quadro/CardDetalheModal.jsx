@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatarDataBR, isConcluidaAcao, montarPayloadAcao, normalizarAcao, toDateKey } from '@/components/quadro/cardAcoesUtils';
 import {
   X, Calendar, User, Tag, MessageSquare, Link2,
   Send, Plus, Check, Trash2, AlertTriangle,
@@ -26,45 +27,6 @@ const ACOES_STATUS_ESTILO = {
   Concluída: 'bg-emerald-100 text-emerald-700',
   Cancelada: 'bg-red-100 text-red-700',
 };
-
-function getPrimeiroValor(item, campos = []) {
-  for (const campo of campos) {
-    const valor = item?.[campo];
-    if (valor !== undefined && valor !== null && `${valor}`.trim() !== '') return valor;
-  }
-  return '';
-}
-
-function normalizarAcao(acao) {
-  return {
-    ...acao,
-    titulo: getPrimeiroValor(acao, ['titulo', 'nome', 'title']),
-    data_prevista: getPrimeiroValor(acao, ['data_prevista', 'data', 'prazo', 'data_acao']) || null,
-    status: getPrimeiroValor(acao, ['status', 'situacao', 'estado']) || 'Pendente',
-  };
-}
-
-function montarPayloadAcao(payload) {
-  const titulo = payload.titulo?.trim();
-  const dataPrevista = payload.data_prevista || null;
-  const status = payload.status || 'Pendente';
-
-  return {
-    ...payload,
-    ...(titulo !== undefined ? { titulo, nome: titulo, title: titulo } : {}),
-    ...(payload.data_prevista !== undefined ? { data_prevista: dataPrevista, data: dataPrevista, prazo: dataPrevista, data_acao: dataPrevista } : {}),
-    ...(payload.status !== undefined ? { status, situacao: status, estado: status } : {}),
-    observacao: '',
-    descricao: '',
-    detalhes: '',
-    responsavel: '',
-    responsavel_nome: '',
-    responsavel_acao: '',
-    anotacoes: '',
-    comentarios: '',
-    comentario_acao: '',
-  };
-}
 
 function SectionCard({ title, children, icon: Icon }) {
   return (
@@ -85,7 +47,8 @@ function formatDateTime(iso) {
 }
 
 function AcaoDatePicker({ value, onChange, disabled, placeholder = 'Selecionar data' }) {
-  const dataSelecionada = value ? parseISO(`${value}T00:00:00`) : undefined;
+  const dataKey = toDateKey(value);
+  const dataSelecionada = dataKey ? parseISO(`${dataKey}T00:00:00`) : undefined;
 
   return (
     <Popover>
@@ -252,6 +215,12 @@ function VinculosSection({ cardId }) {
 }
 
 
+
+function atualizarAcaoNoCache(lista, acaoId, payloadAtualizado) {
+  if (!Array.isArray(lista)) return lista;
+  return lista.map((item) => (item.id === acaoId ? { ...item, ...payloadAtualizado } : item));
+}
+
 function AcoesSection({ cardId }) {
   const queryClient = useQueryClient();
   const [novaAcao, setNovaAcao] = useState({ titulo: '', data_prevista: '' });
@@ -284,6 +253,7 @@ function AcoesSection({ cardId }) {
 
   const invalidateAcoes = () => {
     queryClient.invalidateQueries({ queryKey: ['card-acoes', cardId] });
+    queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
     queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
   };
 
@@ -313,12 +283,16 @@ function AcoesSection({ cardId }) {
       const baseDraft = editingAcao[acao.id] || {};
       const draft = { ...baseDraft, ...(patch || {}) };
       const status = draft.status || 'Pendente';
-      await updateCardAcao(acao.id, montarPayloadAcao({
+      const payloadAtualizado = montarPayloadAcao({
         titulo: draft.titulo || acao.titulo,
         data_prevista: draft.data_prevista || null,
         status,
         concluida: status === 'Concluída',
-      }));
+      });
+      await updateCardAcao(acao.id, payloadAtualizado);
+      queryClient.setQueryData(['card-acoes', cardId], (antigo) => atualizarAcaoNoCache(antigo, acao.id, payloadAtualizado));
+      queryClient.setQueryData(['acoes-consolidadas-quadro'], (antigo) => atualizarAcaoNoCache(antigo, acao.id, payloadAtualizado));
+      queryClient.setQueriesData({ queryKey: ['card-acoes'] }, (antigo) => atualizarAcaoNoCache(antigo, acao.id, payloadAtualizado));
       setEditingAcao((prev) => ({ ...prev, [acao.id]: { ...(prev[acao.id] || {}), ...draft, status } }));
       invalidateAcoes();
     } finally {
@@ -328,7 +302,7 @@ function AcoesSection({ cardId }) {
 
   const toggleConclusao = async (acao) => {
     const draft = editingAcao[acao.id] || {};
-    const proximoStatus = (draft.status || acao.status || 'Pendente') === 'Concluída' ? 'Pendente' : 'Concluída';
+    const proximoStatus = isConcluidaAcao({ ...acao, ...draft }) ? 'Pendente' : 'Concluída';
     await atualizarAcao(acao, { status: proximoStatus });
   };
 
@@ -376,7 +350,7 @@ function AcoesSection({ cardId }) {
         {acoes.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">Nenhuma ação cadastrada.</p>}
         {acoes.map((acao) => {
           const draft = editingAcao[acao.id] || {};
-          const concluida = (draft.status || acao.status || 'Pendente') === 'Concluída';
+          const concluida = isConcluidaAcao({ ...acao, ...draft });
           return (
             <div key={acao.id} className={`rounded-lg border p-2.5 space-y-2 ${concluida ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white'}`}>
               <div className="flex items-start justify-between gap-2">
@@ -388,7 +362,7 @@ function AcoesSection({ cardId }) {
 
               <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-medium">
                 <Calendar className="w-3 h-3" />
-                {draft.data_prevista ? new Date(`${draft.data_prevista}T00:00:00`).toLocaleDateString('pt-BR') : 'Sem data'}
+                {formatarDataBR(draft.data_prevista)}
               </div>
 
               <div className="flex items-center flex-wrap gap-1.5">
@@ -548,7 +522,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     }
   };
 
-  const prazoFormatado = card.prazo ? new Date(`${card.prazo}T00:00:00`).toLocaleDateString('pt-BR') : null;
+  const prazoFormatado = card.prazo ? formatarDataBR(card.prazo) : null;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const prazoAtrasado = card.prazo && new Date(`${card.prazo}T00:00:00`) < hoje;

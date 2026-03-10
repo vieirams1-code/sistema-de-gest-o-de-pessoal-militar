@@ -4,78 +4,13 @@ import { CalendarClock, Clock3, AlertTriangle, ExternalLink, Check } from 'lucid
 import { base44 } from '@/api/base44Client';
 import CardDetalheModal from '@/components/quadro/CardDetalheModal';
 import { deleteCardAcao, listAllCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
+import { formatarDataBR, isConcluidaAcao, montarPayloadAcao, normalizarAcao, toDateKey } from '@/components/quadro/cardAcoesUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-function getPrimeiroValor(item, campos = []) {
-  for (const campo of campos) {
-    const valor = item?.[campo];
-    if (valor !== undefined && valor !== null && `${valor}`.trim() !== '') return valor;
-  }
-  return '';
-}
-
-function normalizarAcao(acao) {
-  return {
-    ...acao,
-    titulo: getPrimeiroValor(acao, ['titulo', 'nome', 'title']) || 'Ação sem título',
-    data_prevista: getPrimeiroValor(acao, ['data_prevista', 'data', 'prazo', 'data_acao']) || null,
-    status: getPrimeiroValor(acao, ['status', 'situacao', 'estado']) || 'Pendente',
-  };
-}
-
-function toDateKey(valor) {
-  if (!valor) return null;
-  const str = `${valor}`;
-  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
-  const data = new Date(str);
-  if (Number.isNaN(data.getTime())) return null;
-  const y = data.getFullYear();
-  const m = String(data.getMonth() + 1).padStart(2, '0');
-  const d = String(data.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function formatarData(valor) {
-  const key = toDateKey(valor);
-  if (!key) return 'Sem data';
-  const [y, m, d] = key.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-function normalizarStatus(status) {
-  return (status || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
-function isConcluida(status) {
-  return ['concluida', 'concluido', 'finalizada', 'finalizado', 'cancelada', 'cancelado'].includes(normalizarStatus(status));
-}
-
-function montarPayloadAcao(payload) {
-  const titulo = payload.titulo?.trim() || '';
-  const dataPrevista = payload.data_prevista || null;
-  const status = payload.status || 'Pendente';
-
-  return {
-    ...(titulo ? { titulo, nome: titulo, title: titulo } : {}),
-    data_prevista: dataPrevista,
-    data: dataPrevista,
-    prazo: dataPrevista,
-    data_acao: dataPrevista,
-    status,
-    situacao: status,
-    estado: status,
-    responsavel: '',
-    responsavel_nome: '',
-    responsavel_acao: '',
-    observacao: '',
-    descricao: '',
-    detalhes: '',
-    anotacoes: '',
-    comentarios: '',
-    comentario_acao: '',
-    concluida: status === 'Concluída',
-  };
+function atualizarAcaoNoCache(lista, acaoId, payloadAtualizado) {
+  if (!Array.isArray(lista)) return lista;
+  return lista.map((item) => (item.id === acaoId ? { ...item, ...payloadAtualizado } : item));
 }
 
 
@@ -134,14 +69,14 @@ function GrupoAcoes({
                 <div className="border-l-2 border-indigo-100 pl-3 space-y-2">
                   {grupo.acoes.map((acao) => {
                     const draft = acaoDrafts[acao.id] || acao;
-                    const concluida = isConcluida(draft.status);
+                    const concluida = isConcluidaAcao(draft);
                     return (
                       <div key={acao.id} className={`bg-white border rounded-lg px-3 py-2.5 ${concluida ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className={`text-sm font-medium truncate ${concluida ? 'text-emerald-700 line-through' : 'text-slate-800'}`}>{draft.titulo}</p>
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                              <span>Prazo: {formatarData(draft.data_prevista)}</span>
+                              <span>Prazo: {formatarDataBR(draft.data_prevista)}</span>
                               <span className={concluida ? 'font-semibold text-emerald-700' : ''}>{concluida ? 'Concluída' : (draft.status || 'Pendente')}</span>
                             </div>
                           </div>
@@ -254,22 +189,32 @@ export default function AgendaAcoesOperacionaisPage() {
 
   const toggleConclusaoMutation = useMutation({
     mutationFn: async ({ acao, status }) => {
-      await updateCardAcao(acao.id, montarPayloadAcao({
+      const payload = montarPayloadAcao({
         titulo: acao.titulo,
         data_prevista: acao.data_prevista,
         status,
-      }));
+      });
+      await updateCardAcao(acao.id, payload);
+      return { acaoId: acao.id, payload };
     },
-    onSuccess: () => {
+    onSuccess: ({ acaoId, payload }) => {
+      queryClient.setQueryData(['acoes-consolidadas-quadro'], (antigo) => atualizarAcaoNoCache(antigo, acaoId, payload));
+      queryClient.setQueriesData({ queryKey: ['card-acoes'] }, (antigo) => atualizarAcaoNoCache(antigo, acaoId, payload));
       queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
       queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
     },
   });
 
   const salvarEdicaoMutation = useMutation({
-    mutationFn: async ({ acaoId, payload }) => updateCardAcao(acaoId, montarPayloadAcao(payload)),
-    onSuccess: () => {
+    mutationFn: async ({ acaoId, payload }) => {
+      const payloadFinal = montarPayloadAcao(payload);
+      await updateCardAcao(acaoId, payloadFinal);
+      return { acaoId, payload: payloadFinal };
+    },
+    onSuccess: ({ acaoId, payload }) => {
       setEditingAcaoId(null);
+      queryClient.setQueryData(['acoes-consolidadas-quadro'], (antigo) => atualizarAcaoNoCache(antigo, acaoId, payload));
+      queryClient.setQueriesData({ queryKey: ['card-acoes'] }, (antigo) => atualizarAcaoNoCache(antigo, acaoId, payload));
       queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
       queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
     },
@@ -365,7 +310,7 @@ export default function AgendaAcoesOperacionaisPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-4">
       <header className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Agenda de Ações v2.0</p>
+        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Ações v3.1</p>
         <div className="mt-1 flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-slate-500" />
           <h1 className="text-lg font-bold text-slate-800">Ações Operacionais</h1>
@@ -400,10 +345,13 @@ export default function AgendaAcoesOperacionaisPage() {
           card={cardSelecionado}
           colunaNome={colunaCardSelecionado?.nome || 'Coluna'}
           onClose={() => setCardAbertoId(null)}
-          onCardUpdate={() => queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] })}
+          onCardUpdate={() => {
+            queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
+            queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
+            queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
+          }}
         />
       )}
     </div>
   );
 }
-

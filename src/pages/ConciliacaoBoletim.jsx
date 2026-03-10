@@ -156,6 +156,8 @@ export default function ConciliacaoBoletim() {
   const [notasEncontradas, setNotasEncontradas] = useState([]);
   const [vinculos, setVinculos] = useState({});
   const [processandoPdf, setProcessandoPdf] = useState(false);
+  const [erroProcessamento, setErroProcessamento] = useState('');
+  const [mensagemProcessamento, setMensagemProcessamento] = useState('');
 
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['conciliacao-registros-livro'],
@@ -240,12 +242,29 @@ export default function ConciliacaoBoletim() {
   });
 
   const processarBoletim = async () => {
-    if (!arquivoPdf) return;
+    setErroProcessamento('');
+    setMensagemProcessamento('');
+
+    if (!arquivoPdf) {
+      setErroProcessamento('Selecione um arquivo PDF antes de buscar notas.');
+      return;
+    }
+
     setProcessandoPdf(true);
     try {
       const notasSistema = pendentes.map((item) => item.nota_normalizada).filter(Boolean);
       const notas = await extrairNotasPdf(arquivoPdf, notasSistema);
       setNotasEncontradas(notas);
+      setVinculos({});
+
+      if (notas.length === 0) {
+        setMensagemProcessamento('PDF processado, mas nenhuma nota válida foi identificada.');
+      } else {
+        setMensagemProcessamento(`${notas.length} nota(s) encontrada(s) no PDF e carregada(s) para conciliação.`);
+      }
+    } catch (error) {
+      setErroProcessamento(error?.message || 'Não foi possível processar o PDF enviado. Verifique o arquivo e tente novamente.');
+      setNotasEncontradas([]);
       setVinculos({});
     } finally {
       setProcessandoPdf(false);
@@ -261,7 +280,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.0</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v1.1</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
@@ -277,12 +296,17 @@ export default function ConciliacaoBoletim() {
             <Input type="file" accept="application/pdf" onChange={(e) => setArquivoPdf(e.target.files?.[0] || null)} />
           </div>
           <div className="flex items-end">
-            <Button onClick={processarBoletim} disabled={!arquivoPdf || processandoPdf} className="w-full">
+            <Button type="button" onClick={processarBoletim} disabled={processandoPdf} className="w-full">
               <FileSearch className="w-4 h-4 mr-2" />
               {processandoPdf ? 'Processando...' : 'Buscar notas'}
             </Button>
           </div>
         </CardContent>
+        <div className="px-6 pb-4 space-y-2">
+          {processandoPdf && <p className="text-xs text-blue-600 font-medium">Processando PDF para buscar notas...</p>}
+          {erroProcessamento && <p className="text-xs text-red-600 font-medium">{erroProcessamento}</p>}
+          {!erroProcessamento && mensagemProcessamento && <p className="text-xs text-emerald-700 font-medium">{mensagemProcessamento}</p>}
+        </div>
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
