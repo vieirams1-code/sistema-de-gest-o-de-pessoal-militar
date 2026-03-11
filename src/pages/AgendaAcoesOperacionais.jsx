@@ -278,10 +278,7 @@ export default function AgendaAcoesOperacionaisPage() {
         if (!card) return;
 
         const dataKey = toDateKey(acao.data_prevista);
-        const acaoComCard = {
-          ...acao,
-          card,
-        };
+        const acaoComCard = { ...acao, card };
 
         if (!dataKey || dataKey > hojeKey) {
           agrupadas.proximas.push(acaoComCard);
