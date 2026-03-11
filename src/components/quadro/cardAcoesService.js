@@ -28,7 +28,6 @@ async function resolveCardAcoesEntity() {
           if (isEntitySchemaNotFound(error)) {
             continue;
           }
-
           return { entity, entityName };
         }
       }
