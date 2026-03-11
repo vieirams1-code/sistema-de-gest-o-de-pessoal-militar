@@ -17,6 +17,7 @@ import { differenceInDays, format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
+import AdminCadeiaPanel from '@/components/ferias/AdminCadeiaPanel';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -537,7 +538,11 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
             {estadoCadeia.ultimoEvento && (
               <div className="inline-flex items-center gap-1 text-[11px] text-slate-500">
                 <Clock3 className="w-3.5 h-3.5" />
-                <span>Atual: {NOMES_OPERACIONAIS[estadoCadeia.ultimoEvento.tipo_registro] || estadoCadeia.ultimoEvento.tipo_registro}</span>
+                <span>
+                  Atual:{' '}
+                  {NOMES_OPERACIONAIS[estadoCadeia.ultimoEvento.tipo_registro] ||
+                    estadoCadeia.ultimoEvento.tipo_registro}
+                </span>
               </div>
             )}
           </div>
@@ -610,7 +615,8 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                             </>
                           )}
 
-                          {(evento.tipo_registro === 'Saída Férias' || evento.tipo_registro === 'Retorno Férias') &&
+                          {(evento.tipo_registro === 'Saída Férias' ||
+                            evento.tipo_registro === 'Retorno Férias') &&
                             evento.dias != null && (
                               <>
                                 <span className="text-slate-400">Dias</span>
@@ -699,6 +705,8 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
             </div>
           )}
         </div>
+
+        <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} />
       </div>
 
       {possuiEventosPendentes && (
