@@ -19,7 +19,7 @@ function groupCardsByColuna(cards = [], colunas = []) {
   cards.forEach((card) => {
     if (mapa[card.coluna_id]) mapa[card.coluna_id].push(card);
   });
-  Object.values(mapa).forEach((lista) => lista.sort((a, b) => (a.ordem || 0) - (b.ordem || 0)));
+  Object.values(mapa).forEach((lista) => lista.sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0)));
   return mapa;
 }
 
@@ -63,6 +63,15 @@ export default function QuadroOperacionalPage() {
   });
 
   const isLoading = loadQ || loadC || loadCards;
+
+  const invalidateBoardData = () => {
+    queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
+    queryClient.invalidateQueries({ queryKey: ['cards'] });
+    queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
+    queryClient.invalidateQueries({ queryKey: ['colunas'] });
+    queryClient.invalidateQueries({ queryKey: ['checklist-board', quadro?.id] });
+    queryClient.invalidateQueries({ queryKey: ['checklist-board'] });
+  };
 
   const cardsComResumo = useMemo(() => {
     const checklistPorCard = checklistItens.reduce((acc, item) => {
@@ -126,8 +135,7 @@ export default function QuadroOperacionalPage() {
         await criarChecklistPreset(novoCard.id, form.preset);
       }
 
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
-      queryClient.invalidateQueries({ queryKey: ['checklist-board'] });
+      invalidateBoardData();
       setColunaNovoCard(null);
     } finally {
       setSalvandoCard(false);
@@ -146,6 +154,7 @@ export default function QuadroOperacionalPage() {
 
     let movedCard;
     let destinationCards;
+
     if (sourceColunaId === destinationColunaId) {
       const reorderedCards = [...sourceCards];
       [movedCard] = reorderedCards.splice(source.index, 1);
@@ -172,7 +181,7 @@ export default function QuadroOperacionalPage() {
       sourceCards.forEach((card, index) => {
         const ordem = index + 1;
         const payload = {};
-        if (card.ordem !== ordem) payload.ordem = ordem;
+        if (Number(card.ordem) !== ordem) payload.ordem = ordem;
         registrarAtualizacao(card, payload);
       });
     }
@@ -190,11 +199,17 @@ export default function QuadroOperacionalPage() {
     if (!updates.length) return;
 
     setMovendo(true);
+
     const previousCards = queryClient.getQueryData(['cards', quadro?.id]);
+    const movedCardAtualizado = cardsAtualizados.get(movedCard.id) || movedCard;
 
     queryClient.setQueryData(['cards', quadro?.id], (currentCards = []) =>
       currentCards.map((card) => cardsAtualizados.get(card.id) || card)
     );
+
+    if (cardAberto?.id === movedCard.id) {
+      setCardAberto((prev) => (prev ? { ...prev, ...movedCardAtualizado } : prev));
+    }
 
     try {
       if (sourceColunaId === destinationColunaId) {
@@ -208,12 +223,15 @@ export default function QuadroOperacionalPage() {
           await base44.entities.CardOperacional.update(update.id, update.payload);
         }
       } else {
-        await Promise.all(updates.map((update) => base44.entities.CardOperacional.update(update.id, update.payload)));
+        await Promise.all(
+          updates.map((update) => base44.entities.CardOperacional.update(update.id, update.payload))
+        );
       }
 
       if (destinationColunaId !== sourceColunaId) {
         const origem = colunas.find((coluna) => coluna.id === sourceColunaId);
         const destino = colunas.find((coluna) => coluna.id === destinationColunaId);
+
         await base44.entities.CardComentario.create({
           card_id: movedCard.id,
           mensagem: `Card movido de [${origem?.nome || 'Origem'}] para [${destino?.nome || 'Destino'}]`,
@@ -224,21 +242,34 @@ export default function QuadroOperacionalPage() {
         });
       }
 
+      queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       queryClient.invalidateQueries({ queryKey: ['card-comentarios', movedCard.id] });
     } catch (error) {
       queryClient.setQueryData(['cards', quadro?.id], previousCards);
-      throw error;
+
+      if (cardAberto?.id === movedCard.id) {
+        const cardAnterior = Array.isArray(previousCards)
+          ? previousCards.find((item) => item.id === movedCard.id)
+          : null;
+        if (cardAnterior) {
+          setCardAberto(cardAnterior);
+        }
+      }
+
+      window.alert(error?.message || 'Não foi possível concluir a movimentação do card.');
     } finally {
       setMovendo(false);
     }
   };
 
   const onDragEndColuna = async ({ source, destination }) => {
-    if (!destination || busca.trim()) return;
+    if (!destination || busca.trim() || movendo) return;
     if (source.index === destination.index) return;
 
+    const colunasAnteriores = [...colunas];
     const ordemOriginal = new Map(colunas.map((coluna) => [coluna.id, Number(coluna.ordem)]));
+
     const reordered = [...colunas];
     const [moved] = reordered.splice(source.index, 1);
     reordered.splice(destination.index, 0, moved);
@@ -257,8 +288,8 @@ export default function QuadroOperacionalPage() {
 
       queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
     } catch (error) {
-      queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
-      throw error;
+      queryClient.setQueryData(['colunas', quadro?.id], colunasAnteriores);
+      window.alert(error?.message || 'Não foi possível reordenar as colunas.');
     }
   };
 
@@ -266,7 +297,10 @@ export default function QuadroOperacionalPage() {
     const nome = novaColuna.trim();
     if (!nome || !quadro?.id) return;
 
-    const jaExiste = colunas.some((coluna) => (coluna.nome || '').trim().toUpperCase() === nome.toUpperCase());
+    const jaExiste = colunas.some(
+      (coluna) => (coluna.nome || '').trim().toUpperCase() === nome.toUpperCase()
+    );
+
     if (jaExiste) {
       window.alert('Já existe uma coluna com esse nome.');
       return;
@@ -288,16 +322,34 @@ export default function QuadroOperacionalPage() {
 
   const renomearColunaManual = async (coluna) => {
     if (coluna.fixa || coluna.origem_coluna === 'automacao') return;
+
     const novoNome = window.prompt('Novo nome da coluna:', coluna.nome || '');
     if (!novoNome) return;
+
     const nome = novoNome.trim();
     if (!nome || nome === coluna.nome) return;
+
+    const jaExiste = colunas.some(
+      (item) =>
+        item.id !== coluna.id &&
+        (item.nome || '').trim().toUpperCase() === nome.toUpperCase()
+    );
+
+    if (jaExiste) {
+      window.alert('Já existe outra coluna com esse nome.');
+      return;
+    }
+
     await base44.entities.ColunaOperacional.update(coluna.id, { nome });
     queryClient.invalidateQueries({ queryKey: ['colunas', quadro?.id] });
   };
 
   const excluirColunaManual = async (coluna) => {
-    const colunaFixa = coluna.fixa || coluna.origem_coluna === 'automacao' || (coluna.nome || '').trim().toUpperCase() === 'JISO';
+    const colunaFixa =
+      coluna.fixa ||
+      coluna.origem_coluna === 'automacao' ||
+      (coluna.nome || '').trim().toUpperCase() === 'JISO';
+
     if (colunaFixa) {
       window.alert('Colunas fixas/automáticas não podem ser excluídas.');
       return;
@@ -324,6 +376,7 @@ export default function QuadroOperacionalPage() {
       ordem: 1,
       cor_tema: '#1e3a5f',
     });
+
     const colunasPadrao = [
       { nome: 'PENDENTE', cor: '#94a3b8', ordem: 1, fixa: false, origem_coluna: 'manual' },
       { nome: 'ATENÇÃO AO PRAZO', cor: '#f59e0b', ordem: 2, fixa: false, origem_coluna: 'manual' },
@@ -336,9 +389,11 @@ export default function QuadroOperacionalPage() {
       { nome: 'ACESSOS', cor: '#0ea5e9', ordem: 9, fixa: false, origem_coluna: 'manual' },
       { nome: 'COBRANÇAS', cor: '#dc2626', ordem: 10, fixa: false, origem_coluna: 'manual' },
     ];
+
     await base44.entities.ColunaOperacional.bulkCreate(
       colunasPadrao.map((coluna) => ({ ...coluna, quadro_id: q.id, ativa: true }))
     );
+
     queryClient.invalidateQueries({ queryKey: ['quadros'] });
     queryClient.invalidateQueries({ queryKey: ['colunas'] });
   };
@@ -398,6 +453,7 @@ export default function QuadroOperacionalPage() {
               <Plus className="w-3.5 h-3.5 mr-1" /> Coluna
             </Button>
           </div>
+
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
             <Input
@@ -407,12 +463,9 @@ export default function QuadroOperacionalPage() {
               className="pl-7 h-8 text-xs w-40 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:bg-white/15"
             />
           </div>
+
           <button
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['cards'] });
-              queryClient.invalidateQueries({ queryKey: ['colunas'] });
-              queryClient.invalidateQueries({ queryKey: ['checklist-board'] });
-            }}
+            onClick={invalidateBoardData}
             className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
             title="Atualizar"
           >
@@ -431,11 +484,21 @@ export default function QuadroOperacionalPage() {
         }}
       >
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <Droppable droppableId="board-columns" direction="horizontal" type="COLUMN" isDropDisabled={!!busca.trim()}>
+          <Droppable
+            droppableId="board-columns"
+            direction="horizontal"
+            type="COLUMN"
+            isDropDisabled={!!busca.trim() || movendo}
+          >
             {(provided) => (
               <div ref={provided.innerRef} {...provided.droppableProps} className="flex gap-3 p-4 h-full items-start">
                 {colunas.map((coluna, index) => (
-                  <Draggable key={coluna.id} draggableId={`col-${coluna.id}`} index={index} isDragDisabled={!!busca.trim()}>
+                  <Draggable
+                    key={coluna.id}
+                    draggableId={`col-${coluna.id}`}
+                    index={index}
+                    isDragDisabled={!!busca.trim() || movendo}
+                  >
                     {(dragProvided) => (
                       <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
                         <div {...dragProvided.dragHandleProps}>
