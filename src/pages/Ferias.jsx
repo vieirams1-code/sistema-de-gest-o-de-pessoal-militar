@@ -315,9 +315,8 @@ export default function Ferias() {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [feriasToDelete, setFeriasToDelete] = useState(null);
-  const [livrosVinculados, setLivrosVinculados] = useState([]);
-  const [livrosDialogOpen, setLivrosDialogOpen] = useState(false);
-  const [deletingLivroId, setDeletingLivroId] = useState(null);
+  const [deleteBlockedDialogOpen, setDeleteBlockedDialogOpen] = useState(false);
+  const [cadeiaBloqueandoDelete, setCadeiaBloqueandoDelete] = useState([]);
 
   const [registroLivroModal, setRegistroLivroModal] = useState({
     open: false,
@@ -361,15 +360,7 @@ export default function Ferias() {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       setDeleteDialogOpen(false);
       setFeriasToDelete(null);
-      setLivrosVinculados([]);
-    },
-  });
-
-  const deleteLivroMutation = useMutation({
-    mutationFn: (id) => base44.entities.RegistroLivro.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-      setDeletingLivroId(null);
+      setCadeiaBloqueandoDelete([]);
     },
   });
 
@@ -434,14 +425,27 @@ export default function Ferias() {
   const handleDelete = async (f) => {
     setFeriasToDelete(f);
 
-    const vinculados = registrosLivro.filter((r) => r.ferias_id === f.id);
-    setLivrosVinculados(vinculados);
+    const cadeiaOperacional = registrosLivro
+      .filter(
+        (r) =>
+          r.ferias_id === f.id &&
+          TIPOS_OPERACIONAIS.includes(r.tipo_registro)
+      )
+      .sort((a, b) => {
+        const da = new Date(`${(a.data_registro || '2000-01-01')}T00:00:00`);
+        const db = new Date(`${(b.data_registro || '2000-01-01')}T00:00:00`);
+        if (da.getTime() !== db.getTime()) return da - db;
+        return new Date(a.created_date || 0) - new Date(b.created_date || 0);
+      });
 
-    if (vinculados.length > 0) {
-      setLivrosDialogOpen(true);
-    } else {
-      setDeleteDialogOpen(true);
+    if (cadeiaOperacional.length > 0) {
+      setCadeiaBloqueandoDelete(cadeiaOperacional);
+      setDeleteBlockedDialogOpen(true);
+      return;
     }
+
+    setCadeiaBloqueandoDelete([]);
+    setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
@@ -451,19 +455,6 @@ export default function Ferias() {
       feriasId: feriasToDelete.id,
       periodoId: feriasToDelete.periodo_aquisitivo_id,
     });
-  };
-
-  const handleDeleteLivro = async (livroId) => {
-    setDeletingLivroId(livroId);
-    await deleteLivroMutation.mutateAsync(livroId);
-
-    const remaining = livrosVinculados.filter((l) => l.id !== livroId);
-    setLivrosVinculados(remaining);
-
-    if (remaining.length === 0) {
-      setLivrosDialogOpen(false);
-      setDeleteDialogOpen(true);
-    }
   };
 
   const formatDate = (dateString) => {
@@ -670,10 +661,7 @@ export default function Ferias() {
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Dias</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Fração</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
-                        <th
-                          className="text-center px-3 py-3 font-semibold text-slate-600 w-10"
-                          title="Rastro da família"
-                        >
+                        <th className="text-center px-3 py-3 font-semibold text-slate-600 w-10" title="Rastro da família">
                           <GitBranch className="w-4 h-4 mx-auto text-slate-400" />
                         </th>
                         <th className="text-right px-4 py-3 font-semibold text-slate-600">Ações</th>
@@ -790,28 +778,24 @@ export default function Ferias() {
                                   <GitBranch className="w-3.5 h-3.5" />
                                 </button>
                               ) : (
-                                <span className="text-slate-200">
-                                  <GitBranch className="w-3.5 h-3.5 mx-auto" />
-                                </span>
+                                <span className="text-slate-300">—</span>
                               )}
                             </td>
 
                             <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
+                              <div className="flex justify-end">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7 text-slate-500 hover:text-[#1e3a5f] hover:bg-slate-100"
-                                    >
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
                                       <MoreHorizontal className="w-4 h-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
 
-                                  <DropdownMenuContent align="end" className="w-72">
-                                    {(f.status === 'Prevista' || f.status === 'Autorizada') && !inicioBlocked && (
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    {(f.status === 'Prevista' || f.status === 'Autorizada') && (
                                       <DropdownMenuItem
+                                        disabled={inicioBlocked}
+                                        title={inicioBlockedReason || ''}
                                         onClick={() =>
                                           setRegistroLivroModal({
                                             open: true,
@@ -820,20 +804,12 @@ export default function Ferias() {
                                           })
                                         }
                                       >
-                                        <LogOut className="w-4 h-4 mr-2 text-emerald-600" />
-                                        <span>Iniciar Férias</span>
-                                      </DropdownMenuItem>
-                                    )}
-
-                                    {(f.status === 'Prevista' || f.status === 'Autorizada') && inicioBlocked && (
-                                      <DropdownMenuItem disabled className="opacity-100 cursor-not-allowed">
-                                        <Lock className="w-4 h-4 mr-2 text-red-500" />
-                                        <div className="flex flex-col">
-                                          <span className="text-slate-700">Iniciar Férias bloqueado</span>
-                                          <span className="text-[11px] text-red-600 whitespace-normal leading-snug">
-                                            {inicioBlockedReason}
-                                          </span>
-                                        </div>
+                                        {inicioBlocked ? (
+                                          <Lock className="w-4 h-4 mr-2 text-red-500" />
+                                        ) : (
+                                          <LogOut className="w-4 h-4 mr-2 text-emerald-600" />
+                                        )}
+                                        <span>{inicioBlocked ? 'Início bloqueado' : 'Início'}</span>
                                       </DropdownMenuItem>
                                     )}
 
@@ -847,7 +823,7 @@ export default function Ferias() {
                                           })
                                         }
                                       >
-                                        <LogOut className="w-4 h-4 mr-2 text-teal-600" />
+                                        <RefreshCw className="w-4 h-4 mr-2 text-teal-600" />
                                         <span>Continuação</span>
                                       </DropdownMenuItem>
                                     )}
@@ -939,70 +915,64 @@ export default function Ferias() {
         )}
       </div>
 
-      <Dialog open={livrosDialogOpen} onOpenChange={setLivrosDialogOpen}>
+      <Dialog open={deleteBlockedDialogOpen} onOpenChange={setDeleteBlockedDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-600">
               <AlertTriangle className="w-5 h-5" />
-              Lançamentos de Livro Vinculados
+              Exclusão bloqueada pela cadeia operacional
             </DialogTitle>
             <DialogDescription>
-              Estas férias possuem {livrosVinculados.length} lançamento(s) de livro vinculados.
-              Você pode excluí-los antes de excluir as férias, ou cancelar.
+              Estas férias possuem eventos operacionais vinculados. Para excluir com segurança,
+              administre primeiro a cadeia pelo painel “Rastro da Família”.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {livrosVinculados.map((l) => (
+            {cadeiaBloqueandoDelete.map((evento, index) => (
               <div
-                key={l.id}
+                key={evento.id}
                 className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50"
               >
                 <div>
-                  <p className="text-sm font-medium text-slate-800">{l.tipo_registro}</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    #{index + 1} — {NOMES_OPERACIONAIS[evento.tipo_registro] || evento.tipo_registro}
+                  </p>
                   <p className="text-xs text-slate-500">
-                    Data: {formatDate(l.data_registro)}
-                    {l.dias ? ` — ${l.dias} dias` : ''}
+                    Data: {formatDate(getEventDate(evento))}
+                    {evento.dias ? ` — ${evento.dias} dias` : ''}
                   </p>
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  disabled={deletingLivroId === l.id}
-                  onClick={() => handleDeleteLivro(l.id)}
-                >
-                  {deletingLivroId === l.id ? (
-                    <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </Button>
               </div>
             ))}
+          </div>
+
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+            Abra o rastro da família e use o bloco <strong>Administração da Cadeia</strong> para:
+            excluir um evento específico, excluir evento + descendentes, ou recalcular a cadeia.
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"
               onClick={() => {
-                setLivrosDialogOpen(false);
+                setDeleteBlockedDialogOpen(false);
                 setFeriasToDelete(null);
+                setCadeiaBloqueandoDelete([]);
               }}
             >
-              Cancelar
+              Fechar
             </Button>
 
-            {livrosVinculados.length === 0 && (
+            {feriasToDelete && (
               <Button
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 onClick={() => {
-                  setLivrosDialogOpen(false);
-                  setDeleteDialogOpen(true);
+                  setDeleteBlockedDialogOpen(false);
+                  setFamiliaPanel({ open: true, ferias: feriasToDelete });
                 }}
               >
-                Prosseguir com exclusão
+                Abrir Rastro da Família
               </Button>
             )}
           </div>
@@ -1102,6 +1072,35 @@ export default function Ferias() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir férias?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação excluirá apenas o registro de férias selecionado e liberará o período aquisitivo vinculado.
+              Use esta opção somente quando não houver eventos operacionais na família.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setFeriasToDelete(null);
+                setCadeiaBloqueandoDelete([]);
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {familiaPanel.open && (
         <>
           <div
@@ -1115,34 +1114,6 @@ export default function Ferias() {
           />
         </>
       )}
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir estas férias de{' '}
-              <strong>{feriasToDelete?.militar_nome}</strong>?
-              {feriasToDelete?.periodo_aquisitivo_id && (
-                <span className="block mt-2 text-amber-700 bg-amber-50 p-2 rounded">
-                  O período aquisitivo <strong>{feriasToDelete?.periodo_aquisitivo_ref}</strong>{' '}
-                  voltará ao status <strong>Disponível</strong>.
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
