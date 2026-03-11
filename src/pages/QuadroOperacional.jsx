@@ -12,6 +12,12 @@ import NovoCardModal from '@/components/quadro/NovoCardModal';
 import { buildChecklistResumo, criarChecklistPreset } from '@/components/quadro/quadroHelpers';
 
 const QUADRO_NOME = 'Operacional';
+const ORDER_STEP = 1024;
+
+function toOrderNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 function groupCardsByColuna(cards = [], colunas = []) {
   const mapa = {};
@@ -20,49 +26,76 @@ function groupCardsByColuna(cards = [], colunas = []) {
   });
 
   cards.forEach((card) => {
-    if (mapa[card.coluna_id]) mapa[card.coluna_id].push(card);
+    if (mapa[card.coluna_id]) {
+      mapa[card.coluna_id].push(card);
+    }
   });
 
   Object.values(mapa).forEach((lista) => {
-    lista.sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0));
+    lista.sort((a, b) => toOrderNumber(a.ordem) - toOrderNumber(b.ordem));
   });
 
   return mapa;
 }
 
-function normalizarListaOrdenada(cards = [], colunaId) {
-  return cards.map((card, index) => ({
-    ...card,
-    coluna_id: colunaId,
-    ordem: index + 1,
-  }));
+function calcularProximaOrdemAoCriar(cardsDaColuna = []) {
+  if (!cardsDaColuna.length) return ORDER_STEP;
+  const ultimaOrdem = toOrderNumber(cardsDaColuna[cardsDaColuna.length - 1]?.ordem);
+  return ultimaOrdem + ORDER_STEP;
 }
 
-async function aplicarOrdensTemporarias(cards, colunaId) {
-  const base = Date.now();
-  for (let index = 0; index < cards.length; index += 1) {
-    const card = cards[index];
-    await base44.entities.CardOperacional.update(card.id, {
-      coluna_id: colunaId,
-      ordem: base + index + 1,
-    });
+function calcularOrdemDeInsercao(listaSemMovido = [], destinationIndex = 0) {
+  if (!listaSemMovido.length) {
+    return ORDER_STEP;
   }
-}
 
-async function aplicarOrdensFinais(cards, colunaId, movedCardId = null) {
-  for (let index = 0; index < cards.length; index += 1) {
-    const card = cards[index];
-    const payload = {
-      coluna_id: colunaId,
-      ordem: index + 1,
-    };
+  const anterior = destinationIndex > 0 ? listaSemMovido[destinationIndex - 1] : null;
+  const proximo = destinationIndex < listaSemMovido.length ? listaSemMovido[destinationIndex] : null;
 
-    if (movedCardId && card.id === movedCardId) {
-      payload.comentarios_count = (card.comentarios_count || 0) + 1;
+  if (!anterior && proximo) {
+    return Math.max(1, toOrderNumber(proximo.ordem) - ORDER_STEP);
+  }
+
+  if (anterior && !proximo) {
+    return toOrderNumber(anterior.ordem) + ORDER_STEP;
+  }
+
+  if (anterior && proximo) {
+    const ordemAnterior = toOrderNumber(anterior.ordem);
+    const ordemProxima = toOrderNumber(proximo.ordem);
+    const diferenca = ordemProxima - ordemAnterior;
+
+    if (diferenca > 1) {
+      return Math.floor((ordemAnterior + ordemProxima) / 2);
     }
 
-    await base44.entities.CardOperacional.update(card.id, payload);
+    return null;
   }
+
+  return ORDER_STEP;
+}
+
+async function reindexarColunaComEspacos(colunaId, cardsDaColuna = []) {
+  const ordenados = [...cardsDaColuna]
+    .sort((a, b) => toOrderNumber(a.ordem) - toOrderNumber(b.ordem))
+    .map((card, index) => ({
+      ...card,
+      coluna_id: colunaId,
+      ordem: (index + 1) * ORDER_STEP,
+    }));
+
+  for (const card of ordenados) {
+    await base44.entities.CardOperacional.update(card.id, {
+      coluna_id: colunaId,
+      ordem: card.ordem,
+    });
+  }
+
+  return ordenados;
+}
+
+function substituirCardNaLista(cards = [], cardAtualizado) {
+  return cards.map((card) => (card.id === cardAtualizado.id ? { ...card, ...cardAtualizado } : card));
 }
 
 export default function QuadroOperacionalPage() {
@@ -162,11 +195,14 @@ export default function QuadroOperacionalPage() {
   const criarCard = async (form) => {
     setSalvandoCard(true);
     try {
-      const cardsDaColuna = cardsComResumo.filter((card) => card.coluna_id === colunaNovoCard.id);
+      const cardsDaColuna = [...cardsComResumo]
+        .filter((card) => card.coluna_id === colunaNovoCard.id)
+        .sort((a, b) => toOrderNumber(a.ordem) - toOrderNumber(b.ordem));
+
       const novoCard = await base44.entities.CardOperacional.create({
         ...form,
         coluna_id: colunaNovoCard.id,
-        ordem: cardsDaColuna.length + 1,
+        ordem: calcularProximaOrdemAoCriar(cardsDaColuna),
         status: 'Ativo',
         arquivado: false,
         criado_automaticamente: false,
@@ -193,10 +229,9 @@ export default function QuadroOperacionalPage() {
     const grouped = groupCardsByColuna(cardsComResumo, colunas);
 
     const sourceCards = [...(grouped[sourceColunaId] || [])];
-    const destinationCards =
-      sourceColunaId === destinationColunaId
-        ? [...sourceCards]
-        : [...(grouped[destinationColunaId] || [])];
+    const destinationCards = sourceColunaId === destinationColunaId
+      ? [...sourceCards]
+      : [...(grouped[destinationColunaId] || [])];
 
     const previousCards = queryClient.getQueryData(['cards', quadro?.id]);
 
@@ -206,28 +241,45 @@ export default function QuadroOperacionalPage() {
       setMovendo(true);
 
       if (sourceColunaId === destinationColunaId) {
-        const reordered = [...sourceCards];
-        [movedCard] = reordered.splice(source.index, 1);
-        reordered.splice(destination.index, 0, movedCard);
+        const listaBase = [...sourceCards];
+        [movedCard] = listaBase.splice(source.index, 1);
 
         if (!movedCard) return;
 
-        const finalMesmoGrupo = normalizarListaOrdenada(reordered, sourceColunaId);
+        let ordemNova = calcularOrdemDeInsercao(listaBase, destination.index);
+
+        if (ordemNova === null) {
+          const reindexados = await reindexarColunaComEspacos(sourceColunaId, sourceCards);
+          const listaReindexada = [...reindexados];
+          const indiceMovido = listaReindexada.findIndex((item) => item.id === movedCard.id);
+          if (indiceMovido >= 0) {
+            listaReindexada.splice(indiceMovido, 1);
+          }
+          ordemNova = calcularOrdemDeInsercao(listaReindexada, destination.index);
+        }
+
+        if (ordemNova === null) {
+          throw new Error('Não foi possível calcular a nova posição do card na coluna.');
+        }
+
+        const movedCardAtualizado = {
+          ...movedCard,
+          coluna_id: sourceColunaId,
+          ordem: ordemNova,
+        };
 
         queryClient.setQueryData(['cards', quadro?.id], (current = []) =>
-          current.map((card) => {
-            const atualizado = finalMesmoGrupo.find((item) => item.id === card.id);
-            return atualizado || card;
-          })
+          substituirCardNaLista(current, movedCardAtualizado)
         );
 
         if (cardAberto?.id === movedCard.id) {
-          const abertoAtualizado = finalMesmoGrupo.find((item) => item.id === movedCard.id);
-          if (abertoAtualizado) setCardAberto(abertoAtualizado);
+          setCardAberto((prev) => (prev ? { ...prev, ...movedCardAtualizado } : prev));
         }
 
-        await aplicarOrdensTemporarias(finalMesmoGrupo, sourceColunaId);
-        await aplicarOrdensFinais(finalMesmoGrupo, sourceColunaId);
+        await base44.entities.CardOperacional.update(movedCard.id, {
+          coluna_id: sourceColunaId,
+          ordem: ordemNova,
+        });
 
         queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
         queryClient.invalidateQueries({ queryKey: ['cards'] });
@@ -235,47 +287,39 @@ export default function QuadroOperacionalPage() {
       }
 
       [movedCard] = sourceCards.splice(source.index, 1);
-      destinationCards.splice(destination.index, 0, movedCard);
-
       if (!movedCard) return;
 
-      const sourceFinal = normalizarListaOrdenada(sourceCards, sourceColunaId);
-      const destinationFinal = normalizarListaOrdenada(destinationCards, destinationColunaId);
+      let ordemNova = calcularOrdemDeInsercao(destinationCards, destination.index);
+
+      if (ordemNova === null) {
+        const reindexadosDestino = await reindexarColunaComEspacos(destinationColunaId, destinationCards);
+        ordemNova = calcularOrdemDeInsercao(reindexadosDestino, destination.index);
+      }
+
+      if (ordemNova === null) {
+        throw new Error('Não foi possível calcular a nova posição do card na coluna de destino.');
+      }
+
+      const movedCardAtualizado = {
+        ...movedCard,
+        coluna_id: destinationColunaId,
+        ordem: ordemNova,
+        comentarios_count: (movedCard.comentarios_count || 0) + 1,
+      };
 
       queryClient.setQueryData(['cards', quadro?.id], (current = []) =>
-        current.map((card) => {
-          const atualizadoOrigem = sourceFinal.find((item) => item.id === card.id);
-          if (atualizadoOrigem) return atualizadoOrigem;
-
-          const atualizadoDestino = destinationFinal.find((item) => item.id === card.id);
-          if (atualizadoDestino) {
-            if (atualizadoDestino.id === movedCard.id) {
-              return {
-                ...atualizadoDestino,
-                comentarios_count: (atualizadoDestino.comentarios_count || 0) + 1,
-              };
-            }
-            return atualizadoDestino;
-          }
-
-          return card;
-        })
+        substituirCardNaLista(current, movedCardAtualizado)
       );
 
       if (cardAberto?.id === movedCard.id) {
-        const abertoAtualizado = destinationFinal.find((item) => item.id === movedCard.id);
-        if (abertoAtualizado) {
-          setCardAberto({
-            ...abertoAtualizado,
-            comentarios_count: (abertoAtualizado.comentarios_count || 0) + 1,
-          });
-        }
+        setCardAberto((prev) => (prev ? { ...prev, ...movedCardAtualizado } : prev));
       }
 
-      await aplicarOrdensTemporarias(sourceFinal, sourceColunaId);
-      await aplicarOrdensTemporarias(destinationFinal, destinationColunaId);
-      await aplicarOrdensFinais(sourceFinal, sourceColunaId);
-      await aplicarOrdensFinais(destinationFinal, destinationColunaId, movedCard.id);
+      await base44.entities.CardOperacional.update(movedCard.id, {
+        coluna_id: destinationColunaId,
+        ordem: ordemNova,
+        comentarios_count: movedCardAtualizado.comentarios_count,
+      });
 
       const origem = colunas.find((coluna) => coluna.id === sourceColunaId);
       const destino = colunas.find((coluna) => coluna.id === destinationColunaId);
@@ -577,11 +621,11 @@ export default function QuadroOperacionalPage() {
           onClose={() => setCardAberto(null)}
           onCardUpdate={(payload) => {
             setCardAberto((prev) => (prev ? { ...prev, ...payload } : prev));
-            queryClient.setQueryData(['cards', quadro?.id], (old = []) =>
+            queryClient.setQueryData(['cards', quadro?.id], (old = []) => (
               Array.isArray(old)
                 ? old.map((item) => (item.id === payload.id ? { ...item, ...payload } : item))
                 : old
-            );
+            ));
             queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
           }}
         />
