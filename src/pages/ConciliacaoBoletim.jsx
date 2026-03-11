@@ -305,46 +305,84 @@ function notaValida(notaNorm) {
   return true;
 }
 
+function limparBlocoNota(texto = '') {
+  return texto
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\s*\n\s*/g, '\n')
+    .trim();
+}
+
+function recortarBlocoComLimite(bloco = '', limite = 2200) {
+  if (bloco.length <= limite) return bloco;
+
+  const trecho = bloco.slice(0, limite);
+  const corteNatural = Math.max(
+    trecho.lastIndexOf('\nNOTA N'),
+    trecho.lastIndexOf('. '),
+    trecho.lastIndexOf('; '),
+    trecho.lastIndexOf(': '),
+    trecho.lastIndexOf('\n')
+  );
+
+  if (corteNatural > 500) {
+    return trecho.slice(0, corteNatural).trim();
+  }
+
+  return trecho.trim();
+}
+
+function extrairBlocoNota(textoPagina = '', inicioNota = 0, proximoInicioNota = null) {
+  if (!textoPagina) return '';
+
+  const limiteMaximo = 2200;
+  const limiteMinimoSemProximaNota = 900;
+  const inicioSeguro = Math.max(0, inicioNota);
+
+  let fim = proximoInicioNota ?? Math.min(textoPagina.length, inicioSeguro + limiteMaximo);
+
+  if (!proximoInicioNota && (fim - inicioSeguro) < limiteMinimoSemProximaNota) {
+    fim = Math.min(textoPagina.length, inicioSeguro + limiteMinimoSemProximaNota);
+  }
+
+  const blocoBruto = textoPagina.slice(inicioSeguro, fim);
+  return recortarBlocoComLimite(limparBlocoNota(blocoBruto), limiteMaximo);
+}
+
 function extrairNotasDoTexto(textoPagina, pagina) {
   if (!textoPagina?.length) return [];
 
   const texto = normalizarTextoExtraido(textoPagina);
-  const linhas = texto
-    .split(/\n+/)
-    .flatMap((linha) => linha.split(/(?<=[.;:])\s+(?=NOTA\s+N)/gi))
-    .map((linha) => linha.replace(/\s+/g, ' ').trim())
-    .filter((linha) => linha && !textoPareceEstrutural(linha));
-
   const regexContextual = /\bNOTA\s+N(?:\.|º|°)?\s*[:\-]?\s*([1-9]\d{3,7})\b/gi;
   const encontrados = [];
   const vistos = new Set();
+  const matches = [...texto.matchAll(regexContextual)];
 
-  for (const linha of linhas) {
-    const notasContextuais = [...linha.matchAll(regexContextual)];
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index];
+    const candidato = match[1];
+    const notaNorm = normalizarNota(candidato);
+    if (!notaValida(notaNorm)) continue;
+    if (notaNorm === '00000') continue;
 
-    for (const match of notasContextuais) {
-      const candidato = match[1];
-      const notaNorm = normalizarNota(candidato);
-      if (!notaValida(notaNorm)) continue;
-      if (notaNorm === '00000') continue;
+    const inicioNota = match.index || 0;
+    const proximaNota = matches[index + 1];
+    const inicioProximaNota = proximaNota?.index ?? null;
+    const contexto = extrairBlocoNota(texto, inicioNota, inicioProximaNota);
 
-      const inicioMatch = Math.max((match.index || 0) - 55, 0);
-      const finalMatch = Math.min((match.index || 0) + match[0].length + 55, linha.length);
-      const contextoCru = linha.slice(inicioMatch, finalMatch).replace(/\s+/g, ' ').trim();
-      const contexto = contextoCru.length > 170 ? `${contextoCru.slice(0, 170)}...` : contextoCru;
+    if (!contexto || textoPareceEstrutural(contexto)) continue;
 
-      const key = `${notaNorm}-${contexto.slice(0, 80)}`;
-      if (vistos.has(key)) continue;
+    const key = `${notaNorm}-${pagina}-${inicioNota}`;
+    if (vistos.has(key)) continue;
 
-      vistos.add(key);
-      encontrados.push({
-        id: key,
-        nota: notaNorm,
-        nota_normalizada: notaNorm,
-        contexto,
-        pagina,
-      });
-    }
+    vistos.add(key);
+    encontrados.push({
+      id: key,
+      nota: notaNorm,
+      nota_normalizada: notaNorm,
+      contexto,
+      pagina,
+    });
   }
 
   return encontrados;
@@ -709,7 +747,7 @@ export default function ConciliacaoBoletim() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
-          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v2.0</p>
+          <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v2.1</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
