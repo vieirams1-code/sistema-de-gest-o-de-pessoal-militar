@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Calendar, Zap, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { addYears, addMonths, format } from 'date-fns';
@@ -14,6 +14,14 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+function parseDateOnly(value) {
+  return new Date(`${value}T00:00:00`);
+}
+
+function mesmaData(a, b) {
+  return a.getTime() === b.getTime();
+}
+
 export default function PeriodoAquisitivoGenerator() {
   const [open, setOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -22,12 +30,12 @@ export default function PeriodoAquisitivoGenerator() {
 
   const { data: militares = [] } = useQuery({
     queryKey: ['militares-ativos'],
-    queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' })
+    queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
   });
 
   const { data: periodosExistentes = [] } = useQuery({
     queryKey: ['periodos-aquisitivos'],
-    queryFn: () => base44.entities.PeriodoAquisitivo.list()
+    queryFn: () => base44.entities.PeriodoAquisitivo.list(),
   });
 
   const handleGenerate = async () => {
@@ -35,36 +43,33 @@ export default function PeriodoAquisitivoGenerator() {
     setResult(null);
 
     try {
-      const novosPeríodos = [];
+      const novosPeriodos = [];
       const hoje = new Date();
-      
+      hoje.setHours(0, 0, 0, 0);
+
       for (const militar of militares) {
         if (!militar.data_inclusao) continue;
 
-        const dataInclusao = new Date(militar.data_inclusao + 'T00:00:00');
-        const periodosDoMilitar = periodosExistentes.filter(p => p.militar_id === militar.id);
-        
-        // Encontrar o período atual: o aniversário de inclusão que já passou neste ano
-        let dataInicio = new Date(dataInclusao);
-        
-        // Avançar até o período corrente (onde hoje está dentro ou é o próximo)
-        while (addYears(dataInicio, 1) <= hoje) {
-          dataInicio = addYears(dataInicio, 1);
-        }
+        const dataInclusao = parseDateOnly(militar.data_inclusao);
+        const periodosDoMilitar = periodosExistentes.filter((p) => p.militar_id === militar.id);
 
-        // Gerar período corrente + próximo (2 períodos futuros/atuais)
-        for (let i = 0; i < 2; i++) {
-          const dataFimPeriodo = new Date(addYears(dataInicio, 1));
+        let dataInicio = new Date(dataInclusao);
+
+        // Gera todos os períodos desde a inclusão até cobrir o período atual
+        // e também o próximo período futuro.
+        while (dataInicio <= addYears(hoje, 1)) {
+          const dataFimPeriodo = addYears(dataInicio, 1);
           dataFimPeriodo.setDate(dataFimPeriodo.getDate() - 1);
 
-          const periodoExiste = periodosDoMilitar.some(p => {
-            const inicioExistente = new Date(p.inicio_aquisitivo + 'T00:00:00');
-            return inicioExistente.getTime() === dataInicio.getTime();
+          const periodoExiste = periodosDoMilitar.some((p) => {
+            if (!p.inicio_aquisitivo) return false;
+            return mesmaData(parseDateOnly(p.inicio_aquisitivo), dataInicio);
           });
 
           if (!periodoExiste) {
             const dataLimiteGozo = addMonths(dataFimPeriodo, 24);
-            novosPeríodos.push({
+
+            novosPeriodos.push({
               militar_id: militar.id,
               militar_nome: militar.nome_completo,
               militar_posto: militar.posto_graduacao,
@@ -76,7 +81,7 @@ export default function PeriodoAquisitivoGenerator() {
               dias_gozados: 0,
               dias_previstos: 0,
               status: 'Disponível',
-              ano_referencia: `${format(dataInicio, 'yyyy')}/${format(dataFimPeriodo, 'yyyy')}`
+              ano_referencia: `${format(dataInicio, 'yyyy')}/${format(dataFimPeriodo, 'yyyy')}`,
             });
           }
 
@@ -84,27 +89,27 @@ export default function PeriodoAquisitivoGenerator() {
         }
       }
 
-      if (novosPeríodos.length > 0) {
-        await base44.entities.PeriodoAquisitivo.bulkCreate(novosPeríodos);
+      if (novosPeriodos.length > 0) {
+        await base44.entities.PeriodoAquisitivo.bulkCreate(novosPeriodos);
         queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
-        
+
         setResult({
           success: true,
-          count: novosPeríodos.length,
-          message: `${novosPeríodos.length} período(s) aquisitivo(s) gerado(s) com sucesso!`
+          count: novosPeriodos.length,
+          message: `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) com sucesso!`,
         });
       } else {
         setResult({
           success: true,
           count: 0,
-          message: 'Todos os períodos aquisitivos já estão atualizados.'
+          message: 'Todos os períodos aquisitivos já estão atualizados.',
         });
       }
     } catch (error) {
       console.error('Erro ao gerar períodos:', error);
       setResult({
         success: false,
-        message: 'Erro ao gerar períodos aquisitivos. Tente novamente.'
+        message: 'Erro ao gerar períodos aquisitivos. Tente novamente.',
       });
     } finally {
       setGenerating(false);
@@ -119,6 +124,7 @@ export default function PeriodoAquisitivoGenerator() {
           Gerar Períodos Automáticos
         </Button>
       </DialogTrigger>
+
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Gerar Períodos Aquisitivos</DialogTitle>
@@ -151,13 +157,10 @@ export default function PeriodoAquisitivoGenerator() {
           )}
 
           <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={generating}
-            >
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={generating}>
               Cancelar
             </Button>
+
             <Button
               onClick={handleGenerate}
               disabled={generating}
