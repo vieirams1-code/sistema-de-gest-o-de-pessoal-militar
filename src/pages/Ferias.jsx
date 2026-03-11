@@ -39,6 +39,7 @@ import {
   PauseCircle,
   GitBranch,
   Lock,
+  RefreshCw,
 } from 'lucide-react';
 import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import FamiliaFeriasPanel from '@/components/ferias/FamiliaFeriasPanel';
