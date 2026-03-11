@@ -82,7 +82,6 @@ import VerMilitar from './pages/VerMilitar';
 import QuadroOperacional from './pages/QuadroOperacional';
 import __Layout from './Layout.jsx';
 
-
 export const PAGES = {
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AgendarJISO": AgendarJISO,
@@ -120,7 +119,7 @@ export const PAGES = {
 }
 
 export const pagesConfig = {
-    mainPage: "CadastrarMilitar",
+    mainPage: "Home",
     Pages: PAGES,
     Layout: __Layout,
 };
