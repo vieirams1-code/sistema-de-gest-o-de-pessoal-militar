@@ -19,7 +19,9 @@ function groupCardsByColuna(cards = [], colunas = []) {
   cards.forEach((card) => {
     if (mapa[card.coluna_id]) mapa[card.coluna_id].push(card);
   });
-  Object.values(mapa).forEach((lista) => lista.sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0)));
+  Object.values(mapa).forEach((lista) =>
+    lista.sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0))
+  );
   return mapa;
 }
 
@@ -151,96 +153,132 @@ export default function QuadroOperacionalPage() {
     const grouped = groupCardsByColuna(cardsComResumo, colunas);
 
     const sourceCards = [...(grouped[sourceColunaId] || [])];
+    const destinationCardsBase =
+      sourceColunaId === destinationColunaId
+        ? sourceCards
+        : [...(grouped[destinationColunaId] || [])];
 
     let movedCard;
-    let destinationCards;
 
     if (sourceColunaId === destinationColunaId) {
-      const reorderedCards = [...sourceCards];
-      [movedCard] = reorderedCards.splice(source.index, 1);
-      reorderedCards.splice(destination.index, 0, movedCard);
-      destinationCards = reorderedCards;
-    } else {
-      destinationCards = [...(grouped[destinationColunaId] || [])];
-      [movedCard] = sourceCards.splice(source.index, 1);
-      destinationCards.splice(destination.index, 0, movedCard);
+      const reordered = [...sourceCards];
+      [movedCard] = reordered.splice(source.index, 1);
+      reordered.splice(destination.index, 0, movedCard);
+
+      if (!movedCard) return;
+
+      const atualizadosMesmoGrupo = reordered.map((card, index) => ({
+        ...card,
+        ordem: index + 1,
+      }));
+
+      const optimisticCards = cardsComResumo.map((card) => {
+        const encontrado = atualizadosMesmoGrupo.find((item) => item.id === card.id);
+        return encontrado || card;
+      });
+
+      const movedCardAtualizado = atualizadosMesmoGrupo.find((item) => item.id === movedCard.id) || movedCard;
+      const previousCards = queryClient.getQueryData(['cards', quadro?.id]);
+
+      setMovendo(true);
+      queryClient.setQueryData(['cards', quadro?.id], optimisticCards);
+
+      if (cardAberto?.id === movedCard.id) {
+        setCardAberto((prev) => (prev ? { ...prev, ...movedCardAtualizado } : prev));
+      }
+
+      try {
+        await Promise.all(
+          atualizadosMesmoGrupo.map((card) =>
+            base44.entities.CardOperacional.update(card.id, { ordem: card.ordem })
+          )
+        );
+
+        queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
+        queryClient.invalidateQueries({ queryKey: ['cards'] });
+      } catch (error) {
+        queryClient.setQueryData(['cards', quadro?.id], previousCards);
+
+        if (cardAberto?.id === movedCard.id) {
+          const cardAnterior = Array.isArray(previousCards)
+            ? previousCards.find((item) => item.id === movedCard.id)
+            : null;
+          if (cardAnterior) {
+            setCardAberto(cardAnterior);
+          }
+        }
+
+        window.alert(error?.message || 'Não foi possível concluir a reordenação do card.');
+      } finally {
+        setMovendo(false);
+      }
+
+      return;
     }
+
+    const destinationCards = [...destinationCardsBase];
+    [movedCard] = sourceCards.splice(source.index, 1);
+    destinationCards.splice(destination.index, 0, movedCard);
 
     if (!movedCard) return;
 
-    const updates = [];
-    const cardsAtualizados = new Map();
+    const sourceAtualizados = sourceCards.map((card, index) => ({
+      ...card,
+      ordem: index + 1,
+      coluna_id: sourceColunaId,
+    }));
 
-    const registrarAtualizacao = (card, payload) => {
-      if (!Object.keys(payload).length) return;
-      updates.push({ id: card.id, payload });
-      cardsAtualizados.set(card.id, { ...card, ...payload });
-    };
+    const destinationAtualizados = destinationCards.map((card, index) => ({
+      ...card,
+      ordem: index + 1,
+      coluna_id: card.id === movedCard.id ? destinationColunaId : card.coluna_id,
+      comentarios_count:
+        card.id === movedCard.id ? (card.comentarios_count || 0) + 1 : card.comentarios_count,
+    }));
 
-    if (sourceColunaId !== destinationColunaId) {
-      sourceCards.forEach((card, index) => {
-        const ordem = index + 1;
-        const payload = {};
-        if (Number(card.ordem) !== ordem) payload.ordem = ordem;
-        registrarAtualizacao(card, payload);
-      });
-    }
+    const mapaAtualizados = new Map(
+      [...sourceAtualizados, ...destinationAtualizados].map((card) => [card.id, card])
+    );
 
-    destinationCards.forEach((card, index) => {
-      const ordem = index + 1;
-      const mudouColuna = card.id === movedCard.id && destinationColunaId !== sourceColunaId;
-      const payload = {};
-      if (Number(card.ordem) !== ordem) payload.ordem = ordem;
-      if (mudouColuna) payload.coluna_id = destinationColunaId;
-      if (mudouColuna) payload.comentarios_count = (card.comentarios_count || 0) + 1;
-      registrarAtualizacao(card, payload);
-    });
-
-    if (!updates.length) return;
+    const optimisticCards = cardsComResumo.map((card) => mapaAtualizados.get(card.id) || card);
+    const previousCards = queryClient.getQueryData(['cards', quadro?.id]);
+    const movedCardAtualizado = mapaAtualizados.get(movedCard.id) || movedCard;
 
     setMovendo(true);
-
-    const previousCards = queryClient.getQueryData(['cards', quadro?.id]);
-    const movedCardAtualizado = cardsAtualizados.get(movedCard.id) || movedCard;
-
-    queryClient.setQueryData(['cards', quadro?.id], (currentCards = []) =>
-      currentCards.map((card) => cardsAtualizados.get(card.id) || card)
-    );
+    queryClient.setQueryData(['cards', quadro?.id], optimisticCards);
 
     if (cardAberto?.id === movedCard.id) {
       setCardAberto((prev) => (prev ? { ...prev, ...movedCardAtualizado } : prev));
     }
 
     try {
-      if (sourceColunaId === destinationColunaId) {
-        const baseTemporaria = Date.now();
+      await Promise.all([
+        ...sourceAtualizados.map((card) =>
+          base44.entities.CardOperacional.update(card.id, {
+            ordem: card.ordem,
+            coluna_id: card.coluna_id,
+          })
+        ),
+        ...destinationAtualizados.map((card) =>
+          base44.entities.CardOperacional.update(card.id, {
+            ordem: card.ordem,
+            coluna_id: card.coluna_id,
+            ...(card.id === movedCard.id ? { comentarios_count: card.comentarios_count } : {}),
+          })
+        ),
+      ]);
 
-        for (const [index, card] of destinationCards.entries()) {
-          await base44.entities.CardOperacional.update(card.id, { ordem: baseTemporaria + index });
-        }
+      const origem = colunas.find((coluna) => coluna.id === sourceColunaId);
+      const destino = colunas.find((coluna) => coluna.id === destinationColunaId);
 
-        for (const update of updates) {
-          await base44.entities.CardOperacional.update(update.id, update.payload);
-        }
-      } else {
-        await Promise.all(
-          updates.map((update) => base44.entities.CardOperacional.update(update.id, update.payload))
-        );
-      }
-
-      if (destinationColunaId !== sourceColunaId) {
-        const origem = colunas.find((coluna) => coluna.id === sourceColunaId);
-        const destino = colunas.find((coluna) => coluna.id === destinationColunaId);
-
-        await base44.entities.CardComentario.create({
-          card_id: movedCard.id,
-          mensagem: `Card movido de [${origem?.nome || 'Origem'}] para [${destino?.nome || 'Destino'}]`,
-          tipo_registro: 'Sistema',
-          data_hora: new Date().toISOString(),
-          origem_automatica: true,
-          autor_nome: 'Sistema',
-        });
-      }
+      await base44.entities.CardComentario.create({
+        card_id: movedCard.id,
+        mensagem: `Card movido de [${origem?.nome || 'Origem'}] para [${destino?.nome || 'Destino'}]`,
+        tipo_registro: 'Sistema',
+        data_hora: new Date().toISOString(),
+        origem_automatica: true,
+        autor_nome: 'Sistema',
+      });
 
       queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
