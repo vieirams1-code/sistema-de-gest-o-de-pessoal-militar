@@ -20,6 +20,7 @@ async function resolveCardAcoesEntity() {
       for (const entityName of CARD_ACAO_ENTITY_CANDIDATES) {
         const entity = base44.entities[entityName];
         if (!entity) continue;
+
         try {
           await entity.list(undefined, 1);
           return { entity, entityName };
@@ -27,14 +28,22 @@ async function resolveCardAcoesEntity() {
           if (isEntitySchemaNotFound(error)) {
             continue;
           }
+
           return { entity, entityName };
         }
       }
-      throw new Error(`Nenhuma entidade de ações de card encontrada. Tentativas: ${CARD_ACAO_ENTITY_CANDIDATES.join(', ')}`);
+
+      throw new Error(
+        `Nenhuma entidade de ações de card encontrada. Tentativas: ${CARD_ACAO_ENTITY_CANDIDATES.join(', ')}`
+      );
     })();
   }
 
   return resolvedEntityPromise;
+}
+
+export async function getCardAcoesEntityInfo() {
+  return resolveCardAcoesEntity();
 }
 
 export async function listCardAcoes(cardId) {
