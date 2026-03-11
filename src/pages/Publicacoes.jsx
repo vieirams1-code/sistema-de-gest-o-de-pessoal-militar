@@ -73,6 +73,35 @@ function normalizarRegistro(registro) {
   };
 }
 
+function montarPayloadAtualizacao(registroAtual, dataParcial, tipo) {
+  const registroBase = registroAtual || {};
+  const payloadParcial = dataParcial || {};
+  const registroMesclado = { ...registroBase, ...payloadParcial };
+
+  const houveAlteracaoCamposPublicacao =
+    Object.prototype.hasOwnProperty.call(payloadParcial, 'nota_para_bg') ||
+    Object.prototype.hasOwnProperty.call(payloadParcial, 'numero_bg') ||
+    Object.prototype.hasOwnProperty.call(payloadParcial, 'data_bg');
+
+  if (!houveAlteracaoCamposPublicacao) {
+    return payloadParcial;
+  }
+
+  const statusCalculado = calcStatus(registroMesclado);
+
+  if (tipo === 'atestado') {
+    return {
+      ...payloadParcial,
+      status_publicacao: statusCalculado,
+    };
+  }
+
+  return {
+    ...payloadParcial,
+    status: statusCalculado,
+  };
+}
+
 function parseDate(dateStr) {
   return new Date(`${dateStr}T00:00:00`);
 }
@@ -223,9 +252,12 @@ export default function Publicacoes() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data, tipo }) => {
-      if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, data);
-      if (tipo === 'atestado') return base44.entities.Atestado.update(id, data);
-      return base44.entities.RegistroLivro.update(id, data);
+      const registroAtual = registros.find((item) => item.id === id);
+      const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
+
+      if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
+      if (tipo === 'atestado') return base44.entities.Atestado.update(id, payloadFinal);
+      return base44.entities.RegistroLivro.update(id, payloadFinal);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
@@ -233,6 +265,9 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
     }
   });
 
@@ -258,105 +293,62 @@ export default function Publicacoes() {
         const original = originais[0];
         if (!original) return;
 
-        if (isApostila && original.apostilada_por_id === id) {
-          await entityOriginal.update(refId, { apostilada_por_id: null });
-        } else if (isTSE && original.tornada_sem_efeito_por_id === id) {
-          await entityOriginal.update(refId, { tornada_sem_efeito_por_id: null });
+        const payload = { ...(origemTipo === 'atestado' ? {} : { status: calcStatus(original) }) };
+
+        if (isApostila) {
+          payload.apostilada_por_id = null;
+          payload.foi_apostilada = false;
         }
+        if (isTSE) {
+          payload.tornada_sem_efeito_por_id = null;
+          payload.foi_tornada_sem_efeito = false;
+        }
+
+        if (origemTipo === 'atestado') {
+          payload.status_publicacao = calcStatus(original);
+        }
+
+        await entityOriginal.update(refId, payload);
       };
 
       if (tipo === 'ex-officio') {
-        const isApostila = registro?.tipo === 'Apostila';
-        const isTSE = registro?.tipo === 'Tornar sem Efeito';
+        const isApostila = registro.tipo === 'Apostila';
+        const isTSE = registro.tipo === 'Tornar sem Efeito';
 
         if (isApostila || isTSE) {
-          await reverterVinculo(isApostila, isTSE, registro?.publicacao_referencia_id, registro?.publicacao_referencia_origem_tipo);
-        }
-
-        if (registro?.tipo === 'Homologação de Atestado' && registro?.atestado_homologado_id) {
-          const atList = await base44.entities.Atestado.filter({ id: registro.atestado_homologado_id });
-          const at = atList[0];
-          if (at && at.homologado_comandante === true) {
-            await base44.entities.Atestado.update(registro.atestado_homologado_id, {
-              homologado_comandante: false,
-              status_jiso: null,
-              status_publicacao: 'Aguardando Nota',
-            });
-          }
-        }
-
-        if (registro?.tipo === 'Ata JISO' && registro?.atestados_jiso_ids?.length) {
-          for (const aid of registro.atestados_jiso_ids) {
-            const atList = await base44.entities.Atestado.filter({ id: aid });
-            const at = atList[0];
-            if (at && at.status_jiso === 'Homologado pela JISO') {
-              await base44.entities.Atestado.update(aid, {
-                status_jiso: 'Aguardando JISO',
-                status_publicacao: 'Aguardando Nota',
-              });
-            }
-          }
+          const refId = registro.publicacao_referencia_id;
+          const origemTipoHint = registro.publicacao_referencia_origem_tipo || null;
+          await reverterVinculo(isApostila, isTSE, refId, origemTipoHint);
         }
 
         return base44.entities.PublicacaoExOfficio.delete(id);
       }
 
       if (tipo === 'livro') {
-        const isApostila = registro?.tipo === 'Apostila';
-        const isTSE = registro?.tipo === 'Tornar sem Efeito';
-
-        if (isApostila || isTSE) {
-          await reverterVinculo(isApostila, isTSE, registro?.publicacao_referencia_id, registro?.publicacao_referencia_origem_tipo);
-          return base44.entities.RegistroLivro.delete(id);
-        }
-
         if (isFeriasOperacional(registro)) {
-          const feriasList = await base44.entities.Ferias.filter({ id: registro.ferias_id });
-          const feriasAtual = feriasList[0];
-
-          if (!feriasAtual) {
-            return base44.entities.RegistroLivro.delete(id);
-          }
-
-          const registrosDaFerias = (await base44.entities.RegistroLivro.filter({ ferias_id: registro.ferias_id }))
-            .filter(r => TIPOS_FERIAS.includes(r.tipo_registro))
+          const feriasAtual = await base44.entities.Ferias.get(registro.ferias_id);
+          const allOpsBruto = await base44.entities.RegistroLivro.filter({ ferias_id: registro.ferias_id }, 'data_registro');
+          const allOps = allOpsBruto
+            .filter(op => TIPOS_FERIAS.includes(op.tipo_registro))
             .sort(compareEventos);
 
-          const idx = registrosDaFerias.findIndex(r => r.id === id);
-          if (idx === -1) {
+          const remainingOps = allOps.filter(op => op.id !== id);
+
+          if (!remainingOps.length) {
+            await base44.entities.Ferias.update(feriasAtual.id, {
+              status: 'Prevista',
+              saldo_remanescente: null,
+              dias_gozados_interrupcao: null,
+              data_interrupcao: null,
+            });
             return base44.entities.RegistroLivro.delete(id);
           }
 
-          const posteriores = registrosDaFerias.slice(idx + 1);
-          const posterioresPublicados = posteriores.filter(r => calcStatus(r) === 'Publicado');
-
-          if (posterioresPublicados.length > 0) {
-            throw new Error(
-              'Há registros posteriores já publicados nesta cadeia. Exclua ou trate os eventos mais recentes antes de remover este item.'
-            );
-          }
-
-          const idsParaExcluir = registrosDaFerias.slice(idx).map(r => r.id);
-
-          for (const rid of idsParaExcluir.reverse()) {
-            try {
-              await base44.entities.RegistroLivro.delete(rid);
-            } catch (error) {
-              const msg = String(error?.message || error || '');
-              if (!msg.toLowerCase().includes('not found')) {
-                throw error;
-              }
-            }
-          }
-
-          const remainingOps = registrosDaFerias.filter(r => !idsParaExcluir.includes(r.id));
           const novoEstado = buildFeriasStateFromChain(feriasAtual, remainingOps);
 
           await base44.entities.Ferias.update(feriasAtual.id, novoEstado);
-          return;
+          return base44.entities.RegistroLivro.delete(id);
         }
-
-        return base44.entities.RegistroLivro.delete(id);
       }
     },
     onSuccess: () => {
