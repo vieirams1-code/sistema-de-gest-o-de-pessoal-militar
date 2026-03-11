@@ -13,6 +13,10 @@ function atualizarAcaoNoCache(lista, acaoId, payloadAtualizado) {
   return lista.map((item) => (item.id === acaoId ? { ...item, ...payloadAtualizado } : item));
 }
 
+function contarAcoesNosGrupos(grupos) {
+  if (!Array.isArray(grupos)) return 0;
+  return grupos.reduce((total, grupo) => total + (grupo?.acoes?.length || 0), 0);
+}
 
 function GrupoAcoes({
   titulo,
@@ -31,13 +35,15 @@ function GrupoAcoes({
   loadingDeleteId,
   loadingSaveId,
 }) {
+  const totalAcoes = contarAcoesNosGrupos(grupos);
+
   return (
     <section className="bg-white border border-slate-200 rounded-xl shadow-sm">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-slate-500" />
           <h2 className="text-sm font-semibold text-slate-800">{titulo}</h2>
-          <span className="text-xs text-slate-400">({grupos.length})</span>
+          <span className="text-xs text-slate-400">({totalAcoes})</span>
         </div>
         <span className="text-[11px] text-slate-400">{descricao}</span>
       </div>
@@ -54,9 +60,13 @@ function GrupoAcoes({
                     <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-indigo-50 px-1.5 text-[10px] font-bold text-indigo-600 border border-indigo-100">
                       #{(grupo.card.codigo || grupo.card.id || '').slice(-4).toUpperCase()}
                     </span>
-                    <h3 className="text-sm font-semibold text-slate-800 truncate">{grupo.card.titulo || grupo.card.militar_nome_snapshot || 'Card sem título'}</h3>
+                    <h3 className="text-sm font-semibold text-slate-800 truncate">
+                      {grupo.card.titulo || grupo.card.militar_nome_snapshot || 'Card sem título'}
+                    </h3>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{grupo.acoes.length} ação(ões) vinculada(s) a este card</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {grupo.acoes.length} ação(ões) aberta(s) vinculada(s) a este card
+                  </p>
                 </div>
 
                 <Button variant="outline" size="sm" className="h-8 shrink-0" onClick={() => onOpenCard(grupo.card.id)}>
@@ -70,14 +80,28 @@ function GrupoAcoes({
                   {grupo.acoes.map((acao) => {
                     const draft = acaoDrafts[acao.id] || acao;
                     const concluida = isConcluidaAcao(draft);
+
                     return (
-                      <div key={acao.id} className={`bg-white border rounded-lg px-3 py-2.5 ${concluida ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
+                      <div
+                        key={acao.id}
+                        className={`bg-white border rounded-lg px-3 py-2.5 ${
+                          concluida ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'
+                        }`}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className={`text-sm font-medium truncate ${concluida ? 'text-emerald-700 line-through' : 'text-slate-800'}`}>{draft.titulo}</p>
+                            <p
+                              className={`text-sm font-medium truncate ${
+                                concluida ? 'text-emerald-700 line-through' : 'text-slate-800'
+                              }`}
+                            >
+                              {draft.titulo}
+                            </p>
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                               <span>Prazo: {formatarDataBR(draft.data_prevista)}</span>
-                              <span className={concluida ? 'font-semibold text-emerald-700' : ''}>{concluida ? 'Concluída' : (draft.status || 'Pendente')}</span>
+                              <span className={concluida ? 'font-semibold text-emerald-700' : ''}>
+                                {concluida ? 'Concluída' : (draft.status || 'Pendente')}
+                              </span>
                             </div>
                           </div>
 
@@ -104,11 +128,13 @@ function GrupoAcoes({
                                 {concluida ? 'Desmarcar concluída' : 'Marcar concluída'}
                               </Button>
                             )}
+
                             {editingAcaoId !== acao.id && (
                               <Button variant="outline" size="sm" className="h-8" onClick={() => onStartEdit(acao)}>
                                 Editar
                               </Button>
                             )}
+
                             <Button
                               variant="outline"
                               size="sm"
@@ -118,6 +144,7 @@ function GrupoAcoes({
                             >
                               Excluir
                             </Button>
+
                             <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenCard(grupo.card.id)}>
                               Abrir card
                             </Button>
@@ -138,7 +165,6 @@ function GrupoAcoes({
                             />
                           </div>
                         )}
-
                       </div>
                     );
                   })}
@@ -198,8 +224,12 @@ export default function AgendaAcoesOperacionaisPage() {
       return { acaoId: acao.id, payload };
     },
     onSuccess: ({ acaoId, payload }) => {
-      queryClient.setQueryData(['acoes-consolidadas-quadro'], (antigo) => atualizarAcaoNoCache(antigo, acaoId, payload));
-      queryClient.setQueriesData({ queryKey: ['card-acoes'] }, (antigo) => atualizarAcaoNoCache(antigo, acaoId, payload));
+      queryClient.setQueryData(['acoes-consolidadas-quadro'], (antigo) =>
+        atualizarAcaoNoCache(antigo, acaoId, payload)
+      );
+      queryClient.setQueriesData({ queryKey: ['card-acoes'] }, (antigo) =>
+        atualizarAcaoNoCache(antigo, acaoId, payload)
+      );
       queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
       queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
     },
@@ -213,8 +243,12 @@ export default function AgendaAcoesOperacionaisPage() {
     },
     onSuccess: ({ acaoId, payload }) => {
       setEditingAcaoId(null);
-      queryClient.setQueryData(['acoes-consolidadas-quadro'], (antigo) => atualizarAcaoNoCache(antigo, acaoId, payload));
-      queryClient.setQueriesData({ queryKey: ['card-acoes'] }, (antigo) => atualizarAcaoNoCache(antigo, acaoId, payload));
+      queryClient.setQueryData(['acoes-consolidadas-quadro'], (antigo) =>
+        atualizarAcaoNoCache(antigo, acaoId, payload)
+      );
+      queryClient.setQueriesData({ queryKey: ['card-acoes'] }, (antigo) =>
+        atualizarAcaoNoCache(antigo, acaoId, payload)
+      );
       queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
       queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
     },
@@ -238,6 +272,8 @@ export default function AgendaAcoesOperacionaisPage() {
     acoesRaw
       .map(normalizarAcao)
       .forEach((acao) => {
+        if (isConcluidaAcao(acao)) return;
+
         const card = mapaCards.get(acao.card_id);
         if (!card) return;
 
@@ -259,25 +295,30 @@ export default function AgendaAcoesOperacionaisPage() {
     const ordenar = (a, b) => {
       const aKey = toDateKey(a.data_prevista) || '9999-12-31';
       const bKey = toDateKey(b.data_prevista) || '9999-12-31';
+
       if (aKey !== bKey) return aKey.localeCompare(bKey);
       return a.titulo.localeCompare(b.titulo, 'pt-BR');
     };
 
     const agruparPorCard = (acoes) => {
       const gruposMap = new Map();
+
       acoes.sort(ordenar).forEach((acao) => {
         if (!gruposMap.has(acao.card.id)) {
           gruposMap.set(acao.card.id, { card: acao.card, acoes: [] });
         }
         gruposMap.get(acao.card.id).acoes.push(acao);
       });
+
       return Array.from(gruposMap.values()).sort((a, b) =>
         (a.card.titulo || '').localeCompare(b.card.titulo || '', 'pt-BR')
       );
     };
 
     const cardSelecionadoAtual = mapaCards.get(cardAbertoId) || null;
-    const colunaSelecionadaAtual = cardSelecionadoAtual ? mapaColunas.get(cardSelecionadoAtual.coluna_id) : null;
+    const colunaSelecionadaAtual = cardSelecionadoAtual
+      ? mapaColunas.get(cardSelecionadoAtual.coluna_id)
+      : null;
 
     return {
       atrasadas: agruparPorCard(agrupadas.atrasadas),
@@ -290,21 +331,36 @@ export default function AgendaAcoesOperacionaisPage() {
 
   const propsComunsGrupo = {
     onOpenCard: setCardAbertoId,
-    onToggleConcluida: (acao, concluir) => toggleConclusaoMutation.mutate({ acao, status: concluir ? 'Concluída' : 'Pendente' }),
+    onToggleConcluida: (acao, concluir) =>
+      toggleConclusaoMutation.mutate({
+        acao,
+        status: concluir ? 'Concluída' : 'Pendente',
+      }),
     onDelete: (acao) => excluirAcaoMutation.mutate(acao.id),
     onStartEdit: (acao) => {
       setEditingAcaoId(acao.id);
       setAcaoDrafts((anterior) => ({ ...anterior, [acao.id]: { ...acao } }));
     },
     onChangeDraft: (acaoId, campo, valor) => {
-      setAcaoDrafts((anterior) => ({ ...anterior, [acaoId]: { ...(anterior[acaoId] || {}), [campo]: valor } }));
+      setAcaoDrafts((anterior) => ({
+        ...anterior,
+        [acaoId]: { ...(anterior[acaoId] || {}), [campo]: valor },
+      }));
     },
-    onSaveEdit: (acao) => salvarEdicaoMutation.mutate({ acaoId: acao.id, payload: acaoDrafts[acao.id] || acao }),
+    onSaveEdit: (acao) =>
+      salvarEdicaoMutation.mutate({
+        acaoId: acao.id,
+        payload: acaoDrafts[acao.id] || acao,
+      }),
     editingAcaoId,
     acaoDrafts,
-      loadingToggleId: toggleConclusaoMutation.isPending ? toggleConclusaoMutation.variables?.acao?.id : null,
+    loadingToggleId: toggleConclusaoMutation.isPending
+      ? toggleConclusaoMutation.variables?.acao?.id
+      : null,
     loadingDeleteId: excluirAcaoMutation.isPending ? excluirAcaoMutation.variables : null,
-    loadingSaveId: salvarEdicaoMutation.isPending ? salvarEdicaoMutation.variables?.acaoId : null,
+    loadingSaveId: salvarEdicaoMutation.isPending
+      ? salvarEdicaoMutation.variables?.acaoId
+      : null,
   };
 
   return (
@@ -325,6 +381,7 @@ export default function AgendaAcoesOperacionaisPage() {
         grupos={atrasadas}
         {...propsComunsGrupo}
       />
+
       <GrupoAcoes
         titulo="Hoje"
         descricao="Prazo do dia"
@@ -332,6 +389,7 @@ export default function AgendaAcoesOperacionaisPage() {
         grupos={hoje}
         {...propsComunsGrupo}
       />
+
       <GrupoAcoes
         titulo="Próximas"
         descricao="Sem prazo vencido"
