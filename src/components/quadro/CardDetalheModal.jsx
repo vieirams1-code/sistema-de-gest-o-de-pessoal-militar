@@ -16,6 +16,7 @@ import {
   X, Calendar, User, Tag, MessageSquare, Link2,
   Send, Plus, Check, Trash2, AlertTriangle,
   SquareCheckBig, ListTodo, Pencil, ChevronDown, ChevronUp,
+  Loader2,
 } from 'lucide-react';
 
 const PRIORIDADE_COR = { Urgente: 'text-red-600', Alta: 'text-orange-500', Média: 'text-blue-500', Baixa: 'text-slate-400' };
@@ -214,8 +215,6 @@ function VinculosSection({ cardId }) {
   );
 }
 
-
-
 function atualizarAcaoNoCache(lista, acaoId, payloadAtualizado) {
   if (!Array.isArray(lista)) return lista;
   return lista.map((item) => (item.id === acaoId ? { ...item, ...payloadAtualizado } : item));
@@ -411,6 +410,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [showSystemActivity, setShowSystemActivity] = useState(false);
+  const [deletingCard, setDeletingCard] = useState(false);
 
   const [jisoDate, setJisoDate] = useState(card.prazo || '');
   const [savingJisoDate, setSavingJisoDate] = useState(false);
@@ -486,7 +486,6 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     setSalvando(false);
   };
 
-
   const salvarDataJiso = async () => {
     if (!permiteEditarDataJiso || savingJisoDate) return;
     setSavingJisoDate(true);
@@ -522,6 +521,35 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     }
   };
 
+  const excluirCard = async () => {
+    if (deletingCard) return;
+
+    const confirmar = window.confirm(
+      `Arquivar o card "${card.titulo}"?\n\n` +
+      `Ele deixará de aparecer no quadro, mas o histórico permanecerá salvo.`
+    );
+
+    if (!confirmar) return;
+
+    setDeletingCard(true);
+    try {
+      await base44.entities.CardOperacional.update(card.id, {
+        arquivado: true,
+        status: 'Arquivado',
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
+      queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
+      queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
+      queryClient.invalidateQueries({ queryKey: ['checklist-board'] });
+      queryClient.invalidateQueries({ queryKey: ['card-comentarios', card.id] });
+
+      onClose?.();
+    } finally {
+      setDeletingCard(false);
+    }
+  };
+
   const prazoFormatado = card.prazo ? formatarDataBR(card.prazo) : null;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
@@ -548,45 +576,66 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 )}
               </div>
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-              <X className="w-4 h-4" />
-            </button>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                onClick={excluirCard}
+                disabled={deletingCard}
+              >
+                {deletingCard ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                )}
+                Excluir card
+              </Button>
+
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4 bg-slate-100/70">
           <SectionCard title="Identificação do card" icon={User}>
             <div className="grid grid-cols-2 gap-3">
-            {card.militar_nome_snapshot && (
-              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Militar</p>
-                <div className="flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-xs font-medium text-slate-700 truncate">{card.militar_nome_snapshot}</span>
+              {card.militar_nome_snapshot && (
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Militar</p>
+                  <div className="flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-medium text-slate-700 truncate">{card.militar_nome_snapshot}</span>
+                  </div>
                 </div>
-              </div>
-            )}
-            {card.responsavel_nome && (
-              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Responsável</p>
-                <div className="flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-xs font-medium text-slate-700 truncate">{card.responsavel_nome}</span>
+              )}
+
+              {card.responsavel_nome && (
+                <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Responsável</p>
+                  <div className="flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-medium text-slate-700 truncate">{card.responsavel_nome}</span>
+                  </div>
                 </div>
-              </div>
-            )}
-            {prazoFormatado && (
-              <div className={`rounded-lg p-3 border ${prazoAtrasado ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Prazo</p>
-                <div className="flex items-center gap-1.5">
-                  {prazoAtrasado && <AlertTriangle className="w-3.5 h-3.5 text-red-500" />}
-                  <Calendar className={`w-3.5 h-3.5 ${prazoAtrasado ? 'text-red-500' : 'text-slate-400'}`} />
-                  <span className={`text-xs font-medium ${prazoAtrasado ? 'text-red-700' : 'text-slate-700'}`}>
-                    {prazoFormatado}{prazoAtrasado ? ' — VENCIDO' : ''}
-                  </span>
+              )}
+
+              {prazoFormatado && (
+                <div className={`rounded-lg p-3 border ${prazoAtrasado ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">Prazo</p>
+                  <div className="flex items-center gap-1.5">
+                    {prazoAtrasado && <AlertTriangle className="w-3.5 h-3.5 text-red-500" />}
+                    <Calendar className={`w-3.5 h-3.5 ${prazoAtrasado ? 'text-red-500' : 'text-slate-400'}`} />
+                    <span className={`text-xs font-medium ${prazoAtrasado ? 'text-red-700' : 'text-slate-700'}`}>
+                      {prazoFormatado}{prazoAtrasado ? ' — VENCIDO' : ''}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
             </div>
           </SectionCard>
 
