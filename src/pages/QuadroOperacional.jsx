@@ -107,7 +107,6 @@ export default function QuadroOperacionalPage() {
   const [movendo, setMovendo] = useState(false);
   const [novaColuna, setNovaColuna] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [debugDnd, setDebugDnd] = useState(null);
 
   const fetchCardsDoQuadro = async () => {
     if (!colunas.length) return [];
@@ -249,7 +248,6 @@ export default function QuadroOperacionalPage() {
         if (!movedCard) return;
 
         let ordemNova = calcularOrdemDeInsercao(listaBase, destination.index);
-        let reindexou = false;
 
         if (ordemNova === null) {
           const reindexados = await reindexarColunaComEspacos(sourceColunaId, sourceCards);
@@ -259,7 +257,6 @@ export default function QuadroOperacionalPage() {
             listaReindexada.splice(indiceMovido, 1);
           }
           ordemNova = calcularOrdemDeInsercao(listaReindexada, destination.index);
-          reindexou = true;
         }
 
         if (ordemNova === null) {
@@ -285,33 +282,6 @@ export default function QuadroOperacionalPage() {
           ordem: ordemNova,
         });
 
-        const cardsRefetch = await queryClient.fetchQuery({
-          queryKey: ['cards', quadro?.id],
-          queryFn: fetchCardsDoQuadro,
-        });
-
-        const cardRetornado = cardsRefetch.find((item) => item.id === movedCard.id);
-
-        setDebugDnd({
-          tipo: 'mesma-coluna',
-          horario: new Date().toLocaleTimeString(),
-          cardId: movedCard.id,
-          titulo: movedCard.titulo || movedCard.militar_nome_snapshot || 'Sem título',
-          colunaOrigem: sourceColunaId,
-          colunaDestino: destinationColunaId,
-          sourceIndex: source.index,
-          destinationIndex: destination.index,
-          ordemAntes: movedCard.ordem,
-          ordemEnviada: ordemNova,
-          ordemRetornada: cardRetornado?.ordem ?? null,
-          colunaRetornada: cardRetornado?.coluna_id ?? null,
-          reindexou,
-          payloadEnviado: {
-            coluna_id: sourceColunaId,
-            ordem: ordemNova,
-          },
-        });
-
         queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
         queryClient.invalidateQueries({ queryKey: ['cards'] });
         return;
@@ -321,12 +291,10 @@ export default function QuadroOperacionalPage() {
       if (!movedCard) return;
 
       let ordemNova = calcularOrdemDeInsercao(destinationCards, destination.index);
-      let reindexou = false;
 
       if (ordemNova === null) {
         const reindexadosDestino = await reindexarColunaComEspacos(destinationColunaId, destinationCards);
         ordemNova = calcularOrdemDeInsercao(reindexadosDestino, destination.index);
-        reindexou = true;
       }
 
       if (ordemNova === null) {
@@ -366,45 +334,11 @@ export default function QuadroOperacionalPage() {
         autor_nome: 'Sistema',
       });
 
-      const cardsRefetch = await queryClient.fetchQuery({
-        queryKey: ['cards', quadro?.id],
-        queryFn: fetchCardsDoQuadro,
-      });
-
-      const cardRetornado = cardsRefetch.find((item) => item.id === movedCard.id);
-
-      setDebugDnd({
-        tipo: 'entre-colunas',
-        horario: new Date().toLocaleTimeString(),
-        cardId: movedCard.id,
-        titulo: movedCard.titulo || movedCard.militar_nome_snapshot || 'Sem título',
-        colunaOrigem: sourceColunaId,
-        colunaDestino: destinationColunaId,
-        sourceIndex: source.index,
-        destinationIndex: destination.index,
-        ordemAntes: movedCard.ordem,
-        ordemEnviada: ordemNova,
-        ordemRetornada: cardRetornado?.ordem ?? null,
-        colunaRetornada: cardRetornado?.coluna_id ?? null,
-        reindexou,
-        payloadEnviado: {
-          coluna_id: destinationColunaId,
-          ordem: ordemNova,
-          comentarios_count: movedCardAtualizado.comentarios_count,
-        },
-      });
-
       queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       queryClient.invalidateQueries({ queryKey: ['card-comentarios', movedCard.id] });
     } catch (error) {
       queryClient.setQueryData(['cards', quadro?.id], previousCards);
-
-      setDebugDnd((prev) => ({
-        ...(prev || {}),
-        horario: new Date().toLocaleTimeString(),
-        erro: error?.message || 'Erro ao mover card',
-      }));
 
       if (cardAberto?.id === movedCard?.id) {
         const cardAnterior = Array.isArray(previousCards)
@@ -631,26 +565,6 @@ export default function QuadroOperacionalPage() {
           </button>
         </div>
       </div>
-
-      {debugDnd && (
-        <div className="shrink-0 px-5 py-2 bg-amber-50 border-b border-amber-200 text-[11px] text-slate-700">
-          <div className="font-semibold text-amber-800 mb-1">DND Debug temporário</div>
-          <div className="grid gap-1 md:grid-cols-2 xl:grid-cols-4">
-            <div><strong>Horário:</strong> {debugDnd.horario}</div>
-            <div><strong>Tipo:</strong> {debugDnd.tipo}</div>
-            <div><strong>Card:</strong> {debugDnd.titulo}</div>
-            <div><strong>ID:</strong> {debugDnd.cardId}</div>
-            <div><strong>Origem:</strong> {debugDnd.colunaOrigem} / idx {debugDnd.sourceIndex}</div>
-            <div><strong>Destino:</strong> {debugDnd.colunaDestino} / idx {debugDnd.destinationIndex}</div>
-            <div><strong>Ordem antes:</strong> {String(debugDnd.ordemAntes)}</div>
-            <div><strong>Ordem enviada:</strong> {String(debugDnd.ordemEnviada)}</div>
-            <div><strong>Ordem retornada:</strong> {String(debugDnd.ordemRetornada)}</div>
-            <div><strong>Coluna retornada:</strong> {String(debugDnd.colunaRetornada)}</div>
-            <div><strong>Reindexou:</strong> {debugDnd.reindexou ? 'Sim' : 'Não'}</div>
-            <div><strong>Erro:</strong> {debugDnd.erro || '—'}</div>
-          </div>
-        </div>
-      )}
 
       <DragDropContext
         onDragEnd={(result) => {
