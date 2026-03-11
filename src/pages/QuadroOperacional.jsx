@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, LayoutDashboard, Plus, Search, RefreshCw, Trash2 } from 'lucide-react';
+import { Loader2, LayoutDashboard, Plus, Search, RefreshCw } from 'lucide-react';
 import ColunaBoard from '@/components/quadro/ColunaBoard';
 import CardDetalheModal from '@/components/quadro/CardDetalheModal';
 import NovoCardModal from '@/components/quadro/NovoCardModal';
@@ -105,7 +105,6 @@ export default function QuadroOperacionalPage() {
   const [colunaNovoCard, setColunaNovoCard] = useState(null);
   const [salvandoCard, setSalvandoCard] = useState(false);
   const [movendo, setMovendo] = useState(false);
-  const [excluindoQuadro, setExcluindoQuadro] = useState(false);
   const [novaColuna, setNovaColuna] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -224,63 +223,8 @@ export default function QuadroOperacionalPage() {
     }
   };
 
-  const excluirQuadroAtual = async () => {
-    if (!quadro?.id || excluindoQuadro) return;
-
-    const totalCards = cardsComResumo.length;
-    const totalColunas = colunas.length;
-
-    const confirmar = window.confirm(
-      `Excluir o quadro "${quadro.nome}"?\n\n` +
-      `Isso irá:\n` +
-      `- desativar o quadro\n` +
-      `- desativar ${totalColunas} coluna(s)\n` +
-      `- arquivar ${totalCards} card(s)\n\n` +
-      `Essa ação deve ser usada somente quando você realmente quiser encerrar este quadro.`
-    );
-
-    if (!confirmar) return;
-
-    setExcluindoQuadro(true);
-
-    try {
-      const colunasIds = new Set(colunas.map((coluna) => coluna.id));
-      const cardsDoQuadro = cardsComResumo.filter((card) => colunasIds.has(card.coluna_id));
-
-      if (cardsDoQuadro.length > 0) {
-        await Promise.all(
-          cardsDoQuadro.map((card) =>
-            base44.entities.CardOperacional.update(card.id, {
-              arquivado: true,
-              status: 'Arquivado',
-            })
-          )
-        );
-      }
-
-      if (colunas.length > 0) {
-        await Promise.all(
-          colunas.map((coluna) =>
-            base44.entities.ColunaOperacional.update(coluna.id, { ativa: false })
-          )
-        );
-      }
-
-      await base44.entities.QuadroOperacional.update(quadro.id, { ativo: false });
-
-      setCardAberto(null);
-      setColunaNovoCard(null);
-      setBusca('');
-      invalidateBoardData();
-    } catch (error) {
-      window.alert(error?.message || 'Não foi possível excluir o quadro.');
-    } finally {
-      setExcluindoQuadro(false);
-    }
-  };
-
   const onDragEnd = async ({ source, destination }) => {
-    if (!destination || busca.trim() || movendo || excluindoQuadro) return;
+    if (!destination || busca.trim() || movendo) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
     const sourceColunaId = source.droppableId;
@@ -413,7 +357,7 @@ export default function QuadroOperacionalPage() {
   };
 
   const onDragEndColuna = async ({ source, destination }) => {
-    if (!destination || busca.trim() || movendo || excluindoQuadro) return;
+    if (!destination || busca.trim() || movendo) return;
     if (source.index === destination.index) return;
 
     const colunasAnteriores = [...colunas];
@@ -591,21 +535,6 @@ export default function QuadroOperacionalPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            onClick={excluirQuadroAtual}
-            variant="outline"
-            className="h-8 text-xs border-white/20 bg-white/10 text-white hover:bg-white/15"
-            disabled={movendo || salvandoCard || excluindoQuadro}
-            title="Excluir quadro"
-          >
-            {excluindoQuadro ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-            ) : (
-              <Trash2 className="w-3.5 h-3.5 mr-1" />
-            )}
-            Excluir quadro
-          </Button>
-
           <div className="flex items-center gap-2">
             <Input
               value={novaColuna}
@@ -652,7 +581,7 @@ export default function QuadroOperacionalPage() {
             droppableId="board-columns"
             direction="horizontal"
             type="COLUMN"
-            isDropDisabled={!!busca.trim() || movendo || excluindoQuadro}
+            isDropDisabled={!!busca.trim() || movendo}
           >
             {(provided) => (
               <div ref={provided.innerRef} {...provided.droppableProps} className="flex gap-3 p-4 h-full items-start">
@@ -661,7 +590,7 @@ export default function QuadroOperacionalPage() {
                     key={coluna.id}
                     draggableId={`col-${coluna.id}`}
                     index={index}
-                    isDragDisabled={!!busca.trim() || movendo || excluindoQuadro}
+                    isDragDisabled={!!busca.trim() || movendo}
                   >
                     {(dragProvided) => (
                       <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
@@ -673,7 +602,7 @@ export default function QuadroOperacionalPage() {
                             onAddCard={setColunaNovoCard}
                             onRenomearColuna={renomearColunaManual}
                             onExcluirColuna={excluirColunaManual}
-                            dragDisabled={!!busca.trim() || movendo || excluindoQuadro}
+                            dragDisabled={!!busca.trim() || movendo}
                           />
                         </div>
                       </div>
