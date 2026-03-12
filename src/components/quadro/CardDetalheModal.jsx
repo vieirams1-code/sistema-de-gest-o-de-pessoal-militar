@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { sincronizarDataJisoCardAtestado } from '@/components/quadro/quadroHelpers';
 import { createCardAcao, deleteCardAcao, listCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
+import JisoHistoricoModal from '@/components/atestado/JisoHistoricoModal';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Shield,
 } from 'lucide-react';
 
 const PRIORIDADE_COR = {
@@ -86,6 +88,41 @@ function obterVinculoAtestado(vinculos = []) {
     const tipo = String(vinculo?.tipo_vinculo || '').trim().toLowerCase();
     return tipo === 'atestado' && !!vinculo?.referencia_id;
   });
+}
+
+const STATUS_VISUAL_JISO = {
+  AGENDADA: {
+    label: 'JISO Agendada',
+    descricao: 'Data de JISO prevista, aguardando andamento para decisão final.',
+    classes: 'bg-purple-50 border-purple-200 text-purple-700',
+  },
+  AGUARDANDO_DECISAO: {
+    label: 'Aguardando Decisão da JISO',
+    descricao: 'Caso em fluxo JISO sem decisão registrada.',
+    classes: 'bg-amber-50 border-amber-200 text-amber-700',
+  },
+  DECISAO_REGISTRADA: {
+    label: 'Decisão da JISO Registrada',
+    descricao: 'A decisão já foi lançada e pode ser consultada/ajustada.',
+    classes: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  },
+};
+
+function getStatusVisualJiso({ atestado, dataJiso }) {
+  if (!atestado) return null;
+
+  const fluxoJiso = atestado.fluxo_homologacao === 'jiso' || atestado.necessita_jiso === true;
+  if (!fluxoJiso) return null;
+
+  const possuiDecisao =
+    Array.isArray(atestado.historico_jiso) && atestado.historico_jiso.length > 0;
+
+  if (possuiDecisao) {
+    return 'DECISAO_REGISTRADA';
+  }
+
+  const possuiAgendamento = Boolean(atestado.data_jiso_agendada || dataJiso);
+  return possuiAgendamento ? 'AGENDADA' : 'AGUARDANDO_DECISAO';
 }
 
 function AcaoDatePicker({ value, onChange, disabled, placeholder = 'Selecionar data' }) {
@@ -612,6 +649,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const [salvando, setSalvando] = useState(false);
   const [showSystemActivity, setShowSystemActivity] = useState(false);
   const [deletingCard, setDeletingCard] = useState(false);
+  const [showJisoModal, setShowJisoModal] = useState(false);
 
   const [jisoDate, setJisoDate] = useState(card.prazo || '');
   const [savingJisoDate, setSavingJisoDate] = useState(false);
@@ -644,6 +682,20 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const vinculoAtestado = useMemo(() => obterVinculoAtestado(vinculos), [vinculos]);
   const permiteEditarDataJiso = !!vinculoAtestado?.referencia_id;
+
+  const { data: atestadoVinculado } = useQuery({
+    queryKey: ['atestado', vinculoAtestado?.referencia_id],
+    queryFn: () => base44.entities.Atestado.get(vinculoAtestado.referencia_id),
+    enabled: !!vinculoAtestado?.referencia_id,
+  });
+
+  const statusVisualJiso = useMemo(
+    () => getStatusVisualJiso({ atestado: atestadoVinculado, dataJiso: jisoDate || card.prazo }),
+    [atestadoVinculado, jisoDate, card.prazo]
+  );
+  const configStatusJiso = statusVisualJiso ? STATUS_VISUAL_JISO[statusVisualJiso] : null;
+  const mostrarAcaoRegistrarDecisao = statusVisualJiso === 'AGUARDANDO_DECISAO';
+  const mostrarAcaoVerEditarDecisao = statusVisualJiso === 'DECISAO_REGISTRADA';
 
   const { data: comentarios = [] } = useQuery({
     queryKey: ['card-comentarios', card.id],
@@ -1024,6 +1076,38 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
             </SectionCard>
           )}
 
+          {configStatusJiso && (
+            <SectionCard title="Fluxo JISO" icon={Shield}>
+              <div className={`rounded-lg border px-3 py-2 ${configStatusJiso.classes}`}>
+                <p className="text-xs font-semibold">{configStatusJiso.label}</p>
+                <p className="text-[11px] mt-0.5 opacity-90">{configStatusJiso.descricao}</p>
+              </div>
+
+              {mostrarAcaoRegistrarDecisao && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setShowJisoModal(true)}
+                >
+                  Registrar decisão da JISO
+                </Button>
+              )}
+
+              {mostrarAcaoVerEditarDecisao && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setShowJisoModal(true)}
+                >
+                  Ver/editar decisão da JISO
+                </Button>
+              )}
+            </SectionCard>
+          )}
+
           <ChecklistSection cardId={card.id} />
           <AcoesSection cardId={card.id} />
           <VinculosSection cardId={card.id} />
@@ -1105,6 +1189,14 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
           </SectionCard>
         </div>
       </div>
+
+      {atestadoVinculado && (
+        <JisoHistoricoModal
+          atestado={atestadoVinculado}
+          open={showJisoModal}
+          onClose={() => setShowJisoModal(false)}
+        />
+      )}
     </div>
   );
 }
