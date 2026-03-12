@@ -23,7 +23,7 @@ import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
 import AjusteDiasPeriodoModal from '@/components/ferias/AjusteDiasPeriodoModal';
-import { aplicarAjusteNegativo, aplicarAjustePositivo, prepararDispensaComDesconto } from '@/components/ferias/ajustePeriodoService';
+import { aplicarAjustePositivo, prepararDispensaComDesconto } from '@/components/ferias/ajustePeriodoService';
 import DispensaDescontoFeriasModal from '@/components/ferias/DispensaDescontoFeriasModal';
 
 export default function PeriodosAquisitivos() {
@@ -35,7 +35,7 @@ export default function PeriodosAquisitivos() {
   const [periodoFilter, setPeriodoFilter] = useState('all');
   const [expandedMilitares, setExpandedMilitares] = useState({});
   const [periodoGerenciado, setPeriodoGerenciado] = useState(null);
-  const [ajusteModal, setAjusteModal] = useState({ open: false, tipo: 'adicao', periodo: null });
+  const [ajusteModal, setAjusteModal] = useState({ open: false, periodo: null });
   const [ajusteFeedback, setAjusteFeedback] = useState(null);
   const [dispensaModal, setDispensaModal] = useState({ open: false, periodo: null });
   const [dispensaFeedback, setDispensaFeedback] = useState(null);
@@ -74,20 +74,17 @@ export default function PeriodosAquisitivos() {
   });
 
   const ajusteDiasMutation = useMutation({
-    mutationFn: async ({ tipo, periodo, payload }) => {
-      const corpo = {
-        periodoId: periodo.id,
-        quantidade: payload.quantidade,
-        motivo: payload.motivo,
-        observacao: payload.observacao,
-      };
-
-      if (tipo === 'desconto') return aplicarAjusteNegativo(corpo);
-      return aplicarAjustePositivo(corpo);
-    },
+    mutationFn: async ({ periodo, payload }) => aplicarAjustePositivo({
+      periodoId: periodo.id,
+      quantidade: payload.quantidade,
+      motivo: payload.motivo,
+      observacao: payload.observacao,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
     },
   });
 
@@ -103,6 +100,8 @@ export default function PeriodosAquisitivos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
     },
   });
 
@@ -221,9 +220,9 @@ export default function PeriodosAquisitivos() {
     });
   };
 
-  const abrirAjusteDias = (periodo, tipo) => {
+  const abrirAjusteDias = (periodo) => {
     setAjusteFeedback(null);
-    setAjusteModal({ open: true, periodo, tipo });
+    setAjusteModal({ open: true, periodo });
   };
 
   const abrirDispensaDesconto = (periodo) => {
@@ -236,16 +235,13 @@ export default function PeriodosAquisitivos() {
 
     try {
       await ajusteDiasMutation.mutateAsync({
-        tipo: ajusteModal.tipo,
         periodo: ajusteModal.periodo,
         payload,
       });
 
       setAjusteFeedback({
         type: 'success',
-        message: ajusteModal.tipo === 'desconto'
-          ? 'Dias subtraídos com sucesso e saldo recalculado.'
-          : 'Dias adicionados com sucesso e saldo recalculado.',
+        message: 'Dias adicionados com sucesso e saldo recalculado.',
       });
 
       setAjusteModal((prev) => ({ ...prev, open: false }));
@@ -473,8 +469,7 @@ export default function PeriodosAquisitivos() {
                             periodo={periodo}
                             onManage={() => setPeriodoGerenciado(periodo)}
                             onOpenFerias={abrirFeriasVinculadas}
-                            onAdicionarDias={() => abrirAjusteDias(periodo, 'adicao')}
-                            onSubtrairDias={() => abrirAjusteDias(periodo, 'desconto')}
+                            onAdicionarDias={() => abrirAjusteDias(periodo)}
                             onDispensaDesconto={() => abrirDispensaDesconto(periodo)}
                           />
                         ))}
@@ -506,7 +501,6 @@ export default function PeriodosAquisitivos() {
       <AjusteDiasPeriodoModal
         open={ajusteModal.open}
         periodo={ajusteModal.periodo}
-        tipo={ajusteModal.tipo}
         ferias={ferias}
         saving={ajusteDiasMutation.isPending}
         feedback={ajusteFeedback}

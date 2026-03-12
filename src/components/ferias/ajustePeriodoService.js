@@ -5,7 +5,6 @@ import { calcularStatusPeriodoAquisitivo } from './recalcularPeriodoAquisitivo';
 
 const TIPO_AJUSTE = {
   ADICAO: 'adicao',
-  DESCONTO: 'desconto',
   DISPENSA_DESCONTO: 'dispensa_desconto',
 };
 
@@ -27,6 +26,41 @@ async function carregarFeriasDoMilitar(militarId) {
   if (!militarId) return [];
 
   return base44.entities.Ferias.filter({ militar_id: militarId });
+}
+
+async function criarPublicacaoDispensaComDesconto({ periodo, quantidade, motivo, observacao, data }) {
+  const dataPublicacao = data || new Date().toISOString().slice(0, 10);
+  const referencia = periodo.ano_referencia || periodo.referencia || 'Sem referência';
+  const nomeMilitar =
+    periodo.militar_nome_guerra ||
+    periodo.militar_nome ||
+    periodo.nome_guerra ||
+    periodo.militar_nome_completo ||
+    'Militar não identificado';
+
+  const texto_publicacao = [
+    `Dispensa com Desconto em Férias do(a) ${nomeMilitar}.`,
+    `Período aquisitivo de referência: ${referencia}.`,
+    `Quantidade descontada: ${quantidade} dia(s).`,
+    `Motivo: ${motivo}.`,
+    observacao ? `Observação: ${observacao}.` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const publicacao = await base44.entities.PublicacaoExOfficio.create({
+    militar_id: periodo.militar_id || '',
+    militar_nome: periodo.militar_nome || periodo.militar_nome_completo || nomeMilitar,
+    militar_posto: periodo.militar_posto || '',
+    militar_matricula: periodo.militar_matricula || '',
+    tipo: 'Dispensa com Desconto em Férias',
+    data_publicacao: dataPublicacao,
+    texto_publicacao,
+    observacoes: observacao || '',
+    status: 'Aguardando Nota',
+  });
+
+  return publicacao;
 }
 
 export async function registrarAjustePeriodoAquisitivo({
@@ -95,12 +129,10 @@ export async function registrarAjustePeriodoAquisitivo({
     publicacao_id: publicacao_id || null,
   };
 
-  // Tenta criar entidade dedicada. Se não existir no backend atual,
-  // grava em fallback de observação administrativa no próprio período.
   try {
     await base44.entities.AjustePeriodoAquisitivo.create(trilhaPayload);
     return { persistedIn: 'AjustePeriodoAquisitivo', trilhaPayload };
-  } catch (_) {
+  } catch {
     const historicoExistente = Array.isArray(periodo.ajustes_admin) ? periodo.ajustes_admin : [];
     await base44.entities.PeriodoAquisitivo.update(periodoId, {
       ajustes_admin: [...historicoExistente, { id: crypto.randomUUID(), ...trilhaPayload }],
@@ -113,10 +145,21 @@ export async function aplicarAjustePositivo(payload) {
   return registrarAjustePeriodoAquisitivo({ ...payload, tipo: TIPO_AJUSTE.ADICAO });
 }
 
-export async function aplicarAjusteNegativo(payload) {
-  return registrarAjustePeriodoAquisitivo({ ...payload, tipo: TIPO_AJUSTE.DESCONTO });
-}
-
 export async function prepararDispensaComDesconto(payload) {
-  return registrarAjustePeriodoAquisitivo({ ...payload, tipo: TIPO_AJUSTE.DISPENSA_DESCONTO });
+  const periodo = await carregarPeriodo(payload?.periodoId);
+  if (!periodo) throw new Error('Período aquisitivo não encontrado para dispensa com desconto.');
+
+  const publicacao = await criarPublicacaoDispensaComDesconto({
+    periodo,
+    quantidade: payload.quantidade,
+    motivo: payload.motivo,
+    observacao: payload.observacao,
+    data: payload.data,
+  });
+
+  return registrarAjustePeriodoAquisitivo({
+    ...payload,
+    tipo: TIPO_AJUSTE.DISPENSA_DESCONTO,
+    publicacao_id: publicacao?.id || null,
+  });
 }
