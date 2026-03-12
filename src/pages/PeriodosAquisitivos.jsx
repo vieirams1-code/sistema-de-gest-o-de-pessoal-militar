@@ -46,29 +46,15 @@ export default function PeriodosAquisitivos() {
   );
 
   const periodosFlat = useMemo(
-    () =>
-      periodosTransformados.militares.flatMap((grupoMilitar) =>
-        grupoMilitar.periodos.map((periodo) => ({
-          ...periodo,
-          militar_id: grupoMilitar.militar.id,
-          militar_nome: grupoMilitar.militar.nome_guerra,
-          militar_posto: grupoMilitar.militar.posto_graduacao,
-          militar_matricula: grupoMilitar.militar.matricula,
-          ano_referencia: periodo.referencia,
-          inicio_aquisitivo: periodo.data_inicio_aquisitivo,
-          fim_aquisitivo: periodo.data_fim_aquisitivo,
-          data_limite_gozo: periodo.data_limite_gozo_iso,
-          status: periodo.status_operacional,
-        }))
-      ),
+    () => periodosTransformados.militares.flatMap((grupoMilitar) => grupoMilitar.periodos),
     [periodosTransformados]
   );
 
-  const militaresUnicos = [...new Map(periodosFlat.map((p) => [p.militar_id, { id: p.militar_id, nome: p.militar_nome, posto: p.militar_posto }])).values()]
+  const militaresUnicos = [...new Map(periodosTransformados.militares.map((grupo) => [grupo.militar.id, { id: grupo.militar.id, nome: grupo.militar.nome_guerra, posto: grupo.militar.posto_graduacao }])).values()]
     .filter((m) => m.id)
     .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
-  const periodosUnicos = [...new Set(periodosFlat.map((p) => p.ano_referencia).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  const periodosUnicos = [...new Set(periodosFlat.map((p) => p.referencia).filter(Boolean))].sort((a, b) => b.localeCompare(a));
 
   const filteredMilitares = useMemo(
     () =>
@@ -102,19 +88,26 @@ export default function PeriodosAquisitivos() {
 
   const stats = {
     total: periodos.length,
-    disponiveis: periodosFlat.filter((p) => p.status === 'Disponível').length,
+    disponiveis: periodosFlat.filter((p) => p.status_operacional === 'Disponível').length,
     vencendo: periodosFlat.filter((p) => {
       const alerta = getAlertaPeriodoConcessivo({
-        dataLimiteGozo: p.data_limite_gozo,
+        dataLimiteGozo: p.data_limite_gozo_iso,
         hasPrevisaoValida: hasPrevisaoValidaPeriodo(p),
       });
       return alerta?.nivel === 'critico';
     }).length,
     vencidos: periodosFlat.filter((p) => {
-      if (!p.data_limite_gozo) return false;
-      const limite = new Date(`${p.data_limite_gozo}T00:00:00`);
+      if (!p.data_limite_gozo_iso) return false;
+      const limite = new Date(`${p.data_limite_gozo_iso}T00:00:00`);
       return differenceInDays(limite, hoje) < 0;
     }).length,
+  };
+
+  const formatProximoVencimento = (dias) => {
+    if (typeof dias !== 'number') return 'Sem data limite';
+    if (dias < 0) return `Vencido há ${Math.abs(dias)} dia(s)`;
+    if (dias === 0) return 'Vence hoje';
+    return `Vence em ${dias} dia(s)`;
   };
 
   const toggleMilitar = (militarId) => {
@@ -268,12 +261,9 @@ export default function PeriodosAquisitivos() {
 
               return (
                 <div key={grupoMilitar.militar.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => toggleMilitar(grupoMilitar.militar.id)}
-                    className="w-full px-4 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 text-left">
+                  <button type="button" onClick={() => toggleMilitar(grupoMilitar.militar.id)} className="w-full px-4 py-4 hover:bg-slate-50 transition-colors">
+                    <div className="grid lg:grid-cols-[minmax(220px,1fr)_minmax(220px,1.3fr)_minmax(180px,1fr)_auto] gap-4 items-center text-left">
+                      <div className="flex items-center gap-3 text-left">
                       {isExpanded ? (
                         <ChevronDown className="w-5 h-5 text-slate-500 shrink-0" />
                       ) : (
@@ -283,7 +273,7 @@ export default function PeriodosAquisitivos() {
                         <Users className="w-5 h-5 text-[#1e3a5f]" />
                       </div>
                       <div>
-                        <p className="text-sm md:text-base font-semibold text-slate-900">
+                        <p className="text-sm md:text-base font-semibold text-slate-900 leading-tight">
                           {grupoMilitar.militar.posto_graduacao ? `${grupoMilitar.militar.posto_graduacao} ` : ''}
                           {grupoMilitar.militar.nome_guerra || 'Militar sem identificação'}
                         </p>
@@ -291,51 +281,37 @@ export default function PeriodosAquisitivos() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-slate-600">
+                    <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm text-slate-600">
                       <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">
-                        {grupoMilitar.periodos.length} período(s)
+                        {grupoMilitar.resumo.total} período(s)
                       </span>
+                      <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700">Próx.: {grupoMilitar.resumo.proximo_vencimento || '-'}</span>
+                    </div>
+
+                    <div className="text-xs text-slate-600">
+                      <p className="font-medium text-slate-700">{formatProximoVencimento(grupoMilitar.resumo.dias_proximo_vencimento)}</p>
+                      <p className="text-slate-500">Resumo de vencimento</p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-start lg:justify-end gap-2 md:gap-3 text-xs md:text-sm text-slate-600">
                       <span className="px-2 py-1 rounded-md bg-red-50 text-red-700">Críticos: {grupoMilitar.resumo.critico}</span>
                       <span className="px-2 py-1 rounded-md bg-amber-50 text-amber-700">Atenção: {grupoMilitar.resumo.atencao}</span>
                       <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">Em dia: {grupoMilitar.resumo.ok}</span>
                     </div>
+                    </div>
                   </button>
 
                   {isExpanded && (
-                    <div className="border-t border-slate-100 overflow-x-auto">
-                      <table className="w-full text-sm min-w-[860px]">
-                        <thead>
-                          <tr className="border-b border-slate-100 bg-slate-50">
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600">Militar</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600">Período Aquisitivo</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600">Concessivo / Limite</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600">Situação</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600">Alerta Gerencial</th>
-                            <th className="text-right px-4 py-3 font-semibold text-slate-600">Ação</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {grupoMilitar.periodos.map((periodo) => (
-                            <PeriodoAquisitivoCard
-                              key={periodo.id}
-                              periodo={{
-                                ...periodo,
-                                militar_id: grupoMilitar.militar.id,
-                                militar_nome: grupoMilitar.militar.nome_guerra,
-                                militar_posto: grupoMilitar.militar.posto_graduacao,
-                                militar_matricula: grupoMilitar.militar.matricula,
-                                ano_referencia: periodo.referencia,
-                                inicio_aquisitivo: periodo.data_inicio_aquisitivo,
-                                fim_aquisitivo: periodo.data_fim_aquisitivo,
-                                data_limite_gozo: periodo.data_limite_gozo_iso,
-                                status: periodo.status_operacional,
-                              }}
-                              listMode
-                            />
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        {grupoMilitar.periodos.map((periodo) => (
+                          <PeriodoAquisitivoCard
+                            key={periodo.id}
+                            periodo={periodo}
+                            onManage={() => navigate(createPageUrl('Ferias'))}
+                          />
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
