@@ -19,7 +19,7 @@ import {
 import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
-import { registrarExclusaoAtestadoNoCard } from '@/components/quadro/quadroHelpers';
+import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 
 export default function Atestados() {
   const navigate = useNavigate();
@@ -41,8 +41,7 @@ export default function Atestados() {
 
   const deleteMutation = useMutation({
     mutationFn: async (atestado) => {
-      await registrarExclusaoAtestadoNoCard(atestado);
-      await base44.entities.Atestado.delete(atestado.id);
+      await excluirAtestadoComReflexoNoQuadro(atestado);
       return atestado;
     },
     onSuccess: () => {
