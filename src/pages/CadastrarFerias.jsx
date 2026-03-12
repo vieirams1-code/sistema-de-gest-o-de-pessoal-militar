@@ -20,7 +20,7 @@ import {
 } from '@/components/ferias/feriasRules';
 import { validarDiasNoSaldoPeriodo } from '@/components/ferias/periodoSaldoUtils';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
-import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoService';
+import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {

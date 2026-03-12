@@ -6,7 +6,7 @@ import {
   calcularDiasGozados,
   calcularDiasPrevistos,
   calcularDiasSaldo,
-} from './periodoSaldoService';
+} from './periodoSaldoUtils';
 
 const STARTED_STATUSES = new Set(['Em Curso', 'Gozada', 'Interrompida']);
 
