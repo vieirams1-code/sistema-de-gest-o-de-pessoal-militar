@@ -20,6 +20,7 @@ import {
 } from '@/components/ferias/feriasRules';
 import { validarDiasNoSaldoPeriodo } from '@/components/ferias/periodoSaldoUtils';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
+import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoService';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {
@@ -270,11 +271,12 @@ export default function CadastrarFerias() {
             inicio_aquisitivo: inicio,
             fim_aquisitivo: fim,
             data_limite_gozo: limite,
-            dias_direito: 30,
-            dias_base: 30,
+            dias_base: DIAS_BASE_PADRAO,
             dias_ajuste: 0,
+            dias_total: DIAS_BASE_PADRAO,
             dias_gozados: 0,
             dias_previstos: 0,
+            dias_saldo: DIAS_BASE_PADRAO,
             status: 'Disponível',
             ano_referencia: formData.periodo_aquisitivo_ref
           });

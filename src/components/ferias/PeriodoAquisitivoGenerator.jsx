@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { DIAS_BASE_PADRAO } from './periodoSaldoService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Calendar, Zap, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
@@ -109,11 +110,12 @@ export default function PeriodoAquisitivoGenerator() {
               inicio_aquisitivo: format(dataInicio, 'yyyy-MM-dd'),
               fim_aquisitivo: format(dataFimPeriodo, 'yyyy-MM-dd'),
               data_limite_gozo: format(dataLimiteGozo, 'yyyy-MM-dd'),
-              dias_direito: 30,
-              dias_base: 30,
+              dias_base: DIAS_BASE_PADRAO,
               dias_ajuste: 0,
+              dias_total: DIAS_BASE_PADRAO,
               dias_gozados: 0,
               dias_previstos: 0,
+              dias_saldo: DIAS_BASE_PADRAO,
               status: 'Disponível',
               ano_referencia: `${format(dataInicio, 'yyyy')}/${format(dataFimPeriodo, 'yyyy')}`,
             });

@@ -10,11 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
-import { aplicarTemplate, buildVarsLivro, formatDateBR, abreviarPosto } from '@/components/utils/templateUtils';
+import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
 import FormField from '@/components/militar/FormField';
+import { registrarDispensaComDescontoFerias } from '@/components/ferias/feriasService';
+import { calcularDiasSaldo } from '@/components/ferias/feriasRules';
 
 const initialFormData = {
   militar_id: '',
@@ -111,7 +113,13 @@ export default function CadastrarRegistroLivro() {
   });
 
   // Mostra períodos Previsto OU Disponível (pode ter saldo para descontar)
-  const periodosParaDesconto = periodosAquisitivos.filter(p => !p.inativo && (p.status === 'Previsto' || p.status === 'Disponível' || p.status === 'Parcialmente Gozado'));
+  const periodosParaDesconto = periodosAquisitivos
+    .filter((p) => !p.inativo && p.status !== 'Inativo')
+    .map((periodo) => ({
+      ...periodo,
+      dias_saldo_calculado: calcularDiasSaldo(periodo, []),
+    }))
+    .filter((periodo) => (Number(periodo.dias_saldo ?? periodo.dias_saldo_calculado) > 0));
 
   const { data: tiposCustom = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom-livro'],
@@ -512,7 +520,24 @@ export default function CadastrarRegistroLivro() {
       dias_restantes: formData.dias_restantes !== '' && formData.dias_restantes !== undefined ? Number(formData.dias_restantes) : undefined,
     };
 
-    await base44.entities.RegistroLivro.create(registroData);
+    const registroLivro = await base44.entities.RegistroLivro.create(registroData);
+
+    if (tipoRegistroEfetivo === 'Dispensa Desconto Férias') {
+      const periodoAlvoId = formData.periodo_aquisitivo;
+      const periodoAlvo = periodosParaDesconto.find((p) => p.id === periodoAlvoId);
+
+      if (!periodoAlvoId || !periodoAlvo) {
+        throw new Error('Selecione um período aquisitivo válido para aplicar a dispensa com desconto.');
+      }
+
+      await registrarDispensaComDescontoFerias({
+        periodoId: periodoAlvoId,
+        quantidade: Number(formData.dias || 0),
+        motivo: `Dispensa com desconto em férias (Registro Livro ${registroLivro?.id || ''})`.trim(),
+        observacao: textoPublicacao,
+        data: formData.data_registro,
+      });
+    }
 
     if (formData.ferias_id) {
       if (tipoRegistroEfetivo === 'Nova Saída / Retomada' && selectedFerias) {
@@ -568,6 +593,10 @@ export default function CadastrarRegistroLivro() {
 
     queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+    queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos-livro'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
     
     setLoading(false);
     navigate(createPageUrl('Publicacoes'));
@@ -890,7 +919,7 @@ export default function CadastrarRegistroLivro() {
                     value={formData.periodo_aquisitivo}
                     onValueChange={v => {
                       const periodo = periodosParaDesconto.find(p => p.id === v);
-                      const saldo = periodo ? (periodo.dias_direito || 30) - (periodo.dias_gozados || 0) - (periodo.dias_previstos || 0) : 0;
+                      const saldo = periodo ? Number((periodo.dias_saldo ?? periodo.dias_saldo_calculado) || 0) : 0;
                       const diasRestantes = Math.max(0, saldo - (Number(formData.dias) || 0));
                       const label = periodo ? (periodo.ano_referencia || `${periodo.inicio_aquisitivo} a ${periodo.fim_aquisitivo}`) : v;
                       setFormData(prev => ({ ...prev, periodo_aquisitivo: v, periodo_aquisitivo_label: label, dias_restantes: diasRestantes }));
@@ -903,9 +932,9 @@ export default function CadastrarRegistroLivro() {
                       {periodosParaDesconto.length === 0 && (
                         <div className="px-3 py-2 text-sm text-slate-400">Nenhum período com status "Previsto"</div>
                       )}
-                      {periodosParaDesconto.map(p => (
+                          {periodosParaDesconto.map(p => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.ano_referencia || `${p.inicio_aquisitivo} a ${p.fim_aquisitivo}`} — {p.dias_direito || 30}d direito — {(p.dias_gozados || 0) + (p.dias_previstos || 0)}d usados
+                          {p.ano_referencia || `${p.inicio_aquisitivo} a ${p.fim_aquisitivo}`} — {p.dias_total || 30}d total — {Number((p.dias_saldo ?? p.dias_saldo_calculado) || 0)}d saldo
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -929,7 +958,7 @@ export default function CadastrarRegistroLivro() {
                   onChange={(e) => {
                     const diasVal = Number(e.target.value) || 0;
                     const periodoSel = periodosParaDesconto.find(p => p.id === formData.periodo_aquisitivo);
-                    const saldo = periodoSel ? (periodoSel.dias_direito || 30) - (periodoSel.dias_gozados || 0) - (periodoSel.dias_previstos || 0) : 0;
+                    const saldo = periodoSel ? Number((periodoSel.dias_saldo ?? periodoSel.dias_saldo_calculado) || 0) : 0;
                     const restantes = Math.max(0, saldo - diasVal);
                     setFormData(prev => ({ ...prev, dias: diasVal, dias_restantes: restantes }));
                   }}
