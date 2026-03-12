@@ -2,9 +2,10 @@ import React from 'react';
 import { format, differenceInDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CheckCircle, Clock, EyeOff, Eye } from 'lucide-react';
+import { AlertCircle, EyeOff, Eye } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo } from './feriasRules';
 
 const statusColors = {
   'Pendente': 'bg-slate-100 text-slate-700 border-slate-200',
@@ -26,9 +27,10 @@ export default function PeriodoAquisitivoCard({ periodo, listMode = false }) {
     await base44.entities.PeriodoAquisitivo.update(periodo.id, { status: novoStatus, inativo: !isInativo });
     queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
   };
+
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return format(new Date(dateString + 'T00:00:00'), "dd/MM/yyyy");
+    return format(new Date(dateString + 'T00:00:00'), 'dd/MM/yyyy');
   };
 
   const getDiasRestantes = () => {
@@ -40,49 +42,21 @@ export default function PeriodoAquisitivoCard({ periodo, listMode = false }) {
   };
 
   const diasRestantes = getDiasRestantes();
-  const diasRestantesFerias = (periodo.dias_direito || 30) - (periodo.dias_gozados || 0);
-  const percentualGozado = ((periodo.dias_gozados || 0) / (periodo.dias_direito || 30)) * 100;
-
-  const getStatusInfo = () => {
-    if (periodo.status === 'Vencido') {
-      return {
-        icon: AlertCircle,
-        text: 'Período vencido',
-        color: 'text-red-600'
-      };
-    }
-    
-    if (diasRestantes !== null) {
-      if (diasRestantes < 0) {
-        return {
-          icon: AlertCircle,
-          text: 'Vencido',
-          color: 'text-red-600'
-        };
-      } else if (diasRestantes <= 30) {
-        return {
-          icon: AlertCircle,
-          text: `Vence em ${diasRestantes} dias`,
-          color: 'text-orange-600'
-        };
-      } else if (diasRestantes <= 90) {
-        return {
-          icon: Clock,
-          text: `${diasRestantes} dias para vencer`,
-          color: 'text-amber-600'
-        };
-      } else {
-        return {
-          icon: CheckCircle,
-          text: `${diasRestantes} dias disponíveis`,
-          color: 'text-emerald-600'
-        };
-      }
-    }
-    return null;
-  };
-
   const isInativo = periodo.status === 'Inativo' || periodo.inativo;
+
+  const hasPrevisaoValida = hasPrevisaoValidaPeriodo(periodo);
+  const alertaConcessivo = getAlertaPeriodoConcessivo({
+    dataLimiteGozo: periodo.data_limite_gozo,
+    hasPrevisaoValida,
+  });
+
+  const getSituacao = () => {
+    if (periodo.status === 'Inativo' || isInativo) return 'Inativo';
+    if (diasRestantes === null) return 'Sem prazo de gozo';
+    if (diasRestantes < 0) return `Vencido há ${Math.abs(diasRestantes)} dia(s)`;
+    if (diasRestantes === 0) return 'Vence hoje';
+    return `Vence em ${diasRestantes} dia(s)`;
+  };
 
   if (listMode) {
     return (
@@ -98,12 +72,28 @@ export default function PeriodoAquisitivoCard({ periodo, listMode = false }) {
           {periodo.ano_referencia || `${format(new Date(periodo.inicio_aquisitivo + 'T00:00:00'), 'yyyy')}/${format(new Date(periodo.fim_aquisitivo + 'T00:00:00'), 'yyyy')}`}
           <p className="text-xs text-slate-400">{formatDate(periodo.inicio_aquisitivo)} a {formatDate(periodo.fim_aquisitivo)}</p>
         </td>
-        <td className="px-4 py-3 text-slate-700">{formatDate(periodo.data_limite_gozo)}</td>
-        <td className="px-4 py-3 text-slate-700">{periodo.dias_gozados || 0}/{periodo.dias_direito || 30}</td>
+        <td className="px-4 py-3 text-slate-700">
+          <p>{formatDate(periodo.data_limite_gozo)}</p>
+          <p className="text-xs text-slate-400">Concessivo</p>
+        </td>
+        <td className="px-4 py-3 text-slate-700">
+          <p>{getSituacao()}</p>
+          <p className="text-xs text-slate-400">{periodo.dias_gozados || 0}/{periodo.dias_direito || 30} dias</p>
+        </td>
         <td className="px-4 py-3">
-          <Badge className={`${statusColors[periodo.status] || statusColors['Pendente']} border text-xs`}>
+          <Badge className={`${statusColors[periodo.status] || statusColors.Pendente} border text-xs`}>
             {periodo.status}
           </Badge>
+        </td>
+        <td className="px-4 py-3">
+          {alertaConcessivo ? (
+            <p className={`inline-flex items-center gap-1 text-xs rounded px-2 py-1 border ${alertaConcessivo.nivel === 'critico' ? 'text-red-700 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+              <AlertCircle className="w-3.5 h-3.5" />
+              {alertaConcessivo.nivel === 'critico' ? 'Crítico' : 'Atenção'}: {alertaConcessivo.diasRestantes} dia(s)
+            </p>
+          ) : (
+            <span className="text-xs text-slate-500">Sem alerta</span>
+          )}
         </td>
         <td className="px-4 py-3 text-right">
           <Button
