@@ -52,6 +52,10 @@ export function validarOrdemFracoesCadastro({
     const anterior = doMesmoPeriodo.find((item) => getFracaoNumero(item.fracionamento) === currentFracao - 1);
     const proxima = doMesmoPeriodo.find((item) => getFracaoNumero(item.fracionamento) === currentFracao + 1);
 
+    if (currentFracao > 1 && !anterior) {
+      return `A ${currentFracao}ª fração só pode ser cadastrada após a ${currentFracao - 1}ª fração.`;
+    }
+
     if (anterior?.data_inicio && dataAtual < anterior.data_inicio) {
       return `A ${currentFracao}ª fração não pode iniciar antes da ${currentFracao - 1}ª (${anterior.data_inicio}).`;
     }
@@ -85,7 +89,9 @@ export function validarInicioFracaoNoLivro({
   const numeroFracao = getFracaoNumero(feriasAtual.fracionamento);
   if (numeroFracao <= 1) return null;
 
-  const anterior = (todasFeriasDoMilitar || [])
+  const todasFerias = todasFeriasDoMilitar || [];
+
+  const anterior = todasFerias
     .find(
       (item) =>
         item &&
