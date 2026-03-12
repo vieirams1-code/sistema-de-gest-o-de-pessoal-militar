@@ -19,9 +19,12 @@ import {
 } from 'lucide-react';
 import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo } from '@/components/ferias/feriasRules';
 import { mapPeriodosAquisitivosPorMilitar } from '@/components/ferias/periodosAquisitivosMapper';
+import { registrarDispensaComDescontoFerias } from '@/components/ferias/ajustePeriodoService';
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
+import DispensaDescontoFeriasModal from '@/components/ferias/DispensaDescontoFeriasModal';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
@@ -32,6 +35,8 @@ export default function PeriodosAquisitivos() {
   const [periodoFilter, setPeriodoFilter] = useState('all');
   const [expandedMilitares, setExpandedMilitares] = useState({});
   const [periodoGerenciado, setPeriodoGerenciado] = useState(null);
+  const [periodoDispensa, setPeriodoDispensa] = useState(null);
+  const { user } = useCurrentUser();
 
   const { data: periodos = [], isLoading } = useQuery({
     queryKey: ['periodos-aquisitivos'],
@@ -63,6 +68,17 @@ export default function PeriodosAquisitivos() {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+    },
+  });
+
+
+  const dispensaDescontoMutation = useMutation({
+    mutationFn: (payload) => registrarDispensaComDescontoFerias(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
     },
   });
 
@@ -162,6 +178,16 @@ export default function PeriodosAquisitivos() {
     await updatePeriodoMutation.mutateAsync({
       periodoId: periodoGerenciado.id,
       payload: { status },
+    });
+  };
+
+  const handleRegistrarDispensa = async ({ periodoId, quantidade, motivo, observacao }) => {
+    await dispensaDescontoMutation.mutateAsync({
+      periodoId,
+      quantidade,
+      motivo,
+      observacao,
+      usuario: user?.full_name || user?.email || 'Usuário',
     });
   };
 
@@ -374,6 +400,7 @@ export default function PeriodosAquisitivos() {
                             periodo={periodo}
                             onManage={() => setPeriodoGerenciado(periodo)}
                             onOpenFerias={abrirFeriasVinculadas}
+                            onDispensaDesconto={() => setPeriodoDispensa(periodo)}
                           />
                         ))}
                       </div>
@@ -386,6 +413,17 @@ export default function PeriodosAquisitivos() {
         )}
       </div>
 
+
+
+      <DispensaDescontoFeriasModal
+        open={Boolean(periodoDispensa)}
+        periodo={periodoDispensa}
+        saving={dispensaDescontoMutation.isPending}
+        onOpenChange={(open) => {
+          if (!open) setPeriodoDispensa(null);
+        }}
+        onSubmit={handleRegistrarDispensa}
+      />
       <GerenciarPeriodoModal
         open={Boolean(periodoGerenciado)}
         periodo={periodoGerenciado}

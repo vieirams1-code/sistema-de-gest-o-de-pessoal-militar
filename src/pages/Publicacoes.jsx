@@ -19,6 +19,7 @@ const TIPOS_FERIAS = [
   'Interrupção de Férias',
   'Nova Saída / Retomada',
   'Retorno Férias',
+  'Dispensa com Desconto em Férias',
 ];
 
 function detectarOrigemTipo(registro) {

@@ -1,5 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
+import { sincronizarPeriodoAquisitivoDaFerias } from './feriasService';
+import { validarDispensaComDescontoFerias } from './feriasRules';
 
 const TIPO_AJUSTE = {
   ADICAO: 'adicao',
@@ -50,6 +52,11 @@ export async function registrarAjustePeriodoAquisitivo({
     dias_ajuste: novoAjuste,
   });
 
+  await sincronizarPeriodoAquisitivoDaFerias({
+    periodoAquisitivoId: periodoId,
+    militarId: periodo.militar_id,
+  });
+
   const trilhaPayload = {
     periodo_aquisitivo_id: periodoId,
     tipo,
@@ -66,7 +73,7 @@ export async function registrarAjustePeriodoAquisitivo({
   try {
     await base44.entities.AjustePeriodoAquisitivo.create(trilhaPayload);
     return { persistedIn: 'AjustePeriodoAquisitivo', trilhaPayload };
-  } catch (_) {
+  } catch {
     const historicoExistente = Array.isArray(periodo.ajustes_admin) ? periodo.ajustes_admin : [];
     await base44.entities.PeriodoAquisitivo.update(periodoId, {
       ajustes_admin: [...historicoExistente, { id: crypto.randomUUID(), ...trilhaPayload }],
@@ -81,6 +88,84 @@ export async function aplicarAjustePositivo(payload) {
 
 export async function aplicarAjusteNegativo(payload) {
   return registrarAjustePeriodoAquisitivo({ ...payload, tipo: TIPO_AJUSTE.DESCONTO });
+}
+
+function montarTextoPublicacaoDispensa({ militarLabel, periodoReferencia, quantidade, motivo, observacao, data }) {
+  const partesMotivo = [];
+
+  if (motivo) partesMotivo.push(`motivo: ${motivo}`);
+  if (observacao) partesMotivo.push(`observação: ${observacao}`);
+
+  const complemento = partesMotivo.length ? ` (${partesMotivo.join(' | ')})` : '';
+
+  return `Dispensa com desconto em férias de ${militarLabel}, referente ao período aquisitivo ${periodoReferencia}. Fica formalizado o desconto de ${quantidade} dia(s), em ${data}.${complemento}`;
+}
+
+export async function registrarDispensaComDescontoFerias({
+  periodoId,
+  quantidade,
+  motivo,
+  observacao,
+  usuario,
+  data,
+}) {
+  const periodo = await carregarPeriodo(periodoId);
+  if (!periodo) throw new Error('Período aquisitivo não encontrado.');
+
+  const validacao = validarDispensaComDescontoFerias({ periodo, quantidade });
+  if (!validacao.ok) {
+    throw new Error(validacao.mensagem || 'Dispensa com desconto inválida para o período selecionado.');
+  }
+
+  const dataEvento = data || new Date().toISOString().slice(0, 10);
+  const militarLabel = `${periodo.militar_posto || ''} ${periodo.militar_nome_guerra || periodo.militar_nome || ''}`.trim() || 'Militar';
+  const periodoReferencia = periodo.ano_referencia || periodo.referencia || `${periodo.inicio_aquisitivo || '-'} / ${periodo.fim_aquisitivo || '-'}`;
+
+  const textoPublicacao = montarTextoPublicacaoDispensa({
+    militarLabel,
+    periodoReferencia,
+    quantidade: Number(quantidade),
+    motivo,
+    observacao,
+    data: dataEvento,
+  });
+
+  const registroAto = await base44.entities.RegistroLivro.create({
+    militar_id: periodo.militar_id,
+    militar_nome: periodo.militar_nome || periodo.militar_nome_guerra || null,
+    militar_posto: periodo.militar_posto || null,
+    militar_matricula: periodo.militar_matricula || null,
+    periodo_aquisitivo: periodoReferencia,
+    periodo_aquisitivo_id: periodo.id,
+    tipo_registro: 'Dispensa com Desconto em Férias',
+    origem: 'Ato Administrativo',
+    data_registro: dataEvento,
+    dias: Number(quantidade),
+    status: 'Aguardando Nota',
+    observacoes: observacao || null,
+    motivo: motivo || null,
+    texto_publicacao: textoPublicacao,
+    nota_para_bg: '',
+  });
+
+  const ajuste = await registrarAjustePeriodoAquisitivo({
+    periodoId,
+    tipo: TIPO_AJUSTE.DISPENSA_DESCONTO,
+    quantidade,
+    motivo,
+    observacao,
+    data: dataEvento,
+    usuario,
+    publicacao_id: registroAto?.id || null,
+  });
+
+  return {
+    periodo,
+    registroAto,
+    ajuste,
+    textoPublicacao,
+    validacao,
+  };
 }
 
 export async function prepararDispensaComDesconto(payload) {
