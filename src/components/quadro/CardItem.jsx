@@ -24,6 +24,8 @@ export default function CardItem({ card, onClick }) {
   const prazo = formatPrazo(card.prazo);
   const dotPrioridade = PRIORIDADE_COR[card.prioridade] || 'bg-slate-300';
 
+  const origemExcluida = card.origem_status === 'Excluída' || card.status === 'Origem Excluída';
+
   return (
     <div
       onClick={() => onClick(card)}
@@ -53,6 +55,15 @@ export default function CardItem({ card, onClick }) {
         <div className="flex items-center gap-1 mt-1.5 ml-4">
           <User className="w-3 h-3 text-slate-400 shrink-0" />
           <span className="text-[11px] text-slate-500 truncate">{card.militar_nome_snapshot}</span>
+        </div>
+      )}
+
+
+      {origemExcluida && (
+        <div className="mt-2 ml-4">
+          <span className="inline-flex items-center text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-semibold">
+            Origem Excluída
+          </span>
         </div>
       )}
 
