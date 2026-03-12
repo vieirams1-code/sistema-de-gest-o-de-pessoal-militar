@@ -1,5 +1,5 @@
 import { recalcularPeriodoAquisitivoVinculado } from './recalcularPeriodoAquisitivo';
-import { aplicarAjusteNegativo, prepararDispensaComDesconto } from './ajustePeriodoService';
+import { prepararDispensaComDesconto } from './ajustePeriodoService';
 
 export async function sincronizarPeriodoAquisitivoDaFerias({
   periodoAquisitivoId,
@@ -28,14 +28,5 @@ export async function registrarDispensaComDescontoFerias({
     observacao,
     data,
     usuario,
-  });
-}
-
-export async function subtrairDiasPeriodoAquisitivo({ periodoId, quantidade, motivo, observacao }) {
-  return aplicarAjusteNegativo({
-    periodoId,
-    quantidade,
-    motivo,
-    observacao,
   });
 }

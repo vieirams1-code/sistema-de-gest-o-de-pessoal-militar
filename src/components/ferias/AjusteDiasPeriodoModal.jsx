@@ -9,7 +9,6 @@ import { filtrarFeriasDoPeriodo, validarAjusteDiasPeriodo } from './periodoSaldo
 export default function AjusteDiasPeriodoModal({
   open,
   periodo,
-  tipo,
   ferias = [],
   saving,
   feedback,
@@ -27,10 +26,9 @@ export default function AjusteDiasPeriodoModal({
     setMotivo('');
     setObservacao('');
     setErroLocal(null);
-  }, [open, tipo, periodo?.id]);
+  }, [open, periodo?.id]);
 
-  const titulo = tipo === 'desconto' ? 'Subtrair dias do período' : 'Adicionar dias ao período';
-  const descricaoTipo = tipo === 'desconto' ? 'desconto' : 'adição';
+  const titulo = 'Adicionar dias ao período';
 
   const validacao = useMemo(() => {
     if (!periodo || !quantidade) return null;
@@ -39,10 +37,10 @@ export default function AjusteDiasPeriodoModal({
     return validarAjusteDiasPeriodo({
       periodo: periodo.raw || periodo,
       ferias: feriasRelacionadas,
-      tipo,
+      tipo: 'adicao',
       quantidade,
     });
-  }, [periodo, ferias, tipo, quantidade]);
+  }, [periodo, ferias, quantidade]);
 
   const handleSubmit = async () => {
     setErroLocal(null);
@@ -79,7 +77,7 @@ export default function AjusteDiasPeriodoModal({
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
-            Referência {periodo?.referencia || '-'} • ajuste de {descricaoTipo} com recálculo imediato do saldo.
+            Referência {periodo?.referencia || '-'} • ajuste administrativo positivo com recálculo imediato do saldo.
           </DialogDescription>
         </DialogHeader>
 
@@ -130,7 +128,7 @@ export default function AjusteDiasPeriodoModal({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange?.(false)} disabled={saving}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={saving} className="bg-[#1e3a5f] hover:bg-[#1e3a5f]/90">
-            {saving ? 'Salvando...' : tipo === 'desconto' ? 'Confirmar subtração' : 'Confirmar adição'}
+            {saving ? 'Salvando...' : 'Confirmar adição'}
           </Button>
         </DialogFooter>
       </DialogContent>
