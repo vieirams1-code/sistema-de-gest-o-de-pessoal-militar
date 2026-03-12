@@ -296,12 +296,23 @@ function getBlockingReasonForInicio(feriasAtual, todasFerias) {
     return `Existe férias interrompida do período ${interrompida.periodo_aquisitivo_ref || '-'} para este militar. É necessário concluir a cadeia interrompida antes de iniciar nova férias.`;
   }
 
-  const previstasOuAutorizadas = [feriasAtual, ...outrasDoMilitar]
-    .filter((f) => f.status === 'Prevista' || f.status === 'Autorizada')
+  const periodoAtual = feriasAtual.periodo_aquisitivo_ref || '';
+
+  const previstasOuAutorizadasDePeriodosDiferentes = [feriasAtual, ...outrasDoMilitar]
+    .filter(
+      (f) =>
+        (f.status === 'Prevista' || f.status === 'Autorizada') &&
+        (f.periodo_aquisitivo_ref || '') !== periodoAtual
+    )
     .sort((a, b) => comparePeriodoRef(a.periodo_aquisitivo_ref, b.periodo_aquisitivo_ref));
 
-  if (previstasOuAutorizadas.length > 0 && previstasOuAutorizadas[0].id !== feriasAtual.id) {
-    return `Existe período aquisitivo mais antigo pendente de início (${previstasOuAutorizadas[0].periodo_aquisitivo_ref || '-'}). O início deve respeitar a ordem cronológica dos períodos.`;
+  const periodoMaisAntigoDiferente = previstasOuAutorizadasDePeriodosDiferentes[0];
+
+  if (
+    periodoMaisAntigoDiferente &&
+    comparePeriodoRef(periodoMaisAntigoDiferente.periodo_aquisitivo_ref, periodoAtual) < 0
+  ) {
+    return `Existe período aquisitivo mais antigo pendente de início (${periodoMaisAntigoDiferente.periodo_aquisitivo_ref || '-'}). O início deve respeitar a ordem cronológica dos períodos.`;
   }
 
   return null;
