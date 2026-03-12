@@ -17,6 +17,7 @@ import {
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } from '@/components/ferias/feriasAdminUtils';
+import { reverterAtestadosPorExclusaoPublicacao } from '@/components/atestado/atestadoPublicacaoHelpers';
 
 const TIPOS = [
   { value: 'todos', label: 'Todos os Registros' },
@@ -466,22 +467,11 @@ export default function FichaMilitar() {
       const reverterExOfficio = async (registro) => {
         if (!registro) return;
 
-        if (registro.tipo === 'Homologação de Atestado' && registro.atestado_homologado_id) {
-          await base44.entities.Atestado.update(registro.atestado_homologado_id, {
-            homologado_comandante: false,
-            status_jiso: null,
-            status_publicacao: 'Aguardando Nota',
-          });
-        }
-
-        if (registro.tipo === 'Ata JISO' && registro.atestados_jiso_ids?.length) {
-          for (const aid of registro.atestados_jiso_ids) {
-            await base44.entities.Atestado.update(aid, {
-              status_jiso: 'Aguardando JISO',
-              status_publicacao: 'Aguardando Nota',
-            });
-          }
-        }
+        await reverterAtestadosPorExclusaoPublicacao(
+          registro,
+          base44.entities.Atestado,
+          base44.entities.PublicacaoExOfficio
+        );
       };
 
       const excluirLivroComReversao = async (registroLivro) => {

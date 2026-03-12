@@ -9,6 +9,10 @@ import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { addDays, differenceInDays, format } from 'date-fns';
+import {
+  calcStatusPublicacao,
+  reverterAtestadosPorExclusaoPublicacao,
+} from '@/components/atestado/atestadoPublicacaoHelpers';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -16,12 +20,6 @@ const TIPOS_FERIAS = [
   'Nova Saída / Retomada',
   'Retorno Férias',
 ];
-
-function calcStatus(registro) {
-  if (registro.numero_bg && registro.data_bg) return 'Publicado';
-  if (registro.nota_para_bg) return 'Aguardando Publicação';
-  return 'Aguardando Nota';
-}
 
 function detectarOrigemTipo(registro) {
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
@@ -66,7 +64,7 @@ function normalizarRegistro(registro) {
   return {
     ...registro,
     origem_tipo: detectarOrigemTipo(registro),
-    status_calculado: calcStatus(registro),
+    status_calculado: calcStatusPublicacao(registro),
     tipo_display: tipoDisplay,
     grupo_display: grupoDisplay,
     tipo_composto_display: tipoCompostoDisplay,
@@ -87,7 +85,7 @@ function montarPayloadAtualizacao(registroAtual, dataParcial, tipo) {
     return payloadParcial;
   }
 
-  const statusCalculado = calcStatus(registroMesclado);
+  const statusCalculado = calcStatusPublicacao(registroMesclado);
 
   if (tipo === 'atestado') {
     return {
@@ -293,7 +291,7 @@ export default function Publicacoes() {
         const original = originais[0];
         if (!original) return;
 
-        const payload = { ...(origemTipo === 'atestado' ? {} : { status: calcStatus(original) }) };
+        const payload = { ...(origemTipo === 'atestado' ? {} : { status: calcStatusPublicacao(original) }) };
 
         if (isApostila) {
           payload.apostilada_por_id = null;
@@ -305,7 +303,7 @@ export default function Publicacoes() {
         }
 
         if (origemTipo === 'atestado') {
-          payload.status_publicacao = calcStatus(original);
+          payload.status_publicacao = calcStatusPublicacao(original);
         }
 
         await entityOriginal.update(refId, payload);
@@ -320,6 +318,12 @@ export default function Publicacoes() {
           const origemTipoHint = registro.publicacao_referencia_origem_tipo || null;
           await reverterVinculo(isApostila, isTSE, refId, origemTipoHint);
         }
+
+        await reverterAtestadosPorExclusaoPublicacao(
+          registro,
+          base44.entities.Atestado,
+          base44.entities.PublicacaoExOfficio
+        );
 
         return base44.entities.PublicacaoExOfficio.delete(id);
       }
