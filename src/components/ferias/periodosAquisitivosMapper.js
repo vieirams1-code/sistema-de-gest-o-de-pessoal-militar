@@ -110,6 +110,9 @@ function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
     mensagem_vencimento: mensagemVencimento,
     dias_previstos: Number(periodo?.dias_previstos || 0),
     dias_gozados: Number(periodo?.dias_gozados || 0),
+    origem_periodo: periodo?.origem_periodo || periodo?.origem_tipo || periodo?.origem || null,
+    criado_automaticamente: Boolean(periodo?.criado_automaticamente || periodo?.origem_automatica),
+    raw: periodo,
     fracoes: normalizarFeriasFracoes(feriasRelacionadas),
   };
 }

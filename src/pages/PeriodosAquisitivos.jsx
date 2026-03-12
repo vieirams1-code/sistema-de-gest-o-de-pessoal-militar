@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -21,14 +21,17 @@ import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo } from '@/componen
 import { mapPeriodosAquisitivosPorMilitar } from '@/components/ferias/periodosAquisitivosMapper';
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
+import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
 
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [militarFilter, setMilitarFilter] = useState('all');
   const [periodoFilter, setPeriodoFilter] = useState('all');
   const [expandedMilitares, setExpandedMilitares] = useState({});
+  const [periodoGerenciado, setPeriodoGerenciado] = useState(null);
 
   const { data: periodos = [], isLoading } = useQuery({
     queryKey: ['periodos-aquisitivos'],
@@ -38,6 +41,29 @@ export default function PeriodosAquisitivos() {
   const { data: ferias = [], isLoading: isLoadingFerias } = useQuery({
     queryKey: ['ferias'],
     queryFn: () => base44.entities.Ferias.list('-data_inicio'),
+  });
+
+  const { data: registrosLivro = [] } = useQuery({
+    queryKey: ['registros-livro-all'],
+    queryFn: () => base44.entities.RegistroLivro.list(),
+  });
+
+  const updatePeriodoMutation = useMutation({
+    mutationFn: ({ periodoId, payload }) => base44.entities.PeriodoAquisitivo.update(periodoId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+    },
+  });
+
+  const deletePeriodoMutation = useMutation({
+    mutationFn: ({ periodoId }) => base44.entities.PeriodoAquisitivo.delete(periodoId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+    },
   });
 
   const periodosTransformados = useMemo(
@@ -115,6 +141,44 @@ export default function PeriodosAquisitivos() {
       ...prev,
       [militarId]: !prev[militarId],
     }));
+  };
+
+  const abrirFeriasVinculadas = () => {
+    navigate(createPageUrl('Ferias'));
+  };
+
+  const handleSubmitEdicao = async (payload) => {
+    if (!periodoGerenciado?.id) throw new Error('Período inválido para edição.');
+
+    await updatePeriodoMutation.mutateAsync({
+      periodoId: periodoGerenciado.id,
+      payload,
+    });
+  };
+
+  const handleChangeStatus = async (status) => {
+    if (!periodoGerenciado?.id) throw new Error('Período inválido para alteração de status.');
+
+    await updatePeriodoMutation.mutateAsync({
+      periodoId: periodoGerenciado.id,
+      payload: { status },
+    });
+  };
+
+  const handleConfirmDelete = async ({ forceInactivate }) => {
+    if (!periodoGerenciado?.id) throw new Error('Período inválido para exclusão.');
+
+    if (forceInactivate) {
+      await updatePeriodoMutation.mutateAsync({
+        periodoId: periodoGerenciado.id,
+        payload: { status: 'Inativo' },
+      });
+      return;
+    }
+
+    await deletePeriodoMutation.mutateAsync({
+      periodoId: periodoGerenciado.id,
+    });
   };
 
   return (
@@ -308,7 +372,8 @@ export default function PeriodosAquisitivos() {
                           <PeriodoAquisitivoCard
                             key={periodo.id}
                             periodo={periodo}
-                            onManage={() => navigate(createPageUrl('Ferias'))}
+                            onManage={() => setPeriodoGerenciado(periodo)}
+                            onOpenFerias={abrirFeriasVinculadas}
                           />
                         ))}
                       </div>
@@ -320,6 +385,21 @@ export default function PeriodosAquisitivos() {
           </div>
         )}
       </div>
+
+      <GerenciarPeriodoModal
+        open={Boolean(periodoGerenciado)}
+        periodo={periodoGerenciado}
+        registrosLivro={registrosLivro}
+        saving={updatePeriodoMutation.isPending}
+        deleting={deletePeriodoMutation.isPending}
+        onOpenChange={(open) => {
+          if (!open) setPeriodoGerenciado(null);
+        }}
+        onSubmitEdicao={handleSubmitEdicao}
+        onChangeStatus={handleChangeStatus}
+        onConfirmDelete={handleConfirmDelete}
+        onOpenFerias={abrirFeriasVinculadas}
+      />
     </div>
   );
 }
