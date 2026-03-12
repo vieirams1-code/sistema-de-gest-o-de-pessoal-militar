@@ -101,6 +101,14 @@ function montarTextoPublicacaoDispensa({ militarLabel, periodoReferencia, quanti
   return `Dispensa com desconto em férias de ${militarLabel}, referente ao período aquisitivo ${periodoReferencia}. Fica formalizado o desconto de ${quantidade} dia(s), em ${data}.${complemento}`;
 }
 
+async function criarRegistroLivroDispensa({ payloadBase, payloadExtendido }) {
+  try {
+    return await base44.entities.RegistroLivro.create(payloadExtendido);
+  } catch {
+    return base44.entities.RegistroLivro.create(payloadBase);
+  }
+}
+
 export async function registrarDispensaComDescontoFerias({
   periodoId,
   quantidade,
@@ -135,7 +143,7 @@ export async function registrarDispensaComDescontoFerias({
     observacao || null,
   ].filter(Boolean).join(' | ');
 
-  const registroAto = await base44.entities.RegistroLivro.create({
+  const payloadRegistroBase = {
     militar_id: periodo.militar_id,
     militar_nome: periodo.militar_nome || periodo.militar_nome_guerra || null,
     militar_posto: periodo.militar_posto || null,
@@ -150,6 +158,15 @@ export async function registrarDispensaComDescontoFerias({
     nota_para_bg: '',
     numero_bg: '',
     data_bg: '',
+  };
+
+  const registroAto = await criarRegistroLivroDispensa({
+    payloadBase: payloadRegistroBase,
+    payloadExtendido: {
+      ...payloadRegistroBase,
+      periodo_aquisitivo_id: periodo.id,
+      origem: 'Ato Administrativo',
+    },
   });
 
   const ajuste = await registrarAjustePeriodoAquisitivo({

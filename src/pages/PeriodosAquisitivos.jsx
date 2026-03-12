@@ -78,7 +78,12 @@ export default function PeriodosAquisitivos() {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
     },
   });
 
