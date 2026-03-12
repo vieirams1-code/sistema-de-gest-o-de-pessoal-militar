@@ -13,7 +13,11 @@ function hasNumericValue(value) {
 }
 
 function getPeriodoKeys(periodo = {}) {
-  const referencia = periodo?.ano_referencia || periodo?.referencia || periodo?.periodo_aquisitivo_ref;
+  const referencia =
+    periodo?.ano_referencia ||
+    periodo?.referencia ||
+    periodo?.periodo_aquisitivo_ref;
+
   return [periodo?.id, referencia].filter(Boolean);
 }
 
@@ -22,18 +26,25 @@ export function filtrarFeriasDoPeriodo(periodo = {}, ferias = []) {
   if (!keys.size) return [];
 
   return (ferias || []).filter(
-    (item) => item && (keys.has(item.periodo_aquisitivo_id) || keys.has(item.periodo_aquisitivo_ref))
+    (item) =>
+      item &&
+      (keys.has(item.periodo_aquisitivo_id) ||
+        keys.has(item.periodo_aquisitivo_ref))
   );
 }
 
 export function obterDiasBase(periodo = {}) {
-  if (hasNumericValue(periodo?.dias_base)) return toNumber(periodo.dias_base, DIAS_BASE_PADRAO);
+  if (hasNumericValue(periodo?.dias_base)) {
+    return toNumber(periodo.dias_base, DIAS_BASE_PADRAO);
+  }
 
   return DIAS_BASE_PADRAO;
 }
 
 export function obterDiasAjuste(periodo = {}) {
-  if (hasNumericValue(periodo?.dias_ajuste)) return toNumber(periodo.dias_ajuste, 0);
+  if (hasNumericValue(periodo?.dias_ajuste)) {
+    return toNumber(periodo.dias_ajuste, 0);
+  }
 
   const base = obterDiasBase(periodo);
 
@@ -49,8 +60,14 @@ export function obterDiasAjuste(periodo = {}) {
 }
 
 export function calcularDiasTotal(periodo = {}) {
-  if (hasNumericValue(periodo?.dias_total)) return toNumber(periodo.dias_total, 0);
-  if (hasNumericValue(periodo?.dias_direito)) return toNumber(periodo.dias_direito, 0);
+  if (hasNumericValue(periodo?.dias_total)) {
+    return toNumber(periodo.dias_total, 0);
+  }
+
+  if (hasNumericValue(periodo?.dias_direito)) {
+    return toNumber(periodo.dias_direito, 0);
+  }
+
   return obterDiasBase(periodo) + obterDiasAjuste(periodo);
 }
 
@@ -79,7 +96,11 @@ export function calcularDiasPrevistos(periodo = {}, ferias = []) {
 }
 
 export function calcularDiasSaldo(periodo = {}, ferias = []) {
-  return calcularDiasTotal(periodo) - calcularDiasGozados(periodo, ferias) - calcularDiasPrevistos(periodo, ferias);
+  return (
+    calcularDiasTotal(periodo) -
+    calcularDiasGozados(periodo, ferias) -
+    calcularDiasPrevistos(periodo, ferias)
+  );
 }
 
 export function recalcularSaldoPeriodo(periodo = {}, ferias = []) {
@@ -100,7 +121,12 @@ export function recalcularSaldoPeriodo(periodo = {}, ferias = []) {
   };
 }
 
-export function validarAjusteDiasPeriodo({ periodo = {}, ferias = [], tipo, quantidade }) {
+export function validarAjusteDiasPeriodo({
+  periodo = {},
+  ferias = [],
+  tipo,
+  quantidade,
+}) {
   const qtd = Math.max(0, toNumber(quantidade, 0));
   const base = obterDiasBase(periodo);
   const ajusteAtual = obterDiasAjuste(periodo);
@@ -110,7 +136,8 @@ export function validarAjusteDiasPeriodo({ periodo = {}, ferias = [], tipo, quan
   const sinal = tipo === 'adicao' ? 1 : -1;
   const novoAjuste = ajusteAtual + sinal * qtd;
   const dias_total_projetado = base + novoAjuste;
-  const dias_saldo_projetado = dias_total_projetado - dias_gozados - dias_previstos;
+  const dias_saldo_projetado =
+    dias_total_projetado - dias_gozados - dias_previstos;
 
   if (dias_total_projetado < 0) {
     return {
@@ -122,7 +149,8 @@ export function validarAjusteDiasPeriodo({ periodo = {}, ferias = [], tipo, quan
   if (dias_saldo_projetado < 0) {
     return {
       ok: false,
-      mensagem: 'O ajuste deixa o período com saldo inconsistente em relação aos dias já gozados/previstos.',
+      mensagem:
+        'O ajuste deixa o período com saldo inconsistente em relação aos dias já gozados/previstos.',
     };
   }
 
@@ -133,4 +161,12 @@ export function validarAjusteDiasPeriodo({ periodo = {}, ferias = [], tipo, quan
     dias_gozados,
     dias_previstos,
   };
+}
+
+/**
+ * Compatibilidade com imports antigos do projeto.
+ * Alguns arquivos ainda podem importar este nome.
+ */
+export function validarDiasNoSaldoPeriodo(args) {
+  return validarAjusteDiasPeriodo(args);
 }
