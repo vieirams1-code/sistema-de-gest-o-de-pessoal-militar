@@ -185,6 +185,7 @@ function validarCronologia({
   resumo,
   ferias,
   todasFeriasDoMilitar,
+  dataLimiteGozo,
 }) {
   if (!dataRegistro) {
     return 'Informe a data do registro.';
@@ -210,7 +211,7 @@ function validarCronologia({
 
     const bloqueioConcessivo = validarInicioNoPeriodoConcessivo(
       dataRegistro,
-      ferias.data_limite_gozo
+      dataLimiteGozo || ferias.data_limite_gozo
     );
 
     if (bloqueioConcessivo) {
@@ -325,6 +326,26 @@ export default function RegistroLivroModal({
     enabled: open && !!ferias?.militar_id,
   });
 
+  const { data: periodosDoMilitar = [] } = useQuery({
+    queryKey: ['periodos-militar-modal', ferias?.militar_id],
+    queryFn: async () => {
+      if (!ferias?.militar_id) return [];
+      return base44.entities.PeriodoAquisitivo.filter({ militar_id: ferias.militar_id });
+    },
+    enabled: open && !!ferias?.militar_id,
+  });
+
+  const dataLimiteGozo = useMemo(() => {
+    if (!ferias) return null;
+
+    const periodo = (periodosDoMilitar || []).find((item) =>
+      (ferias.periodo_aquisitivo_id && item.id === ferias.periodo_aquisitivo_id) ||
+      ((item.ano_referencia || '') === (ferias.periodo_aquisitivo_ref || ''))
+    );
+
+    return periodo?.data_limite_gozo || ferias.data_limite_gozo || null;
+  }, [periodosDoMilitar, ferias]);
+
   useEffect(() => {
     if (!open || !ferias) return;
 
@@ -430,8 +451,9 @@ export default function RegistroLivroModal({
       resumo,
       ferias,
       todasFeriasDoMilitar,
+      dataLimiteGozo,
     });
-  }, [tipoRegistro, dataRegistro, cadeiaOperacional, estadoAtualCadeia, resumo, ferias, todasFeriasDoMilitar]);
+  }, [tipoRegistro, dataRegistro, cadeiaOperacional, estadoAtualCadeia, resumo, ferias, todasFeriasDoMilitar, dataLimiteGozo]);
 
   useEffect(() => {
     if (!ferias || !resumo || erroCronologia) {

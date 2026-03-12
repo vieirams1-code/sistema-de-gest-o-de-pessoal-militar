@@ -217,7 +217,7 @@ export default function CadastrarFerias() {
         data_inicio: f.data_inicio,
         data_fim: f.data_fim,
         data_retorno: f.data_retorno,
-        fracionamento: labelFracao(0, fracoes.length)
+        fracionamento: editingFerias?.fracionamento || labelFracao(0, fracoes.length)
       });
     } else {
       // Criar uma fração por registro
