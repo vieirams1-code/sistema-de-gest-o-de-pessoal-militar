@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertCircle, CalendarDays, Clock3, ExternalLink } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { obterDiasBase, obterDiasAjuste } from './feriasRules';
 
 const statusColors = {
   'Pendente': 'bg-slate-100 text-slate-700 border-slate-200',
@@ -20,6 +21,13 @@ const alertaClasses = {
 };
 
 export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias, onAdicionarDias, onDispensaDesconto }) {
+  const diasBase = obterDiasBase(periodo);
+  const diasAjuste = obterDiasAjuste(periodo);
+  const diasTotal = diasBase + diasAjuste;
+  const diasGozados = Number(periodo.dias_gozados || 0);
+  const diasPrevistos = Number(periodo.dias_previstos || 0);
+  const diasSaldo = diasTotal - diasGozados - diasPrevistos;
+
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -59,11 +67,11 @@ export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias,
 
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs mb-4">
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Base</p><p className="font-semibold text-slate-800">{periodo.dias_base ?? 30}d</p></div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Ajuste</p><p className="font-semibold text-slate-800">{periodo.dias_ajuste ?? 0}d</p></div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Total</p><p className="font-semibold text-slate-800">{periodo.dias_total ?? 30}d</p></div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Gozados/Prev.</p><p className="font-semibold text-slate-800">{periodo.dias_gozados ?? 0}d / {periodo.dias_previstos ?? 0}d</p></div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Saldo</p><p className="font-semibold text-[#1e3a5f]">{periodo.dias_saldo ?? 0}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Base</p><p className="font-semibold text-slate-800">{diasBase}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Ajuste</p><p className="font-semibold text-slate-800">{diasAjuste}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Total</p><p className="font-semibold text-slate-800">{diasTotal}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Gozados/Prev.</p><p className="font-semibold text-slate-800">{diasGozados}d / {diasPrevistos}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Saldo</p><p className="font-semibold text-[#1e3a5f]">{diasSaldo}d</p></div>
       </div>
       <div className="mb-4">
         <p className="text-xs font-semibold text-slate-500 mb-2">FRAÇÕES RELACIONADAS</p>
