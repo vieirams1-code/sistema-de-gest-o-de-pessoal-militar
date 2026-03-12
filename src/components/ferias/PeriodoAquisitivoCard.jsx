@@ -17,7 +17,7 @@ const statusColors = {
   'Inativo': 'bg-slate-100 text-slate-500 border-slate-200'
 };
 
-export default function PeriodoAquisitivoCard({ periodo, listMode = false }) {
+export default function PeriodoAquisitivoCard({ periodo, listMode = false, showMilitarInfo = true }) {
   const queryClient = useQueryClient();
 
   const handleInativar = async (e) => {
@@ -61,13 +61,15 @@ export default function PeriodoAquisitivoCard({ periodo, listMode = false }) {
   if (listMode) {
     return (
       <tr className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${isInativo ? 'opacity-50' : ''}`}>
-        <td className="px-4 py-3">
-          <span className="font-medium text-slate-900">
-            {periodo.militar_posto && <span className="text-slate-500 mr-1">{periodo.militar_posto}</span>}
-            {periodo.militar_nome}
-          </span>
-          <p className="text-xs text-slate-400">{periodo.militar_matricula}</p>
-        </td>
+        {showMilitarInfo && (
+          <td className="px-4 py-3">
+            <span className="font-medium text-slate-900">
+              {periodo.militar_posto && <span className="text-slate-500 mr-1">{periodo.militar_posto}</span>}
+              {periodo.militar_nome}
+            </span>
+            <p className="text-xs text-slate-400">{periodo.militar_matricula}</p>
+          </td>
+        )}
         <td className="px-4 py-3 text-slate-700">
           {periodo.ano_referencia || `${format(new Date(periodo.inicio_aquisitivo + 'T00:00:00'), 'yyyy')}/${format(new Date(periodo.fim_aquisitivo + 'T00:00:00'), 'yyyy')}`}
           <p className="text-xs text-slate-400">{formatDate(periodo.inicio_aquisitivo)} a {formatDate(periodo.fim_aquisitivo)}</p>
