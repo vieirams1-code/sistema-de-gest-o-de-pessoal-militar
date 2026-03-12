@@ -13,6 +13,7 @@ import {
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
+import { reverterAjustesPorPublicacao } from '@/components/ferias/ajustePeriodoService';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -365,6 +366,10 @@ export default function Publicacoes() {
           const refId = registro.publicacao_referencia_id;
           const origemTipoHint = registro.publicacao_referencia_origem_tipo || null;
           await reverterVinculo(isApostila, isTSE, refId, origemTipoHint);
+        }
+
+        if (registro.tipo === 'Dispensa com Desconto em Férias') {
+          await reverterAjustesPorPublicacao(registro);
         }
 
         await reverterAtestadosPorExclusaoPublicacao(
