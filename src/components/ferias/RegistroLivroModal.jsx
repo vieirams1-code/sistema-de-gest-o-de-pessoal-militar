@@ -192,8 +192,8 @@ function validarCronologia({
 
   const dataNova = parseDate(dataRegistro);
 
-  if (tipoRegistro === 'Saída Férias' && ferias && todasFeriasDoMilitar?.length) {
-    const bloqueioInicio = getBlockingReasonForInicio(ferias, todasFeriasDoMilitar);
+  if (tipoRegistro === 'Saída Férias' && ferias) {
+    const bloqueioInicio = getBlockingReasonForInicio(ferias, todasFeriasDoMilitar || []);
     if (bloqueioInicio) {
       return bloqueioInicio;
     }
