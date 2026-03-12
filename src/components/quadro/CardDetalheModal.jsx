@@ -36,7 +36,9 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  History,
 } from 'lucide-react';
+import JisoHistoricoModal from '@/components/atestado/JisoHistoricoModal';
 
 const PRIORIDADE_COR = {
   Urgente: 'text-red-600',
@@ -612,6 +614,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const [salvando, setSalvando] = useState(false);
   const [showSystemActivity, setShowSystemActivity] = useState(false);
   const [deletingCard, setDeletingCard] = useState(false);
+  const [showJisoHistoricoModal, setShowJisoHistoricoModal] = useState(false);
 
   const [jisoDate, setJisoDate] = useState(card.prazo || '');
   const [savingJisoDate, setSavingJisoDate] = useState(false);
@@ -644,6 +647,28 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const vinculoAtestado = useMemo(() => obterVinculoAtestado(vinculos), [vinculos]);
   const permiteEditarDataJiso = !!vinculoAtestado?.referencia_id;
+
+  const { data: atestadoVinculado } = useQuery({
+    queryKey: ['atestado', vinculoAtestado?.referencia_id],
+    queryFn: () => base44.entities.Atestado.get(vinculoAtestado.referencia_id),
+    enabled: !!vinculoAtestado?.referencia_id,
+  });
+
+  const isCardJisoAutomatico = card.origem_tipo === 'Atestado/JISO' && card.criado_automaticamente;
+  const origemAtestadoInativa = ['Cancelado', 'Excluído', 'Excluido'].includes(atestadoVinculado?.status);
+  const fluxoJisoAtivo =
+    atestadoVinculado?.fluxo_homologacao === 'jiso' ||
+    atestadoVinculado?.necessita_jiso === true ||
+    Number(atestadoVinculado?.dias || 0) > 15;
+  const podeRegistrarDecisaoJiso =
+    isCardJisoAutomatico &&
+    !!vinculoAtestado?.referencia_id &&
+    !!atestadoVinculado?.id &&
+    fluxoJisoAtivo &&
+    !origemAtestadoInativa;
+  const decisaoJisoRegistrada =
+    (atestadoVinculado?.historico_jiso || []).length > 0 ||
+    atestadoVinculado?.status_jiso === 'Homologado pela JISO';
 
   const { data: comentarios = [] } = useQuery({
     queryKey: ['card-comentarios', card.id],
@@ -1014,6 +1039,28 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
             </SectionCard>
           )}
 
+          {podeRegistrarDecisaoJiso && (
+            <SectionCard title="Decisão da JISO" icon={History}>
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500">
+                  {decisaoJisoRegistrada
+                    ? 'Decisão da JISO registrada.'
+                    : 'Há decisão da JISO pendente para este atestado.'}
+                </p>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 rounded-lg border-purple-200 bg-purple-50/40 text-xs text-purple-700 hover:bg-purple-100"
+                  onClick={() => setShowJisoHistoricoModal(true)}
+                >
+                  <History className="w-3.5 h-3.5 mr-1.5" />
+                  {decisaoJisoRegistrada ? 'Visualizar/editar decisão da JISO' : 'Registrar decisão da JISO'}
+                </Button>
+              </div>
+            </SectionCard>
+          )}
+
           <ChecklistSection cardId={card.id} />
           <AcoesSection cardId={card.id} />
           <VinculosSection cardId={card.id} />
@@ -1094,6 +1141,14 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
             </div>
           </SectionCard>
         </div>
+
+        {podeRegistrarDecisaoJiso && showJisoHistoricoModal && (
+          <JisoHistoricoModal
+            atestado={atestadoVinculado}
+            open={showJisoHistoricoModal}
+            onClose={() => setShowJisoHistoricoModal(false)}
+          />
+        )}
       </div>
     </div>
   );
