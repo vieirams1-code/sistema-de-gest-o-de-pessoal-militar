@@ -5,6 +5,7 @@ const TIPO_LABELS = {
   'Retorno Férias': 'Retorno de Férias',
   'Interrupção de Férias': 'Interrupção de Férias',
   'Nova Saída / Retomada': 'Nova Saída / Retomada',
+  'Dispensa com Desconto em Férias': 'Dispensa com Desconto em Férias',
 };
 
 const STATUS_LABELS = {
@@ -153,7 +154,7 @@ function mapPublicacao(registro) {
   };
 }
 
-function mapVinculos({ registro, ferias, periodo, cadeiaInfo }) {
+function mapVinculos({ registro: _registro, ferias, periodo, cadeiaInfo }) {
   return {
     ferias: ferias
       ? {

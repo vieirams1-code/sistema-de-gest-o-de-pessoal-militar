@@ -150,3 +150,58 @@ export function hasPrevisaoValidaPeriodo(periodo) {
 
   return ['Previsto', 'Parcialmente Gozado', 'Gozado'].includes(periodo.status);
 }
+
+export function validarDispensaComDescontoFerias({ periodo, quantidade }) {
+  if (!periodo) {
+    return { ok: false, mensagem: 'Período aquisitivo não encontrado.' };
+  }
+
+  const qtd = Number(quantidade);
+  if (!Number.isFinite(qtd) || qtd <= 0) {
+    return { ok: false, mensagem: 'Informe uma quantidade de dias válida para desconto.' };
+  }
+
+  const diasBase = Number(periodo.dias_base ?? 30);
+  const diasAjusteAtual = Number(periodo.dias_ajuste ?? 0);
+  const diasGozados = Number(periodo.dias_gozados ?? 0);
+  const diasPrevistos = Number(periodo.dias_previstos ?? 0);
+
+  const diasComprometidos = diasGozados + diasPrevistos;
+  const novoAjuste = diasAjusteAtual - qtd;
+  const novoTotal = diasBase + novoAjuste;
+  const novoSaldo = novoTotal - diasComprometidos;
+
+  if (novoTotal < 0) {
+    return {
+      ok: false,
+      mensagem: `Desconto inválido: o total do período ficaria negativo (${novoTotal} dia(s)).`,
+    };
+  }
+
+  if (novoTotal < diasComprometidos) {
+    return {
+      ok: false,
+      mensagem: `Desconto incompatível com o uso já registrado: total projetado ${novoTotal} dia(s), comprometidos ${diasComprometidos} dia(s).`,
+    };
+  }
+
+  if (novoSaldo < 0) {
+    return {
+      ok: false,
+      mensagem: `Desconto deixaria saldo inconsistente (${novoSaldo} dia(s)).`,
+    };
+  }
+
+  return {
+    ok: true,
+    mensagem: null,
+    calculo: {
+      dias_base: diasBase,
+      dias_ajuste_atual: diasAjusteAtual,
+      dias_ajuste_novo: novoAjuste,
+      dias_total_novo: novoTotal,
+      dias_comprometidos: diasComprometidos,
+      dias_saldo_novo: novoSaldo,
+    },
+  };
+}
