@@ -14,8 +14,19 @@ const STATUS_CODIGO_MAP = {
 const ALERTA_TIPO_MAP = {
   critico: 'danger',
   atencao: 'warning',
-  none: 'success',
+  ok: 'success',
 };
+
+function resolveNomeMilitar(periodo = {}) {
+  return [
+    periodo?.militar_nome_guerra,
+    periodo?.militar_nome,
+    periodo?.nome_guerra,
+    periodo?.militar_nome_completo,
+    periodo?.militar?.nome_guerra,
+    periodo?.militar?.nome,
+  ].find((nome) => typeof nome === 'string' && nome.trim()) || '';
+}
 
 function parseDateOnly(date) {
   if (!date) return null;
@@ -68,7 +79,7 @@ function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
     hasPrevisaoValida: hasPrevisaoValidaPeriodo(periodo),
   });
 
-  const alertaCodigo = alertaConcessivo?.nivel || 'none';
+  const alertaCodigo = alertaConcessivo?.nivel || 'ok';
   const alertaTipo = ALERTA_TIPO_MAP[alertaCodigo] || 'success';
 
   let mensagemVencimento = 'Sem prazo de gozo';
@@ -92,7 +103,7 @@ function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
     data_limite_gozo_iso: periodo?.data_limite_gozo || null,
     status_operacional: periodo?.status || 'Pendente',
     status_codigo: toStatusCodigo(periodo?.status),
-    alerta_gerencial: alertaCodigo === 'critico' ? 'Crítico' : alertaCodigo === 'atencao' ? 'Atenção' : 'Sem alerta',
+    alerta_gerencial: alertaCodigo === 'critico' ? 'Crítico' : alertaCodigo === 'atencao' ? 'Atenção' : 'Em dia',
     alerta_codigo: alertaCodigo,
     alerta_tipo: alertaTipo,
     dias_para_vencimento: diasParaVencimento,
@@ -161,7 +172,7 @@ export function mapPeriodosAquisitivosPorMilitar({ periodos = [], ferias = [] } 
       acc[periodo.militar_id] = {
         militar: {
           id: periodo.militar_id,
-          nome_guerra: periodo.militar_nome || '',
+          nome_guerra: resolveNomeMilitar(periodo),
           posto_graduacao: periodo.militar_posto || '',
           matricula: periodo.militar_matricula || '',
         },
