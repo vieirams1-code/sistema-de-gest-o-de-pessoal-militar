@@ -15,7 +15,8 @@ import {
   History,
   BookOpen,
   Save,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -317,20 +318,26 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 <Pencil className="w-4 h-4 mr-2" />
                 Editar
               </DropdownMenuItem>
+              {atestado.arquivo_atestado && (
+                <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
+                  <Download className="w-4 h-4 mr-2 text-slate-600" />
+                  Baixar atestado anexado
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               {/* Fluxo exclusivo: mostrar apenas o botão do fluxo definido */}
               {/* dias <= 15 e fluxo = comandante (ou não definido e dias <= 15): mostrar homologação */}
               {atestado.fluxo_homologacao === 'comandante' && (
                 <DropdownMenuItem onClick={handleOpenHomologacao} disabled={hasHomologacaoAtiva}>
                   <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
-                  {hasHomologacaoAtiva ? 'Homologação já gerada' : 'Homologação pelo Comandante'}
+                  {hasHomologacaoAtiva ? 'Homologação já gerada' : 'Publicar Homologação'}
                 </DropdownMenuItem>
               )}
               {/* fluxo = jiso OU dias > 15: mostrar Ata JISO */}
               {(atestado.fluxo_homologacao === 'jiso' || (atestado.dias > 15)) && (
                 <DropdownMenuItem onClick={handleOpenAtaJiso} disabled={hasAtaJisoAtiva}>
                   <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
-                  {hasAtaJisoAtiva ? 'Ata JISO já gerada' : 'Ata JISO'}
+                  {hasAtaJisoAtiva ? 'Ata JISO já gerada' : 'Publicar ata JISO'}
                 </DropdownMenuItem>
               )}
               {publicacoesVinculadas.length > 0 && (
