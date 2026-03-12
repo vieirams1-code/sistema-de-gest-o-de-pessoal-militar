@@ -111,6 +111,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   });
 
   const origemTipo = detectarOrigemTipo(registro);
+  const contratoLivro = origemTipo === 'livro';
+  const detalhesContrato = registro.detalhes_contrato;
+  const vinculosContrato = registro.vinculos_contrato;
+  const publicacaoContrato = registro.publicacao_contrato;
+  const inconsistenciaContrato = registro.inconsistencia_contrato;
+  const cadeiaEventosContrato = registro.cadeia_eventos_contrato || [];
 
   const currentStatus = calcStatus(
     registro.nota_para_bg,
@@ -673,6 +679,80 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             ) : (
               <div className="mt-4 space-y-4">
                 <div className="grid grid-cols-3 gap-4 text-sm bg-slate-50 rounded-lg border border-slate-100 p-3">
+
+
+                {contratoLivro && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div className="p-3 rounded-lg border bg-slate-50">
+                        <p className="text-xs text-slate-400 uppercase tracking-wide">Origem</p>
+                        <p className="font-medium text-slate-700">{registro.origem || '—'}</p>
+                      </div>
+                      <div className="p-3 rounded-lg border bg-slate-50">
+                        <p className="text-xs text-slate-400 uppercase tracking-wide">Data (Contrato)</p>
+                        <p className="font-medium text-slate-700">{registro.data_display || formatDate(registro.data_registro)}</p>
+                      </div>
+                    </div>
+
+                    {detalhesContrato && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Detalhes do Ato</p>
+                        <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
+                          {detalhesContrato.observacoes && <p><span className="font-medium">Observações:</span> {detalhesContrato.observacoes}</p>}
+                          {detalhesContrato.criado_em && <p><span className="font-medium">Criado em:</span> {detalhesContrato.criado_em}</p>}
+                          {detalhesContrato.atualizado_em && <p><span className="font-medium">Atualizado em:</span> {detalhesContrato.atualizado_em}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {vinculosContrato && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Vínculos</p>
+                        <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
+                          <p><span className="font-medium">Férias:</span> {vinculosContrato?.ferias?.label || '—'}</p>
+                          <p><span className="font-medium">Período:</span> {vinculosContrato?.periodo?.label || '—'}</p>
+                          <p><span className="font-medium">Cadeia:</span> {vinculosContrato?.cadeia?.existe ? `${vinculosContrato.cadeia.total_eventos} evento(s)` : 'Sem cadeia'}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {publicacaoContrato && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Publicação Gerada</p>
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-slate-700 space-y-1">
+                          <p><span className="font-medium">Status:</span> {publicacaoContrato.status || '—'}</p>
+                          <p><span className="font-medium">Nota:</span> {publicacaoContrato.nota_para_bg || '—'}</p>
+                          <p><span className="font-medium">BG:</span> {publicacaoContrato.numero_bg || '—'}</p>
+                          <p><span className="font-medium">Data BG:</span> {formatDate(publicacaoContrato.data_bg)}</p>
+                          {publicacaoContrato.texto && <p><span className="font-medium">Texto:</span> {publicacaoContrato.texto}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {inconsistenciaContrato && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Inconsistência</p>
+                        <div className="p-3 bg-red-50 rounded-lg border border-red-100 text-sm text-slate-700">
+                          <p className="font-medium text-red-700">{inconsistenciaContrato.motivo_curto}</p>
+                          {inconsistenciaContrato.detalhe && <p>{inconsistenciaContrato.detalhe}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {cadeiaEventosContrato.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Cadeia de Eventos</p>
+                        <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
+                          {cadeiaEventosContrato.map((evento) => (
+                            <p key={evento.id}>
+                              {evento.atual ? '• ' : '- '} {evento.tipo} ({evento.data})
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                   <div>
                     <p className="text-xs text-slate-400 uppercase tracking-wide">
                       Nota para BG

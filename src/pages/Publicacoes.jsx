@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import {
   calcStatusPublicacao,
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
+import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -22,6 +22,7 @@ const TIPOS_FERIAS = [
 ];
 
 function detectarOrigemTipo(registro) {
+  if (registro.origem_tipo) return registro.origem_tipo;
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
     return 'ex-officio';
   }
@@ -29,6 +30,55 @@ function detectarOrigemTipo(registro) {
     return 'atestado';
   }
   return 'livro';
+}
+
+function mapStatusContratoParaControle(statusCodigo) {
+  if (statusCodigo === 'gerada') return 'Publicado';
+  if (statusCodigo === 'aguardando_publicacao') return 'Aguardando Publicação';
+  if (statusCodigo === 'aguardando_nota') return 'Aguardando Nota';
+  if (statusCodigo === 'inconsistente') return 'Inconsistente';
+  return 'Aguardando Nota';
+}
+
+function mapTipoCodigoParaTipoRegistro(tipoCodigo, fallbackLabel = '') {
+  const mapa = {
+    saida_ferias: 'Saída Férias',
+    interrupcao_de_ferias: 'Interrupção de Férias',
+    nova_saida_retomada: 'Nova Saída / Retomada',
+    retorno_ferias: 'Retorno Férias',
+  };
+
+  return mapa[tipoCodigo] || fallbackLabel;
+}
+
+function normalizarRegistroLivroContrato(registro) {
+  const militar = registro?.militar || {};
+
+  return {
+    ...registro,
+    origem_tipo: 'livro',
+    tipo_registro: mapTipoCodigoParaTipoRegistro(registro.tipo_codigo, registro.tipo_label),
+    tipo: registro.tipo_label,
+    status_calculado: mapStatusContratoParaControle(registro.status_codigo),
+    status: registro.status_label,
+    militar_id: militar.id,
+    militar_nome: militar.nome_guerra,
+    militar_posto: militar.posto_graduacao,
+    militar_matricula: militar.matricula,
+    data_registro: registro.data_inicio_iso,
+    observacoes: registro?.detalhes?.observacoes || null,
+    created_date: registro?.detalhes?.criado_em_iso || null,
+    nota_para_bg: registro?.publicacao?.nota_para_bg || '',
+    numero_bg: registro?.publicacao?.numero_bg || '',
+    data_bg: registro?.publicacao?.data_bg || '',
+    texto_publicacao: registro?.publicacao?.texto || null,
+    ferias_id: registro?.vinculos?.ferias?.id || null,
+    detalhes_contrato: registro?.detalhes || null,
+    vinculos_contrato: registro?.vinculos || null,
+    publicacao_contrato: registro?.publicacao || null,
+    inconsistencia_contrato: registro?.inconsistencia || null,
+    cadeia_eventos_contrato: registro?.cadeia_eventos || [],
+  };
 }
 
 function getTipoDisplay(tipo) {
@@ -64,7 +114,7 @@ function normalizarRegistro(registro) {
   return {
     ...registro,
     origem_tipo: detectarOrigemTipo(registro),
-    status_calculado: calcStatusPublicacao(registro),
+    status_calculado: registro.status_calculado || calcStatusPublicacao(registro),
     tipo_display: tipoDisplay,
     grupo_display: grupoDisplay,
     tipo_composto_display: tipoCompostoDisplay,
@@ -109,7 +159,7 @@ function toDateOnly(date) {
 }
 
 function getEventDate(registro) {
-  return registro?.data_registro || registro?.data_inicio || null;
+  return registro?.data_registro || registro?.data_inicio || registro?.data_inicio_iso || null;
 }
 
 function compareEventos(a, b) {
@@ -129,8 +179,11 @@ function compareEventos(a, b) {
 function isFeriasOperacional(registro) {
   return (
     detectarOrigemTipo(registro) === 'livro' &&
-    !!registro.ferias_id &&
-    TIPOS_FERIAS.includes(registro.tipo_registro)
+    !!(registro.ferias_id || registro?.vinculos?.ferias?.id) &&
+    (
+      TIPOS_FERIAS.includes(registro.tipo_registro) ||
+      ['saida_ferias', 'interrupcao_de_ferias', 'nova_saida_retomada', 'retorno_ferias'].includes(registro.tipo_codigo)
+    )
   );
 }
 
@@ -222,9 +275,9 @@ export default function Publicacoes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
 
-  const { data: registrosLivro = [], isLoading: loadingLivro } = useQuery({
+  const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
-    queryFn: () => base44.entities.RegistroLivro.list('-created_date')
+    queryFn: getLivroRegistrosContrato
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
@@ -241,6 +294,11 @@ export default function Publicacoes() {
   });
 
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
+
+  const registrosLivro = useMemo(
+    () => (contratoLivro?.registros_livro || []).map(normalizarRegistroLivroContrato),
+    [contratoLivro]
+  );
 
   const registros = useMemo(() => {
     return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
@@ -394,7 +452,8 @@ export default function Publicacoes() {
       total: registros.length,
       aguardandoNota: registros.filter(r => r.status_calculado === 'Aguardando Nota').length,
       aguardandoPublicacao: registros.filter(r => r.status_calculado === 'Aguardando Publicação').length,
-      publicados: registros.filter(r => r.status_calculado === 'Publicado').length
+      publicados: registros.filter(r => r.status_calculado === 'Publicado').length,
+      inconsistentes: registros.filter(r => r.status_calculado === 'Inconsistente').length
     };
   }, [registros]);
 
@@ -446,6 +505,13 @@ export default function Publicacoes() {
       color: 'text-emerald-700',
       border: 'border-emerald-300',
       bg: 'bg-emerald-50'
+    },
+    {
+      key: 'Inconsistente',
+      label: 'Inconsistente',
+      color: 'text-red-700',
+      border: 'border-red-300',
+      bg: 'bg-red-50'
     },
   ];
 
@@ -535,6 +601,7 @@ export default function Publicacoes() {
                 <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
                 <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
                 <SelectItem value="Publicado">Publicado</SelectItem>
+                <SelectItem value="Inconsistente">Inconsistente</SelectItem>
               </SelectContent>
             </Select>
           </div>
