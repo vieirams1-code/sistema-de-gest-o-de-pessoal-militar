@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Save, ArrowLeft, Upload, FileText, User as UserIcon, Calendar, Clipboard, BookOpen } from 'lucide-react';
+import { Save, ArrowLeft, Upload, FileText, User as UserIcon, Calendar, Clipboard, BookOpen, Download, Trash2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 
 import FormSection from '@/components/militar/FormSection';
@@ -52,6 +52,7 @@ export default function CadastrarAtestado() {
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const { data: editingAtestado, isLoading: loadingEdit } = useQuery({
     queryKey: ['atestado', editId],
@@ -96,11 +97,17 @@ export default function CadastrarAtestado() {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       handleChange('arquivo_atestado', file_url);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleRemoveFile = () => {
+    handleChange('arquivo_atestado', '');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Quando dias muda: forçar JISO se >15, sem sobrescrever decisão manual para <=15
@@ -269,17 +276,40 @@ export default function CadastrarAtestado() {
                     accept="image/*,application/pdf"
                     onChange={handleFileUpload}
                     className="hidden"
+                    ref={fileInputRef}
                   />
                   {formData.arquivo_atestado && (
-                    <a
-                      href={formData.arquivo_atestado}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline flex items-center gap-2"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Ver arquivo anexado
-                    </a>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={formData.arquivo_atestado}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline flex items-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        Baixar arquivo anexado
+                      </a>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-8"
+                      >
+                        <Upload className="w-4 h-4 mr-1" />
+                        Substituir arquivo
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRemoveFile}
+                        className="h-8 text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Remover arquivo
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
