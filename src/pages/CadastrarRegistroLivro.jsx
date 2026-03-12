@@ -472,7 +472,7 @@ export default function CadastrarRegistroLivro() {
         const periodoLabel = formData.periodo_aquisitivo_label || formData.periodo_aquisitivo || '';
         const t = tentarTemplate('Dispensa Desconto Férias', { data_inicio: dataInicio, periodo_aquisitivo: periodoLabel, dias_restantes: diasRestantes });
         if (t) { texto = t; break; }
-        if (formData.periodo_aquisitivo && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; ${postoNome} ${nomeCompleto}, matrícula ${matricula}, por início de ${dias} (${diasExtenso}) dias de Dispensa para Desconto em Férias a contar de ${dataInicio}, referentes ao período aquisitivo de ${periodoLabel}, restando ${diasRestantes} dias.`;
+        if (formData.periodo_aquisitivo && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em gozo de ${dias} (${diasExtenso}) dia(s) de Dispensa com Desconto em Férias, a contar de ${dataInicio}, com abatimento no período aquisitivo ${periodoLabel}, permanecendo saldo remanescente de ${diasRestantes} dia(s).`;
         break;
       }
 
@@ -533,9 +533,11 @@ export default function CadastrarRegistroLivro() {
       await registrarDispensaComDescontoFerias({
         periodoId: periodoAlvoId,
         quantidade: Number(formData.dias || 0),
-        motivo: `Dispensa com desconto em férias (Registro Livro ${registroLivro?.id || ''})`.trim(),
+        motivo: formData.motivo_dispensa || `Dispensa com desconto em férias (Registro Livro ${registroLivro?.id || ''})`.trim(),
         observacao: textoPublicacao,
         data: formData.data_registro,
+        origem: 'livro',
+        origem_registro_livro_id: registroLivro?.id || null,
       });
     }
 
@@ -903,17 +905,7 @@ export default function CadastrarRegistroLivro() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa com Desconto em Férias</h3>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Início / Término"
-                  name="inicio_termino"
-                  value={formData.inicio_termino}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Início', 'Término']}
-                  required
-                />
-                <div>
+              <div>
                   <Label className="text-sm font-medium text-slate-700">Período Aquisitivo <span className="text-red-500">*</span></Label>
                   <Select
                     value={formData.periodo_aquisitivo}
@@ -940,7 +932,6 @@ export default function CadastrarRegistroLivro() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
               <div className="grid grid-cols-3 gap-4">
               <FormField
                 label="Data de Início"
