@@ -1,21 +1,11 @@
 import { base44 } from '@/api/base44Client';
-import {
-  DIAS_BASE_PADRAO,
-  filtrarFeriasDoPeriodo,
-  obterDiasBase,
-  calcularDiasGozados,
-  calcularDiasPrevistos,
-} from './periodoSaldoUtils';
+import { DIAS_BASE_PADRAO, obterDiasBase, obterDiasAjuste } from './periodoSaldoUtils';
+import { filtrarFeriasDoPeriodo, validarAjusteDiasPeriodo } from './periodoSaldoUtils';
 import { calcularStatusPeriodoAquisitivo } from './recalcularPeriodoAquisitivo';
 
 const TIPO_AJUSTE = {
   ADICAO: 'adicao',
   DISPENSA_DESCONTO: 'dispensa_desconto',
-};
-
-const STATUS_AJUSTE = {
-  ATIVO: 'ativo',
-  INVALIDADO: 'invalidado',
 };
 
 function toNumber(value, fallback = 0) {
@@ -27,150 +17,101 @@ function normalizarQuantidade(quantidade) {
   return Math.max(0, toNumber(quantidade, 0));
 }
 
-function getDateOnly(value) {
-  if (typeof value === 'string' && value) return value.slice(0, 10);
+function nowDateOnly() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function getAdjustmentSignal(tipo) {
-  return tipo === TIPO_AJUSTE.ADICAO ? 1 : -1;
-}
-
-function isAdjustmentActive(ajuste = {}) {
-  if (!ajuste) return false;
-  if (ajuste.status === STATUS_AJUSTE.INVALIDADO) return false;
-  if (ajuste.ativo === false) return false;
-  return true;
-}
-
-function appendObservacao(baseText, extraText) {
-  const base = String(baseText || '').trim();
-  const extra = String(extraText || '').trim();
-  if (!extra) return base;
-  if (!base) return extra;
-  if (base.includes(extra)) return base;
-  return `${base}
-${extra}`.trim();
-}
-
-function buildPeriodoReferencia(periodo = {}) {
-  return (
-    periodo?.ano_referencia ||
-    periodo?.referencia ||
-    periodo?.periodo_aquisitivo_ref ||
-    'Sem referência'
-  );
-}
-
-function buildNomeMilitar(periodo = {}) {
-  return (
-    periodo?.militar_nome_guerra ||
-    periodo?.militar_nome ||
-    periodo?.nome_guerra ||
-    periodo?.militar_nome_completo ||
-    'Militar não identificado'
-  );
-}
-
-function normalizeAjuste(ajuste = {}, periodo = {}) {
-  return {
-    id: ajuste.id || ajuste._id || globalThis.crypto?.randomUUID?.() || `aj-${Date.now()}`,
-    periodo_aquisitivo_id: ajuste.periodo_aquisitivo_id || periodo.id || null,
-    periodo_aquisitivo_ref: ajuste.periodo_aquisitivo_ref || buildPeriodoReferencia(periodo),
-    militar_id: ajuste.militar_id || periodo.militar_id || null,
-    militar_nome: ajuste.militar_nome || periodo.militar_nome || periodo.militar_nome_completo || buildNomeMilitar(periodo),
-    militar_matricula: ajuste.militar_matricula || periodo.militar_matricula || null,
-    militar_posto: ajuste.militar_posto || periodo.militar_posto || null,
-    tipo: ajuste.tipo,
-    quantidade: normalizarQuantidade(ajuste.quantidade),
-    motivo: ajuste.motivo || '',
-    observacao: ajuste.observacao || '',
-    data: getDateOnly(ajuste.data || ajuste.created_date),
-    usuario: ajuste.usuario || null,
-    publicacao_id: ajuste.publicacao_id || null,
-    origem: ajuste.origem || 'manual',
-    origem_registro_livro_id: ajuste.origem_registro_livro_id || null,
-    status: ajuste.status || STATUS_AJUSTE.ATIVO,
-    invalidado_em: ajuste.invalidado_em || null,
-    invalidado_por: ajuste.invalidado_por || null,
-    invalidado_motivo: ajuste.invalidado_motivo || null,
-    created_date: ajuste.created_date || null,
-  };
-}
-
-async function listEntitySafe(entityName, order = null) {
-  const entity = base44.entities?.[entityName];
-  if (!entity || typeof entity.list !== 'function') return [];
+function gerarIdLocal() {
   try {
-    return await entity.list(order || undefined);
+    return crypto.randomUUID();
   } catch {
-    return [];
-  }
-}
-
-async function filterEntitySafe(entityName, filter = {}, order = null) {
-  const entity = base44.entities?.[entityName];
-  if (!entity || typeof entity.filter !== 'function') return [];
-  try {
-    return await entity.filter(filter, order || undefined);
-  } catch {
-    return [];
-  }
-}
-
-async function updateEntitySafe(entityName, id, payload) {
-  const entity = base44.entities?.[entityName];
-  if (!entity || typeof entity.update !== 'function') return null;
-  try {
-    return await entity.update(id, payload);
-  } catch {
-    return null;
-  }
-}
-
-async function createEntitySafe(entityName, payload) {
-  const entity = base44.entities?.[entityName];
-  if (!entity || typeof entity.create !== 'function') return null;
-  try {
-    return await entity.create(payload);
-  } catch {
-    return null;
+    return `ajuste_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   }
 }
 
 async function carregarPeriodo(periodoId) {
-  const list = await filterEntitySafe('PeriodoAquisitivo', { id: periodoId });
+  const list = await base44.entities.PeriodoAquisitivo.filter({ id: periodoId });
   return list[0] || null;
 }
 
 async function carregarFeriasDoMilitar(militarId) {
   if (!militarId) return [];
-  return filterEntitySafe('Ferias', { militar_id: militarId });
+  return base44.entities.Ferias.filter({ militar_id: militarId });
 }
 
-function calcularDiasAjusteFromHistory(ajustes = []) {
-  return (ajustes || []).filter(isAdjustmentActive).reduce((acc, ajuste) => {
-    return acc + getAdjustmentSignal(ajuste.tipo) * normalizarQuantidade(ajuste.quantidade);
-  }, 0);
+function getNomeMilitar(periodo = {}) {
+  return (
+    periodo.militar_nome_guerra ||
+    periodo.militar_nome ||
+    periodo.nome_guerra ||
+    periodo.militar_nome_completo ||
+    'Militar não identificado'
+  );
 }
 
-function montarPayloadPeriodo({ periodo, ferias = [], ajustes = [] }) {
+function getReferenciaPeriodo(periodo = {}) {
+  return periodo.ano_referencia || periodo.referencia || periodo.periodo_aquisitivo_ref || 'Sem referência';
+}
+
+function serializarAjusteLocal(ajuste) {
+  return {
+    id: ajuste.id || gerarIdLocal(),
+    periodo_aquisitivo_id: ajuste.periodo_aquisitivo_id,
+    periodo_aquisitivo_ref: ajuste.periodo_aquisitivo_ref,
+    militar_id: ajuste.militar_id || null,
+    militar_nome: ajuste.militar_nome || null,
+    militar_matricula: ajuste.militar_matricula || null,
+    tipo: ajuste.tipo,
+    quantidade: normalizarQuantidade(ajuste.quantidade),
+    motivo: ajuste.motivo || null,
+    observacao: ajuste.observacao || null,
+    data: ajuste.data || nowDateOnly(),
+    usuario: ajuste.usuario || null,
+    publicacao_id: ajuste.publicacao_id || null,
+    origem: ajuste.origem || 'manual',
+    status: ajuste.status || 'ativo',
+    invalidado_em: ajuste.invalidado_em || null,
+    invalidado_por: ajuste.invalidado_por || null,
+    invalidado_motivo: ajuste.invalidado_motivo || null,
+    created_date: ajuste.created_date || new Date().toISOString(),
+  };
+}
+
+async function listarAjustesPersistidos(periodo) {
+  const locais = Array.isArray(periodo?.ajustes_admin)
+    ? periodo.ajustes_admin.map(serializarAjusteLocal)
+    : [];
+
+  let remotos = [];
+  try {
+    remotos = await base44.entities.AjustePeriodoAquisitivo.filter({ periodo_aquisitivo_id: periodo.id }, '-created_date');
+  } catch {
+    remotos = [];
+  }
+
+  const map = new Map();
+  [...remotos, ...locais].forEach((item) => {
+    const normalizado = serializarAjusteLocal(item);
+    map.set(normalizado.id, { ...(map.get(normalizado.id) || {}), ...normalizado });
+  });
+
+  return [...map.values()].sort((a, b) => new Date(b.created_date || b.data || 0) - new Date(a.created_date || a.data || 0));
+}
+
+function calcularResumoComAjustes({ periodo, feriasRelacionadas, ajustesAtivos }) {
   const dias_base = obterDiasBase(periodo) || DIAS_BASE_PADRAO;
-  const dias_gozados = calcularDiasGozados(periodo, ferias);
-  const dias_previstos = calcularDiasPrevistos(periodo, ferias);
-  const dias_ajuste = calcularDiasAjusteFromHistory(ajustes);
+  const dias_gozados = validarAjusteDiasPeriodo({ periodo, ferias: feriasRelacionadas, tipo: 'adicao', quantidade: 0 }).dias_gozados;
+  const dias_previstos = validarAjusteDiasPeriodo({ periodo, ferias: feriasRelacionadas, tipo: 'adicao', quantidade: 0 }).dias_previstos;
+
+  const dias_ajuste = ajustesAtivos.reduce((acc, item) => {
+    const qtd = normalizarQuantidade(item.quantidade);
+    return acc + (item.tipo === TIPO_AJUSTE.DISPENSA_DESCONTO ? -qtd : qtd);
+  }, 0);
+
   const dias_total = dias_base + dias_ajuste;
   const dias_saldo = dias_total - dias_gozados - dias_previstos;
 
-  if (dias_total < 0) {
-    throw new Error('O total de dias do período não pode ficar negativo.');
-  }
-
-  if (dias_saldo < 0) {
-    throw new Error('A operação deixa o período com saldo negativo frente aos dias já gozados ou previstos.');
-  }
-
-  const payload = {
+  return {
     dias_base,
     dias_ajuste,
     dias_total,
@@ -179,150 +120,63 @@ function montarPayloadPeriodo({ periodo, ferias = [], ajustes = [] }) {
     dias_previstos,
     dias_saldo,
   };
-
-  payload.status = calcularStatusPeriodoAquisitivo({
-    periodo,
-    dias_previstos,
-    dias_gozados,
-    dias_saldo,
-  });
-
-  return payload;
 }
 
-async function listarAjustesDoBancoPorPeriodo(periodoId) {
-  if (!periodoId) return [];
-  const items = await filterEntitySafe('AjustePeriodoAquisitivo', { periodo_aquisitivo_id: periodoId }, '-data');
-  return items;
-}
+function montarTextoPublicacao({ periodo, quantidade, motivo, observacao, data }) {
+  const referencia = getReferenciaPeriodo(periodo);
+  const nomeMilitar = getNomeMilitar(periodo);
+  const posto = periodo.militar_posto ? `${periodo.militar_posto} ` : '';
+  const matricula = periodo.militar_matricula ? `, matrícula ${periodo.militar_matricula}` : '';
+  const dataFato = data || nowDateOnly();
 
-function listarAjustesDoFallback(periodo = {}) {
-  if (!Array.isArray(periodo?.ajustes_admin)) return [];
-  return periodo.ajustes_admin;
-}
-
-function mergeAjustes(periodo = {}, ajustesBanco = []) {
-  const merged = new Map();
-
-  [...listarAjustesDoFallback(periodo), ...ajustesBanco].forEach((item) => {
-    const normalizado = normalizeAjuste(item, periodo);
-    merged.set(normalizado.id, normalizado);
-  });
-
-  return [...merged.values()].sort((a, b) => {
-    const db = `${b.data || ''} ${b.created_date || ''}`;
-    const da = `${a.data || ''} ${a.created_date || ''}`;
-    return db.localeCompare(da);
-  });
-}
-
-export async function listarAjustesPeriodoAquisitivo({ periodoId = null, periodo = null } = {}) {
-  const periodoObj = periodo || (periodoId ? await carregarPeriodo(periodoId) : null);
-  if (!periodoObj?.id) return [];
-  const ajustesBanco = await listarAjustesDoBancoPorPeriodo(periodoObj.id);
-  return mergeAjustes(periodoObj, ajustesBanco);
-}
-
-export async function listarTodosAjustesPeriodoAquisitivo(periodos = []) {
-  const banco = await listEntitySafe('AjustePeriodoAquisitivo', '-data');
-  const agrupados = new Map();
-
-  (periodos || []).forEach((periodo) => {
-    agrupados.set(periodo.id, mergeAjustes(periodo, banco.filter((item) => item?.periodo_aquisitivo_id === periodo.id)));
-  });
-
-  banco.forEach((item) => {
-    if (!item?.periodo_aquisitivo_id || agrupados.has(item.periodo_aquisitivo_id)) return;
-    agrupados.set(item.periodo_aquisitivo_id, [normalizeAjuste(item)]);
-  });
-
-  return agrupados;
-}
-
-function montarTextoPublicacaoDispensa({ periodo, quantidade, motivo, observacao, estadoAntes, estadoDepois, data }) {
-  const referencia = buildPeriodoReferencia(periodo);
-  const nomeMilitar = buildNomeMilitar(periodo);
-  const posto = periodo?.militar_posto ? `${periodo.militar_posto} ` : '';
-  const matricula = periodo?.militar_matricula ? `, matrícula ${periodo.militar_matricula}` : '';
-  const dataAto = getDateOnly(data);
-  const linhas = [
-    `Fica registrada a concessão de dispensa com desconto em férias ao(à) ${posto}${nomeMilitar}${matricula}.`,
-    `Período aquisitivo: ${referencia}.`,
-    `Data do ato: ${dataAto}.`,
-    `Quantidade descontada: ${quantidade} dia(s).`,
-    `Saldo anterior: ${estadoAntes.dias_saldo} dia(s).`,
-    `Saldo remanescente após o desconto: ${estadoDepois.dias_saldo} dia(s).`,
+  return [
+    `O Comandante do 1º Grupamento de Bombeiros Militar torna público que foi concedida dispensa com desconto em férias ao ${posto}${nomeMilitar}${matricula}.`,
+    `O desconto administrativo corresponde a ${quantidade} dia(s), vinculado ao período aquisitivo ${referencia}, com efeitos a contar de ${dataFato}.`,
     `Motivo: ${motivo}.`,
-  ];
-
-  if (observacao) linhas.push(`Observações complementares: ${observacao}.`);
-  return linhas.join(' ');
+    observacao ? `Observação: ${observacao}.` : null,
+  ].filter(Boolean).join(' ');
 }
 
-async function criarPublicacaoDispensaComDesconto({ periodo, quantidade, motivo, observacao, data, estadoAntes, estadoDepois, origem_registro_livro_id = null }) {
-  const dataPublicacao = getDateOnly(data);
-  const referencia = buildPeriodoReferencia(periodo);
-  const nomeMilitar = buildNomeMilitar(periodo);
-  const texto_publicacao = montarTextoPublicacaoDispensa({
-    periodo,
-    quantidade,
-    motivo,
-    observacao,
-    estadoAntes,
-    estadoDepois,
-    data,
-  });
+async function criarPublicacaoDispensaComDesconto({ periodo, quantidade, motivo, observacao, data }) {
+  const dataPublicacao = data || nowDateOnly();
+  const referencia = getReferenciaPeriodo(periodo);
+  const texto_publicacao = montarTextoPublicacao({ periodo, quantidade, motivo, observacao, data: dataPublicacao });
 
-  return createEntitySafe('PublicacaoExOfficio', {
+  const publicacao = await base44.entities.PublicacaoExOfficio.create({
     militar_id: periodo.militar_id || '',
-    militar_nome: periodo.militar_nome || periodo.militar_nome_completo || nomeMilitar,
+    militar_nome: periodo.militar_nome || periodo.militar_nome_completo || getNomeMilitar(periodo),
     militar_posto: periodo.militar_posto || '',
     militar_matricula: periodo.militar_matricula || '',
     tipo: 'Dispensa com Desconto em Férias',
-    tipo_origem: 'ferias_desconto',
+    assunto: 'Dispensa com Desconto em Férias',
     data_publicacao: dataPublicacao,
+    texto_base: texto_publicacao,
     texto_publicacao,
-    observacoes: observacao || '',
+    observacoes: observacao || `Período aquisitivo ${referencia}. Motivo: ${motivo}.`,
     status: 'Aguardando Nota',
     periodo_aquisitivo_id: periodo.id,
     periodo_aquisitivo_ref: referencia,
     quantidade_desconto: quantidade,
-    saldo_antes_desconto: estadoAntes.dias_saldo,
-    saldo_apos_desconto: estadoDepois.dias_saldo,
     motivo_desconto: motivo,
-    origem_registro_livro_id,
-  });
-}
-
-async function persistirAjuste({ periodo, ajuste }) {
-  const payload = normalizeAjuste(ajuste, periodo);
-  const created = await createEntitySafe('AjustePeriodoAquisitivo', payload);
-
-  if (created?.id) {
-    return {
-      persistedIn: 'AjustePeriodoAquisitivo',
-      ajuste: normalizeAjuste(created, periodo),
-    };
-  }
-
-  const historicoExistente = listarAjustesDoFallback(periodo)
-    .filter((item) => item?.id !== payload.id)
-    .concat(payload);
-
-  await base44.entities.PeriodoAquisitivo.update(periodo.id, {
-    ajustes_admin: historicoExistente,
+    origem_ajuste: 'ferias_desconto',
   });
 
-  return {
-    persistedIn: 'PeriodoAquisitivo.ajustes_admin',
-    ajuste: payload,
-  };
+  return publicacao;
 }
 
-async function salvarEstadoPeriodo({ periodo, ajustes, ferias }) {
-  const payloadPeriodo = montarPayloadPeriodo({ periodo, ajustes, ferias });
-  await base44.entities.PeriodoAquisitivo.update(periodo.id, payloadPeriodo);
-  return payloadPeriodo;
+async function persistirHistoricoNoPeriodo(periodo, novoRegistro) {
+  const historicoExistente = Array.isArray(periodo.ajustes_admin) ? periodo.ajustes_admin.map(serializarAjusteLocal) : [];
+  const mapa = new Map(historicoExistente.map((item) => [item.id, item]));
+  mapa.set(novoRegistro.id, serializarAjusteLocal(novoRegistro));
+  const atualizado = [...mapa.values()].sort((a, b) => new Date(b.created_date || b.data || 0) - new Date(a.created_date || a.data || 0));
+  await base44.entities.PeriodoAquisitivo.update(periodo.id, { ajustes_admin: atualizado });
+  return atualizado;
+}
+
+export async function listarHistoricoAjustesPeriodo(periodoId) {
+  const periodo = await carregarPeriodo(periodoId);
+  if (!periodo) return [];
+  return listarAjustesPersistidos(periodo);
 }
 
 export async function registrarAjustePeriodoAquisitivo({
@@ -334,8 +188,6 @@ export async function registrarAjustePeriodoAquisitivo({
   data,
   usuario,
   publicacao_id,
-  origem = 'manual',
-  origem_registro_livro_id = null,
 }) {
   const periodo = await carregarPeriodo(periodoId);
   if (!periodo) throw new Error('Período aquisitivo não encontrado para ajuste.');
@@ -344,73 +196,166 @@ export async function registrarAjustePeriodoAquisitivo({
   if (!Object.values(TIPO_AJUSTE).includes(tipo)) {
     throw new Error('Tipo de ajuste inválido.');
   }
-  if (qtd <= 0) {
-    throw new Error('Informe uma quantidade de dias maior que zero.');
+
+  const feriasMilitar = await carregarFeriasDoMilitar(periodo.militar_id);
+  const feriasRelacionadas = filtrarFeriasDoPeriodo(periodo, feriasMilitar);
+  const validacao = validarAjusteDiasPeriodo({
+    periodo,
+    ferias: feriasRelacionadas,
+    tipo,
+    quantidade: qtd,
+  });
+
+  if (!validacao.ok) {
+    throw new Error(validacao.mensagem || 'Não foi possível aplicar o ajuste neste período.');
   }
-  if (!String(motivo || '').trim()) {
-    throw new Error('Informe o motivo do ajuste.');
+
+  const trilhaPayload = serializarAjusteLocal({
+    id: gerarIdLocal(),
+    periodo_aquisitivo_id: periodoId,
+    periodo_aquisitivo_ref: getReferenciaPeriodo(periodo),
+    militar_id: periodo.militar_id || null,
+    militar_nome: getNomeMilitar(periodo),
+    militar_matricula: periodo.militar_matricula || null,
+    tipo,
+    quantidade: qtd,
+    motivo: motivo || null,
+    observacao: observacao || null,
+    data: data || nowDateOnly(),
+    usuario: usuario || null,
+    publicacao_id: publicacao_id || null,
+    origem: publicacao_id ? 'publicacao' : 'manual',
+    status: 'ativo',
+  });
+
+  const historicoAtualizado = await persistirHistoricoNoPeriodo(periodo, trilhaPayload);
+
+  try {
+    await base44.entities.AjustePeriodoAquisitivo.create(trilhaPayload);
+  } catch {
+    // fallback já persistido no próprio período
+  }
+
+  const ajustesAtivos = historicoAtualizado.filter((item) => item.status !== 'invalidado');
+  const payloadAtualizacao = calcularResumoComAjustes({ periodo, feriasRelacionadas, ajustesAtivos });
+  payloadAtualizacao.status = calcularStatusPeriodoAquisitivo({
+    periodo,
+    dias_previstos: payloadAtualizacao.dias_previstos,
+    dias_gozados: payloadAtualizacao.dias_gozados,
+    dias_saldo: payloadAtualizacao.dias_saldo,
+  });
+
+  await base44.entities.PeriodoAquisitivo.update(periodoId, payloadAtualizacao);
+
+  if (publicacao_id) {
+    try {
+      await base44.entities.PublicacaoExOfficio.update(publicacao_id, {
+        ajuste_periodo_id: trilhaPayload.id,
+        observacoes: [
+          `Ajuste administrativo vinculado: ${trilhaPayload.id}.`,
+          `Período aquisitivo: ${trilhaPayload.periodo_aquisitivo_ref}.`,
+          `Quantidade: ${trilhaPayload.quantidade} dia(s).`,
+          trilhaPayload.motivo ? `Motivo: ${trilhaPayload.motivo}.` : null,
+          trilhaPayload.observacao ? `Observação: ${trilhaPayload.observacao}.` : null,
+        ].filter(Boolean).join(' '),
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  return { persistedIn: 'PeriodoAquisitivo.ajustes_admin', trilhaPayload };
+}
+
+export async function invalidarAjustePeriodoAquisitivo({ periodoId, ajusteId, motivo, usuario }) {
+  const periodo = await carregarPeriodo(periodoId);
+  if (!periodo) throw new Error('Período aquisitivo não encontrado.');
+
+  const historico = await listarAjustesPersistidos(periodo);
+  const alvo = historico.find((item) => item.id === ajusteId);
+  if (!alvo) throw new Error('Ajuste administrativo não encontrado.');
+  if (alvo.status === 'invalidado') return alvo;
+
+  const motivoInval = motivo || 'Registro administrativo original excluído/inativado. Verificar a validade desta nota.';
+  const atualizados = historico.map((item) => item.id !== ajusteId ? item : ({
+    ...item,
+    status: 'invalidado',
+    invalidado_em: new Date().toISOString(),
+    invalidado_por: usuario || null,
+    invalidado_motivo: motivoInval,
+  }));
+
+  await base44.entities.PeriodoAquisitivo.update(periodoId, { ajustes_admin: atualizados });
+
+  try {
+    await base44.entities.AjustePeriodoAquisitivo.update(ajusteId, {
+      status: 'invalidado',
+      invalidado_em: new Date().toISOString(),
+      invalidado_por: usuario || null,
+      invalidado_motivo: motivoInval,
+    });
+  } catch {
+    // ignore
   }
 
   const feriasMilitar = await carregarFeriasDoMilitar(periodo.militar_id);
   const feriasRelacionadas = filtrarFeriasDoPeriodo(periodo, feriasMilitar);
-  const ajustesAtuais = await listarAjustesPeriodoAquisitivo({ periodo });
-  const estadoAntes = montarPayloadPeriodo({ periodo, ferias: feriasRelacionadas, ajustes: ajustesAtuais });
+  const ajustesAtivos = atualizados.filter((item) => item.status !== 'invalidado');
+  const payloadAtualizacao = calcularResumoComAjustes({ periodo, feriasRelacionadas, ajustesAtivos });
+  payloadAtualizacao.status = calcularStatusPeriodoAquisitivo({
+    periodo,
+    dias_previstos: payloadAtualizacao.dias_previstos,
+    dias_gozados: payloadAtualizacao.dias_gozados,
+    dias_saldo: payloadAtualizacao.dias_saldo,
+  });
+  await base44.entities.PeriodoAquisitivo.update(periodoId, payloadAtualizacao);
 
-  const ajusteNovo = normalizeAjuste({
-    id: globalThis.crypto?.randomUUID?.() || `aj-${Date.now()}`,
-    periodo_aquisitivo_id: periodo.id,
-    periodo_aquisitivo_ref: buildPeriodoReferencia(periodo),
-    militar_id: periodo.militar_id,
-    militar_nome: periodo.militar_nome || periodo.militar_nome_completo || buildNomeMilitar(periodo),
-    militar_matricula: periodo.militar_matricula,
-    militar_posto: periodo.militar_posto,
-    tipo,
-    quantidade: qtd,
-    motivo: String(motivo || '').trim(),
-    observacao: String(observacao || '').trim(),
-    data: getDateOnly(data),
-    usuario: usuario || null,
-    publicacao_id: publicacao_id || null,
-    origem,
-    origem_registro_livro_id,
-    status: STATUS_AJUSTE.ATIVO,
-  }, periodo);
-
-  const ajustesProjetados = [...ajustesAtuais, ajusteNovo];
-  const estadoDepois = montarPayloadPeriodo({ periodo, ferias: feriasRelacionadas, ajustes: ajustesProjetados });
-
-  let publicacao = null;
-  if (tipo === TIPO_AJUSTE.DISPENSA_DESCONTO && !publicacao_id) {
-    publicacao = await criarPublicacaoDispensaComDesconto({
-      periodo,
-      quantidade: qtd,
-      motivo: ajusteNovo.motivo,
-      observacao: ajusteNovo.observacao,
-      data: ajusteNovo.data,
-      estadoAntes,
-      estadoDepois,
-      origem_registro_livro_id,
-    });
-    if (publicacao?.id) ajusteNovo.publicacao_id = publicacao.id;
+  if (alvo.publicacao_id) {
+    try {
+      const registros = await base44.entities.PublicacaoExOfficio.filter({ id: alvo.publicacao_id });
+      const pub = registros[0];
+      if (pub) {
+        const textoAtual = pub.texto_publicacao || '';
+        const obsAtual = pub.observacoes || '';
+        const aviso = motivoInval;
+        await base44.entities.PublicacaoExOfficio.update(alvo.publicacao_id, {
+          status: 'Inválida',
+          observacoes: [obsAtual, aviso].filter(Boolean).join(' '),
+          texto_publicacao: textoAtual,
+        });
+      }
+    } catch {
+      // ignore
+    }
   }
 
-  const persistencia = await persistirAjuste({ periodo, ajuste: ajusteNovo });
-  const ajustesFinais = [...ajustesAtuais, persistencia.ajuste];
-  const payloadPeriodo = await salvarEstadoPeriodo({ periodo, ajustes: ajustesFinais, ferias: feriasRelacionadas });
+  return { ...alvo, status: 'invalidado', invalidado_motivo: motivoInval };
+}
 
-  if (publicacao?.id) {
-    await updateEntitySafe('PublicacaoExOfficio', publicacao.id, {
-      ajuste_periodo_id: persistencia.ajuste.id,
-      observacoes: appendObservacao(publicacao.observacoes, `Ajuste administrativo vinculado: ${persistencia.ajuste.id}.`),
-    });
+export async function reverterAjustesPorPublicacao(publicacaoId) {
+  if (!publicacaoId) return null;
+
+  let ajuste = null;
+  try {
+    const encontrados = await base44.entities.AjustePeriodoAquisitivo.filter({ publicacao_id: publicacaoId });
+    ajuste = encontrados[0] || null;
+  } catch {
+    ajuste = null;
   }
 
-  return {
-    persistedIn: persistencia.persistedIn,
-    ajuste: persistencia.ajuste,
-    periodoPayload: payloadPeriodo,
-    publicacao,
-  };
+  if (!ajuste) {
+    const periodos = await base44.entities.PeriodoAquisitivo.list();
+    const periodoComAjuste = periodos.find((periodo) => Array.isArray(periodo.ajustes_admin) && periodo.ajustes_admin.some((item) => item.publicacao_id === publicacaoId));
+    const ajusteLocal = periodoComAjuste?.ajustes_admin?.find((item) => item.publicacao_id === publicacaoId);
+    if (!periodoComAjuste || !ajusteLocal) return null;
+    ajuste = { ...ajusteLocal, periodo_aquisitivo_id: periodoComAjuste.id };
+  }
+
+  return invalidarAjustePeriodoAquisitivo({
+    periodoId: ajuste.periodo_aquisitivo_id,
+    ajusteId: ajuste.id,
+    motivo: 'Publicação originária excluída/inativada. Desconto revertido automaticamente.',
+  });
 }
 
 export async function aplicarAjustePositivo(payload) {
@@ -418,132 +363,20 @@ export async function aplicarAjustePositivo(payload) {
 }
 
 export async function prepararDispensaComDesconto(payload) {
+  const periodo = await carregarPeriodo(payload?.periodoId);
+  if (!periodo) throw new Error('Período aquisitivo não encontrado para dispensa com desconto.');
+
+  const publicacao = await criarPublicacaoDispensaComDesconto({
+    periodo,
+    quantidade: payload.quantidade,
+    motivo: payload.motivo,
+    observacao: payload.observacao,
+    data: payload.data,
+  });
+
   return registrarAjustePeriodoAquisitivo({
     ...payload,
     tipo: TIPO_AJUSTE.DISPENSA_DESCONTO,
-    origem: payload?.origem || 'manual',
+    publicacao_id: publicacao?.id || null,
   });
-}
-
-async function atualizarFallbackPeriodo(periodo, ajusteAtualizado) {
-  const historico = listarAjustesDoFallback(periodo).map((item) => {
-    if ((item?.id || null) !== ajusteAtualizado.id) return item;
-    return { ...item, ...ajusteAtualizado };
-  });
-  await base44.entities.PeriodoAquisitivo.update(periodo.id, { ajustes_admin: historico });
-}
-
-export async function invalidarAjustePeriodoAquisitivo({
-  ajusteId,
-  periodoId = null,
-  motivo = 'Registro administrativo original excluído/inativado. Verificar a validade desta nota.',
-  usuario = null,
-  invalidarPublicacao = true,
-}) {
-  if (!ajusteId) throw new Error('Ajuste não informado para invalidação.');
-
-  let periodo = periodoId ? await carregarPeriodo(periodoId) : null;
-  let ajustes = [];
-
-  if (periodo) {
-    ajustes = await listarAjustesPeriodoAquisitivo({ periodo });
-  } else {
-    const periodos = await listEntitySafe('PeriodoAquisitivo');
-    for (const candidato of periodos) {
-      const lista = await listarAjustesPeriodoAquisitivo({ periodo: candidato });
-      const match = lista.find((item) => item.id === ajusteId);
-      if (match) {
-        periodo = candidato;
-        ajustes = lista;
-        break;
-      }
-    }
-  }
-
-  if (!periodo) throw new Error('Período aquisitivo do ajuste não foi localizado.');
-
-  const ajusteAtual = ajustes.find((item) => item.id === ajusteId);
-  if (!ajusteAtual) throw new Error('Ajuste não encontrado.');
-  if (!isAdjustmentActive(ajusteAtual)) {
-    return { ajuste: ajusteAtual, periodoPayload: montarPayloadPeriodo({ periodo, ajustes, ferias: filtrarFeriasDoPeriodo(periodo, await carregarFeriasDoMilitar(periodo.militar_id)) }) };
-  }
-
-  const ajusteInvalidado = {
-    ...ajusteAtual,
-    status: STATUS_AJUSTE.INVALIDADO,
-    invalidado_em: new Date().toISOString(),
-    invalidado_por: usuario || null,
-    invalidado_motivo: motivo,
-  };
-
-  const atualizadoBanco = await updateEntitySafe('AjustePeriodoAquisitivo', ajusteId, {
-    status: STATUS_AJUSTE.INVALIDADO,
-    invalidado_em: ajusteInvalidado.invalidado_em,
-    invalidado_por: ajusteInvalidado.invalidado_por,
-    invalidado_motivo: ajusteInvalidado.invalidado_motivo,
-  });
-
-  if (!atualizadoBanco) {
-    await atualizarFallbackPeriodo(periodo, ajusteInvalidado);
-  }
-
-  const ajustesReprocessados = ajustes.map((item) => (item.id === ajusteId ? ajusteInvalidado : item));
-  const feriasMilitar = await carregarFeriasDoMilitar(periodo.militar_id);
-  const feriasRelacionadas = filtrarFeriasDoPeriodo(periodo, feriasMilitar);
-  const payloadPeriodo = await salvarEstadoPeriodo({
-    periodo,
-    ajustes: ajustesReprocessados,
-    ferias: feriasRelacionadas,
-  });
-
-  if (invalidarPublicacao && ajusteAtual.publicacao_id) {
-    const observacaoInvalidacao = 'Registro administrativo original excluído/inativado. Esta nota deve ser revisada quanto à sua validade.';
-    const pubs = await filterEntitySafe('PublicacaoExOfficio', { id: ajusteAtual.publicacao_id });
-    const pub = pubs[0];
-    if (pub) {
-      await updateEntitySafe('PublicacaoExOfficio', pub.id, {
-        status: 'Inválida',
-        observacoes: appendObservacao(pub.observacoes, observacaoInvalidacao),
-      });
-    }
-  }
-
-  return {
-    ajuste: ajusteInvalidado,
-    periodoPayload: payloadPeriodo,
-  };
-}
-
-export async function reverterAjustesPorPublicacao(publicacao) {
-  const publicacaoId = publicacao?.id;
-  if (!publicacaoId) return [];
-
-  const ajustesBanco = await filterEntitySafe('AjustePeriodoAquisitivo', { publicacao_id: publicacaoId });
-  const resultados = [];
-
-  for (const ajuste of ajustesBanco) {
-    resultados.push(await invalidarAjustePeriodoAquisitivo({
-      ajusteId: ajuste.id,
-      periodoId: ajuste.periodo_aquisitivo_id || null,
-      motivo: 'Publicação excluída. Desconto revertido automaticamente.',
-      invalidarPublicacao: false,
-    }));
-  }
-
-  if (resultados.length > 0) return resultados;
-
-  const periodos = await listEntitySafe('PeriodoAquisitivo');
-  for (const periodo of periodos) {
-    const fallback = listarAjustesDoFallback(periodo).find((item) => item?.publicacao_id === publicacaoId && isAdjustmentActive(item));
-    if (fallback?.id) {
-      resultados.push(await invalidarAjustePeriodoAquisitivo({
-        ajusteId: fallback.id,
-        periodoId: periodo.id,
-        motivo: 'Publicação excluída. Desconto revertido automaticamente.',
-        invalidarPublicacao: false,
-      }));
-    }
-  }
-
-  return resultados;
 }
