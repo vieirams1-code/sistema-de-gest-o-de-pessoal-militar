@@ -22,6 +22,8 @@ import { mapPeriodosAquisitivosPorMilitar } from '@/components/ferias/periodosAq
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
+import AjusteDiasPeriodoModal from '@/components/ferias/AjusteDiasPeriodoModal';
+import { aplicarAjusteNegativo, aplicarAjustePositivo } from '@/components/ferias/ajustePeriodoService';
 
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
@@ -32,6 +34,8 @@ export default function PeriodosAquisitivos() {
   const [periodoFilter, setPeriodoFilter] = useState('all');
   const [expandedMilitares, setExpandedMilitares] = useState({});
   const [periodoGerenciado, setPeriodoGerenciado] = useState(null);
+  const [ajusteModal, setAjusteModal] = useState({ open: false, tipo: 'adicao', periodo: null });
+  const [ajusteFeedback, setAjusteFeedback] = useState(null);
 
   const { data: periodos = [], isLoading } = useQuery({
     queryKey: ['periodos-aquisitivos'],
@@ -63,6 +67,24 @@ export default function PeriodosAquisitivos() {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+    },
+  });
+
+  const ajusteDiasMutation = useMutation({
+    mutationFn: async ({ tipo, periodo, payload }) => {
+      const corpo = {
+        periodoId: periodo.id,
+        quantidade: payload.quantidade,
+        motivo: payload.motivo,
+        observacao: payload.observacao,
+      };
+
+      if (tipo === 'desconto') return aplicarAjusteNegativo(corpo);
+      return aplicarAjustePositivo(corpo);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
     },
   });
 
@@ -179,6 +201,37 @@ export default function PeriodosAquisitivos() {
     await deletePeriodoMutation.mutateAsync({
       periodoId: periodoGerenciado.id,
     });
+  };
+
+  const abrirAjusteDias = (periodo, tipo) => {
+    setAjusteFeedback(null);
+    setAjusteModal({ open: true, periodo, tipo });
+  };
+
+  const handleSubmitAjusteDias = async (payload) => {
+    if (!ajusteModal?.periodo?.id) throw new Error('Período inválido para ajuste de dias.');
+
+    try {
+      await ajusteDiasMutation.mutateAsync({
+        tipo: ajusteModal.tipo,
+        periodo: ajusteModal.periodo,
+        payload,
+      });
+
+      setAjusteFeedback({
+        type: 'success',
+        message: ajusteModal.tipo === 'desconto'
+          ? 'Dias subtraídos com sucesso e saldo recalculado.'
+          : 'Dias adicionados com sucesso e saldo recalculado.',
+      });
+
+      setAjusteModal((prev) => ({ ...prev, open: false }));
+    } catch (error) {
+      setAjusteFeedback({
+        type: 'error',
+        message: error?.message || 'Não foi possível aplicar o ajuste no período.',
+      });
+    }
   };
 
   return (
@@ -374,6 +427,8 @@ export default function PeriodosAquisitivos() {
                             periodo={periodo}
                             onManage={() => setPeriodoGerenciado(periodo)}
                             onOpenFerias={abrirFeriasVinculadas}
+                            onAdicionarDias={() => abrirAjusteDias(periodo, 'adicao')}
+                            onSubtrairDias={() => abrirAjusteDias(periodo, 'desconto')}
                           />
                         ))}
                       </div>
@@ -399,6 +454,21 @@ export default function PeriodosAquisitivos() {
         onChangeStatus={handleChangeStatus}
         onConfirmDelete={handleConfirmDelete}
         onOpenFerias={abrirFeriasVinculadas}
+      />
+
+      <AjusteDiasPeriodoModal
+        open={ajusteModal.open}
+        periodo={ajusteModal.periodo}
+        tipo={ajusteModal.tipo}
+        ferias={ferias}
+        saving={ajusteDiasMutation.isPending}
+        feedback={ajusteFeedback}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAjusteModal((prev) => ({ ...prev, open: false }));
+          }
+        }}
+        onSubmit={handleSubmitAjusteDias}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
+import { filtrarFeriasDoPeriodo, validarAjusteDiasPeriodo } from './periodoSaldoUtils';
 
 const TIPO_AJUSTE = {
   ADICAO: 'adicao',
@@ -19,6 +20,12 @@ function normalizarQuantidade(quantidade) {
 async function carregarPeriodo(periodoId) {
   const list = await base44.entities.PeriodoAquisitivo.filter({ id: periodoId });
   return list[0] || null;
+}
+
+async function carregarFeriasDoMilitar(militarId) {
+  if (!militarId) return [];
+
+  return base44.entities.Ferias.filter({ militar_id: militarId });
 }
 
 export async function registrarAjustePeriodoAquisitivo({
@@ -44,6 +51,19 @@ export async function registrarAjustePeriodoAquisitivo({
 
   const sinal = tipo === TIPO_AJUSTE.ADICAO ? 1 : -1;
   const novoAjuste = ajusteAtual + (sinal * qtd);
+
+  const feriasMilitar = await carregarFeriasDoMilitar(periodo.militar_id);
+  const feriasRelacionadas = filtrarFeriasDoPeriodo(periodo, feriasMilitar);
+  const validacao = validarAjusteDiasPeriodo({
+    periodo,
+    ferias: feriasRelacionadas,
+    tipo,
+    quantidade: qtd,
+  });
+
+  if (!validacao.ok) {
+    throw new Error(validacao.mensagem || 'Não foi possível aplicar o ajuste neste período.');
+  }
 
   await base44.entities.PeriodoAquisitivo.update(periodoId, {
     dias_base,
