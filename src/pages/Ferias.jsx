@@ -55,6 +55,7 @@ import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
+import { montarPayloadPeriodoComSaldos } from '@/components/ferias/periodoDiasUtils';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -294,11 +295,14 @@ export default function Ferias() {
       await base44.entities.Ferias.delete(feriasId);
 
       if (periodoId) {
-        await base44.entities.PeriodoAquisitivo.update(periodoId, {
-          status: 'Disponível',
-          dias_gozados: 0,
-          dias_previstos: 0,
-        });
+        const periodoList = await base44.entities.PeriodoAquisitivo.filter({ id: periodoId });
+        const periodoAtual = periodoList[0];
+
+        if (periodoAtual) {
+          const feriasPeriodo = await base44.entities.Ferias.filter({ periodo_aquisitivo_id: periodoId });
+          const payloadPeriodo = montarPayloadPeriodoComSaldos(periodoAtual, feriasPeriodo);
+          await base44.entities.PeriodoAquisitivo.update(periodoId, payloadPeriodo);
+        }
       }
     },
     onSuccess: () => {

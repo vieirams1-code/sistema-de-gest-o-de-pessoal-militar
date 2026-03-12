@@ -18,6 +18,7 @@ import {
   validarInicioNoPeriodoConcessivo,
   validarOrdemFracoesCadastro,
 } from '@/components/ferias/feriasRules';
+import { calcularSaldosPeriodo, montarPayloadPeriodoComSaldos } from '@/components/ferias/periodoDiasUtils';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {
@@ -199,6 +200,25 @@ export default function CadastrarFerias() {
 
     setLoading(true);
 
+    const periodoRefAtual = formData.periodo_aquisitivo_ref;
+    const periodoSelecionadoPorRef = periodosAtivos.find((p) => p.ano_referencia === periodoRefAtual);
+    const periodoParaSaldo = periodoSelecionado || periodoSelecionadoPorRef;
+
+    const feriasMesmoPeriodoSemAtual = feriasExistentes.filter((item) => {
+      if (!item || item.id === editId) return false;
+      if (formData.periodo_aquisitivo_id && item.periodo_aquisitivo_id === formData.periodo_aquisitivo_id) return true;
+      return item.periodo_aquisitivo_ref === periodoRefAtual;
+    });
+
+    const totalSolicitado = fracoes.reduce((sum, item) => sum + Number(item?.dias || 0), 0);
+    const saldosPeriodo = calcularSaldosPeriodo(periodoParaSaldo || {}, feriasMesmoPeriodoSemAtual);
+
+    if (totalSolicitado > saldosPeriodo.dias_saldo) {
+      setErroRegras(`Saldo insuficiente no período aquisitivo. Saldo atual: ${saldosPeriodo.dias_saldo} dia(s).`);
+      setLoading(false);
+      return;
+    }
+
     const labelFracao = (i, total) => {
       if (total === 1) return 'Integral';
       if (i === 0) return '1ª Fração';
@@ -257,11 +277,27 @@ export default function CadastrarFerias() {
             fim_aquisitivo: fim,
             data_limite_gozo: limite,
             dias_direito: 30,
+            dias_base: 30,
+            dias_ajuste: 0,
+            dias_total: 30,
             dias_gozados: 0,
             status: 'Disponível',
+            dias_previstos: 0,
+            dias_saldo: 30,
             ano_referencia: formData.periodo_aquisitivo_ref
           });
         }
+      }
+    }
+
+    const periodoIdFinal = formData.periodo_aquisitivo_id || periodosAtivos.find((p) => p.ano_referencia === periodoRefAtual)?.id;
+    if (periodoIdFinal) {
+      const periodoLista = await base44.entities.PeriodoAquisitivo.filter({ id: periodoIdFinal });
+      const periodoAtual = periodoLista[0];
+      if (periodoAtual) {
+        const feriasPeriodoAtual = await base44.entities.Ferias.filter({ periodo_aquisitivo_id: periodoIdFinal });
+        const payloadPeriodo = montarPayloadPeriodoComSaldos(periodoAtual, feriasPeriodoAtual);
+        await base44.entities.PeriodoAquisitivo.update(periodoIdFinal, payloadPeriodo);
       }
     }
 

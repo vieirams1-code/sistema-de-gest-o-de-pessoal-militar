@@ -1,5 +1,6 @@
 import { format, addDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
+import { montarPayloadPeriodoComSaldos } from './periodoDiasUtils';
 
 /**
  * Tipos de eventos que representam operações na cadeia de férias.
@@ -179,24 +180,14 @@ export async function executarExclusaoAdminCadeia({
   await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
 
   // Recalcular período aquisitivo se vinculado
-  // IMPORTANTE: usar atualizacaoFerias.dias (recalculado) — nunca ferias.dias (stale)
   if (ferias.periodo_aquisitivo_id) {
-    const novoStatus = atualizacaoFerias.status;
-    const novosDias = atualizacaoFerias.dias ?? feriasFresh.dias_base ?? feriasFresh.dias ?? 0;
-    let periodoUpdate = {};
+    const periodoList = await base44.entities.PeriodoAquisitivo.filter({ id: ferias.periodo_aquisitivo_id });
+    const periodoAtual = periodoList[0];
 
-    if (novoStatus === 'Prevista') {
-      periodoUpdate = { status: 'Disponível', dias_gozados: 0, dias_previstos: novosDias };
-    } else if (novoStatus === 'Em Curso') {
-      periodoUpdate = { status: 'Previsto', dias_gozados: 0, dias_previstos: novosDias };
-    } else if (novoStatus === 'Gozada') {
-      periodoUpdate = { status: 'Gozado', dias_gozados: novosDias, dias_previstos: 0 };
-    } else if (novoStatus === 'Interrompida') {
-      periodoUpdate = { status: 'Parcialmente Gozado' };
-    }
-
-    if (Object.keys(periodoUpdate).length > 0) {
-      await base44.entities.PeriodoAquisitivo.update(ferias.periodo_aquisitivo_id, periodoUpdate);
+    if (periodoAtual) {
+      const feriasPeriodo = await base44.entities.Ferias.filter({ periodo_aquisitivo_id: ferias.periodo_aquisitivo_id });
+      const payloadPeriodo = montarPayloadPeriodoComSaldos(periodoAtual, feriasPeriodo);
+      await base44.entities.PeriodoAquisitivo.update(ferias.periodo_aquisitivo_id, payloadPeriodo);
     }
   }
 
@@ -220,22 +211,13 @@ export async function recalcularCadeiaCompleta({ ferias, cadeia, queryClient }) 
   await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
 
   if (ferias.periodo_aquisitivo_id) {
-    const novoStatus = atualizacaoFerias.status;
-    const novosDias = atualizacaoFerias.dias ?? feriasFresh.dias_base ?? feriasFresh.dias ?? 0;
-    let periodoUpdate = {};
+    const periodoList = await base44.entities.PeriodoAquisitivo.filter({ id: ferias.periodo_aquisitivo_id });
+    const periodoAtual = periodoList[0];
 
-    if (novoStatus === 'Prevista') {
-      periodoUpdate = { status: 'Disponível', dias_gozados: 0, dias_previstos: novosDias };
-    } else if (novoStatus === 'Em Curso') {
-      periodoUpdate = { status: 'Previsto', dias_gozados: 0, dias_previstos: novosDias };
-    } else if (novoStatus === 'Gozada') {
-      periodoUpdate = { status: 'Gozado', dias_gozados: novosDias, dias_previstos: 0 };
-    } else if (novoStatus === 'Interrompida') {
-      periodoUpdate = { status: 'Parcialmente Gozado' };
-    }
-
-    if (Object.keys(periodoUpdate).length > 0) {
-      await base44.entities.PeriodoAquisitivo.update(ferias.periodo_aquisitivo_id, periodoUpdate);
+    if (periodoAtual) {
+      const feriasPeriodo = await base44.entities.Ferias.filter({ periodo_aquisitivo_id: ferias.periodo_aquisitivo_id });
+      const payloadPeriodo = montarPayloadPeriodoComSaldos(periodoAtual, feriasPeriodo);
+      await base44.entities.PeriodoAquisitivo.update(ferias.periodo_aquisitivo_id, payloadPeriodo);
     }
   }
 

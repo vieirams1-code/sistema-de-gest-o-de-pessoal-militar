@@ -15,6 +15,7 @@ import { aplicarTemplate, buildVarsLivro, formatDateBR, abreviarPosto } from '@/
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
 import FormField from '@/components/militar/FormField';
+import { calcularSaldosPeriodo, montarPayloadPeriodoComSaldos } from '@/components/ferias/periodoDiasUtils';
 
 const initialFormData = {
   militar_id: '',
@@ -110,8 +111,11 @@ export default function CadastrarRegistroLivro() {
     staleTime: 0,
   });
 
-  // Mostra períodos Previsto OU Disponível (pode ter saldo para descontar)
-  const periodosParaDesconto = periodosAquisitivos.filter(p => !p.inativo && (p.status === 'Previsto' || p.status === 'Disponível' || p.status === 'Parcialmente Gozado'));
+  // Mostra períodos com saldo disponível para desconto
+  const periodosParaDesconto = periodosAquisitivos
+    .filter(p => !p.inativo && (p.status === 'Previsto' || p.status === 'Disponível' || p.status === 'Parcialmente Gozado'))
+    .map((periodo) => ({ ...periodo, ...calcularSaldosPeriodo(periodo) }))
+    .filter((periodo) => periodo.dias_saldo > 0);
 
   const { data: tiposCustom = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom-livro'],
@@ -512,7 +516,46 @@ export default function CadastrarRegistroLivro() {
       dias_restantes: formData.dias_restantes !== '' && formData.dias_restantes !== undefined ? Number(formData.dias_restantes) : undefined,
     };
 
-    await base44.entities.RegistroLivro.create(registroData);
+    if (tipoRegistroEfetivo === 'Dispensa Desconto Férias') {
+      const periodoSelecionado = periodosAquisitivos.find((p) => p.id === formData.periodo_aquisitivo);
+      if (!periodoSelecionado) {
+        setLoading(false);
+        alert('Selecione um período aquisitivo válido para aplicar o desconto.');
+        return;
+      }
+
+      const diasDesconto = Number(formData.dias || 0);
+      const saldoAtual = calcularSaldosPeriodo(periodoSelecionado).dias_saldo;
+      if (diasDesconto <= 0 || diasDesconto > saldoAtual) {
+        setLoading(false);
+        alert(`Desconto inválido. Saldo atual do período: ${saldoAtual} dia(s).`);
+        return;
+      }
+    }
+
+    const registroCriado = await base44.entities.RegistroLivro.create(registroData);
+
+    if (tipoRegistroEfetivo === 'Dispensa Desconto Férias' && formData.periodo_aquisitivo) {
+      const periodoList = await base44.entities.PeriodoAquisitivo.filter({ id: formData.periodo_aquisitivo });
+      const periodoAtual = periodoList[0];
+
+      if (periodoAtual) {
+        const ajusteAtual = Number(periodoAtual.dias_ajuste || 0);
+        const diasDesconto = Number(formData.dias || 0);
+        const payloadPeriodo = montarPayloadPeriodoComSaldos(periodoAtual, null, {
+          dias_ajuste: ajusteAtual - diasDesconto,
+        });
+        await base44.entities.PeriodoAquisitivo.update(periodoAtual.id, payloadPeriodo);
+      }
+
+      if (registroCriado?.id) {
+        await base44.entities.RegistroLivro.update(registroCriado.id, {
+          status: 'Publicado',
+          numero_bg: formData.numero_bg || registroCriado.numero_bg,
+          data_bg: formData.data_bg || registroCriado.data_bg || formData.data_registro,
+        });
+      }
+    }
 
     if (formData.ferias_id) {
       if (tipoRegistroEfetivo === 'Nova Saída / Retomada' && selectedFerias) {
@@ -890,7 +933,7 @@ export default function CadastrarRegistroLivro() {
                     value={formData.periodo_aquisitivo}
                     onValueChange={v => {
                       const periodo = periodosParaDesconto.find(p => p.id === v);
-                      const saldo = periodo ? (periodo.dias_direito || 30) - (periodo.dias_gozados || 0) - (periodo.dias_previstos || 0) : 0;
+                      const saldo = periodo ? calcularSaldosPeriodo(periodo).dias_saldo : 0;
                       const diasRestantes = Math.max(0, saldo - (Number(formData.dias) || 0));
                       const label = periodo ? (periodo.ano_referencia || `${periodo.inicio_aquisitivo} a ${periodo.fim_aquisitivo}`) : v;
                       setFormData(prev => ({ ...prev, periodo_aquisitivo: v, periodo_aquisitivo_label: label, dias_restantes: diasRestantes }));
@@ -905,7 +948,7 @@ export default function CadastrarRegistroLivro() {
                       )}
                       {periodosParaDesconto.map(p => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.ano_referencia || `${p.inicio_aquisitivo} a ${p.fim_aquisitivo}`} — {p.dias_direito || 30}d direito — {(p.dias_gozados || 0) + (p.dias_previstos || 0)}d usados
+                          {p.ano_referencia || `${p.inicio_aquisitivo} a ${p.fim_aquisitivo}`} — {p.dias_total}d total — {p.dias_saldo}d saldo
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -929,7 +972,7 @@ export default function CadastrarRegistroLivro() {
                   onChange={(e) => {
                     const diasVal = Number(e.target.value) || 0;
                     const periodoSel = periodosParaDesconto.find(p => p.id === formData.periodo_aquisitivo);
-                    const saldo = periodoSel ? (periodoSel.dias_direito || 30) - (periodoSel.dias_gozados || 0) - (periodoSel.dias_previstos || 0) : 0;
+                    const saldo = periodoSel ? calcularSaldosPeriodo(periodoSel).dias_saldo : 0;
                     const restantes = Math.max(0, saldo - diasVal);
                     setFormData(prev => ({ ...prev, dias: diasVal, dias_restantes: restantes }));
                   }}

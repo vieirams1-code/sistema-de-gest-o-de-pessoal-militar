@@ -1,5 +1,6 @@
 import { differenceInDays, format } from 'date-fns';
 import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo, getFracaoNumero } from './feriasRules';
+import { calcularSaldosPeriodo } from './periodoDiasUtils';
 
 const STATUS_CODIGO_MAP = {
   'Pendente': 'pendente',
@@ -70,6 +71,7 @@ function normalizarFeriasFracoes(ferias = []) {
 }
 
 function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
+  const saldos = calcularSaldosPeriodo(periodo, feriasRelacionadas);
   const diasParaVencimento = periodo?.data_limite_gozo
     ? differenceInDays(parseDateOnly(periodo.data_limite_gozo), hoje)
     : null;
@@ -108,8 +110,12 @@ function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
     alerta_tipo: alertaTipo,
     dias_para_vencimento: diasParaVencimento,
     mensagem_vencimento: mensagemVencimento,
-    dias_previstos: Number(periodo?.dias_previstos || 0),
-    dias_gozados: Number(periodo?.dias_gozados || 0),
+    dias_base: saldos.dias_base,
+    dias_ajuste: saldos.dias_ajuste,
+    dias_total: saldos.dias_total,
+    dias_previstos: saldos.dias_previstos,
+    dias_gozados: saldos.dias_gozados,
+    dias_saldo: saldos.dias_saldo,
     fracoes: normalizarFeriasFracoes(feriasRelacionadas),
   };
 }

@@ -46,6 +46,22 @@ export default function PeriodoAquisitivoCard({ periodo, onManage }) {
         </div>
       </div>
 
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3 text-xs">
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
+          <p className="text-slate-500">Base/Ajuste</p>
+          <p className="font-semibold text-slate-800">{periodo.dias_base} / {periodo.dias_ajuste}</p>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
+          <p className="text-slate-500">Total</p>
+          <p className="font-semibold text-slate-800">{periodo.dias_total} dia(s)</p>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-2 col-span-2 md:col-span-1">
+          <p className="text-slate-500">Saldo</p>
+          <p className="font-semibold text-emerald-700">{periodo.dias_saldo} dia(s)</p>
+        </div>
+      </div>
+
       <div className={`mb-3 rounded-lg border px-3 py-2 text-xs ${alertaClasses[periodo.alerta_tipo] || alertaClasses.success}`}>
         <p className="font-semibold inline-flex items-center gap-1.5">
           <AlertCircle className="w-3.5 h-3.5" />
