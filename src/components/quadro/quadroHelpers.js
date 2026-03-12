@@ -99,6 +99,47 @@ async function encontrarCardJisoVinculado(atestadoId) {
   );
 }
 
+export async function registrarExclusaoAtestadoNoCard(atestado) {
+  if (!atestado?.id) return null;
+
+  const card = await encontrarCardJisoVinculado(atestado.id);
+  if (!card?.id) return null;
+
+  const agora = new Date().toISOString();
+  const mensagem = [
+    'Atestado de origem excluído do módulo de Atestados.',
+    `Origem: ${atestado.militar_posto || ''} ${atestado.militar_nome || 'Militar'}`.trim(),
+    atestado.data_inicio || atestado.data_termino
+      ? `Período original: ${atestado.data_inicio || '-'} até ${atestado.data_termino || '-'}.`
+      : '',
+    'Card mantido no quadro para rastreabilidade operacional.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  await base44.entities.CardComentario.create({
+    card_id: card.id,
+    mensagem,
+    tipo_registro: 'Sistema',
+    data_hora: agora,
+    origem_automatica: true,
+    autor_nome: 'Sistema',
+  });
+
+  const novoComentariosCount = (card.comentarios_count || 0) + 1;
+
+  await base44.entities.CardOperacional.update(card.id, {
+    status: 'Origem Excluída',
+    origem_status: 'Excluída',
+    comentarios_count: novoComentariosCount,
+  });
+
+  return {
+    cardId: card.id,
+    comentarios_count: novoComentariosCount,
+  };
+}
+
 function isMesmoVinculo(vinculo, { cardId, tipoVinculo, referenciaId }) {
   return vinculo.card_id === cardId && vinculo.tipo_vinculo === tipoVinculo && vinculo.referencia_id === referenciaId;
 }

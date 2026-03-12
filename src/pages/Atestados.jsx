@@ -19,6 +19,7 @@ import {
 import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
+import { registrarExclusaoAtestadoNoCard } from '@/components/quadro/quadroHelpers';
 
 export default function Atestados() {
   const navigate = useNavigate();
@@ -39,9 +40,14 @@ export default function Atestados() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Atestado.delete(id),
+    mutationFn: async (atestado) => {
+      await registrarExclusaoAtestadoNoCard(atestado);
+      await base44.entities.Atestado.delete(atestado.id);
+      return atestado;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
       setDeleteDialogOpen(false);
       setAtestadoToDelete(null);
     }
@@ -72,7 +78,7 @@ export default function Atestados() {
   const handleEdit = (atestado) => navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
   const handleDelete = (atestado) => { setAtestadoToDelete(atestado); setDeleteDialogOpen(true); };
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
-  const confirmDelete = () => { if (atestadoToDelete) deleteMutation.mutate(atestadoToDelete.id); };
+  const confirmDelete = () => { if (atestadoToDelete) deleteMutation.mutate(atestadoToDelete); };
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);

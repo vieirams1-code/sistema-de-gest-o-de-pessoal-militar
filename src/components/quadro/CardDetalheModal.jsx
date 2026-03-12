@@ -783,6 +783,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   };
 
   const prazoFormatado = card.prazo ? formatarDataBR(card.prazo) : null;
+  const origemExcluida = card.origem_status === 'Excluída' || card.status === 'Origem Excluída';
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const prazoAtrasado = card.prazo && new Date(`${card.prazo}T00:00:00`) < hoje;
@@ -851,6 +852,15 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4 bg-slate-100/70">
+          {origemExcluida && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+              <p className="text-xs font-semibold text-rose-700">Origem Excluída</p>
+              <p className="text-xs text-rose-600 mt-1">
+                Este card foi mantido para rastreabilidade após a exclusão do atestado de origem.
+              </p>
+            </div>
+          )}
+
           <SectionCard title="Identificação do card" icon={User}>
             <div className="grid grid-cols-2 gap-3">
               {card.militar_nome_snapshot && (
