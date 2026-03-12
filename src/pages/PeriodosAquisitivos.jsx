@@ -23,7 +23,12 @@ import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
 import AjusteDiasPeriodoModal from '@/components/ferias/AjusteDiasPeriodoModal';
-import { aplicarAjustePositivo, prepararDispensaComDesconto } from '@/components/ferias/ajustePeriodoService';
+import {
+  aplicarAjustePositivo,
+  prepararDispensaComDesconto,
+  invalidarAjustePeriodoAquisitivo,
+  listarTodosAjustesPeriodoAquisitivo,
+} from '@/components/ferias/ajustePeriodoService';
 import DispensaDescontoFeriasModal from '@/components/ferias/DispensaDescontoFeriasModal';
 
 export default function PeriodosAquisitivos() {
@@ -39,6 +44,7 @@ export default function PeriodosAquisitivos() {
   const [ajusteFeedback, setAjusteFeedback] = useState(null);
   const [dispensaModal, setDispensaModal] = useState({ open: false, periodo: null });
   const [dispensaFeedback, setDispensaFeedback] = useState(null);
+  const [invalidatingAjusteId, setInvalidatingAjusteId] = useState(null);
 
   const { data: periodos = [], isLoading } = useQuery({
     queryKey: ['periodos-aquisitivos'],
@@ -53,6 +59,12 @@ export default function PeriodosAquisitivos() {
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['registros-livro-all'],
     queryFn: () => base44.entities.RegistroLivro.list(),
+  });
+
+  const { data: ajustesPorPeriodo = new Map() } = useQuery({
+    queryKey: ['ajustes-periodo', periodos.length],
+    queryFn: () => listarTodosAjustesPeriodoAquisitivo(periodos),
+    enabled: periodos.length > 0,
   });
 
   const updatePeriodoMutation = useMutation({
@@ -80,11 +92,17 @@ export default function PeriodosAquisitivos() {
       motivo: payload.motivo,
       observacao: payload.observacao,
     }),
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
+      if (variables?.periodo?.id && result?.periodoPayload) {
+        queryClient.setQueryData(['periodos-aquisitivos'], (prev = []) =>
+          prev.map((item) => (item.id === variables.periodo.id ? { ...item, ...result.periodoPayload } : item))
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['ajustes-periodo'] });
     },
   });
 
@@ -97,11 +115,35 @@ export default function PeriodosAquisitivos() {
       motivo: payload.motivo,
       observacao: payload.observacao,
     }),
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
+      if (variables?.periodo?.id && result?.periodoPayload) {
+        queryClient.setQueryData(['periodos-aquisitivos'], (prev = []) =>
+          prev.map((item) => (item.id === variables.periodo.id ? { ...item, ...result.periodoPayload } : item))
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['ajustes-periodo'] });
+    },
+  });
+
+  const invalidarAjusteMutation = useMutation({
+    mutationFn: async ({ ajuste, periodo }) => invalidarAjustePeriodoAquisitivo({
+      ajusteId: ajuste.id,
+      periodoId: periodo?.id || ajuste.periodo_aquisitivo_id,
+    }),
+    onSuccess: (result, variables) => {
+      if (variables?.periodo?.id && result?.periodoPayload) {
+        queryClient.setQueryData(['periodos-aquisitivos'], (prev = []) =>
+          prev.map((item) => (item.id === variables.periodo.id ? { ...item, ...result.periodoPayload } : item))
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['ajustes-periodo'] });
     },
   });
 
@@ -273,6 +315,17 @@ export default function PeriodosAquisitivos() {
         type: 'error',
         message: error?.message || 'Não foi possível registrar a dispensa com desconto.',
       });
+    }
+  };
+
+  const handleInvalidarAjuste = async (ajuste, periodo) => {
+    if (!ajuste?.id) return;
+
+    try {
+      setInvalidatingAjusteId(ajuste.id);
+      await invalidarAjusteMutation.mutateAsync({ ajuste, periodo });
+    } finally {
+      setInvalidatingAjusteId(null);
     }
   };
 
@@ -467,10 +520,13 @@ export default function PeriodosAquisitivos() {
                           <PeriodoAquisitivoCard
                             key={periodo.id}
                             periodo={periodo}
+                            ajustes={ajustesPorPeriodo.get(periodo.id) || []}
+                            invalidatingAjusteId={invalidatingAjusteId}
                             onManage={() => setPeriodoGerenciado(periodo)}
                             onOpenFerias={abrirFeriasVinculadas}
                             onAdicionarDias={() => abrirAjusteDias(periodo)}
                             onDispensaDesconto={() => abrirDispensaDesconto(periodo)}
+                            onInvalidarAjuste={handleInvalidarAjuste}
                           />
                         ))}
                       </div>
