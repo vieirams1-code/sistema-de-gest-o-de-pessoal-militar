@@ -368,15 +368,15 @@ export default function Publicacoes() {
           await reverterVinculo(isApostila, isTSE, refId, origemTipoHint);
         }
 
-        if (registro.tipo === 'Dispensa com Desconto em Férias') {
-          await reverterAjustesPorPublicacao(registro);
-        }
-
         await reverterAtestadosPorExclusaoPublicacao(
           registro,
           base44.entities.Atestado,
           base44.entities.PublicacaoExOfficio
         );
+
+        if (registro.tipo === 'Dispensa com Desconto em Férias') {
+          await reverterAjustesPorPublicacao(id);
+        }
 
         return base44.entities.PublicacaoExOfficio.delete(id);
       }
@@ -414,6 +414,8 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['ajustes-periodo-aquisitivo'] });
     },
     onError: (error) => {
       alert(error?.message || 'Erro ao excluir registro.');
