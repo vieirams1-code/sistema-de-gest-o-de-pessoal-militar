@@ -145,6 +145,9 @@ function mapPublicacao(registro) {
   return {
     id: publicacaoId,
     status,
+    nota_para_bg: registro?.nota_para_bg || null,
+    numero_bg: registro?.numero_bg || null,
+    data_bg: registro?.data_bg || null,
     texto: registro?.texto_publicacao || registro?.documento_texto || registro?.nota_para_bg || null,
     url: `/controle-publicacoes/${publicacaoId}`,
   };
@@ -220,6 +223,8 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
         observacoes: registro?.observacoes || null,
         criado_em: formatDateTimeBR(registro?.created_date),
         atualizado_em: formatDateTimeBR(registro?.updated_date),
+        criado_em_iso: registro?.created_date || null,
+        atualizado_em_iso: registro?.updated_date || null,
       },
       vinculos: mapVinculos({
         registro,
