@@ -19,6 +19,7 @@ import {
   validarOrdemFracoesCadastro,
 } from '@/components/ferias/feriasRules';
 import { validarDiasNoSaldoPeriodo } from '@/components/ferias/periodoSaldoUtils';
+import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {
@@ -217,6 +218,8 @@ export default function CadastrarFerias() {
       return '3ª Fração';
     };
 
+    let periodoAquisitivoId = formData.periodo_aquisitivo_id || editingFerias?.periodo_aquisitivo_id || null;
+
     // Se é edição, atualizar registro único
     if (editId) {
       const f = fracoes[0];
@@ -259,7 +262,7 @@ export default function CadastrarFerias() {
           const inicio = `${anoInicio}-${diaAniversario}`;
           const fim = format(addDays(new Date(`${anoFim}-${diaAniversario}T00:00:00`), -1), 'yyyy-MM-dd');
           const limite = format(addYears(new Date(fim + 'T00:00:00'), 2), 'yyyy-MM-dd');
-          await base44.entities.PeriodoAquisitivo.create({
+          const periodoCriado = await base44.entities.PeriodoAquisitivo.create({
             militar_id: formData.militar_id,
             militar_nome: formData.militar_nome,
             militar_posto: formData.militar_posto,
@@ -275,9 +278,16 @@ export default function CadastrarFerias() {
             status: 'Disponível',
             ano_referencia: formData.periodo_aquisitivo_ref
           });
+          periodoAquisitivoId = periodoCriado?.id || periodoAquisitivoId;
         }
       }
     }
+
+    await sincronizarPeriodoAquisitivoDaFerias({
+      periodoAquisitivoId,
+      periodoAquisitivoRef: formData.periodo_aquisitivo_ref,
+      militarId: formData.militar_id,
+    });
 
     queryClient.invalidateQueries({ queryKey: ['ferias'] });
     queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });

@@ -55,6 +55,7 @@ import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
+import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -290,14 +291,13 @@ export default function Ferias() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async ({ feriasId, periodoId }) => {
+    mutationFn: async ({ feriasId, periodoId, periodoRef, militarId }) => {
       await base44.entities.Ferias.delete(feriasId);
-
-      if (periodoId) {
-        await base44.entities.PeriodoAquisitivo.update(periodoId, {
-          status: 'Disponível',
-        });
-      }
+      await sincronizarPeriodoAquisitivoDaFerias({
+        periodoAquisitivoId: periodoId,
+        periodoAquisitivoRef: periodoRef,
+        militarId,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
@@ -398,6 +398,8 @@ export default function Ferias() {
     deleteMutation.mutate({
       feriasId: feriasToDelete.id,
       periodoId: feriasToDelete.periodo_aquisitivo_id,
+      periodoRef: feriasToDelete.periodo_aquisitivo_ref,
+      militarId: feriasToDelete.militar_id,
     });
   };
 

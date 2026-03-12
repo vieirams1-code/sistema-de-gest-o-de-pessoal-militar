@@ -1,6 +1,7 @@
 import { differenceInDays, format } from 'date-fns';
 import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo, getFracaoNumero } from './feriasRules';
 import { getSaldoConsolidadoPeriodo } from './periodoSaldoUtils';
+import { calcularStatusPeriodoAquisitivo } from './recalcularPeriodoAquisitivo';
 
 const STATUS_CODIGO_MAP = {
   'Pendente': 'pendente',
@@ -73,6 +74,13 @@ function normalizarFeriasFracoes(ferias = []) {
 function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
   const saldoConsolidado = getSaldoConsolidadoPeriodo({ periodo, ferias: feriasRelacionadas });
 
+  const statusRecalculado = calcularStatusPeriodoAquisitivo({
+    periodo,
+    dias_previstos: saldoConsolidado.dias_previstos,
+    dias_gozados: saldoConsolidado.dias_gozados,
+    dias_saldo: saldoConsolidado.dias_saldo,
+  });
+
   const diasParaVencimento = periodo?.data_limite_gozo
     ? differenceInDays(parseDateOnly(periodo.data_limite_gozo), hoje)
     : null;
@@ -104,8 +112,8 @@ function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
     data_fim_aquisitivo: periodo?.fim_aquisitivo || null,
     limite_gozo: formatDateBR(periodo?.data_limite_gozo),
     data_limite_gozo_iso: periodo?.data_limite_gozo || null,
-    status_operacional: periodo?.status || 'Pendente',
-    status_codigo: toStatusCodigo(periodo?.status),
+    status_operacional: statusRecalculado || 'Pendente',
+    status_codigo: toStatusCodigo(statusRecalculado),
     alerta_gerencial: alertaCodigo === 'critico' ? 'Crítico' : alertaCodigo === 'atencao' ? 'Atenção' : 'Em dia',
     alerta_codigo: alertaCodigo,
     alerta_tipo: alertaTipo,

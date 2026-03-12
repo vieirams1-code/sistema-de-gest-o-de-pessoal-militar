@@ -1,5 +1,6 @@
 import { format, addDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
+import { sincronizarPeriodoAquisitivoDaFerias } from './feriasService';
 
 /**
  * Tipos de eventos que representam operações na cadeia de férias.
@@ -177,27 +178,11 @@ export async function executarExclusaoAdminCadeia({
   // Recalcular estado da férias usando dados frescos
   const atualizacaoFerias = recalcularEstadoFerias(feriasFresh, sobreviventes);
   await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
-
-  // Recalcular período aquisitivo se vinculado
-  // IMPORTANTE: usar atualizacaoFerias.dias (recalculado) — nunca ferias.dias (stale)
-  if (ferias.periodo_aquisitivo_id) {
-    const novoStatus = atualizacaoFerias.status;
-    let periodoUpdate = {};
-
-    if (novoStatus === 'Prevista') {
-      periodoUpdate = { status: 'Disponível' };
-    } else if (novoStatus === 'Em Curso') {
-      periodoUpdate = { status: 'Previsto' };
-    } else if (novoStatus === 'Gozada') {
-      periodoUpdate = { status: 'Gozado' };
-    } else if (novoStatus === 'Interrompida') {
-      periodoUpdate = { status: 'Parcialmente Gozado' };
-    }
-
-    if (Object.keys(periodoUpdate).length > 0) {
-      await base44.entities.PeriodoAquisitivo.update(ferias.periodo_aquisitivo_id, periodoUpdate);
-    }
-  }
+  await sincronizarPeriodoAquisitivoDaFerias({
+    periodoAquisitivoId: ferias.periodo_aquisitivo_id,
+    periodoAquisitivoRef: ferias.periodo_aquisitivo_ref,
+    militarId: ferias.militar_id,
+  });
 
   queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
   queryClient.invalidateQueries({ queryKey: ['ferias'] });
@@ -217,25 +202,11 @@ export async function recalcularCadeiaCompleta({ ferias, cadeia, queryClient }) 
   } catch (_) { /* fallback */ }
   const atualizacaoFerias = recalcularEstadoFerias(feriasFresh, cadeia);
   await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
-
-  if (ferias.periodo_aquisitivo_id) {
-    const novoStatus = atualizacaoFerias.status;
-    let periodoUpdate = {};
-
-    if (novoStatus === 'Prevista') {
-      periodoUpdate = { status: 'Disponível' };
-    } else if (novoStatus === 'Em Curso') {
-      periodoUpdate = { status: 'Previsto' };
-    } else if (novoStatus === 'Gozada') {
-      periodoUpdate = { status: 'Gozado' };
-    } else if (novoStatus === 'Interrompida') {
-      periodoUpdate = { status: 'Parcialmente Gozado' };
-    }
-
-    if (Object.keys(periodoUpdate).length > 0) {
-      await base44.entities.PeriodoAquisitivo.update(ferias.periodo_aquisitivo_id, periodoUpdate);
-    }
-  }
+  await sincronizarPeriodoAquisitivoDaFerias({
+    periodoAquisitivoId: ferias.periodo_aquisitivo_id,
+    periodoAquisitivoRef: ferias.periodo_aquisitivo_ref,
+    militarId: ferias.militar_id,
+  });
 
   queryClient.invalidateQueries({ queryKey: ['ferias'] });
   queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
