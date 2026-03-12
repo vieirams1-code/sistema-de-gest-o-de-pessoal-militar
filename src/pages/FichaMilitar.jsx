@@ -18,6 +18,7 @@ import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } from '@/components/ferias/feriasAdminUtils';
 import { reverterAtestadosPorExclusaoPublicacao } from '@/components/atestado/atestadoPublicacaoHelpers';
+import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 
 const TIPOS = [
   { value: 'todos', label: 'Todos os Registros' },
@@ -519,7 +520,7 @@ export default function FichaMilitar() {
       if (event.tipo === 'punicao') {
         await base44.entities.Punicao.delete(event.id);
       } else if (event.tipo === 'atestado') {
-        await base44.entities.Atestado.delete(event.id);
+        await excluirAtestadoComReflexoNoQuadro(event.raw || { id: event.id });
       } else if (event.tipo === 'livro') {
         await excluirLivroComReversao(event.raw || { id: event.id });
       } else if (event.tipo === 'publicacao') {

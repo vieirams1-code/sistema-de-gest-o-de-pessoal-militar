@@ -140,6 +140,23 @@ export async function registrarExclusaoAtestadoNoCard(atestado) {
   };
 }
 
+export async function excluirAtestadoComReflexoNoQuadro(atestado) {
+  const atestadoId = atestado?.id;
+  if (!atestadoId) return;
+
+  let atestadoCompleto = atestado;
+
+  if (!atestado?.militar_nome || !atestado?.data_inicio || !atestado?.data_termino) {
+    const encontrados = await base44.entities.Atestado.filter({ id: atestadoId });
+    if (encontrados.length > 0) {
+      atestadoCompleto = encontrados[0];
+    }
+  }
+
+  await registrarExclusaoAtestadoNoCard(atestadoCompleto);
+  await base44.entities.Atestado.delete(atestadoId);
+}
+
 function isMesmoVinculo(vinculo, { cardId, tipoVinculo, referenciaId }) {
   return vinculo.card_id === cardId && vinculo.tipo_vinculo === tipoVinculo && vinculo.referencia_id === referenciaId;
 }
