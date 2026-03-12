@@ -130,22 +130,26 @@ export async function registrarDispensaComDescontoFerias({
     data: dataEvento,
   });
 
+  const observacoesRegistro = [
+    motivo ? `Motivo: ${motivo}` : null,
+    observacao || null,
+  ].filter(Boolean).join(' | ');
+
   const registroAto = await base44.entities.RegistroLivro.create({
     militar_id: periodo.militar_id,
     militar_nome: periodo.militar_nome || periodo.militar_nome_guerra || null,
     militar_posto: periodo.militar_posto || null,
     militar_matricula: periodo.militar_matricula || null,
     periodo_aquisitivo: periodoReferencia,
-    periodo_aquisitivo_id: periodo.id,
     tipo_registro: 'Dispensa com Desconto em Férias',
-    origem: 'Ato Administrativo',
     data_registro: dataEvento,
     dias: Number(quantidade),
     status: 'Aguardando Nota',
-    observacoes: observacao || null,
-    motivo: motivo || null,
+    observacoes: observacoesRegistro || '',
     texto_publicacao: textoPublicacao,
     nota_para_bg: '',
+    numero_bg: '',
+    data_bg: '',
   });
 
   const ajuste = await registrarAjustePeriodoAquisitivo({
