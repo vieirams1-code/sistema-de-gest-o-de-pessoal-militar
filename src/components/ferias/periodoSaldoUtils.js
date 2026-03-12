@@ -121,6 +121,16 @@ export function recalcularSaldoPeriodo(periodo = {}, ferias = []) {
   };
 }
 
+export function getSaldoConsolidadoPeriodo({ periodo, ferias = [] }) {
+  const derivado = recalcularSaldoPeriodo(periodo, ferias);
+
+  return {
+    ...periodo,
+    ...derivado,
+    saldo_disponivel: derivado.dias_saldo,
+  };
+}
+
 export function validarAjusteDiasPeriodo({
   periodo = {},
   ferias = [],

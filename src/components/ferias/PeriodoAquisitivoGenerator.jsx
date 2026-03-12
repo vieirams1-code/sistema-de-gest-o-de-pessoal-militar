@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { DIAS_BASE_PADRAO } from './periodoSaldoService';
+import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Calendar, Zap, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
