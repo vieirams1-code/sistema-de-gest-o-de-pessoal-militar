@@ -43,6 +43,50 @@ export function buildChecklistResumo(items = []) {
   return `${concluidos}/${total}`;
 }
 
+export function obterVinculoAtestado(vinculos = []) {
+  return vinculos.find((vinculo) => {
+    const tipo = String(vinculo?.tipo_vinculo || '').trim().toLowerCase();
+    return tipo === 'atestado' && !!vinculo?.referencia_id;
+  });
+}
+
+function normalizarStatus(status) {
+  return String(status || '').trim().toLowerCase();
+}
+
+export function avaliarFluxoJiso({ card, atestadoVinculado, vinculoAtestado }) {
+  const isCardJisoAutomatico = card?.origem_tipo === 'Atestado/JISO' && card?.criado_automaticamente;
+  const origemAtestadoInativa = ['cancelado', 'excluído', 'excluido'].includes(
+    normalizarStatus(atestadoVinculado?.status)
+  );
+  const fluxoJisoAtivo =
+    atestadoVinculado?.fluxo_homologacao === 'jiso' ||
+    atestadoVinculado?.necessita_jiso === true ||
+    Number(atestadoVinculado?.dias || 0) > 15;
+
+  const isCardJisoElegivel =
+    isCardJisoAutomatico &&
+    !!vinculoAtestado?.referencia_id &&
+    !!atestadoVinculado?.id &&
+    fluxoJisoAtivo &&
+    !origemAtestadoInativa;
+
+  const decisaoJisoRegistrada =
+    (atestadoVinculado?.historico_jiso || []).length > 0 ||
+    atestadoVinculado?.status_jiso === 'Homologado pela JISO';
+
+  const jisoAgendada = !!(atestadoVinculado?.data_jiso_agendada || card?.prazo);
+
+  return {
+    isCardJisoAutomatico,
+    origemAtestadoInativa,
+    fluxoJisoAtivo,
+    isCardJisoElegivel,
+    decisaoJisoRegistrada,
+    jisoAgendada,
+  };
+}
+
 export async function criarChecklistPreset(cardId, preset) {
   const itens = CHECKLIST_PRESETS[preset] || [];
   if (!itens.length) return;
