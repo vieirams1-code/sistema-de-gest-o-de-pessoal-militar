@@ -25,13 +25,23 @@ function mesmaData(a, b) {
   return a.getTime() === b.getTime();
 }
 
+function getAniversarioFuncionalNoAno(dataInclusao, anoAlvo) {
+  const mes = dataInclusao.getMonth();
+  const dia = dataInclusao.getDate();
+  const ultimoDiaDoMes = new Date(anoAlvo, mes + 1, 0).getDate();
+  const diaAjustado = Math.min(dia, ultimoDiaDoMes);
+  const aniversario = new Date(anoAlvo, mes, diaAjustado);
+
+  aniversario.setHours(0, 0, 0, 0);
+  return aniversario;
+}
+
 function getInicioPeriodoAtual(dataInclusao, hoje) {
-  const aniversarioNoAnoAtual = new Date(hoje.getFullYear(), dataInclusao.getMonth(), dataInclusao.getDate());
-  aniversarioNoAnoAtual.setHours(0, 0, 0, 0);
+  const aniversarioNoAnoAtual = getAniversarioFuncionalNoAno(dataInclusao, hoje.getFullYear());
 
   const inicio = hoje >= aniversarioNoAnoAtual
     ? aniversarioNoAnoAtual
-    : addYears(aniversarioNoAnoAtual, -1);
+    : getAniversarioFuncionalNoAno(dataInclusao, hoje.getFullYear() - 1);
 
   return inicio < dataInclusao ? new Date(dataInclusao) : inicio;
 }
