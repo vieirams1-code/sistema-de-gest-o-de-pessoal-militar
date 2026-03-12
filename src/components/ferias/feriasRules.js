@@ -1,143 +1,135 @@
-export function getFracaoOrdem(fracionamento) {
-  const valor = String(fracionamento || '').trim().toLowerCase();
+import { differenceInCalendarDays } from 'date-fns';
 
-  if (!valor) return 1;
-  if (valor.includes('integral')) return 1;
-  if (valor.includes('1')) return 1;
-  if (valor.includes('2')) return 2;
-  if (valor.includes('3')) return 3;
+const STARTED_STATUSES = new Set(['Em Curso', 'Gozada', 'Interrompida']);
 
+function parseDateOnly(dateStr) {
+  if (!dateStr) return null;
+  return new Date(`${dateStr}T00:00:00`);
+}
+
+export function getFracaoNumero(fracionamento) {
+  if (!fracionamento) return 1;
+  if (String(fracionamento).includes('2ª')) return 2;
+  if (String(fracionamento).includes('3ª')) return 3;
   return 1;
 }
 
-export function isMesmaReferenciaPeriodo(a, b) {
-  return String(a || '').trim() === String(b || '').trim();
+function sortByFracao(a, b) {
+  return getFracaoNumero(a?.fracionamento) - getFracaoNumero(b?.fracionamento);
 }
 
-export function getFeriasMesmoPeriodoMesmoMilitar(lista, feriasAtualOuPayload) {
-  const militarId = feriasAtualOuPayload?.militar_id;
-  const periodoRef = feriasAtualOuPayload?.periodo_aquisitivo_ref;
-  const feriasIdAtual = feriasAtualOuPayload?.id || null;
-
-  return (lista || []).filter((item) => {
-    if (!item?.militar_id || !item?.periodo_aquisitivo_ref) return false;
-    if (feriasIdAtual && item.id === feriasIdAtual) return false;
-
-    return (
-      item.militar_id === militarId &&
-      isMesmaReferenciaPeriodo(item.periodo_aquisitivo_ref, periodoRef)
-    );
-  });
+export function isFeriasIniciada(ferias) {
+  if (!ferias) return false;
+  return STARTED_STATUSES.has(ferias.status);
 }
 
-export function getFracaoAnteriorObrigatoria(lista, feriasAtualOuPayload) {
-  const ordemAtual = getFracaoOrdem(feriasAtualOuPayload?.fracionamento);
+export function validarOrdemFracoesCadastro({
+  militarId,
+  periodoRef,
+  fracoes = [],
+  feriasExistentes = [],
+  editFerias = null,
+  editId = null,
+}) {
+  if (!militarId || !periodoRef) return null;
 
-  if (ordemAtual <= 1) return null;
+  const doMesmoPeriodo = (feriasExistentes || [])
+    .filter(
+      (item) =>
+        item &&
+        item.id !== editId &&
+        item.militar_id === militarId &&
+        item.periodo_aquisitivo_ref === periodoRef
+    )
+    .sort(sortByFracao);
 
-  const mesmoPeriodo = getFeriasMesmoPeriodoMesmoMilitar(lista, feriasAtualOuPayload);
+  const currentFracao = getFracaoNumero(editFerias?.fracionamento);
 
-  return mesmoPeriodo.find((item) => getFracaoOrdem(item.fracionamento) === ordemAtual - 1) || null;
-}
+  if (editFerias?.id && fracoes.length === 1) {
+    const dataAtual = fracoes[0]?.data_inicio;
+    if (!dataAtual) return null;
 
-export function validarOrdemDasFracoesNoCadastro(lista, feriasAtualOuPayload) {
-  const ordemAtual = getFracaoOrdem(feriasAtualOuPayload?.fracionamento);
-  const dataInicioAtual = feriasAtualOuPayload?.data_inicio;
+    const anterior = doMesmoPeriodo.find((item) => getFracaoNumero(item.fracionamento) === currentFracao - 1);
+    const proxima = doMesmoPeriodo.find((item) => getFracaoNumero(item.fracionamento) === currentFracao + 1);
 
-  if (!dataInicioAtual || ordemAtual <= 1) return null;
+    if (anterior?.data_inicio && dataAtual < anterior.data_inicio) {
+      return `A ${currentFracao}ª fração não pode iniciar antes da ${currentFracao - 1}ª (${anterior.data_inicio}).`;
+    }
 
-  const fracaoAnterior = getFracaoAnteriorObrigatoria(lista, feriasAtualOuPayload);
+    if (proxima?.data_inicio && dataAtual > proxima.data_inicio) {
+      return `A ${currentFracao}ª fração não pode iniciar após a ${currentFracao + 1}ª (${proxima.data_inicio}).`;
+    }
 
-  if (!fracaoAnterior) {
-    return `A ${ordemAtual}ª fração não pode ser cadastrada antes da ${ordemAtual - 1}ª fração.`;
+    return null;
   }
 
-  if (!fracaoAnterior.data_inicio) {
-    return `A ${ordemAtual}ª fração exige que a ${ordemAtual - 1}ª fração já tenha data de início definida.`;
-  }
+  for (let i = 1; i < fracoes.length; i += 1) {
+    const anterior = fracoes[i - 1]?.data_inicio;
+    const atual = fracoes[i]?.data_inicio;
 
-  if (new Date(`${dataInicioAtual}T00:00:00`) < new Date(`${fracaoAnterior.data_inicio}T00:00:00`)) {
-    return `A ${ordemAtual}ª fração não pode iniciar antes da ${ordemAtual - 1}ª fração.`;
-  }
-
-  return null;
-}
-
-export function validarInicioDentroDoConcessivo({ dataInicio, dataLimiteGozo }) {
-  if (!dataInicio || !dataLimiteGozo) return null;
-
-  const inicio = new Date(`${dataInicio}T00:00:00`);
-  const limite = new Date(`${dataLimiteGozo}T00:00:00`);
-
-  if (inicio > limite) {
-    return 'O início do gozo não pode ocorrer após o término do período concessivo deste período aquisitivo.';
-  }
-
-  return null;
-}
-
-export function jaFoiIniciada(ferias, registrosLivro = []) {
-  if (!ferias?.id) return false;
-
-  return registrosLivro.some(
-    (r) => r.ferias_id === ferias.id && r.tipo_registro === 'Saída Férias'
-  );
-}
-
-export function validarOrdemDasFracoesNoInicio(lista, feriasAtual, registrosLivro = [], dataRegistro) {
-  const ordemAtual = getFracaoOrdem(feriasAtual?.fracionamento);
-
-  if (ordemAtual <= 1) return null;
-
-  const fracaoAnterior = getFracaoAnteriorObrigatoria(lista, feriasAtual);
-
-  if (!fracaoAnterior) {
-    return `A ${ordemAtual}ª fração não pode iniciar antes da ${ordemAtual - 1}ª fração existir.`;
-  }
-
-  if (!jaFoiIniciada(fracaoAnterior, registrosLivro)) {
-    return `A ${ordemAtual}ª fração só pode iniciar após o início da ${ordemAtual - 1}ª fração.`;
-  }
-
-  if (dataRegistro && fracaoAnterior.data_inicio) {
-    const dataAtual = new Date(`${dataRegistro}T00:00:00`);
-    const dataAnterior = new Date(`${fracaoAnterior.data_inicio}T00:00:00`);
-
-    if (dataAtual < dataAnterior) {
-      return `A ${ordemAtual}ª fração não pode iniciar antes da ${ordemAtual - 1}ª fração.`;
+    if (anterior && atual && atual < anterior) {
+      return `A ${i + 1}ª fração não pode iniciar antes da ${i}ª fração.`;
     }
   }
 
   return null;
 }
 
-export function possuiPrevisaoValidaNoConcessivo(periodo, feriasDoPeriodo = []) {
-  if (!periodo?.data_limite_gozo) return false;
+export function validarInicioFracaoNoLivro({
+  feriasAtual,
+  todasFeriasDoMilitar = [],
+  dataRegistro,
+}) {
+  if (!feriasAtual || !dataRegistro) return null;
 
-  const limite = new Date(`${periodo.data_limite_gozo}T00:00:00`);
+  const numeroFracao = getFracaoNumero(feriasAtual.fracionamento);
+  if (numeroFracao <= 1) return null;
 
-  return (feriasDoPeriodo || []).some((f) => {
-    if (!f?.data_inicio) return false;
-    const inicio = new Date(`${f.data_inicio}T00:00:00`);
-    return inicio <= limite;
-  });
+  const anterior = (todasFeriasDoMilitar || [])
+    .find(
+      (item) =>
+        item &&
+        item.id !== feriasAtual.id &&
+        item.militar_id === feriasAtual.militar_id &&
+        item.periodo_aquisitivo_ref === feriasAtual.periodo_aquisitivo_ref &&
+        getFracaoNumero(item.fracionamento) === numeroFracao - 1
+    );
+
+  if (!anterior) {
+    return `Não foi localizada a ${numeroFracao - 1}ª fração deste período aquisitivo.`;
+  }
+
+  if (!isFeriasIniciada(anterior)) {
+    return `A ${numeroFracao}ª fração só pode iniciar após o início da ${numeroFracao - 1}ª fração.`;
+  }
+
+  if (anterior.data_inicio && dataRegistro < anterior.data_inicio) {
+    return `A ${numeroFracao}ª fração não pode iniciar antes da ${numeroFracao - 1}ª (${anterior.data_inicio}).`;
+  }
+
+  return null;
 }
 
-export function calcularNivelAlertaPeriodo(periodo, feriasDoPeriodo = []) {
-  if (!periodo?.data_limite_gozo) return 'Regular';
+export function validarInicioNoPeriodoConcessivo(dataInicio, dataLimiteGozo) {
+  if (!dataInicio || !dataLimiteGozo) return null;
+  if (dataInicio > dataLimiteGozo) {
+    return `A data de início ${dataInicio} está após o limite de gozo (${dataLimiteGozo}).`;
+  }
+  return null;
+}
 
-  const possuiPrevisaoValida = possuiPrevisaoValidaNoConcessivo(periodo, feriasDoPeriodo);
-  if (possuiPrevisaoValida) return 'Regular';
+export function getAlertaPeriodoConcessivo({ dataLimiteGozo, hasPrevisaoValida }) {
+  if (!dataLimiteGozo || hasPrevisaoValida) return null;
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+  const diasRestantes = differenceInCalendarDays(parseDateOnly(dataLimiteGozo), new Date());
 
-  const limite = new Date(`${periodo.data_limite_gozo}T00:00:00`);
-  const dias = Math.floor((limite - hoje) / (1000 * 60 * 60 * 24));
+  if (diasRestantes <= 90) {
+    return { nivel: 'critico', diasRestantes };
+  }
 
-  if (dias < 0) return 'Vencido';
-  if (dias <= 90) return 'Crítico 90 Dias';
-  if (dias <= 150) return 'Atenção 5 Meses';
+  if (diasRestantes <= 150) {
+    return { nivel: 'atencao', diasRestantes };
+  }
 
-  return 'Regular';
+  return null;
 }
