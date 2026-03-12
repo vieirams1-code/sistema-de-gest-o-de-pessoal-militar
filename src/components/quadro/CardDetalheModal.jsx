@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { sincronizarDataJisoCardAtestado } from '@/components/quadro/quadroHelpers';
+import {
+  sincronizarDataJisoCardAtestado,
+  obterVinculoAtestado,
+  avaliarFluxoJiso,
+} from '@/components/quadro/quadroHelpers';
 import { createCardAcao, deleteCardAcao, listCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -81,13 +85,6 @@ function formatDateTime(iso) {
     hour: '2-digit',
     minute: '2-digit',
   })}`;
-}
-
-function obterVinculoAtestado(vinculos = []) {
-  return vinculos.find((vinculo) => {
-    const tipo = String(vinculo?.tipo_vinculo || '').trim().toLowerCase();
-    return tipo === 'atestado' && !!vinculo?.referencia_id;
-  });
 }
 
 function AcaoDatePicker({ value, onChange, disabled, placeholder = 'Selecionar data' }) {
@@ -654,21 +651,9 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     enabled: !!vinculoAtestado?.referencia_id,
   });
 
-  const isCardJisoAutomatico = card.origem_tipo === 'Atestado/JISO' && card.criado_automaticamente;
-  const origemAtestadoInativa = ['Cancelado', 'Excluído', 'Excluido'].includes(atestadoVinculado?.status);
-  const fluxoJisoAtivo =
-    atestadoVinculado?.fluxo_homologacao === 'jiso' ||
-    atestadoVinculado?.necessita_jiso === true ||
-    Number(atestadoVinculado?.dias || 0) > 15;
-  const podeRegistrarDecisaoJiso =
-    isCardJisoAutomatico &&
-    !!vinculoAtestado?.referencia_id &&
-    !!atestadoVinculado?.id &&
-    fluxoJisoAtivo &&
-    !origemAtestadoInativa;
-  const decisaoJisoRegistrada =
-    (atestadoVinculado?.historico_jiso || []).length > 0 ||
-    atestadoVinculado?.status_jiso === 'Homologado pela JISO';
+  const fluxoJiso = avaliarFluxoJiso({ card, atestadoVinculado, vinculoAtestado });
+  const podeRegistrarDecisaoJiso = fluxoJiso.isCardJisoElegivel;
+  const decisaoJisoRegistrada = fluxoJiso.decisaoJisoRegistrada;
 
   const { data: comentarios = [] } = useQuery({
     queryKey: ['card-comentarios', card.id],
