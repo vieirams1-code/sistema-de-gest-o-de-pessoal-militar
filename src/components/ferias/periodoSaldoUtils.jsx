@@ -164,6 +164,14 @@ export function validarAjusteDiasPeriodo({
   };
 }
 
+/**
+ * Compatibilidade com imports antigos do projeto.
+ * Alguns arquivos ainda podem importar este nome.
+ */
+export function validarDiasNoSaldoPeriodo(args) {
+  return validarAjusteDiasPeriodo(args);
+}
+
 export function getSaldoConsolidadoPeriodo({ periodo, ferias = [] }) {
   const derivado = recalcularSaldoPeriodo(periodo, ferias);
   return {
@@ -171,12 +179,4 @@ export function getSaldoConsolidadoPeriodo({ periodo, ferias = [] }) {
     ...derivado,
     saldo_disponivel: derivado.dias_saldo,
   };
-}
-
-/**
- * Compatibilidade com imports antigos do projeto.
- * Alguns arquivos ainda podem importar este nome.
- */
-export function validarDiasNoSaldoPeriodo(args) {
-  return validarAjusteDiasPeriodo(args);
 }
