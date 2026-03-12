@@ -11,10 +11,11 @@ import {
   AlertCircle,
   CheckCircle,
   Shield,
+  ShieldCheck,
   History,
   BookOpen,
-  X,
-  Save
+  Save,
+  ChevronRight
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -258,33 +259,52 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const statusInfo = getStatusInfo();
+  const isFluxoJiso = atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15;
+
+  const getProgressPercent = () => {
+    if (!atestado.data_inicio || !atestado.data_retorno) return 0;
+
+    const inicio = new Date(`${atestado.data_inicio}T00:00:00`);
+    const retorno = new Date(`${atestado.data_retorno}T00:00:00`);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const total = Math.max(differenceInDays(retorno, inicio), 1);
+    const decorrido = Math.min(Math.max(differenceInDays(hoje, inicio), 0), total);
+
+    return Math.round((decorrido / total) * 100);
+  };
+
+  const progressPercent = getProgressPercent();
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:border-slate-200 transition-all duration-200"
+      className="bg-white rounded-xl border border-gray-200 shadow-md hover:shadow-lg transition-all duration-200 flex flex-col h-full overflow-hidden"
     >
-      <div className="p-4">
+      <div className="p-5 pb-4">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center flex-shrink-0">
-              <FileText className="w-5 h-5 text-[#1e3a5f]" />
+            <div className="bg-slate-100 p-2.5 rounded-full flex items-center justify-center h-12 w-12 text-slate-600 flex-shrink-0">
+              <FileText className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-slate-900 truncate">
+              <h3 className="font-bold text-gray-900 text-[17px] leading-tight mb-0.5 truncate">
                 {atestado.militar_posto && `${atestado.militar_posto} `}
                 {atestado.militar_nome}
               </h3>
               {atestado.militar_matricula && (
-                <p className="text-sm text-slate-500">Mat: {atestado.militar_matricula}</p>
+                <p className="text-gray-500 text-sm flex items-center gap-1.5">
+                  {atestado.militar_posto || 'Militar'} <span className="w-1 h-1 bg-gray-300 rounded-full" /> Mat: {atestado.militar_matricula}
+                </p>
               )}
             </div>
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+              <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 text-gray-400 hover:text-gray-600 -mr-2">
                 <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -341,14 +361,14 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
           </DropdownMenu>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-1.5 mb-5">
           <Badge className={`${statusColors[atestado.status] || statusColors['Ativo']} border`}>
             {atestado.status || 'Ativo'}
           </Badge>
           {atestado.tipo_afastamento && (
             <Badge className="bg-blue-100 text-blue-700">{atestado.tipo_afastamento}</Badge>
           )}
-          {(atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15) && (
+          {isFluxoJiso && (
             <Badge className={`flex items-center gap-1 ${
               atestado.status_jiso === 'Homologado pela JISO'
                 ? 'bg-green-100 text-green-700'
@@ -371,75 +391,87 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
           )}
         </div>
 
-        {statusInfo && (
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border mb-3 ${statusInfo.bgColor} ${statusInfo.borderColor}`}>
-            <statusInfo.icon className={`w-4 h-4 ${statusInfo.color}`} />
-            <span className={`text-sm font-medium ${statusInfo.color}`}>{statusInfo.text}</span>
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 mb-4">
+          <div className="flex flex-wrap justify-between text-xs font-medium mb-2 gap-2">
+            <span className="text-slate-500">Início: {formatDate(atestado.data_inicio)}</span>
+            {statusInfo && (
+              <span className={`px-2 py-0.5 rounded-full flex items-center gap-1 ${statusInfo.color} ${statusInfo.bgColor}`}>
+                <statusInfo.icon className="w-3 h-3" /> {statusInfo.text}
+              </span>
+            )}
+            <span className="text-slate-700">Retorno: {formatDate(atestado.data_retorno)}</span>
           </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div>
-            <p className="text-slate-500">Início</p>
-            <p className="font-medium text-slate-700">{formatDate(atestado.data_inicio)}</p>
+          <div className="w-full bg-slate-200 rounded-full h-1.5 mb-1">
+            <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${progressPercent}%` }} />
           </div>
-          <div>
-            <p className="text-slate-500">Retorno</p>
-            <p className="font-medium text-slate-700">{formatDate(atestado.data_retorno)}</p>
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span>{atestado.dias || 0} dias de afastamento</span>
+            {atestado.cid_10 && <span>CID-10: {atestado.cid_10}</span>}
           </div>
-          <div>
-            <p className="text-slate-500">Dias</p>
-            <p className="font-medium text-slate-700">{atestado.dias || 0} dias</p>
-          </div>
-          {atestado.cid_10 && (
-            <div>
-              <p className="text-slate-500">CID-10</p>
-              <p className="font-medium text-slate-700">{atestado.cid_10}</p>
-            </div>
-          )}
         </div>
 
-        {/* JISO agendada - editável inline — só mostrar se fluxo é JISO ou dias > 15 */}
-        {(atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15) && (
-          <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
-              <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
-              {editingJiso ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <input
-                    type="date"
-                    value={jisoDate}
-                    onChange={e => setJisoDate(e.target.value)}
-                    className="border border-slate-300 rounded px-2 py-0.5 text-xs flex-1"
-                  />
-                  <Button size="sm" className="h-6 px-2 text-xs bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={handleSaveJiso} disabled={savingJiso}>
-                    {savingJiso ? '...' : 'OK'}
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => { setEditingJiso(false); setJisoDate(atestado.data_jiso_agendada || ''); }}>
-                    ✕
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 flex-1">
-                  <span className="text-sm text-slate-700">
-                    {atestado.data_jiso_agendada ? formatDate(atestado.data_jiso_agendada) : 'Não definida'}
-                  </span>
-                  <button onClick={() => { setJisoDate(atestado.data_jiso_agendada || ''); setEditingJiso(true); }} className="text-slate-400 hover:text-[#1e3a5f]" title="Editar data JISO">
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
+        {isFluxoJiso && !atestado.data_jiso_agendada && !editingJiso && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2.5 mb-4">
+            <AlertCircle size={18} className="text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-amber-900 font-semibold text-sm leading-tight mb-1">JISO não agendada</p>
+              <p className="text-amber-700 text-xs">É necessário definir uma data para a junta.</p>
             </div>
             <button
-              onClick={() => setShowJisoModal(true)}
-              className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium"
+              onClick={() => {
+                setJisoDate(atestado.data_jiso_agendada || '');
+                setEditingJiso(true);
+              }}
+              className="text-amber-700 font-bold text-xs uppercase hover:bg-amber-100 px-2 py-1 rounded transition-colors whitespace-nowrap"
             >
-              <History className="w-3.5 h-3.5" />
-              Registrar decisão da JISO (prorrogação/cassação)
+              Agendar
             </button>
           </div>
         )}
+
+        {isFluxoJiso && (editingJiso || atestado.data_jiso_agendada) && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="w-4 h-4 text-purple-500 flex-shrink-0" />
+              <span className="text-xs font-medium text-purple-700">JISO Agendada:</span>
+            </div>
+            {editingJiso ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={jisoDate}
+                  onChange={e => setJisoDate(e.target.value)}
+                  className="border border-slate-300 rounded px-2 py-1 text-xs flex-1"
+                />
+                <Button size="sm" className="h-7 px-2 text-xs bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={handleSaveJiso} disabled={savingJiso}>
+                  {savingJiso ? '...' : 'OK'}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditingJiso(false); setJisoDate(atestado.data_jiso_agendada || ''); }}>
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-700 font-medium">{formatDate(atestado.data_jiso_agendada)}</span>
+                <button onClick={() => { setJisoDate(atestado.data_jiso_agendada || ''); setEditingJiso(true); }} className="text-slate-400 hover:text-[#1e3a5f]" title="Editar data JISO">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(atestado.medico || atestado.observacoes) && (
+          <div className="grid grid-cols-1 gap-2 text-sm">
+            {atestado.medico && (
+              <p className="text-slate-700"><span className="text-slate-500">Médico:</span> {atestado.medico}</p>
+            )}
+            {atestado.observacoes && (
+              <p className="text-slate-700 whitespace-pre-wrap"><span className="text-slate-500">Observações:</span> {atestado.observacoes}</p>
+            )}
+          </div>
+        )}
+
         {showJisoModal && (
           <JisoHistoricoModal
             atestado={atestado}
@@ -447,19 +479,22 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
             onClose={() => setShowJisoModal(false)}
           />
         )}
+      </div>
 
-        {atestado.medico && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <p className="text-xs text-slate-500">Médico</p>
-            <p className="text-sm font-medium text-slate-700">{atestado.medico}</p>
-          </div>
-        )}
-        {atestado.observacoes && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <p className="text-xs text-slate-500">Observações</p>
-            <p className="text-sm text-slate-700 mt-0.5 whitespace-pre-wrap">{atestado.observacoes}</p>
-          </div>
-        )}
+      <div className="bg-slate-50 p-4 border-t border-slate-200 mt-auto flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-slate-600 text-xs font-medium">
+          <ShieldCheck size={16} className="text-emerald-600" />
+          {atestado.status_jiso === 'Homologado pela JISO' || atestado.status_jiso === 'Homologado pelo Comandante'
+            ? 'Homologado'
+            : 'Em análise'}
+        </div>
+        <button
+          onClick={() => setShowJisoModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 shadow-sm transition-all active:scale-95 text-sm"
+        >
+          Registrar Decisão
+          <ChevronRight size={16} />
+        </button>
       </div>
 
       {/* Modal Homologação pelo Comandante */}
