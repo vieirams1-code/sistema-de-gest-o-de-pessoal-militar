@@ -23,6 +23,7 @@ const TIPOS_FERIAS = [
 
 function detectarOrigemTipo(registro) {
   if (registro.origem_tipo) return registro.origem_tipo;
+  if (registro.tipo_label || registro.status_codigo || registro.origem) return 'livro';
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
     return 'ex-officio';
   }
@@ -30,6 +31,14 @@ function detectarOrigemTipo(registro) {
     return 'atestado';
   }
   return 'livro';
+}
+
+function getTipoDisplay(tipo) {
+  if (tipo === 'Saída Férias') return 'Início';
+  if (tipo === 'Interrupção de Férias') return 'Interrupção';
+  if (tipo === 'Nova Saída / Retomada') return 'Continuação';
+  if (tipo === 'Retorno Férias') return 'Término';
+  return tipo;
 }
 
 function mapStatusContratoParaControle(statusCodigo) {
@@ -51,44 +60,6 @@ function mapTipoCodigoParaTipoRegistro(tipoCodigo, fallbackLabel = '') {
   return mapa[tipoCodigo] || fallbackLabel;
 }
 
-function normalizarRegistroLivroContrato(registro) {
-  const militar = registro?.militar || {};
-
-  return {
-    ...registro,
-    origem_tipo: 'livro',
-    tipo_registro: mapTipoCodigoParaTipoRegistro(registro.tipo_codigo, registro.tipo_label),
-    tipo: registro.tipo_label,
-    status_calculado: mapStatusContratoParaControle(registro.status_codigo),
-    status: registro.status_label,
-    militar_id: militar.id,
-    militar_nome: militar.nome_guerra,
-    militar_posto: militar.posto_graduacao,
-    militar_matricula: militar.matricula,
-    data_registro: registro.data_inicio_iso,
-    observacoes: registro?.detalhes?.observacoes || null,
-    created_date: registro?.detalhes?.criado_em_iso || null,
-    nota_para_bg: registro?.publicacao?.nota_para_bg || '',
-    numero_bg: registro?.publicacao?.numero_bg || '',
-    data_bg: registro?.publicacao?.data_bg || '',
-    texto_publicacao: registro?.publicacao?.texto || null,
-    ferias_id: registro?.vinculos?.ferias?.id || null,
-    detalhes_contrato: registro?.detalhes || null,
-    vinculos_contrato: registro?.vinculos || null,
-    publicacao_contrato: registro?.publicacao || null,
-    inconsistencia_contrato: registro?.inconsistencia || null,
-    cadeia_eventos_contrato: registro?.cadeia_eventos || [],
-  };
-}
-
-function getTipoDisplay(tipo) {
-  if (tipo === 'Saída Férias') return 'Início';
-  if (tipo === 'Interrupção de Férias') return 'Interrupção';
-  if (tipo === 'Nova Saída / Retomada') return 'Continuação';
-  if (tipo === 'Retorno Férias') return 'Término';
-  return tipo;
-}
-
 function getGrupoDisplay(registro) {
   const tipoBase = registro.tipo_registro || registro.tipo || '';
 
@@ -104,20 +75,42 @@ function getGrupoDisplay(registro) {
 }
 
 function normalizarRegistro(registro) {
-  const tipoBase = registro.tipo_registro || registro.tipo || '';
+  const origemTipo = detectarOrigemTipo(registro);
+  const tipoRegistroLivro = mapTipoCodigoParaTipoRegistro(registro.tipo_codigo, registro.tipo_label);
+  const tipoBase = origemTipo === 'livro'
+    ? (tipoRegistroLivro || registro.tipo_label || registro.tipo || '')
+    : (registro.tipo_registro || registro.tipo || '');
   const tipoDisplay = getTipoDisplay(tipoBase);
-  const grupoDisplay = getGrupoDisplay(registro);
+  const grupoDisplay = getGrupoDisplay({ ...registro, tipo_registro: tipoBase });
   const tipoCompostoDisplay = grupoDisplay
     ? `${grupoDisplay} • ${tipoDisplay}`
     : tipoDisplay;
 
   return {
     ...registro,
-    origem_tipo: detectarOrigemTipo(registro),
-    status_calculado: registro.status_calculado || calcStatusPublicacao(registro),
+    origem_tipo: origemTipo,
+    status_calculado: registro.status_calculado || (origemTipo === 'livro'
+      ? mapStatusContratoParaControle(registro.status_codigo)
+      : calcStatusPublicacao(registro)),
     tipo_display: tipoDisplay,
     grupo_display: grupoDisplay,
     tipo_composto_display: tipoCompostoDisplay,
+    tipo: origemTipo === 'livro' ? (registro.tipo_label || registro.tipo) : registro.tipo,
+    tipo_registro: origemTipo === 'livro' ? tipoBase : registro.tipo_registro,
+    militar_nome: origemTipo === 'livro' ? (registro?.militar?.nome_guerra || registro?.militar_nome) : registro.militar_nome,
+    militar_matricula: origemTipo === 'livro' ? (registro?.militar?.matricula || registro?.militar_matricula) : registro.militar_matricula,
+    militar_id: origemTipo === 'livro' ? (registro?.militar?.id || registro?.militar_id) : registro.militar_id,
+    created_date: origemTipo === 'livro' ? (registro?.detalhes?.criado_em_iso || registro.created_date) : registro.created_date,
+    data_registro: origemTipo === 'livro' ? (registro.data_inicio_iso || registro.data_registro) : registro.data_registro,
+    ferias_id: origemTipo === 'livro' ? (registro?.vinculos?.ferias?.id || registro.ferias_id) : registro.ferias_id,
+    nota_para_bg: origemTipo === 'livro' ? (registro?.publicacao?.nota_para_bg || registro.nota_para_bg || '') : (registro.nota_para_bg || ''),
+    numero_bg: origemTipo === 'livro' ? (registro?.publicacao?.numero_bg || registro.numero_bg || '') : (registro.numero_bg || ''),
+    data_bg: origemTipo === 'livro' ? (registro?.publicacao?.data_bg || registro.data_bg || '') : (registro.data_bg || ''),
+    detalhes_contrato: origemTipo === 'livro' ? (registro?.detalhes || null) : registro.detalhes_contrato,
+    vinculos_contrato: origemTipo === 'livro' ? (registro?.vinculos || null) : registro.vinculos_contrato,
+    publicacao_contrato: origemTipo === 'livro' ? (registro?.publicacao || null) : registro.publicacao_contrato,
+    inconsistencia_contrato: origemTipo === 'livro' ? (registro?.inconsistencia || null) : registro.inconsistencia_contrato,
+    cadeia_eventos_contrato: origemTipo === 'livro' ? (registro?.cadeia_eventos || []) : (registro.cadeia_eventos_contrato || []),
   };
 }
 
@@ -295,10 +288,7 @@ export default function Publicacoes() {
 
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
 
-  const registrosLivro = useMemo(
-    () => (contratoLivro?.registros_livro || []).map(normalizarRegistroLivroContrato),
-    [contratoLivro]
-  );
+  const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
 
   const registros = useMemo(() => {
     return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
