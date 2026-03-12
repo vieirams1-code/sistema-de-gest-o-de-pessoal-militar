@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -9,11 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Save, ArrowLeft, Calendar, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
-import { addDays, format, addYears, differenceInDays } from 'date-fns';
+import { addDays, format, addYears } from 'date-fns';
 
 import FormSection from '@/components/militar/FormSection';
-import FormField from '@/components/militar/FormField';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
+import {
+  getAlertaPeriodoConcessivo,
+  validarInicioNoPeriodoConcessivo,
+  validarOrdemFracoesCadastro,
+} from '@/components/ferias/feriasRules';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {
@@ -114,6 +118,9 @@ export default function CadastrarFerias() {
   };
 
   const [avisoVencimento, setAvisoVencimento] = useState(null);
+  const [erroRegras, setErroRegras] = useState(null);
+
+  const periodoSelecionado = periodosAtivos.find((p) => p.id === formData.periodo_aquisitivo_id);
 
   const handleFracaoChange = (i, field, value) => {
     setFracoes(prev => {
@@ -132,15 +139,12 @@ export default function CadastrarFerias() {
     if (field === 'data_inicio' && value && formData.periodo_aquisitivo_id) {
       const periodo = periodosAtivos.find(p => p.id === formData.periodo_aquisitivo_id);
       if (periodo?.data_limite_gozo) {
-        const inicio = new Date(value + 'T00:00:00');
-        const limite = new Date(periodo.data_limite_gozo + 'T00:00:00');
-        if (inicio > limite) {
-          setAvisoVencimento(`⚠ A data de início (${format(inicio, 'dd/MM/yyyy')}) ultrapassa o prazo limite de 24 meses do período aquisitivo (${format(limite, 'dd/MM/yyyy')}).`);
-        } else {
-          setAvisoVencimento(null);
-        }
+        const erroConcessivo = validarInicioNoPeriodoConcessivo(value, periodo.data_limite_gozo);
+        setAvisoVencimento(erroConcessivo ? `⚠ ${erroConcessivo}` : null);
       }
     }
+
+    setErroRegras(null);
   };
 
   const handlePeriodoChange = (ref) => {
@@ -169,6 +173,30 @@ export default function CadastrarFerias() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.militar_id || !formData.periodo_aquisitivo_ref) return;
+
+    const erroOrdem = validarOrdemFracoesCadastro({
+      militarId: formData.militar_id,
+      periodoRef: formData.periodo_aquisitivo_ref,
+      fracoes,
+      feriasExistentes,
+      editFerias: editingFerias,
+      editId,
+    });
+
+    if (erroOrdem) {
+      setErroRegras(erroOrdem);
+      return;
+    }
+
+    const erroConcessivo = fracoes
+      .map((fracao) => validarInicioNoPeriodoConcessivo(fracao.data_inicio, periodoSelecionado?.data_limite_gozo))
+      .find(Boolean);
+
+    if (erroConcessivo) {
+      setErroRegras(erroConcessivo);
+      return;
+    }
+
     setLoading(true);
 
     const labelFracao = (i, total) => {
@@ -362,6 +390,28 @@ export default function CadastrarFerias() {
               ))}
 
               <div className="bg-white rounded-xl border border-slate-200 p-6">
+                {erroRegras && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-3">
+                    {erroRegras}
+                  </p>
+                )}
+                {periodoSelecionado?.data_limite_gozo && !fracoes.some((fracao) => validarInicioNoPeriodoConcessivo(fracao.data_inicio, periodoSelecionado.data_limite_gozo)) && (
+                  (() => {
+                    const hasPrevisaoValida = fracoes.some((fracao) => !!fracao.data_inicio);
+                    const alerta = getAlertaPeriodoConcessivo({
+                      dataLimiteGozo: periodoSelecionado.data_limite_gozo,
+                      hasPrevisaoValida,
+                    });
+
+                    if (!alerta) return null;
+
+                    return (
+                      <p className={`text-xs rounded p-2 mb-3 border ${alerta.nivel === 'critico' ? 'text-red-700 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                        {alerta.nivel === 'critico' ? 'Crítico' : 'Atenção'}: faltam {alerta.diasRestantes} dias para o limite de gozo sem previsão válida.
+                      </p>
+                    );
+                  })()
+                )}
                 <div className="space-y-3">
                   <Label className="text-sm font-medium text-slate-700">Status</Label>
                   <Select value={formData.status} onValueChange={v => handleChange('status', v)}>
