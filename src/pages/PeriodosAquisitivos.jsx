@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Calendar, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo } from '@/components/ferias/feriasRules';
+import { mapPeriodosAquisitivosPorMilitar } from '@/components/ferias/periodosAquisitivosMapper';
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 
@@ -24,14 +25,38 @@ export default function PeriodosAquisitivos() {
     queryFn: () => base44.entities.PeriodoAquisitivo.list('-inicio_aquisitivo')
   });
 
+  const { data: ferias = [], isLoading: isLoadingFerias } = useQuery({
+    queryKey: ['ferias'],
+    queryFn: () => base44.entities.Ferias.list('-data_inicio'),
+  });
+
+  const periodosTransformados = useMemo(() => (
+    mapPeriodosAquisitivosPorMilitar({ periodos, ferias })
+  ), [periodos, ferias]);
+
+  const periodosFlat = useMemo(() => (
+    periodosTransformados.militares.flatMap((grupoMilitar) => grupoMilitar.periodos.map((periodo) => ({
+      ...periodo,
+      militar_id: grupoMilitar.militar.id,
+      militar_nome: grupoMilitar.militar.nome_guerra,
+      militar_posto: grupoMilitar.militar.posto_graduacao,
+      militar_matricula: grupoMilitar.militar.matricula,
+      ano_referencia: periodo.referencia,
+      inicio_aquisitivo: periodo.data_inicio_aquisitivo,
+      fim_aquisitivo: periodo.data_fim_aquisitivo,
+      data_limite_gozo: periodo.data_limite_gozo_iso,
+      status: periodo.status_operacional,
+    })))
+  ), [periodosTransformados]);
+
   // Opções únicas para os filtros
-  const militaresUnicos = [...new Map(periodos.map(p => [p.militar_id, { id: p.militar_id, nome: p.militar_nome, posto: p.militar_posto }])).values()]
+  const militaresUnicos = [...new Map(periodosFlat.map(p => [p.militar_id, { id: p.militar_id, nome: p.militar_nome, posto: p.militar_posto }])).values()]
     .filter(m => m.id)
     .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 
-  const periodosUnicos = [...new Set(periodos.map(p => p.ano_referencia).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  const periodosUnicos = [...new Set(periodosFlat.map(p => p.ano_referencia).filter(Boolean))].sort((a, b) => b.localeCompare(a));
 
-  const filteredPeriodos = periodos.filter(p => {
+  const filteredPeriodos = periodosFlat.filter(p => {
     const matchesSearch = 
       p.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -48,15 +73,15 @@ export default function PeriodosAquisitivos() {
 
   const stats = {
     total: periodos.length,
-    disponiveis: periodos.filter(p => p.status === 'Disponível').length,
-    vencendo: periodos.filter((p) => {
+    disponiveis: periodosFlat.filter(p => p.status === 'Disponível').length,
+    vencendo: periodosFlat.filter((p) => {
       const alerta = getAlertaPeriodoConcessivo({
         dataLimiteGozo: p.data_limite_gozo,
         hasPrevisaoValida: hasPrevisaoValidaPeriodo(p),
       });
       return alerta?.nivel === 'critico';
     }).length,
-    vencidos: periodos.filter(p => {
+    vencidos: periodosFlat.filter(p => {
       if (!p.data_limite_gozo) return false;
       const limite = new Date(p.data_limite_gozo + 'T00:00:00');
       return differenceInDays(limite, hoje) < 0;
@@ -188,7 +213,7 @@ export default function PeriodosAquisitivos() {
         </div>
 
         {/* Content */}
-        {isLoading ? (
+        {isLoading || isLoadingFerias ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           </div>
