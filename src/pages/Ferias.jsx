@@ -54,6 +54,7 @@ import {
 import { format, parseISO, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
+import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -88,30 +89,6 @@ function formatDateBR(dateStr) {
 
 function getEventDate(evento) {
   return evento?.data_registro || evento?.data_inicio || null;
-}
-
-function normalizePeriodoRef(periodoRef) {
-  if (!periodoRef) return { startYear: 9999, endYear: 9999, raw: '' };
-
-  const match = String(periodoRef).match(/(\d{4})\s*\/\s*(\d{4})/);
-  if (!match) {
-    return { startYear: 9999, endYear: 9999, raw: String(periodoRef) };
-  }
-
-  return {
-    startYear: Number(match[1]),
-    endYear: Number(match[2]),
-    raw: String(periodoRef),
-  };
-}
-
-function comparePeriodoRef(a, b) {
-  const pa = normalizePeriodoRef(a);
-  const pb = normalizePeriodoRef(b);
-
-  if (pa.startYear !== pb.startYear) return pa.startYear - pb.startYear;
-  if (pa.endYear !== pb.endYear) return pa.endYear - pb.endYear;
-  return pa.raw.localeCompare(pb.raw);
 }
 
 function deriveInterrupcaoData(ferias, registrosLivro) {
@@ -270,49 +247,6 @@ function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
 
   if (ultimoEventoDataStr && novaDataDate > parseDate(ultimoEventoDataStr)) {
     return `A data de início não pode ser posterior ao último evento da cadeia (${NOMES_OPERACIONAIS[ultimoEvento.tipo_registro] || ultimoEvento.tipo_registro} em ${formatDateBR(ultimoEventoDataStr)}).`;
-  }
-
-  return null;
-}
-
-function getFeriasDoMilitar(ferias, militarId, feriasIdAtual) {
-  return ferias.filter(
-    (item) => item.militar_id === militarId && item.id !== feriasIdAtual
-  );
-}
-
-function getBlockingReasonForInicio(feriasAtual, todasFerias) {
-  if (!feriasAtual?.militar_id) return null;
-
-  const outrasDoMilitar = getFeriasDoMilitar(todasFerias, feriasAtual.militar_id, feriasAtual.id);
-
-  const emCurso = outrasDoMilitar.find((f) => f.status === 'Em Curso');
-  if (emCurso) {
-    return `Existe férias em curso do período ${emCurso.periodo_aquisitivo_ref || '-'} para este militar. Não é permitido iniciar nova férias enquanto houver outra em curso.`;
-  }
-
-  const interrompida = outrasDoMilitar.find((f) => f.status === 'Interrompida');
-  if (interrompida) {
-    return `Existe férias interrompida do período ${interrompida.periodo_aquisitivo_ref || '-'} para este militar. É necessário concluir a cadeia interrompida antes de iniciar nova férias.`;
-  }
-
-  const periodoAtual = feriasAtual.periodo_aquisitivo_ref || '';
-
-  const previstasOuAutorizadasDePeriodosDiferentes = [feriasAtual, ...outrasDoMilitar]
-    .filter(
-      (f) =>
-        (f.status === 'Prevista' || f.status === 'Autorizada') &&
-        (f.periodo_aquisitivo_ref || '') !== periodoAtual
-    )
-    .sort((a, b) => comparePeriodoRef(a.periodo_aquisitivo_ref, b.periodo_aquisitivo_ref));
-
-  const periodoMaisAntigoDiferente = previstasOuAutorizadasDePeriodosDiferentes[0];
-
-  if (
-    periodoMaisAntigoDiferente &&
-    comparePeriodoRef(periodoMaisAntigoDiferente.periodo_aquisitivo_ref, periodoAtual) < 0
-  ) {
-    return `Existe período aquisitivo mais antigo pendente de início (${periodoMaisAntigoDiferente.periodo_aquisitivo_ref || '-'}). O início deve respeitar a ordem cronológica dos períodos.`;
   }
 
   return null;
