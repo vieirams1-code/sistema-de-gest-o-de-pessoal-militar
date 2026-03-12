@@ -8,6 +8,10 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function hasNumericValue(value) {
+  return Number.isFinite(Number(value));
+}
+
 function getPeriodoKeys(periodo = {}) {
   const referencia = periodo?.ano_referencia || periodo?.referencia;
   return [periodo?.id, referencia].filter(Boolean);
@@ -23,14 +27,34 @@ function getFeriasDoPeriodo(periodo = {}, ferias = []) {
 }
 
 export function obterDiasBase(periodo = {}) {
-  return toNumber(periodo?.dias_base, DIAS_BASE_PADRAO);
+  if (hasNumericValue(periodo?.dias_base)) return toNumber(periodo.dias_base, DIAS_BASE_PADRAO);
+
+  // Compatibilidade com o modelo antigo: quando só existir dias_direito,
+  // assumimos 30 como base estrutural do período.
+  return DIAS_BASE_PADRAO;
 }
 
 export function obterDiasAjuste(periodo = {}) {
-  return toNumber(periodo?.dias_ajuste, 0);
+  if (hasNumericValue(periodo?.dias_ajuste)) return toNumber(periodo.dias_ajuste, 0);
+
+  const base = obterDiasBase(periodo);
+
+  if (hasNumericValue(periodo?.dias_total)) {
+    return toNumber(periodo.dias_total, base) - base;
+  }
+
+  // Compatibilidade com legado: usar dias_direito como total persistido quando
+  // os novos campos ainda não existirem/forem ignorados pelo backend.
+  if (hasNumericValue(periodo?.dias_direito)) {
+    return toNumber(periodo.dias_direito, base) - base;
+  }
+
+  return 0;
 }
 
 export function calcularDiasTotal(periodo = {}) {
+  if (hasNumericValue(periodo?.dias_total)) return toNumber(periodo.dias_total, 0);
+  if (hasNumericValue(periodo?.dias_direito)) return toNumber(periodo.dias_direito, 0);
   return obterDiasBase(periodo) + obterDiasAjuste(periodo);
 }
 
@@ -95,4 +119,3 @@ export function recalcularSaldoPeriodo(periodo = {}, ferias = []) {
     dias_saldo,
   };
 }
-
