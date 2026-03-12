@@ -11,6 +11,7 @@ import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { aplicarTemplate } from '@/components/utils/templateUtils';
+import { existePublicacaoAtivaParaAtestado } from '@/components/atestado/atestadoPublicacaoHelpers';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
@@ -463,6 +464,40 @@ export default function CadastrarPublicacao() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    const publicacaoIgnoradaId = publicacaoId || null;
+
+    if (formData.tipo === 'Homologação de Atestado' && formData.atestado_homologado_id) {
+      const jaExisteHomologacao = existePublicacaoAtivaParaAtestado(
+        todasPublicacoes,
+        formData.atestado_homologado_id,
+        'Homologação de Atestado',
+        publicacaoIgnoradaId
+      );
+
+      if (jaExisteHomologacao) {
+        alert('Já existe uma homologação ativa para o atestado selecionado.');
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (formData.tipo === 'Ata JISO' && formData.atestados_jiso_ids?.length) {
+      const idsDuplicados = formData.atestados_jiso_ids.filter((atestadoId) =>
+        existePublicacaoAtivaParaAtestado(
+          todasPublicacoes,
+          atestadoId,
+          'Ata JISO',
+          publicacaoIgnoradaId
+        )
+      );
+
+      if (idsDuplicados.length > 0) {
+        alert('Já existe Ata JISO ativa para um ou mais atestados selecionados.');
+        setLoading(false);
+        return;
+      }
+    }
 
     const dataToSave = {
       ...formData,

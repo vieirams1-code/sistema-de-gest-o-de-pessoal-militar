@@ -35,6 +35,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
+import {
+  calcStatusPublicacao,
+  existePublicacaoAtivaParaAtestado,
+  isPublicacaoAtestadoAtiva,
+} from './atestadoPublicacaoHelpers';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -102,8 +107,24 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
 
   const handleSaveHomologacao = async () => {
     setSavingPublicacao(true);
-    const calcStatus = (nota, num, data) => num && data ? 'Publicado' : nota ? 'Aguardando Publicação' : 'Aguardando Nota';
-    const status = calcStatus(homologacaoForm.nota_para_bg, homologacaoForm.numero_bg, homologacaoForm.data_bg);
+    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+    const jaExisteHomologacao = existePublicacaoAtivaParaAtestado(
+      publicacoesMilitar,
+      atestado.id,
+      'Homologação de Atestado'
+    );
+
+    if (jaExisteHomologacao) {
+      alert('Já existe uma homologação ativa para este atestado.');
+      setSavingPublicacao(false);
+      return;
+    }
+
+    const status = calcStatusPublicacao({
+      nota_para_bg: homologacaoForm.nota_para_bg,
+      numero_bg: homologacaoForm.numero_bg,
+      data_bg: homologacaoForm.data_bg,
+    });
     await base44.entities.PublicacaoExOfficio.create({
       tipo: 'Homologação de Atestado',
       militar_id: atestado.militar_id,
@@ -131,8 +152,24 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
 
   const handleSaveAtaJiso = async () => {
     setSavingPublicacao(true);
-    const calcStatus = (nota, num, data) => num && data ? 'Publicado' : nota ? 'Aguardando Publicação' : 'Aguardando Nota';
-    const status = calcStatus(ataJisoForm.nota_para_bg, ataJisoForm.numero_bg, ataJisoForm.data_bg);
+    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+    const jaExisteAtaJiso = existePublicacaoAtivaParaAtestado(
+      publicacoesMilitar,
+      atestado.id,
+      'Ata JISO'
+    );
+
+    if (jaExisteAtaJiso) {
+      alert('Já existe uma Ata JISO ativa para este atestado.');
+      setSavingPublicacao(false);
+      return;
+    }
+
+    const status = calcStatusPublicacao({
+      nota_para_bg: ataJisoForm.nota_para_bg,
+      numero_bg: ataJisoForm.numero_bg,
+      data_bg: ataJisoForm.data_bg,
+    });
     await base44.entities.PublicacaoExOfficio.create({
       tipo: 'Ata JISO',
       militar_id: atestado.militar_id,
@@ -171,6 +208,18 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       (p.atestados_jiso_ids && p.atestados_jiso_ids.includes(atestado.id))
     )
   });
+
+  const hasHomologacaoAtiva = existePublicacaoAtivaParaAtestado(
+    publicacoesVinculadas,
+    atestado.id,
+    'Homologação de Atestado'
+  );
+
+  const hasAtaJisoAtiva = existePublicacaoAtivaParaAtestado(
+    publicacoesVinculadas,
+    atestado.id,
+    'Ata JISO'
+  );
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -252,22 +301,22 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               {/* Fluxo exclusivo: mostrar apenas o botão do fluxo definido */}
               {/* dias <= 15 e fluxo = comandante (ou não definido e dias <= 15): mostrar homologação */}
               {atestado.fluxo_homologacao === 'comandante' && (
-                <DropdownMenuItem onClick={handleOpenHomologacao}>
+                <DropdownMenuItem onClick={handleOpenHomologacao} disabled={hasHomologacaoAtiva}>
                   <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
-                  Homologação pelo Comandante
+                  {hasHomologacaoAtiva ? 'Homologação já gerada' : 'Homologação pelo Comandante'}
                 </DropdownMenuItem>
               )}
               {/* fluxo = jiso OU dias > 15: mostrar Ata JISO */}
               {(atestado.fluxo_homologacao === 'jiso' || (atestado.dias > 15)) && (
-                <DropdownMenuItem onClick={handleOpenAtaJiso}>
+                <DropdownMenuItem onClick={handleOpenAtaJiso} disabled={hasAtaJisoAtiva}>
                   <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
-                  Ata JISO
+                  {hasAtaJisoAtiva ? 'Ata JISO já gerada' : 'Ata JISO'}
                 </DropdownMenuItem>
               )}
               {publicacoesVinculadas.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
-                  {publicacoesVinculadas.map(p => (
+                  {publicacoesVinculadas.filter(isPublicacaoAtestadoAtiva).map(p => (
                     <DropdownMenuItem key={p.id} onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?id=${p.id}`, '_blank')}>
                       <FileText className="w-4 h-4 mr-2 text-blue-500" />
                       <span className="truncate">{p.tipo} — {p.status}</span>
