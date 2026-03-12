@@ -12,6 +12,7 @@ import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { aplicarTemplate } from '@/components/utils/templateUtils';
 import { existePublicacaoAtivaParaAtestado } from '@/components/atestado/atestadoPublicacaoHelpers';
+import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
@@ -528,17 +529,11 @@ export default function CadastrarPublicacao() {
           status: 'Interrompida',
           observacoes: `Interrompida em ${formData.data_interrupcao || formData.data_publicacao}. Dias gozados: ${diasGozados}. Saldo: ${diasSaldo} dias.`
         });
-        // Atualizar período aquisitivo
-        if (feriasAlvo.periodo_aquisitivo_id) {
-          const periodoList = await base44.entities.PeriodoAquisitivo.filter({ id: feriasAlvo.periodo_aquisitivo_id });
-          const periodo = periodoList[0];
-          if (periodo) {
-            await base44.entities.PeriodoAquisitivo.update(feriasAlvo.periodo_aquisitivo_id, {
-              dias_gozados: diasGozados,
-              status: diasSaldo > 0 ? 'Parcialmente Gozado' : 'Gozado'
-            });
-          }
-        }
+        await sincronizarPeriodoAquisitivoDaFerias({
+          periodoAquisitivoId: feriasAlvo.periodo_aquisitivo_id || null,
+          periodoAquisitivoRef: feriasAlvo.periodo_aquisitivo_ref || null,
+          militarId: feriasAlvo.militar_id || formData.militar_id || null,
+        });
       }
     }
 

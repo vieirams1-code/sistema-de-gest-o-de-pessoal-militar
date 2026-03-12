@@ -200,7 +200,7 @@ export default function CadastrarFerias() {
       const validacaoSaldo = validarDiasNoSaldoPeriodo({
         periodo: periodoSelecionado,
         ferias: feriasExistentes,
-        diasSolicitados: totalDiasSolicitados,
+        quantidade: totalDiasSolicitados,
         ignorarFeriasId: editId || null,
       });
 
