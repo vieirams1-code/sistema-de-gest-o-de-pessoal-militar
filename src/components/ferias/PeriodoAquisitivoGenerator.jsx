@@ -110,6 +110,8 @@ export default function PeriodoAquisitivoGenerator() {
               fim_aquisitivo: format(dataFimPeriodo, 'yyyy-MM-dd'),
               data_limite_gozo: format(dataLimiteGozo, 'yyyy-MM-dd'),
               dias_direito: 30,
+              dias_base: 30,
+              dias_ajuste: 0,
               dias_gozados: 0,
               dias_previstos: 0,
               status: 'Disponível',

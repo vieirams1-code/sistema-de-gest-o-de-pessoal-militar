@@ -296,8 +296,6 @@ export default function Ferias() {
       if (periodoId) {
         await base44.entities.PeriodoAquisitivo.update(periodoId, {
           status: 'Disponível',
-          dias_gozados: 0,
-          dias_previstos: 0,
         });
       }
     },
