@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Calendar, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
+import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo } from '@/components/ferias/feriasRules';
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 
@@ -48,11 +49,12 @@ export default function PeriodosAquisitivos() {
   const stats = {
     total: periodos.length,
     disponiveis: periodos.filter(p => p.status === 'Disponível').length,
-    vencendo: periodos.filter(p => {
-      if (!p.data_limite_gozo) return false;
-      const limite = new Date(p.data_limite_gozo + 'T00:00:00');
-      const diff = differenceInDays(limite, hoje);
-      return diff >= 0 && diff <= 90;
+    vencendo: periodos.filter((p) => {
+      const alerta = getAlertaPeriodoConcessivo({
+        dataLimiteGozo: p.data_limite_gozo,
+        hasPrevisaoValida: hasPrevisaoValidaPeriodo(p),
+      });
+      return alerta?.nivel === 'critico';
     }).length,
     vencidos: periodos.filter(p => {
       if (!p.data_limite_gozo) return false;
@@ -208,10 +210,11 @@ export default function PeriodosAquisitivos() {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="text-left px-4 py-3 font-semibold text-slate-600">Militar</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Período</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Prazo Gozo</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Dias</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Período Aquisitivo</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Concessivo / Limite</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Situação</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600">Alerta Gerencial</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-600">Ação</th>
                 </tr>
               </thead>

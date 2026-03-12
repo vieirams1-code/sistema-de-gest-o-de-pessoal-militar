@@ -139,3 +139,14 @@ export function getAlertaPeriodoConcessivo({ dataLimiteGozo, hasPrevisaoValida }
 
   return null;
 }
+
+export function hasPrevisaoValidaPeriodo(periodo) {
+  if (!periodo) return false;
+
+  const diasPrevistos = Number(periodo.dias_previstos || 0);
+  const diasGozados = Number(periodo.dias_gozados || 0);
+
+  if (diasPrevistos > 0 || diasGozados > 0) return true;
+
+  return ['Previsto', 'Parcialmente Gozado', 'Gozado'].includes(periodo.status);
+}
