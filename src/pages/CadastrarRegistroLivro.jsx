@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,8 @@ function resolverOperacaoFerias(ferias) {
 
 export default function CadastrarRegistroLivro() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('id');
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState(initialFormData);
@@ -118,6 +120,44 @@ export default function CadastrarRegistroLivro() {
 
   // Dados extras para tipos customizados
   const [camposCustom, setCamposCustom] = useState({});
+
+  const { data: registroEdicao } = useQuery({
+    queryKey: ['registro-livro-edicao', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const list = await base44.entities.RegistroLivro.filter({ id });
+      return list[0] || null;
+    },
+    enabled: !!id,
+  });
+
+  const { data: feriasEdicao } = useQuery({
+    queryKey: ['ferias-edicao-livro', registroEdicao?.ferias_id],
+    queryFn: async () => {
+      if (!registroEdicao?.ferias_id) return null;
+      const list = await base44.entities.Ferias.filter({ id: registroEdicao.ferias_id });
+      return list[0] || null;
+    },
+    enabled: !!registroEdicao?.ferias_id,
+  });
+
+  useEffect(() => {
+    if (!registroEdicao) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      ...registroEdicao,
+    }));
+
+    if (registroEdicao.tipo_registro && registroEdicao.tipo_registro !== 'Saída Férias') {
+      setOperacaoFeriasSelecionada(registroEdicao.tipo_registro);
+    }
+  }, [registroEdicao]);
+
+  useEffect(() => {
+    if (!feriasEdicao) return;
+    setSelectedFerias(feriasEdicao);
+  }, [feriasEdicao]);
 
   const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
     ? (selectedFerias ? operacaoFeriasSelecionada : 'Saída Férias')
@@ -498,7 +538,11 @@ export default function CadastrarRegistroLivro() {
       dias: formData.dias !== '' && formData.dias !== undefined ? Number(formData.dias) : undefined,
     };
 
-    const registroLivro = await base44.entities.RegistroLivro.create(registroData);
+    if (id) {
+      await base44.entities.RegistroLivro.update(id, registroData);
+    } else {
+      await base44.entities.RegistroLivro.create(registroData);
+    }
 
 
     if (formData.ferias_id) {
