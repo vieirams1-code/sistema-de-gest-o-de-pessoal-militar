@@ -57,6 +57,14 @@ export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias 
         </p>
       </div>
 
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs mb-4">
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Base</p><p className="font-semibold text-slate-800">{periodo.dias_base ?? 30}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Ajuste</p><p className="font-semibold text-slate-800">{periodo.dias_ajuste ?? 0}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Total</p><p className="font-semibold text-slate-800">{periodo.dias_total ?? 30}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Gozados/Prev.</p><p className="font-semibold text-slate-800">{periodo.dias_gozados ?? 0}d / {periodo.dias_previstos ?? 0}d</p></div>
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"><p className="text-slate-500">Saldo</p><p className="font-semibold text-[#1e3a5f]">{periodo.dias_saldo ?? 0}d</p></div>
+      </div>
       <div className="mb-4">
         <p className="text-xs font-semibold text-slate-500 mb-2">FRAÇÕES RELACIONADAS</p>
         {periodo.fracoes?.length ? (

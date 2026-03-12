@@ -18,6 +18,7 @@ import {
   validarInicioNoPeriodoConcessivo,
   validarOrdemFracoesCadastro,
 } from '@/components/ferias/feriasRules';
+import { validarDiasNoSaldoPeriodo } from '@/components/ferias/periodoSaldoUtils';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {
@@ -192,9 +193,19 @@ export default function CadastrarFerias() {
       .map((fracao) => validarInicioNoPeriodoConcessivo(fracao.data_inicio, periodoSelecionado?.data_limite_gozo))
       .find(Boolean);
 
-    if (erroConcessivo) {
-      setErroRegras(erroConcessivo);
-      return;
+    if (periodoSelecionado) {
+      const totalDiasSolicitados = fracoes.reduce((sum, item) => sum + Number(item?.dias || 0), 0);
+      const validacaoSaldo = validarDiasNoSaldoPeriodo({
+        periodo: periodoSelecionado,
+        ferias: feriasExistentes,
+        diasSolicitados: totalDiasSolicitados,
+        ignorarFeriasId: editId || null,
+      });
+
+      if (!validacaoSaldo.ok) {
+        setErroRegras(validacaoSaldo.mensagem);
+        return;
+      }
     }
 
     setLoading(true);
@@ -257,7 +268,10 @@ export default function CadastrarFerias() {
             fim_aquisitivo: fim,
             data_limite_gozo: limite,
             dias_direito: 30,
+            dias_base: 30,
+            dias_ajuste: 0,
             dias_gozados: 0,
+            dias_previstos: 0,
             status: 'Disponível',
             ano_referencia: formData.periodo_aquisitivo_ref
           });

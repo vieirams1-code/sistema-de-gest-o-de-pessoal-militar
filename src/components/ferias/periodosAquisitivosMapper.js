@@ -1,5 +1,6 @@
 import { differenceInDays, format } from 'date-fns';
 import { getAlertaPeriodoConcessivo, hasPrevisaoValidaPeriodo, getFracaoNumero } from './feriasRules';
+import { getSaldoConsolidadoPeriodo } from './periodoSaldoUtils';
 
 const STATUS_CODIGO_MAP = {
   'Pendente': 'pendente',
@@ -70,13 +71,15 @@ function normalizarFeriasFracoes(ferias = []) {
 }
 
 function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
+  const saldoConsolidado = getSaldoConsolidadoPeriodo({ periodo, ferias: feriasRelacionadas });
+
   const diasParaVencimento = periodo?.data_limite_gozo
     ? differenceInDays(parseDateOnly(periodo.data_limite_gozo), hoje)
     : null;
 
   const alertaConcessivo = getAlertaPeriodoConcessivo({
     dataLimiteGozo: periodo?.data_limite_gozo,
-    hasPrevisaoValida: hasPrevisaoValidaPeriodo(periodo),
+    hasPrevisaoValida: hasPrevisaoValidaPeriodo(saldoConsolidado),
   });
 
   const alertaCodigo = alertaConcessivo?.nivel || 'ok';
@@ -108,8 +111,12 @@ function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
     alerta_tipo: alertaTipo,
     dias_para_vencimento: diasParaVencimento,
     mensagem_vencimento: mensagemVencimento,
-    dias_previstos: Number(periodo?.dias_previstos || 0),
-    dias_gozados: Number(periodo?.dias_gozados || 0),
+    dias_base: saldoConsolidado.dias_base,
+    dias_ajuste: saldoConsolidado.dias_ajuste,
+    dias_total: saldoConsolidado.dias_total,
+    dias_previstos: saldoConsolidado.dias_previstos,
+    dias_gozados: saldoConsolidado.dias_gozados,
+    dias_saldo: saldoConsolidado.dias_saldo,
     origem_periodo: periodo?.origem_periodo || periodo?.origem_tipo || periodo?.origem || null,
     criado_automaticamente: Boolean(periodo?.criado_automaticamente || periodo?.origem_automatica),
     raw: periodo,

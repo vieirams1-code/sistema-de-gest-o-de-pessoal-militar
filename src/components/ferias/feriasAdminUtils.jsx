@@ -182,15 +182,14 @@ export async function executarExclusaoAdminCadeia({
   // IMPORTANTE: usar atualizacaoFerias.dias (recalculado) — nunca ferias.dias (stale)
   if (ferias.periodo_aquisitivo_id) {
     const novoStatus = atualizacaoFerias.status;
-    const novosDias = atualizacaoFerias.dias ?? feriasFresh.dias_base ?? feriasFresh.dias ?? 0;
     let periodoUpdate = {};
 
     if (novoStatus === 'Prevista') {
-      periodoUpdate = { status: 'Disponível', dias_gozados: 0, dias_previstos: novosDias };
+      periodoUpdate = { status: 'Disponível' };
     } else if (novoStatus === 'Em Curso') {
-      periodoUpdate = { status: 'Previsto', dias_gozados: 0, dias_previstos: novosDias };
+      periodoUpdate = { status: 'Previsto' };
     } else if (novoStatus === 'Gozada') {
-      periodoUpdate = { status: 'Gozado', dias_gozados: novosDias, dias_previstos: 0 };
+      periodoUpdate = { status: 'Gozado' };
     } else if (novoStatus === 'Interrompida') {
       periodoUpdate = { status: 'Parcialmente Gozado' };
     }
@@ -221,15 +220,14 @@ export async function recalcularCadeiaCompleta({ ferias, cadeia, queryClient }) 
 
   if (ferias.periodo_aquisitivo_id) {
     const novoStatus = atualizacaoFerias.status;
-    const novosDias = atualizacaoFerias.dias ?? feriasFresh.dias_base ?? feriasFresh.dias ?? 0;
     let periodoUpdate = {};
 
     if (novoStatus === 'Prevista') {
-      periodoUpdate = { status: 'Disponível', dias_gozados: 0, dias_previstos: novosDias };
+      periodoUpdate = { status: 'Disponível' };
     } else if (novoStatus === 'Em Curso') {
-      periodoUpdate = { status: 'Previsto', dias_gozados: 0, dias_previstos: novosDias };
+      periodoUpdate = { status: 'Previsto' };
     } else if (novoStatus === 'Gozada') {
-      periodoUpdate = { status: 'Gozado', dias_gozados: novosDias, dias_previstos: 0 };
+      periodoUpdate = { status: 'Gozado' };
     } else if (novoStatus === 'Interrompida') {
       periodoUpdate = { status: 'Parcialmente Gozado' };
     }
