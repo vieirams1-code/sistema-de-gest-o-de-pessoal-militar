@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
 import { filtrarFeriasDoPeriodo, validarAjusteDiasPeriodo } from './periodoSaldoUtils';
+import { calcularStatusPeriodoAquisitivo } from './recalcularPeriodoAquisitivo';
 
 const TIPO_AJUSTE = {
   ADICAO: 'adicao',
@@ -65,10 +66,23 @@ export async function registrarAjustePeriodoAquisitivo({
     throw new Error(validacao.mensagem || 'Não foi possível aplicar o ajuste neste período.');
   }
 
-  await base44.entities.PeriodoAquisitivo.update(periodoId, {
+  const payloadAtualizacao = {
     dias_base,
     dias_ajuste: novoAjuste,
+    dias_total: validacao.dias_total_projetado,
+    dias_gozados: validacao.dias_gozados,
+    dias_previstos: validacao.dias_previstos,
+    dias_saldo: validacao.dias_saldo_projetado,
+  };
+
+  payloadAtualizacao.status = calcularStatusPeriodoAquisitivo({
+    periodo,
+    dias_previstos: payloadAtualizacao.dias_previstos,
+    dias_gozados: payloadAtualizacao.dias_gozados,
+    dias_saldo: payloadAtualizacao.dias_saldo,
   });
+
+  await base44.entities.PeriodoAquisitivo.update(periodoId, payloadAtualizacao);
 
   const trilhaPayload = {
     periodo_aquisitivo_id: periodoId,

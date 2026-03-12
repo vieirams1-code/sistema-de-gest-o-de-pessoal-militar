@@ -23,7 +23,8 @@ import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
 import AjusteDiasPeriodoModal from '@/components/ferias/AjusteDiasPeriodoModal';
-import { aplicarAjusteNegativo, aplicarAjustePositivo } from '@/components/ferias/ajustePeriodoService';
+import { aplicarAjusteNegativo, aplicarAjustePositivo, prepararDispensaComDesconto } from '@/components/ferias/ajustePeriodoService';
+import DispensaDescontoFeriasModal from '@/components/ferias/DispensaDescontoFeriasModal';
 
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
@@ -36,6 +37,8 @@ export default function PeriodosAquisitivos() {
   const [periodoGerenciado, setPeriodoGerenciado] = useState(null);
   const [ajusteModal, setAjusteModal] = useState({ open: false, tipo: 'adicao', periodo: null });
   const [ajusteFeedback, setAjusteFeedback] = useState(null);
+  const [dispensaModal, setDispensaModal] = useState({ open: false, periodo: null });
+  const [dispensaFeedback, setDispensaFeedback] = useState(null);
 
   const { data: periodos = [], isLoading } = useQuery({
     queryKey: ['periodos-aquisitivos'],
@@ -82,6 +85,21 @@ export default function PeriodosAquisitivos() {
       if (tipo === 'desconto') return aplicarAjusteNegativo(corpo);
       return aplicarAjustePositivo(corpo);
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+    },
+  });
+
+
+
+  const dispensaDescontoMutation = useMutation({
+    mutationFn: async ({ periodo, payload }) => prepararDispensaComDesconto({
+      periodoId: periodo.id,
+      quantidade: payload.quantidade,
+      motivo: payload.motivo,
+      observacao: payload.observacao,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
@@ -208,6 +226,11 @@ export default function PeriodosAquisitivos() {
     setAjusteModal({ open: true, periodo, tipo });
   };
 
+  const abrirDispensaDesconto = (periodo) => {
+    setDispensaFeedback(null);
+    setDispensaModal({ open: true, periodo });
+  };
+
   const handleSubmitAjusteDias = async (payload) => {
     if (!ajusteModal?.periodo?.id) throw new Error('Período inválido para ajuste de dias.');
 
@@ -230,6 +253,29 @@ export default function PeriodosAquisitivos() {
       setAjusteFeedback({
         type: 'error',
         message: error?.message || 'Não foi possível aplicar o ajuste no período.',
+      });
+    }
+  };
+
+  const handleSubmitDispensaDesconto = async (payload) => {
+    if (!dispensaModal?.periodo?.id) throw new Error('Período inválido para dispensa com desconto.');
+
+    try {
+      await dispensaDescontoMutation.mutateAsync({
+        periodo: dispensaModal.periodo,
+        payload,
+      });
+
+      setDispensaFeedback({
+        type: 'success',
+        message: 'Dispensa com desconto registrada com sucesso e saldo recalculado.',
+      });
+
+      setDispensaModal((prev) => ({ ...prev, open: false }));
+    } catch (error) {
+      setDispensaFeedback({
+        type: 'error',
+        message: error?.message || 'Não foi possível registrar a dispensa com desconto.',
       });
     }
   };
@@ -429,6 +475,7 @@ export default function PeriodosAquisitivos() {
                             onOpenFerias={abrirFeriasVinculadas}
                             onAdicionarDias={() => abrirAjusteDias(periodo, 'adicao')}
                             onSubtrairDias={() => abrirAjusteDias(periodo, 'desconto')}
+                            onDispensaDesconto={() => abrirDispensaDesconto(periodo)}
                           />
                         ))}
                       </div>
@@ -469,6 +516,20 @@ export default function PeriodosAquisitivos() {
           }
         }}
         onSubmit={handleSubmitAjusteDias}
+      />
+
+      <DispensaDescontoFeriasModal
+        open={dispensaModal.open}
+        periodo={dispensaModal.periodo}
+        ferias={ferias}
+        saving={dispensaDescontoMutation.isPending}
+        feedback={dispensaFeedback}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDispensaModal((prev) => ({ ...prev, open: false }));
+          }
+        }}
+        onSubmit={handleSubmitDispensaDesconto}
       />
     </div>
   );

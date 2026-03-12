@@ -19,7 +19,7 @@ const alertaClasses = {
   success: 'bg-emerald-50 border-emerald-200 text-emerald-700',
 };
 
-export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias, onAdicionarDias, onSubtrairDias }) {
+export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias, onAdicionarDias, onSubtrairDias, onDispensaDesconto }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -92,6 +92,9 @@ export default function PeriodoAquisitivoCard({ periodo, onManage, onOpenFerias,
         </Button>
         <Button size="sm" variant="outline" onClick={() => onSubtrairDias?.(periodo)}>
           Subtrair dias
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onDispensaDesconto?.(periodo)}>
+          Dispensa c/ desconto
         </Button>
         <Button size="sm" variant="outline" onClick={() => onOpenFerias?.(periodo)}>
           <ExternalLink className="w-3.5 h-3.5 mr-1" />

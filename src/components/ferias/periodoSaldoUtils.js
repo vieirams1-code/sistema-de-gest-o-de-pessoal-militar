@@ -101,10 +101,10 @@ export function validarAjusteDiasPeriodo({ periodo, ferias = [], tipo, quantidad
     };
   }
 
-  if (!['adicao', 'desconto'].includes(tipo)) {
+  if (!['adicao', 'desconto', 'dispensa_desconto'].includes(tipo)) {
     return {
       ok: false,
-      mensagem: 'Tipo de ajuste inválido. Utilize adição ou desconto.',
+      mensagem: 'Tipo de ajuste inválido. Utilize adição, desconto ou dispensa com desconto.',
     };
   }
 
