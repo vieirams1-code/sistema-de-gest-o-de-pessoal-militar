@@ -1,4 +1,4 @@
-// Utilitários de saldo de período aquisitivo
+// Utilitários de saldo de período aquisitivo — v2
 export const DIAS_BASE_PADRAO = 30;
 
 const STATUS_GOZADA = new Set(['Gozada']);
