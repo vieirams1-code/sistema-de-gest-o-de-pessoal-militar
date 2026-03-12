@@ -23,6 +23,10 @@ import {
 import { addDays, differenceInDays, format } from 'date-fns';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
+import {
+  validarInicioFracaoNoLivro,
+  validarInicioNoPeriodoConcessivo,
+} from '@/components/ferias/feriasRules';
 
 const NOMES_OPERACIONAIS = {
   'Saída Férias': 'Início',
@@ -192,6 +196,25 @@ function validarCronologia({
     const bloqueioInicio = getBlockingReasonForInicio(ferias, todasFeriasDoMilitar);
     if (bloqueioInicio) {
       return bloqueioInicio;
+    }
+
+    const bloqueioFracao = validarInicioFracaoNoLivro({
+      feriasAtual: ferias,
+      todasFeriasDoMilitar,
+      dataRegistro,
+    });
+
+    if (bloqueioFracao) {
+      return bloqueioFracao;
+    }
+
+    const bloqueioConcessivo = validarInicioNoPeriodoConcessivo(
+      dataRegistro,
+      ferias.data_limite_gozo
+    );
+
+    if (bloqueioConcessivo) {
+      return bloqueioConcessivo;
     }
   }
 
