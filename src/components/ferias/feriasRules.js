@@ -1,7 +1,6 @@
 import { differenceInCalendarDays } from 'date-fns';
 import {
   obterDiasBase,
-  obterDiasAjuste,
   calcularDiasTotal,
   calcularDiasGozados,
   calcularDiasPrevistos,
@@ -161,7 +160,6 @@ export function hasPrevisaoValidaPeriodo(periodo) {
 
 export {
   obterDiasBase,
-  obterDiasAjuste,
   calcularDiasTotal,
   calcularDiasGozados,
   calcularDiasPrevistos,

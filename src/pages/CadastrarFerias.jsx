@@ -272,7 +272,6 @@ export default function CadastrarFerias() {
             fim_aquisitivo: fim,
             data_limite_gozo: limite,
             dias_base: DIAS_BASE_PADRAO,
-            dias_ajuste: 0,
             dias_total: DIAS_BASE_PADRAO,
             dias_gozados: 0,
             dias_previstos: 0,

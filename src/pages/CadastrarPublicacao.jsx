@@ -344,17 +344,6 @@ export default function CadastrarPublicacao() {
         break;
       }
 
-      case 'Dispensa com Desconto em Férias': {
-        const referencia = formData.periodo_aquisitivo_ref || 'Sem referência';
-        const quantidade = formData.quantidade_desconto || '';
-        const motivo = formData.motivo_desconto || formData.assunto || '';
-        if (formData.texto_publicacao) {
-          texto = formData.texto_publicacao;
-        } else {
-          texto = `${cmd}, torna público que foi concedida dispensa com desconto em férias ao ${postoNome} ${nomeCompleto}, matrícula ${matricula}, vinculada ao período aquisitivo ${referencia}, com desconto de ${quantidade} dia(s).${motivo ? ` Motivo: ${motivo}.` : ''}`.trim();
-        }
-        break;
-      }
 
       case 'Geral':
         texto = formData.texto_base || '';
@@ -1373,7 +1362,6 @@ export default function CadastrarPublicacao() {
                   <SelectItem value="Ata JISO">Ata JISO</SelectItem>
                   <SelectItem value="Transcrição de Documentos">Transcrição de Documentos</SelectItem>
                   <SelectItem value="Interrupção de Férias">Interrupção de Férias</SelectItem>
-                  <SelectItem value="Dispensa com Desconto em Férias">Dispensa com Desconto em Férias</SelectItem>
                   <SelectItem value="Transferência para RR">Transferência para RR</SelectItem>
                   <SelectItem value="Apostila">Apostila</SelectItem>
                   <SelectItem value="Tornar sem Efeito">Tornar sem Efeito</SelectItem>

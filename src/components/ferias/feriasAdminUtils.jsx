@@ -9,8 +9,6 @@ export const TIPOS_EVENTO_FERIAS = {
   SAIDA: 'Saída Férias',
   RETORNO: 'Retorno Férias',
   INTERRUPCAO: 'Interrupção de Férias',
-  ADICAO: 'Adição de Dias',
-  DESCONTO: 'Desconto em Férias',
   NOVA_SAIDA: 'Nova Saída / Retomada',
 };
 
@@ -74,25 +72,8 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
     novoStatus = 'Em Curso';
   }
 
-  // dias_base é a fonte de verdade imutável.
-  // CRÍTICO: nunca usar ferias.dias como fallback — ele pode já estar alterado por adições/descontos.
-  // Se dias_base não existir, usar dias_originais. Se nenhum, inferir somando o evento de saída ou usar 30.
-  const diasBase = ferias.dias_base || ferias.dias_originais || (() => {
-    // Tentativa de inferir: procurar evento de Saída Férias com dias registrado
-    const saida = eventosSobreviventes.find(e => e.tipo_registro === 'Saída Férias' || e.tipo_registro === 'Nova Saída / Retomada');
-    // Se não encontrar, usar o menor valor entre todos os dias de férias para não inflar
-    return saida?.dias || 30;
-  })();
-  const eventosAdicao = eventosSobreviventes.filter(e => e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO);
-  // Reconhecer ambos os tipos de desconto (legado 'Desconto em Férias' e novo 'Dispensa Desconto Férias')
-  const eventosDesconto = eventosSobreviventes.filter(e =>
-    e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO || e.tipo_registro === 'Dispensa Desconto Férias'
-  );
-
-  // dias_evento armazena sempre o valor positivo do impacto individual
-  const totalAdicoes = eventosAdicao.reduce((sum, e) => sum + (e.dias_evento || 0), 0);
-  const totalDescontos = eventosDesconto.reduce((sum, e) => sum + (e.dias_evento || 0), 0);
-  const novosDias = Math.max(0, diasBase + totalAdicoes - totalDescontos);
+  const diasBase = ferias.dias_base || ferias.dias_originais || 30;
+  const novosDias = Math.max(0, diasBase);
 
   // Recalcular datas com base nos dias calculados e na data de início original
   let novaDataFim = ferias.data_fim;
@@ -102,16 +83,7 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
     novaDataRetorno = format(addDays(new Date(ferias.data_inicio + 'T00:00:00'), novosDias), 'yyyy-MM-dd');
   }
 
-  // Reconstruir observações derivadas apenas dos eventos sobreviventes
-  // Apenas linhas de ajuste — nunca linhas residuais de observacoes antigas
   const linhasObs = [];
-  eventosSobreviventes.forEach(e => {
-    if (e.tipo_registro === TIPOS_EVENTO_FERIAS.ADICAO && e.dias_evento) {
-      linhasObs.push(`+${e.dias_evento}d: ${e.motivo_dispensa || 'Adição de dias'}`);
-    } else if ((e.tipo_registro === TIPOS_EVENTO_FERIAS.DESCONTO || e.tipo_registro === 'Dispensa Desconto Férias') && e.dias_evento) {
-      linhasObs.push(`-${e.dias_evento}d: ${e.motivo_dispensa || 'Desconto em férias'}`);
-    }
-  });
 
   // Calcular saldo de interrupção se necessário
   if (novoStatus === 'Interrompida') {

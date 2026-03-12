@@ -13,7 +13,6 @@ import {
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
-import { reverterAjustesPorPublicacao } from '@/components/ferias/ajustePeriodoService';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -374,9 +373,6 @@ export default function Publicacoes() {
           base44.entities.PublicacaoExOfficio
         );
 
-        if (registro.tipo === 'Dispensa com Desconto em Férias') {
-          await reverterAjustesPorPublicacao(id);
-        }
 
         return base44.entities.PublicacaoExOfficio.delete(id);
       }
@@ -415,7 +411,6 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
-      queryClient.invalidateQueries({ queryKey: ['ajustes-periodo-aquisitivo'] });
     },
     onError: (error) => {
       alert(error?.message || 'Erro ao excluir registro.');

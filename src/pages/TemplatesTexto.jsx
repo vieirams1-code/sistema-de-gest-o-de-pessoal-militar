@@ -46,7 +46,6 @@ const TIPOS_POR_MODULO = {
     'Trânsito',
     'Instalação',
     'Dispensa Recompensa',
-    'Dispensa Desconto Férias',
     'Deslocamento Missão',
     'Curso/Estágio',
     'Designação de Função',
@@ -285,20 +284,6 @@ const VARS_POR_TIPO = {
       { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
       { v: '{{data_inicio}}', desc: 'Data de início' },
       { v: '{{motivo_dispensa}}', desc: 'Motivo da dispensa' },
-    ]
-  },
-  'Dispensa Desconto Férias': {
-    grupo: 'Dispensa com Desconto em Férias',
-    cor: 'orange',
-    variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
-      { v: '{{nome_completo}}', desc: 'Nome completo' },
-      { v: '{{matricula}}', desc: 'Matrícula' },
-      { v: '{{dias}}', desc: 'Dias a descontar' },
-      { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
-      { v: '{{data_inicio}}', desc: 'Data de início' },
-      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
-      { v: '{{dias_restantes}}', desc: 'Dias restantes após desconto' },
     ]
   },
   'Deslocamento Missão': {
