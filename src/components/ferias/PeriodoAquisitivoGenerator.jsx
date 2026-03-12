@@ -14,12 +14,35 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+const ANOS_RETROSPECTIVOS = 3;
+const PERIODOS_FUTUROS = 2;
+
 function parseDateOnly(value) {
   return new Date(`${value}T00:00:00`);
 }
 
 function mesmaData(a, b) {
   return a.getTime() === b.getTime();
+}
+
+function getInicioPeriodoAtual(dataInclusao, hoje) {
+  const aniversarioNoAnoAtual = new Date(hoje.getFullYear(), dataInclusao.getMonth(), dataInclusao.getDate());
+  aniversarioNoAnoAtual.setHours(0, 0, 0, 0);
+
+  const inicio = hoje >= aniversarioNoAnoAtual
+    ? aniversarioNoAnoAtual
+    : addYears(aniversarioNoAnoAtual, -1);
+
+  return inicio < dataInclusao ? new Date(dataInclusao) : inicio;
+}
+
+function getJanelaOperacional(dataInclusao, hoje) {
+  const inicioPeriodoAtual = getInicioPeriodoAtual(dataInclusao, hoje);
+  const inicioJanela = addYears(inicioPeriodoAtual, -ANOS_RETROSPECTIVOS);
+  const inicioUtil = inicioJanela < dataInclusao ? new Date(dataInclusao) : inicioJanela;
+  const fimJanela = addYears(inicioPeriodoAtual, PERIODOS_FUTUROS);
+
+  return { inicio: inicioUtil, fim: fimJanela };
 }
 
 export default function PeriodoAquisitivoGenerator() {
@@ -52,12 +75,11 @@ export default function PeriodoAquisitivoGenerator() {
 
         const dataInclusao = parseDateOnly(militar.data_inclusao);
         const periodosDoMilitar = periodosExistentes.filter((p) => p.militar_id === militar.id);
+        const { inicio, fim } = getJanelaOperacional(dataInclusao, hoje);
 
-        let dataInicio = new Date(dataInclusao);
+        let dataInicio = new Date(inicio);
 
-        // Gera todos os períodos desde a inclusão até cobrir o período atual
-        // e também o próximo período futuro.
-        while (dataInicio <= addYears(hoje, 1)) {
+        while (dataInicio <= fim) {
           const dataFimPeriodo = addYears(dataInicio, 1);
           dataFimPeriodo.setDate(dataFimPeriodo.getDate() - 1);
 
