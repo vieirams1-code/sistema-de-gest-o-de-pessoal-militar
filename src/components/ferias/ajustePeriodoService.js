@@ -1,5 +1,5 @@
 import { base44 } from '@/api/base44Client';
-import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
+import { DIAS_BASE_PADRAO, obterDiasBase, obterDiasAjuste } from './periodoSaldoUtils';
 import { filtrarFeriasDoPeriodo, validarAjusteDiasPeriodo } from './periodoSaldoUtils';
 import { calcularStatusPeriodoAquisitivo } from './recalcularPeriodoAquisitivo';
 
@@ -76,8 +76,8 @@ export async function registrarAjustePeriodoAquisitivo({
   const periodo = await carregarPeriodo(periodoId);
   if (!periodo) throw new Error('Período aquisitivo não encontrado para ajuste.');
 
-  const dias_base = toNumber(periodo.dias_base, DIAS_BASE_PADRAO);
-  const ajusteAtual = toNumber(periodo.dias_ajuste, 0);
+  const dias_base = obterDiasBase(periodo) || DIAS_BASE_PADRAO;
+  const ajusteAtual = obterDiasAjuste(periodo);
   const qtd = normalizarQuantidade(quantidade);
 
   if (!Object.values(TIPO_AJUSTE).includes(tipo)) {
@@ -104,6 +104,7 @@ export async function registrarAjustePeriodoAquisitivo({
     dias_base,
     dias_ajuste: novoAjuste,
     dias_total: validacao.dias_total_projetado,
+    dias_direito: validacao.dias_total_projetado,
     dias_gozados: validacao.dias_gozados,
     dias_previstos: validacao.dias_previstos,
     dias_saldo: validacao.dias_saldo_projetado,
