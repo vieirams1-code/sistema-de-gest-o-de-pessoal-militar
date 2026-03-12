@@ -81,6 +81,13 @@ function formatDateTime(iso) {
   })}`;
 }
 
+function obterVinculoAtestado(vinculos = []) {
+  return vinculos.find((vinculo) => {
+    const tipo = String(vinculo?.tipo_vinculo || '').trim().toLowerCase();
+    return tipo === 'atestado' && !!vinculo?.referencia_id;
+  });
+}
+
 function AcaoDatePicker({ value, onChange, disabled, placeholder = 'Selecionar data' }) {
   const dataKey = toDateKey(value);
   const dataSelecionada = dataKey ? parseISO(`${dataKey}T00:00:00`) : undefined;
@@ -635,8 +642,8 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     });
   }, [card.id, card.prioridade, card.tipo, card.etiqueta_texto, card.etiqueta_cor]);
 
-  const vinculoAtestado = vinculos.find((v) => v.tipo_vinculo === 'Atestado');
-  const permiteEditarDataJiso = card.origem_tipo === 'Atestado/JISO' && !!vinculoAtestado?.referencia_id;
+  const vinculoAtestado = useMemo(() => obterVinculoAtestado(vinculos), [vinculos]);
+  const permiteEditarDataJiso = !!vinculoAtestado?.referencia_id;
 
   const { data: comentarios = [] } = useQuery({
     queryKey: ['card-comentarios', card.id],
