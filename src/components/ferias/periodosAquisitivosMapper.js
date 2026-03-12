@@ -120,7 +120,6 @@ function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
     dias_para_vencimento: diasParaVencimento,
     mensagem_vencimento: mensagemVencimento,
     dias_base: saldoConsolidado.dias_base,
-    dias_ajuste: saldoConsolidado.dias_ajuste,
     dias_total: saldoConsolidado.dias_total,
     dias_previstos: saldoConsolidado.dias_previstos,
     dias_gozados: saldoConsolidado.dias_gozados,

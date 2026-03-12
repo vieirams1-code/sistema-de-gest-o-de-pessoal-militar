@@ -41,34 +41,12 @@ export function obterDiasBase(periodo = {}) {
   return DIAS_BASE_PADRAO;
 }
 
-export function obterDiasAjuste(periodo = {}) {
-  if (hasNumericValue(periodo?.dias_ajuste)) {
-    return toNumber(periodo.dias_ajuste, 0);
-  }
-
-  const base = obterDiasBase(periodo);
-
-  if (hasNumericValue(periodo?.dias_total)) {
-    return toNumber(periodo.dias_total, base) - base;
-  }
-
-  if (hasNumericValue(periodo?.dias_direito)) {
-    return toNumber(periodo.dias_direito, base) - base;
-  }
-
-  return 0;
-}
-
 export function calcularDiasTotal(periodo = {}) {
-  if (hasNumericValue(periodo?.dias_total)) {
-    return toNumber(periodo.dias_total, 0);
+  if (hasNumericValue(periodo?.dias_base)) {
+    return toNumber(periodo.dias_base, DIAS_BASE_PADRAO);
   }
 
-  if (hasNumericValue(periodo?.dias_direito)) {
-    return toNumber(periodo.dias_direito, 0);
-  }
-
-  return obterDiasBase(periodo) + obterDiasAjuste(periodo);
+  return DIAS_BASE_PADRAO;
 }
 
 export function calcularDiasGozados(periodo = {}, ferias = []) {
@@ -105,7 +83,6 @@ export function calcularDiasSaldo(periodo = {}, ferias = []) {
 
 export function recalcularSaldoPeriodo(periodo = {}, ferias = []) {
   const dias_base = obterDiasBase(periodo);
-  const dias_ajuste = obterDiasAjuste(periodo);
   const dias_total = calcularDiasTotal(periodo);
   const dias_gozados = calcularDiasGozados(periodo, ferias);
   const dias_previstos = calcularDiasPrevistos(periodo, ferias);
@@ -113,7 +90,6 @@ export function recalcularSaldoPeriodo(periodo = {}, ferias = []) {
 
   return {
     dias_base,
-    dias_ajuste,
     dias_total,
     dias_gozados,
     dias_previstos,
@@ -131,36 +107,18 @@ export function getSaldoConsolidadoPeriodo({ periodo, ferias = [] }) {
   };
 }
 
-export function validarAjusteDiasPeriodo({
-  periodo = {},
-  ferias = [],
-  tipo,
-  quantidade,
-}) {
+export function validarDiasNoSaldoPeriodo({ periodo = {}, ferias = [], quantidade }) {
   const qtd = Math.max(0, toNumber(quantidade, 0));
-  const base = obterDiasBase(periodo);
-  const ajusteAtual = obterDiasAjuste(periodo);
+  const dias_total_projetado = calcularDiasTotal(periodo);
   const dias_gozados = calcularDiasGozados(periodo, ferias);
   const dias_previstos = calcularDiasPrevistos(periodo, ferias);
-
-  const sinal = tipo === 'adicao' ? 1 : -1;
-  const novoAjuste = ajusteAtual + sinal * qtd;
-  const dias_total_projetado = base + novoAjuste;
-  const dias_saldo_projetado =
-    dias_total_projetado - dias_gozados - dias_previstos;
-
-  if (dias_total_projetado < 0) {
-    return {
-      ok: false,
-      mensagem: 'O total de dias do período não pode ficar negativo.',
-    };
-  }
+  const dias_saldo_projetado = dias_total_projetado - dias_gozados - dias_previstos - qtd;
 
   if (dias_saldo_projetado < 0) {
     return {
       ok: false,
       mensagem:
-        'O ajuste deixa o período com saldo inconsistente em relação aos dias já gozados/previstos.',
+        'Quantidade de dias informada deixa o período com saldo inconsistente em relação aos dias já gozados/previstos.',
     };
   }
 
@@ -171,12 +129,4 @@ export function validarAjusteDiasPeriodo({
     dias_gozados,
     dias_previstos,
   };
-}
-
-/**
- * Compatibilidade com imports antigos do projeto.
- * Alguns arquivos ainda podem importar este nome.
- */
-export function validarDiasNoSaldoPeriodo(args) {
-  return validarAjusteDiasPeriodo(args);
 }

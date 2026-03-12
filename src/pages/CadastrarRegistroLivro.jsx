@@ -15,8 +15,6 @@ import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/uti
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
 import FormField from '@/components/militar/FormField';
-import { registrarDispensaComDescontoFerias } from '@/components/ferias/feriasService';
-import { calcularDiasSaldo } from '@/components/ferias/feriasRules';
 
 const initialFormData = {
   militar_id: '',
@@ -44,7 +42,6 @@ const initialFormData = {
   publicacao_transferencia: '',
   motivo_dispensa: '',
   periodo_aquisitivo: '',
-  dias_restantes: '',
   curso_nome: '',
   curso_local: '',
   edicao_ano: '',
@@ -112,14 +109,6 @@ export default function CadastrarRegistroLivro() {
     staleTime: 0,
   });
 
-  // Mostra períodos Previsto OU Disponível (pode ter saldo para descontar)
-  const periodosParaDesconto = periodosAquisitivos
-    .filter((p) => !p.inativo && p.status !== 'Inativo')
-    .map((periodo) => ({
-      ...periodo,
-      dias_saldo_calculado: calcularDiasSaldo(periodo, []),
-    }))
-    .filter((periodo) => (Number(periodo.dias_saldo ?? periodo.dias_saldo_calculado) > 0));
 
   const { data: tiposCustom = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom-livro'],
@@ -269,8 +258,6 @@ export default function CadastrarRegistroLivro() {
       setFormData(prev => ({ ...prev, dias: 5 }));
     } else if (formData.tipo_registro === 'Dispensa Recompensa') {
       setFormData(prev => ({ ...prev, dias: 4 }));
-    } else if (formData.tipo_registro === 'Dispensa Desconto Férias') {
-      setFormData(prev => ({ ...prev, dias: 6 }));
     }
   }, [formData.tipo_registro]);
 
@@ -467,14 +454,6 @@ export default function CadastrarRegistroLivro() {
         break;
       }
 
-      case 'Dispensa Desconto Férias': {
-        const diasRestantes = formData.dias_restantes || '';
-        const periodoLabel = formData.periodo_aquisitivo_label || formData.periodo_aquisitivo || '';
-        const t = tentarTemplate('Dispensa Desconto Férias', { data_inicio: dataInicio, periodo_aquisitivo: periodoLabel, dias_restantes: diasRestantes });
-        if (t) { texto = t; break; }
-        if (formData.periodo_aquisitivo && dataInicio) texto = `A Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público o Livro de Apresentação de Praças, conforme segue. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, em gozo de ${dias} (${diasExtenso}) dia(s) de Dispensa com Desconto em Férias, a contar de ${dataInicio}, com abatimento no período aquisitivo ${periodoLabel}, permanecendo saldo remanescente de ${diasRestantes} dia(s).`;
-        break;
-      }
 
       case 'Deslocamento Missão': {
         const dataRetornoMissao = formatarDataExtenso(formData.data_retorno);
@@ -517,29 +496,10 @@ export default function CadastrarRegistroLivro() {
       tipo_registro: tipoRegistroEfetivo,
       texto_publicacao: textoPublicacao,
       dias: formData.dias !== '' && formData.dias !== undefined ? Number(formData.dias) : undefined,
-      dias_restantes: formData.dias_restantes !== '' && formData.dias_restantes !== undefined ? Number(formData.dias_restantes) : undefined,
     };
 
     const registroLivro = await base44.entities.RegistroLivro.create(registroData);
 
-    if (tipoRegistroEfetivo === 'Dispensa Desconto Férias') {
-      const periodoAlvoId = formData.periodo_aquisitivo;
-      const periodoAlvo = periodosParaDesconto.find((p) => p.id === periodoAlvoId);
-
-      if (!periodoAlvoId || !periodoAlvo) {
-        throw new Error('Selecione um período aquisitivo válido para aplicar a dispensa com desconto.');
-      }
-
-      await registrarDispensaComDescontoFerias({
-        periodoId: periodoAlvoId,
-        quantidade: Number(formData.dias || 0),
-        motivo: formData.motivo_dispensa || `Dispensa com desconto em férias (Registro Livro ${registroLivro?.id || ''})`.trim(),
-        observacao: textoPublicacao,
-        data: formData.data_registro,
-        origem: 'livro',
-        origem_registro_livro_id: registroLivro?.id || null,
-      });
-    }
 
     if (formData.ferias_id) {
       if (tipoRegistroEfetivo === 'Nova Saída / Retomada' && selectedFerias) {
@@ -897,82 +857,6 @@ export default function CadastrarRegistroLivro() {
           </div>
         );
 
-      case 'Dispensa Desconto Férias': {
-        // Calcular dias restantes automaticamente baseado no período selecionado
-        // eslint-disable-next-line no-unused-vars
-        const periodoSelecionado = periodosParaDesconto.find(p => p.ano_referencia === formData.periodo_aquisitivo || p.id === formData.periodo_aquisitivo);
-        return (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa com Desconto em Férias</h3>
-            <div className="space-y-4">
-              <div>
-                  <Label className="text-sm font-medium text-slate-700">Período Aquisitivo <span className="text-red-500">*</span></Label>
-                  <Select
-                    value={formData.periodo_aquisitivo}
-                    onValueChange={v => {
-                      const periodo = periodosParaDesconto.find(p => p.id === v);
-                      const saldo = periodo ? Number((periodo.dias_saldo ?? periodo.dias_saldo_calculado) || 0) : 0;
-                      const diasRestantes = Math.max(0, saldo - (Number(formData.dias) || 0));
-                      const label = periodo ? (periodo.ano_referencia || `${periodo.inicio_aquisitivo} a ${periodo.fim_aquisitivo}`) : v;
-                      setFormData(prev => ({ ...prev, periodo_aquisitivo: v, periodo_aquisitivo_label: label, dias_restantes: diasRestantes }));
-                    }}
-                  >
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue placeholder={periodosParaDesconto.length === 0 ? 'Nenhum período Previsto disponível' : 'Selecione o período...'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {periodosParaDesconto.length === 0 && (
-                        <div className="px-3 py-2 text-sm text-slate-400">Nenhum período com status "Previsto"</div>
-                      )}
-                          {periodosParaDesconto.map(p => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.ano_referencia || `${p.inicio_aquisitivo} a ${p.fim_aquisitivo}`} — {p.dias_total || 30}d total — {Number((p.dias_saldo ?? p.dias_saldo_calculado) || 0)}d saldo
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              <div className="grid grid-cols-3 gap-4">
-              <FormField
-                label="Data de Início"
-                name="data_inicio"
-                value={formData.data_inicio}
-                onChange={handleChange}
-                type="date"
-                required
-              />
-              <div>
-                <Label className="text-sm font-medium text-slate-700">Dias <span className="text-red-500">*</span></Label>
-                <Input
-                  type="number"
-                  value={formData.dias}
-                  onChange={(e) => {
-                    const diasVal = Number(e.target.value) || 0;
-                    const periodoSel = periodosParaDesconto.find(p => p.id === formData.periodo_aquisitivo);
-                    const saldo = periodoSel ? Number((periodoSel.dias_saldo ?? periodoSel.dias_saldo_calculado) || 0) : 0;
-                    const restantes = Math.max(0, saldo - diasVal);
-                    setFormData(prev => ({ ...prev, dias: diasVal, dias_restantes: restantes }));
-                  }}
-                  className="mt-1.5"
-                  required
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-slate-700">Dias Restantes</Label>
-                <Input
-                  type="number"
-                  value={formData.dias_restantes}
-                  disabled
-                  className="mt-1.5 bg-slate-50"
-                  placeholder="Calculado automaticamente"
-                />
-                <p className="text-xs text-slate-400 mt-1">Saldo − dias a descontar</p>
-              </div>
-              </div>
-            </div>
-          </div>
-        );
-      }
 
       case 'Deslocamento Missão':
         return (
@@ -1086,7 +970,6 @@ export default function CadastrarRegistroLivro() {
       { value: 'Trânsito', label: 'Trânsito', sexo: null },
       { value: 'Instalação', label: 'Instalação', sexo: null },
       { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
-      { value: 'Dispensa Desconto Férias', label: 'Dispensa com Desconto em Férias', sexo: null },
       { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
       { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
     ];
@@ -1167,7 +1050,6 @@ export default function CadastrarRegistroLivro() {
                   data_termino: '',
                   data_retorno: '',
                   periodo_aquisitivo: '',
-                  dias_restantes: ''
                 }));
               }}>
                 <SelectTrigger className="mt-1.5">
