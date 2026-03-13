@@ -1,12 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { FileText, CheckCircle, Clock, AlertCircle, Search, Plus } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
+import { createPageUrl } from '@/utils';
 
 import {
   calcStatusPublicacao,
@@ -80,8 +83,45 @@ function getGrupoDisplay(registro) {
   return '';
 }
 
+function abreviarPostoGraduacao(valor) {
+  const mapa = {
+    'Coronel': 'Cel',
+    'Tenente Coronel': 'TC',
+    'Major': 'Maj',
+    'Capitão': 'Cap',
+    '1º Tenente': '1º Ten',
+    '2º Tenente': '2º Ten',
+    'Aspirante': 'Asp',
+    'Subtenente': 'ST',
+    '1º Sargento': '1º Sgt',
+    '2º Sargento': '2º Sgt',
+    '3º Sargento': '3º Sgt',
+    'Cabo': 'Cb',
+    'Soldado': 'Sd',
+  };
+  return mapa[valor] || valor || '';
+}
+
+function montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao }) {
+  return [postoGraduacao, quadro, nomeExibicao].filter(Boolean).join(' ').trim();
+}
+
 function normalizarRegistro(registro) {
   const origemTipo = detectarOrigemTipo(registro);
+  const militarContrato = registro?.militar || {};
+  const militarNome = origemTipo === 'livro'
+    ? (militarContrato?.nome_guerra || militarContrato?.nome || registro?.militar_nome || '')
+    : (registro?.militar_nome || registro?.nome_guerra || registro?.nome || '');
+
+  const postoGraduacaoBruto = origemTipo === 'livro'
+    ? (militarContrato?.posto_graduacao || militarContrato?.posto || militarContrato?.graduacao || '')
+    : (registro?.militar_posto_graduacao || registro?.posto_graduacao || registro?.posto || registro?.graduacao || '');
+
+  const quadro = origemTipo === 'livro'
+    ? (militarContrato?.quadro || '')
+    : (registro?.militar_quadro || registro?.quadro || '');
+
+  const postoGraduacao = abreviarPostoGraduacao(postoGraduacaoBruto);
   const tipoRegistroLivro = mapTipoCodigoParaTipoRegistro(registro.tipo_codigo, registro.tipo_label);
   const tipoBase = origemTipo === 'livro'
     ? (tipoRegistroLivro || registro.tipo_label || registro.tipo || '')
@@ -103,7 +143,14 @@ function normalizarRegistro(registro) {
     tipo_composto_display: tipoCompostoDisplay,
     tipo: origemTipo === 'livro' ? (registro.tipo_label || registro.tipo) : registro.tipo,
     tipo_registro: origemTipo === 'livro' ? tipoBase : registro.tipo_registro,
-    militar_nome: origemTipo === 'livro' ? (registro?.militar?.nome_guerra || registro?.militar_nome) : registro.militar_nome,
+    militar_nome: militarNome,
+    militar_posto_graduacao: postoGraduacao,
+    militar_quadro: quadro,
+    militar_nome_institucional: montarNomeInstitucional({
+      postoGraduacao,
+      quadro,
+      nomeExibicao: militarNome,
+    }),
     militar_matricula: origemTipo === 'livro' ? (registro?.militar?.matricula || registro?.militar_matricula) : registro.militar_matricula,
     militar_id: origemTipo === 'livro' ? (registro?.militar?.id || registro?.militar_id) : registro.militar_id,
     created_date: origemTipo === 'livro' ? (registro?.detalhes?.criado_em_iso || registro.created_date) : registro.created_date,
@@ -166,6 +213,7 @@ function isFeriasOperacional(registro) {
 
 export default function Publicacoes() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
@@ -422,149 +470,159 @@ export default function Publicacoes() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#1e3a5f]">Publicações</h1>
-          <p className="text-slate-500">Controle de notas e boletins gerais</p>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-[#1e3a5f]" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-[#1e3a5f]">{stats.total}</p>
-                  <p className="text-xs text-slate-500">Total</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-amber-600">{stats.aguardandoNota}</p>
-                  <p className="text-xs text-slate-500">Aguardando Nota</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">{stats.aguardandoPublicacao}</p>
-                  <p className="text-xs text-slate-500">Aguardando Publ.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-emerald-600">{stats.publicados}</p>
-                  <p className="text-xs text-slate-500">Publicados</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
+    <div className="min-h-screen bg-slate-100">
+      <div className="px-4 py-6 lg:px-8">
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex-1">
-              <Input
-                placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border-slate-200"
-              />
+              <div className="relative">
+                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-11 pl-11 border-slate-300 bg-white rounded-xl shadow-sm"
+                />
+              </div>
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-56">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Status</SelectItem>
-                <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                <SelectItem value="Publicado">Publicado</SelectItem>
-                <SelectItem value="Inconsistente">Inconsistente</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="min-w-[170px]">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-white shadow-sm">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Status</SelectItem>
+                    <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
+                    <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
+                    <SelectItem value="Publicado">Publicado</SelectItem>
+                    <SelectItem value="Inconsistente">Inconsistente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-        <div className="mb-4 text-sm text-slate-500">
-          {filteredRegistros.length} registro(s) encontrado(s)
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+              <Button
+                className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Publicação
+              </Button>
+            </div>
           </div>
-        ) : filteredRegistros.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
-            <FileText className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">
-              Nenhum registro encontrado
-            </h3>
-            <p className="text-slate-500">
-              {searchTerm || statusFilter !== 'all'
-                ? 'Tente ajustar os filtros de busca'
-                : 'Os registros de publicação aparecerão aqui'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {grupos.map((grupo) => {
-              const items = filteredRegistros.filter(r => r.status_calculado === grupo.key);
-              if (items.length === 0) return null;
 
-              return (
-                <div key={grupo.key}>
-                  <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border ${grupo.border} ${grupo.bg}`}>
-                    <span className={`font-bold text-sm ${grupo.color}`}>{grupo.label}</span>
-                    <span className={`text-xs ${grupo.color} opacity-70`}>
-                      — {items.length} registro(s)
-                    </span>
+          <div className="text-sm font-medium text-slate-500">
+            {filteredRegistros.length} registro(s) encontrado(s)
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-[#e8eef5] flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-[#1e3a5f]" />
                   </div>
-
-                  <div className="space-y-3">
-                    {items.map((registro) => (
-                      <PublicacaoCard
-                        key={registro.id}
-                        registro={registro}
-                        onUpdate={handleUpdate}
-                        onDelete={handleDelete}
-                        onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
-                        todosRegistros={registros}
-                      />
-                    ))}
+                  <div>
+                    <p className="text-2xl font-bold text-[#1e3a5f]">{stats.total}</p>
+                    <p className="text-xs text-slate-500">Total</p>
                   </div>
                 </div>
-              );
-            })}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-600">{stats.aguardandoNota}</p>
+                    <p className="text-xs text-slate-500">Aguardando Nota</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-600">{stats.aguardandoPublicacao}</p>
+                    <p className="text-xs text-slate-500">Aguardando Publ.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-emerald-600">{stats.publicados}</p>
+                    <p className="text-xs text-slate-500">Publicados</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        )}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filteredRegistros.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
+              <FileText className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">
+                Nenhum registro encontrado
+              </h3>
+              <p className="text-slate-500">
+                {searchTerm || statusFilter !== 'all'
+                  ? 'Tente ajustar os filtros de busca'
+                  : 'Os registros de publicação aparecerão aqui'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {grupos.map((grupo) => {
+                const items = filteredRegistros.filter(r => r.status_calculado === grupo.key);
+                if (items.length === 0) return null;
+
+                return (
+                  <div key={grupo.key} className="space-y-3">
+                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${grupo.border} ${grupo.bg}`}>
+                      <span className={`font-bold text-sm ${grupo.color}`}>{grupo.label}</span>
+                      <span className={`text-xs ${grupo.color} opacity-70`}>
+                        {items.length} registro(s)
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {items.map((registro) => (
+                        <PublicacaoCard
+                          key={registro.id}
+                          registro={registro}
+                          onUpdate={handleUpdate}
+                          onDelete={handleDelete}
+                          onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
+                          todosRegistros={registros}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {familiaPanel.open && (
