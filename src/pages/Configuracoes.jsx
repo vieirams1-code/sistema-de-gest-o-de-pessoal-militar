@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings, Trash2, Plus, Users, Shield, CheckSquare, Square, UserCog, Sliders, Building } from 'lucide-react';
 import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoManager';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,6 +26,7 @@ const TABS = [
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
+  const { isAdmin, isLoading: loadingUser, getAccessModeFromUser } = useCurrentUser();
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
 
@@ -44,6 +46,7 @@ export default function Configuracoes() {
   const [userGrupamentoId, setUserGrupamentoId] = useState('');
   const [userSubgrupamentoId, setUserSubgrupamentoId] = useState('');
   const [savingUser, setSavingUser] = useState(false);
+  const [userAccessMode, setUserAccessMode] = useState('proprio');
 
   // Estado - atribuição em massa de militares
   const [massaGrupamentoId, setMassaGrupamentoId] = useState('');
@@ -53,6 +56,13 @@ export default function Configuracoes() {
   const [savingMassa, setSavingMassa] = useState(false);
 
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
+
+  useEffect(() => {
+    if (!loadingUser && !isAdmin && activeTab === 'permissoes') {
+      setActiveTab('adicoes');
+    }
+  }, [activeTab, isAdmin, loadingUser]);
+
 
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
@@ -70,35 +80,53 @@ export default function Configuracoes() {
     m.posto_graduacao?.toLowerCase().includes(searchMassa.toLowerCase())
   );
 
+
+  const visibleTabs = useMemo(() => {
+    if (isAdmin) return TABS;
+    return TABS.filter((tab) => tab.id === 'adicoes');
+  }, [isAdmin]);
+
   const handleSelectUser = (userId) => {
     const u = usuarios.find(u => u.id === userId);
     setSelectedUser(u);
+    setUserAccessMode(getAccessModeFromUser(u));
+
     const sId = subgrupamentos.find(s => s.tipo === 'Subgrupamento' && s.id === u?.subgrupamento_id) ? u.subgrupamento_id : '';
     const gId = grupamentos.find(g => g.id === u?.subgrupamento_id) ? u.subgrupamento_id : '';
+
     if (sId) {
       const sub = subgrupamentos.find(s => s.id === sId);
       setUserGrupamentoId(sub?.grupamento_id || '');
       setUserSubgrupamentoId(sId);
-    } else {
-      setUserGrupamentoId(gId);
-      setUserSubgrupamentoId('');
+      return;
     }
+
+    setUserGrupamentoId(gId);
+    setUserSubgrupamentoId('');
   };
 
   const handleSaveUserScope = async () => {
     if (!selectedUser) return;
+
     setSavingUser(true);
-    const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
-    const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
-    const data = sub
-      ? { subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento' }
-      : grupamento
-        ? { subgrupamento_id: grupamento.id, subgrupamento_nome: grupamento.nome, subgrupamento_tipo: 'Grupamento' }
-        : { subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null };
-    await base44.entities.User.update(selectedUser.id, data);
-    queryClient.invalidateQueries({ queryKey: ['usuarios'] });
-    setSelectedUser(prev => ({ ...prev, ...data }));
-    setSavingUser(false);
+    try {
+      const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
+      const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
+
+      const data = userAccessMode === 'admin'
+        ? { role: 'admin', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null }
+        : userAccessMode === 'subsetor' && sub
+          ? { role: 'user', subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento' }
+          : userAccessMode === 'setor' && grupamento
+            ? { role: 'user', subgrupamento_id: grupamento.id, subgrupamento_nome: grupamento.nome, subgrupamento_tipo: 'Grupamento' }
+            : { role: 'user', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null };
+
+      await base44.entities.User.update(selectedUser.id, data);
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+      setSelectedUser(prev => ({ ...prev, ...data }));
+    } finally {
+      setSavingUser(false);
+    }
   };
 
   const toggleMilitar = (id) => setMilitaresSelecionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -148,7 +176,7 @@ export default function Configuracoes() {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-slate-200">
-          {TABS.map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -165,7 +193,7 @@ export default function Configuracoes() {
         </div>
 
         {/* Tab: Permissões e Usuários */}
-        {activeTab === 'permissoes' && (
+        {activeTab === 'permissoes' && isAdmin && (
           <div className="space-y-6">
             {/* Permissões de Usuários */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -175,7 +203,7 @@ export default function Configuracoes() {
               </div>
               <p className="text-sm text-slate-500 mb-4">Defina qual setor/subsetor cada usuário pode acessar. Sem atribuição de setor = acesso apenas aos próprios dados (militares vinculados ao próprio email).</p>
               <div className="space-y-2 mb-6">
-                {usuarios.filter(u => u.role !== 'admin').map(u => (
+                {usuarios.map(u => (
                   <div key={u.id} onClick={() => handleSelectUser(u.id)} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
                     <div>
                       <p className="font-medium text-sm text-slate-800">{u.full_name || u.email}</p>
@@ -184,42 +212,73 @@ export default function Configuracoes() {
                     {u.subgrupamento_nome ? (
                       <Badge className={u.subgrupamento_tipo === 'Grupamento' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>{u.subgrupamento_nome} ({u.subgrupamento_tipo})</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-slate-400">Sem restrição</Badge>
+                      <Badge variant="outline" className="text-slate-500">Próprio / sem setor</Badge>
                     )}
                   </div>
                 ))}
-                {usuarios.filter(u => u.role !== 'admin').length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum usuário cadastrado</p>}
+                {usuarios.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum usuário cadastrado</p>}
               </div>
               {selectedUser && (
                 <div className="border-t pt-4 space-y-4">
                   <p className="text-sm font-semibold text-slate-700">Editando: <span className="text-[#1e3a5f]">{selectedUser.full_name || selectedUser.email}</span></p>
                   <div>
-                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Setor</label>
-                    <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); }}>
-                      <SelectTrigger><SelectValue placeholder="Selecione um setor..." /></SelectTrigger>
+                    <label className="text-sm font-medium text-slate-700 block mb-1.5">Modo de acesso</label>
+                    <Select
+                      value={userAccessMode}
+                      onValueChange={(v) => {
+                        setUserAccessMode(v);
+                        if (v === 'proprio' || v === 'admin') {
+                          setUserGrupamentoId('');
+                          setUserSubgrupamentoId('');
+                        }
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione o modo de acesso" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="_nenhum">— Acesso apenas aos próprios dados —</SelectItem>
-                        {grupamentos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>)}
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="setor">Setor</SelectItem>
+                        <SelectItem value="subsetor">Subsetor</SelectItem>
+                        <SelectItem value="proprio">Próprio / sem setor</SelectItem>
                       </SelectContent>
                     </Select>
-                    {userGrupamentoId && !userSubgrupamentoId && <p className="text-xs text-blue-600 mt-1">✓ Acesso a todos os subsetores/seções deste setor</p>}
                   </div>
-                  {userGrupamentoId && subgrupamentosFilhos.length > 0 && (
+
+                  {(userAccessMode === 'setor' || userAccessMode === 'subsetor') && (
                     <div>
-                      <label className="text-sm font-medium text-slate-700 block mb-1.5">Restringir a Subsetor/Seção (opcional)</label>
-                      <Select value={userSubgrupamentoId || '_todos'} onValueChange={(v) => setUserSubgrupamentoId(v === '_todos' ? '' : v)}>
-                        <SelectTrigger><SelectValue placeholder="Todo o setor" /></SelectTrigger>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">Setor</label>
+                      <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); }}>
+                        <SelectTrigger><SelectValue placeholder="Selecione um setor..." /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="_todos">— Acesso a todo o setor —</SelectItem>
+                          <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                          {grupamentos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {userAccessMode === 'setor' && userGrupamentoId && !userSubgrupamentoId && <p className="text-xs text-blue-600 mt-1">✓ Acesso ao setor e subsetores subordinados</p>}
+                    </div>
+                  )}
+
+                  {userAccessMode === 'subsetor' && userGrupamentoId && subgrupamentosFilhos.length > 0 && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">Subsetor/Seção</label>
+                      <Select value={userSubgrupamentoId || '_nenhum'} onValueChange={(v) => setUserSubgrupamentoId(v === '_nenhum' ? '' : v)}>
+                        <SelectTrigger><SelectValue placeholder="Selecione um subsetor" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_nenhum">— Selecione —</SelectItem>
                           {subgrupamentosFilhos.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      {userSubgrupamentoId && <p className="text-xs text-amber-600 mt-1">✓ Acesso restrito apenas a este subsetor/seção</p>}
+                      {userSubgrupamentoId && <p className="text-xs text-amber-600 mt-1">✓ Acesso restrito ao subsetor selecionado</p>}
                     </div>
+                  )}
+
+                  {userAccessMode === 'proprio' && (
+                    <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+                      Este usuário ficará em modo <strong>Próprio / sem setor</strong>, com acesso apenas aos registros vinculados ao próprio e-mail.
+                    </p>
                   )}
                   <div className="flex justify-end gap-2 pt-1">
                     <Button variant="outline" onClick={() => setSelectedUser(null)}>Cancelar</Button>
-                    <Button onClick={handleSaveUserScope} disabled={savingUser} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">{savingUser ? 'Salvando...' : 'Salvar Permissão'}</Button>
+                    <Button onClick={handleSaveUserScope} disabled={savingUser || (userAccessMode === 'setor' && !userGrupamentoId) || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">{savingUser ? 'Salvando...' : 'Salvar Permissão'}</Button>
                   </div>
                 </div>
               )}
@@ -281,6 +340,14 @@ export default function Configuracoes() {
                 </Button>
               </div>
             </div>
+          </div>
+        )}
+
+
+        {activeTab === 'permissoes' && !isAdmin && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-semibold text-[#1e3a5f] mb-2">Área restrita</h2>
+            <p className="text-sm text-slate-500">As configurações de permissões e atribuições administrativas são exclusivas para administradores.</p>
           </div>
         )}
 

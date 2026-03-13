@@ -35,6 +35,14 @@ export function useCurrentUser() {
 
   const userEmail = user?.email || null;
 
+  const getAccessModeFromUser = (targetUser) => {
+    if (!targetUser) return 'proprio';
+    if (targetUser.role === 'admin') return 'admin';
+    if (targetUser.subgrupamento_tipo === 'Grupamento') return 'setor';
+    if (targetUser.subgrupamento_tipo === 'Subgrupamento') return 'subsetor';
+    return 'proprio';
+  };
+
   /**
    * Retorna true se o usuário tem acesso ao registro.
    * @param registro - objeto com grupamento_id, subgrupamento_id e/ou created_by
@@ -82,6 +90,24 @@ export function useCurrentUser() {
     return !!userEmail && possibleEmails.includes(userEmail);
   };
 
+  const getMilitarScopeFilters = () => {
+    if (isAdmin) return [];
+
+    if (modoAcesso === 'setor' && subgrupamentoId) {
+      return [{ grupamento_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }];
+    }
+
+    if (modoAcesso === 'subsetor' && subgrupamentoId) {
+      return [{ subgrupamento_id: subgrupamentoId }];
+    }
+
+    if (modoAcesso === 'proprio' && userEmail) {
+      return [{ email: userEmail }, { created_by: userEmail }];
+    }
+
+    return [];
+  };
+
   const hasModuleAccess = (moduleKey) => {
     if (isAdmin) return true;
     const rolePermissions = modulePermissionsByRole[user?.role] || modulePermissionsByRole.default;
@@ -100,5 +126,7 @@ export function useCurrentUser() {
     hasAccess,
     hasSelfAccess,
     hasModuleAccess,
+    getAccessModeFromUser,
+    getMilitarScopeFilters,
   };
 }
