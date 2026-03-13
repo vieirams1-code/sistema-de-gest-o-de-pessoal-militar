@@ -582,11 +582,15 @@ export default function CadastrarRegistroLivro() {
         ? calcularMetricasInterrupcao(selectedFerias, formData.data_registro)
         : null;
 
+    const toNumOrUndef = (v) => (v !== '' && v !== undefined && v !== null && !Number.isNaN(Number(v)) ? Number(v) : undefined);
+
     const registroData = {
       ...formData,
       tipo_registro: tipoRegistroEfetivo,
       texto_publicacao: textoPublicacao,
-      dias: formData.dias !== '' && formData.dias !== undefined ? Number(formData.dias) : undefined,
+      dias: toNumOrUndef(formData.dias),
+      dias_evento: toNumOrUndef(formData.dias_evento),
+      dias_restantes: toNumOrUndef(formData.dias_restantes),
       ...(metricasInterrupcao
         ? {
             dias_no_momento: metricasInterrupcao.diasNoMomento,
