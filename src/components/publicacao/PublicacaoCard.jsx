@@ -31,7 +31,10 @@ import {
   XCircle,
   PenLine,
   Ban,
-  GitBranch
+  GitBranch,
+  Shield,
+  BadgeCheck,
+  Triangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
@@ -83,6 +86,18 @@ function getGrupoDisplay(registro) {
   }
 
   return '';
+}
+
+
+
+function getChainBadge(chainStatus) {
+  if (chainStatus === 'ok') {
+    return { icon: BadgeCheck, className: 'bg-emerald-100 text-emerald-800 border-emerald-200', label: 'Integridade OK' };
+  }
+  if (chainStatus === 'inconsistente') {
+    return { icon: Triangle, className: 'bg-red-100 text-red-800 border-red-200', label: 'Inconsistente' };
+  }
+  return { icon: GitBranch, className: 'bg-slate-100 text-slate-700 border-slate-200', label: 'Sem Cadeia' };
 }
 
 function getEditUrl(registro) {
@@ -178,6 +193,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const tipoLabel = getTipoDisplay(tipoBase);
   const grupoLabel = registro.grupo_display || getGrupoDisplay(registro);
+  const nomeInstitucional = [registro.militar_posto, registro.militar_quadro, registro.militar_nome_exibicao || registro.militar_nome]
+    .filter(Boolean)
+    .join(' ');
+  const cadeiaStatus = registro?.inconsistencia_contrato?.status || (registro?.vinculos_contrato?.cadeia?.existe ? 'ok' : null);
+  const chainBadge = getChainBadge(cadeiaStatus);
+  const ChainIcon = chainBadge.icon;
 
   // Ver Atestado: Homologação de Atestado tem atestado_homologado_id; Ata JISO tem atestados_jiso_ids
   const atestadoLink = registro.atestado_homologado_id
@@ -280,7 +301,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
       </AlertDialog>
 
       <Card
-        className={`border hover:shadow-md transition-shadow ${
+        className={`rounded-xl border transition-all duration-200 ${
           isTSE
             ? 'border-red-200 bg-red-50/40'
             : isApostila && foiTornadaSemEfeito
@@ -298,10 +319,14 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             : 'border-slate-200'
         }`}
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-2 flex-wrap">
+        <CardHeader className="pb-3 px-6 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4 flex-1 min-w-0">
+              <div className="hidden sm:flex h-12 w-12 rounded-full bg-slate-50 border border-slate-200 items-center justify-center text-slate-400 shrink-0">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
                 {/* Badges de tipo derivado — discretas, antes do nome */}
                 {isTSE && (
                   <span className="flex items-center gap-1 text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
@@ -361,27 +386,33 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   </span>
                 )}
 
-                <h3 className="font-semibold text-lg text-slate-900 truncate">
-                  {registro.militar_posto && `${registro.militar_posto} `}
-                  {registro.militar_nome}
+                <h3 className="text-xl font-bold text-slate-900 tracking-tight leading-none truncate">
+                  {nomeInstitucional || 'Militar não identificado'}
                 </h3>
 
-                <Badge className={statusColors[currentStatus]}>
+                <Badge className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border ${statusColors[currentStatus] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                   {currentStatus}
                 </Badge>
+
+                {contratoLivro && (
+                  <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${chainBadge.className}`}>
+                    <ChainIcon className="w-3 h-3" />
+                    {chainBadge.label}
+                  </span>
+                )}
               </div>
 
-              <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+              <div className="flex flex-wrap items-center gap-2.5 text-sm text-slate-600">
                 {registro.militar_matricula && (
-                  <span>Mat: {registro.militar_matricula}</span>
+                  <span className="font-medium text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Mat: {registro.militar_matricula}</span>
                 )}
 
                 {grupoLabel === 'Férias' ? (
                   <span className="flex items-center gap-2 flex-wrap">
-                    <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200">
+                    <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200 uppercase text-[10px] tracking-wide">
                       Férias
                     </Badge>
-                    <Badge className="bg-slate-100 text-slate-700 border-slate-200">
+                    <Badge className="bg-slate-100 text-slate-700 border-slate-200 uppercase text-[10px] tracking-wide">
                       {tipoLabel}
                     </Badge>
                   </span>
@@ -392,8 +423,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   </span>
                 ) : null}
 
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
                   {formatDate(registro.data_registro || registro.data_publicacao)}
                 </span>
 
@@ -438,7 +469,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 )}
               </div>
 
-              {/* Vínculos rápidos — derivadas mostram a principal; original mostra quem a afetou */}
+              {/* Origem e Vínculos rápidos — derivadas mostram a principal; original mostra quem a afetou */}
               {isDerivado && codigoPrincipal && (
                 <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                   <span className="text-xs text-slate-400">Publicação principal:</span>
@@ -605,10 +636,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               </Button>
             </div>
           </div>
+        </div>
         </CardHeader>
 
         {isExpanded && (
-          <CardContent className="pt-0 border-t border-slate-100">
+          <CardContent className="pt-0 px-6 pb-5 border-t border-slate-100">
             {isEditingBg ? (
               <div className="mt-4 space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
@@ -696,7 +728,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
                     {detalhesContrato && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Detalhes do Ato</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Identificação do Ato</p>
                         <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
                           {detalhesContrato.observacoes && <p><span className="font-medium">Observações:</span> {detalhesContrato.observacoes}</p>}
                           {detalhesContrato.criado_em && <p><span className="font-medium">Criado em:</span> {detalhesContrato.criado_em}</p>}
@@ -707,7 +739,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
                     {vinculosContrato && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Vínculos</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Origem e Vínculos</p>
                         <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
                           <p><span className="font-medium">Férias:</span> {vinculosContrato?.ferias?.label || '—'}</p>
                           <p><span className="font-medium">Período:</span> {vinculosContrato?.periodo?.label || '—'}</p>
@@ -718,7 +750,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
                     {publicacaoContrato && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Publicação Gerada</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Texto da Publicação</p>
                         <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-slate-700 space-y-1">
                           <p><span className="font-medium">Status:</span> {publicacaoContrato.status || '—'}</p>
                           <p><span className="font-medium">Nota:</span> {publicacaoContrato.nota_para_bg || '—'}</p>
@@ -731,7 +763,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
                     {inconsistenciaContrato && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Inconsistência</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Estado da Cadeia de Férias</p>
                         <div className="p-3 bg-red-50 rounded-lg border border-red-100 text-sm text-slate-700">
                           <p className="font-medium text-red-700">{inconsistenciaContrato.motivo_curto}</p>
                           {inconsistenciaContrato.detalhe && <p>{inconsistenciaContrato.detalhe}</p>}
@@ -741,7 +773,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
                     {cadeiaEventosContrato.length > 0 && (
                       <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Cadeia de Eventos</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Rastreabilidade</p>
                         <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
                           {cadeiaEventosContrato.map((evento) => (
                             <p key={evento.id}>

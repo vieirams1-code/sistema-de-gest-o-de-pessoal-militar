@@ -103,6 +103,15 @@ function normalizarRegistro(registro) {
     tipo: origemTipo === 'livro' ? (registro.tipo_label || registro.tipo) : registro.tipo,
     tipo_registro: origemTipo === 'livro' ? tipoBase : registro.tipo_registro,
     militar_nome: origemTipo === 'livro' ? (registro?.militar?.nome_guerra || registro?.militar_nome) : registro.militar_nome,
+    militar_nome_exibicao: origemTipo === 'livro'
+      ? (registro?.militar?.nome_guerra || registro?.militar_nome || registro?.militar?.nome_completo)
+      : (registro.militar_nome || registro.nome_guerra || registro.nome_exibicao),
+    militar_posto: origemTipo === 'livro'
+      ? (registro?.militar?.posto_graduacao || registro?.militar_posto)
+      : (registro.militar_posto || registro.posto_graduacao),
+    militar_quadro: origemTipo === 'livro'
+      ? (registro?.militar?.quadro || registro?.militar_quadro)
+      : (registro.militar_quadro || registro.quadro),
     militar_matricula: origemTipo === 'livro' ? (registro?.militar?.matricula || registro?.militar_matricula) : registro.militar_matricula,
     militar_id: origemTipo === 'livro' ? (registro?.militar?.id || registro?.militar_id) : registro.militar_id,
     created_date: origemTipo === 'livro' ? (registro?.detalhes?.criado_em_iso || registro.created_date) : registro.created_date,
