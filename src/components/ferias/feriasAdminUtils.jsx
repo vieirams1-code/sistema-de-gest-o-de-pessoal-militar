@@ -38,6 +38,106 @@ export function identificarDescendentes(eventoAlvo, cadeia) {
   return cadeia.slice(idx + 1);
 }
 
+const TRANSICOES_VALIDAS = {
+  [TIPOS_EVENTO_FERIAS.SAIDA]: new Set([TIPOS_EVENTO_FERIAS.INTERRUPCAO, TIPOS_EVENTO_FERIAS.RETORNO]),
+  [TIPOS_EVENTO_FERIAS.INTERRUPCAO]: new Set([TIPOS_EVENTO_FERIAS.NOVA_SAIDA]),
+  [TIPOS_EVENTO_FERIAS.NOVA_SAIDA]: new Set([TIPOS_EVENTO_FERIAS.INTERRUPCAO, TIPOS_EVENTO_FERIAS.RETORNO]),
+};
+
+function getEventoData(evento) {
+  return evento?.data_registro || evento?.data_inicio || null;
+}
+
+function detectarPrimeiraInconsistencia(cadeia) {
+  if (!cadeia.length) return null;
+
+  if (cadeia[0]?.tipo_registro !== TIPOS_EVENTO_FERIAS.SAIDA) {
+    return {
+      index: 0,
+      motivoCurto: 'Cadeia sem início válido',
+      detalhe: `A cadeia inicia com ${cadeia[0]?.tipo_registro || 'evento desconhecido'}, e não com ${TIPOS_EVENTO_FERIAS.SAIDA}.`,
+    };
+  }
+
+  for (let i = 1; i < cadeia.length; i += 1) {
+    const anterior = cadeia[i - 1];
+    const atual = cadeia[i];
+    const dataAnterior = getEventoData(anterior);
+    const dataAtual = getEventoData(atual);
+
+    if (dataAnterior && dataAtual) {
+      const da = new Date(`${dataAnterior}T00:00:00`);
+      const db = new Date(`${dataAtual}T00:00:00`);
+      if (db < da) {
+        return {
+          index: i,
+          motivoCurto: 'Cadeia fora de ordem cronológica',
+          detalhe: `${atual?.tipo_registro || 'Evento'} em ${dataAtual} está anterior a ${anterior?.tipo_registro || 'evento anterior'} em ${dataAnterior}.`,
+        };
+      }
+    }
+
+    const transicoesPermitidas = TRANSICOES_VALIDAS[anterior?.tipo_registro];
+    if (!transicoesPermitidas || !transicoesPermitidas.has(atual?.tipo_registro)) {
+      return {
+        index: i,
+        motivoCurto: 'Sequência da cadeia inválida',
+        detalhe: `Sequência inválida entre ${anterior?.tipo_registro || 'evento anterior'} e ${atual?.tipo_registro || 'evento atual'}.`,
+      };
+    }
+  }
+
+  return null;
+}
+
+function anexarObservacao(original, observacao) {
+  const atual = String(original || '').trim();
+  if (!atual) return observacao;
+  if (atual.includes(observacao)) return atual;
+  return `${atual}\n${observacao}`;
+}
+
+async function invalidarPublicacaoDeEvento(evento, inconsistencia) {
+  const observacao = `Publicação invalidada automaticamente: evento perdeu validade após remoção de evento anterior da cadeia de férias.`;
+  const payload = {
+    status: 'Inconsistente',
+    inconsistencia_motivo_curto: inconsistencia?.motivoCurto || 'Evento sem base válida na cadeia',
+    inconsistencia_detalhe:
+      inconsistencia?.detalhe ||
+      'Evento ficou sem base válida após remoção de evento anterior da cadeia de férias.',
+    numero_bg: null,
+    data_bg: null,
+    nota_para_bg: null,
+    observacoes: anexarObservacao(evento?.observacoes, observacao),
+  };
+
+  await base44.entities.RegistroLivro.update(evento.id, payload);
+  return { id: evento.id, tipo_registro: evento?.tipo_registro };
+}
+
+async function auditarDependenciasPosExclusao({ eventosSobreviventes = [] }) {
+  const inconsistencia = detectarPrimeiraInconsistencia(eventosSobreviventes);
+
+  if (!inconsistencia) {
+    return {
+      eventosValidos: eventosSobreviventes,
+      eventosInvalidos: [],
+    };
+  }
+
+  const eventosInvalidos = eventosSobreviventes.slice(inconsistencia.index);
+  const eventosValidos = eventosSobreviventes.slice(0, inconsistencia.index);
+
+  const invalidacoes = [];
+  for (const evento of eventosInvalidos) {
+    // eslint-disable-next-line no-await-in-loop
+    const resultado = await invalidarPublicacaoDeEvento(evento, inconsistencia);
+    invalidacoes.push(resultado);
+  }
+
+  return { eventosValidos, eventosInvalidos: invalidacoes };
+}
+
 /**
  * Recalcula o estado completo da férias com base nos eventos sobreviventes.
  * Reconstrói dias, datas, observações derivadas e status.
@@ -147,8 +247,12 @@ export async function executarExclusaoAdminCadeia({
     if (lista[0]) feriasFresh = lista[0];
   } catch (_) { /* fallback para ferias da prop */ }
 
-  // Recalcular estado da férias usando dados frescos
-  const atualizacaoFerias = recalcularEstadoFerias(feriasFresh, sobreviventes);
+  const { eventosValidos } = await auditarDependenciasPosExclusao({
+    eventosSobreviventes: sobreviventes,
+  });
+
+  // Recalcular estado da férias usando apenas os eventos ainda válidos
+  const atualizacaoFerias = recalcularEstadoFerias(feriasFresh, eventosValidos);
   await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
   await sincronizarPeriodoAquisitivoDaFerias({
     periodoAquisitivoId: ferias.periodo_aquisitivo_id,
@@ -157,6 +261,8 @@ export async function executarExclusaoAdminCadeia({
   });
 
   queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+  queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+  queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
   queryClient.invalidateQueries({ queryKey: ['ferias'] });
   queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
 }

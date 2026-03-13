@@ -13,7 +13,11 @@ import {
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
-import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
+import {
+  montarCadeia,
+  identificarDescendentes,
+  executarExclusaoAdminCadeia,
+} from '@/components/ferias/feriasAdminUtils';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -380,39 +384,36 @@ export default function Publicacoes() {
 
       if (tipo === 'livro') {
         if (isFeriasOperacional(registro)) {
-          const feriasAtual = await base44.entities.Ferias.get(registro.ferias_id);
-          const allOpsBruto = await base44.entities.RegistroLivro.filter({ ferias_id: registro.ferias_id }, 'data_registro');
-          const allOps = allOpsBruto
-            .filter(op => TIPOS_FERIAS.includes(op.tipo_registro))
-            .sort(compareEventos);
+          const feriasList = await base44.entities.Ferias.filter({ id: registro.ferias_id });
+          const feriasAtual = feriasList[0];
 
-          const remainingOps = allOps.filter(op => op.id !== id);
-
-          if (!remainingOps.length) {
-            await base44.entities.Ferias.update(feriasAtual.id, {
-              status: 'Prevista',
-              saldo_remanescente: null,
-              dias_gozados_interrupcao: null,
-              data_interrupcao: null,
-            });
-            await sincronizarPeriodoAquisitivoDaFerias({
-              periodoAquisitivoId: feriasAtual.periodo_aquisitivo_id || null,
-              periodoAquisitivoRef: feriasAtual.periodo_aquisitivo_ref || null,
-              militarId: feriasAtual.militar_id || null,
-            });
+          if (!feriasAtual) {
             return base44.entities.RegistroLivro.delete(id);
           }
 
-          const novoEstado = buildFeriasStateFromChain(feriasAtual, remainingOps);
+          const allOpsBruto = await base44.entities.RegistroLivro.filter({ ferias_id: registro.ferias_id }, 'data_registro');
+          const allOps = allOpsBruto.filter(op => TIPOS_FERIAS.includes(op.tipo_registro));
+          const cadeia = montarCadeia(feriasAtual, allOps);
+          const eventoAlvo = cadeia.find((e) => e.id === id) || registro;
+          const descendentes = identificarDescendentes(eventoAlvo, cadeia);
 
-          await base44.entities.Ferias.update(feriasAtual.id, novoEstado);
-          await sincronizarPeriodoAquisitivoDaFerias({
-            periodoAquisitivoId: feriasAtual.periodo_aquisitivo_id || null,
-            periodoAquisitivoRef: feriasAtual.periodo_aquisitivo_ref || null,
-            militarId: feriasAtual.militar_id || null,
+          const descendentesPublicados = descendentes.filter((d) => calcStatusPublicacao(d) === 'Publicado');
+          if (descendentesPublicados.length > 0) {
+            throw new Error('Não é possível excluir este registro porque existem eventos posteriores já publicados na cadeia de férias.');
+          }
+
+          await executarExclusaoAdminCadeia({
+            ferias: feriasAtual,
+            eventoAlvo,
+            incluirDescendentes: descendentes.length > 0,
+            cadeia,
+            queryClient,
           });
-          return base44.entities.RegistroLivro.delete(id);
+
+          return;
         }
+
+        return base44.entities.RegistroLivro.delete(id);
       }
     },
     onSuccess: () => {
