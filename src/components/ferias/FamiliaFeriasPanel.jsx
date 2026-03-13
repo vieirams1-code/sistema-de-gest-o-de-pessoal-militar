@@ -240,9 +240,9 @@ function detectarInconsistencias(cadeia) {
 }
 
 export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) {
-  if (!ferias) return null;
-
   const eventosVinculados = useMemo(() => {
+    if (!ferias) return [];
+
     return montarCadeia(
       ferias,
       registrosLivro.filter(
@@ -313,6 +313,9 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
       cadeiaSaudavel: inconsistencias.length === 0,
     };
   }, [estadoCadeia, inconsistencias]);
+
+
+  if (!ferias) return null;
 
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-[460px] bg-white shadow-2xl z-50 flex flex-col border-l border-slate-200 overflow-hidden">

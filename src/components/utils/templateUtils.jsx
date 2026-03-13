@@ -71,9 +71,23 @@ export const formatPeriodoAquisitivo = (ref, periodo) => {
  * Constrói o mapa de variáveis para registros do Livro com base em férias + dados do registro.
  * Recebe opcionalmente o objeto periodo aquisitivo para gerar a data completa.
  */
-export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto } = {}) {
+export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto, interrupcaoInfo } = {}) {
   if (!ferias) return {};
-  const dias = ferias.dias || 0;
+  const diasBase = Number(ferias.dias || 0);
+  const diasNoMomento = Number(interrupcaoInfo?.diasNoMomento ?? diasBase);
+  const diasGozados = Number(
+    interrupcaoInfo?.diasGozados ??
+      ferias.dias_gozados_interrupcao ??
+      0
+  );
+  const saldoRemanescente = Number(
+    interrupcaoInfo?.saldoRemanescente ??
+      ferias.saldo_remanescente ??
+      Math.max(0, diasNoMomento - diasGozados)
+  );
+  const dataInterrupcao = interrupcaoInfo?.dataInterrupcao || ferias.data_interrupcao || dataRegistro || null;
+
+  const dias = diasBase;
   const desconto = diasDesconto || ferias._diasDesconto || 0;
   const abreviatura = abreviarPosto(ferias.militar_posto);
   return {
@@ -84,9 +98,13 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto } =
     data_inicio: formatDateBR(ferias.data_inicio),
     data_termino: formatDateBR(ferias.data_fim || ferias.data_termino),
     data_retorno: formatDateBR(ferias.data_retorno),
+    data_interrupcao: formatDateBR(dataInterrupcao),
     data_registro: formatDateBR(dataRegistro || ferias.data_inicio),
     dias: String(dias),
     dias_extenso: numeroPorExtenso(dias),
+    dias_gozados: String(diasGozados),
+    dias_gozados_interrupcao: String(diasGozados),
+    saldo_remanescente: String(saldoRemanescente),
     dias_desconto: String(desconto),
     dias_desconto_extenso: numeroPorExtenso(desconto),
     periodo_aquisitivo: formatPeriodoAquisitivo(ferias.periodo_aquisitivo_ref, periodo),
@@ -110,8 +128,12 @@ export const VARS_PREVIEW = {
   data_termino: '30/04/2026',
   data_retorno: '01/05/2026',
   data_registro: '01/04/2026',
+  data_interrupcao: '10/04/2026',
   dias: '30',
   dias_extenso: 'trinta',
+  dias_gozados: '10',
+  dias_gozados_interrupcao: '10',
+  saldo_remanescente: '20',
   periodo_aquisitivo: '01/09/2024 a 31/08/2025',
   periodo_aquisitivo_simplificado: '2024/2025',
   fracionamento: '1ª parcela',

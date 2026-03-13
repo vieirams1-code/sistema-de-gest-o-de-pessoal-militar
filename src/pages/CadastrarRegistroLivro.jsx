@@ -11,6 +11,7 @@ import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
+import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -365,7 +366,27 @@ export default function CadastrarRegistroLivro() {
       case 'Interrupção de Férias':
         if (selectedFerias) {
           const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
-          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
+          const diasNoMomento = Number(selectedFerias.dias || 0);
+          const inicioBase = selectedFerias.data_inicio ? new Date(`${selectedFerias.data_inicio}T00:00:00`) : null;
+          const interrupcaoDate = formData.data_registro ? new Date(`${formData.data_registro}T00:00:00`) : null;
+          let diasGozados = Number(selectedFerias.dias_gozados_interrupcao || 0);
+          if (inicioBase && interrupcaoDate && !Number.isNaN(inicioBase.getTime()) && !Number.isNaN(interrupcaoDate.getTime())) {
+            const diffMs = interrupcaoDate.getTime() - inicioBase.getTime();
+            diasGozados = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+          }
+          diasGozados = Math.min(diasGozados, diasNoMomento);
+          const saldoRemanescente = Math.max(0, diasNoMomento - diasGozados);
+          const vars = buildVarsLivro({
+            ferias: selectedFerias,
+            dataRegistro: formData.data_registro,
+            periodo: periodoFerias,
+            interrupcaoInfo: {
+              dataInterrupcao: formData.data_registro,
+              diasNoMomento,
+              diasGozados,
+              saldoRemanescente,
+            },
+          });
           const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Interrupção de Férias' && t.ativo !== false);
           if (tmpl?.template) {
             texto = aplicarTemplate(tmpl.template, vars);
@@ -383,7 +404,13 @@ export default function CadastrarRegistroLivro() {
       case 'Nova Saída / Retomada':
         if (selectedFerias) {
           const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
-          const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
+          const saldoRetomada = Number(selectedFerias.saldo_remanescente ?? selectedFerias.dias ?? 0);
+          const vars = buildVarsLivro({
+            ferias: selectedFerias,
+            dataRegistro: formData.data_registro,
+            periodo: periodoFerias,
+            interrupcaoInfo: { saldoRemanescente: saldoRetomada },
+          });
           const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Nova Saída / Retomada' && t.ativo !== false);
           if (tmpl?.template) {
             texto = aplicarTemplate(tmpl.template, vars);
@@ -546,6 +573,8 @@ export default function CadastrarRegistroLivro() {
 
 
     if (formData.ferias_id) {
+      let feriasAtualizada = false;
+
       if (tipoRegistroEfetivo === 'Nova Saída / Retomada' && selectedFerias) {
         const saldo = Number(selectedFerias.saldo_remanescente || selectedFerias.dias || 0);
         const novoFim = saldo > 0
@@ -563,6 +592,7 @@ export default function CadastrarRegistroLivro() {
           dias_gozados_interrupcao: null,
           data_interrupcao: null,
         });
+        feriasAtualizada = true;
       } else if (tipoRegistroEfetivo === 'Interrupção de Férias' && selectedFerias) {
         const diasNoMomento = Number(selectedFerias.dias || 0);
         const inicioBase = selectedFerias.data_inicio ? new Date(`${selectedFerias.data_inicio}T00:00:00`) : null;
@@ -584,15 +614,26 @@ export default function CadastrarRegistroLivro() {
           saldo_remanescente: saldoRemanescente,
           dias_gozados_interrupcao: diasGozados,
         });
+        feriasAtualizada = true;
       } else if (tipoRegistroEfetivo === 'Retorno Férias') {
         await base44.entities.Ferias.update(formData.ferias_id, {
           status: 'Gozada',
           data_retorno_registrada: new Date().toISOString()
         });
+        feriasAtualizada = true;
       } else if (tipoRegistroEfetivo === 'Saída Férias') {
         await base44.entities.Ferias.update(formData.ferias_id, {
           status: 'Em Curso',
           data_saida_registrada: new Date().toISOString()
+        });
+        feriasAtualizada = true;
+      }
+
+      if (feriasAtualizada) {
+        await sincronizarPeriodoAquisitivoDaFerias({
+          periodoAquisitivoId: selectedFerias?.periodo_aquisitivo_id || formData.periodo_aquisitivo_id || null,
+          periodoAquisitivoRef: selectedFerias?.periodo_aquisitivo_ref || formData.periodo_aquisitivo || null,
+          militarId: selectedFerias?.militar_id || formData.militar_id || null,
         });
       }
     }

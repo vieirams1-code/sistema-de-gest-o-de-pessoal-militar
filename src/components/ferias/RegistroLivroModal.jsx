@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -524,6 +525,8 @@ export default function RegistroLivroModal({
         texto_publicacao: textoPublicacao || '',
       };
 
+      let feriasAtualizada = false;
+
       if (tipoRegistro === 'Interrupção de Férias' && resumo) {
         registroPayload.dias = Number(resumo.diasNoMomento || ferias.dias || 0);
         registroPayload.dias_no_momento = Number(resumo.diasNoMomento || ferias.dias || 0);
@@ -538,6 +541,7 @@ export default function RegistroLivroModal({
           saldo_remanescente: Number(resumo.saldo || 0),
           data_interrupcao: dataRegistro,
         });
+        feriasAtualizada = true;
       } else if (tipoRegistro === 'Nova Saída / Retomada' && resumo) {
         const saldo = Number(resumo.saldo || 0);
 
@@ -555,6 +559,7 @@ export default function RegistroLivroModal({
           saldo_remanescente: null,
           data_interrupcao: null,
         });
+        feriasAtualizada = true;
       } else if (tipoRegistro === 'Saída Férias' && resumo) {
         registroPayload.dias = Number(resumo.dias || ferias.dias || 0);
 
@@ -566,14 +571,24 @@ export default function RegistroLivroModal({
           data_fim: resumo.fim,
           data_retorno: resumo.retorno,
         });
+        feriasAtualizada = true;
       } else if (tipoRegistro === 'Retorno Férias') {
         await base44.entities.RegistroLivro.create(registroPayload);
 
         await base44.entities.Ferias.update(ferias.id, {
           status: 'Gozada',
         });
+        feriasAtualizada = true;
       } else {
         await base44.entities.RegistroLivro.create(registroPayload);
+      }
+
+      if (feriasAtualizada) {
+        await sincronizarPeriodoAquisitivoDaFerias({
+          periodoAquisitivoId: ferias.periodo_aquisitivo_id || null,
+          periodoAquisitivoRef: ferias.periodo_aquisitivo_ref || null,
+          militarId: ferias.militar_id || null,
+        });
       }
 
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
