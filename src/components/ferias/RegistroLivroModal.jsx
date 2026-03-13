@@ -88,10 +88,10 @@ function compareEvents(a, b) {
 }
 
 function deriveUltimaInterrupcao(ferias, registros) {
-  const ultima = [...registros]
-    .filter((r) => r.tipo_registro === 'Interrupção de Férias')
-    .sort(compareEvents)
-    .pop();
+  const cadeia = [...registros].sort(compareEvents);
+  const ultima = [...cadeia]
+    .reverse()
+    .find((r) => r.tipo_registro === 'Interrupção de Férias');
 
   if (!ultima) return null;
 
@@ -100,8 +100,15 @@ function deriveUltimaInterrupcao(ferias, registros) {
   let gozados = null;
   let saldo = null;
 
-  if (ferias?.data_inicio && ultima.data_registro) {
-    const inicio = parseDate(ferias.data_inicio);
+  const indiceInterrupcao = cadeia.findIndex((evento) => evento?.id === ultima?.id);
+  const eventosAteInterrupcao = indiceInterrupcao >= 0 ? cadeia.slice(0, indiceInterrupcao + 1) : cadeia;
+  const ultimoInicio = [...eventosAteInterrupcao]
+    .reverse()
+    .find((evento) => evento?.tipo_registro === 'Saída Férias' || evento?.tipo_registro === 'Nova Saída / Retomada');
+  const dataInicioBase = ultimoInicio?.data_registro || ultimoInicio?.data_inicio || ferias?.data_inicio;
+
+  if (dataInicioBase && ultima.data_registro) {
+    const inicio = parseDate(dataInicioBase);
     const interrupcao = parseDate(ultima.data_registro);
     gozados = Math.max(0, differenceInDays(interrupcao, inicio) + 1);
     gozados = Math.min(gozados, diasNoMomento);
