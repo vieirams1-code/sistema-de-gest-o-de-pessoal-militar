@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,11 +27,14 @@ import {
   ExternalLink,
   Star,
   AlertTriangle,
-  Stamp,
-  XCircle,
   PenLine,
   Ban,
-  GitBranch
+  GitBranch,
+  Shield,
+  Link2,
+  BadgeCheck,
+  FileBadge,
+  User
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
@@ -39,7 +42,8 @@ import { createPageUrl } from '@/utils';
 const statusColors = {
   'Aguardando Nota': 'bg-amber-100 text-amber-700 border-amber-200',
   'Aguardando Publicação': 'bg-blue-100 text-blue-700 border-blue-200',
-  'Publicado': 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  'Publicado': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'Inconsistente': 'bg-red-100 text-red-700 border-red-200',
 };
 
 function calcStatus(nota, numBg, dataBg) {
@@ -99,6 +103,60 @@ function getEditUrl(registro) {
   return `${createPageUrl('CadastrarRegistroLivro')}?id=${registro.id}`;
 }
 
+function formatDate(d) {
+  if (!d) return '-';
+  try {
+    if (String(d).includes('T')) return format(new Date(d), 'dd/MM/yyyy');
+    return format(new Date(`${d}T00:00:00`), 'dd/MM/yyyy');
+  } catch {
+    return d;
+  }
+}
+
+function gerarCodigo(id) {
+  if (!id) return '—';
+  return `PUB-${id.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(-4)}`;
+}
+
+function getActBadgeClasses(grupo, tipo) {
+  if (grupo === 'Férias') {
+    if (tipo === 'Interrupção') return 'bg-cyan-50 text-cyan-800 border-cyan-200';
+    if (tipo === 'Início') return 'bg-blue-50 text-blue-800 border-blue-200';
+    if (tipo === 'Continuação') return 'bg-indigo-50 text-indigo-800 border-indigo-200';
+    if (tipo === 'Término') return 'bg-amber-50 text-amber-800 border-amber-200';
+    return 'bg-cyan-50 text-cyan-800 border-cyan-200';
+  }
+  if (grupo === 'Atestado') return 'bg-rose-50 text-rose-800 border-rose-200';
+  return 'bg-slate-100 text-slate-700 border-slate-200';
+}
+
+function getIntegridadeBadge(registro) {
+  if (
+    registro.status_calculado === 'Inconsistente' ||
+    registro.integridade_status === 'inconsistente' ||
+    registro.inconsistencia_contrato?.motivo_curto
+  ) {
+    return {
+      label: 'INCONSISTENTE',
+      className: 'bg-red-100 text-red-800 border-red-200'
+    };
+  }
+
+  return {
+    label: 'INTEGRIDADE OK',
+    className: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+  };
+}
+
+function FieldBlock({ label, children, className = '' }) {
+  return (
+    <div className={`rounded-xl border border-slate-200 bg-slate-50 p-4 ${className}`}>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">{label}</p>
+      <div className="text-sm text-slate-800">{children}</div>
+    </div>
+  );
+}
+
 export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [] }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -125,9 +183,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   );
 
   const isPublicado = currentStatus === 'Publicado';
-
-  // foiApostilada só é verdadeiro se a Apostila vinculada ainda é válida (não foi TSE)
-  // Tipo do registro: original, apostila ou TSE
   const isApostila = registro.tipo === 'Apostila';
   const isTSE = registro.tipo === 'Tornar sem Efeito';
   const isDerivado = isApostila || isTSE;
@@ -135,38 +190,24 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const apostilaVinculada = registro.apostilada_por_id
     ? todosRegistros.find(r => r.id === registro.apostilada_por_id)
     : null;
-  // Para Apostilas: verifica se a apostila vinculada ainda não foi tornada sem efeito
   const apostilaAindaValida = apostilaVinculada
     ? !apostilaVinculada.tornada_sem_efeito_por_id && !todosRegistros.find(r => r.tipo === 'Tornar sem Efeito' && r.publicacao_referencia_id === apostilaVinculada.id)
     : !!registro.apostilada_por_id;
   const foiApostilada = apostilaAindaValida;
 
-  // Para Apostilas: verifica também se existe um TSE derivado em todosRegistros referenciando esta
   const tseDaApostila = isApostila
     ? todosRegistros.find(r => r.tipo === 'Tornar sem Efeito' && r.publicacao_referencia_id === registro.id)
     : null;
   const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id || !!tseDaApostila;
   const temFamilia = foiApostilada || foiTornadaSemEfeito || !!registro.publicacao_referencia_id;
 
-  // Regras de ações por tipo:
-  // 3.1 Original publicada e válida → Nota/BG + Apostila + TSE + Família
-  // 3.2 Original já tornada sem efeito → Nota/BG + Família
-  // 3.3 Apostila publicada → Nota/BG + TSE + Família (NÃO Apostila)
-  // 3.4 TSE publicada → Nota/BG + Família (NÃO Apostila, NÃO TSE)
   const podeApostilar = isPublicado && !foiTornadaSemEfeito && !isDerivado;
-  const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && (
-    (!isDerivado) || // original válida
-    (isApostila)    // apostila publicada também pode ser tornada sem efeito
-  ) && !isTSE;     // TSE não pode ser tornada sem efeito
+  const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
   const podeMarcarPrioridade = !isPublicado;
   const podeEditar = !isPublicado;
   const podeExcluir = !isPublicado;
 
-  const liveStatus = calcStatus(
-    bgData.nota_para_bg,
-    bgData.numero_bg,
-    bgData.data_bg
-  );
+  const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
   const tipoBase =
     registro.tipo_registro ||
@@ -178,8 +219,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const tipoLabel = getTipoDisplay(tipoBase);
   const grupoLabel = registro.grupo_display || getGrupoDisplay(registro);
-
-  // Ver Atestado: Homologação de Atestado tem atestado_homologado_id; Ata JISO tem atestados_jiso_ids
   const atestadoLink = registro.atestado_homologado_id
     ? `${createPageUrl('VerAtestado')}?id=${registro.atestado_homologado_id}`
     : null;
@@ -187,25 +226,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     ? registro.atestados_jiso_ids
     : null;
 
-  // Código funcional legível
-  function gerarCodigo(id) {
-    if (!id) return '—';
-    return `PUB-${id.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(-4)}`;
-  }
-
   const codigoPrincipal = registro.publicacao_referencia_id ? gerarCodigo(registro.publicacao_referencia_id) : null;
   const urlPrincipal = registro.publicacao_referencia_id
     ? `${createPageUrl('CadastrarPublicacao')}?id=${registro.publicacao_referencia_id}`
     : null;
-
-  const formatDate = (d) => {
-    if (!d) return '-';
-    try {
-      return format(new Date(d + 'T00:00:00'), 'dd/MM/yyyy');
-    } catch {
-      return d;
-    }
-  };
 
   const handleTogglePrioridade = (e, flag) => {
     e.stopPropagation();
@@ -214,11 +238,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   };
 
   const handleSaveBg = () => {
-    const novoStatus = calcStatus(
-      bgData.nota_para_bg,
-      bgData.numero_bg,
-      bgData.data_bg
-    );
+    const novoStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
     const updateData =
       origemTipo === 'atestado'
@@ -244,16 +264,20 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   };
 
   const handleApostila = () => {
-    navigate(
-      `${createPageUrl('CadastrarPublicacao')}?tipo=Apostila&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`
-    );
+    navigate(`${createPageUrl('CadastrarPublicacao')}?tipo=Apostila&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`);
   };
 
   const handleTornarSemEfeito = () => {
-    navigate(
-      `${createPageUrl('CadastrarPublicacao')}?tipo=Tornar+sem+Efeito&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`
-    );
+    navigate(`${createPageUrl('CadastrarPublicacao')}?tipo=Tornar+sem+Efeito&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`);
   };
+
+  const integridadeBadge = getIntegridadeBadge(registro);
+  const nomeInstitucional = registro.militar_nome_institucional || registro.militar_nome || 'Militar';
+  const dataHeader = formatDate(registro.data_registro || registro.created_date || registro.data_inicio);
+  const textoPublicacao = publicacaoContrato?.texto || registro.texto_publicacao || 'Sem texto gerado.';
+  const origemLabel = contratoLivro
+    ? (registro.origem || 'Automática')
+    : (origemTipo === 'ex-officio' ? 'Ex Officio' : origemTipo === 'atestado' ? 'Atestado' : 'Manual');
 
   return (
     <>
@@ -269,715 +293,257 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={handleDelete}
-            >
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDelete}>
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card
-        className={`border hover:shadow-md transition-shadow ${
-          isTSE
-            ? 'border-red-200 bg-red-50/40'
-            : isApostila && foiTornadaSemEfeito
-              ? 'border-red-200 bg-red-50/30'
-            : isApostila
-              ? 'border-purple-200 bg-purple-50/40'
-            : foiTornadaSemEfeito
-              ? 'border-red-200 bg-red-50/30'
-            : foiApostilada
-              ? 'border-purple-200 bg-purple-50/30'
-            : !isPublicado && registro.urgente
-              ? 'border-red-400 bg-red-50'
-            : !isPublicado && registro.importante
-              ? 'border-amber-400 bg-amber-50'
-            : 'border-slate-200'
-        }`}
-      >
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-2 flex-wrap">
-                {/* Badges de tipo derivado — discretas, antes do nome */}
-                {isTSE && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                    <Ban className="w-3 h-3" />
-                    TSE
-                  </span>
-                )}
-
-                {isApostila && !foiTornadaSemEfeito && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                    <Stamp className="w-3 h-3" />
-                    Apostila
-                  </span>
-                )}
-
-                {/* Badge na Apostila tornada sem efeito */}
-                {isApostila && foiTornadaSemEfeito && (
-                  <>
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                      <Stamp className="w-3 h-3" />
-                      Apostila
-                    </span>
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                      <XCircle className="w-3 h-3" />
-                      Sem Validade
-                    </span>
-                  </>
-                )}
-
-                {/* Badge na original: sem validade — discreta */}
-                {!isDerivado && foiTornadaSemEfeito && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                    <XCircle className="w-3 h-3" />
-                    Sem Validade
-                  </span>
-                )}
-
-                {/* Badge na original: apostilada — discreta */}
-                {!isDerivado && foiApostilada && !foiTornadaSemEfeito && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-purple-500 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                    <Stamp className="w-3 h-3" />
-                    Apostilada
-                  </span>
-                )}
-
-                {registro.urgente && !isPublicado && (
-                  <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
-                    <AlertTriangle className="w-3 h-3" />
-                    URGENTE
-                  </span>
-                )}
-
-                {registro.importante && !registro.urgente && !isPublicado && (
-                  <span className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                    <Star className="w-3 h-3" />
-                    IMPORTANTE
-                  </span>
-                )}
-
-                <h3 className="font-semibold text-lg text-slate-900 truncate">
-                  {registro.militar_posto && `${registro.militar_posto} `}
-                  {registro.militar_nome}
-                </h3>
-
-                <Badge className={statusColors[currentStatus]}>
-                  {currentStatus}
-                </Badge>
+      <Card className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-200">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+            <div className="flex items-start gap-4 min-w-0">
+              <div className="w-14 h-14 rounded-full border-2 border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                <User className="w-7 h-7" />
               </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2.5 mb-2">
+                  {isTSE && <Badge className="border bg-red-50 text-red-700 border-red-200">TSE</Badge>}
+                  {isApostila && <Badge className="border bg-purple-50 text-purple-700 border-purple-200">Apostila</Badge>}
+                  {foiTornadaSemEfeito && <Badge className="border bg-red-50 text-red-700 border-red-200">Sem Validade</Badge>}
+                  {foiApostilada && !isDerivado && !foiTornadaSemEfeito && <Badge className="border bg-purple-50 text-purple-700 border-purple-200">Apostilada</Badge>}
+                  {registro.urgente && !isPublicado && <Badge className="border bg-red-100 text-red-700 border-red-200">URGENTE</Badge>}
+                  {registro.importante && !registro.urgente && !isPublicado && <Badge className="border bg-amber-100 text-amber-700 border-amber-200">IMPORTANTE</Badge>}
 
-              <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-                {registro.militar_matricula && (
-                  <span>Mat: {registro.militar_matricula}</span>
+                  <h3 className="text-[2rem] leading-none font-bold text-slate-900 tracking-tight">{nomeInstitucional}</h3>
+
+                  <Badge className={`border ${statusColors[registro.status_calculado] || statusColors[currentStatus] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                    {registro.status_calculado || currentStatus}
+                  </Badge>
+                  <Badge className={`border ${integridadeBadge.className}`}>{integridadeBadge.label}</Badge>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                  <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-semibold">
+                    MAT: {registro.militar_matricula || '—'}
+                  </span>
+                  {grupoLabel && <Badge className={`border ${getActBadgeClasses(grupoLabel, tipoLabel)}`}>{grupoLabel.toUpperCase()}</Badge>}
+                  {tipoLabel && <Badge className={`border ${getActBadgeClasses(grupoLabel, tipoLabel)}`}>{tipoLabel.toUpperCase()}</Badge>}
+                  <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+                    <Calendar className="w-4 h-4" />{dataHeader}
+                  </span>
+                  {registro.numero_bg && <span className="font-medium text-emerald-700">BG Nº {registro.numero_bg}</span>}
+                </div>
+
+                {isDerivado && codigoPrincipal && (
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap text-xs">
+                    <span className="text-slate-400">Publicação principal:</span>
+                    <button onClick={(e) => { e.stopPropagation(); navigate(urlPrincipal); }} className="flex items-center gap-1 font-mono font-semibold text-[#1e3a5f] hover:underline">
+                      <ExternalLink className="w-3 h-3" />{codigoPrincipal}
+                    </button>
+                  </div>
                 )}
-
-                {grupoLabel === 'Férias' ? (
-                  <span className="flex items-center gap-2 flex-wrap">
-                    <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200">
-                      Férias
-                    </Badge>
-                    <Badge className="bg-slate-100 text-slate-700 border-slate-200">
-                      {tipoLabel}
-                    </Badge>
-                  </span>
-                ) : tipoLabel ? (
-                  <span className="flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5" />
-                    {tipoLabel}
-                  </span>
-                ) : null}
-
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" />
-                  {formatDate(registro.data_registro || registro.data_publicacao)}
-                </span>
-
-                {registro.numero_bg && (
-                  <span className="font-medium text-emerald-700">
-                    BG Nº {registro.numero_bg}
-                  </span>
-                )}
-
                 {atestadoLink && (
-                  <a
-                    href={atestadoLink}
-                    className="flex items-center gap-1 text-blue-600 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(atestadoLink);
-                    }}
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Ver Atestado
-                  </a>
+                  <button onClick={(e) => { e.stopPropagation(); navigate(atestadoLink); }} className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                    <ExternalLink className="w-3.5 h-3.5" />Ver Atestado
+                  </button>
                 )}
                 {atestadosJISOIds && (
-                  atestadosJISOIds.length === 1 ? (
-                    <a
-                      href={`${createPageUrl('VerAtestado')}?id=${atestadosJISOIds[0]}`}
-                      className="flex items-center gap-1 text-blue-600 hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`${createPageUrl('VerAtestado')}?id=${atestadosJISOIds[0]}`);
-                      }}
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      Ver Atestado
-                    </a>
-                  ) : (
-                    <span className="flex items-center gap-1 text-blue-600 text-sm font-medium">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      {atestadosJISOIds.length} atestado(s) vinculado(s)
-                    </span>
-                  )
+                  <span className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 font-medium">
+                    <ExternalLink className="w-3.5 h-3.5" />{atestadosJISOIds.length} atestado(s) vinculado(s)
+                  </span>
                 )}
               </div>
-
-              {/* Vínculos rápidos — derivadas mostram a principal; original mostra quem a afetou */}
-              {isDerivado && codigoPrincipal && (
-                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs text-slate-400">Publicação principal:</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); navigate(urlPrincipal); }}
-                    className="flex items-center gap-1 text-xs font-mono font-semibold text-[#1e3a5f] hover:underline"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    {codigoPrincipal}
-                  </button>
-                </div>
-              )}
-
-              {((!isDerivado && (foiTornadaSemEfeito || foiApostilada)) || (isApostila && foiTornadaSemEfeito)) && (
-                <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                  {!isDerivado && foiApostilada && registro.apostilada_por_id && (
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500 bg-purple-50 border border-purple-200 rounded px-2 py-0.5">
-                      <Stamp className="w-3 h-3 text-purple-400" />
-                      <span>Apostilada por:</span>
-                      <span className="font-mono font-semibold text-purple-700">{gerarCodigo(registro.apostilada_por_id)}</span>
-                    </span>
-                  )}
-                  {foiTornadaSemEfeito && registro.tornada_sem_efeito_por_id && (
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500 bg-red-50 border border-red-200 rounded px-2 py-0.5">
-                      <XCircle className="w-3 h-3 text-red-400" />
-                      <span>Sem efeito por:</span>
-                      <span className="font-mono font-semibold text-red-600">{gerarCodigo(registro.tornada_sem_efeito_por_id)}</span>
-                    </span>
-                  )}
-                  {isApostila && foiTornadaSemEfeito && tseDaApostila && !registro.tornada_sem_efeito_por_id && (
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500 bg-red-50 border border-red-200 rounded px-2 py-0.5">
-                      <XCircle className="w-3 h-3 text-red-400" />
-                      <span>Sem efeito por:</span>
-                      <span className="font-mono font-semibold text-red-600">{gerarCodigo(tseDaApostila.id)}</span>
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
 
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center flex-wrap gap-2 xl:justify-end">
               {podeMarcarPrioridade && (
                 <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title={registro.urgente ? 'Remover Urgente' : 'Marcar como Urgente'}
-                    onClick={(e) => handleTogglePrioridade(e, 'urgente')}
-                    className={`text-xs gap-1 ${
-                      registro.urgente
-                        ? 'text-red-600'
-                        : 'text-slate-400 hover:text-red-500'
-                    }`}
-                  >
+                  <Button variant="ghost" size="sm" onClick={(e) => handleTogglePrioridade(e, 'urgente')} className={registro.urgente ? 'text-red-600' : 'text-slate-400 hover:text-red-500'}>
                     <AlertTriangle className="w-4 h-4" />
                   </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title={registro.importante ? 'Remover Importante' : 'Marcar como Importante'}
-                    onClick={(e) => handleTogglePrioridade(e, 'importante')}
-                    className={`text-xs gap-1 ${
-                      registro.importante
-                        ? 'text-amber-500'
-                        : 'text-slate-400 hover:text-amber-500'
-                    }`}
-                  >
+                  <Button variant="ghost" size="sm" onClick={(e) => handleTogglePrioridade(e, 'importante')} className={registro.importante ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'}>
                     <Star className="w-4 h-4" />
                   </Button>
                 </>
               )}
-
               {!isEditingBg && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Preencher Nota/BG"
-                  onClick={() => {
-                    setIsEditingBg(true);
-                    setIsExpanded(true);
-                  }}
-                  className="text-slate-500 hover:text-blue-600 text-xs gap-1"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span className="hidden sm:inline">Nota/BG</span>
+                <Button variant="ghost" size="sm" onClick={() => { setIsEditingBg(true); setIsExpanded(true); }} className="text-slate-500 hover:text-blue-600 text-xs gap-1">
+                  <FileText className="w-4 h-4" /><span className="hidden sm:inline">Nota/BG</span>
                 </Button>
               )}
-
               {podeEditar && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Editar publicação"
-                  onClick={() => navigate(getEditUrl(registro))}
-                  className="text-slate-500 hover:text-[#1e3a5f] text-xs gap-1"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Editar</span>
+                <Button variant="ghost" size="sm" onClick={() => navigate(getEditUrl(registro))} className="text-slate-500 hover:text-[#1e3a5f] text-xs gap-1">
+                  <Edit2 className="w-4 h-4" /><span className="hidden sm:inline">Editar</span>
                 </Button>
               )}
-
               {podeApostilar && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Fazer Apostila"
-                  onClick={handleApostila}
-                  className="text-purple-500 hover:text-purple-700 text-xs gap-1"
-                >
-                  <PenLine className="w-4 h-4" />
-                  <span className="hidden sm:inline">Apostila</span>
+                <Button variant="ghost" size="sm" onClick={handleApostila} className="text-purple-500 hover:text-purple-700 text-xs gap-1">
+                  <PenLine className="w-4 h-4" /><span className="hidden sm:inline">Apostila</span>
                 </Button>
               )}
-
               {podeTornarSemEfeito && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Tornar sem Efeito"
-                  onClick={handleTornarSemEfeito}
-                  className="text-red-500 hover:text-red-700 text-xs gap-1"
-                >
-                  <Ban className="w-4 h-4" />
-                  <span className="hidden sm:inline">Tornar s/ Efeito</span>
+                <Button variant="ghost" size="sm" onClick={handleTornarSemEfeito} className="text-red-500 hover:text-red-700 text-xs gap-1">
+                  <Ban className="w-4 h-4" /><span className="hidden sm:inline">Tornar s/ Efeito</span>
                 </Button>
               )}
-
               {podeExcluir && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Excluir"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="text-slate-500 hover:text-red-600"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(true)} className="text-slate-500 hover:text-red-600">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               )}
-
               {temFamilia && onVerFamilia && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Ver família da publicação"
-                  onClick={onVerFamilia}
-                  className="text-[#1e3a5f] hover:text-[#1e3a5f] hover:bg-[#1e3a5f]/10 text-xs gap-1"
-                >
-                  <GitBranch className="w-4 h-4" />
-                  <span className="hidden sm:inline">Família</span>
+                <Button variant="ghost" size="sm" onClick={onVerFamilia} className="text-[#1e3a5f] hover:bg-[#1e3a5f]/10 text-xs gap-1">
+                  <GitBranch className="w-4 h-4" /><span className="hidden sm:inline">Família</span>
                 </Button>
               )}
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-              >
-                {isExpanded ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
+              <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)}>
+                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </Button>
             </div>
           </div>
-        </CardHeader>
+        </div>
 
         {isExpanded && (
-          <CardContent className="pt-0 border-t border-slate-100">
+          <CardContent className="p-5">
             {isEditingBg ? (
-              <div className="mt-4 space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
-                  Preencher Nota / BG
-                </p>
-
+              <div className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Preencher Nota / BG</p>
                 <div>
                   <Label className="text-sm font-medium">Nota para BG</Label>
-                  <Input
-                    value={bgData.nota_para_bg}
-                    onChange={(e) =>
-                      setBgData((d) => ({ ...d, nota_para_bg: e.target.value }))
-                    }
-                    className="mt-1 bg-white"
-                    placeholder="Ex: 001/2025"
-                  />
+                  <Input value={bgData.nota_para_bg} onChange={(e) => setBgData((d) => ({ ...d, nota_para_bg: e.target.value }))} className="mt-1 bg-white" />
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-sm font-medium">Número do BG</Label>
-                    <Input
-                      value={bgData.numero_bg}
-                      onChange={(e) =>
-                        setBgData((d) => ({ ...d, numero_bg: e.target.value }))
-                      }
-                      className="mt-1 bg-white"
-                      placeholder="Ex: 045/2025"
-                    />
+                    <Input value={bgData.numero_bg} onChange={(e) => setBgData((d) => ({ ...d, numero_bg: e.target.value }))} className="mt-1 bg-white" />
                   </div>
-
                   <div>
                     <Label className="text-sm font-medium">Data do BG</Label>
-                    <Input
-                      type="date"
-                      value={bgData.data_bg}
-                      onChange={(e) =>
-                        setBgData((d) => ({ ...d, data_bg: e.target.value }))
-                      }
-                      className="mt-1 bg-white"
-                    />
+                    <Input type="date" value={bgData.data_bg} onChange={(e) => setBgData((d) => ({ ...d, data_bg: e.target.value }))} className="mt-1 bg-white" />
                   </div>
                 </div>
-
                 <div className="flex items-center gap-2">
-                  <Badge className={`${statusColors[liveStatus]} text-xs`}>
-                    → {liveStatus}
-                  </Badge>
-                  <span className="text-xs text-slate-500">status resultante</span>
+                  <Badge className={`${statusColors[liveStatus]} text-xs`}>→ {liveStatus}</Badge>
                 </div>
-
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleSaveBg}
-                    className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                  >
-                    <Save className="w-4 h-4 mr-1" />
-                    Salvar
-                  </Button>
-
-                  <Button size="sm" variant="outline" onClick={handleCancelBg}>
-                    <X className="w-4 h-4 mr-1" />
-                    Cancelar
-                  </Button>
+                  <Button size="sm" onClick={handleSaveBg} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"><Save className="w-4 h-4 mr-1" />Salvar</Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelBg}><X className="w-4 h-4 mr-1" />Cancelar</Button>
                 </div>
               </div>
             ) : (
-              <div className="mt-4 space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-sm bg-slate-50 rounded-lg border border-slate-100 p-3">
-
-
-                {contratoLivro && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div className="p-3 rounded-lg border bg-slate-50">
-                        <p className="text-xs text-slate-400 uppercase tracking-wide">Origem</p>
-                        <p className="font-medium text-slate-700">{registro.origem || '—'}</p>
+              <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FieldBlock label="Origem"><div className="text-2xl font-semibold text-slate-900">{origemLabel}</div></FieldBlock>
+                    <FieldBlock label="Data (Contrato)">
+                      <div className="space-y-1">
+                        <div className="font-semibold text-slate-900">{formatDate(registro.data_registro || registro.data_inicio)}</div>
+                        {(registro.data_fim || registro.data_termino) && <div className="font-semibold text-slate-700">{formatDate(registro.data_fim || registro.data_termino)}</div>}
                       </div>
-                      <div className="p-3 rounded-lg border bg-slate-50">
-                        <p className="text-xs text-slate-400 uppercase tracking-wide">Data (Contrato)</p>
-                        <p className="font-medium text-slate-700">{registro.data_display || formatDate(registro.data_registro)}</p>
-                      </div>
+                    </FieldBlock>
+                  </div>
+
+                  <FieldBlock label="Identificação do Ato">
+                    <div className="space-y-1.5">
+                      <p><span className="font-semibold">Criado em:</span> {detalhesContrato?.criado_em || formatDate(registro.created_date)}</p>
+                      <p><span className="font-semibold">Atualizado em:</span> {detalhesContrato?.atualizado_em || '—'}</p>
+                      {registro.assunto && <p><span className="font-semibold">Assunto:</span> {registro.assunto}</p>}
                     </div>
+                  </FieldBlock>
 
-                    {detalhesContrato && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Detalhes do Ato</p>
-                        <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
-                          {detalhesContrato.observacoes && <p><span className="font-medium">Observações:</span> {detalhesContrato.observacoes}</p>}
-                          {detalhesContrato.criado_em && <p><span className="font-medium">Criado em:</span> {detalhesContrato.criado_em}</p>}
-                          {detalhesContrato.atualizado_em && <p><span className="font-medium">Atualizado em:</span> {detalhesContrato.atualizado_em}</p>}
-                        </div>
-                      </div>
-                    )}
-
-                    {vinculosContrato && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Vínculos</p>
-                        <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
-                          <p><span className="font-medium">Férias:</span> {vinculosContrato?.ferias?.label || '—'}</p>
-                          <p><span className="font-medium">Período:</span> {vinculosContrato?.periodo?.label || '—'}</p>
-                          <p><span className="font-medium">Cadeia:</span> {vinculosContrato?.cadeia?.existe ? `${vinculosContrato.cadeia.total_eventos} evento(s)` : 'Sem cadeia'}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {publicacaoContrato && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Publicação Gerada</p>
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-slate-700 space-y-1">
-                          <p><span className="font-medium">Status:</span> {publicacaoContrato.status || '—'}</p>
-                          <p><span className="font-medium">Nota:</span> {publicacaoContrato.nota_para_bg || '—'}</p>
-                          <p><span className="font-medium">BG:</span> {publicacaoContrato.numero_bg || '—'}</p>
-                          <p><span className="font-medium">Data BG:</span> {formatDate(publicacaoContrato.data_bg)}</p>
-                          {publicacaoContrato.texto && <p><span className="font-medium">Texto:</span> {publicacaoContrato.texto}</p>}
-                        </div>
-                      </div>
-                    )}
-
-                    {inconsistenciaContrato && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Inconsistência</p>
-                        <div className="p-3 bg-red-50 rounded-lg border border-red-100 text-sm text-slate-700">
-                          <p className="font-medium text-red-700">{inconsistenciaContrato.motivo_curto}</p>
-                          {inconsistenciaContrato.detalhe && <p>{inconsistenciaContrato.detalhe}</p>}
-                        </div>
-                      </div>
-                    )}
-
-                    {cadeiaEventosContrato.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Cadeia de Eventos</p>
-                        <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-700 space-y-1">
-                          {cadeiaEventosContrato.map((evento) => (
-                            <p key={evento.id}>
-                              {evento.atual ? '• ' : '- '} {evento.tipo} ({evento.data})
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">
-                      Nota para BG
-                    </p>
-                    <p className="font-semibold mt-0.5 text-slate-800">
-                      {registro.nota_para_bg || '—'}
-                    </p>
-                  </div>
+                  <FieldBlock label="Origem e Vínculos">
+                    <div className="space-y-1.5">
+                      <p><span className="font-semibold">Férias:</span> {vinculosContrato?.ferias?.label || (registro.ferias_id ? `Vinculada (${registro.ferias_id})` : '—')}</p>
+                      <p><span className="font-semibold">Período:</span> {vinculosContrato?.periodo?.label || registro.periodo_aquisitivo || '—'}</p>
+                      <p><span className="font-semibold">Cadeia:</span> {vinculosContrato?.cadeia?.existe ? `${vinculosContrato.cadeia.total_eventos} evento(s)` : (cadeiaEventosContrato.length ? `${cadeiaEventosContrato.length} evento(s)` : 'Sem cadeia')}</p>
+                      {registro.publicacao_referencia_id && <p><span className="font-semibold">Código principal:</span> {gerarCodigo(registro.publicacao_referencia_id)}</p>}
+                    </div>
+                  </FieldBlock>
 
                   <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">
-                      Número do BG
-                    </p>
-                    <p className="font-semibold mt-0.5 text-slate-800">
-                      {registro.numero_bg || '—'}
-                    </p>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Texto da Publicação</p>
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-5 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      <div className="mb-3 space-y-1">
+                        <p><span className="font-semibold">Status:</span> {publicacaoContrato?.status || registro.status_calculado || currentStatus}</p>
+                        <p><span className="font-semibold">Nota:</span> {registro.nota_para_bg || publicacaoContrato?.nota_para_bg || '—'}</p>
+                      </div>
+                      {textoPublicacao}
+                    </div>
                   </div>
 
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">
-                      Data do BG
-                    </p>
-                    <p className="font-semibold mt-0.5 text-slate-800">
-                      {formatDate(registro.data_bg)}
-                    </p>
-                  </div>
+                  {registro.observacoes && (
+                    <FieldBlock label="Observações"><div className="text-slate-700">{registro.observacoes}</div></FieldBlock>
+                  )}
                 </div>
 
-                {(registro.data_inicio ||
-                  registro.data_termino ||
-                  registro.data_retorno ||
-                  registro.dias ||
-                  registro.periodo_aquisitivo ||
-                  registro.data_designacao ||
-                  registro.data_melhoria ||
-                  registro.data_punicao) && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                      Datas e Período
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                      {registro.data_inicio && (
-                        <div>
-                          <p className="text-xs text-slate-400">Data Início</p>
-                          <p className="font-medium text-slate-700">
-                            {formatDate(registro.data_inicio)}
-                          </p>
-                        </div>
-                      )}
+                <div className="space-y-5">
+                  <FieldBlock label="Nota para BG"><div className="font-semibold">{registro.nota_para_bg || '—'}</div></FieldBlock>
+                  <FieldBlock label="Número do BG"><div className="font-semibold">{registro.numero_bg || '—'}</div></FieldBlock>
+                  <FieldBlock label="Rastreabilidade">
+                    {cadeiaEventosContrato.length > 0 ? (
+                      <div className="space-y-2">
+                        {cadeiaEventosContrato.map((evento) => (
+                          <div key={evento.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${evento.atual ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'}`}>
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2.5 h-2.5 rounded-full ${evento.atual ? 'bg-amber-500' : 'bg-slate-300'}`}></span>
+                              <span className="font-medium text-slate-800">{evento.tipo}</span>
+                            </div>
+                            <span className="text-sm text-slate-500">{evento.data}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <div className="text-slate-500">Sem rastreabilidade detalhada.</div>}
+                  </FieldBlock>
+                  <FieldBlock label="Data do BG"><div className="font-semibold">{formatDate(registro.data_bg)}</div></FieldBlock>
 
-                      {registro.data_termino && (
-                        <div>
-                          <p className="text-xs text-slate-400">Data Término</p>
-                          <p className="font-medium text-slate-700">
-                            {formatDate(registro.data_termino)}
-                          </p>
-                        </div>
-                      )}
+                  {(registro.data_inicio || registro.data_termino || registro.data_retorno || registro.dias || registro.periodo_aquisitivo) && (
+                    <FieldBlock label="Datas e Período">
+                      <div className="space-y-1.5">
+                        {registro.data_inicio && <p><span className="font-semibold">Início:</span> {formatDate(registro.data_inicio)}</p>}
+                        {registro.data_termino && <p><span className="font-semibold">Término:</span> {formatDate(registro.data_termino)}</p>}
+                        {registro.data_retorno && <p><span className="font-semibold">Retorno:</span> {formatDate(registro.data_retorno)}</p>}
+                        {registro.dias && <p><span className="font-semibold">Dias:</span> {registro.dias}</p>}
+                        {registro.periodo_aquisitivo && <p><span className="font-semibold">Período:</span> {registro.periodo_aquisitivo}</p>}
+                      </div>
+                    </FieldBlock>
+                  )}
 
-                      {registro.data_retorno && (
-                        <div>
-                          <p className="text-xs text-slate-400">Data Retorno</p>
-                          <p className="font-medium text-slate-700">
-                            {formatDate(registro.data_retorno)}
-                          </p>
-                        </div>
-                      )}
+                  {(registro.funcao || registro.portaria || registro.tipo_punicao || registro.documento_referencia || registro.destino) && (
+                    <FieldBlock label="Dados Específicos">
+                      <div className="space-y-1.5">
+                        {registro.funcao && <p><span className="font-semibold">Função:</span> {registro.funcao}</p>}
+                        {registro.portaria && <p><span className="font-semibold">Portaria:</span> {registro.portaria}</p>}
+                        {registro.tipo_punicao && <p><span className="font-semibold">Tipo Punição:</span> {registro.tipo_punicao}</p>}
+                        {registro.documento_referencia && <p><span className="font-semibold">Documento:</span> {registro.documento_referencia}</p>}
+                        {registro.destino && <p><span className="font-semibold">Destino:</span> {registro.destino}</p>}
+                      </div>
+                    </FieldBlock>
+                  )}
 
-                      {registro.dias && (
-                        <div>
-                          <p className="text-xs text-slate-400">Dias</p>
-                          <p className="font-medium text-slate-700">
-                            {registro.dias} dias
-                          </p>
-                        </div>
-                      )}
+                  {inconsistenciaContrato && (
+                    <FieldBlock label="Inconsistência" className="border-red-200 bg-red-50">
+                      <p className="font-semibold text-red-700">{inconsistenciaContrato.motivo_curto}</p>
+                      {inconsistenciaContrato.detalhe && <p>{inconsistenciaContrato.detalhe}</p>}
+                    </FieldBlock>
+                  )}
 
-                      {registro.periodo_aquisitivo && (
-                        <div>
-                          <p className="text-xs text-slate-400">Período Aquisitivo</p>
-                          <p className="font-medium text-slate-700">
-                            {registro.periodo_aquisitivo}
-                          </p>
-                        </div>
-                      )}
+                  {temFamilia && onVerFamilia && (
+                    <FieldBlock label="Família de Publicação">
+                      <Button variant="outline" onClick={onVerFamilia} className="w-full justify-start gap-2"><GitBranch className="w-4 h-4" />Ver vínculos da família</Button>
+                    </FieldBlock>
+                  )}
 
-                      {registro.data_designacao && (
-                        <div>
-                          <p className="text-xs text-slate-400">Data Designação</p>
-                          <p className="font-medium text-slate-700">
-                            {formatDate(registro.data_designacao)}
-                          </p>
-                        </div>
-                      )}
-
-                      {registro.data_melhoria && (
-                        <div>
-                          <p className="text-xs text-slate-400">Data Melhoria</p>
-                          <p className="font-medium text-slate-700">
-                            {formatDate(registro.data_melhoria)}
-                          </p>
-                        </div>
-                      )}
-
-                      {registro.data_punicao && (
-                        <div>
-                          <p className="text-xs text-slate-400">Data Punição</p>
-                          <p className="font-medium text-slate-700">
-                            {formatDate(registro.data_punicao)}
-                          </p>
-                        </div>
-                      )}
+                  <FieldBlock label="Links e Integridade">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-slate-500" />{integridadeBadge.label}</div>
+                      {codigoPrincipal && <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-slate-500" />{codigoPrincipal}</div>}
+                      <div className="flex items-center gap-2"><BadgeCheck className="w-4 h-4 text-slate-500" />Status: {registro.status_calculado || currentStatus}</div>
+                      <div className="flex items-center gap-2"><FileBadge className="w-4 h-4 text-slate-500" />ID: {registro.id}</div>
                     </div>
-                  </div>
-                )}
-
-                {(registro.funcao ||
-                  registro.portaria ||
-                  registro.tipo_punicao ||
-                  registro.dias_punicao ||
-                  registro.comportamento_atual ||
-                  registro.comportamento_ingresso ||
-                  registro.graduacao_punicao ||
-                  registro.documento_referencia ||
-                  registro.origem ||
-                  registro.destino) && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                      Dados Específicos
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                      {registro.funcao && (
-                        <div>
-                          <p className="text-xs text-slate-400">Função</p>
-                          <p className="font-medium text-slate-700">{registro.funcao}</p>
-                        </div>
-                      )}
-
-                      {registro.portaria && (
-                        <div>
-                          <p className="text-xs text-slate-400">Portaria</p>
-                          <p className="font-medium text-slate-700">{registro.portaria}</p>
-                        </div>
-                      )}
-
-                      {registro.tipo_punicao && (
-                        <div>
-                          <p className="text-xs text-slate-400">Tipo Punição</p>
-                          <p className="font-medium text-slate-700">{registro.tipo_punicao}</p>
-                        </div>
-                      )}
-
-                      {registro.dias_punicao && (
-                        <div>
-                          <p className="text-xs text-slate-400">Dias Punição</p>
-                          <p className="font-medium text-slate-700">{registro.dias_punicao} dias</p>
-                        </div>
-                      )}
-
-                      {registro.comportamento_atual && (
-                        <div>
-                          <p className="text-xs text-slate-400">Comportamento Atual</p>
-                          <p className="font-medium text-slate-700">{registro.comportamento_atual}</p>
-                        </div>
-                      )}
-
-                      {registro.comportamento_ingresso && (
-                        <div>
-                          <p className="text-xs text-slate-400">Comportamento Ingresso</p>
-                          <p className="font-medium text-slate-700">{registro.comportamento_ingresso}</p>
-                        </div>
-                      )}
-
-                      {registro.graduacao_punicao && (
-                        <div>
-                          <p className="text-xs text-slate-400">Graduação Punição</p>
-                          <p className="font-medium text-slate-700">{registro.graduacao_punicao}</p>
-                        </div>
-                      )}
-
-                      {registro.documento_referencia && (
-                        <div>
-                          <p className="text-xs text-slate-400">Documento</p>
-                          <p className="font-medium text-slate-700">{registro.documento_referencia}</p>
-                        </div>
-                      )}
-
-                      {registro.origem && (
-                        <div>
-                          <p className="text-xs text-slate-400">Origem</p>
-                          <p className="font-medium text-slate-700">{registro.origem}</p>
-                        </div>
-                      )}
-
-                      {registro.destino && (
-                        <div>
-                          <p className="text-xs text-slate-400">Destino</p>
-                          <p className="font-medium text-slate-700">{registro.destino}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {registro.texto_publicacao && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                      Texto para Publicação
-                    </p>
-                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {registro.texto_publicacao}
-                    </div>
-                  </div>
-                )}
-
-                {registro.observacoes && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                      Observações
-                    </p>
-                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-sm text-slate-700">
-                      {registro.observacoes}
-                    </div>
-                  </div>
-                )}
+                  </FieldBlock>
+                </div>
               </div>
             )}
           </CardContent>
