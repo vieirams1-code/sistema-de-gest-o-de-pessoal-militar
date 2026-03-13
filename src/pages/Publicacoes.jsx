@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, CheckCircle, Clock, AlertCircle, Shield, Plus } from 'lucide-react';
+import { FileText, Shield, Plus, Search } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 
@@ -18,6 +19,7 @@ import {
   executarExclusaoAdminCadeia,
 } from '@/components/ferias/feriasAdminUtils';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
+import { createPageUrl } from '@/utils';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -173,24 +175,9 @@ function isFeriasOperacional(registro) {
 }
 
 
-function StatusCard({ icon: Icon, label, value, iconClass, bgClass, valueClass }) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${bgClass}`}>
-          <Icon className={`w-5 h-5 ${iconClass}`} />
-        </div>
-        <div>
-          <p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
-          <p className="text-xs text-slate-500">{label}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Publicacoes() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
@@ -378,15 +365,6 @@ export default function Publicacoes() {
     });
   }, [registros, statusFilter, searchTerm]);
 
-  const stats = useMemo(() => {
-    return {
-      total: registros.length,
-      aguardandoNota: registros.filter(r => r.status_calculado === 'Aguardando Nota').length,
-      aguardandoPublicacao: registros.filter(r => r.status_calculado === 'Aguardando Publicação').length,
-      publicados: registros.filter(r => r.status_calculado === 'Publicado').length,
-      inconsistentes: registros.filter(r => r.status_calculado === 'Inconsistente').length
-    };
-  }, [registros]);
 
   const handleUpdate = (id, data, tipo) => {
     updateMutation.mutate({ id, data, tipo });
@@ -447,9 +425,9 @@ export default function Publicacoes() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6]">
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-end">
+    <div className="min-h-screen bg-[#eef1f6]">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
+        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
           <div className="flex items-start gap-3">
             <div className="hidden sm:flex h-12 w-12 rounded-full bg-white border border-slate-200 items-center justify-center text-slate-500 shadow-sm">
               <Shield size={20} />
@@ -459,53 +437,53 @@ export default function Publicacoes() {
               <p className="text-sm text-slate-500 mt-1">Análise, validação, rastreabilidade e integridade de atos administrativos.</p>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button className="px-4 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-              Filtros Avançados
-            </button>
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-md text-sm font-medium hover:bg-slate-800 transition-colors">
-              <Plus size={14} /> Nova Publicação
-            </button>
-          </div>
         </div>
 
-        <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
-          <StatusCard icon={FileText} label="Total" value={stats.total} iconClass="text-[#1e3a5f]" bgClass="bg-[#1e3a5f]/10" valueClass="text-[#1e3a5f]" />
-          <StatusCard icon={Clock} label="Aguardando Nota" value={stats.aguardandoNota} iconClass="text-amber-600" bgClass="bg-amber-100" valueClass="text-amber-600" />
-          <StatusCard icon={AlertCircle} label="Aguardando Publ." value={stats.aguardandoPublicacao} iconClass="text-blue-600" bgClass="bg-blue-100" valueClass="text-blue-600" />
-          <StatusCard icon={CheckCircle} label="Publicados" value={stats.publicados} iconClass="text-emerald-600" bgClass="bg-emerald-100" valueClass="text-emerald-600" />
-          <StatusCard icon={AlertCircle} label="Inconsistentes" value={stats.inconsistentes} iconClass="text-red-600" bgClass="bg-red-100" valueClass="text-red-600" />
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-5 space-y-4">
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="border-slate-200"
+                className="h-11 pl-10 border-slate-200 bg-slate-50/60"
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-56">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Status</SelectItem>
-                <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                <SelectItem value="Publicado">Publicado</SelectItem>
-                <SelectItem value="Inconsistente">Inconsistente</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+            <div className="flex flex-col sm:flex-row gap-3 lg:w-auto">
+              <div className="h-11 min-w-52 px-3 rounded-xl border border-slate-200 bg-white flex items-center">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-9 border-0 shadow-none px-0">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Status</SelectItem>
+                    <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
+                    <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
+                    <SelectItem value="Publicado">Publicado</SelectItem>
+                    <SelectItem value="Inconsistente">Inconsistente</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="hidden lg:flex flex-col text-xs text-slate-400 leading-tight">
+                  <span className="font-semibold text-slate-700">{statusFilter === 'all' ? 'Todos Status' : statusFilter}</span>
+                  <span>Filtros Ativos</span>
+                </div>
+              </div>
 
-        <div className="text-sm text-slate-500">
-          {filteredRegistros.length} registro(s) encontrado(s)
+              <button
+                onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}
+                className="inline-flex items-center justify-center gap-2 px-4 h-11 bg-[#2258d9] text-white rounded-xl text-sm font-semibold hover:bg-[#1f4fc5] transition-colors"
+              >
+                <Plus size={16} /> Nova Publicação
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-slate-500">
+            <span>{filteredRegistros.length} registro(s) encontrado(s)</span>
+            <span className="hidden md:inline">Filtros Ativos</span>
+          </div>
         </div>
 
         {isLoading ? (
@@ -532,10 +510,10 @@ export default function Publicacoes() {
 
               return (
                 <div key={grupo.key}>
-                  <div className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-lg border ${grupo.border} ${grupo.bg}`}>
-                    <span className={`font-bold text-sm ${grupo.color}`}>{grupo.label}</span>
+                  <div className={`inline-flex items-center gap-2 mb-3 px-4 py-2 rounded-full border ${grupo.border} ${grupo.bg}`}>
+                    <span className={`font-bold text-sm uppercase ${grupo.color}`}>{grupo.label}</span>
                     <span className={`text-xs ${grupo.color} opacity-70`}>
-                      — {items.length} registro(s)
+                      | {items.length} registro(s)
                     </span>
                   </div>
 

@@ -193,9 +193,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const tipoLabel = getTipoDisplay(tipoBase);
   const grupoLabel = registro.grupo_display || getGrupoDisplay(registro);
-  const nomeInstitucional = [registro.militar_posto, registro.militar_quadro, registro.militar_nome_exibicao || registro.militar_nome]
-    .filter(Boolean)
-    .join(' ');
+  const postoGraduacao = registro.militar_posto || registro.posto_graduacao || registro.posto || registro.graduacao || '';
+  const quadroMilitar = registro.militar_quadro || registro.quadro || '';
+  const nomeExibicao = registro.militar_nome_exibicao || registro.militar_nome || registro.nome_guerra || registro.nome || '';
+  const nomeInstitucional = [postoGraduacao, quadroMilitar, nomeExibicao].filter(Boolean).join(' ');
   const cadeiaStatus = registro?.inconsistencia_contrato?.status || (registro?.vinculos_contrato?.cadeia?.existe ? 'ok' : null);
   const chainBadge = getChainBadge(cadeiaStatus);
   const ChainIcon = chainBadge.icon;
@@ -301,7 +302,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
       </AlertDialog>
 
       <Card
-        className={`rounded-xl border transition-all duration-200 ${
+        className={`rounded-xl border bg-white shadow-sm transition-all duration-200 ${
           isTSE
             ? 'border-red-200 bg-red-50/40'
             : isApostila && foiTornadaSemEfeito
@@ -322,7 +323,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
         <CardHeader className="pb-3 px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4 flex-1 min-w-0">
-              <div className="hidden sm:flex h-12 w-12 rounded-full bg-slate-50 border border-slate-200 items-center justify-center text-slate-400 shrink-0">
+              <div className="hidden sm:flex h-12 w-12 rounded-full bg-white border border-slate-200 items-center justify-center text-slate-400 shadow-sm shrink-0">
                 <Shield className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -386,7 +387,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   </span>
                 )}
 
-                <h3 className="text-xl font-bold text-slate-900 tracking-tight leading-none truncate">
+                <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none truncate">
                   {nomeInstitucional || 'Militar não identificado'}
                 </h3>
 
@@ -404,7 +405,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
               <div className="flex flex-wrap items-center gap-2.5 text-sm text-slate-600">
                 {registro.militar_matricula && (
-                  <span className="font-medium text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Mat: {registro.militar_matricula}</span>
+                  <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">MAT: {registro.militar_matricula}</span>
                 )}
 
                 {grupoLabel === 'Férias' ? (
@@ -510,7 +511,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               )}
             </div>
 
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0 border-l border-slate-200 pl-3">
               {podeMarcarPrioridade && (
                 <>
                   <Button
@@ -518,10 +519,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     size="sm"
                     title={registro.urgente ? 'Remover Urgente' : 'Marcar como Urgente'}
                     onClick={(e) => handleTogglePrioridade(e, 'urgente')}
-                    className={`text-xs gap-1 ${
+                    className={`h-8 w-8 p-0 ${
                       registro.urgente
-                        ? 'text-red-600'
-                        : 'text-slate-400 hover:text-red-500'
+                        ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                        : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
                     }`}
                   >
                     <AlertTriangle className="w-4 h-4" />
@@ -532,10 +533,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     size="sm"
                     title={registro.importante ? 'Remover Importante' : 'Marcar como Importante'}
                     onClick={(e) => handleTogglePrioridade(e, 'importante')}
-                    className={`text-xs gap-1 ${
+                    className={`h-8 w-8 p-0 ${
                       registro.importante
-                        ? 'text-amber-500'
-                        : 'text-slate-400 hover:text-amber-500'
+                        ? 'text-amber-500 bg-amber-50 hover:bg-amber-100'
+                        : 'text-slate-400 hover:text-amber-500 hover:bg-amber-50'
                     }`}
                   >
                     <Star className="w-4 h-4" />
@@ -552,7 +553,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     setIsEditingBg(true);
                     setIsExpanded(true);
                   }}
-                  className="text-slate-500 hover:text-blue-600 text-xs gap-1"
+                  className="h-8 px-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 text-xs gap-1"
                 >
                   <FileText className="w-4 h-4" />
                   <span className="hidden sm:inline">Nota/BG</span>
@@ -565,7 +566,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Editar publicação"
                   onClick={() => navigate(getEditUrl(registro))}
-                  className="text-slate-500 hover:text-[#1e3a5f] text-xs gap-1"
+                  className="h-8 px-2 text-slate-600 hover:text-[#1e3a5f] hover:bg-slate-100 text-xs gap-1"
                 >
                   <Edit2 className="w-4 h-4" />
                   <span className="hidden sm:inline">Editar</span>
@@ -578,7 +579,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Fazer Apostila"
                   onClick={handleApostila}
-                  className="text-purple-500 hover:text-purple-700 text-xs gap-1"
+                  className="h-8 px-2 text-purple-500 hover:text-purple-700 hover:bg-purple-50 text-xs gap-1"
                 >
                   <PenLine className="w-4 h-4" />
                   <span className="hidden sm:inline">Apostila</span>
@@ -591,7 +592,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Tornar sem Efeito"
                   onClick={handleTornarSemEfeito}
-                  className="text-red-500 hover:text-red-700 text-xs gap-1"
+                  className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 text-xs gap-1"
                 >
                   <Ban className="w-4 h-4" />
                   <span className="hidden sm:inline">Tornar s/ Efeito</span>
@@ -604,7 +605,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Excluir"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="text-slate-500 hover:text-red-600"
+                  className="h-8 w-8 p-0 text-slate-500 hover:text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -616,7 +617,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Ver família da publicação"
                   onClick={onVerFamilia}
-                  className="text-[#1e3a5f] hover:text-[#1e3a5f] hover:bg-[#1e3a5f]/10 text-xs gap-1"
+                  className="h-8 px-2 text-[#1e3a5f] hover:text-[#1e3a5f] hover:bg-[#1e3a5f]/10 text-xs gap-1"
                 >
                   <GitBranch className="w-4 h-4" />
                   <span className="hidden sm:inline">Família</span>
@@ -626,6 +627,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               <Button
                 variant="ghost"
                 size="sm"
+                className="h-8 w-8 p-0 bg-slate-900 text-white hover:bg-slate-800 hover:text-white"
                 onClick={() => setIsExpanded(!isExpanded)}
               >
                 {isExpanded ? (
@@ -640,7 +642,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
         </CardHeader>
 
         {isExpanded && (
-          <CardContent className="pt-0 px-6 pb-5 border-t border-slate-100">
+          <CardContent className="pt-0 px-6 pb-5 border-t border-slate-200 bg-slate-50/60">
             {isEditingBg ? (
               <div className="mt-4 space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
@@ -709,8 +711,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 </div>
               </div>
             ) : (
-              <div className="mt-4 space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-sm bg-slate-50 rounded-lg border border-slate-100 p-3">
+              <div className="mt-4 space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm bg-white rounded-xl border border-slate-200 p-4">
 
 
                 {contratoLivro && (
@@ -751,7 +753,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     {publicacaoContrato && (
                       <div>
                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Texto da Publicação</p>
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-slate-700 space-y-1">
+                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-700 space-y-2">
                           <p><span className="font-medium">Status:</span> {publicacaoContrato.status || '—'}</p>
                           <p><span className="font-medium">Nota:</span> {publicacaoContrato.nota_para_bg || '—'}</p>
                           <p><span className="font-medium">BG:</span> {publicacaoContrato.numero_bg || '—'}</p>
@@ -994,7 +996,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                       Texto para Publicação
                     </p>
-                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                       {registro.texto_publicacao}
                     </div>
                   </div>
