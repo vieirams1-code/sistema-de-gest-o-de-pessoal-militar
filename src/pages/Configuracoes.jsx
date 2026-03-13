@@ -26,11 +26,9 @@ const TABS = [
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
-  const { user, isAdmin, isLoading: loadingUser, getAccessModeFromUser } = useCurrentUser();
+  const { isAdmin, isLoading: loadingUser, getAccessModeFromUser } = useCurrentUser();
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
-  const [syncingAdminRole, setSyncingAdminRole] = useState(false);
-  const [adminRoleSyncError, setAdminRoleSyncError] = useState('');
 
   // Ler tab da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -71,46 +69,10 @@ export default function Configuracoes() {
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
   const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) });
-  useEffect(() => {
-    let isMounted = true;
-
-    const ensureAdminRole = async () => {
-      if (loadingUser || !user || !isAdmin || user.role === 'admin') {
-        if (isMounted) {
-          setSyncingAdminRole(false);
-          setAdminRoleSyncError('');
-        }
-        return;
-      }
-
-      setSyncingAdminRole(true);
-      setAdminRoleSyncError('');
-
-      try {
-        await base44.auth.updateMe({ role: 'admin' });
-        await queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      } catch (error) {
-        if (isMounted) {
-          setAdminRoleSyncError('Não foi possível sincronizar o papel de admin deste usuário. Verifique as permissões no Base44.');
-        }
-      } finally {
-        if (isMounted) {
-          setSyncingAdminRole(false);
-        }
-      }
-    };
-
-    ensureAdminRole();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [loadingUser, user, isAdmin, queryClient]);
-
   const { data: usuarios = [], error: usuariosError } = useQuery({
     queryKey: ['usuarios'],
     queryFn: () => base44.entities.User.list(),
-    enabled: isAdmin && !syncingAdminRole,
+    enabled: isAdmin,
   });
   const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome') });
 
@@ -274,19 +236,9 @@ export default function Configuracoes() {
                 <h2 className="text-xl font-semibold text-[#1e3a5f]">Permissões de Usuários</h2>
               </div>
               <p className="text-sm text-slate-500 mb-4">Defina o tipo de acesso de cada usuário: Admin, Setor, Subsetor ou Próprio. Em modo Próprio, vincule explicitamente o militar correspondente.</p>
-              {syncingAdminRole && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2 mb-3">
-                  Sincronizando privilégio administrativo para habilitar esta área...
-                </p>
-              )}
-              {adminRoleSyncError && (
-                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 mb-3">
-                  {adminRoleSyncError}
-                </p>
-              )}
               {usuariosError && (
                 <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 mb-3">
-                  Falha ao carregar usuários. Há indício de bloqueio de permissões no backend/Base44 para esta conta admin.
+                  Falha ao carregar usuários. Há provável bloqueio de permissões no Base44/backend para esta conta admin. O frontend não está aplicando restrições extras além da validação administrativa.
                 </p>
               )}
               <div className="space-y-2 mb-6">
@@ -297,14 +249,14 @@ export default function Configuracoes() {
                       <p className="text-xs text-slate-500">{u.email}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 justify-end">
-                      {(u.role === 'admin' || u.isAdmin) ? (
+                      {(u.role === 'admin' || u.isAdmin === true) ? (
                         <Badge className="bg-emerald-100 text-emerald-800">Admin (acesso total)</Badge>
                       ) : u.subgrupamento_nome ? (
                         <Badge className={u.subgrupamento_tipo === 'Grupamento' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>{u.subgrupamento_nome} ({u.subgrupamento_tipo})</Badge>
                       ) : (
                         <Badge variant="outline" className="text-slate-500">Próprio / sem setor</Badge>
                       )}
-                      {!u.subgrupamento_nome && !(u.role === 'admin' || u.isAdmin) && (u.militar_email || u.militar_id) && (
+                      {!u.subgrupamento_nome && !(u.role === 'admin' || u.isAdmin === true) && (u.militar_email || u.militar_id) && (
                         <Badge variant="outline" className="text-indigo-600 border-indigo-200">Vínculo: {u.militar_email || 'Militar selecionado'}</Badge>
                       )}
                     </div>
