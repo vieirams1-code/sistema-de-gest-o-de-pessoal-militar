@@ -15,6 +15,7 @@ import {
   ArrowLeft, User, Filter, ClipboardList, Shield, Award, Calendar, BookOpen, FileText, Activity, Search, ChevronDown, ChevronUp, Trash2, PenLine, Ban, AlertTriangle, Star
 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { format } from 'date-fns';
 import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } from '@/components/ferias/feriasAdminUtils';
 import { reverterAtestadosPorExclusaoPublicacao } from '@/components/atestado/atestadoPublicacaoHelpers';
@@ -219,6 +220,7 @@ export default function FichaMilitar() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const militarId = searchParams.get('id');
+  const { hasAccess, hasSelfAccess, isLoading: loadingUser } = useCurrentUser();
 
   const filtroParam = searchParams.get('filtro');
   const [tipoFiltro, setTipoFiltro] = useState(filtroParam === 'elogios_punicoes' ? 'elogios_punicoes' : 'todos');
@@ -276,6 +278,8 @@ export default function FichaMilitar() {
     queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: militarId }),
     enabled: !!militarId
   });
+
+  const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
 
   const refetchAll = () => {
     refetchPunicoes();
@@ -551,6 +555,15 @@ export default function FichaMilitar() {
 
   if (!militarId) {
     return <div className="p-8 text-center text-slate-500">Militar não especificado.</div>;
+  }
+
+
+  if (loadingUser) {
+    return <div className="p-8 text-center text-slate-500">Carregando permissões...</div>;
+  }
+
+  if (militar && !canViewMilitar) {
+    return <div className="p-8 text-center text-slate-500">Acesso negado para esta ficha militar.</div>;
   }
 
   return (

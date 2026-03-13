@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const menuGroups = [
   {
@@ -79,17 +80,25 @@ const menuGroups = [
         children: [
           { name: 'Permissões e Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
           { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes' },
-          { name: 'Estrutura Organizacional', page: 'Subgrupamentos', icon: ScrollText },
-          { name: 'Solicitações de Atualização', page: 'SolicitacoesAtualizacao', icon: FileText },
         ],
       },
     ],
   },
 ];
 
+
+const adminMenuGroup = {
+  title: 'ADMIN',
+  items: [
+    { name: 'Permissões de Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
+    { name: 'Estrutura Organizacional', page: 'Subgrupamentos', icon: ScrollText },
+  ],
+};
+
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState(['Configurações']);
+  const { isAdmin } = useCurrentUser();
 
   const toggleExpanded = (itemName) => {
     setExpandedItems((prev) =>
@@ -98,6 +107,8 @@ export default function Layout({ children, currentPageName }) {
         : [...prev, itemName]
     );
   };
+
+  const visibleMenuGroups = isAdmin ? [...menuGroups, adminMenuGroup] : menuGroups;
 
   const isItemActive = (item) => {
     if (item.children?.length) {
@@ -184,7 +195,7 @@ export default function Layout({ children, currentPageName }) {
         {/* Menu rolável */}
         <nav className="flex-1 overflow-y-auto px-3 py-5 custom-scrollbar">
           <div className="space-y-6">
-            {menuGroups.map((group) => (
+            {visibleMenuGroups.map((group) => (
               <div key={group.title}>
                 <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">
                   {group.title}
@@ -253,7 +264,7 @@ export default function Layout({ children, currentPageName }) {
                     return (
                       <Link
                         key={item.name}
-                        to={createPageUrl(item.page)}
+                        to={item.tab ? `${createPageUrl(item.page)}?tab=${item.tab}` : createPageUrl(item.page)}
                         onClick={() => setSidebarOpen(false)}
                         className={`
                           group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all

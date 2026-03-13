@@ -8,6 +8,22 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CheckCircle, XCircle, Clock, User, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import RequireAdmin from '@/components/auth/RequireAdmin';
+
+const CAMPOS_MUTAVEIS_WHITELIST = new Set([
+  'telefone',
+  'telefone_contato',
+  'email',
+  'endereco',
+  'cep',
+  'bairro',
+  'cidade',
+  'estado',
+  'numero',
+  'complemento',
+  'nome_contato_emergencia',
+  'telefone_contato_emergencia',
+]);
 
 const statusConfig = {
   'Pendente': { color: 'bg-amber-100 text-amber-700', icon: Clock },
@@ -38,6 +54,7 @@ export default function SolicitacoesAtualizacao() {
 
   const handleDecisao = async () => {
     const { solicitacao, acao } = decisaoModal;
+    if (!isAdmin) return;
     setProcessing(true);
     const novoStatus = acao === 'aprovar' ? 'Aprovada' : 'Rejeitada';
     await base44.entities.SolicitacaoAtualizacao.update(solicitacao.id, {
@@ -49,9 +66,11 @@ export default function SolicitacoesAtualizacao() {
 
     // Se aprovado: atualizar o cadastro do militar
     if (acao === 'aprovar' && solicitacao.militar_id && solicitacao.campo_chave) {
-      await base44.entities.Militar.update(solicitacao.militar_id, {
-        [solicitacao.campo_chave]: solicitacao.valor_proposto,
-      });
+      if (CAMPOS_MUTAVEIS_WHITELIST.has(solicitacao.campo_chave)) {
+        await base44.entities.Militar.update(solicitacao.militar_id, {
+          [solicitacao.campo_chave]: solicitacao.valor_proposto,
+        });
+      }
     }
 
     queryClient.invalidateQueries({ queryKey: ['solicitacoes-atualizacao'] });
@@ -61,6 +80,7 @@ export default function SolicitacoesAtualizacao() {
   };
 
   return (
+    <RequireAdmin>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
@@ -128,7 +148,7 @@ export default function SolicitacoesAtualizacao() {
                         <p className="text-xs text-slate-500 mt-1">Obs. decisão: {s.observacao_decisao}</p>
                       )}
                     </div>
-                    {s.status === 'Pendente' && (
+                    {isAdmin && s.status === 'Pendente' && (
                       <div className="flex gap-2 shrink-0">
                         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { setDecisaoModal({ solicitacao: s, acao: 'aprovar' }); setObsDecisao(''); }}>
                           <CheckCircle className="w-4 h-4 mr-1" /> Aprovar
@@ -179,5 +199,6 @@ export default function SolicitacoesAtualizacao() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </RequireAdmin>
   );
 }

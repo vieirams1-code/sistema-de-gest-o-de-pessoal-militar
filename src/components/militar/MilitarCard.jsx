@@ -36,9 +36,12 @@ const postoAbreviado = {
 
 import { createPageUrl } from '@/utils';
 import { useNavigate } from 'react-router-dom';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
   const navigate = useNavigate();
+  const { hasAccess, hasSelfAccess } = useCurrentUser();
+  const canAccess = hasAccess(militar) || hasSelfAccess(militar);
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -77,7 +80,7 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
                 )}
               </div>
 
-              <DropdownMenu>
+              {canAccess && (<DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
                     <MoreVertical className="w-4 h-4" />
@@ -111,7 +114,7 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
                   Excluir
                  </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenu>)}
             </div>
 
             <div className="mt-2 flex flex-wrap gap-2">

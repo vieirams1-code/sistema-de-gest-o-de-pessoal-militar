@@ -23,7 +23,15 @@ import MilitarCard from '@/components/militar/MilitarCard';
 export default function Militares() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, subgrupamentoTipo, isLoading: loadingUser } = useCurrentUser();
+  const {
+    isAdmin,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    modoAcesso,
+    userEmail,
+    hasSelfAccess,
+    isLoading: loadingUser
+  } = useCurrentUser();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -34,10 +42,26 @@ export default function Militares() {
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
   const { data: militares = [], isLoading } = useQuery({
-    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo],
+    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail],
     queryFn: async () => {
       if (isAdmin) return base44.entities.Militar.list('-created_date');
-      if (!subgrupamentoId) return base44.entities.Militar.list('-created_date');
+
+      if (modoAcesso === 'proprio') {
+        if (!userEmail) return [];
+        const [byEmail, byCreator] = await Promise.all([
+          base44.entities.Militar.filter({ email: userEmail }, '-created_date'),
+          base44.entities.Militar.filter({ created_by: userEmail }, '-created_date'),
+        ]);
+
+        const ids = new Set();
+        return [...byEmail, ...byCreator].filter((m) => {
+          if (!hasSelfAccess(m) || ids.has(m.id)) return false;
+          ids.add(m.id);
+          return true;
+        });
+      }
+
+      if (!subgrupamentoId) return [];
       // Usuário de Grupamento: busca todos com grupamento_id OU subgrupamento_id que sejam filhos
       if (subgrupamentoTipo === 'Grupamento') {
         const [porGrupamento, porSubgrupamento] = await Promise.all([
