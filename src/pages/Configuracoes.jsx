@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Settings, Trash2, Plus, Users, Shield, CheckSquare, Square, UserCog, Sliders, Building } from 'lucide-react';
+import { Settings, Trash2, Plus, Users, Shield, CheckSquare, Square, UserCog, Sliders } from 'lucide-react';
 import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoManager';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -47,6 +47,8 @@ export default function Configuracoes() {
   const [userSubgrupamentoId, setUserSubgrupamentoId] = useState('');
   const [savingUser, setSavingUser] = useState(false);
   const [userAccessMode, setUserAccessMode] = useState('proprio');
+  const [userMilitarId, setUserMilitarId] = useState('');
+  const [userMilitarEmail, setUserMilitarEmail] = useState('');
 
   // Estado - atribuição em massa de militares
   const [massaGrupamentoId, setMassaGrupamentoId] = useState('');
@@ -86,6 +88,27 @@ export default function Configuracoes() {
     return TABS.filter((tab) => tab.id === 'adicoes');
   }, [isAdmin]);
 
+  const militaresOrdenados = useMemo(() => {
+    return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
+  }, [militares]);
+
+  const findMilitarFromUser = (u) => {
+    if (!u) return null;
+    if (u.militar_id) {
+      return militares.find((m) => m.id === u.militar_id) || null;
+    }
+
+    const emails = [u.militar_email, u.email].filter(Boolean).map((email) => email.toLowerCase());
+    if (emails.length === 0) return null;
+
+    return militares.find((m) => {
+      const militarEmails = [m.email, m.email_particular, m.email_funcional, m.militar_email]
+        .filter(Boolean)
+        .map((email) => email.toLowerCase());
+      return militarEmails.some((email) => emails.includes(email));
+    }) || null;
+  };
+
   const handleSelectUser = (userId) => {
     const u = usuarios.find(u => u.id === userId);
     setSelectedUser(u);
@@ -93,6 +116,10 @@ export default function Configuracoes() {
 
     const sId = subgrupamentos.find(s => s.tipo === 'Subgrupamento' && s.id === u?.subgrupamento_id) ? u.subgrupamento_id : '';
     const gId = grupamentos.find(g => g.id === u?.subgrupamento_id) ? u.subgrupamento_id : '';
+
+    const militarVinculado = findMilitarFromUser(u);
+    setUserMilitarId(militarVinculado?.id || '');
+    setUserMilitarEmail(u?.militar_email || militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || u?.email || '');
 
     if (sId) {
       const sub = subgrupamentos.find(s => s.id === sId);
@@ -113,13 +140,16 @@ export default function Configuracoes() {
       const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
       const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
 
+      const militarVinculado = militares.find((m) => m.id === userMilitarId);
+      const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || selectedUser.email || '';
+
       const data = userAccessMode === 'admin'
-        ? { role: 'admin', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null }
+        ? { role: 'admin', isAdmin: true, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: '', militar_email: '' }
         : userAccessMode === 'subsetor' && sub
-          ? { role: 'user', subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento' }
+          ? { role: 'user', isAdmin: false, subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento', militar_id: '', militar_email: '' }
           : userAccessMode === 'setor' && grupamento
-            ? { role: 'user', subgrupamento_id: grupamento.id, subgrupamento_nome: grupamento.nome, subgrupamento_tipo: 'Grupamento' }
-            : { role: 'user', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null };
+            ? { role: 'user', isAdmin: false, subgrupamento_id: grupamento.id, subgrupamento_nome: grupamento.nome, subgrupamento_tipo: 'Grupamento', militar_id: '', militar_email: '' }
+            : { role: 'user', isAdmin: false, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: userMilitarId || '', militar_email: militarEmailVinculado };
 
       await base44.entities.User.update(selectedUser.id, data);
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
@@ -201,7 +231,7 @@ export default function Configuracoes() {
                 <Users className="w-5 h-5 text-[#1e3a5f]" />
                 <h2 className="text-xl font-semibold text-[#1e3a5f]">Permissões de Usuários</h2>
               </div>
-              <p className="text-sm text-slate-500 mb-4">Defina qual setor/subsetor cada usuário pode acessar. Sem atribuição de setor = acesso apenas aos próprios dados (militares vinculados ao próprio email).</p>
+              <p className="text-sm text-slate-500 mb-4">Defina o tipo de acesso de cada usuário: Admin, Setor, Subsetor ou Próprio. Em modo Próprio, vincule explicitamente o militar correspondente.</p>
               <div className="space-y-2 mb-6">
                 {usuarios.map(u => (
                   <div key={u.id} onClick={() => handleSelectUser(u.id)} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
@@ -209,11 +239,18 @@ export default function Configuracoes() {
                       <p className="font-medium text-sm text-slate-800">{u.full_name || u.email}</p>
                       <p className="text-xs text-slate-500">{u.email}</p>
                     </div>
-                    {u.subgrupamento_nome ? (
-                      <Badge className={u.subgrupamento_tipo === 'Grupamento' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>{u.subgrupamento_nome} ({u.subgrupamento_tipo})</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-slate-500">Próprio / sem setor</Badge>
-                    )}
+                    <div className="flex flex-wrap gap-2 justify-end">
+                      {(u.role === 'admin' || u.isAdmin) ? (
+                        <Badge className="bg-emerald-100 text-emerald-800">Admin (acesso total)</Badge>
+                      ) : u.subgrupamento_nome ? (
+                        <Badge className={u.subgrupamento_tipo === 'Grupamento' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>{u.subgrupamento_nome} ({u.subgrupamento_tipo})</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-slate-500">Próprio / sem setor</Badge>
+                      )}
+                      {!u.subgrupamento_nome && !(u.role === 'admin' || u.isAdmin) && (u.militar_email || u.militar_id) && (
+                        <Badge variant="outline" className="text-indigo-600 border-indigo-200">Vínculo: {u.militar_email || 'Militar selecionado'}</Badge>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {usuarios.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum usuário cadastrado</p>}
@@ -230,6 +267,10 @@ export default function Configuracoes() {
                         if (v === 'proprio' || v === 'admin') {
                           setUserGrupamentoId('');
                           setUserSubgrupamentoId('');
+                        }
+                        if (v !== 'proprio') {
+                          setUserMilitarId('');
+                          setUserMilitarEmail('');
                         }
                       }}
                     >
@@ -272,13 +313,39 @@ export default function Configuracoes() {
                   )}
 
                   {userAccessMode === 'proprio' && (
-                    <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
-                      Este usuário ficará em modo <strong>Próprio / sem setor</strong>, com acesso apenas aos registros vinculados ao próprio e-mail.
-                    </p>
+                    <div className="space-y-3">
+                      <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+                        Este usuário ficará em modo <strong>Próprio / sem setor</strong>, com acesso apenas ao militar vinculado (por ID e e-mail).
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 block mb-1.5">Militar vinculado</label>
+                          <Select value={userMilitarId || '_nenhum'} onValueChange={(v) => {
+                            const militarId = v === '_nenhum' ? '' : v;
+                            setUserMilitarId(militarId);
+                            const militar = militares.find((m) => m.id === militarId);
+                            setUserMilitarEmail(militar?.email || militar?.email_particular || militar?.email_funcional || selectedUser?.email || '');
+                          }}>
+                            <SelectTrigger><SelectValue placeholder="Selecione o militar" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                              {militaresOrdenados.map((m) => (
+                                <SelectItem key={m.id} value={m.id}>{m.posto_graduacao ? `${m.posto_graduacao} ` : ''}{m.nome_completo} {m.matricula ? `- Mat ${m.matricula}` : ''}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 block mb-1.5">E-mail de vínculo (curto prazo)</label>
+                          <Input value={userMilitarEmail || selectedUser.email || ''} onChange={(e) => setUserMilitarEmail(e.target.value)} placeholder="email@militar" />
+                          <p className="text-xs text-slate-500 mt-1">Usuário: {selectedUser.email || 'sem e-mail'}</p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                   <div className="flex justify-end gap-2 pt-1">
                     <Button variant="outline" onClick={() => setSelectedUser(null)}>Cancelar</Button>
-                    <Button onClick={handleSaveUserScope} disabled={savingUser || (userAccessMode === 'setor' && !userGrupamentoId) || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">{savingUser ? 'Salvando...' : 'Salvar Permissão'}</Button>
+                    <Button onClick={handleSaveUserScope} disabled={savingUser || (userAccessMode === 'setor' && !userGrupamentoId) || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId)) || (userAccessMode === 'proprio' && !userMilitarId)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">{savingUser ? 'Salvando...' : 'Salvar Permissão'}</Button>
                   </div>
                 </div>
               )}

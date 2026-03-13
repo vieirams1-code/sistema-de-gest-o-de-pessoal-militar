@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Filter, Users, Grid3X3, List, Download, Upload } from 'lucide-react';
+import { Plus, Search, Users, Grid3X3, List } from 'lucide-react';
 import MilitarCard from '@/components/militar/MilitarCard';
 
 export default function Militares() {
@@ -29,6 +29,8 @@ export default function Militares() {
     subgrupamentoTipo,
     modoAcesso,
     userEmail,
+    linkedMilitarId,
+    linkedMilitarEmail,
     hasSelfAccess,
     isLoading: loadingUser
   } = useCurrentUser();
@@ -42,19 +44,27 @@ export default function Militares() {
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
   const { data: militares = [], isLoading } = useQuery({
-    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail],
+    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
     queryFn: async () => {
       if (isAdmin) return base44.entities.Militar.list('-created_date');
 
       if (modoAcesso === 'proprio') {
-        if (!userEmail) return [];
-        const [byEmail, byCreator] = await Promise.all([
-          base44.entities.Militar.filter({ email: userEmail }, '-created_date'),
-          base44.entities.Militar.filter({ created_by: userEmail }, '-created_date'),
-        ]);
+        const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
+        if (!linkedMilitarId && knownEmails.length === 0) return [];
 
+        const requests = [];
+        if (linkedMilitarId) requests.push(base44.entities.Militar.filter({ id: linkedMilitarId }, '-created_date'));
+        for (const email of knownEmails) {
+          requests.push(base44.entities.Militar.filter({ email }, '-created_date'));
+          requests.push(base44.entities.Militar.filter({ email_particular: email }, '-created_date'));
+          requests.push(base44.entities.Militar.filter({ email_funcional: email }, '-created_date'));
+          requests.push(base44.entities.Militar.filter({ created_by: email }, '-created_date'));
+          requests.push(base44.entities.Militar.filter({ militar_email: email }, '-created_date'));
+        }
+
+        const batches = await Promise.all(requests);
         const ids = new Set();
-        return [...byEmail, ...byCreator].filter((m) => {
+        return batches.flat().filter((m) => {
           if (!hasSelfAccess(m) || ids.has(m.id)) return false;
           ids.add(m.id);
           return true;

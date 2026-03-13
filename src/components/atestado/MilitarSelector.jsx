@@ -20,10 +20,10 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const { isAdmin, modoAcesso, subgrupamentoId, userEmail, hasAccess, hasSelfAccess } = useCurrentUser();
+  const { isAdmin, modoAcesso, subgrupamentoId, userEmail, linkedMilitarId, linkedMilitarEmail, hasAccess, hasSelfAccess } = useCurrentUser();
 
   const { data: militares = [] } = useQuery({
-    queryKey: ['militares-ativos-selector', isAdmin, modoAcesso, subgrupamentoId, userEmail],
+    queryKey: ['militares-ativos-selector', isAdmin, modoAcesso, subgrupamentoId, userEmail, linkedMilitarId, linkedMilitarEmail],
     queryFn: async () => {
       if (isAdmin) {
         const all = await base44.entities.Militar.list('-nome_completo');
@@ -50,13 +50,24 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
         return list.filter((m) => m.status_cadastro !== 'Inativo').filter(hasAccess);
       }
 
-      if (modoAcesso === 'proprio' && userEmail) {
-        const [byEmail, byCreator] = await Promise.all([
-          base44.entities.Militar.filter({ email: userEmail }, '-nome_completo'),
-          base44.entities.Militar.filter({ created_by: userEmail }, '-nome_completo'),
-        ]);
+      if (modoAcesso === 'proprio') {
+        const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
+        if (!linkedMilitarId && knownEmails.length === 0) return [];
+
+        const requests = [];
+        if (linkedMilitarId) requests.push(base44.entities.Militar.filter({ id: linkedMilitarId }, '-nome_completo'));
+        for (const email of knownEmails) {
+          requests.push(base44.entities.Militar.filter({ email }, '-nome_completo'));
+          requests.push(base44.entities.Militar.filter({ email_particular: email }, '-nome_completo'));
+          requests.push(base44.entities.Militar.filter({ email_funcional: email }, '-nome_completo'));
+          requests.push(base44.entities.Militar.filter({ created_by: email }, '-nome_completo'));
+          requests.push(base44.entities.Militar.filter({ militar_email: email }, '-nome_completo'));
+        }
+
+        const batches = await Promise.all(requests);
         const ids = new Set();
-        return [...byEmail, ...byCreator]
+        return batches
+          .flat()
           .filter((m) => m.status_cadastro !== 'Inativo')
           .filter((m) => {
             if (!hasSelfAccess(m) || ids.has(m.id)) return false;
