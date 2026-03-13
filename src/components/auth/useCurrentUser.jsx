@@ -17,7 +17,7 @@ export function useCurrentUser() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
   // setorId: ID do Setor (Grupamento) ou Subsetor (Subgrupamento) atribuído ao usuário
   const subgrupamentoId = user?.subgrupamento_id || null;
   const subgrupamentoTipo = user?.subgrupamento_tipo || null; // 'Grupamento' (Setor) ou 'Subgrupamento' (Subsetor/Seção)
@@ -34,10 +34,12 @@ export function useCurrentUser() {
       : 'proprio';
 
   const userEmail = user?.email || null;
+  const linkedMilitarId = user?.militar_id || null;
+  const linkedMilitarEmail = user?.militar_email || null;
 
   const getAccessModeFromUser = (targetUser) => {
     if (!targetUser) return 'proprio';
-    if (targetUser.role === 'admin') return 'admin';
+    if (targetUser.role === 'admin' || targetUser.isAdmin === true) return 'admin';
     if (targetUser.subgrupamento_tipo === 'Grupamento') return 'setor';
     if (targetUser.subgrupamento_tipo === 'Subgrupamento') return 'subsetor';
     return 'proprio';
@@ -80,14 +82,21 @@ export function useCurrentUser() {
     if (!registro) return false;
     if (isAdmin) return true;
 
+    if (linkedMilitarId && registro.id === linkedMilitarId) {
+      return true;
+    }
+
     const possibleEmails = [
       registro.email,
+      registro.email_particular,
+      registro.email_funcional,
       registro.militar_email,
       registro.created_by,
       registro.usuario_email,
     ].filter(Boolean);
 
-    return !!userEmail && possibleEmails.includes(userEmail);
+    const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
+    return knownEmails.some((email) => possibleEmails.includes(email));
   };
 
   const getMilitarScopeFilters = () => {
@@ -102,7 +111,13 @@ export function useCurrentUser() {
     }
 
     if (modoAcesso === 'proprio' && userEmail) {
-      return [{ email: userEmail }, { created_by: userEmail }];
+      const filters = [];
+      if (linkedMilitarId) filters.push({ id: linkedMilitarId });
+      filters.push({ email: userEmail }, { email_particular: userEmail }, { email_funcional: userEmail }, { created_by: userEmail });
+      if (linkedMilitarEmail && linkedMilitarEmail !== userEmail) {
+        filters.push({ email: linkedMilitarEmail }, { email_particular: linkedMilitarEmail }, { email_funcional: linkedMilitarEmail }, { militar_email: linkedMilitarEmail });
+      }
+      return filters;
     }
 
     return [];
@@ -123,6 +138,8 @@ export function useCurrentUser() {
     subgrupamentoTipo,
     modoAcesso,
     userEmail,
+    linkedMilitarId,
+    linkedMilitarEmail,
     hasAccess,
     hasSelfAccess,
     hasModuleAccess,
