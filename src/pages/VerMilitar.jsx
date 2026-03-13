@@ -54,7 +54,7 @@ export default function VerMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
-  const { user, isAdmin } = useCurrentUser();
+  const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
 
   const { data: militar, isLoading } = useQuery({
@@ -92,8 +92,10 @@ export default function VerMilitar() {
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
     enabled: !!id
   });
+  const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
 
-  if (isLoading) {
+
+  if (loadingUser || isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
@@ -107,6 +109,17 @@ export default function VerMilitar() {
         <div className="text-center">
           <p className="text-slate-500 mb-4">Militar não encontrado</p>
           <Button onClick={() => navigate(createPageUrl('Militares'))}>Voltar</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canViewMilitar) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-slate-500 mb-4">Acesso negado para este militar.</p>
+          <Button onClick={() => navigate(createPageUrl('Home'))}>Ir para Home</Button>
         </div>
       </div>
     );

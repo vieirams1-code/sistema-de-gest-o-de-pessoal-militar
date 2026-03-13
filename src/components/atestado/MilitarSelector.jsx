@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Search, User, X } from 'lucide-react';
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Command,
   CommandEmpty,
@@ -17,16 +15,57 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const { isAdmin, modoAcesso, subgrupamentoId, userEmail, hasAccess, hasSelfAccess } = useCurrentUser();
 
   const { data: militares = [] } = useQuery({
-    queryKey: ['militares-ativos-selector'],
+    queryKey: ['militares-ativos-selector', isAdmin, modoAcesso, subgrupamentoId, userEmail],
     queryFn: async () => {
-      const all = await base44.entities.Militar.list('-nome_completo');
-      return all.filter(m => m.status_cadastro !== 'Inativo');
+      if (isAdmin) {
+        const all = await base44.entities.Militar.list('-nome_completo');
+        return all.filter((m) => m.status_cadastro !== 'Inativo');
+      }
+
+      if (modoAcesso === 'setor') {
+        const [porGrupamento, porSubgrupamento] = await Promise.all([
+          base44.entities.Militar.filter({ grupamento_id: subgrupamentoId }, '-nome_completo'),
+          base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-nome_completo'),
+        ]);
+        const ids = new Set();
+        return [...porGrupamento, ...porSubgrupamento]
+          .filter((m) => m.status_cadastro !== 'Inativo')
+          .filter((m) => {
+            if (!hasAccess(m) || ids.has(m.id)) return false;
+            ids.add(m.id);
+            return true;
+          });
+      }
+
+      if (modoAcesso === 'subsetor' && subgrupamentoId) {
+        const list = await base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-nome_completo');
+        return list.filter((m) => m.status_cadastro !== 'Inativo').filter(hasAccess);
+      }
+
+      if (modoAcesso === 'proprio' && userEmail) {
+        const [byEmail, byCreator] = await Promise.all([
+          base44.entities.Militar.filter({ email: userEmail }, '-nome_completo'),
+          base44.entities.Militar.filter({ created_by: userEmail }, '-nome_completo'),
+        ]);
+        const ids = new Set();
+        return [...byEmail, ...byCreator]
+          .filter((m) => m.status_cadastro !== 'Inativo')
+          .filter((m) => {
+            if (!hasSelfAccess(m) || ids.has(m.id)) return false;
+            ids.add(m.id);
+            return true;
+          });
+      }
+
+      return [];
     }
   });
 
