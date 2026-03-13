@@ -13,7 +13,7 @@ import {
   CheckCircle2,
   Clock3,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { differenceInDays, format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
