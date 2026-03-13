@@ -56,6 +56,7 @@ import { ptBR } from 'date-fns/locale';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -263,6 +264,7 @@ function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
 export default function Ferias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, isLoading: loadingUser } = useCurrentUser();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -288,8 +290,41 @@ export default function Ferias() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
   const { data: ferias = [], isLoading } = useQuery({
-    queryKey: ['ferias'],
-    queryFn: () => base44.entities.Ferias.list('-data_inicio'),
+    queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Ferias.list('-data_inicio');
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militarQueries = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const militaresAcessiveis = militarQueries.flat();
+      const militarIds = [...new Set(militaresAcessiveis.map((m) => m.id).filter(Boolean))];
+
+      if (!militarIds.length) return [];
+
+      const feriasByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.Ferias.filter({ militar_id: militarId }, '-data_inicio'))
+      );
+
+      const ids = new Set();
+      const merged = [];
+
+      for (const registro of feriasByMilitar.flat()) {
+        if (!registro?.id || ids.has(registro.id)) continue;
+        ids.add(registro.id);
+        merged.push(registro);
+      }
+
+      return merged.sort((a, b) => {
+        const da = new Date(`${a?.data_inicio || '1900-01-01'}T00:00:00`).getTime();
+        const db = new Date(`${b?.data_inicio || '1900-01-01'}T00:00:00`).getTime();
+        return db - da;
+      });
+    },
+    enabled: !loadingUser,
   });
 
   const { data: registrosLivro = [] } = useQuery({
