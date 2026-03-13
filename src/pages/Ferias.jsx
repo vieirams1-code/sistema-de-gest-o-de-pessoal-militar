@@ -430,6 +430,12 @@ export default function Ferias() {
         data_retorno: novaDataRetorno,
       });
 
+      await sincronizarPeriodoAquisitivoDaFerias({
+        periodoAquisitivoId: f.periodo_aquisitivo_id || null,
+        periodoAquisitivoRef: f.periodo_aquisitivo_ref || null,
+        militarId: f.militar_id || null,
+      });
+
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       setEditDataModal({ open: false, ferias: null, novaData: '' });
     } catch (error) {

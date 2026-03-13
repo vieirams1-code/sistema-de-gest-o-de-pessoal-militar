@@ -13,6 +13,7 @@ import {
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
+import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -394,12 +395,22 @@ export default function Publicacoes() {
               dias_gozados_interrupcao: null,
               data_interrupcao: null,
             });
+            await sincronizarPeriodoAquisitivoDaFerias({
+              periodoAquisitivoId: feriasAtual.periodo_aquisitivo_id || null,
+              periodoAquisitivoRef: feriasAtual.periodo_aquisitivo_ref || null,
+              militarId: feriasAtual.militar_id || null,
+            });
             return base44.entities.RegistroLivro.delete(id);
           }
 
           const novoEstado = buildFeriasStateFromChain(feriasAtual, remainingOps);
 
           await base44.entities.Ferias.update(feriasAtual.id, novoEstado);
+          await sincronizarPeriodoAquisitivoDaFerias({
+            periodoAquisitivoId: feriasAtual.periodo_aquisitivo_id || null,
+            periodoAquisitivoRef: feriasAtual.periodo_aquisitivo_ref || null,
+            militarId: feriasAtual.militar_id || null,
+          });
           return base44.entities.RegistroLivro.delete(id);
         }
       }
