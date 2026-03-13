@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
-import { addDays, differenceInDays, format } from 'date-fns';
+
 import {
   calcStatusPublicacao,
   reverterAtestadosPorExclusaoPublicacao,
@@ -18,6 +18,7 @@ import {
   identificarDescendentes,
   executarExclusaoAdminCadeia,
 } from '@/components/ferias/feriasAdminUtils';
+import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -148,30 +149,8 @@ function montarPayloadAtualizacao(registroAtual, dataParcial, tipo) {
   };
 }
 
-function parseDate(dateStr) {
-  return new Date(`${dateStr}T00:00:00`);
-}
-
-function toDateOnly(date) {
-  return format(date, 'yyyy-MM-dd');
-}
-
 function getEventDate(registro) {
   return registro?.data_registro || registro?.data_inicio || registro?.data_inicio_iso || null;
-}
-
-function compareEventos(a, b) {
-  const da = getEventDate(a) || '2000-01-01';
-  const db = getEventDate(b) || '2000-01-01';
-
-  const dateA = new Date(`${da}T00:00:00`);
-  const dateB = new Date(`${db}T00:00:00`);
-
-  if (dateA.getTime() !== dateB.getTime()) {
-    return dateA - dateB;
-  }
-
-  return new Date(a?.created_date || 0) - new Date(b?.created_date || 0);
 }
 
 function isFeriasOperacional(registro) {
@@ -183,88 +162,6 @@ function isFeriasOperacional(registro) {
       ['saida_ferias', 'interrupcao_de_ferias', 'nova_saida_retomada', 'retorno_ferias'].includes(registro.tipo_codigo)
     )
   );
-}
-
-function buildFeriasStateFromChain(feriasAtual, remainingOps) {
-  if (!remainingOps.length) {
-    return {
-      status: 'Prevista',
-      saldo_remanescente: null,
-      dias_gozados_interrupcao: null,
-      data_interrupcao: null,
-    };
-  }
-
-  const ordenados = [...remainingOps].sort(compareEventos);
-  const ultimo = ordenados[ordenados.length - 1];
-  const tipo = ultimo.tipo_registro;
-  const dataBase = ultimo.data_registro;
-
-  if (tipo === 'Saída Férias') {
-    const dias = Number(ultimo.dias ?? feriasAtual.dias ?? 0);
-    return {
-      status: 'Em Curso',
-      data_inicio: dataBase,
-      data_fim: toDateOnly(addDays(parseDate(dataBase), Math.max(dias - 1, 0))),
-      data_retorno: toDateOnly(addDays(parseDate(dataBase), dias)),
-      dias,
-      saldo_remanescente: null,
-      dias_gozados_interrupcao: null,
-      data_interrupcao: null,
-    };
-  }
-
-  if (tipo === 'Interrupção de Férias') {
-    const diasNoMomento = Number(ultimo.dias_no_momento ?? ultimo.dias ?? feriasAtual.dias ?? 0);
-
-    let gozados = Number(ultimo.dias_gozados ?? 0);
-    let saldo = Number(ultimo.saldo_remanescente ?? 0);
-
-    if ((!ultimo.dias_gozados && ultimo.dias_gozados !== 0) || (!ultimo.saldo_remanescente && ultimo.saldo_remanescente !== 0)) {
-      const inicioReferencia = [...ordenados]
-        .reverse()
-        .find((r) => r.tipo_registro === 'Saída Férias' || r.tipo_registro === 'Nova Saída / Retomada');
-
-      if (inicioReferencia?.data_registro && ultimo.data_registro) {
-        gozados = Math.max(0, differenceInDays(parseDate(ultimo.data_registro), parseDate(inicioReferencia.data_registro)) + 1);
-        gozados = Math.min(gozados, diasNoMomento);
-        saldo = Math.max(0, diasNoMomento - gozados);
-      }
-    }
-
-    return {
-      status: 'Interrompida',
-      dias: diasNoMomento,
-      saldo_remanescente: saldo,
-      dias_gozados_interrupcao: gozados,
-      data_interrupcao: ultimo.data_registro,
-    };
-  }
-
-  if (tipo === 'Nova Saída / Retomada') {
-    const dias = Number(ultimo.dias ?? feriasAtual.dias ?? 0);
-    return {
-      status: 'Em Curso',
-      data_inicio: dataBase,
-      data_fim: toDateOnly(addDays(parseDate(dataBase), Math.max(dias - 1, 0))),
-      data_retorno: toDateOnly(addDays(parseDate(dataBase), dias)),
-      dias,
-      saldo_remanescente: null,
-      dias_gozados_interrupcao: null,
-      data_interrupcao: null,
-    };
-  }
-
-  if (tipo === 'Retorno Férias') {
-    return {
-      status: 'Gozada',
-      saldo_remanescente: null,
-      dias_gozados_interrupcao: null,
-      data_interrupcao: null,
-    };
-  }
-
-  return {};
 }
 
 export default function Publicacoes() {
@@ -302,13 +199,18 @@ export default function Publicacoes() {
   }, [registrosLivro, publicacoesExOfficio, atestados]);
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data, tipo }) => {
+    mutationFn: async ({ id, data, tipo }) => {
       const registroAtual = registros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
 
       if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
       if (tipo === 'atestado') return base44.entities.Atestado.update(id, payloadFinal);
-      return base44.entities.RegistroLivro.update(id, payloadFinal);
+
+      await base44.entities.RegistroLivro.update(id, payloadFinal);
+      if (isFeriasOperacional(registroAtual)) {
+        await reconciliarCadeiaFerias({ feriasId: registroAtual.ferias_id });
+      }
+      return null;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });

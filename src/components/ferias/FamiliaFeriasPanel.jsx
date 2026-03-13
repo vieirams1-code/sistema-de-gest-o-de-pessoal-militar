@@ -17,6 +17,7 @@ import { differenceInDays, format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
+import { calcularSnapshotInterrupcao } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import AdminCadeiaPanel from '@/components/ferias/AdminCadeiaPanel';
 
 const statusColors = {
@@ -121,41 +122,12 @@ function deriveEventoInterrupcao(ferias, evento, cadeiaEventos = []) {
     return { gozados: null, saldo: null, diasNoMomento: null };
   }
 
-  const diasNoMomento = Number(
-    evento.dias_no_momento ??
-      evento.dias ??
-      ferias.dias ??
-      0
-  );
-
-  let gozados = null;
-  let saldo = null;
-
-  const indiceEvento = cadeiaEventos.findIndex((item) => item?.id === evento?.id);
-  const eventosAteInterrupcao =
-    indiceEvento >= 0 ? cadeiaEventos.slice(0, indiceEvento + 1) : cadeiaEventos;
-  const inicioEvento = [...eventosAteInterrupcao]
-    .reverse()
-    .find((item) => item?.tipo_registro === 'Saída Férias' || item?.tipo_registro === 'Nova Saída / Retomada');
-  const dataInicioBase = inicioEvento?.data_registro || inicioEvento?.data_inicio || ferias?.data_inicio;
-
-  if (dataInicioBase && evento.data_registro) {
-    const inicio = parseDate(dataInicioBase);
-    const dataInterrupcao = parseDate(evento.data_registro);
-    gozados = Math.max(0, differenceInDays(dataInterrupcao, inicio) + 1);
-    gozados = Math.min(gozados, diasNoMomento);
-    saldo = Math.max(0, diasNoMomento - gozados);
-  }
-
-  if (evento.dias_gozados != null && !Number.isNaN(Number(evento.dias_gozados))) {
-    gozados = Number(evento.dias_gozados);
-  }
-
-  if (evento.saldo_remanescente != null && !Number.isNaN(Number(evento.saldo_remanescente))) {
-    saldo = Number(evento.saldo_remanescente);
-  }
-
-  return { gozados, saldo, diasNoMomento };
+  const snap = calcularSnapshotInterrupcao(evento, cadeiaEventos, ferias);
+  return {
+    gozados: snap.gozados,
+    saldo: snap.saldo,
+    diasNoMomento: snap.diasNoMomento,
+  };
 }
 
 function getEstadoAtualDaCadeia(cadeia) {

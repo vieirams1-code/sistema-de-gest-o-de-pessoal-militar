@@ -11,7 +11,7 @@ import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
-import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
+import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -604,58 +604,10 @@ export default function CadastrarRegistroLivro() {
 
 
     if (formData.ferias_id) {
-      let feriasAtualizada = false;
-
-      if (tipoRegistroEfetivo === 'Nova Saída / Retomada' && selectedFerias) {
-        const saldo = Number(selectedFerias.saldo_remanescente || selectedFerias.dias || 0);
-        const novoFim = saldo > 0
-          ? addDays(new Date(`${formData.data_registro}T00:00:00`), saldo - 1).toISOString().split('T')[0]
-          : formData.data_registro;
-        const novoRetorno = addDays(new Date(`${formData.data_registro}T00:00:00`), saldo).toISOString().split('T')[0];
-
-        await base44.entities.Ferias.update(formData.ferias_id, {
-          status: 'Em Curso',
-          data_inicio: formData.data_registro,
-          data_fim: novoFim,
-          data_retorno: novoRetorno,
-          dias: saldo,
-          saldo_remanescente: null,
-          dias_gozados_interrupcao: null,
-          data_interrupcao: null,
-        });
-        feriasAtualizada = true;
-      } else if (tipoRegistroEfetivo === 'Interrupção de Férias' && selectedFerias) {
-        const { diasGozados, saldoRemanescente } =
-          metricasInterrupcao || calcularMetricasInterrupcao(selectedFerias, formData.data_registro);
-
-        await base44.entities.Ferias.update(formData.ferias_id, {
-          status: 'Interrompida',
-          data_interrupcao: formData.data_registro,
-          saldo_remanescente: saldoRemanescente,
-          dias_gozados_interrupcao: diasGozados,
-        });
-        feriasAtualizada = true;
-      } else if (tipoRegistroEfetivo === 'Retorno Férias') {
-        await base44.entities.Ferias.update(formData.ferias_id, {
-          status: 'Gozada',
-          data_retorno_registrada: new Date().toISOString()
-        });
-        feriasAtualizada = true;
-      } else if (tipoRegistroEfetivo === 'Saída Férias') {
-        await base44.entities.Ferias.update(formData.ferias_id, {
-          status: 'Em Curso',
-          data_saida_registrada: new Date().toISOString()
-        });
-        feriasAtualizada = true;
-      }
-
-      if (feriasAtualizada) {
-        await sincronizarPeriodoAquisitivoDaFerias({
-          periodoAquisitivoId: selectedFerias?.periodo_aquisitivo_id || formData.periodo_aquisitivo_id || null,
-          periodoAquisitivoRef: selectedFerias?.periodo_aquisitivo_ref || formData.periodo_aquisitivo || null,
-          militarId: selectedFerias?.militar_id || formData.militar_id || null,
-        });
-      }
+      await reconciliarCadeiaFerias({
+        feriasId: formData.ferias_id,
+        ferias: selectedFerias || null,
+      });
     }
 
     queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
