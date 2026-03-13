@@ -511,7 +511,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 flex-shrink-0 border-l border-slate-200 pl-3">
+            <div className="flex items-center gap-1 flex-shrink-0">
               {podeMarcarPrioridade && (
                 <>
                   <Button
@@ -519,10 +519,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     size="sm"
                     title={registro.urgente ? 'Remover Urgente' : 'Marcar como Urgente'}
                     onClick={(e) => handleTogglePrioridade(e, 'urgente')}
-                    className={`h-8 w-8 p-0 ${
+                    className={`text-xs gap-1 ${
                       registro.urgente
-                        ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                        : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                        ? 'text-red-600'
+                        : 'text-slate-400 hover:text-red-500'
                     }`}
                   >
                     <AlertTriangle className="w-4 h-4" />
@@ -533,10 +533,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     size="sm"
                     title={registro.importante ? 'Remover Importante' : 'Marcar como Importante'}
                     onClick={(e) => handleTogglePrioridade(e, 'importante')}
-                    className={`h-8 w-8 p-0 ${
+                    className={`text-xs gap-1 ${
                       registro.importante
-                        ? 'text-amber-500 bg-amber-50 hover:bg-amber-100'
-                        : 'text-slate-400 hover:text-amber-500 hover:bg-amber-50'
+                        ? 'text-amber-500'
+                        : 'text-slate-400 hover:text-amber-500'
                     }`}
                   >
                     <Star className="w-4 h-4" />
@@ -553,7 +553,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     setIsEditingBg(true);
                     setIsExpanded(true);
                   }}
-                  className="h-8 px-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 text-xs gap-1"
+                  className="text-slate-500 hover:text-blue-600 text-xs gap-1"
                 >
                   <FileText className="w-4 h-4" />
                   <span className="hidden sm:inline">Nota/BG</span>
@@ -566,7 +566,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Editar publicação"
                   onClick={() => navigate(getEditUrl(registro))}
-                  className="h-8 px-2 text-slate-600 hover:text-[#1e3a5f] hover:bg-slate-100 text-xs gap-1"
+                  className="text-slate-500 hover:text-[#1e3a5f] text-xs gap-1"
                 >
                   <Edit2 className="w-4 h-4" />
                   <span className="hidden sm:inline">Editar</span>
@@ -579,7 +579,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Fazer Apostila"
                   onClick={handleApostila}
-                  className="h-8 px-2 text-purple-500 hover:text-purple-700 hover:bg-purple-50 text-xs gap-1"
+                  className="text-purple-500 hover:text-purple-700 text-xs gap-1"
                 >
                   <PenLine className="w-4 h-4" />
                   <span className="hidden sm:inline">Apostila</span>
@@ -592,7 +592,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Tornar sem Efeito"
                   onClick={handleTornarSemEfeito}
-                  className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 text-xs gap-1"
+                  className="text-red-500 hover:text-red-700 text-xs gap-1"
                 >
                   <Ban className="w-4 h-4" />
                   <span className="hidden sm:inline">Tornar s/ Efeito</span>
@@ -605,7 +605,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Excluir"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="h-8 w-8 p-0 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                  className="text-slate-500 hover:text-red-600"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -617,7 +617,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   size="sm"
                   title="Ver família da publicação"
                   onClick={onVerFamilia}
-                  className="h-8 px-2 text-[#1e3a5f] hover:text-[#1e3a5f] hover:bg-[#1e3a5f]/10 text-xs gap-1"
+                  className="text-[#1e3a5f] hover:text-[#1e3a5f] hover:bg-[#1e3a5f]/10 text-xs gap-1"
                 >
                   <GitBranch className="w-4 h-4" />
                   <span className="hidden sm:inline">Família</span>
@@ -627,7 +627,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 bg-slate-900 text-white hover:bg-slate-800 hover:text-white"
                 onClick={() => setIsExpanded(!isExpanded)}
               >
                 {isExpanded ? (

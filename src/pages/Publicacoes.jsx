@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,6 @@ import {
   executarExclusaoAdminCadeia,
 } from '@/components/ferias/feriasAdminUtils';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
-import { createPageUrl } from '@/utils';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -177,7 +175,6 @@ function isFeriasOperacional(registro) {
 
 export default function Publicacoes() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
@@ -365,6 +362,15 @@ export default function Publicacoes() {
     });
   }, [registros, statusFilter, searchTerm]);
 
+  const stats = useMemo(() => {
+    return {
+      total: registros.length,
+      aguardandoNota: registros.filter(r => r.status_calculado === 'Aguardando Nota').length,
+      aguardandoPublicacao: registros.filter(r => r.status_calculado === 'Aguardando Publicação').length,
+      publicados: registros.filter(r => r.status_calculado === 'Publicado').length,
+      inconsistentes: registros.filter(r => r.status_calculado === 'Inconsistente').length
+    };
+  }, [registros]);
 
   const handleUpdate = (id, data, tipo) => {
     updateMutation.mutate({ id, data, tipo });
@@ -451,30 +457,21 @@ export default function Publicacoes() {
               />
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 lg:w-auto">
-              <div className="h-11 min-w-52 px-3 rounded-xl border border-slate-200 bg-white flex items-center">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-9 border-0 shadow-none px-0">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Status</SelectItem>
-                    <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                    <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                    <SelectItem value="Publicado">Publicado</SelectItem>
-                    <SelectItem value="Inconsistente">Inconsistente</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="hidden lg:flex flex-col text-xs text-slate-400 leading-tight">
-                  <span className="font-semibold text-slate-700">{statusFilter === 'all' ? 'Todos Status' : statusFilter}</span>
-                  <span>Filtros Ativos</span>
-                </div>
-              </div>
+            <div className="flex gap-3 lg:w-auto">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-11 min-w-52 bg-white border-slate-200">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Status</SelectItem>
+                  <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
+                  <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
+                  <SelectItem value="Publicado">Publicado</SelectItem>
+                  <SelectItem value="Inconsistente">Inconsistente</SelectItem>
+                </SelectContent>
+              </Select>
 
-              <button
-                onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}
-                className="inline-flex items-center justify-center gap-2 px-4 h-11 bg-[#2258d9] text-white rounded-xl text-sm font-semibold hover:bg-[#1f4fc5] transition-colors"
-              >
+              <button className="inline-flex items-center gap-2 px-4 h-11 bg-[#2258d9] text-white rounded-xl text-sm font-semibold hover:bg-[#1f4fc5] transition-colors">
                 <Plus size={16} /> Nova Publicação
               </button>
             </div>
