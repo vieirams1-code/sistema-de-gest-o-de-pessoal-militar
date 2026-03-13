@@ -116,7 +116,7 @@ function compareEvents(a, b) {
   return new Date(a?.created_date || 0) - new Date(b?.created_date || 0);
 }
 
-function deriveEventoInterrupcao(ferias, evento) {
+function deriveEventoInterrupcao(ferias, evento, cadeiaEventos = []) {
   if (!ferias || !evento) {
     return { gozados: null, saldo: null, diasNoMomento: null };
   }
@@ -131,8 +131,16 @@ function deriveEventoInterrupcao(ferias, evento) {
   let gozados = null;
   let saldo = null;
 
-  if (ferias.data_inicio && evento.data_registro) {
-    const inicio = parseDate(ferias.data_inicio);
+  const indiceEvento = cadeiaEventos.findIndex((item) => item?.id === evento?.id);
+  const eventosAteInterrupcao =
+    indiceEvento >= 0 ? cadeiaEventos.slice(0, indiceEvento + 1) : cadeiaEventos;
+  const inicioEvento = [...eventosAteInterrupcao]
+    .reverse()
+    .find((item) => item?.tipo_registro === 'Saída Férias' || item?.tipo_registro === 'Nova Saída / Retomada');
+  const dataInicioBase = inicioEvento?.data_registro || inicioEvento?.data_inicio || ferias?.data_inicio;
+
+  if (dataInicioBase && evento.data_registro) {
+    const inicio = parseDate(dataInicioBase);
     const dataInterrupcao = parseDate(evento.data_registro);
     gozados = Math.max(0, differenceInDays(dataInterrupcao, inicio) + 1);
     gozados = Math.min(gozados, diasNoMomento);
@@ -569,7 +577,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
                   const pubStatus = calcPubStatus(evento);
                   const interrupcaoDerivada =
                     evento.tipo_registro === 'Interrupção de Férias'
-                      ? deriveEventoInterrupcao(ferias, evento)
+                      ? deriveEventoInterrupcao(ferias, evento, eventosVinculados)
                       : null;
 
                   const isUltimoEvento =

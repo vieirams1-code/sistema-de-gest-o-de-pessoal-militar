@@ -84,6 +84,25 @@ function resolverOperacaoFerias(ferias) {
   return getOperacoesDisponiveisFerias(ferias)[0];
 }
 
+
+function calcularMetricasInterrupcao(ferias, dataInterrupcaoIso) {
+  const diasNoMomento = Number(ferias?.dias || 0);
+  const inicioBase = ferias?.data_inicio ? new Date(`${ferias.data_inicio}T00:00:00`) : null;
+  const interrupcaoDate = dataInterrupcaoIso ? new Date(`${dataInterrupcaoIso}T00:00:00`) : null;
+
+  let diasGozados = 0;
+  if (inicioBase && interrupcaoDate && !Number.isNaN(inicioBase.getTime()) && !Number.isNaN(interrupcaoDate.getTime())) {
+    const diffMs = interrupcaoDate.getTime() - inicioBase.getTime();
+    const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+    diasGozados = Math.max(0, diffDias);
+  }
+
+  diasGozados = Math.min(diasGozados, diasNoMomento);
+  const saldoRemanescente = Math.max(0, diasNoMomento - diasGozados);
+
+  return { diasNoMomento, diasGozados, saldoRemanescente };
+}
+
 export default function CadastrarRegistroLivro() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -558,11 +577,23 @@ export default function CadastrarRegistroLivro() {
     e.preventDefault();
     setLoading(true);
 
+    const metricasInterrupcao =
+      tipoRegistroEfetivo === 'Interrupção de Férias' && selectedFerias
+        ? calcularMetricasInterrupcao(selectedFerias, formData.data_registro)
+        : null;
+
     const registroData = {
       ...formData,
       tipo_registro: tipoRegistroEfetivo,
       texto_publicacao: textoPublicacao,
       dias: formData.dias !== '' && formData.dias !== undefined ? Number(formData.dias) : undefined,
+      ...(metricasInterrupcao
+        ? {
+            dias_no_momento: metricasInterrupcao.diasNoMomento,
+            dias_gozados: metricasInterrupcao.diasGozados,
+            saldo_remanescente: metricasInterrupcao.saldoRemanescente,
+          }
+        : {}),
     };
 
     if (id) {
@@ -594,19 +625,8 @@ export default function CadastrarRegistroLivro() {
         });
         feriasAtualizada = true;
       } else if (tipoRegistroEfetivo === 'Interrupção de Férias' && selectedFerias) {
-        const diasNoMomento = Number(selectedFerias.dias || 0);
-        const inicioBase = selectedFerias.data_inicio ? new Date(`${selectedFerias.data_inicio}T00:00:00`) : null;
-        const interrupcaoDate = new Date(`${formData.data_registro}T00:00:00`);
-
-        let diasGozados = 0;
-        if (inicioBase && !Number.isNaN(inicioBase.getTime()) && !Number.isNaN(interrupcaoDate.getTime())) {
-          const diffMs = interrupcaoDate.getTime() - inicioBase.getTime();
-          const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
-          diasGozados = Math.max(0, diffDias);
-        }
-
-        diasGozados = Math.min(diasGozados, diasNoMomento);
-        const saldoRemanescente = Math.max(0, diasNoMomento - diasGozados);
+        const { diasGozados, saldoRemanescente } =
+          metricasInterrupcao || calcularMetricasInterrupcao(selectedFerias, formData.data_registro);
 
         await base44.entities.Ferias.update(formData.ferias_id, {
           status: 'Interrompida',
