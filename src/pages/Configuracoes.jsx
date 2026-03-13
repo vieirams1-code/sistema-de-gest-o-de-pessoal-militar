@@ -26,9 +26,11 @@ const TABS = [
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
-  const { isAdmin, isLoading: loadingUser, getAccessModeFromUser } = useCurrentUser();
+  const { user, isAdmin, isLoading: loadingUser, getAccessModeFromUser } = useCurrentUser();
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
+  const [syncingAdminRole, setSyncingAdminRole] = useState(false);
+  const [adminRoleSyncError, setAdminRoleSyncError] = useState('');
 
   // Ler tab da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -69,7 +71,47 @@ export default function Configuracoes() {
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
   const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) });
-  const { data: usuarios = [] } = useQuery({ queryKey: ['usuarios'], queryFn: () => base44.entities.User.list() });
+  useEffect(() => {
+    let isMounted = true;
+
+    const ensureAdminRole = async () => {
+      if (loadingUser || !user || !isAdmin || user.role === 'admin') {
+        if (isMounted) {
+          setSyncingAdminRole(false);
+          setAdminRoleSyncError('');
+        }
+        return;
+      }
+
+      setSyncingAdminRole(true);
+      setAdminRoleSyncError('');
+
+      try {
+        await base44.auth.updateMe({ role: 'admin' });
+        await queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+      } catch (error) {
+        if (isMounted) {
+          setAdminRoleSyncError('Não foi possível sincronizar o papel de admin deste usuário. Verifique as permissões no Base44.');
+        }
+      } finally {
+        if (isMounted) {
+          setSyncingAdminRole(false);
+        }
+      }
+    };
+
+    ensureAdminRole();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadingUser, user, isAdmin, queryClient]);
+
+  const { data: usuarios = [], error: usuariosError } = useQuery({
+    queryKey: ['usuarios'],
+    queryFn: () => base44.entities.User.list(),
+    enabled: isAdmin && !syncingAdminRole,
+  });
   const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome') });
 
   const grupamentos = subgrupamentos.filter(s => s.tipo === 'Grupamento');
@@ -232,6 +274,21 @@ export default function Configuracoes() {
                 <h2 className="text-xl font-semibold text-[#1e3a5f]">Permissões de Usuários</h2>
               </div>
               <p className="text-sm text-slate-500 mb-4">Defina o tipo de acesso de cada usuário: Admin, Setor, Subsetor ou Próprio. Em modo Próprio, vincule explicitamente o militar correspondente.</p>
+              {syncingAdminRole && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2 mb-3">
+                  Sincronizando privilégio administrativo para habilitar esta área...
+                </p>
+              )}
+              {adminRoleSyncError && (
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 mb-3">
+                  {adminRoleSyncError}
+                </p>
+              )}
+              {usuariosError && (
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 mb-3">
+                  Falha ao carregar usuários. Há indício de bloqueio de permissões no backend/Base44 para esta conta admin.
+                </p>
+              )}
               <div className="space-y-2 mb-6">
                 {usuarios.map(u => (
                   <div key={u.id} onClick={() => handleSelectUser(u.id)} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
