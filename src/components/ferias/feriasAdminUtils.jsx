@@ -1,6 +1,6 @@
 import { format, addDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
-import { sincronizarPeriodoAquisitivoDaFerias } from './feriasService';
+import { reconciliarCadeiaFerias } from './reconciliacaoCadeiaFerias';
 
 /**
  * Tipos de eventos que representam operações na cadeia de férias.
@@ -247,18 +247,11 @@ export async function executarExclusaoAdminCadeia({
     if (lista[0]) feriasFresh = lista[0];
   } catch (_) { /* fallback para ferias da prop */ }
 
-  const { eventosValidos } = await auditarDependenciasPosExclusao({
+  await auditarDependenciasPosExclusao({
     eventosSobreviventes: sobreviventes,
   });
 
-  // Recalcular estado da férias usando apenas os eventos ainda válidos
-  const atualizacaoFerias = recalcularEstadoFerias(feriasFresh, eventosValidos);
-  await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
-  await sincronizarPeriodoAquisitivoDaFerias({
-    periodoAquisitivoId: ferias.periodo_aquisitivo_id,
-    periodoAquisitivoRef: ferias.periodo_aquisitivo_ref,
-    militarId: ferias.militar_id,
-  });
+  await reconciliarCadeiaFerias({ feriasId: ferias.id, ferias: feriasFresh });
 
   queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
   queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
@@ -278,16 +271,10 @@ export async function recalcularCadeiaCompleta({ ferias, cadeia, queryClient }) 
     const lista = await base44.entities.Ferias.filter({ id: ferias.id });
     if (lista[0]) feriasFresh = lista[0];
   } catch (_) { /* fallback */ }
-  const atualizacaoFerias = recalcularEstadoFerias(feriasFresh, cadeia);
-  await base44.entities.Ferias.update(ferias.id, atualizacaoFerias);
-  await sincronizarPeriodoAquisitivoDaFerias({
-    periodoAquisitivoId: ferias.periodo_aquisitivo_id,
-    periodoAquisitivoRef: ferias.periodo_aquisitivo_ref,
-    militarId: ferias.militar_id,
-  });
+  const resultado = await reconciliarCadeiaFerias({ feriasId: ferias.id, ferias: feriasFresh });
 
   queryClient.invalidateQueries({ queryKey: ['ferias'] });
   queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
 
-  return atualizacaoFerias;
+  return resultado;
 }
