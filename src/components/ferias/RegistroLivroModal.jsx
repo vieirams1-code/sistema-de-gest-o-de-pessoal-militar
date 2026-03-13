@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
+import { reconciliarCadeiaFerias, calcularSnapshotInterrupcao, compareEventosFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,61 +73,21 @@ function getEventDate(evento) {
   return evento?.data_registro || evento?.data_inicio || null;
 }
 
-function compareEvents(a, b) {
-  const da = getEventDate(a) || '2000-01-01';
-  const db = getEventDate(b) || '2000-01-01';
-
-  const dateA = new Date(`${da}T00:00:00`);
-  const dateB = new Date(`${db}T00:00:00`);
-
-  if (dateA.getTime() !== dateB.getTime()) {
-    return dateA - dateB;
-  }
-
-  return new Date(a?.created_date || 0) - new Date(b?.created_date || 0);
-}
-
 function deriveUltimaInterrupcao(ferias, registros) {
-  const cadeia = [...registros].sort(compareEvents);
+  const cadeia = [...registros].sort(compareEventosFerias);
   const ultima = [...cadeia]
     .reverse()
     .find((r) => r.tipo_registro === 'Interrupção de Férias');
 
   if (!ultima) return null;
 
-  const diasNoMomento = Number(ultima.dias_no_momento ?? ultima.dias ?? ferias?.dias ?? 0);
-
-  let gozados = null;
-  let saldo = null;
-
-  const indiceInterrupcao = cadeia.findIndex((evento) => evento?.id === ultima?.id);
-  const eventosAteInterrupcao = indiceInterrupcao >= 0 ? cadeia.slice(0, indiceInterrupcao + 1) : cadeia;
-  const ultimoInicio = [...eventosAteInterrupcao]
-    .reverse()
-    .find((evento) => evento?.tipo_registro === 'Saída Férias' || evento?.tipo_registro === 'Nova Saída / Retomada');
-  const dataInicioBase = ultimoInicio?.data_registro || ultimoInicio?.data_inicio || ferias?.data_inicio;
-
-  if (dataInicioBase && ultima.data_registro) {
-    const inicio = parseDate(dataInicioBase);
-    const interrupcao = parseDate(ultima.data_registro);
-    gozados = Math.max(0, differenceInDays(interrupcao, inicio) + 1);
-    gozados = Math.min(gozados, diasNoMomento);
-    saldo = Math.max(0, diasNoMomento - gozados);
-  }
-
-  if (ultima.dias_gozados != null && !Number.isNaN(Number(ultima.dias_gozados))) {
-    gozados = Number(ultima.dias_gozados);
-  }
-
-  if (ultima.saldo_remanescente != null && !Number.isNaN(Number(ultima.saldo_remanescente))) {
-    saldo = Number(ultima.saldo_remanescente);
-  }
+  const snap = calcularSnapshotInterrupcao(ultima, cadeia, ferias);
 
   return {
     ...ultima,
-    diasNoMomento,
-    gozados,
-    saldo,
+    diasNoMomento: snap.diasNoMomento,
+    gozados: snap.gozados,
+    saldo: snap.saldo,
   };
 }
 
@@ -532,70 +492,21 @@ export default function RegistroLivroModal({
         texto_publicacao: textoPublicacao || '',
       };
 
-      let feriasAtualizada = false;
-
       if (tipoRegistro === 'Interrupção de Férias' && resumo) {
         registroPayload.dias = Number(resumo.diasNoMomento || ferias.dias || 0);
         registroPayload.dias_no_momento = Number(resumo.diasNoMomento || ferias.dias || 0);
         registroPayload.dias_gozados = Number(resumo.gozados || 0);
         registroPayload.saldo_remanescente = Number(resumo.saldo || 0);
-
-        await base44.entities.RegistroLivro.create(registroPayload);
-
-        await base44.entities.Ferias.update(ferias.id, {
-          status: 'Interrompida',
-          dias_gozados_interrupcao: Number(resumo.gozados || 0),
-          saldo_remanescente: Number(resumo.saldo || 0),
-          data_interrupcao: dataRegistro,
-        });
-        feriasAtualizada = true;
       } else if (tipoRegistro === 'Nova Saída / Retomada' && resumo) {
-        const saldo = Number(resumo.saldo || 0);
-
-        registroPayload.dias = saldo;
-
-        await base44.entities.RegistroLivro.create(registroPayload);
-
-        await base44.entities.Ferias.update(ferias.id, {
-          status: 'Em Curso',
-          data_inicio: dataRegistro,
-          data_fim: resumo.novoFim,
-          data_retorno: resumo.novoRetorno,
-          dias: saldo,
-          dias_gozados_interrupcao: null,
-          saldo_remanescente: null,
-          data_interrupcao: null,
-        });
-        feriasAtualizada = true;
+        registroPayload.dias = Number(resumo.saldo || 0);
       } else if (tipoRegistro === 'Saída Férias' && resumo) {
         registroPayload.dias = Number(resumo.dias || ferias.dias || 0);
-
-        await base44.entities.RegistroLivro.create(registroPayload);
-
-        await base44.entities.Ferias.update(ferias.id, {
-          status: 'Em Curso',
-          data_inicio: dataRegistro,
-          data_fim: resumo.fim,
-          data_retorno: resumo.retorno,
-        });
-        feriasAtualizada = true;
-      } else if (tipoRegistro === 'Retorno Férias') {
-        await base44.entities.RegistroLivro.create(registroPayload);
-
-        await base44.entities.Ferias.update(ferias.id, {
-          status: 'Gozada',
-        });
-        feriasAtualizada = true;
-      } else {
-        await base44.entities.RegistroLivro.create(registroPayload);
       }
 
-      if (feriasAtualizada) {
-        await sincronizarPeriodoAquisitivoDaFerias({
-          periodoAquisitivoId: ferias.periodo_aquisitivo_id || null,
-          periodoAquisitivoRef: ferias.periodo_aquisitivo_ref || null,
-          militarId: ferias.militar_id || null,
-        });
+      await base44.entities.RegistroLivro.create(registroPayload);
+
+      if (TIPOS_OPERACIONAIS.includes(tipoRegistro)) {
+        await reconciliarCadeiaFerias({ feriasId: ferias.id, ferias });
       }
 
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
