@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
-import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { FileText, CheckCircle, Clock, AlertCircle, Shield, Plus } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 
@@ -161,6 +160,23 @@ function isFeriasOperacional(registro) {
       TIPOS_FERIAS.includes(registro.tipo_registro) ||
       ['saida_ferias', 'interrupcao_de_ferias', 'nova_saida_retomada', 'retorno_ferias'].includes(registro.tipo_codigo)
     )
+  );
+}
+
+
+function StatusCard({ icon: Icon, label, value, iconClass, bgClass, valueClass }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${bgClass}`}>
+          <Icon className={`w-5 h-5 ${iconClass}`} />
+        </div>
+        <div>
+          <p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
+          <p className="text-xs text-slate-500">{label}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -422,72 +438,38 @@ export default function Publicacoes() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#1e3a5f]">Publicações</h1>
-          <p className="text-slate-500">Controle de notas e boletins gerais</p>
+    <div className="min-h-screen bg-[#f3f4f6]">
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-end">
+          <div className="flex items-start gap-3">
+            <div className="hidden sm:flex h-12 w-12 rounded-full bg-white border border-slate-200 items-center justify-center text-slate-500 shadow-sm">
+              <Shield size={20} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Controle de Publicações</h1>
+              <p className="text-sm text-slate-500 mt-1">Análise, validação, rastreabilidade e integridade de atos administrativos.</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button className="px-4 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+              Filtros Avançados
+            </button>
+            <button className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-md text-sm font-medium hover:bg-slate-800 transition-colors">
+              <Plus size={14} /> Nova Publicação
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-[#1e3a5f]" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-[#1e3a5f]">{stats.total}</p>
-                  <p className="text-xs text-slate-500">Total</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-amber-600">{stats.aguardandoNota}</p>
-                  <p className="text-xs text-slate-500">Aguardando Nota</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">{stats.aguardandoPublicacao}</p>
-                  <p className="text-xs text-slate-500">Aguardando Publ.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-emerald-600">{stats.publicados}</p>
-                  <p className="text-xs text-slate-500">Publicados</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
+          <StatusCard icon={FileText} label="Total" value={stats.total} iconClass="text-[#1e3a5f]" bgClass="bg-[#1e3a5f]/10" valueClass="text-[#1e3a5f]" />
+          <StatusCard icon={Clock} label="Aguardando Nota" value={stats.aguardandoNota} iconClass="text-amber-600" bgClass="bg-amber-100" valueClass="text-amber-600" />
+          <StatusCard icon={AlertCircle} label="Aguardando Publ." value={stats.aguardandoPublicacao} iconClass="text-blue-600" bgClass="bg-blue-100" valueClass="text-blue-600" />
+          <StatusCard icon={CheckCircle} label="Publicados" value={stats.publicados} iconClass="text-emerald-600" bgClass="bg-emerald-100" valueClass="text-emerald-600" />
+          <StatusCard icon={AlertCircle} label="Inconsistentes" value={stats.inconsistentes} iconClass="text-red-600" bgClass="bg-red-100" valueClass="text-red-600" />
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <Input
@@ -513,7 +495,7 @@ export default function Publicacoes() {
           </div>
         </div>
 
-        <div className="mb-4 text-sm text-slate-500">
+        <div className="text-sm text-slate-500">
           {filteredRegistros.length} registro(s) encontrado(s)
         </div>
 
