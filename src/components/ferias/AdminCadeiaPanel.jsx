@@ -38,7 +38,7 @@ const statusResultante = {
   Interrompida: 'bg-orange-100 text-orange-700',
 };
 
-export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
+export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = false }) {
   const queryClient = useQueryClient();
   const { isAdmin } = useCurrentUser();
   const [expanded, setExpanded] = useState(false);
@@ -49,6 +49,10 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
   const cadeia = montarCadeia(ferias, registrosLivro);
 
   const handleRecalcular = async () => {
+    if (!isAdmin || !modoAdmin) {
+      setFeedback({ type: 'error', msg: 'Ative o modo admin para usar esta função.' });
+      return;
+    }
     setLoading(true);
     setFeedback(null);
 
@@ -74,8 +78,8 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
   };
 
   const handleIniciarExclusao = (evento, incluirDescendentes) => {
-    if (!isAdmin) {
-      setFeedback({ type: 'error', msg: 'Ação restrita a administradores.' });
+    if (!isAdmin || !modoAdmin) {
+      setFeedback({ type: 'error', msg: 'Ative o modo admin para usar esta função.' });
       return;
     }
 
@@ -95,8 +99,8 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
 
   const handleConfirmarExclusao = async () => {
     if (!confirmarExclusao) return;
-    if (!isAdmin) {
-      setFeedback({ type: 'error', msg: 'Ação restrita a administradores.' });
+    if (!isAdmin || !modoAdmin) {
+      setFeedback({ type: 'error', msg: 'Ative o modo admin para usar esta função.' });
       return;
     }
 
@@ -173,6 +177,13 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4">
+          {!modoAdmin && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-amber-50 text-amber-700 border border-amber-200">
+              <Lock className="w-4 h-4 shrink-0" />
+              Ative o <strong>modo admin</strong> na barra superior para desbloquear as ações destrutivas.
+            </div>
+          )}
+
           {feedback && (
             <div
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
@@ -203,8 +214,9 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
                 size="sm"
                 variant="outline"
                 className="shrink-0 border-slate-300 hover:border-[#1e3a5f] hover:text-[#1e3a5f]"
-                disabled={loading}
+                disabled={loading || !modoAdmin}
                 onClick={handleRecalcular}
+                title={!modoAdmin ? 'Ative o modo admin para usar esta função.' : ''}
               >
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
@@ -285,7 +297,7 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
                   <Button
                     size="sm"
                     className="bg-red-600 hover:bg-red-700 text-white flex-1"
-                    disabled={loading}
+                    disabled={loading || !modoAdmin}
                     onClick={handleConfirmarExclusao}
                   >
                     {loading ? (
@@ -368,8 +380,9 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
                             size="sm"
                             variant="ghost"
                             className="text-xs text-red-700 hover:text-red-800 hover:bg-red-100 h-7 px-2"
-                            title={`Excluir este + ${descendentes.length} descendente(s)`}
-                            onClick={() => handleIniciarExclusao(evento, true)}
+                            title={!modoAdmin ? 'Ative o modo admin' : `Excluir este + ${descendentes.length} descendente(s)`}
+                            disabled={!modoAdmin}
+                            onClick={() => modoAdmin && handleIniciarExclusao(evento, true)}
                           >
                             <Trash2 className="w-3.5 h-3.5 mr-1" />
                             +{descendentes.length} desc.
@@ -380,7 +393,9 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
                           size="sm"
                           variant="ghost"
                           className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2"
-                          onClick={() => handleIniciarExclusao(evento, false)}
+                          disabled={!modoAdmin}
+                          title={!modoAdmin ? 'Ative o modo admin' : ''}
+                          onClick={() => modoAdmin && handleIniciarExclusao(evento, false)}
                         >
                           <Trash2 className="w-3.5 h-3.5 mr-1" />
                           Excluir

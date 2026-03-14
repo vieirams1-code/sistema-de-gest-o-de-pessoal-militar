@@ -10,6 +10,7 @@ import { FileText, CheckCircle, Clock, AlertCircle, Search, Plus } from 'lucide-
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 import {
   calcStatusPublicacao,
@@ -217,6 +218,7 @@ export default function Publicacoes() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
+  const { isAdmin } = useCurrentUser();
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
@@ -416,6 +418,11 @@ export default function Publicacoes() {
   };
 
   const handleDelete = (id, tipo) => {
+    if (!isAdmin) {
+      alert('A exclusão de publicações é restrita a administradores.');
+      return;
+    }
+
     const registro = registros.find(r => r.id === id);
     if (!registro) return;
 
@@ -614,6 +621,7 @@ export default function Publicacoes() {
                           onDelete={handleDelete}
                           onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
                           todosRegistros={registros}
+                          isAdmin={isAdmin}
                         />
                       ))}
                     </div>

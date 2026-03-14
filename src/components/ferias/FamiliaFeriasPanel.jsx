@@ -220,7 +220,7 @@ function detectarInconsistencias(cadeia) {
   return [...new Set(inconsistencias)];
 }
 
-export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) {
+export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, modoAdmin = false }) {
   const { isAdmin } = useCurrentUser();
 
   const eventosVinculados = useMemo(() => {
@@ -692,7 +692,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
           )}
         </div>
 
-        {isAdmin && <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} />}
+        {isAdmin && <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} modoAdmin={modoAdmin} />}
       </div>
 
       {possuiEventosPendentes && (

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   sincronizarDataJisoCardAtestado,
   obterVinculoAtestado,
@@ -121,26 +122,34 @@ function AcaoDatePicker({ value, onChange, disabled, placeholder = 'Selecionar d
   );
 }
 
-function MensagemComentario({ item, index }) {
-  const alinhadoDireita = index % 2 === 1;
+function MensagemComentario({ item, currentUserEmail }) {
+  const autorEmail = item.autor_email || '';
+  const isMine = currentUserEmail && autorEmail && autorEmail.toLowerCase() === currentUserEmail.toLowerCase();
 
   return (
-    <div className={`flex ${alinhadoDireita ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] rounded-2xl px-3 py-2 border shadow-sm ${
-          alinhadoDireita
-            ? 'bg-indigo-600 text-white border-indigo-500'
-            : 'bg-white text-slate-800 border-slate-200'
+        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm ${
+          isMine
+            ? 'bg-[#1e3a5f] text-white rounded-br-md'
+            : 'bg-white text-slate-800 border border-slate-200 rounded-bl-md'
         }`}
       >
+        {!isMine && (
+          <p className={`text-[10px] font-bold mb-0.5 ${
+            isMine ? 'text-blue-200' : 'text-indigo-600'
+          }`}>
+            {item.autor_nome || 'Usuário'}
+          </p>
+        )}
         <p className="text-xs leading-relaxed whitespace-pre-wrap">{item.mensagem}</p>
         <div
           className={`mt-1 flex items-center gap-1 text-[10px] ${
-            alinhadoDireita ? 'text-indigo-100' : 'text-slate-400'
+            isMine ? 'text-blue-200 justify-end' : 'text-slate-400'
           }`}
         >
-          <span className="font-semibold">{item.autor_nome || 'Usuário'}</span>
-          <span>·</span>
+          {isMine && <span className="font-semibold">Você</span>}
+          {isMine && <span>·</span>}
           <span>{formatDateTime(item.data_hora || item.created_date)}</span>
         </div>
       </div>
@@ -607,6 +616,7 @@ function AcoesSection({ cardId }) {
 
 export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpdate }) {
   const queryClient = useQueryClient();
+  const { userEmail, user } = useCurrentUser();
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [showSystemActivity, setShowSystemActivity] = useState(false);
@@ -689,6 +699,8 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
         tipo_registro: 'Comentário',
         data_hora: new Date().toISOString(),
         origem_automatica: false,
+        autor_nome: user?.full_name || userEmail || 'Usuário',
+        autor_email: userEmail || '',
       });
 
       const novoComentariosCount = (card.comentarios_count || 0) + 1;
@@ -1078,8 +1090,8 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 </p>
               )}
 
-              {comentariosHumanos.map((item, idx) => (
-                <MensagemComentario key={item.id} item={item} index={idx} />
+              {comentariosHumanos.map((item) => (
+                <MensagemComentario key={item.id} item={item} currentUserEmail={userEmail} />
               ))}
             </div>
 

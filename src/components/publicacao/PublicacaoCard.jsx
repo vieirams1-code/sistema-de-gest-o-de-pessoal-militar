@@ -157,7 +157,7 @@ function FieldBlock({ label, children, className = '' }) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [] }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [], isAdmin = false }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditingBg, setIsEditingBg] = useState(false);
@@ -205,7 +205,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
   const podeMarcarPrioridade = !isPublicado;
   const podeEditar = !isPublicado;
-  const podeExcluir = !isPublicado;
+  const podeExcluir = !isPublicado && isAdmin;
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -259,6 +259,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   };
 
   const handleDelete = () => {
+    if (!isAdmin) {
+      alert('A exclusão de publicações é restrita a administradores.');
+      return;
+    }
     onDelete(registro.id, origemTipo);
     setShowDeleteConfirm(false);
   };
