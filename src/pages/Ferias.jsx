@@ -40,6 +40,7 @@ import {
   GitBranch,
   Lock,
   RefreshCw,
+  ShieldAlert,
 } from 'lucide-react';
 import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import FamiliaFeriasPanel from '@/components/ferias/FamiliaFeriasPanel';
@@ -287,6 +288,7 @@ export default function Ferias() {
   });
 
   const [savingEdit, setSavingEdit] = useState(false);
+  const [modoAdmin, setModoAdmin] = useState(false);
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
   const { data: ferias = [], isLoading } = useQuery({
@@ -413,8 +415,10 @@ export default function Ferias() {
       alert('Ação restrita a administradores.');
       return;
     }
-
-    setFeriasToDelete(f);
+    if (!modoAdmin) {
+      alert('Ative o modo admin para usar esta função.');
+      return;
+    }
 
     const cadeiaOperacional = registrosLivro
       .filter(
@@ -435,14 +439,15 @@ export default function Ferias() {
       return;
     }
 
+    setFeriasToDelete(f);
     setCadeiaBloqueandoDelete([]);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
     if (!feriasToDelete) return;
-    if (!isAdmin) {
-      alert('Ação restrita a administradores.');
+    if (!isAdmin || !modoAdmin) {
+      alert('Ação restrita a administradores com modo admin ativo.');
       return;
     }
 
@@ -514,6 +519,20 @@ export default function Ferias() {
           </div>
 
           <div className="flex gap-2">
+            {isAdmin && (
+              <Button
+                variant={modoAdmin ? 'default' : 'outline'}
+                onClick={() => setModoAdmin((v) => !v)}
+                className={modoAdmin
+                  ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
+                  : 'border-red-300 text-red-600 hover:bg-red-50'}
+                title={modoAdmin ? 'Desativar modo admin' : 'Ativar modo admin para ações sensíveis'}
+              >
+                <ShieldAlert className="w-4 h-4 mr-2" />
+                {modoAdmin ? 'Admin Ativo' : 'Modo Admin'}
+              </Button>
+            )}
+
             <Button
               variant="outline"
               onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}
@@ -887,15 +906,38 @@ export default function Ferias() {
                                           <span>Editar Férias</span>
                                         </DropdownMenuItem>
 
-                                        {isAdmin && (
-                                          <DropdownMenuItem
-                                            onClick={() => handleDelete(f)}
-                                            className="text-red-600 focus:text-red-600"
-                                          >
-                                            <Trash2 className="w-4 h-4 mr-2" />
-                                            <span>Excluir Férias</span>
-                                          </DropdownMenuItem>
-                                        )}
+                                        {isAdmin && (() => {
+                                          const temCadeia = registrosLivro.some(
+                                            (r) => r.ferias_id === f.id && TIPOS_OPERACIONAIS.includes(r.tipo_registro)
+                                          );
+                                          if (temCadeia) {
+                                            return (
+                                              <DropdownMenuItem
+                                                disabled
+                                                className="text-slate-400"
+                                                title="Esta férias já possui atos/cadeia vinculados e não pode ser excluída de forma simples."
+                                              >
+                                                <Lock className="w-4 h-4 mr-2" />
+                                                <span>Excluir Férias (possui cadeia)</span>
+                                              </DropdownMenuItem>
+                                            );
+                                          }
+                                          return (
+                                            <DropdownMenuItem
+                                              disabled={!modoAdmin}
+                                              onClick={() => modoAdmin && handleDelete(f)}
+                                              className={modoAdmin ? 'text-red-600 focus:text-red-600' : 'text-slate-400'}
+                                              title={!modoAdmin ? 'Ative o modo admin para usar esta função.' : ''}
+                                            >
+                                              {modoAdmin ? (
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                              ) : (
+                                                <Lock className="w-4 h-4 mr-2" />
+                                              )}
+                                              <span>{modoAdmin ? 'Excluir Férias' : 'Excluir (modo admin)'}</span>
+                                            </DropdownMenuItem>
+                                          );
+                                        })()}
                                       </>
                                     )}
 
@@ -1116,6 +1158,7 @@ export default function Ferias() {
             ferias={familiaPanel.ferias}
             registrosLivro={registrosLivro}
             onClose={() => setFamiliaPanel({ open: false, ferias: null })}
+            modoAdmin={modoAdmin}
           />
         </>
       )}
