@@ -123,8 +123,13 @@ function AcaoDatePicker({ value, onChange, disabled, placeholder = 'Selecionar d
 }
 
 function MensagemComentario({ item, currentUserEmail }) {
-  const autorEmail = item.autor_email || '';
-  const isMine = currentUserEmail && autorEmail && autorEmail.toLowerCase() === currentUserEmail.toLowerCase();
+  const autorEmail = (item.autor_email || '').toLowerCase();
+  const createdBy = (item.created_by || '').toLowerCase();
+  const meEmail = (currentUserEmail || '').toLowerCase();
+  const isMine = meEmail && (
+    (autorEmail && autorEmail === meEmail) ||
+    (createdBy && createdBy === meEmail)
+  );
 
   return (
     <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
