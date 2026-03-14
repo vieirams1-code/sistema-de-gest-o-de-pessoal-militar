@@ -58,6 +58,8 @@ export default function Configuracoes() {
   const [userAccessMode, setUserAccessMode] = useState('proprio');
   const [userMilitarId, setUserMilitarId] = useState('');
   const [userMilitarEmail, setUserMilitarEmail] = useState('');
+  const [userPerfilId, setUserPerfilId] = useState('');
+  const [userPerfilNome, setUserPerfilNome] = useState('');
 
   const initialPermissions = useMemo(() => ({
     acesso_militares: false,
@@ -114,7 +116,27 @@ export default function Configuracoes() {
     queryFn: () => base44.entities.UsuarioAcesso.list(),
     enabled: isAdmin,
   });
+  const { data: perfisPermissao = [] } = useQuery({
+    queryKey: ['perfisPermissao'],
+    queryFn: () => base44.entities.PerfilPermissao.list('nome'),
+    enabled: isAdmin,
+  });
   const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome') });
+
+  const perfisAtivos = useMemo(() => perfisPermissao.filter((perfil) => perfil.ativo !== false), [perfisPermissao]);
+
+  const applyPerfilPermissions = (perfil) => {
+    if (!perfil) return;
+
+    const loadedPerms = {};
+    Object.keys(initialPermissions).forEach((key) => {
+      loadedPerms[key] = perfil[key] === true;
+    });
+
+    setUserPermissions(loadedPerms);
+    setUserPerfilId(perfil.id || '');
+    setUserPerfilNome(perfil.nome || '');
+  };
 
   const grupamentos = subgrupamentos.filter(s => s.tipo === 'Grupamento');
   const subgrupamentosFilhos = subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId);
@@ -143,6 +165,8 @@ export default function Configuracoes() {
     setUserMilitarEmail(acesso.militar_email || '');
     setUserGrupamentoId(acesso.grupamento_id || '');
     setUserSubgrupamentoId(acesso.subgrupamento_id || '');
+    setUserPerfilId(acesso.perfil_id || '');
+    setUserPerfilNome(acesso.perfil_nome || '');
 
     const loadedPerms = {};
     Object.keys(initialPermissions).forEach(key => {
@@ -163,6 +187,8 @@ export default function Configuracoes() {
     setUserMilitarEmail('');
     setUserGrupamentoId('');
     setUserSubgrupamentoId('');
+    setUserPerfilId('');
+    setUserPerfilNome('');
     setUserPermissions(initialPermissions);
   };
 
@@ -183,6 +209,8 @@ export default function Configuracoes() {
         user_email: userUserEmail.trim(),
         ativo: userAtivo,
         observacoes: userObservacoes,
+        perfil_id: userPerfilId || '',
+        perfil_nome: userPerfilNome || '',
         ...userPermissions
       };
 
@@ -427,6 +455,52 @@ export default function Configuracoes() {
                       </div>
                     </div>
                   )}
+
+                  <div className="border-t border-slate-200 mt-6 pt-4 space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">Perfil de permissões</label>
+                      <Select
+                        value={userPerfilId || '_sem_perfil'}
+                        onValueChange={(v) => {
+                          if (v === '_sem_perfil') {
+                            setUserPerfilId('');
+                            setUserPerfilNome('');
+                            return;
+                          }
+
+                          const perfilSelecionado = perfisAtivos.find((perfil) => perfil.id === v);
+                          if (!perfilSelecionado) return;
+                          applyPerfilPermissions(perfilSelecionado);
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecionar perfil" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_sem_perfil">Selecionar perfil</SelectItem>
+                          {perfisAtivos.map((perfil) => (
+                            <SelectItem key={perfil.id} value={perfil.id}>{perfil.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const perfilSelecionado = perfisAtivos.find((perfil) => perfil.id === userPerfilId);
+                          if (!perfilSelecionado) {
+                            alert('Selecione um perfil de permissões para aplicar.');
+                            return;
+                          }
+                          applyPerfilPermissions(perfilSelecionado);
+                        }}
+                        disabled={!userPerfilId}
+                      >
+                        Aplicar perfil
+                      </Button>
+                      {userPerfilNome && <span className="text-xs text-slate-500">Perfil atual: {userPerfilNome}</span>}
+                    </div>
+                  </div>
 
                   <div className="border-t border-slate-200 mt-6 pt-4">
                     <h3 className="text-lg font-medium text-slate-800 mb-4">Módulos Permitidos</h3>

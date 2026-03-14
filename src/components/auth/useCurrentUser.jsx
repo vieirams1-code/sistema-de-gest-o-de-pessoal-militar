@@ -18,6 +18,8 @@ export function useCurrentUser() {
   const isLoading = loadingAuth || loadingAcesso;
   const acesso = usuarioAcessoList?.[0]; // Pega o primeiro acesso ativo encontrado
 
+  // Observação: mesmo com perfil vinculado (perfil_id/perfil_nome), a autorização em runtime
+  // continua baseada nos booleanos do próprio UsuarioAcesso para manter compatibilidade.
   // Resolve as propriedades explicitamente usando UsuarioAcesso, com fallback para o modelo antigo (User)
   const isAdmin = acesso 
     ? acesso.tipo_acesso === 'admin' 
