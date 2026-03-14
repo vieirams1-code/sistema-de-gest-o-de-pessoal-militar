@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { calcularSnapshotInterrupcao } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import AdminCadeiaPanel from '@/components/ferias/AdminCadeiaPanel';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -220,6 +221,8 @@ function detectarInconsistencias(cadeia) {
 }
 
 export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) {
+  const { isAdmin } = useCurrentUser();
+
   const eventosVinculados = useMemo(() => {
     if (!ferias) return [];
 
@@ -689,7 +692,7 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose }) 
           )}
         </div>
 
-        <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} />
+        {isAdmin && <AdminCadeiaPanel ferias={ferias} registrosLivro={registrosLivro} />}
       </div>
 
       {possuiEventosPendentes && (

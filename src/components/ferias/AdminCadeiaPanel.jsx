@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   ShieldAlert,
   Trash2,
@@ -39,6 +40,7 @@ const statusResultante = {
 
 export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
   const queryClient = useQueryClient();
+  const { isAdmin } = useCurrentUser();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -72,6 +74,11 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
   };
 
   const handleIniciarExclusao = (evento, incluirDescendentes) => {
+    if (!isAdmin) {
+      setFeedback({ type: 'error', msg: 'Ação restrita a administradores.' });
+      return;
+    }
+
     const descendentes = identificarDescendentes(evento, cadeia);
 
     if (!incluirDescendentes && descendentes.length > 0) {
@@ -88,6 +95,10 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro }) {
 
   const handleConfirmarExclusao = async () => {
     if (!confirmarExclusao) return;
+    if (!isAdmin) {
+      setFeedback({ type: 'error', msg: 'Ação restrita a administradores.' });
+      return;
+    }
 
     setLoading(true);
     setFeedback(null);

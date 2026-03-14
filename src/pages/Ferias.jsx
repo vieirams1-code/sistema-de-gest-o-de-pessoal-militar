@@ -409,6 +409,11 @@ export default function Ferias() {
   }, [editDataModal]);
 
   const handleDelete = async (f) => {
+    if (!isAdmin) {
+      alert('Ação restrita a administradores.');
+      return;
+    }
+
     setFeriasToDelete(f);
 
     const cadeiaOperacional = registrosLivro
@@ -436,6 +441,10 @@ export default function Ferias() {
 
   const confirmDelete = () => {
     if (!feriasToDelete) return;
+    if (!isAdmin) {
+      alert('Ação restrita a administradores.');
+      return;
+    }
 
     deleteMutation.mutate({
       feriasId: feriasToDelete.id,
@@ -878,13 +887,15 @@ export default function Ferias() {
                                           <span>Editar Férias</span>
                                         </DropdownMenuItem>
 
-                                        <DropdownMenuItem
-                                          onClick={() => handleDelete(f)}
-                                          className="text-red-600 focus:text-red-600"
-                                        >
-                                          <Trash2 className="w-4 h-4 mr-2" />
-                                          <span>Excluir Férias</span>
-                                        </DropdownMenuItem>
+                                        {isAdmin && (
+                                          <DropdownMenuItem
+                                            onClick={() => handleDelete(f)}
+                                            className="text-red-600 focus:text-red-600"
+                                          >
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            <span>Excluir Férias</span>
+                                          </DropdownMenuItem>
+                                        )}
                                       </>
                                     )}
 
