@@ -24,6 +24,8 @@ import {
   CalendarClock,
   Wrench,
   ArrowLeftRight,
+  Building2,
+  GitBranch,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -91,8 +93,10 @@ const menuGroups = [
 const adminMenuGroup = {
   title: 'ADMIN',
   items: [
-    { name: 'Permissões de Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
-    { name: 'Estrutura Organizacional', page: 'Subgrupamentos', icon: ScrollText },
+    { name: 'Permissões de Usuários', page: 'PermissoesUsuarios', icon: Users },
+    { name: 'Perfis de Permissão', page: 'PerfisPermissao', icon: Shield },
+    { name: 'Estrutura Organizacional', page: 'EstruturaOrganizacional', icon: GitBranch },
+    { name: 'Lotação de Militares', page: 'LotacaoMilitares', icon: Building2 },
   ],
 };
 
