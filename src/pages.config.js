@@ -75,11 +75,14 @@ import Publicacoes from './pages/Publicacoes';
 import Punicoes from './pages/Punicoes';
 import QuadroOperacional from './pages/QuadroOperacional';
 import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
-import Subgrupamentos from './pages/Subgrupamentos';
 import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
+import EstruturaOrganizacional from './pages/EstruturaOrganizacional';
+import LotacaoMilitares from './pages/LotacaoMilitares';
+import PerfisPermissao from './pages/PerfisPermissao';
+import PermissoesUsuarios from './pages/PermissoesUsuarios';
 import __Layout from './Layout.jsx';
 
 
@@ -112,11 +115,14 @@ export const PAGES = {
     "Punicoes": Punicoes,
     "QuadroOperacional": QuadroOperacional,
     "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
-    "Subgrupamentos": Subgrupamentos,
     "TemplatesTexto": TemplatesTexto,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
+    "EstruturaOrganizacional": EstruturaOrganizacional,
+    "LotacaoMilitares": LotacaoMilitares,
+    "PerfisPermissao": PerfisPermissao,
+    "PermissoesUsuarios": PermissoesUsuarios,
 }
 
 export const pagesConfig = {

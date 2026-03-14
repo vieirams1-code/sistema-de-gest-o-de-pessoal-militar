@@ -54,7 +54,6 @@ export default function Configuracoes() {
           </div>
         </div>
 
-        {/* Tab Header Simulada para manter padrão visual */}
         <div className="flex gap-2 mb-6 border-b border-slate-200">
           <div className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-[#1e3a5f] text-[#1e3a5f] -mb-px">
             <Sliders className="w-4 h-4" />
@@ -63,7 +62,6 @@ export default function Configuracoes() {
         </div>
 
         <div className="space-y-6">
-          {/* Lotações */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Lotações / Setores Operacionais</h2>
             <div className="flex gap-2 mb-6">
@@ -83,7 +81,6 @@ export default function Configuracoes() {
             </div>
           </div>
 
-          {/* Funções */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Funções</h2>
             <div className="flex gap-2 mb-6">
@@ -103,7 +100,6 @@ export default function Configuracoes() {
             </div>
           </div>
 
-          {/* Tipos de Publicação Personalizados */}
           <TiposPublicacaoManager />
         </div>
 
