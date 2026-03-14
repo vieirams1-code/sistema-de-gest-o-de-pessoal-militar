@@ -41,8 +41,12 @@ export default function Configuracoes() {
     if (t) setActiveTab(t);
   }, [window.location.search]);
 
-  // Estado - permissões de usuários
   const [selectedUser, setSelectedUser] = useState(null);
+  const [isNewAcesso, setIsNewAcesso] = useState(false);
+  const [userNomeUsuario, setUserNomeUsuario] = useState('');
+  const [userUserEmail, setUserUserEmail] = useState('');
+  const [userAtivo, setUserAtivo] = useState(true);
+  const [userObservacoes, setUserObservacoes] = useState('');
   const [userGrupamentoId, setUserGrupamentoId] = useState('');
   const [userSubgrupamentoId, setUserSubgrupamentoId] = useState('');
   const [savingUser, setSavingUser] = useState(false);
@@ -69,9 +73,9 @@ export default function Configuracoes() {
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
   const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) });
-  const { data: usuarios = [], error: usuariosError } = useQuery({
-    queryKey: ['usuarios'],
-    queryFn: () => base44.entities.User.list(),
+  const { data: acessos = [], error: acessosError } = useQuery({
+    queryKey: ['usuariosAcesso'],
+    queryFn: () => base44.entities.UsuarioAcesso.list(),
     enabled: isAdmin,
   });
   const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome') });
@@ -96,48 +100,38 @@ export default function Configuracoes() {
     return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
   }, [militares]);
 
-  const findMilitarFromUser = (u) => {
-    if (!u) return null;
-    if (u.militar_id) {
-      return militares.find((m) => m.id === u.militar_id) || null;
-    }
+  const handleSelectAcesso = (acesso) => {
+    setSelectedUser(acesso);
+    setIsNewAcesso(false);
+    setUserAccessMode(acesso.tipo_acesso || 'proprio');
+    setUserNomeUsuario(acesso.nome_usuario || '');
+    setUserUserEmail(acesso.user_email || '');
+    setUserAtivo(acesso.ativo !== false);
+    setUserObservacoes(acesso.observacoes || '');
 
-    const emails = [u.militar_email, u.email].filter(Boolean).map((email) => email.toLowerCase());
-    if (emails.length === 0) return null;
-
-    return militares.find((m) => {
-      const militarEmails = [m.email, m.email_particular, m.email_funcional, m.militar_email]
-        .filter(Boolean)
-        .map((email) => email.toLowerCase());
-      return militarEmails.some((email) => emails.includes(email));
-    }) || null;
+    setUserMilitarId(acesso.militar_id || '');
+    setUserMilitarEmail(acesso.militar_email || '');
+    setUserGrupamentoId(acesso.grupamento_id || '');
+    setUserSubgrupamentoId(acesso.subgrupamento_id || '');
   };
 
-  const handleSelectUser = (userId) => {
-    const u = usuarios.find(u => u.id === userId);
-    setSelectedUser(u);
-    setUserAccessMode(getAccessModeFromUser(u));
-
-    const sId = subgrupamentos.find(s => s.tipo === 'Subgrupamento' && s.id === u?.subgrupamento_id) ? u.subgrupamento_id : '';
-    const gId = grupamentos.find(g => g.id === u?.subgrupamento_id) ? u.subgrupamento_id : '';
-
-    const militarVinculado = findMilitarFromUser(u);
-    setUserMilitarId(militarVinculado?.id || '');
-    setUserMilitarEmail(u?.militar_email || militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || u?.email || '');
-
-    if (sId) {
-      const sub = subgrupamentos.find(s => s.id === sId);
-      setUserGrupamentoId(sub?.grupamento_id || '');
-      setUserSubgrupamentoId(sId);
-      return;
-    }
-
-    setUserGrupamentoId(gId);
+  const handleCreateNew = () => {
+    setSelectedUser({});
+    setIsNewAcesso(true);
+    setUserAccessMode('proprio');
+    setUserNomeUsuario('');
+    setUserUserEmail('');
+    setUserAtivo(true);
+    setUserObservacoes('');
+    setUserMilitarId('');
+    setUserMilitarEmail('');
+    setUserGrupamentoId('');
     setUserSubgrupamentoId('');
   };
 
   const handleSaveUserScope = async () => {
     if (!selectedUser) return;
+    if (!userUserEmail) { alert('E-mail do Usuário é obrigatório.'); return; }
 
     setSavingUser(true);
     try {
@@ -145,19 +139,38 @@ export default function Configuracoes() {
       const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
 
       const militarVinculado = militares.find((m) => m.id === userMilitarId);
-      const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || selectedUser.email || '';
+      const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
 
-      const data = userAccessMode === 'admin'
-        ? { role: 'admin', isAdmin: true, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: '', militar_email: '' }
-        : userAccessMode === 'subsetor' && sub
-          ? { role: 'user', isAdmin: false, subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento', militar_id: '', militar_email: '' }
-          : userAccessMode === 'setor' && grupamento
-            ? { role: 'user', isAdmin: false, subgrupamento_id: grupamento.id, subgrupamento_nome: grupamento.nome, subgrupamento_tipo: 'Grupamento', militar_id: '', militar_email: '' }
-            : { role: 'user', isAdmin: false, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: userMilitarId || '', militar_email: militarEmailVinculado };
+      const baseData = {
+        nome_usuario: userNomeUsuario,
+        user_email: userUserEmail.trim(),
+        ativo: userAtivo,
+        observacoes: userObservacoes,
+      };
 
-      await base44.entities.User.update(selectedUser.id, data);
-      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
-      setSelectedUser(prev => ({ ...prev, ...data }));
+      let roleData = {};
+      if (userAccessMode === 'admin') {
+        roleData = { tipo_acesso: 'admin', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: '', militar_email: '' };
+      } else if (userAccessMode === 'subsetor' && sub) {
+        roleData = { tipo_acesso: 'subsetor', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento', militar_id: '', militar_email: '' };
+      } else if (userAccessMode === 'setor' && grupamento) {
+        roleData = { tipo_acesso: 'setor', grupamento_id: grupamento.id, grupamento_nome: grupamento.nome, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: 'Grupamento', militar_id: '', militar_email: '' };
+      } else {
+        roleData = { tipo_acesso: 'proprio', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: userMilitarId || '', militar_email: militarEmailVinculado };
+      }
+
+      const dataToSave = { ...baseData, ...roleData };
+
+      if (isNewAcesso) {
+        await base44.entities.UsuarioAcesso.create(dataToSave);
+      } else {
+        await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
+      }
+      queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
+      setSelectedUser(null);
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao salvar permissão no Base44.');
     } finally {
       setSavingUser(false);
     }
@@ -235,38 +248,62 @@ export default function Configuracoes() {
                 <Users className="w-5 h-5 text-[#1e3a5f]" />
                 <h2 className="text-xl font-semibold text-[#1e3a5f]">Permissões de Usuários</h2>
               </div>
-              <p className="text-sm text-slate-500 mb-4">Defina o tipo de acesso de cada usuário: Admin, Setor, Subsetor ou Próprio. Em modo Próprio, vincule explicitamente o militar correspondente.</p>
-              {usuariosError && (
+              <p className="text-sm text-slate-500 mb-4">Gerencie os acessos na entidade base UsuarioAcesso. Defina o tipo de acesso: Admin, Setor, Subsetor ou Próprio.</p>
+              
+              <div className="mb-4">
+                <Button onClick={handleCreateNew} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                  <Plus className="w-4 h-4 mr-2" /> Novo Acesso
+                </Button>
+              </div>
+
+              {acessosError && (
                 <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 mb-3">
-                  Falha ao carregar usuários. Há provável bloqueio de permissões no Base44/backend para esta conta admin. O frontend não está aplicando restrições extras além da validação administrativa.
+                  Falha ao carregar acessos. Verifique a existência da entidade UsuarioAcesso.
                 </p>
               )}
               <div className="space-y-2 mb-6">
-                {usuarios.map(u => (
-                  <div key={u.id} onClick={() => handleSelectUser(u.id)} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
+                {acessos.map(u => (
+                  <div key={u.id} onClick={() => handleSelectAcesso(u)} className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
                     <div>
-                      <p className="font-medium text-sm text-slate-800">{u.full_name || u.email}</p>
-                      <p className="text-xs text-slate-500">{u.email}</p>
+                      <p className="font-medium text-sm text-slate-800">{u.nome_usuario || u.user_email} {!u.ativo && <span className="text-red-500 text-xs ml-1">(Inativo)</span>}</p>
+                      <p className="text-xs text-slate-500">{u.user_email}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 justify-end">
-                      {(u.role === 'admin' || u.isAdmin === true) ? (
+                      {u.tipo_acesso === 'admin' ? (
                         <Badge className="bg-emerald-100 text-emerald-800">Admin (acesso total)</Badge>
                       ) : u.subgrupamento_nome ? (
-                        <Badge className={u.subgrupamento_tipo === 'Grupamento' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>{u.subgrupamento_nome} ({u.subgrupamento_tipo})</Badge>
+                        <Badge className={(u.tipo_acesso === 'setor' || u.subgrupamento_tipo === 'Grupamento') ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>{u.subgrupamento_nome} ({u.subgrupamento_tipo || u.tipo_acesso})</Badge>
                       ) : (
                         <Badge variant="outline" className="text-slate-500">Próprio / sem setor</Badge>
                       )}
-                      {!u.subgrupamento_nome && !(u.role === 'admin' || u.isAdmin === true) && (u.militar_email || u.militar_id) && (
+                      {!u.subgrupamento_nome && u.tipo_acesso !== 'admin' && (u.militar_email || u.militar_id) && (
                         <Badge variant="outline" className="text-indigo-600 border-indigo-200">Vínculo: {u.militar_email || 'Militar selecionado'}</Badge>
                       )}
                     </div>
                   </div>
                 ))}
-                {usuarios.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum usuário cadastrado</p>}
+                {acessos.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum acesso cadastrado</p>}
               </div>
               {selectedUser && (
                 <div className="border-t pt-4 space-y-4">
-                  <p className="text-sm font-semibold text-slate-700">Editando: <span className="text-[#1e3a5f]">{selectedUser.full_name || selectedUser.email}</span></p>
+                  <p className="text-sm font-semibold text-slate-700">{isNewAcesso ? 'Criando Novo Acesso' : 'Editando Acesso:'} <span className="text-[#1e3a5f]">{!isNewAcesso && (selectedUser.nome_usuario || selectedUser.user_email)}</span></p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">Nome de Usuário (Opcional)</label>
+                      <Input value={userNomeUsuario} onChange={(e) => setUserNomeUsuario(e.target.value)} placeholder="Ex: João da Silva" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">E-mail do Usuário <span className="text-red-500">*</span></label>
+                      <Input value={userUserEmail} onChange={(e) => setUserUserEmail(e.target.value)} placeholder="email@exemplo.com" />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-2">
+                     <input type="checkbox" id="userAtivo" checked={userAtivo} onChange={(e) => setUserAtivo(e.target.checked)} className="rounded border-slate-300 w-4 h-4 text-[#1e3a5f]" />
+                     <label htmlFor="userAtivo" className="text-sm font-medium text-slate-700 cursor-pointer">Acesso Ativo</label>
+                  </div>
+
                   <div>
                     <label className="text-sm font-medium text-slate-700 block mb-1.5">Modo de acesso</label>
                     <Select
@@ -346,13 +383,13 @@ export default function Configuracoes() {
                         </div>
                         <div>
                           <label className="text-sm font-medium text-slate-700 block mb-1.5">E-mail de vínculo (curto prazo)</label>
-                          <Input value={userMilitarEmail || selectedUser.email || ''} onChange={(e) => setUserMilitarEmail(e.target.value)} placeholder="email@militar" />
-                          <p className="text-xs text-slate-500 mt-1">Usuário: {selectedUser.email || 'sem e-mail'}</p>
+                          <Input value={userMilitarEmail || userUserEmail || ''} onChange={(e) => setUserMilitarEmail(e.target.value)} placeholder="email@militar" />
+                          <p className="text-xs text-slate-500 mt-1">Usuário: {userUserEmail || 'sem e-mail'}</p>
                         </div>
                       </div>
                     </div>
                   )}
-                  <div className="flex justify-end gap-2 pt-1">
+                  <div className="flex justify-end gap-2 pt-1 mt-4">
                     <Button variant="outline" onClick={() => setSelectedUser(null)}>Cancelar</Button>
                     <Button onClick={handleSaveUserScope} disabled={savingUser || (userAccessMode === 'setor' && !userGrupamentoId) || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId)) || (userAccessMode === 'proprio' && !userMilitarId)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">{savingUser ? 'Salvando...' : 'Salvar Permissão'}</Button>
                   </div>

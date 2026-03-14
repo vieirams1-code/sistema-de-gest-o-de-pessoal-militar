@@ -11,33 +11,51 @@ const modulePermissionsByRole = {
 };
 
 export function useCurrentUser() {
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading: loadingAuth } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
     staleTime: 5 * 60 * 1000,
   });
 
-  const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
-  // setorId: ID do Setor (Grupamento) ou Subsetor (Subgrupamento) atribuído ao usuário
-  const subgrupamentoId = user?.subgrupamento_id || null;
-  const subgrupamentoTipo = user?.subgrupamento_tipo || null; // 'Grupamento' (Setor) ou 'Subgrupamento' (Subsetor/Seção)
+  const { data: usuarioAcessoList, isLoading: loadingAcesso } = useQuery({
+    queryKey: ['usuarioAcesso', user?.email],
+    queryFn: () => base44.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true }),
+    enabled: !!user?.email,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Modo de acesso:
-  // 'admin' - acesso total
-  // 'setor' - acesso a todos os registros do setor e subsetores
-  // 'subsetor' - acesso apenas ao próprio subsetor
-  // 'proprio' - sem setor atribuído: acesso apenas aos próprios dados (por email)
-  const modoAcesso = isAdmin
-    ? 'admin'
-    : subgrupamentoId
-      ? (subgrupamentoTipo === 'Grupamento' ? 'setor' : 'subsetor')
-      : 'proprio';
+  const isLoading = loadingAuth || loadingAcesso;
+  const acesso = usuarioAcessoList?.[0]; // Pega o primeiro acesso ativo encontrado
+
+  // Resolve as propriedades explicitamente usando UsuarioAcesso, com fallback para o modelo antigo (User)
+  const isAdmin = acesso 
+    ? acesso.tipo_acesso === 'admin' 
+    : (user?.role === 'admin' || user?.isAdmin === true);
+
+  const subgrupamentoId = acesso 
+    ? (acesso.subgrupamento_id || acesso.grupamento_id || null) 
+    : (user?.subgrupamento_id || null);
+
+  const subgrupamentoTipo = acesso 
+    ? (acesso.tipo_acesso === 'setor' ? 'Grupamento' : acesso.tipo_acesso === 'subsetor' ? 'Subgrupamento' : null) 
+    : (user?.subgrupamento_tipo || null);
 
   const userEmail = user?.email || null;
-  const linkedMilitarId = user?.militar_id || null;
-  const linkedMilitarEmail = user?.militar_email || null;
+  const linkedMilitarId = acesso ? (acesso.militar_id || null) : (user?.militar_id || null);
+  const linkedMilitarEmail = acesso ? (acesso.militar_email || null) : (user?.militar_email || null);
 
-  const getAccessModeFromUser = (targetUser) => {
+  // Modo de acesso: 'admin', 'setor', 'subsetor', 'proprio'
+  let modoAcesso = 'proprio';
+  if (acesso) {
+    modoAcesso = acesso.tipo_acesso || 'proprio';
+  } else {
+    if (isAdmin) modoAcesso = 'admin';
+    else if (subgrupamentoId) modoAcesso = subgrupamentoTipo === 'Grupamento' ? 'setor' : 'subsetor';
+    else modoAcesso = 'proprio';
+  }
+
+  const getAccessModeFromUser = (targetUser, targetAcesso = null) => {
+    if (targetAcesso) return targetAcesso.tipo_acesso || 'proprio';
     if (!targetUser) return 'proprio';
     if (targetUser.role === 'admin' || targetUser.isAdmin === true) return 'admin';
     if (targetUser.subgrupamento_tipo === 'Grupamento') return 'setor';
