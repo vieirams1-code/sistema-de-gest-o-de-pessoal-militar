@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,8 +33,11 @@ export default function Militares() {
     linkedMilitarId,
     linkedMilitarEmail,
     hasSelfAccess,
+    canAccessModule,
     isLoading: loadingUser
   } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');

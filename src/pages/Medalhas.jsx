@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Award, Plus, Search, Settings, Edit } from 'lucide-react';
@@ -16,7 +17,9 @@ export default function Medalhas() {
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState('all');
   const [anoFilter, setAnoFilter] = useState('all');
-  const { isAdmin, isLoading: loadingUser, hasAccess } = useCurrentUser();
+  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('medalhas')) return <AccessDenied modulo="Medalhas" />;
 
   const { data: allMedalhas = [], isLoading } = useQuery({
     queryKey: ['medalhas'],

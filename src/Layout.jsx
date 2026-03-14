@@ -40,43 +40,44 @@ const menuGroups = [
   {
     title: 'Pessoal',
     items: [
-      { name: 'Efetivo', page: 'Militares', icon: Users },
-      { name: 'Alterações Militar', page: 'FichaMilitar', icon: FilePenLine },
+      { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
+      { name: 'Alterações Militar', page: 'FichaMilitar', icon: FilePenLine, moduleKey: 'militares' },
     ],
   },
   {
     title: 'Saúde',
     items: [
-      { name: 'Atestados', page: 'DashboardAtestados', icon: HeartPulse },
-      { name: 'Férias', page: 'Ferias', icon: CalendarDays },
+      { name: 'Atestados', page: 'DashboardAtestados', icon: HeartPulse, moduleKey: 'atestados' },
+      { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias' },
     ],
   },
   {
     title: 'Gestão',
     items: [
-      { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban },
-      { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock },
-      { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen },
-      { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText },
-      { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield },
-      { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight },
+      { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban, moduleKey: 'quadro_operacional' },
+      { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock, moduleKey: 'quadro_operacional' },
+      { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen, moduleKey: 'livro' },
+      { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText, moduleKey: 'publicacoes' },
+      { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, moduleKey: 'publicacoes' },
+      { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, moduleKey: 'publicacoes' },
     ],
   },
   {
     title: 'Patrimônio e Reconhecimento',
     items: [
-      { name: 'Armamentos', page: 'Armamentos', icon: Sword },
-      { name: 'Medalhas', page: 'Medalhas', icon: Medal },
+      { name: 'Armamentos', page: 'Armamentos', icon: Sword, moduleKey: 'armamentos' },
+      { name: 'Medalhas', page: 'Medalhas', icon: Medal, moduleKey: 'medalhas' },
     ],
   },
   {
     title: 'Administração',
     items: [
-      { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList },
+      { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, moduleKey: 'templates' },
       {
         name: 'Configurações',
         page: 'Configuracoes',
         icon: Settings,
+        moduleKey: 'configuracoes',
         children: [
           { name: 'Permissões e Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
           { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes' },
@@ -98,7 +99,7 @@ const adminMenuGroup = {
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState(['Configurações']);
-  const { isAdmin } = useCurrentUser();
+  const { isAdmin, canAccessModule } = useCurrentUser();
 
   const toggleExpanded = (itemName) => {
     setExpandedItems((prev) =>
@@ -108,7 +109,20 @@ export default function Layout({ children, currentPageName }) {
     );
   };
 
-  const visibleMenuGroups = isAdmin ? [...menuGroups, adminMenuGroup] : menuGroups;
+  // Filtra itens de menu por permissão de módulo
+  const filterItemsByPermission = (items) => {
+    return items.filter((item) => {
+      if (!item.moduleKey) return true; // Dashboard, etc
+      return canAccessModule(item.moduleKey);
+    });
+  };
+
+  const baseGroups = menuGroups.map((group) => ({
+    ...group,
+    items: filterItemsByPermission(group.items),
+  })).filter((group) => group.items.length > 0);
+
+  const visibleMenuGroups = isAdmin ? [...baseGroups, adminMenuGroup] : baseGroups;
 
   const isItemActive = (item) => {
     if (item.children?.length) {

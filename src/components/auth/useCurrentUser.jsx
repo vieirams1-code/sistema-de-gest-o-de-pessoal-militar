@@ -1,15 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
-const modulePermissionsByRole = {
-  admin: { all: true },
-  default: {
-    all: false,
-    solicitacoesAtualizacao: false,
-    estruturaOrganizacional: false,
-  },
-};
-
 export function useCurrentUser() {
   const { data: user, isLoading: loadingAuth } = useQuery({
     queryKey: ['currentUser'],
@@ -61,6 +52,52 @@ export function useCurrentUser() {
     if (targetUser.subgrupamento_tipo === 'Grupamento') return 'setor';
     if (targetUser.subgrupamento_tipo === 'Subgrupamento') return 'subsetor';
     return 'proprio';
+  };
+
+  /**
+   * Permissão por módulo via UsuarioAcesso.
+   * Campos: acesso_militares, acesso_ferias, acesso_livro, acesso_publicacoes,
+   *         acesso_atestados, acesso_armamentos, acesso_medalhas, acesso_templates,
+   *         acesso_configuracoes, acesso_quadro_operacional, acesso_processos
+   *
+   * @param {string} modulo — ex: 'ferias', 'militares', 'configuracoes'
+   */
+  const canAccessModule = (modulo) => {
+    // Admin sem registro de acesso → libera tudo (fallback legado)
+    if (isAdmin && !acesso) return true;
+    // Admin com registro → respeita campo se existir, senão libera
+    if (isAdmin && acesso) {
+      const campo = `acesso_${modulo}`;
+      return acesso[campo] !== false; // undefined/true → true
+    }
+    // Usuário comum com registro → lê o campo
+    if (acesso) {
+      const campo = `acesso_${modulo}`;
+      return acesso[campo] === true;
+    }
+    // Sem registro e sem admin → bloqueia
+    return false;
+  };
+
+  /**
+   * Permissão por ação sensível via UsuarioAcesso.
+   * Campos: perm_admin_mode, perm_gerir_cadeia_ferias, perm_excluir_ferias,
+   *         perm_recalcular_ferias, perm_gerir_templates, perm_gerir_permissoes,
+   *         perm_gerir_estrutura
+   *
+   * @param {string} acao — ex: 'admin_mode', 'excluir_ferias', 'gerir_cadeia_ferias'
+   */
+  const canAccessAction = (acao) => {
+    if (isAdmin && !acesso) return true;
+    if (isAdmin && acesso) {
+      const campo = `perm_${acao}`;
+      return acesso[campo] !== false;
+    }
+    if (acesso) {
+      const campo = `perm_${acao}`;
+      return acesso[campo] === true;
+    }
+    return false;
   };
 
   /**
@@ -141,12 +178,8 @@ export function useCurrentUser() {
     return [];
   };
 
-  const hasModuleAccess = (moduleKey) => {
-    if (isAdmin) return true;
-    const rolePermissions = modulePermissionsByRole[user?.role] || modulePermissionsByRole.default;
-    if (rolePermissions.all) return true;
-    return !!rolePermissions[moduleKey];
-  };
+  // Mantém hasModuleAccess como alias para compatibilidade
+  const hasModuleAccess = canAccessModule;
 
   return {
     user,
@@ -161,6 +194,8 @@ export function useCurrentUser() {
     hasAccess,
     hasSelfAccess,
     hasModuleAccess,
+    canAccessModule,
+    canAccessAction,
     getAccessModeFromUser,
     getMilitarScopeFilters,
   };

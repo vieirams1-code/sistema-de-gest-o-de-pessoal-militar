@@ -19,6 +19,7 @@ import {
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
 
 const normalizeText = (value) => value?.toString().toLowerCase().trim() || '';
@@ -46,7 +47,9 @@ const formatDate = (value) => {
 export default function Armamentos() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const { isAdmin, isLoading: loadingUser, hasAccess } = useCurrentUser();
+  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
 
   const { data: allArmamentos = [], isLoading } = useQuery({
     queryKey: ['armamentos'],
