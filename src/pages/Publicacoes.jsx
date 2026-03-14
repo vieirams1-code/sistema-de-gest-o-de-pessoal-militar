@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, Lock } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
@@ -219,11 +219,13 @@ export default function Publicacoes() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
-  const { isAdmin, canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const [modoAdmin, setModoAdmin] = useState(false);
+  const { isAdmin, canAccessModule, canAccessAction, modoAcesso, userEmail, getMilitarScopeFilters, isLoading: loadingUser } = useCurrentUser();
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
-    queryFn: getLivroRegistrosContrato
+    queryFn: getLivroRegistrosContrato,
+    enabled: !loadingUser,
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
@@ -419,8 +421,8 @@ export default function Publicacoes() {
   };
 
   const handleDelete = (id, tipo) => {
-    if (!isAdmin) {
-      alert('A exclusão de publicações é restrita a administradores.');
+    if (!canAccessAction('admin_mode') || !modoAdmin) {
+      alert('Ação restrita. Exige permissão de administração e modo admin ativo.');
       return;
     }
 
@@ -430,6 +432,24 @@ export default function Publicacoes() {
     if (tipo === 'atestado') {
       alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
       return;
+    }
+
+    // Verificar dependências posteriores para registros do livro
+    if (tipo === 'livro' && isFeriasOperacional(registro)) {
+      const feriasId = registro.ferias_id || registro?.vinculos?.ferias?.id;
+      if (feriasId) {
+        const eventosFerias = registros.filter(
+          r => detectarOrigemTipo(r) === 'livro' &&
+            (r.ferias_id === feriasId || r?.vinculos?.ferias?.id === feriasId) &&
+            TIPOS_FERIAS.includes(r.tipo_registro)
+        );
+        const idx = eventosFerias.findIndex(e => e.id === id);
+        const possuiDependenciasPosterores = idx >= 0 && idx < eventosFerias.length - 1;
+        if (possuiDependenciasPosterores) {
+          alert('Este ato possui dependências posteriores e não pode ser excluído isoladamente. Use o painel de Administração da Cadeia.');
+          return;
+        }
+      }
     }
 
     if (registro.status_calculado === 'Publicado') {
@@ -497,6 +517,20 @@ export default function Publicacoes() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              {canAccessAction('admin_mode') && (
+                <Button
+                  variant={modoAdmin ? 'default' : 'outline'}
+                  onClick={() => setModoAdmin((v) => !v)}
+                  className={modoAdmin
+                    ? 'h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white animate-pulse'
+                    : 'h-11 rounded-xl border-red-300 text-red-600 hover:bg-red-50'}
+                  title={modoAdmin ? 'Desativar modo admin' : 'Ativar modo admin para ações sensíveis'}
+                >
+                  <ShieldAlert className="w-4 h-4 mr-2" />
+                  {modoAdmin ? 'Admin Ativo' : 'Modo Admin'}
+                </Button>
+              )}
+
               <div className="min-w-[170px]">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-white shadow-sm">
@@ -625,6 +659,8 @@ export default function Publicacoes() {
                           onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
                           todosRegistros={registros}
                           isAdmin={isAdmin}
+                          modoAdmin={modoAdmin}
+                          canAccessAction={canAccessAction}
                         />
                       ))}
                     </div>

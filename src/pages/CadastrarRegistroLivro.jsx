@@ -13,6 +13,7 @@ import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -108,6 +109,7 @@ export default function CadastrarRegistroLivro() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
+  const id = editId;
   const queryClient = useQueryClient();
   const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
 

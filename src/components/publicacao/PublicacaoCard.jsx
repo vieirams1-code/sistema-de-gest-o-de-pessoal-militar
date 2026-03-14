@@ -34,7 +34,8 @@ import {
   Link2,
   BadgeCheck,
   FileBadge,
-  User
+  User,
+  Lock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
@@ -157,7 +158,7 @@ function FieldBlock({ label, children, className = '' }) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [], isAdmin = false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [], isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditingBg, setIsEditingBg] = useState(false);
@@ -205,7 +206,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
   const podeMarcarPrioridade = !isPublicado;
   const podeEditar = !isPublicado;
-  const podeExcluir = !isPublicado && isAdmin;
+  const temPermissaoAdmin = canAccessAction('admin_mode');
+  const podeExcluir = !isPublicado && temPermissaoAdmin && modoAdmin;
+  const podeExcluirDesabilitado = !isPublicado && temPermissaoAdmin && !modoAdmin;
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -259,8 +262,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   };
 
   const handleDelete = () => {
-    if (!isAdmin) {
-      alert('A exclusão de publicações é restrita a administradores.');
+    if (!canAccessAction('admin_mode') || !modoAdmin) {
+      alert('Ação restrita. Exige permissão de administração e modo admin ativo.');
       return;
     }
     onDelete(registro.id, origemTipo);
@@ -395,6 +398,17 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               {podeExcluir && (
                 <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(true)} className="text-slate-500 hover:text-red-600">
                   <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+              {podeExcluirDesabilitado && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled
+                  title="Ative o modo admin para usar esta função."
+                  className="text-slate-400"
+                >
+                  <Lock className="w-4 h-4" />
                 </Button>
               )}
               {temFamilia && onVerFamilia && (
