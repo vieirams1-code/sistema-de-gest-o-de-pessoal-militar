@@ -19,10 +19,16 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import JisoHistoricoModal from '@/components/atestado/JisoHistoricoModal';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 export default function DashboardAtestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
+
   const hoje = new Date().toISOString().split('T')[0];
   const [editingJisoId, setEditingJisoId] = useState(null);
   const [jisoDateEdit, setJisoDateEdit] = useState('');

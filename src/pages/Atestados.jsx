@@ -20,10 +20,15 @@ import { Plus, Search, FileText, Calendar, AlertCircle, ChevronDown, ChevronUp }
 import { differenceInDays } from 'date-fns';
 import AtestadoCard from '@/components/atestado/AtestadoCard';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoAfastamentoFilter, setTipoAfastamentoFilter] = useState('all');

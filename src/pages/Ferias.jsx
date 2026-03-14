@@ -58,6 +58,7 @@ import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -265,7 +266,9 @@ function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
 export default function Ferias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -335,7 +338,8 @@ export default function Ferias() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async ({ feriasId, periodoId, periodoRef, militarId }) => {
+    mutationFn: async (params) => {
+      const { feriasId, periodoId, periodoRef, militarId } = params;
       await base44.entities.Ferias.delete(feriasId);
       await sincronizarPeriodoAquisitivoDaFerias({
         periodoAquisitivoId: periodoId,
@@ -411,12 +415,8 @@ export default function Ferias() {
   }, [editDataModal]);
 
   const handleDelete = async (f) => {
-    if (!isAdmin) {
-      alert('Ação restrita a administradores.');
-      return;
-    }
-    if (!modoAdmin) {
-      alert('Ative o modo admin para usar esta função.');
+    if (!canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('excluir_ferias')) {
+      alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
       return;
     }
 
@@ -429,8 +429,8 @@ export default function Ferias() {
       .sort((a, b) => {
         const da = new Date(`${(a.data_registro || '2000-01-01')}T00:00:00`);
         const db = new Date(`${(b.data_registro || '2000-01-01')}T00:00:00`);
-        if (da.getTime() !== db.getTime()) return da - db;
-        return new Date(a.created_date || 0) - new Date(b.created_date || 0);
+        if (da.getTime() !== db.getTime()) return da.getTime() - db.getTime();
+        return new Date(a.created_date || 0).getTime() - new Date(b.created_date || 0).getTime();
       });
 
     if (cadeiaOperacional.length > 0) {
@@ -446,8 +446,8 @@ export default function Ferias() {
 
   const confirmDelete = () => {
     if (!feriasToDelete) return;
-    if (!isAdmin || !modoAdmin) {
-      alert('Ação restrita a administradores com modo admin ativo.');
+    if (!canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('excluir_ferias')) {
+      alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
       return;
     }
 
@@ -519,7 +519,7 @@ export default function Ferias() {
           </div>
 
           <div className="flex gap-2">
-            {isAdmin && (
+            {canAccessAction('admin_mode') && (
               <Button
                 variant={modoAdmin ? 'default' : 'outline'}
                 onClick={() => setModoAdmin((v) => !v)}

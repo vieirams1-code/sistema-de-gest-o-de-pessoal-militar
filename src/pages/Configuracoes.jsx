@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Settings, Trash2, Plus, Users, Shield, CheckSquare, Square, UserCog, Sliders } from 'lucide-react';
 import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoManager';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,9 +27,13 @@ const TABS = [
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
-  const { isAdmin, isLoading: loadingUser, getAccessModeFromUser } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
+
+  if (!loadingUser && (!isAdmin && !canAccessModule('configuracoes'))) {
+    return <AccessDenied modulo="Configurações" />;
+  }
 
   // Ler tab da URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -54,6 +59,29 @@ export default function Configuracoes() {
   const [userMilitarId, setUserMilitarId] = useState('');
   const [userMilitarEmail, setUserMilitarEmail] = useState('');
 
+  const initialPermissions = useMemo(() => ({
+    acesso_militares: false,
+    acesso_ferias: false,
+    acesso_livro: false,
+    acesso_publicacoes: false,
+    acesso_atestados: false,
+    acesso_armamentos: false,
+    acesso_medalhas: false,
+    acesso_templates: false,
+    acesso_configuracoes: false,
+    acesso_quadro_operacional: false,
+    acesso_processos: false,
+    perm_admin_mode: false,
+    perm_gerir_cadeia_ferias: false,
+    perm_excluir_ferias: false,
+    perm_recalcular_ferias: false,
+    perm_gerir_templates: false,
+    perm_gerir_permissoes: false,
+    perm_gerir_estrutura: false,
+  }), []);
+  
+  const [userPermissions, setUserPermissions] = useState(initialPermissions);
+
   // Estado - atribuição em massa de militares
   const [massaGrupamentoId, setMassaGrupamentoId] = useState('');
   const [massaSubgrupamentoId, setMassaSubgrupamentoId] = useState('');
@@ -63,12 +91,20 @@ export default function Configuracoes() {
 
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
 
-  useEffect(() => {
-    if (!loadingUser && !isAdmin && activeTab === 'permissoes') {
-      setActiveTab('adicoes');
-    }
-  }, [activeTab, isAdmin, loadingUser]);
+  const visibleTabs = useMemo(() => {
+    const tabs = [];
+    if (isAdmin || canAccessAction('gerir_permissoes')) tabs.push(TABS[0]);
+    if (isAdmin || canAccessAction('gerir_estrutura')) tabs.push(TABS[1]);
+    return tabs;
+  }, [isAdmin, canAccessAction]);
 
+  useEffect(() => {
+    if (!loadingUser && visibleTabs.length > 0) {
+      if (!visibleTabs.find(t => t.id === activeTab)) {
+        setActiveTab(visibleTabs[0].id);
+      }
+    }
+  }, [activeTab, visibleTabs, loadingUser]);
 
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
@@ -90,12 +126,6 @@ export default function Configuracoes() {
     m.posto_graduacao?.toLowerCase().includes(searchMassa.toLowerCase())
   );
 
-
-  const visibleTabs = useMemo(() => {
-    if (isAdmin) return TABS;
-    return TABS.filter((tab) => tab.id === 'adicoes');
-  }, [isAdmin]);
-
   const militaresOrdenados = useMemo(() => {
     return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
   }, [militares]);
@@ -113,6 +143,12 @@ export default function Configuracoes() {
     setUserMilitarEmail(acesso.militar_email || '');
     setUserGrupamentoId(acesso.grupamento_id || '');
     setUserSubgrupamentoId(acesso.subgrupamento_id || '');
+
+    const loadedPerms = {};
+    Object.keys(initialPermissions).forEach(key => {
+      loadedPerms[key] = acesso[key] === true;
+    });
+    setUserPermissions(loadedPerms);
   };
 
   const handleCreateNew = () => {
@@ -127,6 +163,7 @@ export default function Configuracoes() {
     setUserMilitarEmail('');
     setUserGrupamentoId('');
     setUserSubgrupamentoId('');
+    setUserPermissions(initialPermissions);
   };
 
   const handleSaveUserScope = async () => {
@@ -146,6 +183,7 @@ export default function Configuracoes() {
         user_email: userUserEmail.trim(),
         ativo: userAtivo,
         observacoes: userObservacoes,
+        ...userPermissions
       };
 
       let roleData = {};
@@ -240,7 +278,7 @@ export default function Configuracoes() {
         </div>
 
         {/* Tab: Permissões e Usuários */}
-        {activeTab === 'permissoes' && isAdmin && (
+        {activeTab === 'permissoes' && (isAdmin || canAccessAction('gerir_permissoes')) && (
           <div className="space-y-6">
             {/* Permissões de Usuários */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -389,7 +427,64 @@ export default function Configuracoes() {
                       </div>
                     </div>
                   )}
-                  <div className="flex justify-end gap-2 pt-1 mt-4">
+
+                  <div className="border-t border-slate-200 mt-6 pt-4">
+                    <h3 className="text-lg font-medium text-slate-800 mb-4">Módulos Permitidos</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {[
+                        { key: 'acesso_militares', label: 'Militares' },
+                        { key: 'acesso_ferias', label: 'Férias' },
+                        { key: 'acesso_livro', label: 'Livro' },
+                        { key: 'acesso_publicacoes', label: 'Publicações' },
+                        { key: 'acesso_atestados', label: 'Atestados' },
+                        { key: 'acesso_armamentos', label: 'Armamentos' },
+                        { key: 'acesso_medalhas', label: 'Medalhas' },
+                        { key: 'acesso_templates', label: 'Templates' },
+                        { key: 'acesso_configuracoes', label: 'Configurações' },
+                        { key: 'acesso_quadro_operacional', label: 'Quadro Operacional' },
+                        { key: 'acesso_processos', label: 'Processos' },
+                      ].map(mod => (
+                        <div key={mod.key} className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
+                          <input 
+                            type="checkbox" 
+                            id={`mod_${mod.key}`}
+                            checked={userPermissions[mod.key]}
+                            onChange={(e) => setUserPermissions(prev => ({ ...prev, [mod.key]: e.target.checked }))}
+                            className="rounded border-slate-300 w-4 h-4 text-[#1e3a5f]"
+                          />
+                          <label htmlFor={`mod_${mod.key}`} className="text-sm cursor-pointer select-none">{mod.label}</label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-200 mt-6 pt-4">
+                    <h3 className="text-lg font-medium text-slate-800 mb-4">Ações Sensíveis</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        { key: 'perm_admin_mode', label: 'Pode Ativar Modo Admin' },
+                        { key: 'perm_gerir_cadeia_ferias', label: 'Gerir Cadeia de Férias' },
+                        { key: 'perm_excluir_ferias', label: 'Excluir Férias' },
+                        { key: 'perm_recalcular_ferias', label: 'Recalcular Férias' },
+                        { key: 'perm_gerir_templates', label: 'Gerir Templates' },
+                        { key: 'perm_gerir_permissoes', label: 'Gerir Permissões' },
+                        { key: 'perm_gerir_estrutura', label: 'Gerir Estrutura Org.' },
+                      ].map(act => (
+                        <div key={act.key} className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
+                          <input 
+                            type="checkbox" 
+                            id={`act_${act.key}`}
+                            checked={userPermissions[act.key]}
+                            onChange={(e) => setUserPermissions(prev => ({ ...prev, [act.key]: e.target.checked }))}
+                            className="rounded border-slate-300 w-4 h-4 text-orange-600"
+                          />
+                          <label htmlFor={`act_${act.key}`} className="text-sm cursor-pointer select-none font-medium">{act.label}</label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1 mt-6 border-t border-slate-200 pt-4">
                     <Button variant="outline" onClick={() => setSelectedUser(null)}>Cancelar</Button>
                     <Button onClick={handleSaveUserScope} disabled={savingUser || (userAccessMode === 'setor' && !userGrupamentoId) || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId)) || (userAccessMode === 'proprio' && !userMilitarId)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">{savingUser ? 'Salvando...' : 'Salvar Permissão'}</Button>
                   </div>
@@ -457,15 +552,8 @@ export default function Configuracoes() {
         )}
 
 
-        {activeTab === 'permissoes' && !isAdmin && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-semibold text-[#1e3a5f] mb-2">Área restrita</h2>
-            <p className="text-sm text-slate-500">As configurações de permissões e atribuições administrativas são exclusivas para administradores.</p>
-          </div>
-        )}
-
         {/* Tab: Adições e Personalizações */}
-        {activeTab === 'adicoes' && (
+        {activeTab === 'adicoes' && (isAdmin || canAccessAction('gerir_estrutura')) && (
           <div className="space-y-6">
             {/* Lotações */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

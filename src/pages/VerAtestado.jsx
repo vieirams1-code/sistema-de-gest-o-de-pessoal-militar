@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700',
@@ -72,6 +74,9 @@ export default function VerAtestado() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
 
   const { data: atestado, isLoading } = useQuery({
     queryKey: ['atestado', id],

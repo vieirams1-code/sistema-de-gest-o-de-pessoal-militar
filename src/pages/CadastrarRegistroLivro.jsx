@@ -11,7 +11,8 @@ import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
-import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -106,8 +107,11 @@ function calcularMetricasInterrupcao(ferias, dataInterrupcaoIso) {
 export default function CadastrarRegistroLivro() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const id = searchParams.get('id');
+  const editId = searchParams.get('id');
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('livro')) return <AccessDenied modulo="Livro de Registros" />;
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);

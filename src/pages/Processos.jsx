@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import { DragDropContext } from '@hello-pangea/dnd';
 import KanbanColuna from '@/components/processos/KanbanColuna';
 import ProcessoModal from '@/components/processos/ProcessoModal';
@@ -31,7 +32,9 @@ function PrazoChip({ data }) {
 
 export default function Processos() {
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, subgrupamentoId, canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('processos')) return <AccessDenied modulo="Processos" />;
   const [view, setView] = useState('kanban');
   const [search, setSearch] = useState('');
   const [filterPrio, setFilterPrio] = useState('Todas');

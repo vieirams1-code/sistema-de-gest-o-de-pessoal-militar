@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, CheckCircle, Clock, AlertCircle, Search, Plus } from 'lucide-react';
+import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 import {
   calcStatusPublicacao,
@@ -218,7 +219,7 @@ export default function Publicacoes() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
-  const { isAdmin } = useCurrentUser();
+  const { isAdmin, canAccessModule, isLoading: loadingUser } = useCurrentUser();
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
@@ -475,6 +476,8 @@ export default function Publicacoes() {
       bg: 'bg-red-50'
     },
   ];
+
+  if (!loadingUser && !canAccessModule('publicacoes')) return <AccessDenied modulo="Controle de Publicações" />;
 
   return (
     <div className="min-h-screen bg-slate-100">

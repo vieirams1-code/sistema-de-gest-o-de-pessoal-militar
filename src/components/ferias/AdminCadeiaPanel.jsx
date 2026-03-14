@@ -40,7 +40,7 @@ const statusResultante = {
 
 export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = false }) {
   const queryClient = useQueryClient();
-  const { isAdmin } = useCurrentUser();
+  const { isAdmin, canAccessAction } = useCurrentUser();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -49,8 +49,8 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = f
   const cadeia = montarCadeia(ferias, registrosLivro);
 
   const handleRecalcular = async () => {
-    if (!isAdmin || !modoAdmin) {
-      setFeedback({ type: 'error', msg: 'Ative o modo admin para usar esta função.' });
+    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('recalcular_ferias')) {
+      setFeedback({ type: 'error', msg: 'Ative o modo admin e certifique-se de ter permissão para recalcular férias.' });
       return;
     }
     setLoading(true);
@@ -78,8 +78,8 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = f
   };
 
   const handleIniciarExclusao = (evento, incluirDescendentes) => {
-    if (!isAdmin || !modoAdmin) {
-      setFeedback({ type: 'error', msg: 'Ative o modo admin para usar esta função.' });
+    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('gerir_cadeia_ferias')) {
+      setFeedback({ type: 'error', msg: 'Ative o modo admin e certifique-se de ter permissão para gerir cadeia.' });
       return;
     }
 
@@ -99,8 +99,8 @@ export default function AdminCadeiaPanel({ ferias, registrosLivro, modoAdmin = f
 
   const handleConfirmarExclusao = async () => {
     if (!confirmarExclusao) return;
-    if (!isAdmin || !modoAdmin) {
-      setFeedback({ type: 'error', msg: 'Ative o modo admin para usar esta função.' });
+    if (!isAdmin || !canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('gerir_cadeia_ferias')) {
+      setFeedback({ type: 'error', msg: 'Ative o modo admin e certifique-se de ter permissão para gerir cadeia.' });
       return;
     }
 

@@ -17,6 +17,8 @@ import MilitarSelector from '@/components/atestado/MilitarSelector';
 import CidSelector from '@/components/atestado/CidSelector';
 import DateCalculator from '@/components/atestado/DateCalculator';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 const initialFormData = {
   militar_id: '',
@@ -48,6 +50,9 @@ export default function CadastrarAtestado() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);

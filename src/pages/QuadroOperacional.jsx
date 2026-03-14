@@ -10,6 +10,8 @@ import ColunaBoard from '@/components/quadro/ColunaBoard';
 import CardDetalheModal from '@/components/quadro/CardDetalheModal';
 import NovoCardModal from '@/components/quadro/NovoCardModal';
 import { buildChecklistResumo, criarChecklistPreset } from '@/components/quadro/quadroHelpers';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 const QUADRO_NOME = 'Operacional';
 const ORDER_STEP = 1024;
@@ -100,6 +102,7 @@ function substituirCardNaLista(cards = [], cardAtualizado) {
 
 export default function QuadroOperacionalPage() {
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
   const [busca, setBusca] = useState('');
   const [cardAberto, setCardAberto] = useState(null);
   const [colunaNovoCard, setColunaNovoCard] = useState(null);
@@ -488,8 +491,10 @@ export default function QuadroOperacionalPage() {
     );
 
     queryClient.invalidateQueries({ queryKey: ['quadros'] });
-    queryClient.invalidateQueries({ queryKey: ['colunas'] });
+    queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
   };
+
+  if (!loadingUser && !canAccessModule('quadro_operacional')) return <AccessDenied modulo="Quadro Operacional" />;
 
   if (isLoading) {
     return (
