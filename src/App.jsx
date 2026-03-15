@@ -20,6 +20,7 @@ const adminOnlyPages = new Set([
   'SolicitacoesAtualizacao',
   'Subgrupamentos',
   'ConciliacaoBoletim',
+  'TemplatesTexto',
 ]);
 
 
