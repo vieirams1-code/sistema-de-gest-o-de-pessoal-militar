@@ -455,9 +455,9 @@ const COR_GRUPO = {
 
 export default function TemplatesTexto() {
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, isLoading: loadingUser } = useCurrentUser();
 
-  if (!loadingUser && !canAccessModule('templates')) return <AccessDenied modulo="Templates de Texto" />;
+  if (!loadingUser && !isAdmin) return <AccessDenied modulo="Templates de Texto" />;
 
   const [moduloFiltro, setModuloFiltro] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');

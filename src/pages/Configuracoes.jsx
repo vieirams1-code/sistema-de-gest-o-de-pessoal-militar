@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
@@ -20,12 +21,23 @@ import {
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const [searchParams] = useSearchParams();
+  const { isAdmin, canAccessModule, isLoading: loadingUser } = useCurrentUser();
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
 
   if (!loadingUser && (!isAdmin && !canAccessModule('configuracoes'))) {
     return <AccessDenied modulo="Configurações" />;
+  }
+
+  const selectedTab = searchParams.get('tab') || 'adicoes';
+
+  if (!loadingUser && selectedTab === 'adicoes' && !isAdmin) {
+    return <AccessDenied modulo="Adições e Personalizações" />;
+  }
+
+  if (selectedTab === 'permissoes') {
+    return <Navigate to="/PermissoesUsuarios" replace />;
   }
 
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });

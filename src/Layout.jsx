@@ -74,15 +74,14 @@ const menuGroups = [
   {
     title: 'Administração',
     items: [
-      { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, moduleKey: 'templates' },
+      { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, moduleKey: 'templates', adminOnly: true },
       {
         name: 'Configurações',
         page: 'Configuracoes',
         icon: Settings,
         moduleKey: 'configuracoes',
         children: [
-          { name: 'Permissões e Usuários', page: 'Configuracoes', icon: Users, tab: 'permissoes' },
-          { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes' },
+          { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes', adminOnly: true },
         ],
       },
     ],
@@ -116,9 +115,15 @@ export default function Layout({ children, currentPageName }) {
   // Filtra itens de menu por permissão de módulo
   const filterItemsByPermission = (items) => {
     return items.filter((item) => {
+      if (item.adminOnly && !isAdmin) return false;
       if (!item.moduleKey) return true; // Dashboard, etc
       return canAccessModule(item.moduleKey);
-    });
+    }).map((item) => {
+      if (!item.children?.length) return item;
+
+      const visibleChildren = item.children.filter((child) => !(child.adminOnly && !isAdmin));
+      return { ...item, children: visibleChildren };
+    }).filter((item) => !item.children || item.children.length > 0);
   };
 
   const baseGroups = menuGroups.map((group) => ({
