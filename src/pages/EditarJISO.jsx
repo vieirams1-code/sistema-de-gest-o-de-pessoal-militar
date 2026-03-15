@@ -10,12 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Save, Calendar, FileText } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays, format as formatDate } from 'date-fns';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 export default function EditarJISO() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const atestadoId = searchParams.get('atestado_id');
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
 
   const [formData, setFormData] = useState({
     data_jiso: '',
@@ -129,6 +133,11 @@ export default function EditarJISO() {
     
     navigate(createPageUrl('AgendarJISO'));
   };
+
+
+  if (!loadingUser && !canAccessModule('atestados')) {
+    return <AccessDenied modulo="Atestados" />;
+  }
 
   if (loadingAtestado || loadingJISO) {
     return (

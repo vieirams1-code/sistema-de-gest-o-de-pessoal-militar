@@ -16,6 +16,8 @@ import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/ferias
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 const initialFormData = {
   militar_id: '',
@@ -85,6 +87,8 @@ export default function CadastrarPublicacao() {
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
 
   // Para apostila / tornar sem efeito: buscar publicações publicadas do militar em todas as entidades
   const { data: todasPublicacoes = [] } = useQuery({
@@ -1272,6 +1276,11 @@ export default function CadastrarPublicacao() {
     });
     setFormData(prev => ({ ...prev, texto_publicacao: texto }));
   }, [tiposCustomExOfficio, formData.tipo, formData.militar_id, camposCustom]);
+
+
+  if (!loadingUser && !canAccessModule('publicacoes')) {
+    return <AccessDenied modulo="Controle de Publicações" />;
+  }
 
   if (loadingPublicacao) {
     return (
