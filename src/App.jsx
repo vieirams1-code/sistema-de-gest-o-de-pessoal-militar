@@ -26,10 +26,19 @@ const adminOnlyPages = new Set([
 
 const moduleGuardByPage = {
   AgendarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  AgendaJISO: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   EditarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  EditarJiso: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   CadastrarPublicacao: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
 };
+
+const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {
+  acc[pageKey.toLowerCase()] = guard;
+  return acc;
+}, {});
+
+const getModuleGuardByPage = (pageKey) => moduleGuardByPageNormalized[pageKey.toLowerCase()] || null;
 
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
@@ -77,8 +86,10 @@ const AuthenticatedApp = () => {
           );
         }
 
-        if (moduleGuardByPage[path]) {
-          const { moduleKey, moduleName } = moduleGuardByPage[path];
+        const pageModuleGuard = getModuleGuardByPage(path);
+
+        if (pageModuleGuard) {
+          const { moduleKey, moduleName } = pageModuleGuard;
           pageContent = (
             <RequireModuleAccess moduleKey={moduleKey} moduleName={moduleName}>
               {pageContent}
