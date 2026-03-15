@@ -8,10 +8,14 @@ import { Calendar, Search, Clock, ArrowRight, Edit } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 export default function AgendarJISO() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
 
   const { data: atestados = [], isLoading } = useQuery({
     queryKey: ['atestados-jiso'],
@@ -40,6 +44,10 @@ export default function AgendarJISO() {
     'Realizada': 'bg-green-100 text-green-700',
     'Cancelada': 'bg-red-100 text-red-700'
   };
+
+  if (!loadingUser && !canAccessModule('atestados')) {
+    return <AccessDenied modulo="Atestados" />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

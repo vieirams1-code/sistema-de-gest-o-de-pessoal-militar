@@ -7,6 +7,8 @@ import { deleteCardAcao, listAllCardAcoes, updateCardAcao } from '@/components/q
 import { formatarDataBR, isConcluidaAcao, montarPayloadAcao, normalizarAcao, toDateKey } from '@/components/quadro/cardAcoesUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 function atualizarAcaoNoCache(lista, acaoId, payloadAtualizado) {
   if (!Array.isArray(lista)) return lista;
@@ -36,6 +38,7 @@ function GrupoAcoes({
   loadingSaveId,
 }) {
   const totalAcoes = contarAcoesNosGrupos(grupos);
+
 
   return (
     <section className="bg-white border border-slate-200 rounded-xl shadow-sm">
@@ -183,6 +186,7 @@ export default function AgendaAcoesOperacionaisPage() {
   const [cardAbertoId, setCardAbertoId] = useState(null);
   const [editingAcaoId, setEditingAcaoId] = useState(null);
   const [acaoDrafts, setAcaoDrafts] = useState({});
+  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
 
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
@@ -359,6 +363,10 @@ export default function AgendaAcoesOperacionaisPage() {
       ? salvarEdicaoMutation.variables?.acaoId
       : null,
   };
+
+  if (!loadingUser && !canAccessModule('quadro_operacional')) {
+    return <AccessDenied modulo="Quadro Operacional" />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-4">
