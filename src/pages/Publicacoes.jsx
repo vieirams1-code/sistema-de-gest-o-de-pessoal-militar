@@ -14,7 +14,9 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 
 import {
+  atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
+  getAtestadoIdsVinculados,
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
@@ -324,6 +326,18 @@ export default function Publicacoes() {
           const refId = registro.publicacao_referencia_id;
           const origemTipoHint = registro.publicacao_referencia_origem_tipo || null;
           await reverterVinculo(isApostila, isTSE, refId, origemTipoHint);
+
+          if (isTSE && refId && (!origemTipoHint || origemTipoHint === 'ex-officio')) {
+            const [publicacaoReferencia] = await base44.entities.PublicacaoExOfficio.filter({ id: refId });
+            const atestadoIdsVinculados = getAtestadoIdsVinculados(publicacaoReferencia);
+            for (const atestadoId of atestadoIdsVinculados) {
+              await atualizarEstadoAtestadoPelasPublicacoes(
+                atestadoId,
+                base44.entities.Atestado,
+                base44.entities.PublicacaoExOfficio
+              );
+            }
+          }
         }
 
         await reverterAtestadosPorExclusaoPublicacao(

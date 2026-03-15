@@ -40,6 +40,7 @@ import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpe
 import {
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
+  getStatusDocumentalAtaJiso,
   isPublicacaoAtestadoAtiva,
 } from './atestadoPublicacaoHelpers';
 
@@ -162,7 +163,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     );
 
     if (jaExisteAtaJiso) {
-      alert('Já existe uma Ata JISO ativa para este atestado.');
+      alert('Já existe uma nota/publicação ativa para esta Ata JISO.');
       setSavingPublicacao(false);
       return;
     }
@@ -217,11 +218,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     'Homologação de Atestado'
   );
 
-  const hasAtaJisoAtiva = existePublicacaoAtivaParaAtestado(
-    publicacoesVinculadas,
-    atestado.id,
-    'Ata JISO'
-  );
+
+  const statusDocumentalAtaJiso = getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas);
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -335,9 +333,15 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               )}
               {/* fluxo = jiso OU dias > 15: mostrar Ata JISO */}
               {(atestado.fluxo_homologacao === 'jiso' || (atestado.dias > 15)) && (
-                <DropdownMenuItem onClick={handleOpenAtaJiso} disabled={hasAtaJisoAtiva}>
+                <DropdownMenuItem
+                  onClick={handleOpenAtaJiso}
+                  disabled={statusDocumentalAtaJiso.bloqueiaNovaPublicacao}
+                  title={statusDocumentalAtaJiso.bloqueiaNovaPublicacao ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : ''}
+                >
                   <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
-                  {hasAtaJisoAtiva ? 'Ata JISO já gerada' : 'Publicar ata JISO'}
+                  {statusDocumentalAtaJiso.bloqueiaNovaPublicacao
+                    ? 'Já existe uma nota/publicação ativa para esta Ata JISO.'
+                    : 'Publicar ata JISO'}
                 </DropdownMenuItem>
               )}
               {publicacoesVinculadas.length > 0 && (
@@ -383,6 +387,11 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
             }`}>
               <Shield className="w-3 h-3" />
               {atestado.status_jiso === 'Homologado pela JISO' ? 'JISO Homologado' : 'Aguardando JISO'}
+            </Badge>
+          )}
+          {isFluxoJiso && (
+            <Badge className="bg-indigo-100 text-indigo-700">
+              {statusDocumentalAtaJiso.texto}
             </Badge>
           )}
           {atestado.status_jiso === 'Homologado pelo Comandante' && (

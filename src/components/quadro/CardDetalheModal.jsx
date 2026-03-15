@@ -9,6 +9,7 @@ import {
 } from '@/components/quadro/quadroHelpers';
 import { createCardAcao, deleteCardAcao, listCardAcoes, updateCardAcao } from '@/components/quadro/cardAcoesService';
 import { Button } from '@/components/ui/button';
+import { createPageUrl } from '@/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,6 +45,10 @@ import {
   History,
 } from 'lucide-react';
 import JisoHistoricoModal from '@/components/atestado/JisoHistoricoModal';
+import {
+  existePublicacaoAtivaParaAtestado,
+  getStatusDocumentalAtaJiso,
+} from '@/components/atestado/atestadoPublicacaoHelpers';
 
 const PRIORIDADE_COR = {
   Urgente: 'text-red-600',
@@ -666,9 +671,24 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     enabled: !!vinculoAtestado?.referencia_id,
   });
 
+  const { data: publicacoesAtestado = [] } = useQuery({
+    queryKey: ['publicacoes-atestado', vinculoAtestado?.referencia_id],
+    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoVinculado?.militar_id }),
+    enabled: !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
+    select: (data) => data.filter((publicacao) =>
+      (publicacao.atestados_jiso_ids || []).includes(vinculoAtestado?.referencia_id)
+    ),
+  });
+
   const fluxoJiso = avaliarFluxoJiso({ card, atestadoVinculado, vinculoAtestado });
   const podeRegistrarDecisaoJiso = fluxoJiso.isCardJisoElegivel;
   const decisaoJisoRegistrada = fluxoJiso.decisaoJisoRegistrada;
+  const statusDocumentalAtaJiso = getStatusDocumentalAtaJiso(atestadoVinculado || {}, publicacoesAtestado);
+  const ataJisoAtiva = existePublicacaoAtivaParaAtestado(
+    publicacoesAtestado,
+    vinculoAtestado?.referencia_id,
+    'Ata JISO'
+  );
 
   const { data: comentarios = [] } = useQuery({
     queryKey: ['card-comentarios', card.id],
@@ -1068,6 +1088,33 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 >
                   <History className="w-3.5 h-3.5 mr-1.5" />
                   {decisaoJisoRegistrada ? 'Visualizar/editar decisão da JISO' : 'Registrar decisão da JISO'}
+                </Button>
+              </div>
+            </SectionCard>
+          )}
+
+          {podeRegistrarDecisaoJiso && (
+            <SectionCard title="Ata JISO" icon={Tag}>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-700">{statusDocumentalAtaJiso.texto}</p>
+                {statusDocumentalAtaJiso.publicacao?.id ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => window.open(`${createPageUrl('CadastrarPublicacao')}?id=${statusDocumentalAtaJiso.publicacao.id}`, '_blank')}
+                  >
+                    Ver publicação
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  className="h-8 text-xs bg-indigo-700 hover:bg-indigo-800"
+                  disabled={ataJisoAtiva}
+                  title={ataJisoAtiva ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : ''}
+                  onClick={() => window.open(`${createPageUrl('CadastrarPublicacao')}?tipo=${encodeURIComponent('Ata JISO')}&militar_id=${atestadoVinculado?.militar_id || ''}`, '_blank')}
+                >
+                  {ataJisoAtiva ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : 'Publicar ata JISO'}
                 </Button>
               </div>
             </SectionCard>
