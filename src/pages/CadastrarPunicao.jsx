@@ -1,3 +1,5 @@
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -26,6 +28,9 @@ import { calcularComportamento } from '@/components/utils/comportamentoCalculato
 export default function CadastrarPunicao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasMilitaresAccess = canAccessModule('militares');
+
   const [searchParams] = useSearchParams();
   const punicaoId = searchParams.get('id');
   const [loading, setLoading] = useState(false);
@@ -114,6 +119,9 @@ export default function CadastrarPunicao() {
   };
 
   const necessitaPeriodo = ['Detenção', 'Prisão'].includes(formData.tipo);
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
 
   if (loadingPunicao) {
     return (

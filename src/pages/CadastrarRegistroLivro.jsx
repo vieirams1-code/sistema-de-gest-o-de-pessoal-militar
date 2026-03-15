@@ -111,9 +111,11 @@ export default function CadastrarRegistroLivro() {
   const editId = searchParams.get('id');
   const id = editId;
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasLivroAccess = canAccessModule('livro');
 
-  if (!loadingUser && !canAccessModule('livro')) return <AccessDenied modulo="Livro de Registros" />;
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);

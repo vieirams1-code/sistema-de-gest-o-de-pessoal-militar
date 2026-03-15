@@ -1,3 +1,5 @@
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -62,6 +64,9 @@ export default function CadastrarFerias() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasFeriasAccess = canAccessModule('ferias');
+
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
@@ -295,6 +300,9 @@ export default function CadastrarFerias() {
     setLoading(false);
     navigate(createPageUrl('Ferias'));
   };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasFeriasAccess) return <AccessDenied modulo="Férias" />;
 
   if (loadingEdit) {
     return (

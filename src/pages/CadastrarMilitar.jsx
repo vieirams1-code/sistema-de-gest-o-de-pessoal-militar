@@ -17,6 +17,7 @@ import HistoricoComportamentoModal from '@/components/militar/HistoricoComportam
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 const initialFormData = {
   nome_completo: '',
@@ -104,7 +105,8 @@ export default function CadastrarMilitar() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, subgrupamentoTipo, user } = useCurrentUser();
+  const { isAdmin, subgrupamentoId, subgrupamentoTipo, user, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasMilitaresAccess = canAccessModule('militares');
 
   const [formData, setFormData] = useState(initialFormData);
 
@@ -193,6 +195,9 @@ export default function CadastrarMilitar() {
     setLoading(false);
     navigate(createPageUrl('Militares'));
   };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
 
   if (loadingEdit) {
     return (

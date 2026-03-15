@@ -19,7 +19,8 @@ const normalizeTipo = (tipo) => {
 export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { isAdmin, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
+  const hasMilitaresAccess = canAccessModule('militares');
 
   const [searchMilitar, setSearchMilitar] = useState('');
   const [selectedMilitares, setSelectedMilitares] = useState([]);
@@ -36,7 +37,10 @@ export default function LotacaoMilitares() {
     queryFn: () => base44.entities.Subgrupamento.list('nome'),
   });
 
-  if (!loadingUser && (!isAdmin && !canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes'))) {
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
+
+  if (!isAdmin && !canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Lotação de Militares" />;
   }
 

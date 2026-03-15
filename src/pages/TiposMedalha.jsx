@@ -1,3 +1,5 @@
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -25,6 +27,9 @@ import {
 
 export default function TiposMedalha() {
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasMedalhasAccess = canAccessModule('medalhas');
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
   const [formData, setFormData] = useState({ nome: '', descricao: '' });
@@ -50,6 +55,9 @@ export default function TiposMedalha() {
       setDeleteDialog({ open: false, id: null });
     }
   });
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

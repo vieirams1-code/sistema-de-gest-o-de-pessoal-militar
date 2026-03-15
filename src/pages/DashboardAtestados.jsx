@@ -25,9 +25,8 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function DashboardAtestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
-
-  if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasAtestadosAccess = canAccessModule('atestados');
 
   const hoje = new Date().toISOString().split('T')[0];
   const [editingJisoId, setEditingJisoId] = useState(null);
@@ -92,6 +91,9 @@ export default function DashboardAtestados() {
   const atestadoParaModal = jisoModalAtestado 
     ? atestados.find(a => a.id === jisoModalAtestado.id) || jisoModalAtestado 
     : null;
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasAtestadosAccess) return <AccessDenied modulo="Atestados" />;
 
   if (isLoading) {
     return (

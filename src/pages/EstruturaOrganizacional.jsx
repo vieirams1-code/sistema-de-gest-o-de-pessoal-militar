@@ -33,7 +33,8 @@ const normalizeTipo = (tipo) => {
 
 export default function EstruturaOrganizacional() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
+  const hasMilitaresAccess = canAccessModule('militares');
 
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
@@ -47,7 +48,10 @@ export default function EstruturaOrganizacional() {
     queryFn: () => base44.entities.Subgrupamento.list('nome'),
   });
 
-  if (!loadingUser && (!isAdmin && !canAccessAction('gerir_estrutura'))) {
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
+
+  if (!isAdmin && !canAccessAction('gerir_estrutura')) {
     return <AccessDenied modulo="Estrutura Organizacional" />;
   }
 

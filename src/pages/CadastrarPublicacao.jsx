@@ -92,7 +92,9 @@ export default function CadastrarPublicacao() {
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasPublicacoesAccess = canAccessModule('publicacoes');
+
 
 
   // Para apostila / tornar sem efeito: buscar publicações publicadas do militar em todas as entidades
@@ -1297,10 +1299,8 @@ export default function CadastrarPublicacao() {
     setFormData(prev => ({ ...prev, texto_publicacao: texto }));
   }, [tiposCustomExOfficio, formData.tipo, formData.militar_id, camposCustom]);
 
-
-  if (!loadingUser && !canAccessModule('publicacoes')) {
-    return <AccessDenied modulo="Controle de Publicações" />;
-  }
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasPublicacoesAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
   if (loadingPublicacao) {
     return (

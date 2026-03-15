@@ -1,3 +1,5 @@
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -14,6 +16,9 @@ import FormField from '@/components/militar/FormField';
 export default function CadastrarMedalha() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasMedalhasAccess = canAccessModule('medalhas');
+
   const [searchParams] = useSearchParams();
   const medalhaId = searchParams.get('id');
   const [loading, setLoading] = useState(false);
@@ -84,6 +89,9 @@ export default function CadastrarMedalha() {
       setLoading(false);
     }
   };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
 
   if (loadingMedalha) {
     return (

@@ -50,9 +50,8 @@ export default function CadastrarAtestado() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
-
-  if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasAtestadosAccess = canAccessModule('atestados');
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
@@ -168,6 +167,9 @@ export default function CadastrarAtestado() {
     setLoading(false);
     navigate(createPageUrl('Atestados'));
   };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasAtestadosAccess) return <AccessDenied modulo="Atestados" />;
 
   if (loadingEdit) {
     return (

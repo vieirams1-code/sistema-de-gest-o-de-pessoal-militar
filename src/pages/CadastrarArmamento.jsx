@@ -1,3 +1,5 @@
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -14,6 +16,9 @@ import MilitarSelector from '@/components/atestado/MilitarSelector';
 export default function CadastrarArmamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasArmamentosAccess = canAccessModule('armamentos');
+
   const [searchParams] = useSearchParams();
   const armamentoId = searchParams.get('id');
   const [loading, setLoading] = useState(false);
@@ -74,6 +79,9 @@ export default function CadastrarArmamento() {
   };
 
   const necessitaBaixa = ['Vendido', 'Extraviado', 'Furtado', 'Baixado'].includes(formData.status);
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasArmamentosAccess) return <AccessDenied modulo="Armamentos" />;
 
   if (loadingArmamento) {
     return (
