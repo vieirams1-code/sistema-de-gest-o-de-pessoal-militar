@@ -17,29 +17,40 @@ export default function Medalhas() {
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState('all');
   const [anoFilter, setAnoFilter] = useState('all');
-  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule } = useCurrentUser();
+  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule, isAccessResolved, getMilitarScopeFilters } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('medalhas')) return <AccessDenied modulo="Medalhas" />;
 
-  const { data: allMedalhas = [], isLoading } = useQuery({
-    queryKey: ['medalhas'],
-    queryFn: () => base44.entities.Medalha.list('-created_date'),
-    enabled: !loadingUser,
-  });
+  const canLoadMedalhas = !loadingUser && isAccessResolved && canAccessModule('medalhas');
 
-  // Filtrar medalhas pelo escopo do usuário: busca os militares acessíveis via hasAccess
-  const { data: militaresAcessiveis = [] } = useQuery({
-    queryKey: ['militares-ids'],
-    queryFn: () => base44.entities.Militar.list(),
-    enabled: !loadingUser && !isAdmin,
-  });
+  const { data: medalhas = [], isLoading } = useQuery({
+    queryKey: ['medalhas', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Medalha.list('-created_date');
 
-  const militaresIds = isAdmin ? null : new Set(militaresAcessiveis.filter(m => hasAccess(m)).map(m => m.id));
-  const medalhas = isAdmin ? allMedalhas : allMedalhas.filter(m => militaresIds?.has(m.militar_id));
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militaresAcessiveis = (await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      )).flat();
+
+      const militarIds = [...new Set(militaresAcessiveis.filter((m) => hasAccess(m)).map((m) => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+
+      const medalhasPorMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.Medalha.filter({ militar_id: militarId }, '-created_date'))
+      );
+
+      return medalhasPorMilitar.flat();
+    },
+    enabled: canLoadMedalhas,
+  });
 
   const { data: tiposMedalha = [] } = useQuery({
     queryKey: ['tipos-medalha'],
-    queryFn: () => base44.entities.TipoMedalha.filter({ ativa: true }, 'nome')
+    queryFn: () => base44.entities.TipoMedalha.filter({ ativa: true }, 'nome'),
+    enabled: canLoadMedalhas,
   });
 
   const anosDisponiveis = [...new Set(

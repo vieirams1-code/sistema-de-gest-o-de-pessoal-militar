@@ -47,29 +47,35 @@ const formatDate = (value) => {
 export default function Armamentos() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule } = useCurrentUser();
+  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule, isAccessResolved, getMilitarScopeFilters } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
 
-  const { data: allArmamentos = [], isLoading } = useQuery({
-    queryKey: ['armamentos'],
-    queryFn: () => base44.entities.Armamento.list('-created_date'),
-    enabled: !loadingUser,
+  const canLoadArmamentos = !loadingUser && isAccessResolved && canAccessModule('armamentos');
+
+  const { data: armamentos = [], isLoading } = useQuery({
+    queryKey: ['armamentos', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Armamento.list('-created_date');
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militaresAcessiveis = (await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      )).flat();
+
+      const militarIds = [...new Set(militaresAcessiveis.filter((militar) => hasAccess(militar)).map((militar) => militar.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+
+      const armamentosPorMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.Armamento.filter({ militar_id: militarId }, '-created_date'))
+      );
+
+      return armamentosPorMilitar.flat();
+    },
+    enabled: canLoadArmamentos,
   });
-
-  const { data: militaresAcessiveis = [] } = useQuery({
-    queryKey: ['militares-ids'],
-    queryFn: () => base44.entities.Militar.list(),
-    enabled: !loadingUser && !isAdmin,
-  });
-
-  const militaresIds = isAdmin
-    ? null
-    : new Set(militaresAcessiveis.filter((militar) => hasAccess(militar)).map((militar) => militar.id));
-
-  const armamentos = isAdmin
-    ? allArmamentos
-    : allArmamentos.filter((armamento) => militaresIds?.has(armamento.militar_id));
 
   const filteredArmamentos = useMemo(() => {
     const normalizedTerm = normalizeText(searchTerm);

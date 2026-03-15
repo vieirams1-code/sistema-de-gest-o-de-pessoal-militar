@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { obterVinculoAtestado, avaliarFluxoJiso } from '@/components/quadro/quadroHelpers';
@@ -68,6 +69,9 @@ function obterCtaJiso(fluxoJiso) {
 }
 
 export default function CardItem({ card, onClick }) {
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const canLoadCardData = !loadingUser && isAccessResolved && canAccessModule('quadro_operacional');
+
   const prazo = formatPrazo(card.prazo);
   const dotPrioridade = PRIORIDADE_COR[card.prioridade] || 'bg-slate-300';
   const origemExcluida = card.origem_status === 'Excluída' || card.status === 'Origem Excluída';
@@ -75,7 +79,7 @@ export default function CardItem({ card, onClick }) {
   const { data: vinculos = [] } = useQuery({
     queryKey: ['vinculos', card.id],
     queryFn: () => base44.entities.CardVinculo.filter({ card_id: card.id }),
-    enabled: card.origem_tipo === 'Atestado/JISO' && !!card.criado_automaticamente,
+    enabled: canLoadCardData && card.origem_tipo === 'Atestado/JISO' && !!card.criado_automaticamente,
   });
 
   const vinculoAtestado = useMemo(() => obterVinculoAtestado(vinculos), [vinculos]);
@@ -83,13 +87,13 @@ export default function CardItem({ card, onClick }) {
   const { data: atestadoVinculado } = useQuery({
     queryKey: ['atestado', vinculoAtestado?.referencia_id],
     queryFn: () => base44.entities.Atestado.get(vinculoAtestado.referencia_id),
-    enabled: !!vinculoAtestado?.referencia_id,
+    enabled: canLoadCardData && !!vinculoAtestado?.referencia_id,
   });
 
   const { data: publicacoesVinculadas = [] } = useQuery({
     queryKey: ['publicacoes-atestado', vinculoAtestado?.referencia_id],
     queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoVinculado?.militar_id }),
-    enabled: !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
+    enabled: canLoadCardData && !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
     select: (data) => data.filter((publicacao) =>
       (publicacao.atestados_jiso_ids || []).includes(vinculoAtestado?.referencia_id)
     ),

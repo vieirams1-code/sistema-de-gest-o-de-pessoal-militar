@@ -169,12 +169,14 @@ function MensagemComentario({ item, currentUserEmail }) {
 
 function ChecklistSection({ cardId }) {
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const canLoadCardData = !loadingUser && isAccessResolved && canAccessModule('quadro_operacional');
   const [novoItem, setNovoItem] = useState('');
 
   const { data: itens = [] } = useQuery({
     queryKey: ['checklist', cardId],
     queryFn: () => base44.entities.CardChecklistItem.filter({ card_id: cardId }, 'ordem', 100),
-    enabled: !!cardId,
+    enabled: canLoadCardData && !!cardId,
   });
 
   const concluidos = itens.filter((item) => item.concluido).length;
@@ -277,10 +279,13 @@ function ChecklistSection({ cardId }) {
 }
 
 function VinculosSection({ cardId }) {
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const canLoadCardData = !loadingUser && isAccessResolved && canAccessModule('quadro_operacional');
+
   const { data: vinculos = [] } = useQuery({
     queryKey: ['vinculos', cardId],
     queryFn: () => base44.entities.CardVinculo.filter({ card_id: cardId }),
-    enabled: !!cardId,
+    enabled: canLoadCardData && !!cardId,
   });
 
   const vinculosUnicos = useMemo(() => {
@@ -320,6 +325,8 @@ function atualizarAcaoNoCache(lista, acaoId, payloadAtualizado) {
 
 function AcoesSection({ cardId }) {
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const canLoadCardData = !loadingUser && isAccessResolved && canAccessModule('quadro_operacional');
   const [novaAcao, setNovaAcao] = useState({ titulo: '', data_prevista: '' });
   const [savingId, setSavingId] = useState('');
   const [criando, setCriando] = useState(false);
@@ -329,7 +336,7 @@ function AcoesSection({ cardId }) {
   const { data: acoesRaw = [] } = useQuery({
     queryKey: ['card-acoes', cardId],
     queryFn: () => listCardAcoes(cardId),
-    enabled: !!cardId,
+    enabled: canLoadCardData && !!cardId,
   });
 
   const acoes = useMemo(() => acoesRaw.map(normalizarAcao), [acoesRaw]);
@@ -626,7 +633,8 @@ function AcoesSection({ cardId }) {
 
 export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpdate }) {
   const queryClient = useQueryClient();
-  const { userEmail, user } = useCurrentUser();
+  const { userEmail, user, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const canLoadCardData = !loadingUser && isAccessResolved && canAccessModule('quadro_operacional');
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [showSystemActivity, setShowSystemActivity] = useState(false);
@@ -646,7 +654,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const { data: vinculos = [] } = useQuery({
     queryKey: ['vinculos', card.id],
     queryFn: () => base44.entities.CardVinculo.filter({ card_id: card.id }),
-    enabled: !!card.id,
+    enabled: canLoadCardData && !!card.id,
   });
 
   useEffect(() => {
@@ -668,13 +676,13 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const { data: atestadoVinculado } = useQuery({
     queryKey: ['atestado', vinculoAtestado?.referencia_id],
     queryFn: () => base44.entities.Atestado.get(vinculoAtestado.referencia_id),
-    enabled: !!vinculoAtestado?.referencia_id,
+    enabled: canLoadCardData && !!vinculoAtestado?.referencia_id,
   });
 
   const { data: publicacoesAtestado = [] } = useQuery({
     queryKey: ['publicacoes-atestado', vinculoAtestado?.referencia_id],
     queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoVinculado?.militar_id }),
-    enabled: !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
+    enabled: canLoadCardData && !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
     select: (data) => data.filter((publicacao) =>
       (publicacao.atestados_jiso_ids || []).includes(vinculoAtestado?.referencia_id)
     ),
@@ -693,7 +701,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const { data: comentarios = [] } = useQuery({
     queryKey: ['card-comentarios', card.id],
     queryFn: () => base44.entities.CardComentario.filter({ card_id: card.id }, '-data_hora', 100),
-    enabled: !!card.id,
+    enabled: canLoadCardData && !!card.id,
   });
 
   const { comentariosHumanos, comentariosSistema } = useMemo(() => {
