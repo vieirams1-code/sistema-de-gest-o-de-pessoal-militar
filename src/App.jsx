@@ -10,6 +10,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
+import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -20,6 +21,14 @@ const adminOnlyPages = new Set([
   'Subgrupamentos',
   'ConciliacaoBoletim',
 ]);
+
+
+const moduleGuardByPage = {
+  AgendarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  EditarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  CadastrarPublicacao: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
+  AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
+};
 
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
@@ -57,13 +66,24 @@ const AuthenticatedApp = () => {
         </LayoutWrapper>
       } />
       {Object.entries(Pages).map(([path, Page]) => {
-        const pageContent = adminOnlyPages.has(path)
-          ? (
+        let pageContent = <Page />;
+
+        if (adminOnlyPages.has(path)) {
+          pageContent = (
             <RequireAdmin>
-              <Page />
+              {pageContent}
             </RequireAdmin>
-          )
-          : <Page />;
+          );
+        }
+
+        if (moduleGuardByPage[path]) {
+          const { moduleKey, moduleName } = moduleGuardByPage[path];
+          pageContent = (
+            <RequireModuleAccess moduleKey={moduleKey} moduleName={moduleName}>
+              {pageContent}
+            </RequireModuleAccess>
+          );
+        }
 
         return (
           <Route
