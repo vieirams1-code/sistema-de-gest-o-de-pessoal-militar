@@ -18,7 +18,9 @@ export default function EditarJISO() {
   const [searchParams] = useSearchParams();
   const atestadoId = searchParams.get('atestado_id');
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isLoading, isAccessResolved } = useCurrentUser();
+  const hasAtestadosAccess = canAccessModule('atestados');
+  const isAccessPending = isLoading || !isAccessResolved;
 
 
   const [formData, setFormData] = useState({
@@ -40,7 +42,7 @@ export default function EditarJISO() {
       const list = await base44.entities.Atestado.filter({ id: atestadoId });
       return list[0];
     },
-    enabled: !!atestadoId
+    enabled: !!atestadoId && hasAtestadosAccess,
   });
 
   const { data: jiso, isLoading: loadingJISO } = useQuery({
@@ -49,7 +51,7 @@ export default function EditarJISO() {
       const list = await base44.entities.JISO.filter({ atestado_id: atestadoId });
       return list[0];
     },
-    enabled: !!atestadoId
+    enabled: !!atestadoId && hasAtestadosAccess,
   });
 
   useEffect(() => {
@@ -135,7 +137,11 @@ export default function EditarJISO() {
   };
 
 
-  if (!loadingUser && !canAccessModule('atestados')) {
+  if (isAccessPending) {
+    return null;
+  }
+
+  if (!hasAtestadosAccess) {
     return <AccessDenied modulo="Atestados" />;
   }
 

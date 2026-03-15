@@ -14,20 +14,24 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function AgendarJISO() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isLoading, isAccessResolved } = useCurrentUser();
+  const hasAtestadosAccess = canAccessModule('atestados');
+  const isAccessPending = isLoading || !isAccessResolved;
 
 
-  const { data: atestados = [], isLoading } = useQuery({
+  const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
     queryKey: ['atestados-jiso'],
     queryFn: async () => {
       const all = await base44.entities.Atestado.list('-created_date');
       return all.filter(a => a.necessita_jiso);
-    }
+    },
+    enabled: hasAtestadosAccess,
   });
 
   const { data: jisos = [] } = useQuery({
     queryKey: ['jisos'],
-    queryFn: () => base44.entities.JISO.list('-created_date')
+    queryFn: () => base44.entities.JISO.list('-created_date'),
+    enabled: hasAtestadosAccess,
   });
 
   const filteredAtestados = atestados.filter(a =>
@@ -45,7 +49,11 @@ export default function AgendarJISO() {
     'Cancelada': 'bg-red-100 text-red-700'
   };
 
-  if (!loadingUser && !canAccessModule('atestados')) {
+  if (isAccessPending) {
+    return null;
+  }
+
+  if (!hasAtestadosAccess) {
     return <AccessDenied modulo="Atestados" />;
   }
 
@@ -74,7 +82,7 @@ export default function AgendarJISO() {
           </div>
         </div>
 
-        {isLoading ? (
+        {isLoadingAtestados ? (
           <div className="flex justify-center py-20">
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           </div>
