@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Plus, Shield, Check, UserPlus, Building2, UserCircle, Save, Settings2, Info } from 'lucide-react';
+import { Users, Plus, Shield, Check, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -73,6 +73,7 @@ export default function PermissoesUsuarios() {
   const [selectedProfileId, setSelectedProfileId] = useState('_nenhum');
   const [savingUser, setSavingUser] = useState(false);
 
+
   // Queries
   const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) });
   const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome') });
@@ -84,6 +85,11 @@ export default function PermissoesUsuarios() {
     queryKey: ['perfisPermissao'],
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
   });
+
+  const selectedProfilePreview = useMemo(() => {
+    if (selectedProfileId === '_nenhum') return null;
+    return perfis.find((p) => p.id === selectedProfileId) || null;
+  }, [selectedProfileId, perfis]);
 
   if (!loadingUser && (!isAdmin && !canAccessAction('gerir_permissoes'))) {
     return <AccessDenied modulo="Permissões de Usuários" />;
@@ -132,14 +138,16 @@ export default function PermissoesUsuarios() {
   };
 
   const aplicarPerfil = () => {
-    if (selectedProfileId === '_nenhum') return;
-    const perfil = perfis.find(p => p.id === selectedProfileId);
-    if (!perfil) return;
+    if (!selectedProfilePreview) return;
 
     const newPerms = { ...userPermissions };
-    modulosList.forEach(m => newPerms[m.key] = perfil[m.key] === true);
-    acoesSensiveis.forEach(a => newPerms[a.key] = perfil[a.key] === true);
-    
+    modulosList.forEach((m) => {
+      newPerms[m.key] = selectedProfilePreview[m.key] === true;
+    });
+    acoesSensiveis.forEach((a) => {
+      newPerms[a.key] = selectedProfilePreview[a.key] === true;
+    });
+
     setUserPermissions(newPerms);
   };
 
@@ -151,7 +159,7 @@ export default function PermissoesUsuarios() {
     try {
       const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
       const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
-      const perfilSelected = perfis.find(p => p.id === selectedProfileId);
+      const perfilSelected = selectedProfilePreview;
 
       const militarVinculado = militares.find((m) => m.id === userMilitarId);
       const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
@@ -448,8 +456,52 @@ export default function PermissoesUsuarios() {
                       </Button>
                     </div>
                     <p className="text-xs text-slate-500 mt-3 flex items-center gap-1">
-                      <Info className="w-4 h-4" /> Ao aplicar um perfil, os módulos e ações abaixo serão preenchidos automaticamente. Você ainda pode ajustar manualmente se desejar.
+                      <Info className="w-4 h-4" /> Selecionar um perfil apenas exibe a prévia abaixo. As permissões do formulário só mudam ao clicar em <b>Aplicar Perfil</b>.
                     </p>
+
+                    {selectedProfilePreview && (
+                      <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+                        <h4 className="text-sm font-bold text-emerald-800 mb-3 flex items-center gap-2">
+                          <BadgeAlert className="w-4 h-4" />
+                          Prévia do Perfil: {selectedProfilePreview.nome_perfil}
+                        </h4>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="bg-white border border-emerald-100 rounded-lg p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">Módulos do perfil</p>
+                            <div className="space-y-2">
+                              {modulosList.map((mod) => (
+                                <label key={`preview_mod_${mod.key}`} className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedProfilePreview[mod.key] === true}
+                                    readOnly
+                                    className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
+                                  />
+                                  <span>{mod.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="bg-white border border-orange-100 rounded-lg p-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 mb-2">Ações sensíveis do perfil</p>
+                            <div className="space-y-2">
+                              {acoesSensiveis.map((act) => (
+                                <label key={`preview_act_${act.key}`} className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedProfilePreview[act.key] === true}
+                                    readOnly
+                                    className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
+                                  />
+                                  <span>{act.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Bloco 5: Módulos Permitidos */}

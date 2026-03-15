@@ -21,7 +21,6 @@ import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import {
   montarCadeia,
   identificarDescendentes,
-  executarExclusaoAdminCadeia,
 } from '@/components/ferias/feriasAdminUtils';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 
@@ -339,33 +338,7 @@ export default function Publicacoes() {
 
       if (tipo === 'livro') {
         if (isFeriasOperacional(registro)) {
-          const feriasList = await base44.entities.Ferias.filter({ id: registro.ferias_id });
-          const feriasAtual = feriasList[0];
-
-          if (!feriasAtual) {
-            return base44.entities.RegistroLivro.delete(id);
-          }
-
-          const allOpsBruto = await base44.entities.RegistroLivro.filter({ ferias_id: registro.ferias_id }, 'data_registro');
-          const allOps = allOpsBruto.filter(op => TIPOS_FERIAS.includes(op.tipo_registro));
-          const cadeia = montarCadeia(feriasAtual, allOps);
-          const eventoAlvo = cadeia.find((e) => e.id === id) || registro;
-          const descendentes = identificarDescendentes(eventoAlvo, cadeia);
-
-          const descendentesPublicados = descendentes.filter((d) => calcStatusPublicacao(d) === 'Publicado');
-          if (descendentesPublicados.length > 0) {
-            throw new Error('Não é possível excluir este registro porque existem eventos posteriores já publicados na cadeia de férias.');
-          }
-
-          await executarExclusaoAdminCadeia({
-            ferias: feriasAtual,
-            eventoAlvo,
-            incluirDescendentes: descendentes.length > 0,
-            cadeia,
-            queryClient,
-          });
-
-          return;
+          throw new Error('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
         }
 
         return base44.entities.RegistroLivro.delete(id);
@@ -434,22 +407,9 @@ export default function Publicacoes() {
       return;
     }
 
-    // Verificar dependências posteriores para registros do livro
     if (tipo === 'livro' && isFeriasOperacional(registro)) {
-      const feriasId = registro.ferias_id || registro?.vinculos?.ferias?.id;
-      if (feriasId) {
-        const eventosFerias = registros.filter(
-          r => detectarOrigemTipo(r) === 'livro' &&
-            (r.ferias_id === feriasId || r?.vinculos?.ferias?.id === feriasId) &&
-            TIPOS_FERIAS.includes(r.tipo_registro)
-        );
-        const idx = eventosFerias.findIndex(e => e.id === id);
-        const possuiDependenciasPosterores = idx >= 0 && idx < eventosFerias.length - 1;
-        if (possuiDependenciasPosterores) {
-          alert('Este ato possui dependências posteriores e não pode ser excluído isoladamente. Use o painel de Administração da Cadeia.');
-          return;
-        }
-      }
+      alert('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
+      return;
     }
 
     if (registro.status_calculado === 'Publicado') {
