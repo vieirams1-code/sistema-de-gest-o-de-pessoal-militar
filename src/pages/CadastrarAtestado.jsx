@@ -85,8 +85,8 @@ export default function CadastrarAtestado() {
       ...prev,
       fluxo_homologacao: fluxo,
       necessita_jiso: fluxo === 'jiso',
-      homologado_comandante: false,
-      encaminhado_jiso: fluxo === 'jiso',
+      homologado_comandante: fluxo === 'jiso' ? false : prev.homologado_comandante,
+      encaminhado_jiso: fluxo === 'jiso' ? true : prev.encaminhado_jiso,
     }));
   };
 
@@ -143,7 +143,6 @@ export default function CadastrarAtestado() {
     delete dataToSave.nota_para_bg;
     delete dataToSave.numero_bg;
     delete dataToSave.data_bg;
-    delete dataToSave.status_publicacao;
     delete dataToSave.data_jiso;
     delete dataToSave.secao_jiso;
     delete dataToSave.finalidade_jiso;
