@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { obterVinculoAtestado, avaliarFluxoJiso } from '@/components/quadro/quadroHelpers';
+import { getStatusDocumentalAtaJiso } from '@/components/atestado/atestadoPublicacaoHelpers';
 import {
   Calendar,
   MessageSquare,
@@ -85,6 +86,20 @@ export default function CardItem({ card, onClick }) {
     enabled: !!vinculoAtestado?.referencia_id,
   });
 
+  const { data: publicacoesVinculadas = [] } = useQuery({
+    queryKey: ['publicacoes-atestado', vinculoAtestado?.referencia_id],
+    queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoVinculado?.militar_id }),
+    enabled: !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
+    select: (data) => data.filter((publicacao) =>
+      (publicacao.atestados_jiso_ids || []).includes(vinculoAtestado?.referencia_id)
+    ),
+  });
+
+  const statusDocumentalAtaJiso = useMemo(
+    () => getStatusDocumentalAtaJiso(atestadoVinculado || {}, publicacoesVinculadas),
+    [atestadoVinculado, publicacoesVinculadas]
+  );
+
   const fluxoJiso = useMemo(
     () => avaliarFluxoJiso({ card, atestadoVinculado, vinculoAtestado }),
     [card, atestadoVinculado, vinculoAtestado]
@@ -127,6 +142,9 @@ export default function CardItem({ card, onClick }) {
           </span>
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
             {fluxoJiso.jisoAgendada ? 'JISO agendada' : 'JISO pendente'}
+          </span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+            {statusDocumentalAtaJiso.texto}
           </span>
         </div>
 

@@ -11,7 +11,12 @@ import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { aplicarTemplate } from '@/components/utils/templateUtils';
-import { existePublicacaoAtivaParaAtestado } from '@/components/atestado/atestadoPublicacaoHelpers';
+import {
+  atualizarEstadoAtestadoPelasPublicacoes,
+  calcStatusPublicacao,
+  existePublicacaoAtivaParaAtestado,
+  getAtestadoIdsVinculados,
+} from '@/components/atestado/atestadoPublicacaoHelpers';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
@@ -499,7 +504,7 @@ export default function CadastrarPublicacao() {
       );
 
       if (idsDuplicados.length > 0) {
-        alert('Já existe Ata JISO ativa para um ou mais atestados selecionados.');
+        alert('Já existe uma nota/publicação ativa para esta Ata JISO.');
         setLoading(false);
         return;
       }
@@ -543,10 +548,11 @@ export default function CadastrarPublicacao() {
 
     // Marcar atestados homologados para Ata JISO
     if (formData.tipo === 'Ata JISO' && formData.atestados_jiso_ids?.length) {
+      const statusAtaJiso = calcStatusPublicacao(formData);
       for (const aid of formData.atestados_jiso_ids) {
         await base44.entities.Atestado.update(aid, {
           status_jiso: 'Homologado pela JISO',
-          status_publicacao: 'Publicado'
+          status_publicacao: statusAtaJiso
         });
       }
     }
@@ -578,17 +584,31 @@ export default function CadastrarPublicacao() {
     // Tornar sem Efeito: marcar publicação original na entidade correta
     if (formData.tipo === 'Tornar sem Efeito' && formData.publicacao_referencia_id) {
       const origemTipoTSE = resolverOrigemTipo(formData.publicacao_referencia_id);
-      await resolverEntidade(origemTipoTSE).update(formData.publicacao_referencia_id, {
+      const entidadeReferencia = resolverEntidade(origemTipoTSE);
+      await entidadeReferencia.update(formData.publicacao_referencia_id, {
         tornada_sem_efeito_por_id: savedId,
       });
+
+      if (origemTipoTSE === 'ex-officio') {
+        const [publicacaoReferencia] = await base44.entities.PublicacaoExOfficio.filter({ id: formData.publicacao_referencia_id });
+        const atestadoIds = getAtestadoIdsVinculados(publicacaoReferencia);
+        for (const atestadoId of atestadoIds) {
+          await atualizarEstadoAtestadoPelasPublicacoes(
+            atestadoId,
+            base44.entities.Atestado,
+            base44.entities.PublicacaoExOfficio
+          );
+        }
+      }
     }
 
     // Marcar atestado homologado para Homologação de Atestado
     if (formData.tipo === 'Homologação de Atestado' && formData.atestado_homologado_id) {
+      const statusHomologacao = calcStatusPublicacao(formData);
       await base44.entities.Atestado.update(formData.atestado_homologado_id, {
         homologado_comandante: true,
         status_jiso: 'Homologado pelo Comandante',
-        status_publicacao: 'Publicado'
+        status_publicacao: statusHomologacao
       });
     }
 
