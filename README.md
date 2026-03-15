@@ -1,9 +1,5 @@
 # Base44 App
 
-## Manual operacional de acessos
-Para consultar o manual de administração de acessos, clique em:
-- [`docs/manual-operacional-acessos-sgp-militar.md`](docs/manual-operacional-acessos-sgp-militar.md)
-
 ## Publicação automática no GitHub (sincronizar com Base44)
 
 Este projeto inclui um script para publicar alterações automaticamente no repositório GitHub conectado ao Base44.
