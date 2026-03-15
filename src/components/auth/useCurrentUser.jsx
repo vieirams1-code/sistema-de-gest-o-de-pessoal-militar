@@ -8,7 +8,7 @@ export function useCurrentUser() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: usuarioAcessoList, isLoading: loadingAcesso } = useQuery({
+  const { data: usuarioAcessoList, isLoading: loadingAcesso, isFetched: fetchedAcesso } = useQuery({
     queryKey: ['usuarioAcesso', user?.email],
     queryFn: () => base44.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true }),
     enabled: !!user?.email,
@@ -16,6 +16,7 @@ export function useCurrentUser() {
   });
 
   const isLoading = loadingAuth || loadingAcesso;
+  const isAccessResolved = !user?.email || !loadingAcesso || fetchedAcesso;
   const acesso = usuarioAcessoList?.[0]; // Pega o primeiro acesso ativo encontrado
 
   // Observação: mesmo com perfil vinculado (perfil_id/perfil_nome), a autorização em runtime
@@ -65,6 +66,8 @@ export function useCurrentUser() {
    * @param {string} modulo — ex: 'ferias', 'militares', 'configuracoes'
    */
   const canAccessModule = (modulo) => {
+    if (user?.email && !isAccessResolved) return false;
+
     // Admin sem registro de acesso → libera tudo (fallback legado)
     if (isAdmin && !acesso) return true;
     // Admin com registro → respeita campo se existir, senão libera
@@ -90,6 +93,8 @@ export function useCurrentUser() {
    * @param {string} acao — ex: 'admin_mode', 'excluir_ferias', 'gerir_cadeia_ferias'
    */
   const canAccessAction = (acao) => {
+    if (user?.email && !isAccessResolved) return false;
+
     if (isAdmin && !acesso) return true;
     if (isAdmin && acesso) {
       const campo = `perm_${acao}`;
@@ -186,6 +191,7 @@ export function useCurrentUser() {
   return {
     user,
     isLoading,
+    isAccessResolved,
     isAdmin,
     subgrupamentoId,
     subgrupamentoTipo,
