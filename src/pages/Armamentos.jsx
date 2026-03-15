@@ -49,9 +49,8 @@ export default function Armamentos() {
   const [searchTerm, setSearchTerm] = useState('');
   const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule, isAccessResolved, getMilitarScopeFilters } = useCurrentUser();
 
-  if (!loadingUser && !canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
-
-  const canLoadArmamentos = !loadingUser && isAccessResolved && canAccessModule('armamentos');
+  const hasArmamentosAccess = canAccessModule('armamentos');
+  const canLoadArmamentos = !loadingUser && isAccessResolved && hasArmamentosAccess;
 
   const { data: armamentos = [], isLoading } = useQuery({
     queryKey: ['armamentos', isAdmin],
@@ -139,6 +138,8 @@ export default function Armamentos() {
       className: 'bg-emerald-100 text-emerald-700',
     };
   };
+
+  if (!loadingUser && !hasArmamentosAccess) return <AccessDenied modulo="Armamentos" />;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans p-6 md:p-8">

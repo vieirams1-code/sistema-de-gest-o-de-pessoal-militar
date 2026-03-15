@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Plus, Shield, Check, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert } from 'lucide-react';
+import { Users, Plus, Shield, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -95,16 +95,16 @@ export default function PermissoesUsuarios() {
     return perfis.find((p) => p.id === selectedProfileId) || null;
   }, [selectedProfileId, perfis]);
 
-  if (!loadingUser && (!isAdmin && !canAccessAction('gerir_permissoes'))) {
-    return <AccessDenied modulo="Permissões de Usuários" />;
-  }
-
   const grupamentos = subgrupamentos.filter(s => s.tipo === 'Grupamento');
   const subgrupamentosFilhos = subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId);
 
   const militaresOrdenados = useMemo(() => {
     return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
   }, [militares]);
+
+  if (!loadingUser && (!isAdmin && !canAccessAction('gerir_permissoes'))) {
+    return <AccessDenied modulo="Permissões de Usuários" />;
+  }
 
   const handleSelectAcesso = (acesso) => {
     setSelectedUser(acesso);

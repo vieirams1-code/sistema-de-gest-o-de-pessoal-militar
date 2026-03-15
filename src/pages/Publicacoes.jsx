@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, Lock } from 'lucide-react';
+import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
@@ -20,10 +20,6 @@ import {
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
-import {
-  montarCadeia,
-  identificarDescendentes,
-} from '@/components/ferias/feriasAdminUtils';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 
 const TIPOS_FERIAS = [
@@ -199,7 +195,7 @@ function montarPayloadAtualizacao(registroAtual, dataParcial, tipo) {
   };
 }
 
-function getEventDate(registro) {
+function _getEventDate(registro) {
   return registro?.data_registro || registro?.data_inicio || registro?.data_inicio_iso || null;
 }
 

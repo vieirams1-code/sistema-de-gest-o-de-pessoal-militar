@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -19,9 +19,8 @@ export default function Medalhas() {
   const [anoFilter, setAnoFilter] = useState('all');
   const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule, isAccessResolved, getMilitarScopeFilters } = useCurrentUser();
 
-  if (!loadingUser && !canAccessModule('medalhas')) return <AccessDenied modulo="Medalhas" />;
-
-  const canLoadMedalhas = !loadingUser && isAccessResolved && canAccessModule('medalhas');
+  const hasMedalhasAccess = canAccessModule('medalhas');
+  const canLoadMedalhas = !loadingUser && isAccessResolved && hasMedalhasAccess;
 
   const { data: medalhas = [], isLoading } = useQuery({
     queryKey: ['medalhas', isAdmin],
@@ -72,6 +71,8 @@ export default function Medalhas() {
     'Concedido': 'bg-green-100 text-green-700',
     'Negado': 'bg-red-100 text-red-700'
   };
+
+  if (!loadingUser && !hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

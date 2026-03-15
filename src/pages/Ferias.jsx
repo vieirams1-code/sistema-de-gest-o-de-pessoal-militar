@@ -268,7 +268,7 @@ export default function Ferias() {
   const queryClient = useQueryClient();
   const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
-  if (!loadingUser && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
+  const hasFeriasAccess = canAccessModule('ferias');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -294,7 +294,7 @@ export default function Ferias() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
-  const canLoadFerias = !loadingUser && isAccessResolved && canAccessModule('ferias');
+  const canLoadFerias = !loadingUser && isAccessResolved && hasFeriasAccess;
 
   const { data: ferias = [], isLoading } = useQuery({
     queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
@@ -517,6 +517,8 @@ export default function Ferias() {
     previstas: ferias.filter((f) => f.status === 'Prevista').length,
     gozadas: ferias.filter((f) => f.status === 'Gozada').length,
   };
+
+  if (!loadingUser && !hasFeriasAccess) return <AccessDenied modulo="Férias" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
