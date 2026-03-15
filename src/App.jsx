@@ -9,22 +9,51 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import RequireAdmin from '@/components/auth/RequireAdmin';
-import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
+import RequireRouteAccess from '@/components/auth/RequireRouteAccess';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const adminOnlyPages = new Set([
-  'SolicitacoesAtualizacao',
-  'Subgrupamentos',
-  'ConciliacaoBoletim',
-  'TemplatesTexto',
-]);
+// Exceção temporária: fluxo de SolicitacoesAtualizacao ainda é estritamente legado por admin.
+// A página possui decisões críticas sem actionKey dedicado no modelo atual.
+const legacyAdminOnlyPages = new Set(['SolicitacoesAtualizacao']);
 
-
-const moduleGuardByPage = {
+const routeAccessByPage = {
+  PermissoesUsuarios: {
+    moduleKey: 'configuracoes',
+    moduleName: 'Configurações',
+    actionKey: 'gerir_permissoes',
+    actionName: 'Gerir Permissões',
+  },
+  PerfisPermissao: {
+    moduleKey: 'configuracoes',
+    moduleName: 'Configurações',
+    actionKey: 'gerir_permissoes',
+    actionName: 'Gerir Permissões',
+  },
+  EstruturaOrganizacional: {
+    moduleKey: 'configuracoes',
+    moduleName: 'Configurações',
+    actionKey: 'gerir_estrutura',
+    actionName: 'Gerir Estrutura Organizacional',
+  },
+  LotacaoMilitares: {
+    moduleKey: 'militares',
+    moduleName: 'Militares',
+    anyActionKeys: ['gerir_estrutura', 'gerir_permissoes'],
+    actionName: 'Gerir Estrutura Organizacional ou Permissões',
+  },
+  ConciliacaoBoletim: {
+    moduleKey: 'publicacoes',
+    moduleName: 'Controle de Publicações',
+  },
+  TemplatesTexto: {
+    moduleKey: 'templates',
+    moduleName: 'Templates',
+    actionKey: 'gerir_templates',
+    actionName: 'Gerir Templates',
+  },
   AgendarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
   AgendaJISO: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   EditarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
@@ -33,12 +62,12 @@ const moduleGuardByPage = {
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
 };
 
-const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {
+const routeAccessByPageNormalized = Object.entries(routeAccessByPage).reduce((acc, [pageKey, guard]) => {
   acc[pageKey.toLowerCase()] = guard;
   return acc;
 }, {});
 
-const getModuleGuardByPage = (pageKey) => moduleGuardByPageNormalized[pageKey.toLowerCase()] || null;
+const getRouteAccessByPage = (pageKey) => routeAccessByPageNormalized[pageKey.toLowerCase()] || null;
 
 const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   <Layout currentPageName={currentPageName}>{children}</Layout>
@@ -78,22 +107,22 @@ const AuthenticatedApp = () => {
       {Object.entries(Pages).map(([path, Page]) => {
         let pageContent = <Page />;
 
-        if (adminOnlyPages.has(path)) {
+        const pageAccessRule = getRouteAccessByPage(path);
+
+        if (pageAccessRule) {
           pageContent = (
-            <RequireAdmin>
+            <RequireRouteAccess {...pageAccessRule}>
               {pageContent}
-            </RequireAdmin>
+            </RequireRouteAccess>
           );
         }
 
-        const pageModuleGuard = getModuleGuardByPage(path);
-
-        if (pageModuleGuard) {
-          const { moduleKey, moduleName } = pageModuleGuard;
+        // Exceção temporária de compatibilidade: rota ainda depende de role legado de admin.
+        if (legacyAdminOnlyPages.has(path)) {
           pageContent = (
-            <RequireModuleAccess moduleKey={moduleKey} moduleName={moduleName}>
+            <RequireRouteAccess requireAdminLegacy>
               {pageContent}
-            </RequireModuleAccess>
+            </RequireRouteAccess>
           );
         }
 

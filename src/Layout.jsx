@@ -92,17 +92,41 @@ const menuGroups = [
 const adminMenuGroup = {
   title: 'ADMIN',
   items: [
-    { name: 'Permissões de Usuários', page: 'PermissoesUsuarios', icon: Users },
-    { name: 'Perfis de Permissão', page: 'PerfisPermissao', icon: Shield },
-    { name: 'Estrutura Organizacional', page: 'EstruturaOrganizacional', icon: GitBranch },
-    { name: 'Lotação de Militares', page: 'LotacaoMilitares', icon: Building2 },
+    {
+      name: 'Permissões de Usuários',
+      page: 'PermissoesUsuarios',
+      icon: Users,
+      moduleKey: 'configuracoes',
+      actionKey: 'gerir_permissoes',
+    },
+    {
+      name: 'Perfis de Permissão',
+      page: 'PerfisPermissao',
+      icon: Shield,
+      moduleKey: 'configuracoes',
+      actionKey: 'gerir_permissoes',
+    },
+    {
+      name: 'Estrutura Organizacional',
+      page: 'EstruturaOrganizacional',
+      icon: GitBranch,
+      moduleKey: 'configuracoes',
+      actionKey: 'gerir_estrutura',
+    },
+    {
+      name: 'Lotação de Militares',
+      page: 'LotacaoMilitares',
+      icon: Building2,
+      moduleKey: 'militares',
+      anyActionKeys: ['gerir_estrutura', 'gerir_permissoes'],
+    },
   ],
 };
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState(['Configurações']);
-  const { isAdmin, canAccessModule } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction } = useCurrentUser();
 
   const toggleExpanded = (itemName) => {
     setExpandedItems((prev) =>
@@ -112,18 +136,25 @@ export default function Layout({ children, currentPageName }) {
     );
   };
 
-  // Filtra itens de menu por permissão de módulo
-  const filterItemsByPermission = (items) => {
-    return items.filter((item) => {
-      if (item.adminOnly && !isAdmin) return false;
-      if (!item.moduleKey) return true; // Dashboard, etc
-      return canAccessModule(item.moduleKey);
-    }).map((item) => {
-      if (!item.children?.length) return item;
+  const hasPermission = (item) => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.moduleKey && !canAccessModule(item.moduleKey)) return false;
+    if (item.actionKey && !canAccessAction(item.actionKey)) return false;
+    if (item.anyActionKeys?.length && !item.anyActionKeys.some((key) => canAccessAction(key))) return false;
+    return true;
+  };
 
-      const visibleChildren = item.children.filter((child) => !(child.adminOnly && !isAdmin));
-      return { ...item, children: visibleChildren };
-    }).filter((item) => !item.children || item.children.length > 0);
+  // Filtro unificado por módulo/ação para todos os grupos.
+  const filterItemsByPermission = (items) => {
+    return items
+      .filter((item) => hasPermission(item))
+      .map((item) => {
+        if (!item.children?.length) return item;
+
+        const visibleChildren = item.children.filter((child) => hasPermission(child));
+        return { ...item, children: visibleChildren };
+      })
+      .filter((item) => !item.children || item.children.length > 0);
   };
 
   const baseGroups = menuGroups.map((group) => ({
@@ -131,7 +162,14 @@ export default function Layout({ children, currentPageName }) {
     items: filterItemsByPermission(group.items),
   })).filter((group) => group.items.length > 0);
 
-  const visibleMenuGroups = isAdmin ? [...baseGroups, adminMenuGroup] : baseGroups;
+  const adminGroupFiltered = {
+    ...adminMenuGroup,
+    items: filterItemsByPermission(adminMenuGroup.items),
+  };
+
+  const visibleMenuGroups = adminGroupFiltered.items.length > 0
+    ? [...baseGroups, adminGroupFiltered]
+    : baseGroups;
 
   const isItemActive = (item) => {
     if (item.children?.length) {
