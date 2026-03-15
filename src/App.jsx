@@ -29,8 +29,22 @@ const moduleGuardByPage = {
   AgendaJISO: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   EditarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
   EditarJiso: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
+  Atestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  DashboardAtestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  CadastrarAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   CadastrarPublicacao: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
+  CadastrarArmamento: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
+  CadastrarMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  FichaMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  CadastrarFerias: { moduleKey: 'ferias', moduleName: 'Férias' },
+  PeriodosAquisitivos: { moduleKey: 'ferias', moduleName: 'Férias' },
+  CadastrarRegistroLivro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
+  CadastrarMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
+  CadastrarPunicao: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
+  Configuracoes: { moduleKey: 'configuracoes', moduleName: 'Configurações' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {

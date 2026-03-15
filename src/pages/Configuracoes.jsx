@@ -22,17 +22,19 @@ import {
 export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { isAdmin, canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasConfiguracoesAccess = canAccessModule('configuracoes');
+
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
 
-  if (!loadingUser && (!isAdmin && !canAccessModule('configuracoes'))) {
-    return <AccessDenied modulo="Configurações" />;
-  }
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasConfiguracoesAccess) return <AccessDenied modulo="Configurações" />;
 
   const selectedTab = searchParams.get('tab') || 'adicoes';
 
-  if (!loadingUser && selectedTab === 'adicoes' && !isAdmin) {
+  if (selectedTab === 'adicoes' && !isAdmin) {
     return <AccessDenied modulo="Adições e Personalizações" />;
   }
 

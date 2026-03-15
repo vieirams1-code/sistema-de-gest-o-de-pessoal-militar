@@ -26,9 +26,8 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
-
-  if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasAtestadosAccess = canAccessModule('atestados');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoAfastamentoFilter, setTipoAfastamentoFilter] = useState('all');
@@ -101,6 +100,9 @@ export default function Atestados() {
   };
 
   const hasFilters = searchTerm || tipoAfastamentoFilter !== 'all' || jisoFilter !== 'all' || publicacaoFilter !== 'all';
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasAtestadosAccess) return <AccessDenied modulo="Atestados" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

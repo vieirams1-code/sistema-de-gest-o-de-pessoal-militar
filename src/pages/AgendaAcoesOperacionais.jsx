@@ -186,7 +186,9 @@ export default function AgendaAcoesOperacionaisPage() {
   const [cardAbertoId, setCardAbertoId] = useState(null);
   const [editingAcaoId, setEditingAcaoId] = useState(null);
   const [acaoDrafts, setAcaoDrafts] = useState({});
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasQuadroOperacionalAccess = canAccessModule('quadro_operacional');
+
 
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
@@ -364,9 +366,8 @@ export default function AgendaAcoesOperacionaisPage() {
       : null,
   };
 
-  if (!loadingUser && !canAccessModule('quadro_operacional')) {
-    return <AccessDenied modulo="Quadro Operacional" />;
-  }
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasQuadroOperacionalAccess) return <AccessDenied modulo="Quadro Operacional" />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-4">

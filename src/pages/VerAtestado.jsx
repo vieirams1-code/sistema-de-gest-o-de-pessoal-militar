@@ -74,9 +74,8 @@ export default function VerAtestado() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
-
-  if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasAtestadosAccess = canAccessModule('atestados');
 
   const { data: atestado, isLoading } = useQuery({
     queryKey: ['atestado', id],
@@ -86,6 +85,9 @@ export default function VerAtestado() {
     },
     enabled: !!id
   });
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasAtestadosAccess) return <AccessDenied modulo="Atestados" />;
 
   if (isLoading) {
     return (

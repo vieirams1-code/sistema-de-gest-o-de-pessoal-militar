@@ -1,3 +1,5 @@
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +28,9 @@ import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasFeriasAccess = canAccessModule('ferias');
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [militarFilter, setMilitarFilter] = useState('all');
@@ -187,6 +192,9 @@ export default function PeriodosAquisitivos() {
 
 
 
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasFeriasAccess) return <AccessDenied modulo="Férias" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
