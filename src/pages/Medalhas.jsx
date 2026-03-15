@@ -17,25 +17,37 @@ export default function Medalhas() {
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState('all');
   const [anoFilter, setAnoFilter] = useState('all');
-  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule } = useCurrentUser();
+  const { isAdmin, getMilitarScopeFilters, isLoading: loadingUser, canAccessModule } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('medalhas')) return <AccessDenied modulo="Medalhas" />;
 
-  const { data: allMedalhas = [], isLoading } = useQuery({
-    queryKey: ['medalhas'],
-    queryFn: () => base44.entities.Medalha.list('-created_date'),
+  const { data: medalhas = [], isLoading } = useQuery({
+    queryKey: ['medalhas', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Medalha.list('-created_date');
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militarBatches = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const militarIds = [...new Set(militarBatches.flat().map((m) => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+
+      const medalhasByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.Medalha.filter({ militar_id: militarId }, '-created_date'))
+      );
+
+      const ids = new Set();
+      return medalhasByMilitar.flat().filter((registro) => {
+        if (!registro?.id || ids.has(registro.id)) return false;
+        ids.add(registro.id);
+        return true;
+      });
+    },
     enabled: !loadingUser,
   });
-
-  // Filtrar medalhas pelo escopo do usuário: busca os militares acessíveis via hasAccess
-  const { data: militaresAcessiveis = [] } = useQuery({
-    queryKey: ['militares-ids'],
-    queryFn: () => base44.entities.Militar.list(),
-    enabled: !loadingUser && !isAdmin,
-  });
-
-  const militaresIds = isAdmin ? null : new Set(militaresAcessiveis.filter(m => hasAccess(m)).map(m => m.id));
-  const medalhas = isAdmin ? allMedalhas : allMedalhas.filter(m => militaresIds?.has(m.militar_id));
 
   const { data: tiposMedalha = [] } = useQuery({
     queryKey: ['tipos-medalha'],

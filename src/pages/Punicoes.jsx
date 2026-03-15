@@ -18,18 +18,47 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 export default function Punicoes() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin, getMilitarScopeFilters, canAccessModule, isLoading: loadingUser } = useCurrentUser();
+
+  if (!loadingUser && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [agruparPor, setAgruparPor] = useState('ano');
   const [ordenarPor, setOrdenarPor] = useState('data');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
   const { data: punicoes = [], isLoading } = useQuery({
-    queryKey: ['punicoes'],
-    queryFn: () => base44.entities.Punicao.list('-data_aplicacao')
+    queryKey: ['punicoes', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Punicao.list('-data_aplicacao');
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militarBatches = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const militarIds = [...new Set(militarBatches.flat().map((m) => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+
+      const punicoesByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.Punicao.filter({ militar_id: militarId }, '-data_aplicacao'))
+      );
+
+      const ids = new Set();
+      return punicoesByMilitar.flat().filter((registro) => {
+        if (!registro?.id || ids.has(registro.id)) return false;
+        ids.add(registro.id);
+        return true;
+      });
+    },
+    enabled: !loadingUser,
   });
 
   const deleteMutation = useMutation({
