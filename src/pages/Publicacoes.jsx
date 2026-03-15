@@ -17,6 +17,7 @@ import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
   getAtestadoIdsVinculados,
+  invalidateFluxoAtaJisoQueries,
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
@@ -268,9 +269,7 @@ export default function Publicacoes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      invalidateFluxoAtaJisoQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
@@ -360,9 +359,7 @@ export default function Publicacoes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      invalidateFluxoAtaJisoQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
     },
