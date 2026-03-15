@@ -19,7 +19,7 @@ import {
   getAtestadoIdsVinculados,
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
-import { getLivroRegistrosContrato } from '@/components/livro/livroService';
+import { mapLivroRegistrosPresenter } from '@/components/livro/livroRegistrosMapper';
 import {
   montarCadeia,
   identificarDescendentes,
@@ -224,22 +224,108 @@ export default function Publicacoes() {
   const { isAdmin, canAccessModule, canAccessAction, modoAcesso, userEmail, getMilitarScopeFilters, isLoading: loadingUser } = useCurrentUser();
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
-    queryKey: ['registros-livro'],
-    queryFn: getLivroRegistrosContrato,
+    queryKey: ['registros-livro', isAdmin, modoAcesso, userEmail],
+    queryFn: async () => {
+      if (isAdmin) {
+        const [registros, militares, ferias, periodos] = await Promise.all([
+          base44.entities.RegistroLivro.list('-created_date'),
+          base44.entities.Militar.list(),
+          base44.entities.Ferias.list(),
+          base44.entities.PeriodoAquisitivo.list(),
+        ]);
+        return mapLivroRegistrosPresenter({ registros, militares, ferias, periodos });
+      }
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return { registros_livro: [] };
+
+      const militarBatches = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const militares = militarBatches.flat();
+      const militarIds = [...new Set(militares.map((m) => m.id).filter(Boolean))];
+      if (!militarIds.length) return { registros_livro: [] };
+
+      const [registrosByMilitar, feriasByMilitar, periodosByMilitar] = await Promise.all([
+        Promise.all(militarIds.map((militarId) => base44.entities.RegistroLivro.filter({ militar_id: militarId }, '-created_date'))),
+        Promise.all(militarIds.map((militarId) => base44.entities.Ferias.filter({ militar_id: militarId }))),
+        Promise.all(militarIds.map((militarId) => base44.entities.PeriodoAquisitivo.filter({ militar_id: militarId }))),
+      ]);
+
+      const dedupe = (items) => {
+        const ids = new Set();
+        return items.flat().filter((item) => {
+          if (!item?.id || ids.has(item.id)) return false;
+          ids.add(item.id);
+          return true;
+        });
+      };
+
+      return mapLivroRegistrosPresenter({
+        registros: dedupe(registrosByMilitar),
+        militares: dedupe([militares]),
+        ferias: dedupe(feriasByMilitar),
+        periodos: dedupe(periodosByMilitar),
+      });
+    },
     enabled: !loadingUser,
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
-    queryKey: ['publicacoes-ex-officio'],
-    queryFn: () => base44.entities.PublicacaoExOfficio.list('-created_date')
+    queryKey: ['publicacoes-ex-officio', isAdmin, modoAcesso, userEmail],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militarBatches = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const militarIds = [...new Set(militarBatches.flat().map((m) => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+
+      const publicacoesByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }, '-created_date'))
+      );
+      const ids = new Set();
+      return publicacoesByMilitar.flat().filter((registro) => {
+        if (!registro?.id || ids.has(registro.id)) return false;
+        ids.add(registro.id);
+        return true;
+      });
+    },
+    enabled: !loadingUser,
   });
 
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
-    queryKey: ['atestados-publicacao'],
+    queryKey: ['atestados-publicacao', isAdmin, modoAcesso, userEmail],
     queryFn: async () => {
-      const all = await base44.entities.Atestado.list('-created_date');
-      return all.filter(a => a.nota_para_bg || a.numero_bg);
-    }
+      if (isAdmin) {
+        const all = await base44.entities.Atestado.list('-created_date');
+        return all.filter((a) => a.nota_para_bg || a.numero_bg);
+      }
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militarBatches = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const militarIds = [...new Set(militarBatches.flat().map((m) => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+
+      const atestadosByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.Atestado.filter({ militar_id: militarId }, '-created_date'))
+      );
+      const ids = new Set();
+      return atestadosByMilitar.flat().filter((registro) => {
+        if (!registro?.id || ids.has(registro.id)) return false;
+        ids.add(registro.id);
+        return registro.nota_para_bg || registro.numero_bg;
+      });
+    },
+    enabled: !loadingUser,
   });
 
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;

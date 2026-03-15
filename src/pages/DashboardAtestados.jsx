@@ -25,7 +25,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function DashboardAtestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, getMilitarScopeFilters, canAccessModule, isLoading: loadingUser } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
 
@@ -36,8 +36,31 @@ export default function DashboardAtestados() {
   const [jisoModalAtestado, setJisoModalAtestado] = useState(null);
 
   const { data: atestados = [], isLoading } = useQuery({
-    queryKey: ['atestados-dashboard'],
-    queryFn: () => base44.entities.Atestado.list('-created_date')
+    queryKey: ['atestados-dashboard', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Atestado.list('-created_date');
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militarBatches = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const militarIds = [...new Set(militarBatches.flat().map((m) => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+
+      const atestadosByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.Atestado.filter({ militar_id: militarId }, '-created_date'))
+      );
+
+      const ids = new Set();
+      return atestadosByMilitar.flat().filter((registro) => {
+        if (!registro?.id || ids.has(registro.id)) return false;
+        ids.add(registro.id);
+        return true;
+      });
+    },
+    enabled: !loadingUser,
   });
 
   // Ordenar: Ativos acima, Encerrados abaixo

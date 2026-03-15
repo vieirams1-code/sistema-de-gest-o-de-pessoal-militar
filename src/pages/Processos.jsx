@@ -32,7 +32,7 @@ function PrazoChip({ data }) {
 
 export default function Processos() {
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, modoAcesso, subgrupamentoId, getMilitarScopeFilters, canAccessModule, isLoading: loadingUser } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('processos')) return <AccessDenied modulo="Processos" />;
   const [view, setView] = useState('kanban');
@@ -43,11 +43,46 @@ export default function Processos() {
   const [modal, setModal] = useState({ open: false, processo: null });
 
   const { data: processos = [], isLoading } = useQuery({
-    queryKey: ['processos', isAdmin, subgrupamentoId],
-    queryFn: () => {
+    queryKey: ['processos', isAdmin, modoAcesso, subgrupamentoId],
+    queryFn: async () => {
       if (isAdmin) return base44.entities.Processo.list('-created_date', 200);
-      if (subgrupamentoId) return base44.entities.Processo.filter({ subgrupamento_id: subgrupamentoId }, '-created_date', 200);
-      return base44.entities.Processo.list('-created_date', 200);
+
+      if (modoAcesso === 'setor' && subgrupamentoId) {
+        const [porGrupamento, porSubgrupamento] = await Promise.all([
+          base44.entities.Processo.filter({ grupamento_id: subgrupamentoId }, '-created_date', 200),
+          base44.entities.Processo.filter({ subgrupamento_id: subgrupamentoId }, '-created_date', 200),
+        ]);
+        const ids = new Set();
+        return [...porGrupamento, ...porSubgrupamento].filter((registro) => {
+          if (!registro?.id || ids.has(registro.id)) return false;
+          ids.add(registro.id);
+          return true;
+        });
+      }
+
+      if (modoAcesso === 'subsetor' && subgrupamentoId) {
+        return base44.entities.Processo.filter({ subgrupamento_id: subgrupamentoId }, '-created_date', 200);
+      }
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militarBatches = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const militarIds = [...new Set(militarBatches.flat().map((m) => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+
+      const processosByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.Processo.filter({ militar_id: militarId }, '-created_date', 200))
+      );
+
+      const ids = new Set();
+      return processosByMilitar.flat().filter((registro) => {
+        if (!registro?.id || ids.has(registro.id)) return false;
+        ids.add(registro.id);
+        return true;
+      });
     },
     enabled: !loadingUser,
   });

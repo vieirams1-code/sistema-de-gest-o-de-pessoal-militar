@@ -333,8 +333,25 @@ export default function Ferias() {
   });
 
   const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['registros-livro-all'],
-    queryFn: () => base44.entities.RegistroLivro.list(),
+    queryKey: ['registros-livro-all', isAdmin, ferias.length],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.RegistroLivro.list();
+
+      const feriasIds = [...new Set(ferias.map((item) => item.id).filter(Boolean))];
+      if (!feriasIds.length) return [];
+
+      const registrosByFerias = await Promise.all(
+        feriasIds.map((feriasId) => base44.entities.RegistroLivro.filter({ ferias_id: feriasId }))
+      );
+
+      const ids = new Set();
+      return registrosByFerias.flat().filter((registro) => {
+        if (!registro?.id || ids.has(registro.id)) return false;
+        ids.add(registro.id);
+        return true;
+      });
+    },
+    enabled: !loadingUser,
   });
 
   const deleteMutation = useMutation({
