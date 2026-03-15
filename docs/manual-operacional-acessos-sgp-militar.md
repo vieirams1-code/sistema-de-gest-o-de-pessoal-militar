@@ -1,9 +1,5 @@
 # Manual Operacional de Acessos — SGP Militar
 
-## Como acessar este manual
-- No repositório do projeto, clique em `docs/manual-operacional-acessos-sgp-militar.md`.
-- Se estiver no GitHub, abra a pasta `docs` e selecione o arquivo do manual.
-
 ## 1) Visão geral da arquitetura de acesso
 O SGP Militar trabalha com **duas camadas complementares**: entrada no sistema e autorização interna.
 
