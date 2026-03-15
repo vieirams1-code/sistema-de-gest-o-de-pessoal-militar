@@ -14,8 +14,9 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function AgendarJISO() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const { canAccessModule, isLoading, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
+  const podeGerirJiso = canAccessAction('gerir_jiso');
   const isAccessPending = isLoading || !isAccessResolved;
 
 
@@ -53,8 +54,8 @@ export default function AgendarJISO() {
     return null;
   }
 
-  if (!hasAtestadosAccess) {
-    return <AccessDenied modulo="Atestados" />;
+  if (!hasAtestadosAccess || !podeGerirJiso) {
+    return <AccessDenied modulo="JISO" />;
   }
 
   return (

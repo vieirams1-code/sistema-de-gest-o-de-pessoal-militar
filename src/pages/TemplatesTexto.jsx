@@ -455,9 +455,10 @@ const COR_GRUPO = {
 
 export default function TemplatesTexto() {
   const queryClient = useQueryClient();
-  const { isAdmin, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const podeGerirTemplates = isAdmin || canAccessAction('gerir_templates');
 
-  if (!loadingUser && !isAdmin) return <AccessDenied modulo="Templates de Texto" />;
+  if (!loadingUser && !podeGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
 
   const [moduloFiltro, setModuloFiltro] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -471,9 +472,12 @@ export default function TemplatesTexto() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data) => data.id
-      ? base44.entities.TemplateTexto.update(data.id, data)
-      : base44.entities.TemplateTexto.create(data),
+    mutationFn: (data) => {
+      if (!podeGerirTemplates) throw new Error('Você não tem permissão para gerir templates.');
+      return data.id
+        ? base44.entities.TemplateTexto.update(data.id, data)
+        : base44.entities.TemplateTexto.create(data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
       setShowForm(false);
@@ -482,7 +486,10 @@ export default function TemplatesTexto() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.TemplateTexto.delete(id),
+    mutationFn: (id) => {
+      if (!podeGerirTemplates) throw new Error('Você não tem permissão para gerir templates.');
+      return base44.entities.TemplateTexto.delete(id);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] })
   });
 
@@ -523,7 +530,7 @@ export default function TemplatesTexto() {
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Templates de Texto</h1>
             <p className="text-slate-500">Padrões de texto para publicações — editáveis por tipo/módulo</p>
           </div>
-          <Button onClick={handleNew} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+          <Button onClick={handleNew} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white" disabled={!podeGerirTemplates}>
             <Plus className="w-4 h-4 mr-2" /> Novo Template
           </Button>
         </div>

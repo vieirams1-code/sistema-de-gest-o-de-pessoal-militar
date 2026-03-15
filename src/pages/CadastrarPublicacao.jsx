@@ -92,7 +92,18 @@ export default function CadastrarPublicacao() {
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+
+  const getActionKeyByTipoPublicacao = (tipo) => {
+    if (tipo === 'Ata JISO') return 'publicar_ata_jiso';
+    if (tipo === 'Homologação de Atestado') return 'publicar_homologacao';
+    if (tipo === 'Apostila') return 'apostilar_publicacao';
+    if (tipo === 'Tornar sem Efeito') return 'tornar_sem_efeito_publicacao';
+    return 'publicar_bg';
+  };
+
+  const actionKeyAtual = getActionKeyByTipoPublicacao(formData.tipo);
+  const podeExecutarAcaoAtual = canAccessAction(actionKeyAtual);
 
 
   // Para apostila / tornar sem efeito: buscar publicações publicadas do militar em todas as entidades
@@ -474,6 +485,12 @@ export default function CadastrarPublicacao() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!podeExecutarAcaoAtual) {
+      alert(`Você não tem permissão para executar esta ação (${actionKeyAtual}).`);
+      return;
+    }
+
     setLoading(true);
 
     const publicacaoIgnoradaId = publicacaoId || null;
@@ -1327,7 +1344,7 @@ export default function CadastrarPublicacao() {
           </div>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !formData.militar_id}
+            disabled={!podeExecutarAcaoAtual || loading || !formData.militar_id}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-6"
           >
             {loading ? (

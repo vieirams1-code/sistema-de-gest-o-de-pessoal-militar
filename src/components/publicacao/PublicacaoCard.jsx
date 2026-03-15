@@ -207,8 +207,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeMarcarPrioridade = !isPublicado;
   const podeEditar = !isPublicado;
   const temPermissaoAdmin = canAccessAction('admin_mode');
-  const podeExcluir = !isPublicado && temPermissaoAdmin && modoAdmin;
-  const podeExcluirDesabilitado = !isPublicado && temPermissaoAdmin && !modoAdmin;
+  const podeEditarPublicacoes = canAccessAction('editar_publicacoes');
+  const podePublicarBg = canAccessAction('publicar_bg');
+  const podeApostilarAcao = canAccessAction('apostilar_publicacao');
+  const podeTseAcao = canAccessAction('tornar_sem_efeito_publicacao');
+  const podeExcluir = !isPublicado && temPermissaoAdmin && modoAdmin && podeEditarPublicacoes;
+  const podeExcluirDesabilitado = !isPublicado && temPermissaoAdmin && !modoAdmin && podeEditarPublicacoes;
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -236,11 +240,19 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const handleTogglePrioridade = (e, flag) => {
     e.stopPropagation();
+    if (!podeEditarPublicacoes) {
+      alert('Você não tem permissão para editar publicações.');
+      return;
+    }
     const newVal = !registro[flag];
     onUpdate(registro.id, { [flag]: newVal }, origemTipo);
   };
 
   const handleSaveBg = () => {
+    if (!podePublicarBg) {
+      alert('Você não tem permissão para publicar no BG.');
+      return;
+    }
     const novoStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
     const updateData =
@@ -262,7 +274,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   };
 
   const handleDelete = () => {
-    if (!canAccessAction('admin_mode') || !modoAdmin) {
+    if (!canAccessAction('admin_mode') || !modoAdmin || !podeEditarPublicacoes) {
       alert('Ação restrita. Exige permissão de administração e modo admin ativo.');
       return;
     }
@@ -271,10 +283,18 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   };
 
   const handleApostila = () => {
+    if (!podeApostilarAcao) {
+      alert('Você não tem permissão para apostilar publicação.');
+      return;
+    }
     navigate(`${createPageUrl('CadastrarPublicacao')}?tipo=Apostila&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`);
   };
 
   const handleTornarSemEfeito = () => {
+    if (!podeTseAcao) {
+      alert('Você não tem permissão para tornar sem efeito publicação.');
+      return;
+    }
     navigate(`${createPageUrl('CadastrarPublicacao')}?tipo=Tornar+sem+Efeito&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`);
   };
 
@@ -376,21 +396,21 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 </>
               )}
               {!isEditingBg && (
-                <Button variant="ghost" size="sm" onClick={() => { setIsEditingBg(true); setIsExpanded(true); }} className="text-slate-500 hover:text-blue-600 text-xs gap-1">
+                <Button variant="ghost" size="sm" onClick={() => { setIsEditingBg(true); setIsExpanded(true); }} className="text-slate-500 hover:text-blue-600 text-xs gap-1" disabled={!podePublicarBg}>
                   <FileText className="w-4 h-4" /><span className="hidden sm:inline">Nota/BG</span>
                 </Button>
               )}
               {podeEditar && (
-                <Button variant="ghost" size="sm" onClick={() => navigate(getEditUrl(registro))} className="text-slate-500 hover:text-[#1e3a5f] text-xs gap-1">
+                <Button variant="ghost" size="sm" onClick={() => navigate(getEditUrl(registro))} className="text-slate-500 hover:text-[#1e3a5f] text-xs gap-1" disabled={!podeEditarPublicacoes}>
                   <Edit2 className="w-4 h-4" /><span className="hidden sm:inline">Editar</span>
                 </Button>
               )}
-              {podeApostilar && (
+              {podeApostilar && podeApostilarAcao && (
                 <Button variant="ghost" size="sm" onClick={handleApostila} className="text-purple-500 hover:text-purple-700 text-xs gap-1">
                   <PenLine className="w-4 h-4" /><span className="hidden sm:inline">Apostila</span>
                 </Button>
               )}
-              {podeTornarSemEfeito && (
+              {podeTornarSemEfeito && podeTseAcao && (
                 <Button variant="ghost" size="sm" onClick={handleTornarSemEfeito} className="text-red-500 hover:text-red-700 text-xs gap-1">
                   <Ban className="w-4 h-4" /><span className="hidden sm:inline">Tornar s/ Efeito</span>
                 </Button>

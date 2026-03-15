@@ -20,6 +20,7 @@ export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { isAdmin, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const podeGerirEstrutura = isAdmin || canAccessAction('gerir_estrutura');
 
   const [searchMilitar, setSearchMilitar] = useState('');
   const [selectedMilitares, setSelectedMilitares] = useState([]);
@@ -83,6 +84,9 @@ export default function LotacaoMilitares() {
 
   const moveMutation = useMutation({
     mutationFn: async ({ militaresIds, targetNode }) => {
+      if (!podeGerirEstrutura) {
+        throw new Error('Você não tem permissão para gerir estrutura.');
+      }
       // Determinar o grupamento e subgrupamento baseado no nível do targetNode
       let updateData = {};
       
@@ -135,6 +139,10 @@ export default function LotacaoMilitares() {
   });
 
   const handleMove = () => {
+    if (!podeGerirEstrutura) {
+      toast({ title: 'Acesso negado', description: 'Você não tem permissão para gerir estrutura.', variant: 'destructive' });
+      return;
+    }
     if (!selectedNode || selectedMilitares.length === 0) return;
     moveMutation.mutate({ militaresIds: selectedMilitares, targetNode: selectedNode });
   };
@@ -313,7 +321,7 @@ export default function LotacaoMilitares() {
                 
                 <Button 
                   onClick={handleMove} 
-                  disabled={moveMutation.isPending || selectedMilitares.length === 0 || !selectedNode}
+                  disabled={!podeGerirEstrutura || !selectedNode || selectedMilitares.length === 0 || moveMutation.isPending}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 shadow-sm"
                 >
                   {moveMutation.isPending ? 'Movendo...' : (
