@@ -320,6 +320,9 @@ function atualizarAcaoNoCache(lista, acaoId, payloadAtualizado) {
 
 function AcoesSection({ cardId }) {
   const queryClient = useQueryClient();
+  const { canAccessAction } = useCurrentUser();
+  const podeGerirAcoes = canAccessAction('gerir_acoes_operacionais');
+  const podeExcluirAcoes = canAccessAction('excluir_acao_operacional');
   const [novaAcao, setNovaAcao] = useState({ titulo: '', data_prevista: '' });
   const [savingId, setSavingId] = useState('');
   const [criando, setCriando] = useState(false);
@@ -355,6 +358,10 @@ function AcoesSection({ cardId }) {
   };
 
   const criarAcao = async () => {
+    if (!podeGerirAcoes) {
+      window.alert('Você não tem permissão para gerir ações operacionais.');
+      return;
+    }
     if (!novaAcao.titulo.trim() || criando) return;
 
     setCriando(true);
@@ -378,6 +385,10 @@ function AcoesSection({ cardId }) {
   };
 
   const atualizarAcao = async (acao, patch = null) => {
+    if (!podeGerirAcoes) {
+      window.alert('Você não tem permissão para gerir ações operacionais.');
+      return;
+    }
     if (savingId === acao.id) return;
 
     setSavingId(acao.id);
@@ -423,6 +434,10 @@ function AcoesSection({ cardId }) {
   };
 
   const excluirAcao = async (acaoId) => {
+    if (!podeExcluirAcoes) {
+      window.alert('Você não tem permissão para excluir ações operacionais.');
+      return;
+    }
     if (savingId === acaoId) return;
 
     setSavingId(acaoId);
@@ -462,7 +477,7 @@ function AcoesSection({ cardId }) {
           <Button
             onClick={criarAcao}
             size="sm"
-            disabled={criando || !novaAcao.titulo.trim()}
+            disabled={!podeGerirAcoes || criando || !novaAcao.titulo.trim()}
             className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -518,7 +533,7 @@ function AcoesSection({ cardId }) {
                   variant="secondary"
                   className="h-7 text-[11px] px-2"
                   onClick={() => setExpandedEdicao((prev) => ({ ...prev, [acao.id]: !prev[acao.id] }))}
-                  disabled={savingId === acao.id}
+                  disabled={!podeGerirAcoes || savingId === acao.id}
                 >
                   <Pencil className="w-3.5 h-3.5 mr-1" />
                   {expandedEdicao[acao.id] ? 'Fechar edição' : 'Editar'}
@@ -529,7 +544,7 @@ function AcoesSection({ cardId }) {
                   variant="secondary"
                   className="h-7 text-[11px] px-2 bg-rose-50 text-rose-700 hover:bg-rose-100"
                   onClick={() => excluirAcao(acao.id)}
-                  disabled={savingId === acao.id}
+                  disabled={!podeGerirAcoes || savingId === acao.id}
                 >
                   <Trash2 className="w-3.5 h-3.5 mr-1" />
                   Excluir
@@ -544,7 +559,7 @@ function AcoesSection({ cardId }) {
                       : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                   }`}
                   onClick={() => toggleConclusao(acao)}
-                  disabled={savingId === acao.id}
+                  disabled={!podeGerirAcoes || savingId === acao.id}
                 >
                   <Check className="w-3.5 h-3.5 mr-1" />
                   {concluida ? 'Desmarcar concluída' : 'Marcar concluída'}
@@ -563,7 +578,7 @@ function AcoesSection({ cardId }) {
                     }
                     className="h-7 text-[11px] bg-white"
                     placeholder="Título"
-                    disabled={savingId === acao.id}
+                    disabled={!podeGerirAcoes || savingId === acao.id}
                   />
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -575,7 +590,7 @@ function AcoesSection({ cardId }) {
                           [acao.id]: { ...(prev[acao.id] || {}), data_prevista: value },
                         }))
                       }
-                      disabled={savingId === acao.id}
+                      disabled={!podeGerirAcoes || savingId === acao.id}
                     />
 
                     <Select
@@ -586,7 +601,7 @@ function AcoesSection({ cardId }) {
                           [acao.id]: { ...(prev[acao.id] || {}), status: value },
                         }))
                       }
-                      disabled={savingId === acao.id}
+                      disabled={!podeGerirAcoes || savingId === acao.id}
                     >
                       <SelectTrigger className="h-7 text-[11px] bg-white">
                         <SelectValue />
@@ -609,7 +624,7 @@ function AcoesSection({ cardId }) {
                         await atualizarAcao(acao);
                         setExpandedEdicao((prev) => ({ ...prev, [acao.id]: false }));
                       }}
-                      disabled={savingId === acao.id}
+                      disabled={!podeGerirAcoes || savingId === acao.id}
                     >
                       {savingId === acao.id ? 'Salvando...' : 'Salvar'}
                     </Button>
@@ -626,7 +641,10 @@ function AcoesSection({ cardId }) {
 
 export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpdate }) {
   const queryClient = useQueryClient();
-  const { userEmail, user } = useCurrentUser();
+  const { userEmail, user, canAccessAction } = useCurrentUser();
+  const podeArquivarCard = canAccessAction('arquivar_card');
+  const podeGerirQuadro = canAccessAction('gerir_quadro');
+  const podeRegistrarDecisaoJisoAction = canAccessAction('registrar_decisao_jiso');
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [showSystemActivity, setShowSystemActivity] = useState(false);
@@ -748,6 +766,10 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   };
 
   const salvarDataJiso = async () => {
+    if (!podeRegistrarDecisaoJisoAction) {
+      window.alert('Você não tem permissão para registrar decisão JISO.');
+      return;
+    }
     if (!permiteEditarDataJiso || savingJisoDate) return;
 
     setSavingJisoDate(true);
@@ -772,6 +794,10 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   };
 
   const salvarClassificacao = async () => {
+    if (!podeGerirQuadro) {
+      window.alert('Você não tem permissão para gerir quadro.');
+      return;
+    }
     if (salvandoClassificacao) return;
 
     setSalvandoClassificacao(true);
@@ -793,6 +819,10 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   };
 
   const excluirCard = async () => {
+    if (!podeArquivarCard) {
+      window.alert('Você não tem permissão para arquivar card.');
+      return;
+    }
     if (deletingCard) return;
 
     const confirmar = window.confirm(
@@ -878,7 +908,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 size="sm"
                 className="h-8 text-xs border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
                 onClick={excluirCard}
-                disabled={deletingCard}
+                disabled={!podeArquivarCard || deletingCard}
               >
                 {deletingCard ? (
                   <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -1040,7 +1070,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
               <Button
                 size="sm"
                 onClick={salvarClassificacao}
-                disabled={salvandoClassificacao}
+                disabled={!podeGerirQuadro || salvandoClassificacao}
                 className="h-8 text-xs"
               >
                 {salvandoClassificacao ? 'Salvando...' : 'Salvar classificação'}
@@ -1062,7 +1092,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 <Button
                   size="sm"
                   onClick={salvarDataJiso}
-                  disabled={savingJisoDate}
+                  disabled={!podeRegistrarDecisaoJisoAction || savingJisoDate}
                   className="h-8 text-xs"
                 >
                   {savingJisoDate ? 'Salvando...' : 'Salvar data'}

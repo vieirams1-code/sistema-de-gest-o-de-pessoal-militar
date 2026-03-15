@@ -37,6 +37,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
@@ -51,8 +52,12 @@ const statusColors = {
   'Prorrogado': 'bg-blue-100 text-blue-700 border-blue-200'
 };
 
-export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
+export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canDelete = false }) {
   const queryClient = useQueryClient();
+  const { canAccessAction } = useCurrentUser();
+  const podePublicarHomologacao = canAccessAction('publicar_homologacao');
+  const podePublicarAtaJiso = canAccessAction('publicar_ata_jiso');
+  const podeRegistrarDecisaoJiso = canAccessAction('registrar_decisao_jiso');
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [savingJiso, setSavingJiso] = useState(false);
@@ -97,18 +102,30 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const handleOpenHomologacao = () => {
+    if (!podePublicarHomologacao) {
+      alert('Você não tem permissão para publicar homologação.');
+      return;
+    }
     const texto = gerarTextoHomologacao({});
     setHomologacaoForm(prev => ({ ...prev, texto_publicacao: texto }));
     setShowHomologacaoModal(true);
   };
 
   const handleOpenAtaJiso = () => {
+    if (!podePublicarAtaJiso) {
+      alert('Você não tem permissão para publicar ata JISO.');
+      return;
+    }
     const texto = gerarTextoAtaJiso(ataJisoForm);
     setAtaJisoForm(prev => ({ ...prev, texto_publicacao: texto }));
     setShowAtaJisoModal(true);
   };
 
   const handleSaveHomologacao = async () => {
+    if (!podePublicarHomologacao) {
+      alert('Você não tem permissão para publicar homologação.');
+      return;
+    }
     setSavingPublicacao(true);
     const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
     const jaExisteHomologacao = existePublicacaoAtivaParaAtestado(
@@ -154,6 +171,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const handleSaveAtaJiso = async () => {
+    if (!podePublicarAtaJiso) {
+      alert('Você não tem permissão para publicar ata JISO.');
+      return;
+    }
     setSavingPublicacao(true);
     const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
     const jaExisteAtaJiso = existePublicacaoAtivaParaAtestado(
@@ -240,6 +261,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const handleSaveJiso = async () => {
+    if (!podeRegistrarDecisaoJiso) {
+      alert('Você não tem permissão para registrar decisão JISO.');
+      return;
+    }
     if (!jisoDate) return;
     setSavingJiso(true);
     await base44.entities.Atestado.update(atestado.id, {
@@ -326,7 +351,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               {/* Fluxo exclusivo: mostrar apenas o botão do fluxo definido */}
               {/* dias <= 15 e fluxo = comandante (ou não definido e dias <= 15): mostrar homologação */}
               {atestado.fluxo_homologacao === 'comandante' && (
-                <DropdownMenuItem onClick={handleOpenHomologacao} disabled={hasHomologacaoAtiva}>
+                <DropdownMenuItem onClick={handleOpenHomologacao} disabled={!podePublicarHomologacao || hasHomologacaoAtiva}>
                   <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
                   {hasHomologacaoAtiva ? 'Homologação já gerada' : 'Publicar Homologação'}
                 </DropdownMenuItem>
@@ -335,7 +360,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               {(atestado.fluxo_homologacao === 'jiso' || (atestado.dias > 15)) && (
                 <DropdownMenuItem
                   onClick={handleOpenAtaJiso}
-                  disabled={statusDocumentalAtaJiso.bloqueiaNovaPublicacao}
+                  disabled={!podePublicarAtaJiso || statusDocumentalAtaJiso.bloqueiaNovaPublicacao}
                   title={statusDocumentalAtaJiso.bloqueiaNovaPublicacao ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : ''}
                 >
                   <BookOpen className="w-4 h-4 mr-2 text-purple-600" />
@@ -358,13 +383,13 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               {(atestado.fluxo_homologacao === 'jiso' || atestado.dias > 15) && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowJisoModal(true)}>
+                  <DropdownMenuItem onClick={() => { if (!podeRegistrarDecisaoJiso) { alert('Você não tem permissão para registrar decisão JISO.'); return; } setShowJisoModal(true); }} disabled={!podeRegistrarDecisaoJiso}>
                     <History className="w-4 h-4 mr-2" />
                     Registrar decisão JISO
                   </DropdownMenuItem>
                 </>
               )}
-              <DropdownMenuItem onClick={() => onDelete(atestado)} className="text-red-600 focus:text-red-600">
+              <DropdownMenuItem onClick={() => onDelete(atestado)} className="text-red-600 focus:text-red-600" disabled={!canDelete}>
                 <Trash2 className="w-4 h-4 mr-2" />
                 Excluir
               </DropdownMenuItem>
@@ -505,8 +530,9 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
             : 'Em análise'}
         </div>
         <button
-          onClick={() => setShowJisoModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 shadow-sm transition-all active:scale-95 text-sm"
+          onClick={() => { if (!podeRegistrarDecisaoJiso) { alert('Você não tem permissão para registrar decisão JISO.'); return; } setShowJisoModal(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 shadow-sm transition-all active:scale-95 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!podeRegistrarDecisaoJiso}
         >
           Registrar Decisão
           <ChevronRight size={16} />

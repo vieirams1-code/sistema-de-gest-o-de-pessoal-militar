@@ -22,11 +22,12 @@ import {
 export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { isAdmin, canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const podeGerirConfiguracoes = isAdmin || canAccessAction('gerir_configuracoes');
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
 
-  if (!loadingUser && (!isAdmin && !canAccessModule('configuracoes'))) {
+  if (!loadingUser && (!canAccessModule('configuracoes') || !podeGerirConfiguracoes)) {
     return <AccessDenied modulo="Configurações" />;
   }
 
@@ -45,10 +46,10 @@ export default function Configuracoes() {
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
 
-  const createLotacaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Lotacao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setNovaLotacao(''); } });
-  const createFuncaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Funcao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setNovaFuncao(''); } });
-  const deleteLotacaoMutation = useMutation({ mutationFn: (id) => base44.entities.Lotacao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
-  const deleteFuncaoMutation = useMutation({ mutationFn: (id) => base44.entities.Funcao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
+  const createLotacaoMutation = useMutation({ mutationFn: (nome) => { if (!podeGerirConfiguracoes) throw new Error('Sem permissão para gerir configurações.'); return base44.entities.Lotacao.create({ nome, ativa: true }); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setNovaLotacao(''); } });
+  const createFuncaoMutation = useMutation({ mutationFn: (nome) => { if (!podeGerirConfiguracoes) throw new Error('Sem permissão para gerir configurações.'); return base44.entities.Funcao.create({ nome, ativa: true }); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setNovaFuncao(''); } });
+  const deleteLotacaoMutation = useMutation({ mutationFn: (id) => { if (!podeGerirConfiguracoes) throw new Error('Sem permissão para gerir configurações.'); return base44.entities.Lotacao.delete(id); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
+  const deleteFuncaoMutation = useMutation({ mutationFn: (id) => { if (!podeGerirConfiguracoes) throw new Error('Sem permissão para gerir configurações.'); return base44.entities.Funcao.delete(id); }, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
 
   const handleDelete = () => {
     if (deleteDialog.type === 'lotacao') deleteLotacaoMutation.mutate(deleteDialog.id);

@@ -18,8 +18,9 @@ export default function EditarJISO() {
   const [searchParams] = useSearchParams();
   const atestadoId = searchParams.get('atestado_id');
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
+  const podeGerirJiso = canAccessAction('gerir_jiso');
   const isAccessPending = isLoading || !isAccessResolved;
 
 
@@ -93,6 +94,10 @@ export default function EditarJISO() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!podeGerirJiso) {
+      alert('Você não tem permissão para gerir JISO.');
+      return;
+    }
     
     const jisoData = {
       atestado_id: atestadoId,
@@ -141,8 +146,8 @@ export default function EditarJISO() {
     return null;
   }
 
-  if (!hasAtestadosAccess) {
-    return <AccessDenied modulo="Atestados" />;
+  if (!hasAtestadosAccess || !podeGerirJiso) {
+    return <AccessDenied modulo="JISO" />;
   }
 
   if (loadingAtestado || loadingJISO) {
@@ -191,6 +196,7 @@ export default function EditarJISO() {
           </div>
           <Button
             onClick={handleSubmit}
+            disabled={!podeGerirJiso}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
           >
             <Save className="w-5 h-5 mr-2" />

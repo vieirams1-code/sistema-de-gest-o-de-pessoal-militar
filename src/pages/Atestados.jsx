@@ -26,7 +26,8 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const podeExcluirAtestado = canAccessAction('excluir_atestado');
 
   if (!loadingUser && !canAccessModule('atestados')) return <AccessDenied modulo="Atestados" />;
 
@@ -46,6 +47,9 @@ export default function Atestados() {
 
   const deleteMutation = useMutation({
     mutationFn: async (atestado) => {
+      if (!podeExcluirAtestado) {
+        throw new Error('Você não tem permissão para excluir atestados.');
+      }
       await excluirAtestadoComReflexoNoQuadro(atestado);
       return atestado;
     },
@@ -80,7 +84,14 @@ export default function Atestados() {
   const finalizados = applyFilters(atestados.filter(a => a.status !== 'Ativo'));
 
   const handleEdit = (atestado) => navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
-  const handleDelete = (atestado) => { setAtestadoToDelete(atestado); setDeleteDialogOpen(true); };
+  const handleDelete = (atestado) => {
+    if (!podeExcluirAtestado) {
+      alert('Você não tem permissão para excluir atestados.');
+      return;
+    }
+    setAtestadoToDelete(atestado);
+    setDeleteDialogOpen(true);
+  };
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
   const confirmDelete = () => { if (atestadoToDelete) deleteMutation.mutate(atestadoToDelete); };
 
@@ -221,7 +232,7 @@ export default function Atestados() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {vigentes.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
+                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canDelete={podeExcluirAtestado} />
                     ))}
                   </div>
                 )
@@ -251,7 +262,7 @@ export default function Atestados() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {finalizados.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
+                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canDelete={podeExcluirAtestado} />
                     ))}
                   </div>
                 )

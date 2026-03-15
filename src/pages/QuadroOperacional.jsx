@@ -102,7 +102,10 @@ function substituirCardNaLista(cards = [], cardAtualizado) {
 
 export default function QuadroOperacionalPage() {
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const podeGerirQuadro = canAccessAction('gerir_quadro');
+  const podeMoverCard = canAccessAction('mover_card');
+  const podeGerirColunas = canAccessAction('gerir_colunas');
   const [busca, setBusca] = useState('');
   const [cardAberto, setCardAberto] = useState(null);
   const [colunaNovoCard, setColunaNovoCard] = useState(null);
@@ -199,6 +202,10 @@ export default function QuadroOperacionalPage() {
   }, [cardsComResumo, searchParams, setSearchParams]);
 
   const criarCard = async (form) => {
+    if (!podeGerirQuadro) {
+      window.alert('Você não tem permissão para gerir quadro.');
+      return;
+    }
     setSalvandoCard(true);
     try {
       const cardsDaColuna = [...cardsComResumo]
@@ -228,6 +235,10 @@ export default function QuadroOperacionalPage() {
 
   const onDragEnd = async ({ source, destination }) => {
     if (!destination || busca.trim() || movendo) return;
+    if (!podeMoverCard) {
+      window.alert('Você não tem permissão para mover cards.');
+      return;
+    }
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
     const sourceColunaId = source.droppableId;
@@ -361,6 +372,10 @@ export default function QuadroOperacionalPage() {
 
   const onDragEndColuna = async ({ source, destination }) => {
     if (!destination || busca.trim() || movendo) return;
+    if (!podeGerirColunas) {
+      window.alert('Você não tem permissão para gerir colunas.');
+      return;
+    }
     if (source.index === destination.index) return;
 
     const colunasAnteriores = [...colunas];
@@ -390,6 +405,10 @@ export default function QuadroOperacionalPage() {
   };
 
   const criarColunaManual = async () => {
+    if (!podeGerirColunas) {
+      window.alert('Você não tem permissão para gerir colunas.');
+      return;
+    }
     const nome = novaColuna.trim();
     if (!nome || !quadro?.id) return;
 
@@ -417,6 +436,10 @@ export default function QuadroOperacionalPage() {
   };
 
   const renomearColunaManual = async (coluna) => {
+    if (!podeGerirColunas) {
+      window.alert('Você não tem permissão para gerir colunas.');
+      return;
+    }
     if (coluna.fixa || coluna.origem_coluna === 'automacao') return;
 
     const novoNome = window.prompt('Novo nome da coluna:', coluna.nome || '');
@@ -441,6 +464,10 @@ export default function QuadroOperacionalPage() {
   };
 
   const excluirColunaManual = async (coluna) => {
+    if (!podeGerirColunas) {
+      window.alert('Você não tem permissão para gerir colunas.');
+      return;
+    }
     const colunaFixa =
       coluna.fixa ||
       coluna.origem_coluna === 'automacao' ||
@@ -465,6 +492,10 @@ export default function QuadroOperacionalPage() {
   };
 
   const setupInicial = async () => {
+    if (!podeGerirQuadro) {
+      window.alert('Você não tem permissão para gerir quadro.');
+      return;
+    }
     const q = await base44.entities.QuadroOperacional.create({
       nome: QUADRO_NOME,
       descricao: 'Quadro operacional da seção',
@@ -516,7 +547,7 @@ export default function QuadroOperacionalPage() {
         <div className="text-center">
           <h2 className="text-lg font-bold text-slate-800 mb-1">Quadro Operacional</h2>
           <p className="text-sm text-slate-500 mb-4">Nenhum quadro configurado ainda.</p>
-          <Button onClick={setupInicial} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+          <Button onClick={setupInicial} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white" disabled={!podeGerirQuadro}>
             <Plus className="w-4 h-4 mr-2" /> Criar quadro padrão
           </Button>
         </div>
@@ -547,7 +578,7 @@ export default function QuadroOperacionalPage() {
               placeholder="Nova coluna manual"
               className="h-8 text-xs w-44 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:bg-white/15"
             />
-            <Button onClick={criarColunaManual} className="h-8 text-xs bg-white text-[#1e3a5f] hover:bg-white/90">
+            <Button onClick={criarColunaManual} className="h-8 text-xs bg-white text-[#1e3a5f] hover:bg-white/90" disabled={!podeGerirColunas}>
               <Plus className="w-3.5 h-3.5 mr-1" /> Coluna
             </Button>
           </div>

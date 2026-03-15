@@ -254,6 +254,9 @@ export default function Publicacoes() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
+      if (!canAccessAction('editar_publicacoes')) {
+        throw new Error('Você não tem permissão para editar publicações.');
+      }
       const registroAtual = registros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
 
@@ -417,6 +420,10 @@ export default function Publicacoes() {
     if (!registro) return;
 
     if (tipo === 'atestado') {
+      if (!canAccessAction('excluir_atestado')) {
+        alert('Você não tem permissão para excluir atestados.');
+        return;
+      }
       alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
       return;
     }
@@ -435,6 +442,11 @@ export default function Publicacoes() {
         alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
         return;
       }
+    }
+
+    if (!canAccessAction('editar_publicacoes')) {
+      alert('Você não tem permissão para excluir publicações.');
+      return;
     }
 
     deleteMutation.mutate({ id, tipo, registro });
@@ -523,6 +535,7 @@ export default function Publicacoes() {
               <Button
                 className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
                 onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}
+                disabled={!canAccessAction('publicar_bg')}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Nova Publicação

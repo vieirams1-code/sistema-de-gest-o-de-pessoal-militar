@@ -186,7 +186,9 @@ export default function AgendaAcoesOperacionaisPage() {
   const [cardAbertoId, setCardAbertoId] = useState(null);
   const [editingAcaoId, setEditingAcaoId] = useState(null);
   const [acaoDrafts, setAcaoDrafts] = useState({});
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const podeGerirAcoes = canAccessAction('gerir_acoes_operacionais');
+  const podeExcluirAcoes = canAccessAction('excluir_acao_operacional');
 
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
@@ -219,6 +221,9 @@ export default function AgendaAcoesOperacionaisPage() {
 
   const toggleConclusaoMutation = useMutation({
     mutationFn: async ({ acao, status }) => {
+      if (!podeGerirAcoes) {
+        throw new Error('Você não tem permissão para gerir ações operacionais.');
+      }
       const payload = montarPayloadAcao({
         titulo: acao.titulo,
         data_prevista: acao.data_prevista,
@@ -241,6 +246,9 @@ export default function AgendaAcoesOperacionaisPage() {
 
   const salvarEdicaoMutation = useMutation({
     mutationFn: async ({ acaoId, payload }) => {
+      if (!podeGerirAcoes) {
+        throw new Error('Você não tem permissão para gerir ações operacionais.');
+      }
       const payloadFinal = montarPayloadAcao(payload);
       await updateCardAcao(acaoId, payloadFinal);
       return { acaoId, payload: payloadFinal };
@@ -259,7 +267,12 @@ export default function AgendaAcoesOperacionaisPage() {
   });
 
   const excluirAcaoMutation = useMutation({
-    mutationFn: (acaoId) => deleteCardAcao(acaoId),
+    mutationFn: (acaoId) => {
+      if (!podeExcluirAcoes) {
+        throw new Error('Você não tem permissão para excluir ações operacionais.');
+      }
+      return deleteCardAcao(acaoId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['acoes-consolidadas-quadro'] });
       queryClient.invalidateQueries({ queryKey: ['card-acoes'] });
@@ -337,7 +350,13 @@ export default function AgendaAcoesOperacionaisPage() {
         acao,
         status: concluir ? 'Concluída' : 'Pendente',
       }),
-    onDelete: (acao) => excluirAcaoMutation.mutate(acao.id),
+    onDelete: (acao) => {
+      if (!podeExcluirAcoes) {
+        window.alert('Você não tem permissão para excluir ações operacionais.');
+        return;
+      }
+      excluirAcaoMutation.mutate(acao.id);
+    },
     onStartEdit: (acao) => {
       setEditingAcaoId(acao.id);
       setAcaoDrafts((anterior) => ({ ...anterior, [acao.id]: { ...acao } }));
@@ -348,11 +367,16 @@ export default function AgendaAcoesOperacionaisPage() {
         [acaoId]: { ...(anterior[acaoId] || {}), [campo]: valor },
       }));
     },
-    onSaveEdit: (acao) =>
+    onSaveEdit: (acao) => {
+      if (!podeGerirAcoes) {
+        window.alert('Você não tem permissão para gerir ações operacionais.');
+        return;
+      }
       salvarEdicaoMutation.mutate({
         acaoId: acao.id,
         payload: acaoDrafts[acao.id] || acao,
-      }),
+      });
+    },
     editingAcaoId,
     acaoDrafts,
     loadingToggleId: toggleConclusaoMutation.isPending

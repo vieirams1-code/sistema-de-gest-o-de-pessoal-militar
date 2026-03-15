@@ -22,7 +22,10 @@ const TIPOS = ['Renovação de Contrato', 'Processo Administrativo', 'Processo J
 
 export default function ProcessoModal({ open, onClose, processo }) {
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, user } = useCurrentUser();
+  const { isAdmin, subgrupamentoId, user, canAccessAction } = useCurrentUser();
+  const podeCriarProcesso = canAccessAction('criar_processo');
+  const podeEditarProcesso = canAccessAction('editar_processo');
+  const podeExcluirProcesso = canAccessAction('excluir_processo');
   const isNew = !processo?.id;
 
   const defaultForm = {
@@ -61,6 +64,11 @@ export default function ProcessoModal({ open, onClose, processo }) {
   ).slice(0, 8);
 
   const handleSave = async () => {
+    const permitido = isNew ? podeCriarProcesso : podeEditarProcesso;
+    if (!permitido) {
+      window.alert(`Você não tem permissão para ${isNew ? 'criar' : 'editar'} processos.`);
+      return;
+    }
     setSaving(true);
     const data = { ...form };
     if (!data.tags) data.tags = [];
@@ -81,6 +89,10 @@ export default function ProcessoModal({ open, onClose, processo }) {
   };
 
   const handleDelete = async () => {
+    if (!podeExcluirProcesso) {
+      window.alert('Você não tem permissão para excluir processos.');
+      return;
+    }
     if (!window.confirm('Excluir este processo?')) return;
     await base44.entities.Processo.delete(processo.id);
     queryClient.invalidateQueries({ queryKey: ['processos'] });
@@ -286,7 +298,7 @@ export default function ProcessoModal({ open, onClose, processo }) {
           {/* Ações */}
           <div className="flex items-center justify-between pt-2 border-t">
             {!isNew ? (
-              <Button variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={handleDelete}>
+              <Button variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={handleDelete} disabled={!podeExcluirProcesso}>
                 <Trash2 className="w-4 h-4 mr-1" /> Excluir
               </Button>
             ) : <div />}
@@ -295,6 +307,7 @@ export default function ProcessoModal({ open, onClose, processo }) {
               <Button
                 disabled={saving || !form.titulo}
                 onClick={handleSave}
+                disabled={saving || (isNew ? !podeCriarProcesso : !podeEditarProcesso)}
                 className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
               >
                 {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" /> : null}
