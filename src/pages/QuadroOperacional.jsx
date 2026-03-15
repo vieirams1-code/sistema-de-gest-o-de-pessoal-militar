@@ -102,7 +102,7 @@ function substituirCardNaLista(cards = [], cardAtualizado) {
 
 export default function QuadroOperacionalPage() {
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [busca, setBusca] = useState('');
   const [cardAberto, setCardAberto] = useState(null);
   const [colunaNovoCard, setColunaNovoCard] = useState(null);
@@ -113,33 +113,38 @@ export default function QuadroOperacionalPage() {
 
   const fetchCardsDoQuadro = async () => {
     if (!colunas.length) return [];
-    const cardsBrutos = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
-    const colunasIds = new Set(colunas.map((coluna) => coluna.id));
-    return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
+    const cardsPorColuna = await Promise.all(
+      colunas.map((coluna) => base44.entities.CardOperacional.filter({ coluna_id: coluna.id, arquivado: false }, '-created_date', 200))
+    );
+    return cardsPorColuna.flat();
   };
+
+
+  const canLoadQuadro = !loadingUser && isAccessResolved && canAccessModule('quadro_operacional');
 
   const { data: quadros = [], isLoading: loadQ } = useQuery({
     queryKey: ['quadros'],
     queryFn: () => base44.entities.QuadroOperacional.filter({ ativo: true }, 'ordem'),
+    enabled: canLoadQuadro,
   });
   const quadro = quadros[0] || null;
 
   const { data: colunas = [], isLoading: loadC } = useQuery({
     queryKey: ['colunas', quadro?.id],
     queryFn: () => base44.entities.ColunaOperacional.filter({ quadro_id: quadro.id, ativa: true }, 'ordem'),
-    enabled: !!quadro?.id,
+    enabled: canLoadQuadro && !!quadro?.id,
   });
 
   const { data: cards = [], isLoading: loadCards } = useQuery({
     queryKey: ['cards', quadro?.id],
     queryFn: fetchCardsDoQuadro,
-    enabled: !!quadro?.id && colunas.length > 0,
+    enabled: canLoadQuadro && !!quadro?.id && colunas.length > 0,
   });
 
   const { data: checklistItens = [] } = useQuery({
     queryKey: ['checklist-board', quadro?.id],
     queryFn: () => base44.entities.CardChecklistItem.list('-created_date', 2000),
-    enabled: !!quadro?.id,
+    enabled: canLoadQuadro && !!quadro?.id,
   });
 
   const isLoading = loadQ || loadC || loadCards;

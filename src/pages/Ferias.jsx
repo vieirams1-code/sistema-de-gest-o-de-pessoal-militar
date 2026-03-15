@@ -266,7 +266,7 @@ function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
 export default function Ferias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
@@ -293,6 +293,8 @@ export default function Ferias() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [modoAdmin, setModoAdmin] = useState(false);
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
+
+  const canLoadFerias = !loadingUser && isAccessResolved && canAccessModule('ferias');
 
   const { data: ferias = [], isLoading } = useQuery({
     queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
@@ -329,12 +331,19 @@ export default function Ferias() {
         return db - da;
       });
     },
-    enabled: !loadingUser,
+    enabled: canLoadFerias,
   });
 
   const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['registros-livro-all'],
-    queryFn: () => base44.entities.RegistroLivro.list(),
+    queryKey: ['registros-livro-all', ferias.map((f) => f.id).join(',')],
+    queryFn: async () => {
+      if (!ferias.length) return [];
+      const registrosPorFerias = await Promise.all(
+        ferias.map((f) => base44.entities.RegistroLivro.filter({ ferias_id: f.id }, 'data_registro', 200))
+      );
+      return registrosPorFerias.flat();
+    },
+    enabled: canLoadFerias && ferias.length > 0,
   });
 
   const deleteMutation = useMutation({

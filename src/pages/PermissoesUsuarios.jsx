@@ -56,7 +56,7 @@ const initialPermissions = {
 
 export default function PermissoesUsuarios() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [isNewAcesso, setIsNewAcesso] = useState(false);
@@ -73,17 +73,21 @@ export default function PermissoesUsuarios() {
   const [selectedProfileId, setSelectedProfileId] = useState('_nenhum');
   const [savingUser, setSavingUser] = useState(false);
 
+  const canLoadPermissoes = !loadingUser && isAccessResolved && (isAdmin || canAccessAction('gerir_permissoes'));
+
 
   // Queries
-  const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) });
-  const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome') });
+  const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }), enabled: canLoadPermissoes });
+  const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome'), enabled: canLoadPermissoes });
   const { data: acessos = [], error: acessosError } = useQuery({
     queryKey: ['usuariosAcesso'],
     queryFn: () => base44.entities.UsuarioAcesso.list(),
+    enabled: canLoadPermissoes,
   });
   const { data: perfis = [] } = useQuery({
     queryKey: ['perfisPermissao'],
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
+    enabled: canLoadPermissoes,
   });
 
   const selectedProfilePreview = useMemo(() => {

@@ -221,25 +221,58 @@ export default function Publicacoes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
-  const { isAdmin, canAccessModule, canAccessAction, modoAcesso, userEmail, getMilitarScopeFilters, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction, modoAcesso, userEmail, getMilitarScopeFilters, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+
+
+  const canLoadPublicacoes = !loadingUser && isAccessResolved && canAccessModule('publicacoes');
+
+
+  const { data: militarIdsAcessiveis = [] } = useQuery({
+    queryKey: ['publicacoes-militares-ids', isAdmin, modoAcesso, userEmail],
+    queryFn: async () => {
+      if (isAdmin) return [];
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+      const militaresAcessiveis = (await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      )).flat();
+      return [...new Set(militaresAcessiveis.map((m) => m.id).filter(Boolean))];
+    },
+    enabled: canLoadPublicacoes,
+  });
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
-    queryKey: ['registros-livro'],
-    queryFn: getLivroRegistrosContrato,
-    enabled: !loadingUser,
+    queryKey: ['registros-livro', isAdmin, militarIdsAcessiveis.join(',')],
+    queryFn: () => getLivroRegistrosContrato({ isAdmin, militarIds: militarIdsAcessiveis }),
+    enabled: canLoadPublicacoes,
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
-    queryKey: ['publicacoes-ex-officio'],
-    queryFn: () => base44.entities.PublicacaoExOfficio.list('-created_date')
+    queryKey: ['publicacoes-ex-officio', isAdmin, militarIdsAcessiveis.join(',')],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
+      if (!militarIdsAcessiveis.length) return [];
+      const porMilitar = await Promise.all(
+        militarIdsAcessiveis.map((militarId) => base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }, '-created_date'))
+      );
+      return porMilitar.flat();
+    },
+    enabled: canLoadPublicacoes,
   });
 
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
-    queryKey: ['atestados-publicacao'],
+    queryKey: ['atestados-publicacao', isAdmin, militarIdsAcessiveis.join(',')],
     queryFn: async () => {
-      const all = await base44.entities.Atestado.list('-created_date');
-      return all.filter(a => a.nota_para_bg || a.numero_bg);
-    }
+      const atestadosBase = isAdmin
+        ? await base44.entities.Atestado.list('-created_date')
+        : (militarIdsAcessiveis.length
+          ? (await Promise.all(
+              militarIdsAcessiveis.map((militarId) => base44.entities.Atestado.filter({ militar_id: militarId }, '-created_date'))
+            )).flat()
+          : []);
+      return atestadosBase.filter(a => a.nota_para_bg || a.numero_bg);
+    },
+    enabled: canLoadPublicacoes,
   });
 
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;

@@ -22,7 +22,7 @@ async function resolveCardAcoesEntity() {
         if (!entity) continue;
 
         try {
-          await entity.list(undefined, 1);
+          await entity.filter({ id: '__schema_probe__' }, undefined, 1);
           return { entity, entityName };
         } catch (error) {
           if (isEntitySchemaNotFound(error)) {

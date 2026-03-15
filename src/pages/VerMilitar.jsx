@@ -54,45 +54,49 @@ export default function VerMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
-  const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser } = useCurrentUser();
+  const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
+
+  const canRunSensitiveQueries = !loadingUser && isAccessResolved;
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
     queryFn: async () => { const list = await base44.entities.Militar.filter({ id }); return list[0] || null; },
-    enabled: !!id
+    enabled: !!id && canRunSensitiveQueries
   });
+
+  const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
+  const canFetchRelated = canRunSensitiveQueries && !!id && !!militar && canViewMilitar;
 
   const { data: ferias = [] } = useQuery({
     queryKey: ['ver-ferias', id],
     queryFn: () => base44.entities.Ferias.filter({ militar_id: id }, '-data_inicio'),
-    enabled: !!id
+    enabled: canFetchRelated
   });
 
   const { data: atestados = [] } = useQuery({
     queryKey: ['ver-atestados', id],
     queryFn: () => base44.entities.Atestado.filter({ militar_id: id }, '-data_inicio'),
-    enabled: !!id
+    enabled: canFetchRelated
   });
 
   const { data: medalhas = [] } = useQuery({
     queryKey: ['ver-medalhas', id],
     queryFn: () => base44.entities.Medalha.filter({ militar_id: id }, '-data_indicacao'),
-    enabled: !!id
+    enabled: canFetchRelated
   });
 
   const { data: armamentos = [] } = useQuery({
     queryKey: ['ver-armamentos', id],
     queryFn: () => base44.entities.Armamento.filter({ militar_id: id }),
-    enabled: !!id
+    enabled: canFetchRelated
   });
 
   const { data: periodos = [] } = useQuery({
     queryKey: ['ver-periodos', id],
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
-    enabled: !!id
+    enabled: canFetchRelated
   });
-  const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
 
 
   if (loadingUser || isLoading) {

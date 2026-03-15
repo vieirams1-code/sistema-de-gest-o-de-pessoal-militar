@@ -186,11 +186,15 @@ export default function AgendaAcoesOperacionaisPage() {
   const [cardAbertoId, setCardAbertoId] = useState(null);
   const [editingAcaoId, setEditingAcaoId] = useState(null);
   const [acaoDrafts, setAcaoDrafts] = useState({});
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+
+
+  const canLoadAgenda = !loadingUser && isAccessResolved && canAccessModule('quadro_operacional');
 
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
     queryFn: () => base44.entities.QuadroOperacional.filter({ ativo: true }, 'ordem'),
+    enabled: canLoadAgenda,
   });
 
   const quadro = quadros[0] || null;
@@ -198,23 +202,25 @@ export default function AgendaAcoesOperacionaisPage() {
   const { data: colunas = [] } = useQuery({
     queryKey: ['colunas', quadro?.id],
     queryFn: () => base44.entities.ColunaOperacional.filter({ quadro_id: quadro.id, ativa: true }, 'ordem'),
-    enabled: !!quadro?.id,
+    enabled: canLoadAgenda && !!quadro?.id,
   });
 
   const { data: cards = [] } = useQuery({
     queryKey: ['cards', quadro?.id],
     queryFn: async () => {
       if (!colunas.length) return [];
-      const cardsBrutos = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
-      const colunasIds = new Set(colunas.map((coluna) => coluna.id));
-      return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
+      const cardsPorColuna = await Promise.all(
+        colunas.map((coluna) => base44.entities.CardOperacional.filter({ coluna_id: coluna.id, arquivado: false }, '-created_date', 200))
+      );
+      return cardsPorColuna.flat();
     },
-    enabled: !!quadro?.id && colunas.length > 0,
+    enabled: canLoadAgenda && !!quadro?.id && colunas.length > 0,
   });
 
   const { data: acoesRaw = [] } = useQuery({
     queryKey: ['acoes-consolidadas-quadro'],
     queryFn: () => listAllCardAcoes(3000),
+    enabled: canLoadAgenda,
   });
 
   const toggleConclusaoMutation = useMutation({
