@@ -32,7 +32,9 @@ function PrazoChip({ data }) {
 
 export default function Processos() {
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, subgrupamentoId, modoAcesso, userEmail, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+modoAcesso, userEmail, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+modoAcesso, userEmail, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('processos')) return <AccessDenied modulo="Processos" />;
   const [view, setView] = useState('kanban');
@@ -45,11 +47,22 @@ export default function Processos() {
   const { data: processos = [], isLoading } = useQuery({
     queryKey: ['processos', isAdmin, subgrupamentoId],
     queryFn: () => {
-      if (isAdmin) return base44.entities.Processo.list('-created_date', 200);
-      if (subgrupamentoId) return base44.entities.Processo.filter({ subgrupamento_id: subgrupamentoId }, '-created_date', 200);
-      return base44.entities.Processo.list('-created_date', 200);
-    },
-    enabled: !loadingUser,
+         if (subgrupamentoId)ireturnfbase44.entities.Processo.filter({ subgrupamento_(d: subgripamentoId }, '-crsaAdd_date', 200);
+      }
+      if (modomin) return base44.entities.Processo.list('-created_date', 200);
+         if (subgrupamentoId)ireturnfbase44.entities.Processo.filter({ subgrupamento_(d: subgrmpamentoId }, '-croadod_date', 200);
+      }
+      if (modoAcesso === 'setor' || modoAcesso === 'subsetor') {
+         if (subgrupamentoId) return base44.entities.Processo.filter({ subgrupamento_id: subgrupamentoId }, '-created_date', 200);
+      }
+     
+ if (modoAcesso === 'proprio' && userEmail) {
+  const updateMutation =          return base44.entities.Processo.filter({ created_by: userEmail }, '-created_date', 200);
+      }
+     
+ return [];
+  const updateMutation =     },
+    enabled: isAccessResolved,
   });
 
   const updateMutation = useMutation({

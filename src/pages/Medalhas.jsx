@@ -21,21 +21,25 @@ export default function Medalhas() {
 
   if (!loadingUser && !canAccessModule('medalhas')) return <AccessDenied modulo="Medalhas" />;
 
-  const { data: allMedalhas = [], isLoading } = useQuery({
-    queryKey: ['medalhas'],
-    queryFn: () => base44.entities.Medalha.list('-created_date'),
-    enabled: !loadingUser,
+  const { data: medalhas = [], isLoading } = useQuery({
+    queryKey: ['medalhas', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Medalha.list('-created_date');
+      const scopeFilters = getMilitarScopeFilters();
+      if (!scopeFilters.length) return [];
+      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
+      const militaresAcess = militarQueries.flat();
+      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+      
+      const queryPromises = militarIds.map(id => base44.entities.Medalha.filter({ militar_id: id }, '-created_date'));
+      const arrays = await Promise.all(queryPromises);
+      const m = new Map();
+      arrays.flat().forEach(item => m.set(item.id, item));
+      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
+    },
+    enabled: isAccessResolved && canAccessModule('medalhas'),
   });
-
-  // Filtrar medalhas pelo escopo do usuário: busca os militares acessíveis via hasAccess
-  const { data: militaresAcessiveis = [] } = useQuery({
-    queryKey: ['militares-ids'],
-    queryFn: () => base44.entities.Militar.list(),
-    enabled: !loadingUser && !isAdmin,
-  });
-
-  const militaresIds = isAdmin ? null : new Set(militaresAcessiveis.filter(m => hasAccess(m)).map(m => m.id));
-  const medalhas = isAdmin ? allMedalhas : allMedalhas.filter(m => militaresIds?.has(m.militar_id));
 
   const { data: tiposMedalha = [] } = useQuery({
     queryKey: ['tipos-medalha'],

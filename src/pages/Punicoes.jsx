@@ -22,14 +22,32 @@ import {
 export default function Punicoes() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin, getMilitarScopeFilters, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [agruparPor, setAgruparPor] = useState('ano');
   const [ordenarPor, setOrdenarPor] = useState('data');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
+  
+  if (!loadingUser && !isAccessResolved) return null;
+  if (!loadingUser && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
 
   const { data: punicoes = [], isLoading } = useQuery({
-    queryKey: ['punicoes'],
-    queryFn: () => base44.entities.Punicao.list('-data_aplicacao')
+    queryKey: ['punicoes', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Punicao.list('-data_aplicacao');
+      const scopeFilters = getMilitarScopeFilters();
+      if (!scopeFilters.length) return [];
+      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
+      const militaresAcess = militarQueries.flat();
+      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+      const queryPromises = militarIds.map(id => base44.entities.Punicao.filter({ militar_id: id }, '-data_aplicacao'));
+      const arrays = await Promise.all(queryPromises);
+      const m = new Map();
+      arrays.flat().forEach(item => m.set(item.id, item));
+      return Array.from(m.values()).sort((a,b) => new Date(b.data_aplicacao||0) - new Date(a.data_aplicacao||0));
+    },
+    enabled: isAccessResolved
   });
 
   const deleteMutation = useMutation({

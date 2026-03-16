@@ -26,7 +26,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, getMilitarScopeFilters, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,8 +39,24 @@ export default function Atestados() {
   const [finalizadosCollapsed, setFinalizadosCollapsed] = useState(true);
 
   const { data: atestados = [], isLoading } = useQuery({
-    queryKey: ['atestados'],
-    queryFn: () => base44.entities.Atestado.list('-created_date')
+    queryKey: ['atestados', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Atestado.list('-created_date');
+      
+      const scopeFilters = getMilitarScopeFilters();
+      if (!scopeFilters.length) return [];
+      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
+      const militaresAcess = militarQueries.flat();
+      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
+      if (!militarIds.length) return [];
+      
+      const queryPromises = militarIds.map(id => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
+      const arrays = await Promise.all(queryPromises);
+      const m = new Map();
+      arrays.flat().forEach(item => m.set(item.id, item));
+      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
+    },
+    enabled: isAccessResolved && hasAtestadosAccess
   });
 
   const deleteMutation = useMutation({
