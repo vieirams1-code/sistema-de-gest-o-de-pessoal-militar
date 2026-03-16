@@ -266,7 +266,7 @@ function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
 export default function Ferias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
@@ -329,12 +329,41 @@ export default function Ferias() {
         return db - da;
       });
     },
-    enabled: !loadingUser,
+    enabled: isAccessResolved && canAccessModule('ferias'),
   });
 
   const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['registros-livro-all'],
-    queryFn: () => base44.entities.RegistroLivro.list(),
+    queryKey: ['registros-livro-all', isAdmin, modoAcesso, userEmail],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.RegistroLivro.list();
+
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+
+      const militarQueries = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter))
+      );
+      const militaresAcessiveis = militarQueries.flat();
+      const militarIds = [...new Set(militaresAcessiveis.map((m) => m.id).filter(Boolean))];
+
+      if (!militarIds.length) return [];
+
+      const registrosByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.RegistroLivro.filter({ militar_id: militarId }))
+      );
+
+      const ids = new Set();
+      const merged = [];
+
+      for (const registro of registrosByMilitar.flat()) {
+        if (!registro?.id || ids.has(registro.id)) continue;
+        ids.add(registro.id);
+        merged.push(registro);
+      }
+
+      return merged;
+    },
+    enabled: isAccessResolved && canAccessModule('ferias'),
   });
 
   const deleteMutation = useMutation({

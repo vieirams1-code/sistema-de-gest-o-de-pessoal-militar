@@ -242,46 +242,46 @@ export default function FichaMilitar() {
       const r = await base44.entities.Militar.filter({ id: militarId });
       return r[0];
     },
-    enabled: !!militarId
+    enabled: !!militarId && isAccessResolved
   });
+
+  const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
 
   const { data: punicoes = [], refetch: refetchPunicoes } = useQuery({
     queryKey: ['ficha-punicoes', militarId],
     queryFn: () => base44.entities.Punicao.filter({ militar_id: militarId }),
-    enabled: !!militarId
+    enabled: !!militarId && isAccessResolved && canViewMilitar
   });
 
   const { data: atestados = [], refetch: refetchAtestados } = useQuery({
     queryKey: ['ficha-atestados', militarId],
     queryFn: () => base44.entities.Atestado.filter({ militar_id: militarId }),
-    enabled: !!militarId
+    enabled: !!militarId && isAccessResolved && canViewMilitar
   });
 
   const { data: registrosLivro = [], refetch: refetchLivro } = useQuery({
     queryKey: ['ficha-livro', militarId],
     queryFn: () => base44.entities.RegistroLivro.filter({ militar_id: militarId }),
-    enabled: !!militarId
+    enabled: !!militarId && isAccessResolved && canViewMilitar
   });
 
   const { data: publicacoes = [], refetch: refetchPublicacoes } = useQuery({
     queryKey: ['ficha-publicacoes', militarId],
     queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }),
-    enabled: !!militarId
+    enabled: !!militarId && isAccessResolved && canViewMilitar
   });
 
   const { data: medalhas = [], refetch: refetchMedalhas } = useQuery({
     queryKey: ['ficha-medalhas', militarId],
     queryFn: () => base44.entities.Medalha.filter({ militar_id: militarId }),
-    enabled: !!militarId
+    enabled: !!militarId && isAccessResolved && canViewMilitar
   });
 
   const { data: historico = [], refetch: refetchHistorico } = useQuery({
     queryKey: ['ficha-comportamento', militarId],
     queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: militarId }),
-    enabled: !!militarId
+    enabled: !!militarId && isAccessResolved && canViewMilitar
   });
-
-  const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
 
   const refetchAll = () => {
     refetchPunicoes();
