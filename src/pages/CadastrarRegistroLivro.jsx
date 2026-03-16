@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
@@ -120,6 +120,7 @@ export default function CadastrarRegistroLivro() {
   const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState('Saída Férias');
   const [textoPublicacao, setTextoPublicacao] = useState('');
   const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
+  const [templateError, setTemplateError] = useState(null);
 
   // Buscar templates cadastrados
   const { data: templates = [] } = useQuery({
@@ -334,6 +335,8 @@ export default function CadastrarRegistroLivro() {
   }, [formData, selectedFerias, templates]);
 
   const gerarTextoPublicacao = () => {
+    setTemplateError(null);
+
     const abreviatura = abreviarPosto(formData.militar_posto);
     const postoNome = abreviatura ? `${abreviatura} QOBM` : '';
     const nomeCompleto = formData.militar_nome || '';
@@ -382,10 +385,7 @@ export default function CadastrarRegistroLivro() {
             setUsingCustomTemplate(true);
           } else {
             setUsingCustomTemplate(false);
-            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
-            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
-            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
-            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(selectedFerias.data_inicio)} entrará em gozo de férias regulamentares, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+            setTemplateError(`Template obrigatório não encontrado para 'Saída Férias'. Cadastre o template antes de continuar.`);
           }
         }
         break;
@@ -420,10 +420,7 @@ export default function CadastrarRegistroLivro() {
             setUsingCustomTemplate(true);
           } else {
             setUsingCustomTemplate(false);
-            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
-            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
-            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
-            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(formData.data_registro)}, teve interrompido o gozo de férias regulamentares, referente ao período aquisitivo ${periodoRef}.`;
+            setTemplateError(`Template obrigatório não encontrado para 'Interrupção de Férias'. Cadastre o template antes de continuar.`);
           }
         }
         break;
@@ -444,11 +441,7 @@ export default function CadastrarRegistroLivro() {
             setUsingCustomTemplate(true);
           } else {
             setUsingCustomTemplate(false);
-            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
-            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
-            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
-            const saldo = selectedFerias.saldo_remanescente ?? selectedFerias.dias ?? 0;
-            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(formData.data_registro)} reiniciará o gozo do saldo remanescente de férias regulamentares, ${saldo} (${numeroPorExtenso(Number(saldo))}) dias, referente ao período aquisitivo ${periodoRef}.`;
+            setTemplateError(`Template obrigatório não encontrado para 'Nova Saída / Retomada'. Cadastre o template antes de continuar.`);
           }
         }
         break;
@@ -463,12 +456,7 @@ export default function CadastrarRegistroLivro() {
             setUsingCustomTemplate(true);
           } else {
             setUsingCustomTemplate(false);
-            const abrevFerias = abreviarPosto(selectedFerias.militar_posto);
-            const postoNomeFerias = abrevFerias ? `${abrevFerias} QOBM` : '';
-            const periodoRef = selectedFerias.periodo_aquisitivo_ref || '';
-            const fracionamento = selectedFerias.fracionamento || '';
-            const tipoFeriaTexto = fracionamento ? `${fracionamento} de férias regulamentares` : 'férias regulamentares';
-            texto = `A Comandante do 1° Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, cujo conteúdo segue: em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se: ${postoNomeFerias} ${selectedFerias.militar_nome}, matrícula ${selectedFerias.militar_matricula}, em ${formatarDataExtenso(formData.data_registro)}, por término do gozo da ${tipoFeriaTexto}, ${selectedFerias.dias} (${numeroPorExtenso(selectedFerias.dias)}) dias, referente ao período aquisitivo ${periodoRef}.`;
+            setTemplateError(`Template obrigatório não encontrado para 'Retorno Férias'. Cadastre o template antes de continuar.`);
           }
         }
         break;
@@ -1078,7 +1066,7 @@ export default function CadastrarRegistroLivro() {
           </div>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !formData.militar_id}
+            disabled={loading || !formData.militar_id || !!templateError}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-6"
           >
             {loading ? (
@@ -1140,6 +1128,17 @@ export default function CadastrarRegistroLivro() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {/* Erro de Template Obrigatório */}
+          {templateError && (
+            <div className="bg-red-50 rounded-xl shadow-sm border border-red-200 p-6 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <Label className="text-sm font-bold text-red-800">Ação Bloqueada</Label>
+                <p className="text-sm text-red-700 mt-1">{templateError}</p>
+              </div>
             </div>
           )}
 

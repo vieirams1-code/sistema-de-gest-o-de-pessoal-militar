@@ -24,6 +24,7 @@ import {
 import { addDays, differenceInDays, format } from 'date-fns';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
+import { aplicarTemplate, buildVarsLivro } from '@/components/utils/templateUtils';
 import {
   validarInicioFracaoNoLivro,
   validarInicioNoPeriodoConcessivo,
@@ -279,6 +280,14 @@ export default function RegistroLivroModal({
   const [observacoes, setObservacoes] = useState('');
   const [textoPublicacao, setTextoPublicacao] = useState('');
   const [saving, setSaving] = useState(false);
+  const [templateError, setTemplateError] = useState(null);
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['templates-texto'],
+    queryFn: () => base44.entities.TemplateTexto.list(),
+    staleTime: 30000,
+    enabled: open,
+  });
 
   const { data: registrosDaFerias = [] } = useQuery({
     queryKey: ['registros-livro-ferias-modal', ferias?.id],
@@ -336,6 +345,7 @@ export default function RegistroLivroModal({
     setDataBg('');
     setObservacoes('');
     setTextoPublicacao('');
+    setTemplateError(null);
   }, [open, ferias, tipoInicial]);
 
   const cadeiaOperacional = useMemo(() => {
@@ -430,42 +440,48 @@ export default function RegistroLivroModal({
   useEffect(() => {
     if (!ferias || !resumo || erroCronologia) {
       setTextoPublicacao('');
+      setTemplateError(null);
       return;
     }
 
-    const militar = `${ferias.militar_posto ? `${ferias.militar_posto} ` : ''}${ferias.militar_nome || ''}`.trim();
-    const matricula = ferias.militar_matricula || '';
+    const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === tipoRegistro && t.ativo !== false);
 
-    if (tipoRegistro === 'Saída Férias') {
-      setTextoPublicacao(
-        `O Comandante do 1º Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, onde consta o início do gozo de férias do militar ${militar}, matrícula ${matricula}, a contar de ${formatDateBR(dataRegistro)}, por ${resumo.dias} dias, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`
-      );
+    if (!tmpl?.template) {
+      setTextoPublicacao('');
+      setTemplateError(`Template obrigatório não encontrado para '${tipoRegistro}'. Cadastre o template antes de continuar.`);
       return;
     }
 
-    if (tipoRegistro === 'Retorno Férias') {
-      setTextoPublicacao(
-        `O Comandante do 1º Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, onde consta o término do gozo de férias do militar ${militar}, matrícula ${matricula}, em ${formatDateBR(dataRegistro)}, após ${resumo.dias} dias de afastamento, referente ao período aquisitivo ${ferias.periodo_aquisitivo_ref || ''}.`
-      );
-      return;
-    }
+    setTemplateError(null);
 
+    const periodoFerias = (periodosDoMilitar || []).find((item) =>
+      (ferias.periodo_aquisitivo_id && item.id === ferias.periodo_aquisitivo_id) ||
+      ((item.ano_referencia || '') === (ferias.periodo_aquisitivo_ref || ''))
+    );
+
+    let interrupcaoInfo = null;
     if (tipoRegistro === 'Interrupção de Férias') {
-      setTextoPublicacao(
-        `O Comandante do 1º Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, onde consta a interrupção das férias do militar ${militar}, matrícula ${matricula}, em ${formatDateBR(dataRegistro)}, após ${resumo.gozados} dias gozados, restando saldo de ${resumo.saldo} dias.`
-      );
-      return;
+      interrupcaoInfo = {
+        dataInterrupcao: resumo.dataInterrupcao || dataRegistro,
+        diasNoMomento: resumo.diasNoMomento,
+        diasGozados: resumo.gozados,
+        saldoRemanescente: resumo.saldo,
+      };
+    } else if (tipoRegistro === 'Nova Saída / Retomada') {
+      interrupcaoInfo = {
+        saldoRemanescente: resumo.saldo,
+      };
     }
 
-    if (tipoRegistro === 'Nova Saída / Retomada') {
-      setTextoPublicacao(
-        `O Comandante do 1º Grupamento de Bombeiros Militar torna público o Livro de Férias e Outras Concessões de Oficiais e Praças, onde consta a continuação das férias do militar ${militar}, matrícula ${matricula}, a contar de ${formatDateBR(dataRegistro)}, para gozo do saldo remanescente de ${resumo.saldo} dias.`
-      );
-      return;
-    }
+    const vars = buildVarsLivro({
+      ferias,
+      dataRegistro,
+      periodo: periodoFerias,
+      interrupcaoInfo
+    });
 
-    setTextoPublicacao('');
-  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia]);
+    setTextoPublicacao(aplicarTemplate(tmpl.template, vars));
+  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar]);
 
   const statusPublicacao = useMemo(
     () => calcStatusPublicacao(notaParaBg, numeroBg, dataBg),
@@ -597,6 +613,13 @@ export default function RegistroLivroModal({
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{erroCronologia}</span>
+            </div>
+          )}
+
+          {templateError && !erroCronologia && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{templateError}</span>
             </div>
           )}
 
@@ -751,7 +774,7 @@ export default function RegistroLivroModal({
             </Button>
             <Button
               onClick={handleSalvar}
-              disabled={saving || !dataRegistro || !!erroCronologia || !canGerirCadeia}
+              disabled={saving || !dataRegistro || !!erroCronologia || !canGerirCadeia || !!templateError}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
             >
               {saving ? 'Salvando...' : 'Salvar Registro'}
