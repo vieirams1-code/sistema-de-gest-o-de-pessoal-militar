@@ -486,11 +486,6 @@ export default function Ferias() {
     });
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    return format(new Date(`${dateString}T00:00:00`), 'dd/MM/yyyy');
-  };
-
   const handleSalvarEditData = async () => {
     if (!editDataModal.ferias || !editDataModal.novaData || editDataError) return;
 
