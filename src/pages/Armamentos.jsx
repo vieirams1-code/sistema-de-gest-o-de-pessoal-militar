@@ -114,6 +114,9 @@ export default function Armamentos() {
   }).length;
   const crafRegular = totalRegistrado - crafVencidoOuIrregular;
 
+  if (loadingUser || !isAccessResolved) return null;
+  if (!canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
+
   const getStatusBadge = (arma) => {
     const status = normalizeText(arma.status);
     const validade = parseDate(arma.validade_craf);
