@@ -195,14 +195,18 @@ export default function AgendarJISO() {
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`)}
-                      >
-                        <Edit className="w-4 h-4 mr-1" />
-                        {jiso ? 'Editar JISO' : 'Registrar JISO'}
-                      </Button>
+                      {/* Botão só é exibido se o usuário tiver permissão para registrar/editar JISO,
+                          alinhando a UI com a action key validada em EditarJISO.jsx (registrar_decisao_jiso) */}
+                      {canAccessAction('registrar_decisao_jiso') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`)}
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          {jiso ? 'Editar JISO' : 'Registrar JISO'}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
