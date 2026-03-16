@@ -157,6 +157,11 @@ export default function PermissoesUsuarios() {
 
   const handleSaveUserScope = async () => {
     if (!selectedUser) return;
+    // Revalidação explícita no handler — não depende só da UI
+    if (!isAdmin && !canAccessAction('gerir_permissoes')) {
+      alert('Ação negada: você não tem permissão para gerenciar permissões de usuários.');
+      return;
+    }
     if (!userUserEmail) { alert('E-mail do Usuário é obrigatório.'); return; }
 
     setSavingUser(true);
