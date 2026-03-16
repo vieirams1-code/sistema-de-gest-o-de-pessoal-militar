@@ -186,7 +186,7 @@ export default function AgendaAcoesOperacionaisPage() {
   const [cardAbertoId, setCardAbertoId] = useState(null);
   const [editingAcaoId, setEditingAcaoId] = useState(null);
   const [acaoDrafts, setAcaoDrafts] = useState({});
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasQuadroOperacionalAccess = canAccessModule('quadro_operacional');
 
 
@@ -338,13 +338,25 @@ export default function AgendaAcoesOperacionaisPage() {
 
   const propsComunsGrupo = {
     onOpenCard: setCardAbertoId,
-    onToggleConcluida: (acao, concluir) =>
-      toggleConclusaoMutation.mutate({
-        acao,
-        status: concluir ? 'Concluída' : 'Pendente',
-      }),
-    onDelete: (acao) => excluirAcaoMutation.mutate(acao.id),
+    onToggleConcluida: (acao, concluir) => {
+      if (!canAccessAction('gerir_acoes_operacionais')) {
+        alert('Ação negada: você não tem permissão para alterar ações operacionais.');
+        return;
+      }
+      toggleConclusaoMutation.mutate({ acao, status: concluir ? 'Concluída' : 'Pendente' });
+    },
+    onDelete: (acao) => {
+      if (!canAccessAction('excluir_acao_operacional')) {
+        alert('Ação negada: você não tem permissão para excluir ações operacionais.');
+        return;
+      }
+      excluirAcaoMutation.mutate(acao.id);
+    },
     onStartEdit: (acao) => {
+      if (!canAccessAction('gerir_acoes_operacionais')) {
+        alert('Ação negada: você não tem permissão para editar ações operacionais.');
+        return;
+      }
       setEditingAcaoId(acao.id);
       setAcaoDrafts((anterior) => ({ ...anterior, [acao.id]: { ...acao } }));
     },
@@ -354,11 +366,13 @@ export default function AgendaAcoesOperacionaisPage() {
         [acaoId]: { ...(anterior[acaoId] || {}), [campo]: valor },
       }));
     },
-    onSaveEdit: (acao) =>
-      salvarEdicaoMutation.mutate({
-        acaoId: acao.id,
-        payload: acaoDrafts[acao.id] || acao,
-      }),
+    onSaveEdit: (acao) => {
+      if (!canAccessAction('gerir_acoes_operacionais')) {
+        alert('Ação negada: você não tem permissão para salvar edições de ações operacionais.');
+        return;
+      }
+      salvarEdicaoMutation.mutate({ acaoId: acao.id, payload: acaoDrafts[acao.id] || acao });
+    },
     editingAcaoId,
     acaoDrafts,
     loadingToggleId: toggleConclusaoMutation.isPending
