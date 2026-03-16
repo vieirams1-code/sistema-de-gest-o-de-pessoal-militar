@@ -41,8 +41,6 @@ export default function LotacaoMilitares() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
 
-  // Acesso à página: admin, gerir_estrutura (ação correta para mover lotação) ou gerir_permissoes (acesso legado)
-  if (!isAdmin && !canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes')) {
   if (!canGerirEstrutura) {
     return <AccessDenied modulo="Lotação de Militares" />;
   }
@@ -142,11 +140,6 @@ export default function LotacaoMilitares() {
   });
 
   const handleMove = () => {
-    if (!selectedNode || selectedMilitares.length === 0) return;
-    // Revalidação explícita no handler: requer gerir_estrutura (mover lotação é uma operação
-    // de estrutura organizacional, não de gestão de permissões de usuários)
-    if (!isAdmin && !canAccessAction('gerir_estrutura')) {
-      alert('Ação negada: você não tem permissão para mover a lotação de militares.');
     if (!canGerirEstrutura) {
       toast({ title: "Ação negada", description: "Permissão insuficiente para mover militares.", variant: "destructive" });
       return;

@@ -60,7 +60,8 @@ export default function PerfisPermissao() {
   const [formData, setFormData] = useState(initialForm);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
-  if (!loadingUser && !canAccessAction('gerir_permissoes')) {
+  if (loadingUser) return null;
+  if (!canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Perfis de Permissão" />;
   }
 

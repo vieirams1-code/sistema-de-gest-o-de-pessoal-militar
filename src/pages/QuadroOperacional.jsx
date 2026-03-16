@@ -536,7 +536,8 @@ export default function QuadroOperacionalPage() {
     queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
   };
 
-  if (!loadingUser && !hasAccess) return <AccessDenied modulo="Quadro Operacional" />;
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasAccess) return <AccessDenied modulo="Quadro Operacional" />;
 
   if (isLoading) {
     return (

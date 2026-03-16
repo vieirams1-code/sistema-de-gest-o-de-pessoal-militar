@@ -222,11 +222,12 @@ export default function Publicacoes() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
   const { isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const hasPublicacoesAccess = canAccessModule('publicacoes');
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
-    queryFn: getLivroRegistrosContrato,
-    enabled: isAccessResolved,
+    queryFn: () => getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
+    enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
@@ -270,7 +271,7 @@ export default function Publicacoes() {
       const m = new Map();
       arrays.flat().forEach(item => { if (item.nota_para_bg || item.numero_bg) m.set(item.id, item); });
       return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
-    }
+    },
     enabled: isAccessResolved && hasPublicacoesAccess
   });
 
@@ -513,7 +514,8 @@ export default function Publicacoes() {
     },
   ];
 
-  if (!loadingUser && !canAccessModule('publicacoes')) return <AccessDenied modulo="Controle de Publicações" />;
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasPublicacoesAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
   return (
     <div className="min-h-screen bg-slate-100">

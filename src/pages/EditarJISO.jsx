@@ -18,10 +18,9 @@ export default function EditarJISO() {
   const [searchParams] = useSearchParams();
   const atestadoId = searchParams.get('atestado_id');
   const queryClient = useQueryClient();
-  const { canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
-  const isAccessPending = isLoading || !isAccessResolved;
-
+  const canGerirJiso = canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso');
 
   const [formData, setFormData] = useState({
     data_jiso: '',
@@ -93,10 +92,7 @@ export default function EditarJISO() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!canAccessAction('registrar_decisao_jiso')) {
-      alert('Ação negada: você não tem permissão para registrar decisões de JISO.');
-      return;
-    }
+    
     const jisoData = {
       atestado_id: atestadoId,
       militar_id: atestado.militar_id,
@@ -139,18 +135,16 @@ export default function EditarJISO() {
     navigate(createPageUrl('AgendarJISO'));
   };
 
-
-  if (isAccessPending) {
+  if (loadingUser || !isAccessResolved) {
     return null;
   }
-
-  if (!hasAtestadosAccess) {
-    return <AccessDenied modulo="Atestados" />;
+  if (!hasAtestadosAccess || !canGerirJiso) {
+    return <AccessDenied modulo="JISO / Atestados" />;
   }
 
   if (loadingAtestado || loadingJISO) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex justify-center py-20">
         <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
       </div>
     );

@@ -455,15 +455,11 @@ const COR_GRUPO = {
 
 export default function TemplatesTexto() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
-  // Acesso: admin OU permissão explícita de gerir_templates
-  const canManageTemplates = isAdmin || canAccessAction('gerir_templates');
   const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const canGerirTemplates = canAccessAction('gerir_templates');
 
-  if (!loadingUser && isAccessResolved && !canManageTemplates) return <AccessDenied modulo="Templates de Texto" />;
-  if (!loadingUser && !isAccessResolved) return null;
-  if (!loadingUser && !canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
+  if (loadingUser || !isAccessResolved) return null;
+  if (!canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
 
   const [moduloFiltro, setModuloFiltro] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -474,20 +470,16 @@ export default function TemplatesTexto() {
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates-texto'],
     queryFn: () => base44.entities.TemplateTexto.list('-created_date'),
-    enabled: isAccessResolved && canManageTemplates,
+    enabled: isAccessResolved && canGerirTemplates,
   });
 
   const saveMutation = useMutation({
     mutationFn: (data) => {
-      // Guarda explícita no handler
-      if (!canManageTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
+      if (!canGerirTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
       return data.id
         ? base44.entities.TemplateTexto.update(data.id, data)
         : base44.entities.TemplateTexto.create(data);
     },
-    mutationFn: (data) => data.id
-      ? base44.entities.TemplateTexto.update(data.id, data)
-      : base44.entities.TemplateTexto.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
       setShowForm(false);
@@ -497,12 +489,9 @@ export default function TemplatesTexto() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => {
-      // Guarda explícita no handler
-      if (!canManageTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
+      if (!canGerirTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
       return base44.entities.TemplateTexto.delete(id);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] }),
-    mutationFn: (id) => base44.entities.TemplateTexto.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] })
   });
 
@@ -647,7 +636,6 @@ export default function TemplatesTexto() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700 text-white"
-              onClick={() => { deleteMutation.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
               onClick={handleDelete}
             >
               Excluir
@@ -792,7 +780,6 @@ export default function TemplatesTexto() {
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <Button variant="outline" onClick={() => { setShowForm(false); setEditingTemplate(null); }}>Cancelar</Button>
                 <Button
-                  onClick={() => saveMutation.mutate(editingTemplate)}
                   onClick={handleSave}
                   disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"

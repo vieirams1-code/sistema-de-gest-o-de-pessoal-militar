@@ -91,7 +91,8 @@ export default function PermissoesUsuarios() {
     return perfis.find((p) => p.id === selectedProfileId) || null;
   }, [selectedProfileId, perfis]);
 
-  if (!loadingUser && !canAccessAction('gerir_permissoes')) {
+  if (loadingUser) return null;
+  if (!canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Permissões de Usuários" />;
   }
 

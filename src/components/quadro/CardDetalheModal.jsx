@@ -170,6 +170,8 @@ function MensagemComentario({ item, currentUserEmail }) {
 function ChecklistSection({ cardId }) {
   const queryClient = useQueryClient();
   const [novoItem, setNovoItem] = useState('');
+  const { canAccessAction } = useCurrentUser();
+  const canManage = canAccessAction('gerir_acoes_operacionais');
 
   const { data: itens = [] } = useQuery({
     queryKey: ['checklist', cardId],
@@ -187,6 +189,10 @@ function ChecklistSection({ cardId }) {
   };
 
   const toggle = async (item) => {
+    if (!canManage) {
+      window.alert('Ação negada: Sem permissão para gerir checklist.');
+      return;
+    }
     await base44.entities.CardChecklistItem.update(item.id, {
       concluido: !item.concluido,
       data_conclusao: !item.concluido ? new Date().toISOString().split('T')[0] : null,
@@ -195,11 +201,19 @@ function ChecklistSection({ cardId }) {
   };
 
   const excluir = async (id) => {
+    if (!canManage) {
+      window.alert('Ação negada: Sem permissão para gerir checklist.');
+      return;
+    }
     await base44.entities.CardChecklistItem.delete(id);
     invalidateChecklist();
   };
 
   const adicionar = async () => {
+    if (!canManage) {
+      window.alert('Ação negada: Sem permissão para gerir checklist.');
+      return;
+    }
     if (!novoItem.trim()) return;
 
     await base44.entities.CardChecklistItem.create({
@@ -325,6 +339,8 @@ function AcoesSection({ cardId }) {
   const [criando, setCriando] = useState(false);
   const [editingAcao, setEditingAcao] = useState({});
   const [expandedEdicao, setExpandedEdicao] = useState({});
+  const { canAccessAction } = useCurrentUser();
+  const canManage = canAccessAction('gerir_acoes_operacionais');
 
   const { data: acoesRaw = [] } = useQuery({
     queryKey: ['card-acoes', cardId],
@@ -355,6 +371,10 @@ function AcoesSection({ cardId }) {
   };
 
   const criarAcao = async () => {
+    if (!canManage) {
+      window.alert('Ação negada: Sem permissão para gerir ações operacionais.');
+      return;
+    }
     if (!novaAcao.titulo.trim() || criando) return;
 
     setCriando(true);
@@ -378,6 +398,10 @@ function AcoesSection({ cardId }) {
   };
 
   const atualizarAcao = async (acao, patch = null) => {
+    if (!canManage) {
+      window.alert('Ação negada: Sem permissão para gerir ações operacionais.');
+      return;
+    }
     if (savingId === acao.id) return;
 
     setSavingId(acao.id);
@@ -417,12 +441,20 @@ function AcoesSection({ cardId }) {
   };
 
   const toggleConclusao = async (acao) => {
+    if (!canManage) {
+      window.alert('Ação negada: Sem permissão para gerir ações operacionais.');
+      return;
+    }
     const draft = editingAcao[acao.id] || {};
     const proximoStatus = isConcluidaAcao({ ...acao, ...draft }) ? 'Pendente' : 'Concluída';
     await atualizarAcao(acao, { status: proximoStatus });
   };
 
   const excluirAcao = async (acaoId) => {
+    if (!canManage) {
+      window.alert('Ação negada: Sem permissão para gerir ações operacionais.');
+      return;
+    }
     if (savingId === acaoId) return;
 
     setSavingId(acaoId);
