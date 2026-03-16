@@ -40,6 +40,7 @@ export default function Configuracoes() {
   const deleteFuncaoMutation = useMutation({ mutationFn: (id) => base44.entities.Funcao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
 
   const handleDelete = () => {
+    if (!canAccessAction('gerir_configuracoes')) return;
     if (deleteDialog.type === 'lotacao') deleteLotacaoMutation.mutate(deleteDialog.id);
     else deleteFuncaoMutation.mutate(deleteDialog.id);
   };
@@ -89,7 +90,7 @@ export default function Configuracoes() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Lotações / Setores Operacionais</h2>
             <div className="flex gap-2 mb-6">
-              <Input value={novaLotacao} onChange={(e) => setNovaLotacao(e.target.value)} placeholder="Nova lotação..." onKeyDown={(e) => e.key === 'Enter' && handleCreateLotacao()} disabled={!canAccessAction('gerir_configuracoes')} />
+              <Input value={novaLotacao} onChange={(e) => setNovaLotacao(e.target.value)} placeholder="Nova lotação..." onKeyDown={(e) => { if (e.key === 'Enter' && canAccessAction('gerir_configuracoes')) handleCreateLotacao(); }} disabled={!canAccessAction('gerir_configuracoes')} />
               <Button onClick={handleCreateLotacao} disabled={!novaLotacao.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-4 h-4 mr-2" /> Adicionar
               </Button>
@@ -98,7 +99,9 @@ export default function Configuracoes() {
               {lotacoes.map((lot) => (
                 <div key={lot.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                   <span className="font-medium">{lot.nome}</span>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, type: 'lotacao', id: lot.id })} className="text-red-600 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                  {canAccessAction('gerir_configuracoes') && (
+                    <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, type: 'lotacao', id: lot.id })} className="text-red-600 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                  )}
                 </div>
               ))}
               {lotacoes.length === 0 && <p className="text-center text-slate-500 py-8">Nenhuma lotação cadastrada</p>}
@@ -108,7 +111,7 @@ export default function Configuracoes() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Funções</h2>
             <div className="flex gap-2 mb-6">
-              <Input value={novaFuncao} onChange={(e) => setNovaFuncao(e.target.value)} placeholder="Nova função..." onKeyDown={(e) => e.key === 'Enter' && handleCreateFuncao()} disabled={!canAccessAction('gerir_configuracoes')} />
+              <Input value={novaFuncao} onChange={(e) => setNovaFuncao(e.target.value)} placeholder="Nova função..." onKeyDown={(e) => { if (e.key === 'Enter' && canAccessAction('gerir_configuracoes')) handleCreateFuncao(); }} disabled={!canAccessAction('gerir_configuracoes')} />
               <Button onClick={handleCreateFuncao} disabled={!novaFuncao.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-4 h-4 mr-2" /> Adicionar
               </Button>
@@ -117,7 +120,9 @@ export default function Configuracoes() {
               {funcoes.map((func) => (
                 <div key={func.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                   <span className="font-medium">{func.nome}</span>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, type: 'funcao', id: func.id })} className="text-red-600 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                  {canAccessAction('gerir_configuracoes') && (
+                    <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, type: 'funcao', id: func.id })} className="text-red-600 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                  )}
                 </div>
               ))}
               {funcoes.length === 0 && <p className="text-center text-slate-500 py-8">Nenhuma função cadastrada</p>}

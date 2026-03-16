@@ -76,7 +76,7 @@ export default function Armamentos() {
       arrays.flat().forEach(item => m.set(item.id, item));
       return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
     },
-    enabled: isAccessResolved && canAccessModule('armamentos'),
+    enabled: Boolean(isAccessResolved && canAccessModule('armamentos')),
   });
 
   const filteredArmamentos = useMemo(() => {
