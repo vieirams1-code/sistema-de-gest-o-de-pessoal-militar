@@ -100,8 +100,8 @@ export default function Configuracoes() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Lotações / Setores Operacionais</h2>
             <div className="flex gap-2 mb-6">
-              <Input value={novaLotacao} onChange={(e) => setNovaLotacao(e.target.value)} placeholder="Nova lotação..." onKeyDown={(e) => e.key === 'Enter' && novaLotacao.trim() && createLotacaoMutation.mutate(novaLotacao.trim())} />
-              <Button onClick={() => novaLotacao.trim() && createLotacaoMutation.mutate(novaLotacao.trim())} disabled={!novaLotacao.trim()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+              <Input value={novaLotacao} onChange={(e) => setNovaLotacao(e.target.value)} placeholder="Nova lotação..." onKeyDown={(e) => e.key === 'Enter' && handleAdicionarLotacao()} />
+              <Button onClick={handleAdicionarLotacao} disabled={!novaLotacao.trim()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-4 h-4 mr-2" /> Adicionar
               </Button>
             </div>
@@ -119,8 +119,8 @@ export default function Configuracoes() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Funções</h2>
             <div className="flex gap-2 mb-6">
-              <Input value={novaFuncao} onChange={(e) => setNovaFuncao(e.target.value)} placeholder="Nova função..." onKeyDown={(e) => e.key === 'Enter' && novaFuncao.trim() && createFuncaoMutation.mutate(novaFuncao.trim())} />
-              <Button onClick={() => novaFuncao.trim() && createFuncaoMutation.mutate(novaFuncao.trim())} disabled={!novaFuncao.trim()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+              <Input value={novaFuncao} onChange={(e) => setNovaFuncao(e.target.value)} placeholder="Nova função..." onKeyDown={(e) => e.key === 'Enter' && handleAdicionarFuncao()} />
+              <Button onClick={handleAdicionarFuncao} disabled={!novaFuncao.trim()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-4 h-4 mr-2" /> Adicionar
               </Button>
             </div>

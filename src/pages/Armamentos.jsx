@@ -80,6 +80,8 @@ export default function Armamentos() {
   });
 
   const filteredArmamentos = useMemo(() => {
+    if (loadingUser || !isAccessResolved) return [];
+    if (!canAccessModule('armamentos')) return [];
     const normalizedTerm = normalizeText(searchTerm);
 
     if (!normalizedTerm) return armamentos;
