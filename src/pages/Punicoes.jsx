@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import AccessDenied from '@/components/auth/AccessDenied';
 
 export default function Punicoes() {
   const navigate = useNavigate();
@@ -27,9 +28,6 @@ export default function Punicoes() {
   const [agruparPor, setAgruparPor] = useState('ano');
   const [ordenarPor, setOrdenarPor] = useState('data');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
-  
-  if (!loadingUser && !isAccessResolved) return null;
-  if (!loadingUser && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
 
   const { data: punicoes = [], isLoading } = useQuery({
     queryKey: ['punicoes', isAdmin],
@@ -98,6 +96,8 @@ export default function Punicoes() {
     }
     return a.localeCompare(b);
   });
+
+  if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
 
   const tipoColors = {
     'Advertência Verbal': 'bg-blue-100 text-blue-700',

@@ -54,7 +54,7 @@ export default function VerMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
-  const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser } = useCurrentUser();
+  const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
 
   const { data: militar, isLoading } = useQuery({

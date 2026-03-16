@@ -37,8 +37,6 @@ export default function Militares() {
     isLoading: loadingUser
   } = useCurrentUser();
 
-  if (!loadingUser && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
-
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [postoFilter, setPostoFilter] = useState('all');
@@ -46,6 +44,8 @@ export default function Militares() {
   const [viewMode, setViewMode] = useState('grid');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
+
+  if (!loadingUser && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
 
   const { data: militares = [], isLoading } = useQuery({
     queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],

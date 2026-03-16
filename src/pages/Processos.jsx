@@ -41,8 +41,6 @@ export default function Processos() {
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [modal, setModal] = useState({ open: false, processo: null });
 
-  if (!loadingUser && !canAccessModule('processos')) return <AccessDenied modulo="Processos" />;
-
   const { data: processos = [], isLoading } = useQuery({
     queryKey: ['processos', isAdmin, subgrupamentoId],
     queryFn: () => {
@@ -100,6 +98,8 @@ export default function Processos() {
     const newStatus = destination.droppableId;
     await updateMutation.mutateAsync({ id: draggableId, data: { status: newStatus } });
   };
+
+  if (!loadingUser && isAccessResolved && !canAccessModule('processos')) return <AccessDenied modulo="Processos" />;
 
   const openModal = (processo = null, statusInicial = null) => {
     setModal({ open: true, processo: processo || (statusInicial ? { status: statusInicial } : null) });

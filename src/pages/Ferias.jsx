@@ -268,8 +268,6 @@ export default function Ferias() {
   const queryClient = useQueryClient();
   const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
-  if (!loadingUser && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
-
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -530,6 +528,8 @@ export default function Ferias() {
       setSavingEdit(false);
     }
   };
+
+  if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
   const stats = {
     total: ferias.length,
