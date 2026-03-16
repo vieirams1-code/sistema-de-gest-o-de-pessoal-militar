@@ -31,21 +31,29 @@ export function useCurrentUser() {
     : (user?.subgrupamento_id || null);
 
   const subgrupamentoTipo = acesso 
-    ? (acesso.tipo_acesso === 'setor' ? 'Grupamento' : acesso.tipo_acesso === 'subsetor' ? 'Subgrupamento' : null) 
+    ? (acesso.tipo_acesso === 'setor' ? 'Grupamento' : 
+       acesso.tipo_acesso === 'subsetor' ? 'Subgrupamento' : 
+       acesso.tipo_acesso === 'unidade' ? 'Unidade' : null) 
     : (user?.subgrupamento_tipo || null);
 
   const userEmail = user?.email || null;
   const linkedMilitarId = acesso ? (acesso.militar_id || null) : (user?.militar_id || null);
   const linkedMilitarEmail = acesso ? (acesso.militar_email || null) : (user?.militar_email || null);
 
-  // Modo de acesso: 'admin', 'setor', 'subsetor', 'proprio'
+  // Modo de acesso: 'admin', 'setor', 'subsetor', 'unidade', 'proprio'
   let modoAcesso = 'proprio';
   if (acesso) {
     modoAcesso = acesso.tipo_acesso || 'proprio';
   } else {
     if (isAdmin) modoAcesso = 'admin';
-    else if (subgrupamentoId) modoAcesso = subgrupamentoTipo === 'Grupamento' ? 'setor' : 'subsetor';
-    else modoAcesso = 'proprio';
+    else if (subgrupamentoId) {
+      if (subgrupamentoTipo === 'Grupamento') modoAcesso = 'setor';
+      else if (subgrupamentoTipo === 'Subgrupamento') modoAcesso = 'subsetor';
+      else if (subgrupamentoTipo === 'Unidade') modoAcesso = 'unidade';
+      else modoAcesso = 'subsetor';
+    } else {
+      modoAcesso = 'proprio';
+    }
   }
 
   const getAccessModeFromUser = (targetUser, targetAcesso = null) => {
@@ -54,6 +62,7 @@ export function useCurrentUser() {
     if (targetUser.role === 'admin' || targetUser.isAdmin === true) return 'admin';
     if (targetUser.subgrupamento_tipo === 'Grupamento') return 'setor';
     if (targetUser.subgrupamento_tipo === 'Subgrupamento') return 'subsetor';
+    if (targetUser.subgrupamento_tipo === 'Unidade') return 'unidade';
     return 'proprio';
   };
 
@@ -130,8 +139,8 @@ export function useCurrentUser() {
       );
     }
 
-    // Modo Subsetor/Seção: vê apenas o próprio subsetor
-    if (modoAcesso === 'subsetor') {
+    // Modo Subsetor/Seção ou Unidade: vê apenas o próprio subsetor/unidade (id exato)
+    if (modoAcesso === 'subsetor' || modoAcesso === 'unidade') {
       return registro.subgrupamento_id === subgrupamentoId;
     }
 
@@ -175,7 +184,7 @@ export function useCurrentUser() {
       return [{ grupamento_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }];
     }
 
-    if (modoAcesso === 'subsetor' && subgrupamentoId) {
+    if ((modoAcesso === 'subsetor' || modoAcesso === 'unidade') && subgrupamentoId) {
       return [{ subgrupamento_id: subgrupamentoId }];
     }
 

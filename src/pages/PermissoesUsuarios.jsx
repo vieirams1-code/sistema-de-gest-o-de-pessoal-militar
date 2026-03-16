@@ -67,6 +67,7 @@ export default function PermissoesUsuarios() {
   const [userAccessMode, setUserAccessMode] = useState('proprio');
   const [userGrupamentoId, setUserGrupamentoId] = useState('');
   const [userSubgrupamentoId, setUserSubgrupamentoId] = useState('');
+  const [userUnidadeId, setUserUnidadeId] = useState('');
   const [userMilitarId, setUserMilitarId] = useState('');
   const [userMilitarEmail, setUserMilitarEmail] = useState('');
   const [userPermissions, setUserPermissions] = useState(initialPermissions);
@@ -94,10 +95,6 @@ export default function PermissoesUsuarios() {
     return perfis.find((p) => p.id === selectedProfileId) || null;
   }, [selectedProfileId, perfis]);
 
-  const militaresOrdenados = useMemo(() => {
-    return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
-  }, [militares]);
-
   if (loadingUser || !isAccessResolved) return null;
   if (!canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Permissões de Usuários" />;
@@ -105,6 +102,11 @@ export default function PermissoesUsuarios() {
 
   const grupamentos = subgrupamentos.filter(s => s.tipo === 'Grupamento');
   const subgrupamentosFilhos = subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId);
+  const unidadesFilhas = subgrupamentos.filter(s => s.tipo === 'Unidade' && s.grupamento_id === userSubgrupamentoId);
+
+  const militaresOrdenados = useMemo(() => {
+    return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
+  }, [militares]);
 
   const handleSelectAcesso = (acesso) => {
     setSelectedUser(acesso);
@@ -115,8 +117,24 @@ export default function PermissoesUsuarios() {
     setUserAtivo(acesso.ativo !== false);
     setUserMilitarId(acesso.militar_id || '');
     setUserMilitarEmail(acesso.militar_email || '');
-    setUserGrupamentoId(acesso.grupamento_id || '');
-    setUserSubgrupamentoId(acesso.subgrupamento_id || '');
+
+    let gId = acesso.grupamento_id || '';
+    let sId = acesso.subgrupamento_id || '';
+    let uId = '';
+
+    if (acesso.tipo_acesso === 'unidade') {
+      uId = acesso.subgrupamento_id || '';
+      const uni = subgrupamentos.find(x => x.id === uId);
+      if (uni) {
+        sId = uni.grupamento_id || '';
+      }
+    } else if (acesso.tipo_acesso === 'subsetor') {
+      sId = acesso.subgrupamento_id || '';
+    }
+
+    setUserGrupamentoId(gId);
+    setUserSubgrupamentoId(sId);
+    setUserUnidadeId(uId);
     setSelectedProfileId(acesso.perfil_id || '_nenhum');
 
     const loadedPerms = {};
@@ -137,6 +155,7 @@ export default function PermissoesUsuarios() {
     setUserMilitarEmail('');
     setUserGrupamentoId('');
     setUserSubgrupamentoId('');
+    setUserUnidadeId('');
     setSelectedProfileId('_nenhum');
     setUserPermissions(initialPermissions);
   };
@@ -168,6 +187,7 @@ export default function PermissoesUsuarios() {
     try {
       const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
       const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
+      const uni = subgrupamentos.find(s => s.id === userUnidadeId);
       const perfilSelected = selectedProfilePreview;
 
       const militarVinculado = militares.find((m) => m.id === userMilitarId);
@@ -189,6 +209,8 @@ export default function PermissoesUsuarios() {
         roleData = { tipo_acesso: 'subsetor', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento', militar_id: '', militar_email: '' };
       } else if (userAccessMode === 'setor' && grupamento) {
         roleData = { tipo_acesso: 'setor', grupamento_id: grupamento.id, grupamento_nome: grupamento.nome, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: 'Grupamento', militar_id: '', militar_email: '' };
+      } else if (userAccessMode === 'unidade' && uni) {
+        roleData = { tipo_acesso: 'unidade', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: uni.id, subgrupamento_nome: uni.nome, subgrupamento_tipo: 'Unidade', militar_id: '', militar_email: '' };
       } else {
         roleData = { tipo_acesso: 'proprio', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: userMilitarId || '', militar_email: militarEmailVinculado };
       }
@@ -212,6 +234,7 @@ export default function PermissoesUsuarios() {
 
   const getTipoBadge = (u) => {
     if (u.tipo_acesso === 'admin') return <Badge className="bg-emerald-100 text-emerald-800">Admin</Badge>;
+    if (u.tipo_acesso === 'unidade') return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">{u.subgrupamento_nome}</Badge>;
     if (u.subgrupamento_nome) return <Badge className={(u.tipo_acesso === 'setor' || u.subgrupamento_tipo === 'Grupamento') ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}>{u.subgrupamento_nome}</Badge>;
     return <Badge variant="outline" className="text-slate-500">Próprio</Badge>;
   };
@@ -293,7 +316,7 @@ export default function PermissoesUsuarios() {
                     <Button 
                       size="sm"
                       onClick={handleSaveUserScope} 
-                      disabled={savingUser || (userAccessMode === 'setor' && !userGrupamentoId) || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId)) || (userAccessMode === 'proprio' && !userMilitarId)} 
+                      disabled={savingUser || (userAccessMode === 'setor' && !userGrupamentoId) || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId)) || (userAccessMode === 'unidade' && (!userGrupamentoId || !userSubgrupamentoId || !userUnidadeId)) || (userAccessMode === 'proprio' && !userMilitarId)} 
                       className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                     >
                       <Save className="w-4 h-4 mr-2" />
@@ -341,6 +364,7 @@ export default function PermissoesUsuarios() {
                           if (v === 'proprio' || v === 'admin') {
                             setUserGrupamentoId('');
                             setUserSubgrupamentoId('');
+                            setUserUnidadeId('');
                           }
                           if (v !== 'proprio') {
                             setUserMilitarId('');
@@ -351,6 +375,7 @@ export default function PermissoesUsuarios() {
                         <SelectTrigger className="bg-white md:max-w-xs"><SelectValue placeholder="Selecione o escopo" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="proprio">Proprio / Sem Setor Visto (Padrão)</SelectItem>
+                          <SelectItem value="unidade">Unidade / Nível 3</SelectItem>
                           <SelectItem value="subsetor">Subsetor / Seção</SelectItem>
                           <SelectItem value="setor">Setor / Grupamento Todo</SelectItem>
                           <SelectItem value="admin">Administrador Global</SelectItem>
@@ -358,11 +383,11 @@ export default function PermissoesUsuarios() {
                       </Select>
                     </div>
 
-                    {(userAccessMode === 'setor' || userAccessMode === 'subsetor') && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5 p-4 bg-white border border-blue-100 rounded-lg">
+                    {(userAccessMode === 'setor' || userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5 p-4 bg-white border border-blue-100 rounded-lg">
                         <div>
                           <label className="text-sm font-semibold text-slate-700 block mb-1.5">Setor (Obrigatório)</label>
-                          <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); }}>
+                          <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); setUserUnidadeId(''); }}>
                             <SelectTrigger><SelectValue placeholder="Selecione um setor..." /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="_nenhum">— Selecione —</SelectItem>
@@ -372,12 +397,12 @@ export default function PermissoesUsuarios() {
                           {userAccessMode === 'setor' && userGrupamentoId && !userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados deste setor inteiro.</p>}
                         </div>
 
-                        {userAccessMode === 'subsetor' && (
+                        {(userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
                           <div>
                             <label className="text-sm font-semibold text-slate-700 block mb-1.5">Subsetor/Seção (Obrigatório)</label>
                             <Select 
                               value={userSubgrupamentoId || '_nenhum'} 
-                              onValueChange={(v) => setUserSubgrupamentoId(v === '_nenhum' ? '' : v)}
+                              onValueChange={(v) => { setUserSubgrupamentoId(v === '_nenhum' ? '' : v); setUserUnidadeId(''); }}
                               disabled={!userGrupamentoId || subgrupamentosFilhos.length === 0}
                             >
                               <SelectTrigger><SelectValue placeholder={!userGrupamentoId ? "Selecione o setor primeiro" : (subgrupamentosFilhos.length === 0 ? "Sem subsetores" : "Selecione o subsetor") } /></SelectTrigger>
@@ -386,7 +411,25 @@ export default function PermissoesUsuarios() {
                                 {subgrupamentosFilhos.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                            {userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados apenas deste subsetor.</p>}
+                            {userAccessMode === 'subsetor' && userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados apenas deste subsetor e suas unidades.</p>}
+                          </div>
+                        )}
+
+                        {userAccessMode === 'unidade' && (
+                          <div>
+                            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Unidade (Obrigatório)</label>
+                            <Select 
+                              value={userUnidadeId || '_nenhum'} 
+                              onValueChange={(v) => setUserUnidadeId(v === '_nenhum' ? '' : v)}
+                              disabled={!userSubgrupamentoId || unidadesFilhas.length === 0}
+                            >
+                              <SelectTrigger><SelectValue placeholder={!userSubgrupamentoId ? "Selecione o subsetor" : (unidadesFilhas.length === 0 ? "Sem unidades filhas" : "Selecione a unidade") } /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                {unidadesFilhas.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}{u.sigla ? ` (${u.sigla})` : ''}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            {userUnidadeId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão estrita e limitada a esta unidade.</p>}
                           </div>
                         )}
                       </div>
@@ -520,18 +563,27 @@ export default function PermissoesUsuarios() {
                       Módulos Permitidos (Menud do Sistema)
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-white p-4 rounded-lg border border-slate-200">
-                      {modulosList.map(mod => (
-                        <div key={mod.key} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer select-none ${userPermissions[mod.key] ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-blue-100'}`} onClick={() => setUserPermissions(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}>
-                          <input 
-                            type="checkbox" 
-                            id={`mod_${mod.key}`}
-                            checked={userPermissions[mod.key]}
-                            readOnly
-                            className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
-                          />
-                          <label className="text-sm font-semibold pointer-events-none">{mod.label}</label>
-                        </div>
-                      ))}
+                      {modulosList.map(mod => {
+                        const isOverride = selectedProfilePreview && (selectedProfilePreview[mod.key] === true) !== (userPermissions[mod.key] === true);
+                        return (
+                          <div key={mod.key} className={`flex flex-col p-3 rounded-lg border transition-colors cursor-pointer select-none ${userPermissions[mod.key] ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-blue-100'}`} onClick={() => setUserPermissions(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}>
+                            <div className="flex items-center gap-3">
+                              <input 
+                                type="checkbox" 
+                                checked={userPermissions[mod.key]}
+                                readOnly
+                                className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
+                              />
+                              <label className="text-sm font-semibold pointer-events-none">{mod.label}</label>
+                            </div>
+                            {isOverride && (
+                              <div className="mt-1.5 ml-7 text-[10px] font-bold text-orange-600 bg-orange-100/50 px-1.5 py-0.5 rounded w-fit uppercase tracking-wider">
+                                Modificado
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -542,18 +594,27 @@ export default function PermissoesUsuarios() {
                       Ações Sensíveis e Administrativas
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-white p-4 rounded-lg border border-orange-100">
-                      {acoesSensiveis.map(act => (
-                        <div key={act.key} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer select-none ${userPermissions[act.key] ? 'bg-orange-50 border-orange-300 text-orange-900' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-orange-100'}`} onClick={() => setUserPermissions(prev => ({ ...prev, [act.key]: !prev[act.key] }))}>
-                          <input 
-                            type="checkbox" 
-                            id={`act_${act.key}`}
-                            checked={userPermissions[act.key]}
-                            readOnly
-                            className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
-                          />
-                          <label className="text-sm font-bold pointer-events-none">{act.label}</label>
-                        </div>
-                      ))}
+                      {acoesSensiveis.map(act => {
+                        const isOverride = selectedProfilePreview && (selectedProfilePreview[act.key] === true) !== (userPermissions[act.key] === true);
+                        return (
+                          <div key={act.key} className={`flex flex-col p-3 rounded-lg border transition-colors cursor-pointer select-none ${userPermissions[act.key] ? 'bg-orange-50 border-orange-300 text-orange-900' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-orange-100'}`} onClick={() => setUserPermissions(prev => ({ ...prev, [act.key]: !prev[act.key] }))}>
+                            <div className="flex items-center gap-3">
+                              <input 
+                                type="checkbox" 
+                                checked={userPermissions[act.key]}
+                                readOnly
+                                className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
+                              />
+                              <label className="text-sm font-bold pointer-events-none">{act.label}</label>
+                            </div>
+                            {isOverride && (
+                              <div className="mt-1.5 ml-7 text-[10px] font-bold text-orange-600 bg-orange-100/50 px-1.5 py-0.5 rounded w-fit uppercase tracking-wider">
+                                Modificado
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
