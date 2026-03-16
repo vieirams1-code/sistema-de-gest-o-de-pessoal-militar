@@ -27,25 +27,23 @@ export default function Configuracoes() {
 
   const [novaLotacao, setNovaLotacao] = useState('');
   const [novaFuncao, setNovaFuncao] = useState('');
-
-
-  if (loadingUser || !isAccessResolved) return null;
-  if (!hasConfiguracoesAccess) return <AccessDenied modulo="Configurações" />;
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
 
   const selectedTab = searchParams.get('tab') || 'adicoes';
 
-  if (selectedTab === 'adicoes' && !isAdmin) {
-    return <AccessDenied modulo="Adições e Personalizações" />;
-  }
+  const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
+  const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasConfiguracoesAccess) return <AccessDenied modulo="Configurações" />;
 
   if (selectedTab === 'permissoes') {
     return <Navigate to="/PermissoesUsuarios" replace />;
   }
 
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
-
-  const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
-  const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
+  if (selectedTab === 'adicoes' && !isAdmin) {
+    return <AccessDenied modulo="Adições e Personalizações" />;
+  }
 
   const createLotacaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Lotacao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setNovaLotacao(''); } });
   const createFuncaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Funcao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setNovaFuncao(''); } });

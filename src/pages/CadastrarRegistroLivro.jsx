@@ -114,9 +114,6 @@ export default function CadastrarRegistroLivro() {
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasLivroAccess = canAccessModule('livro');
 
-  if (loadingUser || !isAccessResolved) return null;
-  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
-
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [selectedFerias, setSelectedFerias] = useState(null);
@@ -186,6 +183,9 @@ export default function CadastrarRegistroLivro() {
     if (!feriasEdicao) return;
     setSelectedFerias(feriasEdicao);
   }, [feriasEdicao]);
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
   const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
     ? (selectedFerias ? operacaoFeriasSelecionada : 'Saída Férias')
