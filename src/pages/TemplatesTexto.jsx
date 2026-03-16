@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye } from 'lucide-react';
 import { aplicarTemplate, VARS_PREVIEW } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -466,6 +466,7 @@ export default function TemplatesTexto() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const textareaRef = useRef(null);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates-texto'],
@@ -484,6 +485,9 @@ export default function TemplatesTexto() {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
       setShowForm(false);
       setEditingTemplate(null);
+    },
+    onError: (error) => {
+      alert(error?.message || 'Falha ao salvar o template. Tente novamente.');
     }
   });
 
@@ -492,7 +496,14 @@ export default function TemplatesTexto() {
       if (!canGerirTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
       return base44.entities.TemplateTexto.delete(id);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
+      setConfirmDeleteId(null);
+    },
+    onError: (error) => {
+      alert(error?.message || 'Falha ao excluir o template. Tente novamente.');
+      setConfirmDeleteId(null);
+    }
   });
 
   const filtered = templates.filter(t => {
@@ -622,13 +633,15 @@ export default function TemplatesTexto() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
               className="bg-red-600 hover:bg-red-700 text-white"
-              onClick={() => { deleteMutation.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate(confirmDeleteId)}
             >
-              Excluir
-            </AlertDialogAction>
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -694,6 +707,7 @@ export default function TemplatesTexto() {
                   <Label className="text-sm font-medium text-slate-700">Texto do Template <span className="text-red-500">*</span></Label>
                 </div>
                 <Textarea
+                ref={textareaRef}
                   value={editingTemplate.template}
                   onChange={e => setEditingTemplate(p => ({ ...p, template: e.target.value }))}
                   rows={8}
@@ -704,11 +718,11 @@ export default function TemplatesTexto() {
 
               {(() => {
                 const inserirVar = (v) => {
-                  const textArea = document.querySelector('textarea.font-mono');
+              const textArea = textareaRef.current;
                   if (textArea) {
                     const start = textArea.selectionStart;
                     const end = textArea.selectionEnd;
-                    const newText = editingTemplate.template.substring(0, start) + v + editingTemplate.template.substring(end);
+                const newText = (editingTemplate.template || '').substring(0, start) + v + (editingTemplate.template || '').substring(end);
                     setEditingTemplate(p => ({ ...p, template: newText }));
                     setTimeout(() => {
                       textArea.selectionStart = start + v.length;
@@ -716,7 +730,7 @@ export default function TemplatesTexto() {
                       textArea.focus();
                     }, 0);
                   } else {
-                    setEditingTemplate(p => ({ ...p, template: p.template + v }));
+                setEditingTemplate(p => ({ ...p, template: (p.template || '') + v }));
                   }
                 };
 
@@ -767,7 +781,9 @@ export default function TemplatesTexto() {
               </div>
 
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-                <Button variant="outline" onClick={() => { setShowForm(false); setEditingTemplate(null); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setShowForm(false); setEditingTemplate(null); }} disabled={saveMutation.isPending}>
+              Cancelar
+            </Button>
                 <Button
                   onClick={() => saveMutation.mutate(editingTemplate)}
                   disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template}
