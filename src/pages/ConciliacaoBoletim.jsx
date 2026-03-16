@@ -492,8 +492,9 @@ export default function ConciliacaoBoletim() {
   const [erroVinculo, setErroVinculo] = useState('');
   
   const { isAdmin, getMilitarScopeFilters, canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const hasAccess = canAccessModule('publicacoes');
   
-  if (!loadingUser && !canAccessModule('publicacoes')) return <AccessDenied modulo="Controle de Publicações" />;
+  if (!loadingUser && !hasAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['conciliacao-registros-livro'],
@@ -512,7 +513,7 @@ export default function ConciliacaoBoletim() {
       arrays.flat().forEach(item => m.set(item.id, item));
       return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
     },
-    enabled: isAccessResolved
+    enabled: isAccessResolved && hasAccess
   });
 
   const { data: publicacoesExOfficio = [] } = useQuery({
@@ -532,7 +533,7 @@ export default function ConciliacaoBoletim() {
       arrays.flat().forEach(item => m.set(item.id, item));
       return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
     },
-    enabled: isAccessResolved
+    enabled: isAccessResolved && hasAccess
   });
 
   const { data: atestados = [] } = useQuery({
@@ -555,7 +556,7 @@ export default function ConciliacaoBoletim() {
       arrays.flat().forEach(item => { if (item.nota_para_bg || item.numero_bg) m.set(item.id, item); });
       return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
     },
-    enabled: isAccessResolved
+    enabled: isAccessResolved && hasAccess
   });
 
   const pendentes = useMemo(() => {

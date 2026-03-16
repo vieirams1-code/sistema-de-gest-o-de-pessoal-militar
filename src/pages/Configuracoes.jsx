@@ -22,7 +22,7 @@ import {
 export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasConfiguracoesAccess = canAccessModule('configuracoes');
 
   const [novaLotacao, setNovaLotacao] = useState('');
@@ -31,8 +31,8 @@ export default function Configuracoes() {
 
   const selectedTab = searchParams.get('tab') || 'adicoes';
 
-  const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
-  const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
+  const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date'), enabled: isAccessResolved && hasConfiguracoesAccess });
+  const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date'), enabled: isAccessResolved && hasConfiguracoesAccess });
 
   const createLotacaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Lotacao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setNovaLotacao(''); } });
   const createFuncaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Funcao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setNovaFuncao(''); } });
@@ -40,42 +40,31 @@ export default function Configuracoes() {
   const deleteFuncaoMutation = useMutation({ mutationFn: (id) => base44.entities.Funcao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
 
   const handleDelete = () => {
-    if (!canAccessAction('gerir_configuracoes')) {
-      alert('Ação negada: você não tem permissão para excluir configurações.');
-      setDeleteDialog({ open: false, type: null, id: null });
-      return;
-    }
     if (deleteDialog.type === 'lotacao') deleteLotacaoMutation.mutate(deleteDialog.id);
     else deleteFuncaoMutation.mutate(deleteDialog.id);
   };
 
-  const handleAdicionarLotacao = () => {
-    if (!novaLotacao.trim()) return;
-    if (!canAccessAction('gerir_configuracoes')) {
-      alert('Ação negada: você não tem permissão para adicionar configurações.');
-      return;
+  const handleCreateLotacao = () => {
+    if (canAccessAction('gerir_configuracoes') && novaLotacao.trim()) {
+      createLotacaoMutation.mutate(novaLotacao.trim());
     }
-    createLotacaoMutation.mutate(novaLotacao.trim());
   };
 
-  const handleAdicionarFuncao = () => {
-    if (!novaFuncao.trim()) return;
-    if (!canAccessAction('gerir_configuracoes')) {
-      alert('Ação negada: você não tem permissão para adicionar configurações.');
-      return;
+  const handleCreateFuncao = () => {
+    if (canAccessAction('gerir_configuracoes') && novaFuncao.trim()) {
+      createFuncaoMutation.mutate(novaFuncao.trim());
     }
-    createFuncaoMutation.mutate(novaFuncao.trim());
   };
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasConfiguracoesAccess) return <AccessDenied modulo="Configurações" />;
 
-  if (selectedTab === 'permissoes') {
-    return <Navigate to="/PermissoesUsuarios" replace />;
+  if (selectedTab === 'adicoes' && !canAccessAction('gerir_configuracoes')) {
+    return <AccessDenied modulo="Adições e Personalizações" />;
   }
 
-  if (selectedTab === 'adicoes' && !isAdmin) {
-    return <AccessDenied modulo="Adições e Personalizações" />;
+  if (selectedTab === 'permissoes') {
+    return <Navigate to="/PermissoesUsuarios" replace />;
   }
 
   return (
@@ -100,8 +89,8 @@ export default function Configuracoes() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Lotações / Setores Operacionais</h2>
             <div className="flex gap-2 mb-6">
-              <Input value={novaLotacao} onChange={(e) => setNovaLotacao(e.target.value)} placeholder="Nova lotação..." onKeyDown={(e) => e.key === 'Enter' && handleAdicionarLotacao()} />
-              <Button onClick={handleAdicionarLotacao} disabled={!novaLotacao.trim()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+              <Input value={novaLotacao} onChange={(e) => setNovaLotacao(e.target.value)} placeholder="Nova lotação..." onKeyDown={(e) => e.key === 'Enter' && handleCreateLotacao()} disabled={!canAccessAction('gerir_configuracoes')} />
+              <Button onClick={handleCreateLotacao} disabled={!novaLotacao.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-4 h-4 mr-2" /> Adicionar
               </Button>
             </div>
@@ -119,8 +108,8 @@ export default function Configuracoes() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Funções</h2>
             <div className="flex gap-2 mb-6">
-              <Input value={novaFuncao} onChange={(e) => setNovaFuncao(e.target.value)} placeholder="Nova função..." onKeyDown={(e) => e.key === 'Enter' && handleAdicionarFuncao()} />
-              <Button onClick={handleAdicionarFuncao} disabled={!novaFuncao.trim()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+              <Input value={novaFuncao} onChange={(e) => setNovaFuncao(e.target.value)} placeholder="Nova função..." onKeyDown={(e) => e.key === 'Enter' && handleCreateFuncao()} disabled={!canAccessAction('gerir_configuracoes')} />
+              <Button onClick={handleCreateFuncao} disabled={!novaFuncao.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-4 h-4 mr-2" /> Adicionar
               </Button>
             </div>

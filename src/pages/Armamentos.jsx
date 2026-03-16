@@ -101,6 +101,9 @@ export default function Armamentos() {
     });
   }, [armamentos, searchTerm]);
 
+  if (loadingUser || !isAccessResolved) return null;
+  if (!canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -113,9 +116,6 @@ export default function Armamentos() {
     return validade ? validade < today : false;
   }).length;
   const crafRegular = totalRegistrado - crafVencidoOuIrregular;
-
-  if (loadingUser || !isAccessResolved) return null;
-  if (!canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
 
   const getStatusBadge = (arma) => {
     const status = normalizeText(arma.status);
