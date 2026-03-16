@@ -19,7 +19,7 @@ const normalizeTipo = (tipo) => {
 export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
   const hasMilitaresAccess = canAccessModule('militares');
 
   const [searchMilitar, setSearchMilitar] = useState('');
@@ -40,8 +40,9 @@ export default function LotacaoMilitares() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
 
-  // Acesso à página: admin, gerir_estrutura (ação correta para mover lotação) ou gerir_permissoes (acesso legado)
-  if (!isAdmin && !canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes')) {
+  // Acesso à página: gerir_estrutura (ação correta para mover lotação) ou gerir_permissoes (acesso legado)
+  const canAccess = canAccessAction('gerir_estrutura') || canAccessAction('gerir_permissoes');
+  if (!canAccess) {
     return <AccessDenied modulo="Lotação de Militares" />;
   }
 
@@ -142,7 +143,7 @@ export default function LotacaoMilitares() {
   const handleMove = () => {
     if (!selectedNode || selectedMilitares.length === 0) return;
 
-    if (!isAdmin && !canAccessAction('gerir_estrutura')) {
+    if (!canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes')) {
       toast({ title: "Ação negada", description: "Permissão insuficiente para mover militares.", variant: "destructive" });
       return;
     }

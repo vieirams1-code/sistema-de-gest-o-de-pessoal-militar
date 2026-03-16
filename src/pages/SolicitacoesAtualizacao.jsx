@@ -80,6 +80,8 @@ export default function SolicitacoesAtualizacao() {
   };
 
   return (
+    {/* Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação 
+        de uma action key específica (ex: gerir_solicitacoes_atualizacao). */}
     <RequireAdmin>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-4xl mx-auto px-4 py-8">

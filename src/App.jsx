@@ -17,10 +17,10 @@ const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
 const adminOnlyPages = new Set([
+  // Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação
+  // de uma action key específica na arquitetura (ex: gerir_solicitacoes_atualizacao).
   'SolicitacoesAtualizacao',
   'Subgrupamentos',
-  'ConciliacaoBoletim',
-  'TemplatesTexto',
 ]);
 
 
@@ -47,6 +47,7 @@ const moduleGuardByPage = {
   CadastrarPunicao: { moduleKey: 'militares', moduleName: 'Efetivo' },
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   Configuracoes: { moduleKey: 'configuracoes', moduleName: 'Configurações' },
+  ConciliacaoBoletim: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {

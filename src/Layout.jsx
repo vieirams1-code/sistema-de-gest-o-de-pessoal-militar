@@ -74,14 +74,14 @@ const menuGroups = [
   {
     title: 'Administração',
     items: [
-      { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, moduleKey: 'templates', adminOnly: true },
+      { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
       {
         name: 'Configurações',
         page: 'Configuracoes',
         icon: Settings,
         moduleKey: 'configuracoes',
         children: [
-          { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes', adminOnly: true },
+          { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes', actionKey: 'gerir_configuracoes' },
         ],
       },
     ],
@@ -92,17 +92,17 @@ const menuGroups = [
 const adminMenuGroup = {
   title: 'ADMIN',
   items: [
-    { name: 'Permissões de Usuários', page: 'PermissoesUsuarios', icon: Users },
-    { name: 'Perfis de Permissão', page: 'PerfisPermissao', icon: Shield },
-    { name: 'Estrutura Organizacional', page: 'EstruturaOrganizacional', icon: GitBranch },
-    { name: 'Lotação de Militares', page: 'LotacaoMilitares', icon: Building2 },
+    { name: 'Permissões de Usuários', page: 'PermissoesUsuarios', icon: Users, actionKey: 'gerir_permissoes' },
+    { name: 'Perfis de Permissão', page: 'PerfisPermissao', icon: Shield, actionKey: 'gerir_permissoes' },
+    { name: 'Estrutura Organizacional', page: 'EstruturaOrganizacional', icon: GitBranch, actionKey: 'gerir_estrutura' },
+    { name: 'Lotação de Militares', page: 'LotacaoMilitares', icon: Building2, actionKey: 'gerir_estrutura' },
   ],
 };
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState(['Configurações']);
-  const { isAdmin, canAccessModule } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction } = useCurrentUser();
 
   const toggleExpanded = (itemName) => {
     setExpandedItems((prev) =>
@@ -116,22 +116,28 @@ export default function Layout({ children, currentPageName }) {
   const filterItemsByPermission = (items) => {
     return items.filter((item) => {
       if (item.adminOnly && !isAdmin) return false;
-      if (!item.moduleKey) return true; // Dashboard, etc
-      return canAccessModule(item.moduleKey);
+      if (item.actionKey && !canAccessAction(item.actionKey)) return false;
+      if (item.moduleKey && !canAccessModule(item.moduleKey)) return false;
+      return true;
     }).map((item) => {
       if (!item.children?.length) return item;
 
-      const visibleChildren = item.children.filter((child) => !(child.adminOnly && !isAdmin));
+      const visibleChildren = item.children.filter((child) => {
+        if (child.adminOnly && !isAdmin) return false;
+        if (child.actionKey && !canAccessAction(child.actionKey)) return false;
+        return true;
+      });
+      
       return { ...item, children: visibleChildren };
     }).filter((item) => !item.children || item.children.length > 0);
   };
 
-  const baseGroups = menuGroups.map((group) => ({
+  const allGroups = [...menuGroups, adminMenuGroup];
+
+  const visibleMenuGroups = allGroups.map((group) => ({
     ...group,
     items: filterItemsByPermission(group.items),
   })).filter((group) => group.items.length > 0);
-
-  const visibleMenuGroups = isAdmin ? [...baseGroups, adminMenuGroup] : baseGroups;
 
   const isItemActive = (item) => {
     if (item.children?.length) {

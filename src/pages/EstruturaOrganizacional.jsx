@@ -33,7 +33,7 @@ const normalizeTipo = (tipo) => {
 
 export default function EstruturaOrganizacional() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
   const hasMilitaresAccess = canAccessModule('militares');
 
   const [editingId, setEditingId] = useState(null);
@@ -51,7 +51,7 @@ export default function EstruturaOrganizacional() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
 
-  if (!isAdmin && !canAccessAction('gerir_estrutura')) {
+  if (!canAccessAction('gerir_estrutura')) {
     return <AccessDenied modulo="Estrutura Organizacional" />;
   }
 

@@ -56,8 +56,8 @@ const initialPermissions = {
 
 export default function PermissoesUsuarios() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
-  const hasAccess = !loadingUser && isAccessResolved && (isAdmin || canAccessAction('gerir_permissoes'));
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasAccess = !loadingUser && isAccessResolved && canAccessAction('gerir_permissoes');
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [isNewAcesso, setIsNewAcesso] = useState(false);
@@ -95,7 +95,7 @@ export default function PermissoesUsuarios() {
   }, [selectedProfileId, perfis]);
 
   if (loadingUser || !isAccessResolved) return null;
-  if (!isAdmin && !canAccessAction('gerir_permissoes')) {
+  if (!canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Permissões de Usuários" />;
   }
 
@@ -158,7 +158,7 @@ export default function PermissoesUsuarios() {
   const handleSaveUserScope = async () => {
     if (!selectedUser) return;
     // Revalidação explícita no handler — não depende só da UI
-    if (!isAdmin && !canAccessAction('gerir_permissoes')) {
+    if (!canAccessAction('gerir_permissoes')) {
       alert('Ação negada: você não tem permissão para gerenciar permissões de usuários.');
       return;
     }

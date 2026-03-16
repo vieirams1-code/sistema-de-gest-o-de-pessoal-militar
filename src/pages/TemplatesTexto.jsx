@@ -455,8 +455,8 @@ const COR_GRUPO = {
 
 export default function TemplatesTexto() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
-  const canGerirTemplates = isAdmin || canAccessAction('gerir_templates');
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const canGerirTemplates = canAccessAction('gerir_templates');
 
   if (loadingUser || !isAccessResolved) return null;
   if (!canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
