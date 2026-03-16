@@ -97,7 +97,15 @@ export default function Atestados() {
   const handleEdit = (atestado) => navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
   const handleDelete = (atestado) => { setAtestadoToDelete(atestado); setDeleteDialogOpen(true); };
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
-  const confirmDelete = () => { if (atestadoToDelete) deleteMutation.mutate(atestadoToDelete); };
+  const confirmDelete = () => {
+    if (!atestadoToDelete) return;
+    if (!canAccessAction('excluir_atestado')) {
+      alert('Ação negada: você não tem permissão para excluir atestados.');
+      setDeleteDialogOpen(false);
+      return;
+    }
+    deleteMutation.mutate(atestadoToDelete);
+  };
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);

@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
@@ -110,6 +111,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const handleSaveHomologacao = async () => {
+    if (!canAccessAction('publicar_homologacao')) {
+      alert('Ação negada: você não tem permissão para publicar homologações.');
+      return;
+    }
     setSavingPublicacao(true);
     const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
     const jaExisteHomologacao = existePublicacaoAtivaParaAtestado(
@@ -155,6 +160,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const handleSaveAtaJiso = async () => {
+    if (!canAccessAction('publicar_ata_jiso')) {
+      alert('Ação negada: você não tem permissão para publicar atas JISO.');
+      return;
+    }
     setSavingPublicacao(true);
     const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
     const jaExisteAtaJiso = existePublicacaoAtivaParaAtestado(
@@ -242,6 +251,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
 
   const handleSaveJiso = async () => {
     if (!jisoDate) return;
+    if (!canAccessAction('registrar_decisao_jiso')) {
+      alert('Ação negada: você não tem permissão para agendar/registrar JISO.');
+      return;
+    }
     setSavingJiso(true);
     await base44.entities.Atestado.update(atestado.id, {
       data_jiso_agendada: jisoDate,

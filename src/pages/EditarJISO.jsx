@@ -93,7 +93,10 @@ export default function EditarJISO() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    if (!canAccessAction('registrar_decisao_jiso')) {
+      alert('Ação negada: você não tem permissão para registrar decisões de JISO.');
+      return;
+    }
     const jisoData = {
       atestado_id: atestadoId,
       militar_id: atestado.militar_id,

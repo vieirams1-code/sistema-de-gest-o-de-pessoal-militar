@@ -51,6 +51,11 @@ export default function Configuracoes() {
   const deleteFuncaoMutation = useMutation({ mutationFn: (id) => base44.entities.Funcao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
 
   const handleDelete = () => {
+    if (!canAccessAction('gerir_configuracoes')) {
+      alert('Ação negada: você não tem permissão para excluir configurações.');
+      setDeleteDialog({ open: false, type: null, id: null });
+      return;
+    }
     if (deleteDialog.type === 'lotacao') deleteLotacaoMutation.mutate(deleteDialog.id);
     else deleteFuncaoMutation.mutate(deleteDialog.id);
   };

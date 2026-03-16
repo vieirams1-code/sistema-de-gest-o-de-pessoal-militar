@@ -773,6 +773,10 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const salvarClassificacao = async () => {
     if (salvandoClassificacao) return;
+    if (!canAccessAction('gerir_acoes_operacionais')) {
+      alert('Ação negada: você não tem permissão para editar classificação de cards.');
+      return;
+    }
 
     setSalvandoClassificacao(true);
     try {
@@ -794,6 +798,10 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const excluirCard = async () => {
     if (deletingCard) return;
+    if (!canAccessAction('arquivar_card')) {
+      alert('Ação negada: você não tem permissão para arquivar cards.');
+      return;
+    }
 
     const confirmar = window.confirm(
       `Arquivar o card "${card.titulo}"?\n\n` +
