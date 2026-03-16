@@ -14,7 +14,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function AgendarJISO() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const { isAdmin, getMilitarScopeFilters, canAccessModule, isLoading, isAccessResolved } = useCurrentUser();
+  const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
   const isAccessPending = isLoading || !isAccessResolved;
 
