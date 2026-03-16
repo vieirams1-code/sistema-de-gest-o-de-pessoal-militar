@@ -22,7 +22,7 @@ const TIPOS = ['Renovação de Contrato', 'Processo Administrativo', 'Processo J
 
 export default function ProcessoModal({ open, onClose, processo }) {
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, user } = useCurrentUser();
+  const { isAdmin, subgrupamentoId, user, canAccessAction } = useCurrentUser();
   const isNew = !processo?.id;
 
   const defaultForm = {
@@ -61,6 +61,11 @@ export default function ProcessoModal({ open, onClose, processo }) {
   ).slice(0, 8);
 
   const handleSave = async () => {
+    const actionKey = isNew ? 'criar_processo' : 'editar_processo';
+    if (!canAccessAction(actionKey)) {
+      alert(`Ação negada: você não tem permissão para ${isNew ? 'criar' : 'editar'} processos.`);
+      return;
+    }
     setSaving(true);
     const data = { ...form };
     if (!data.tags) data.tags = [];
@@ -81,6 +86,10 @@ export default function ProcessoModal({ open, onClose, processo }) {
   };
 
   const handleDelete = async () => {
+    if (!canAccessAction('excluir_processo')) {
+      alert('Ação negada: você não tem permissão para excluir processos.');
+      return;
+    }
     if (!window.confirm('Excluir este processo?')) return;
     await base44.entities.Processo.delete(processo.id);
     queryClient.invalidateQueries({ queryKey: ['processos'] });
