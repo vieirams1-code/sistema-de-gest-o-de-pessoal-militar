@@ -222,11 +222,13 @@ export default function Publicacoes() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
   const { isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const hasPublicacoesAccess = canAccessModule('publicacoes');
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
     queryFn: getLivroRegistrosContrato,
-    enabled: isAccessResolved,
+    // Só dispara após resolução de acesso e confirmação de permissão
+    enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
@@ -247,7 +249,7 @@ export default function Publicacoes() {
       arrays.flat().forEach(item => m.set(item.id, item));
       return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
     },
-    enabled: isAccessResolved
+    enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
@@ -271,7 +273,7 @@ export default function Publicacoes() {
       arrays.flat().forEach(item => { if (item.nota_para_bg || item.numero_bg) m.set(item.id, item); });
       return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
     },
-    enabled: isAccessResolved
+    enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
@@ -436,6 +438,11 @@ export default function Publicacoes() {
   }, [registros]);
 
   const handleUpdate = (id, data, tipo) => {
+    // Verificação explícita: atualizar BG/nota exige permissão de publicar
+    if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) {
+      alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
+      return;
+    }
     updateMutation.mutate({ id, data, tipo });
   };
 
