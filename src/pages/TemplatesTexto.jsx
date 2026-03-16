@@ -455,9 +455,11 @@ const COR_GRUPO = {
 
 export default function TemplatesTexto() {
   const queryClient = useQueryClient();
-  const { isAdmin, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  // Acesso: admin OU permissão explícita de gerir_templates
+  const canManageTemplates = isAdmin || canAccessAction('gerir_templates');
 
-  if (!loadingUser && !isAdmin) return <AccessDenied modulo="Templates de Texto" />;
+  if (!loadingUser && isAccessResolved && !canManageTemplates) return <AccessDenied modulo="Templates de Texto" />;
 
   const [moduloFiltro, setModuloFiltro] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -468,12 +470,17 @@ export default function TemplatesTexto() {
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates-texto'],
     queryFn: () => base44.entities.TemplateTexto.list('-created_date'),
+    enabled: isAccessResolved && canManageTemplates,
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data) => data.id
-      ? base44.entities.TemplateTexto.update(data.id, data)
-      : base44.entities.TemplateTexto.create(data),
+    mutationFn: (data) => {
+      // Guarda explícita no handler
+      if (!canManageTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
+      return data.id
+        ? base44.entities.TemplateTexto.update(data.id, data)
+        : base44.entities.TemplateTexto.create(data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
       setShowForm(false);
@@ -482,8 +489,12 @@ export default function TemplatesTexto() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.TemplateTexto.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] })
+    mutationFn: (id) => {
+      // Guarda explícita no handler
+      if (!canManageTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
+      return base44.entities.TemplateTexto.delete(id);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] }),
   });
 
   const filtered = templates.filter(t => {
