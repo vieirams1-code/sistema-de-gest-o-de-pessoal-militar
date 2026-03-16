@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Save, Calendar, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays, format as formatDate } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { aplicarTemplate } from '@/components/utils/templateUtils';
 
 export default function EditarJISO() {
   const navigate = useNavigate();
@@ -74,8 +76,17 @@ export default function EditarJISO() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const { data: templatesExOfficio = [] } = useQuery({
+    queryKey: ['templates-texto-exofficio'],
+    queryFn: () => base44.entities.TemplateTexto.list(),
+    staleTime: 30000,
+    select: (data) => data.filter(t => t.modulo === 'Publicação Ex Officio'),
+  });
+
   const gerarTextoPublicacao = () => {
     if (!atestado || !formData.ata_jiso) return '';
+    const tmpl = templatesExOfficio.find(t => t.tipo_registro === 'Ata JISO' && t.ativo !== false);
+    if (!tmpl?.template) return null;
     
     const formatarData = (dataStr) => {
       if (!dataStr) return '';
@@ -88,6 +99,17 @@ export default function EditarJISO() {
     const matricula = atestado.militar_matricula || '';
 
     return `A Comandante do 1° Grupamento de Bombeiros Militar torna público o seguinte: JISO ${formData.secao_jiso || ''}, realizada em ${formatarData(formData.data_jiso)}, com finalidade de ${formData.finalidade_jiso || ''}, NUP: ${formData.nup || ''}, Ata n° ${formData.ata_jiso}. Parecer: ${formData.parecer_jiso || ''}. ${postoNome} ${nomeCompleto}, matrícula ${matricula}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
+    const vars = {
+      posto_nome: postoNome,
+      nome_completo: atestado.militar_nome || '',
+      matricula: atestado.militar_matricula || '',
+      finalidade_jiso: formData.finalidade_jiso || '',
+      secao_jiso: formData.secao_jiso || '',
+      data_ata: formatarData(formData.data_jiso),
+      nup: formData.nup || '',
+      parecer_jiso: formData.parecer_jiso || ''
+    };
+    return aplicarTemplate(tmpl.template, vars);
   };
 
   const handleSubmit = async (e) => {
@@ -103,6 +125,7 @@ export default function EditarJISO() {
       dias_original: atestado.dias,
       dias_jiso: formData.dias_jiso ? parseInt(formData.dias_jiso) : null,
       texto_publicacao: gerarTextoPublicacao()
+      texto_publicacao: textoPublicacao
     };
 
     if (jiso) {
@@ -164,6 +187,7 @@ export default function EditarJISO() {
   }
 
   const textoPublicacao = gerarTextoPublicacao();
+  const templateError = formData.ata_jiso && !textoPublicacao ? "Template obrigatório não encontrado para 'Ata JISO'. Entre em contato com o administrador para cadastrar o template antes de continuar." : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -189,6 +213,7 @@ export default function EditarJISO() {
           <Button
             onClick={handleSubmit}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+            disabled={!!templateError}
           >
             <Save className="w-5 h-5 mr-2" />
             Salvar
@@ -196,6 +221,16 @@ export default function EditarJISO() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {templateError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-red-800">Ação Bloqueada</h4>
+                <p className="text-sm text-red-700 mt-1">{templateError}</p>
+              </div>
+            </div>
+          )}
+
           {/* Dados do Atestado Original */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dados do Atestado Original</h3>

@@ -173,4 +173,11 @@ export const VARS_PREVIEW = {
   comportamento_ingressou: 'Ótimo',
   data_inclusao: '15/03/2010',
   texto_complemento: 'pela dedicação e esforço demonstrados',
+  portaria: '123/2026',
+  data_portaria: '01/03/2026',
+  tipo_punicao: 'Prisão',
+  dias_punicao: '5',
+  itens_enquadramento: '3 e 5',
+  graduacao_punicao: 'Média',
+  comportamento_ingresso: 'Bom',
 };
