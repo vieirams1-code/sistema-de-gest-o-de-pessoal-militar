@@ -34,17 +34,6 @@ export default function Configuracoes() {
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date') });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date') });
 
-  if (loadingUser || !isAccessResolved) return null;
-  if (!hasConfiguracoesAccess) return <AccessDenied modulo="Configurações" />;
-
-  if (selectedTab === 'permissoes') {
-    return <Navigate to="/PermissoesUsuarios" replace />;
-  }
-
-  if (selectedTab === 'adicoes' && !isAdmin) {
-    return <AccessDenied modulo="Adições e Personalizações" />;
-  }
-
   const createLotacaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Lotacao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setNovaLotacao(''); } });
   const createFuncaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Funcao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setNovaFuncao(''); } });
   const deleteLotacaoMutation = useMutation({ mutationFn: (id) => base44.entities.Lotacao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
@@ -59,6 +48,35 @@ export default function Configuracoes() {
     if (deleteDialog.type === 'lotacao') deleteLotacaoMutation.mutate(deleteDialog.id);
     else deleteFuncaoMutation.mutate(deleteDialog.id);
   };
+
+  const handleAdicionarLotacao = () => {
+    if (!novaLotacao.trim()) return;
+    if (!canAccessAction('gerir_configuracoes')) {
+      alert('Ação negada: você não tem permissão para adicionar configurações.');
+      return;
+    }
+    createLotacaoMutation.mutate(novaLotacao.trim());
+  };
+
+  const handleAdicionarFuncao = () => {
+    if (!novaFuncao.trim()) return;
+    if (!canAccessAction('gerir_configuracoes')) {
+      alert('Ação negada: você não tem permissão para adicionar configurações.');
+      return;
+    }
+    createFuncaoMutation.mutate(novaFuncao.trim());
+  };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasConfiguracoesAccess) return <AccessDenied modulo="Configurações" />;
+
+  if (selectedTab === 'permissoes') {
+    return <Navigate to="/PermissoesUsuarios" replace />;
+  }
+
+  if (selectedTab === 'adicoes' && !isAdmin) {
+    return <AccessDenied modulo="Adições e Personalizações" />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
