@@ -458,8 +458,12 @@ export default function TemplatesTexto() {
   const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   // Acesso: admin OU permissão explícita de gerir_templates
   const canManageTemplates = isAdmin || canAccessAction('gerir_templates');
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const canGerirTemplates = canAccessAction('gerir_templates');
 
   if (!loadingUser && isAccessResolved && !canManageTemplates) return <AccessDenied modulo="Templates de Texto" />;
+  if (!loadingUser && !isAccessResolved) return null;
+  if (!loadingUser && !canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
 
   const [moduloFiltro, setModuloFiltro] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -481,6 +485,9 @@ export default function TemplatesTexto() {
         ? base44.entities.TemplateTexto.update(data.id, data)
         : base44.entities.TemplateTexto.create(data);
     },
+    mutationFn: (data) => data.id
+      ? base44.entities.TemplateTexto.update(data.id, data)
+      : base44.entities.TemplateTexto.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
       setShowForm(false);
@@ -495,6 +502,8 @@ export default function TemplatesTexto() {
       return base44.entities.TemplateTexto.delete(id);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] }),
+    mutationFn: (id) => base44.entities.TemplateTexto.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] })
   });
 
   const filtered = templates.filter(t => {
@@ -506,6 +515,17 @@ export default function TemplatesTexto() {
       tipoBusca?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesModulo && matchesSearch;
   });
+
+  const handleSave = () => {
+    if (!canGerirTemplates) return;
+    saveMutation.mutate(editingTemplate);
+  };
+
+  const handleDelete = () => {
+    if (!canGerirTemplates) return;
+    deleteMutation.mutate(confirmDeleteId);
+    setConfirmDeleteId(null);
+  };
 
   const handleEdit = (t) => {
     setEditingTemplate({ ...t });
@@ -628,6 +648,7 @@ export default function TemplatesTexto() {
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={() => { deleteMutation.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
+              onClick={handleDelete}
             >
               Excluir
             </AlertDialogAction>
@@ -772,6 +793,7 @@ export default function TemplatesTexto() {
                 <Button variant="outline" onClick={() => { setShowForm(false); setEditingTemplate(null); }}>Cancelar</Button>
                 <Button
                   onClick={() => saveMutation.mutate(editingTemplate)}
+                  onClick={handleSave}
                   disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 >

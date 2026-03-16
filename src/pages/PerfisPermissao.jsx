@@ -60,7 +60,7 @@ export default function PerfisPermissao() {
   const [formData, setFormData] = useState(initialForm);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
-  if (!loadingUser && (!isAdmin && !canAccessAction('gerir_permissoes'))) {
+  if (!loadingUser && !canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Perfis de Permissão" />;
   }
 
@@ -117,12 +117,12 @@ export default function PerfisPermissao() {
   };
 
   const handleSave = () => {
-    if (!formData.nome_perfil.trim()) return;
-    // Revalidação explícita no handler
-    if (!isAdmin && !canAccessAction('gerir_permissoes')) {
-      alert('Ação negada: você não tem permissão para salvar perfis de permissão.');
+    if (!canAccessAction('gerir_permissoes')) {
+      alert('Ação negada: Você não possui permissão para gerir perfis.');
       return;
     }
+    if (!formData.nome_perfil.trim()) return;
+    
     if (editingId) {
       updateMutation.mutate({ id: editingId, data: formData });
     } else {
@@ -131,12 +131,7 @@ export default function PerfisPermissao() {
   };
 
   const handleDelete = () => {
-    // Revalidação explícita no handler
-    if (!isAdmin && !canAccessAction('gerir_permissoes')) {
-      alert('Ação negada: você não tem permissão para excluir perfis de permissão.');
-      setDeleteDialog({ open: false, id: null });
-      return;
-    }
+    if (!canAccessAction('gerir_permissoes')) return;
     if (deleteDialog.id) {
       deleteMutation.mutate(deleteDialog.id);
     }

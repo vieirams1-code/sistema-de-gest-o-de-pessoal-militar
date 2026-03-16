@@ -207,7 +207,7 @@ export default function QuadroOperacionalPage() {
   }, [cardsComResumo, searchParams, setSearchParams]);
 
   const criarCard = async (form) => {
-    if (!canGerirAcoesOperacionais) {
+    if (!canAccessAction('gerir_acoes_operacionais')) {
       window.alert('Ação negada: Sem permissão para criar cards operacionais.');
       return;
     }
