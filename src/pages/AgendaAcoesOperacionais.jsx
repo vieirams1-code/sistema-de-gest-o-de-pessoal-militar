@@ -190,9 +190,12 @@ export default function AgendaAcoesOperacionaisPage() {
   const hasQuadroOperacionalAccess = canAccessModule('quadro_operacional');
 
 
+  const canFetch = isAccessResolved && hasQuadroOperacionalAccess;
+
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
     queryFn: () => base44.entities.QuadroOperacional.filter({ ativo: true }, 'ordem'),
+    enabled: canFetch,
   });
 
   const quadro = quadros[0] || null;
@@ -200,7 +203,7 @@ export default function AgendaAcoesOperacionaisPage() {
   const { data: colunas = [] } = useQuery({
     queryKey: ['colunas', quadro?.id],
     queryFn: () => base44.entities.ColunaOperacional.filter({ quadro_id: quadro.id, ativa: true }, 'ordem'),
-    enabled: !!quadro?.id,
+    enabled: canFetch && !!quadro?.id,
   });
 
   const { data: cards = [] } = useQuery({
@@ -211,12 +214,13 @@ export default function AgendaAcoesOperacionaisPage() {
       const colunasIds = new Set(colunas.map((coluna) => coluna.id));
       return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
     },
-    enabled: !!quadro?.id && colunas.length > 0,
+    enabled: canFetch && !!quadro?.id && colunas.length > 0,
   });
 
   const { data: acoesRaw = [] } = useQuery({
     queryKey: ['acoes-consolidadas-quadro'],
     queryFn: () => listAllCardAcoes(3000),
+    enabled: canFetch,
   });
 
   const toggleConclusaoMutation = useMutation({

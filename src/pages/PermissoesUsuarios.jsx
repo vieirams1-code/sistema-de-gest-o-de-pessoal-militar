@@ -56,7 +56,8 @@ const initialPermissions = {
 
 export default function PermissoesUsuarios() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasAccess = !loadingUser && isAccessResolved && (isAdmin || canAccessAction('gerir_permissoes'));
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [isNewAcesso, setIsNewAcesso] = useState(false);

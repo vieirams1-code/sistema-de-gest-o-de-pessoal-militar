@@ -49,8 +49,8 @@ export default function Armamentos() {
   const [searchTerm, setSearchTerm] = useState('');
   const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule, getMilitarScopeFilters, isAccessResolved } = useCurrentUser();
 
-  if (!loadingUser && !isAccessResolved) return null;
-  if (!loadingUser && !canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
+  if (loadingUser || !isAccessResolved) return null;
+  if (!canAccessModule('armamentos')) return <AccessDenied modulo="Armamentos" />;
 
   const { data: armamentos = [], isLoading } = useQuery({
     queryKey: ['armamentos', isAdmin],
