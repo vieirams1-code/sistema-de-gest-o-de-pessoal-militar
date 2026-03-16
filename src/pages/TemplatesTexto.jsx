@@ -234,7 +234,6 @@ const VARS_POR_TIPO = {
       { v: '{{destino}}', desc: 'Unidade de destino' },
       { v: '{{data_transferencia}}', desc: 'Data da transferência' },
       { v: '{{publicacao_transferencia}}', desc: 'Publicação da transferência (DOEMS nº XX.XXX...)' },
-      { v: '{{tipo_transferencia}}', desc: 'Tipo (Entrada / Saída / Ex Officio)' },
     ]
   },
   'Transferência para RR': {

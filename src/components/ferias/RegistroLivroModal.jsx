@@ -448,7 +448,7 @@ export default function RegistroLivroModal({
 
     if (!tmpl?.template) {
       setTextoPublicacao('');
-      setTemplateError(`Template obrigatório não encontrado para '${tipoRegistro}'. Cadastre o template antes de continuar.`);
+      setTemplateError(`Template obrigatório não encontrado para '${tipoRegistro}'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
       return;
     }
 
@@ -694,13 +694,17 @@ export default function RegistroLivroModal({
           )}
 
           <div>
-            <Label>Texto para Publicação</Label>
-            <Textarea
-              value={textoPublicacao}
-              onChange={(e) => setTextoPublicacao(e.target.value)}
-              rows={5}
-              className="mt-1.5"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <Label>Texto para Publicação</Label>
+              <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+              </span>
+            </div>
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {textoPublicacao || 'Nenhum texto gerado.'}
+              </p>
+            </div>
           </div>
 
           <div className="rounded-lg border border-slate-200 p-4 space-y-4">

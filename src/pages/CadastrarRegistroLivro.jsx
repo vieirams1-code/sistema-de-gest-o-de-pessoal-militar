@@ -41,8 +41,6 @@ const initialFormData = {
   destino: '',
   data_cedencia: '',
   obs_cedencia: '',
-  tipo_transferencia: 'Entrada',
-  publicacao_transferencia: '',
   motivo_dispensa: '',
   periodo_aquisitivo: '',
   curso_nome: '',
@@ -720,15 +718,6 @@ export default function CadastrarRegistroLivro() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência</h3>
             <div className="space-y-4">
-              <FormField
-                label="Tipo"
-                name="tipo_transferencia"
-                value={formData.tipo_transferencia}
-                onChange={handleChange}
-                type="select"
-                options={['Entrada', 'Saída', 'Ex Officio']}
-                required
-              />
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="1ºSGBM/3°GBM" required />
                 <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="1° Grupamento de Bombeiros Militar" required />
@@ -1004,6 +993,8 @@ export default function CadastrarRegistroLivro() {
   };
 
   const tipoAtualCustom = tiposCustom.find(t => t.nome === formData.tipo_registro);
+  
+  const isFeriasEfetivo = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'].includes(tipoRegistroEfetivo);
 
   // Gerar texto para tipo customizado
   useEffect(() => {
@@ -1066,7 +1057,7 @@ export default function CadastrarRegistroLivro() {
           </div>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !formData.militar_id || !!templateError}
+            disabled={loading || !formData.militar_id || !!templateError || (isFeriasEfetivo && !formData.ferias_id)}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-6"
           >
             {loading ? (
@@ -1146,30 +1137,19 @@ export default function CadastrarRegistroLivro() {
           {formData.militar_id && renderSpecificFields()}
 
           {/* Texto para Publicação */}
-          {textoPublicacao && (
+          {!templateError && formData.militar_id && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-sm font-medium text-slate-700">Texto para publicação</Label>
-                {usingCustomTemplate && (
-                  <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3" /> Template personalizado aplicado
-                  </span>
-                )}
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente por template
+                </span>
               </div>
-              {['Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade'].includes(formData.tipo_registro) ? (
-                <Textarea
-                  value={textoPublicacao}
-                  onChange={e => setTextoPublicacao(e.target.value)}
-                  rows={6}
-                  className="text-sm text-slate-700 leading-relaxed"
-                />
-              ) : (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    {textoPublicacao}
-                  </p>
-                </div>
-              )}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
+                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {textoPublicacao || 'Nenhum texto gerado.'}
+                </p>
+              </div>
             </div>
           )}
 
