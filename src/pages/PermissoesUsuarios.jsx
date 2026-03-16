@@ -56,7 +56,8 @@ const initialPermissions = {
 
 export default function PermissoesUsuarios() {
   const queryClient = useQueryClient();
-  const { isAdmin, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const hasAccess = !loadingUser && isAccessResolved && (isAdmin || canAccessAction('gerir_permissoes'));
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [isNewAcesso, setIsNewAcesso] = useState(false);
@@ -74,16 +75,18 @@ export default function PermissoesUsuarios() {
   const [savingUser, setSavingUser] = useState(false);
 
 
-  // Queries
-  const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) });
-  const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome') });
+  // Queries — só executam após resolução do acesso e confirmação de permissão
+  const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }), enabled: hasAccess });
+  const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome'), enabled: hasAccess });
   const { data: acessos = [], error: acessosError } = useQuery({
     queryKey: ['usuariosAcesso'],
     queryFn: () => base44.entities.UsuarioAcesso.list(),
+    enabled: hasAccess,
   });
   const { data: perfis = [] } = useQuery({
     queryKey: ['perfisPermissao'],
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
+    enabled: hasAccess,
   });
 
   const selectedProfilePreview = useMemo(() => {
@@ -91,8 +94,8 @@ export default function PermissoesUsuarios() {
     return perfis.find((p) => p.id === selectedProfileId) || null;
   }, [selectedProfileId, perfis]);
 
-  if (loadingUser) return null;
-  if (!canAccessAction('gerir_permissoes')) {
+  if (loadingUser || !isAccessResolved) return null;
+  if (!isAdmin && !canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Permissões de Usuários" />;
   }
 
@@ -153,11 +156,12 @@ export default function PermissoesUsuarios() {
   };
 
   const handleSaveUserScope = async () => {
-    if (!canAccessAction('gerir_permissoes')) {
-      alert('Ação negada: Você não possui permissão para gerir permissões.');
+    if (!selectedUser) return;
+    // Revalidação explícita no handler — não depende só da UI
+    if (!isAdmin && !canAccessAction('gerir_permissoes')) {
+      alert('Ação negada: você não tem permissão para gerenciar permissões de usuários.');
       return;
     }
-    if (!selectedUser) return;
     if (!userUserEmail) { alert('E-mail do Usuário é obrigatório.'); return; }
 
     setSavingUser(true);

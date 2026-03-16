@@ -455,8 +455,8 @@ const COR_GRUPO = {
 
 export default function TemplatesTexto() {
   const queryClient = useQueryClient();
-  const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
-  const canGerirTemplates = canAccessAction('gerir_templates');
+  const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const canGerirTemplates = isAdmin || canAccessAction('gerir_templates');
 
   if (loadingUser || !isAccessResolved) return null;
   if (!canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
@@ -492,7 +492,7 @@ export default function TemplatesTexto() {
       if (!canGerirTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
       return base44.entities.TemplateTexto.delete(id);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['templates-texto'] }),
   });
 
   const filtered = templates.filter(t => {
@@ -504,17 +504,6 @@ export default function TemplatesTexto() {
       tipoBusca?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesModulo && matchesSearch;
   });
-
-  const handleSave = () => {
-    if (!canGerirTemplates) return;
-    saveMutation.mutate(editingTemplate);
-  };
-
-  const handleDelete = () => {
-    if (!canGerirTemplates) return;
-    deleteMutation.mutate(confirmDeleteId);
-    setConfirmDeleteId(null);
-  };
 
   const handleEdit = (t) => {
     setEditingTemplate({ ...t });
@@ -636,7 +625,7 @@ export default function TemplatesTexto() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700 text-white"
-              onClick={handleDelete}
+              onClick={() => { deleteMutation.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
             >
               Excluir
             </AlertDialogAction>
@@ -780,7 +769,7 @@ export default function TemplatesTexto() {
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <Button variant="outline" onClick={() => { setShowForm(false); setEditingTemplate(null); }}>Cancelar</Button>
                 <Button
-                  onClick={handleSave}
+                  onClick={() => saveMutation.mutate(editingTemplate)}
                   disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 >

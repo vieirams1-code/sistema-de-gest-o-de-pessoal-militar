@@ -21,7 +21,6 @@ export default function LotacaoMilitares() {
   const { toast } = useToast();
   const { isAdmin, canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
   const hasMilitaresAccess = canAccessModule('militares');
-  const canGerirEstrutura = canAccessAction('gerir_estrutura');
 
   const [searchMilitar, setSearchMilitar] = useState('');
   const [selectedMilitares, setSelectedMilitares] = useState([]);
@@ -41,7 +40,8 @@ export default function LotacaoMilitares() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
 
-  if (!canGerirEstrutura) {
+  // Acesso à página: admin, gerir_estrutura (ação correta para mover lotação) ou gerir_permissoes (acesso legado)
+  if (!isAdmin && !canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Lotação de Militares" />;
   }
 
@@ -140,11 +140,12 @@ export default function LotacaoMilitares() {
   });
 
   const handleMove = () => {
-    if (!canGerirEstrutura) {
+    if (!selectedNode || selectedMilitares.length === 0) return;
+
+    if (!isAdmin && !canAccessAction('gerir_estrutura')) {
       toast({ title: "Ação negada", description: "Permissão insuficiente para mover militares.", variant: "destructive" });
       return;
     }
-    if (!selectedNode || selectedMilitares.length === 0) return;
     moveMutation.mutate({ militaresIds: selectedMilitares, targetNode: selectedNode });
   };
 

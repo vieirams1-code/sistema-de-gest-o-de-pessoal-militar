@@ -16,7 +16,6 @@ export default function AgendarJISO() {
   const [searchTerm, setSearchTerm] = useState('');
   const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
-  const canGerirJiso = canAccessAction('gerir_jiso');
   const isAccessPending = loadingUser || !isAccessResolved;
 
 
@@ -196,7 +195,9 @@ export default function AgendarJISO() {
                       )}
                     </div>
                     <div className="flex gap-2">
-                      {canGerirJiso && (
+                      {/* Botão só é exibido se o usuário tiver permissão para registrar/editar JISO,
+                          alinhando a UI com a action key validada em EditarJISO.jsx (registrar_decisao_jiso) */}
+                      {canAccessAction('registrar_decisao_jiso') && (
                         <Button
                           variant="outline"
                           size="sm"

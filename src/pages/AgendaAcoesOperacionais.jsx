@@ -186,14 +186,16 @@ export default function AgendaAcoesOperacionaisPage() {
   const [cardAbertoId, setCardAbertoId] = useState(null);
   const [editingAcaoId, setEditingAcaoId] = useState(null);
   const [acaoDrafts, setAcaoDrafts] = useState({});
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasQuadroOperacionalAccess = canAccessModule('quadro_operacional');
 
+
+  const canFetch = isAccessResolved && hasQuadroOperacionalAccess;
 
   const { data: quadros = [] } = useQuery({
     queryKey: ['quadros'],
     queryFn: () => base44.entities.QuadroOperacional.filter({ ativo: true }, 'ordem'),
-    enabled: isAccessResolved && hasQuadroOperacionalAccess,
+    enabled: canFetch,
   });
 
   const quadro = quadros[0] || null;
@@ -201,7 +203,7 @@ export default function AgendaAcoesOperacionaisPage() {
   const { data: colunas = [] } = useQuery({
     queryKey: ['colunas', quadro?.id],
     queryFn: () => base44.entities.ColunaOperacional.filter({ quadro_id: quadro.id, ativa: true }, 'ordem'),
-    enabled: isAccessResolved && hasQuadroOperacionalAccess && !!quadro?.id,
+    enabled: canFetch && !!quadro?.id,
   });
 
   const { data: cards = [] } = useQuery({
@@ -212,13 +214,13 @@ export default function AgendaAcoesOperacionaisPage() {
       const colunasIds = new Set(colunas.map((coluna) => coluna.id));
       return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
     },
-    enabled: isAccessResolved && hasQuadroOperacionalAccess && !!quadro?.id && colunas.length > 0,
+    enabled: canFetch && !!quadro?.id && colunas.length > 0,
   });
 
   const { data: acoesRaw = [] } = useQuery({
     queryKey: ['acoes-consolidadas-quadro'],
     queryFn: () => listAllCardAcoes(3000),
-    enabled: isAccessResolved && hasQuadroOperacionalAccess,
+    enabled: canFetch,
   });
 
   const toggleConclusaoMutation = useMutation({
@@ -336,13 +338,25 @@ export default function AgendaAcoesOperacionaisPage() {
 
   const propsComunsGrupo = {
     onOpenCard: setCardAbertoId,
-    onToggleConcluida: (acao, concluir) =>
-      toggleConclusaoMutation.mutate({
-        acao,
-        status: concluir ? 'Concluída' : 'Pendente',
-      }),
-    onDelete: (acao) => excluirAcaoMutation.mutate(acao.id),
+    onToggleConcluida: (acao, concluir) => {
+      if (!canAccessAction('gerir_acoes_operacionais')) {
+        alert('Ação negada: você não tem permissão para alterar ações operacionais.');
+        return;
+      }
+      toggleConclusaoMutation.mutate({ acao, status: concluir ? 'Concluída' : 'Pendente' });
+    },
+    onDelete: (acao) => {
+      if (!canAccessAction('excluir_acao_operacional')) {
+        alert('Ação negada: você não tem permissão para excluir ações operacionais.');
+        return;
+      }
+      excluirAcaoMutation.mutate(acao.id);
+    },
     onStartEdit: (acao) => {
+      if (!canAccessAction('gerir_acoes_operacionais')) {
+        alert('Ação negada: você não tem permissão para editar ações operacionais.');
+        return;
+      }
       setEditingAcaoId(acao.id);
       setAcaoDrafts((anterior) => ({ ...anterior, [acao.id]: { ...acao } }));
     },
@@ -352,11 +366,13 @@ export default function AgendaAcoesOperacionaisPage() {
         [acaoId]: { ...(anterior[acaoId] || {}), [campo]: valor },
       }));
     },
-    onSaveEdit: (acao) =>
-      salvarEdicaoMutation.mutate({
-        acaoId: acao.id,
-        payload: acaoDrafts[acao.id] || acao,
-      }),
+    onSaveEdit: (acao) => {
+      if (!canAccessAction('gerir_acoes_operacionais')) {
+        alert('Ação negada: você não tem permissão para salvar edições de ações operacionais.');
+        return;
+      }
+      salvarEdicaoMutation.mutate({ acaoId: acao.id, payload: acaoDrafts[acao.id] || acao });
+    },
     editingAcaoId,
     acaoDrafts,
     loadingToggleId: toggleConclusaoMutation.isPending
