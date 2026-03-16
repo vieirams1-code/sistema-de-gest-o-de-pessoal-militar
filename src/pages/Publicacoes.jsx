@@ -270,7 +270,7 @@ export default function Publicacoes() {
       const m = new Map();
       arrays.flat().forEach(item => { if (item.nota_para_bg || item.numero_bg) m.set(item.id, item); });
       return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
-    }
+    },
     enabled: isAccessResolved
   });
 

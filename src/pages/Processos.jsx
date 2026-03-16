@@ -33,8 +33,6 @@ function PrazoChip({ data }) {
 export default function Processos() {
   const queryClient = useQueryClient();
   const { isAdmin, subgrupamentoId, modoAcesso, userEmail, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
-modoAcesso, userEmail, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
-modoAcesso, userEmail, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
   if (!loadingUser && !canAccessModule('processos')) return <AccessDenied modulo="Processos" />;
   const [view, setView] = useState('kanban');
