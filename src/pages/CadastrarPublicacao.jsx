@@ -476,6 +476,32 @@ export default function CadastrarPublicacao() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (formData.tipo === 'Apostila' && !canApostilar) {
+      alert('Ação negada: Você não tem permissão para realizar apostilamento.');
+      return;
+    }
+    if (formData.tipo === 'Tornar sem Efeito' && !canTSE) {
+      alert('Ação negada: Você não tem permissão para tornar publicações sem efeito.');
+      return;
+    }
+    if (formData.tipo === 'Ata JISO' && !canPublicarAta) {
+      alert('Ação negada: Você não tem permissão para publicar atas JISO.');
+      return;
+    }
+    if (formData.tipo === 'Homologação de Atestado' && !canPublicarHomologacao) {
+      alert('Ação negada: Você não tem permissão para publicar homologações.');
+      return;
+    }
+    if (!['Apostila', 'Tornar sem Efeito', 'Ata JISO', 'Homologação de Atestado'].includes(formData.tipo) && !canEditarPublicacoes) {
+      alert('Ação negada: Você não tem permissão para editar/cadastrar publicações gerais.');
+      return;
+    }
+    if ((formData.numero_bg || formData.data_bg) && !canPublicarBG) {
+      alert('Ação negada: Você não tem permissão para atribuir número/data de BG (publicar).');
+      return;
+    }
+
     setLoading(true);
 
     const publicacaoIgnoradaId = publicacaoId || null;
@@ -1327,7 +1353,15 @@ export default function CadastrarPublicacao() {
           </div>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !formData.militar_id}
+            disabled={
+              loading ||
+              !formData.militar_id ||
+              (formData.tipo === 'Apostila' && !canApostilar) ||
+              (formData.tipo === 'Tornar sem Efeito' && !canTSE) ||
+              (formData.tipo === 'Ata JISO' && !canPublicarAta) ||
+              (formData.tipo === 'Homologação de Atestado' && !canPublicarHomologacao) ||
+              (!['Apostila', 'Tornar sem Efeito', 'Ata JISO', 'Homologação de Atestado'].includes(formData.tipo) && !canEditarPublicacoes)
+            }
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-6"
           >
             {loading ? (
@@ -1433,6 +1467,7 @@ export default function CadastrarPublicacao() {
                 name="numero_bg"
                 value={formData.numero_bg}
                 onChange={handleChange}
+                disabled={!canPublicarBG}
               />
               <FormField
                 label="Data do BG"
@@ -1440,6 +1475,7 @@ export default function CadastrarPublicacao() {
                 value={formData.data_bg}
                 onChange={handleChange}
                 type="date"
+                disabled={!canPublicarBG}
               />
             </div>
           </div>

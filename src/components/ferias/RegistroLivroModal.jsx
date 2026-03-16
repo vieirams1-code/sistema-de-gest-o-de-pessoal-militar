@@ -28,6 +28,7 @@ import {
   validarInicioFracaoNoLivro,
   validarInicioNoPeriodoConcessivo,
 } from '@/components/ferias/feriasRules';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const NOMES_OPERACIONAIS = {
   'Saída Férias': 'Início',
@@ -266,6 +267,9 @@ export default function RegistroLivroModal({
   tipoInicial = 'Saída Férias',
 }) {
   const queryClient = useQueryClient();
+  
+  const { canAccessAction } = useCurrentUser();
+  const canGerirCadeia = canAccessAction('gerir_cadeia_ferias');
 
   const [tipoRegistro, setTipoRegistro] = useState(tipoInicial);
   const [dataRegistro, setDataRegistro] = useState('');
@@ -470,6 +474,11 @@ export default function RegistroLivroModal({
 
   const handleSalvar = async () => {
     if (!ferias || !dataRegistro || erroCronologia) return;
+
+    if (!canGerirCadeia) {
+      alert('Ação negada: Você não possui permissão para gerir a cadeia de férias (adicionar registros).');
+      return;
+    }
 
     setSaving(true);
 
@@ -742,7 +751,7 @@ export default function RegistroLivroModal({
             </Button>
             <Button
               onClick={handleSalvar}
-              disabled={saving || !dataRegistro || !!erroCronologia}
+              disabled={saving || !dataRegistro || !!erroCronologia || !canGerirCadeia}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
             >
               {saving ? 'Salvando...' : 'Salvar Registro'}

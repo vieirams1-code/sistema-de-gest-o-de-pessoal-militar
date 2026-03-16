@@ -102,7 +102,12 @@ function substituirCardNaLista(cards = [], cardAtualizado) {
 
 export default function QuadroOperacionalPage() {
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  
+  const canMoverCard = canAccessAction('mover_card');
+  const canGerirColunas = canAccessAction('gerir_colunas');
+  const canGerirQuadro = canAccessAction('gerir_quadro');
+
   const [busca, setBusca] = useState('');
   const [cardAberto, setCardAberto] = useState(null);
   const [colunaNovoCard, setColunaNovoCard] = useState(null);
@@ -229,6 +234,11 @@ export default function QuadroOperacionalPage() {
   const onDragEnd = async ({ source, destination }) => {
     if (!destination || busca.trim() || movendo) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    if (!canMoverCard) {
+      window.alert('Ação negada: Sem permissão para mover cards.');
+      return;
+    }
 
     const sourceColunaId = source.droppableId;
     const destinationColunaId = destination.droppableId;
@@ -363,6 +373,11 @@ export default function QuadroOperacionalPage() {
     if (!destination || busca.trim() || movendo) return;
     if (source.index === destination.index) return;
 
+    if (!canGerirColunas) {
+      window.alert('Ação negada: Sem permissão para reordenar colunas.');
+      return;
+    }
+
     const colunasAnteriores = [...colunas];
     const ordemOriginal = new Map(colunas.map((coluna) => [coluna.id, Number(coluna.ordem)]));
 
@@ -390,6 +405,11 @@ export default function QuadroOperacionalPage() {
   };
 
   const criarColunaManual = async () => {
+    if (!canGerirColunas) {
+      window.alert('Ação negada: Sem permissão para criar colunas.');
+      return;
+    }
+
     const nome = novaColuna.trim();
     if (!nome || !quadro?.id) return;
 
@@ -417,6 +437,11 @@ export default function QuadroOperacionalPage() {
   };
 
   const renomearColunaManual = async (coluna) => {
+    if (!canGerirColunas) {
+      window.alert('Ação negada: Sem permissão para renomear colunas.');
+      return;
+    }
+
     if (coluna.fixa || coluna.origem_coluna === 'automacao') return;
 
     const novoNome = window.prompt('Novo nome da coluna:', coluna.nome || '');
@@ -441,6 +466,11 @@ export default function QuadroOperacionalPage() {
   };
 
   const excluirColunaManual = async (coluna) => {
+    if (!canGerirColunas) {
+      window.alert('Ação negada: Sem permissão para excluir colunas.');
+      return;
+    }
+
     const colunaFixa =
       coluna.fixa ||
       coluna.origem_coluna === 'automacao' ||
@@ -465,6 +495,11 @@ export default function QuadroOperacionalPage() {
   };
 
   const setupInicial = async () => {
+    if (!canGerirQuadro) {
+      window.alert('Ação negada: Sem permissão para configurar o quadro.');
+      return;
+    }
+
     const q = await base44.entities.QuadroOperacional.create({
       nome: QUADRO_NOME,
       descricao: 'Quadro operacional da seção',
@@ -516,7 +551,7 @@ export default function QuadroOperacionalPage() {
         <div className="text-center">
           <h2 className="text-lg font-bold text-slate-800 mb-1">Quadro Operacional</h2>
           <p className="text-sm text-slate-500 mb-4">Nenhum quadro configurado ainda.</p>
-          <Button onClick={setupInicial} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+          <Button onClick={setupInicial} disabled={!canGerirQuadro} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white disabled:opacity-50">
             <Plus className="w-4 h-4 mr-2" /> Criar quadro padrão
           </Button>
         </div>
@@ -545,9 +580,10 @@ export default function QuadroOperacionalPage() {
               value={novaColuna}
               onChange={(e) => setNovaColuna(e.target.value)}
               placeholder="Nova coluna manual"
-              className="h-8 text-xs w-44 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:bg-white/15"
+              disabled={!canGerirColunas}
+              className="h-8 text-xs w-44 bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:bg-white/15 disabled:opacity-50"
             />
-            <Button onClick={criarColunaManual} className="h-8 text-xs bg-white text-[#1e3a5f] hover:bg-white/90">
+            <Button onClick={criarColunaManual} disabled={!canGerirColunas} className="h-8 text-xs bg-white text-[#1e3a5f] hover:bg-white/90 disabled:opacity-50">
               <Plus className="w-3.5 h-3.5 mr-1" /> Coluna
             </Button>
           </div>
@@ -595,7 +631,7 @@ export default function QuadroOperacionalPage() {
                     key={coluna.id}
                     draggableId={`col-${coluna.id}`}
                     index={index}
-                    isDragDisabled={!!busca.trim() || movendo}
+                    isDragDisabled={!!busca.trim() || movendo || !canGerirColunas}
                   >
                     {(dragProvided) => (
                       <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
@@ -607,7 +643,7 @@ export default function QuadroOperacionalPage() {
                             onAddCard={setColunaNovoCard}
                             onRenomearColuna={renomearColunaManual}
                             onExcluirColuna={excluirColunaManual}
-                            dragDisabled={!!busca.trim() || movendo}
+                            dragDisabled={!!busca.trim() || movendo || !canMoverCard}
                           />
                         </div>
                       </div>

@@ -88,7 +88,14 @@ export function useCurrentUser() {
    * Permissão por ação sensível via UsuarioAcesso.
    * Campos: perm_admin_mode, perm_gerir_cadeia_ferias, perm_excluir_ferias,
    *         perm_recalcular_ferias, perm_gerir_templates, perm_gerir_permissoes,
-   *         perm_gerir_estrutura
+   *         perm_gerir_estrutura, perm_editar_publicacoes, perm_publicar_bg,
+   *         perm_tornar_sem_efeito_publicacao, perm_apostilar_publicacao,
+   *         perm_publicar_ata_jiso, perm_publicar_homologacao, perm_gerir_jiso,
+   *         perm_registrar_decisao_jiso, perm_excluir_atestado, perm_gerir_quadro,
+   *         perm_mover_card, perm_gerir_colunas, perm_arquivar_card,
+   *         perm_gerir_acoes_operacionais, perm_excluir_acao_operacional,
+   *         perm_criar_processo, perm_editar_processo, perm_excluir_processo,
+   *         perm_gerir_configuracoes
    *
    * @param {string} acao — ex: 'admin_mode', 'excluir_ferias', 'gerir_cadeia_ferias'
    */
