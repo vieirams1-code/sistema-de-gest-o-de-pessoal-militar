@@ -164,6 +164,7 @@ export default function CadastrarAtestado() {
 
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
     queryClient.invalidateQueries({ queryKey: ['cards'] });
+    queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
     setLoading(false);
     navigate(createPageUrl('Atestados'));
   };

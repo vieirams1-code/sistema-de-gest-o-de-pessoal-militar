@@ -494,7 +494,7 @@ export default function ConciliacaoBoletim() {
   const { isAdmin, getMilitarScopeFilters, canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('publicacoes');
 
-  const { data: registrosLivro = [] } = useQuery({
+  const { data: registrosLivro = [], isLoading: isLoadingLivro } = useQuery({
     queryKey: ['conciliacao-registros-livro'],
     queryFn: async () => {
       if (isAdmin) return base44.entities.RegistroLivro.list('-created_date');
@@ -514,7 +514,7 @@ export default function ConciliacaoBoletim() {
     enabled: isAccessResolved && hasAccess
   });
 
-  const { data: publicacoesExOfficio = [] } = useQuery({
+  const { data: publicacoesExOfficio = [], isLoading: isLoadingExOfficio } = useQuery({
     queryKey: ['conciliacao-publicacoes-ex-officio'],
     queryFn: async () => {
       if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
@@ -534,7 +534,7 @@ export default function ConciliacaoBoletim() {
     enabled: isAccessResolved && hasAccess
   });
 
-  const { data: atestados = [] } = useQuery({
+  const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
     queryKey: ['conciliacao-atestados-publicacao'],
     queryFn: async () => {
       if (isAdmin) {
@@ -695,6 +695,7 @@ export default function ConciliacaoBoletim() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
@@ -809,6 +810,7 @@ export default function ConciliacaoBoletim() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
     } catch (error) {
@@ -838,6 +840,7 @@ export default function ConciliacaoBoletim() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
 
@@ -876,6 +879,7 @@ export default function ConciliacaoBoletim() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
     } catch (error) {
@@ -887,6 +891,16 @@ export default function ConciliacaoBoletim() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasAccess) return <AccessDenied modulo="Controle de Publicações" />;
+
+  const isCarregandoDados = isLoadingLivro || isLoadingExOfficio || isLoadingAtestados;
+
+  if (isCarregandoDados) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 space-y-6">
