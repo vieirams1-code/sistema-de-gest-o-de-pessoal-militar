@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, FileText, Save, Info, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle } from 'lucide-react';
 import { aplicarTemplate, VARS_PREVIEW } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -534,6 +534,24 @@ export default function TemplatesTexto() {
 
   const selectedTipoVars = editingTemplate?.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
 
+  const templateConflictError = useMemo(() => {
+    if (!editingTemplate || editingTemplate.ativo === false || !editingTemplate.modulo || !editingTemplate.tipo_registro) {
+      return null;
+    }
+
+    const conflict = templates.find(t =>
+      t.modulo === editingTemplate.modulo &&
+      t.tipo_registro === editingTemplate.tipo_registro &&
+      t.ativo !== false &&
+      t.id !== editingTemplate.id
+    );
+
+    if (conflict) {
+      return `Já existe um template ativo para '${getTipoDisplay(editingTemplate.tipo_registro)}' no módulo '${editingTemplate.modulo}'. Desative ou edite o template existente antes de ativar este.`;
+    }
+    return null;
+  }, [editingTemplate, templates]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-5xl mx-auto px-4 py-8">
@@ -779,13 +797,20 @@ export default function TemplatesTexto() {
                 <Label htmlFor="ativo" className="text-sm text-slate-700 cursor-pointer">Template ativo</Label>
               </div>
 
+              {templateConflictError && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2 mt-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{templateConflictError}</span>
+                </div>
+              )}
+
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
             <Button variant="outline" onClick={() => { setShowForm(false); setEditingTemplate(null); }} disabled={saveMutation.isPending}>
               Cancelar
             </Button>
                 <Button
                   onClick={() => saveMutation.mutate(editingTemplate)}
-                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template}
+                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 >
                   {saveMutation.isPending ? (
