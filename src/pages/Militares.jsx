@@ -34,6 +34,7 @@ export default function Militares() {
     linkedMilitarEmail,
     hasSelfAccess,
     canAccessModule,
+    getMilitarScopeFilters,
     isLoading: loadingUser,
     isAccessResolved,
   } = useCurrentUser();
@@ -74,22 +75,17 @@ export default function Militares() {
         });
       }
 
-      if (!subgrupamentoId) return [];
-      // Usuário de Grupamento: busca todos com grupamento_id OU subgrupamento_id que sejam filhos
-      if (subgrupamentoTipo === 'Grupamento') {
-        const [porGrupamento, porSubgrupamento] = await Promise.all([
-          base44.entities.Militar.filter({ grupamento_id: subgrupamentoId }, '-created_date'),
-          base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-created_date'),
-        ]);
-        const ids = new Set();
-        const merged = [];
-        for (const m of [...porGrupamento, ...porSubgrupamento]) {
-          if (!ids.has(m.id)) { ids.add(m.id); merged.push(m); }
-        }
-        return merged;
+      const filters = getMilitarScopeFilters();
+      if (!filters.length) return [];
+      
+      const requests = filters.map(f => base44.entities.Militar.filter(f, '-created_date'));
+      const batches = await Promise.all(requests);
+      const ids = new Set();
+      const merged = [];
+      for (const m of batches.flat()) {
+        if (!ids.has(m.id)) { ids.add(m.id); merged.push(m); }
       }
-      // Usuário de Subgrupamento: apenas o próprio
-      return base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-created_date');
+      return merged;
     },
     enabled: isAccessResolved,
   });

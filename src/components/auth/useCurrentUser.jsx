@@ -15,8 +15,6 @@ export function useCurrentUser() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isLoading = loadingAuth || loadingAcesso;
-  const isAccessResolved = !user?.email || !loadingAcesso || fetchedAcesso;
   const acesso = usuarioAcessoList?.[0]; // Pega o primeiro acesso ativo encontrado
 
   // Observação: mesmo com perfil vinculado (perfil_id/perfil_nome), a autorização em runtime
@@ -55,6 +53,17 @@ export function useCurrentUser() {
       modoAcesso = 'proprio';
     }
   }
+
+  const requiresUnidades = modoAcesso === 'subsetor' && !!subgrupamentoId;
+  const { data: unidadesFilhas = [], isLoading: loadingUnidades, isFetched: fetchedUnidades } = useQuery({
+    queryKey: ['unidadesFilhas', subgrupamentoId],
+    queryFn: () => base44.entities.Subgrupamento.filter({ tipo: 'Unidade', grupamento_id: subgrupamentoId }),
+    enabled: requiresUnidades,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isLoading = loadingAuth || loadingAcesso || (requiresUnidades && loadingUnidades);
+  const isAccessResolved = !user?.email || (!loadingAcesso && fetchedAcesso && (!requiresUnidades || (!loadingUnidades && fetchedUnidades)));
 
   const getAccessModeFromUser = (targetUser, targetAcesso = null) => {
     if (targetAcesso) return targetAcesso.tipo_acesso || 'proprio';
@@ -139,8 +148,14 @@ export function useCurrentUser() {
       );
     }
 
-    // Modo Subsetor/Seção ou Unidade: vê apenas o próprio subsetor/unidade (id exato)
-    if (modoAcesso === 'subsetor' || modoAcesso === 'unidade') {
+    // Modo Subsetor/Seção: vê o próprio subsetor e as unidades filhas
+    if (modoAcesso === 'subsetor') {
+      const scopeIds = [subgrupamentoId, ...unidadesFilhas.map(u => u.id)];
+      return scopeIds.includes(registro.subgrupamento_id);
+    }
+
+    // Modo Unidade: vê apenas a própria unidade (id exato)
+    if (modoAcesso === 'unidade') {
       return registro.subgrupamento_id === subgrupamentoId;
     }
 
@@ -184,7 +199,12 @@ export function useCurrentUser() {
       return [{ grupamento_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }];
     }
 
-    if ((modoAcesso === 'subsetor' || modoAcesso === 'unidade') && subgrupamentoId) {
+    if (modoAcesso === 'subsetor' && subgrupamentoId) {
+      const scopeIds = [subgrupamentoId, ...unidadesFilhas.map(u => u.id)];
+      return scopeIds.map(id => ({ subgrupamento_id: id }));
+    }
+
+    if (modoAcesso === 'unidade' && subgrupamentoId) {
       return [{ subgrupamento_id: subgrupamentoId }];
     }
 
