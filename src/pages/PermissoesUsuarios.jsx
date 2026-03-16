@@ -75,16 +75,18 @@ export default function PermissoesUsuarios() {
   const [savingUser, setSavingUser] = useState(false);
 
 
-  // Queries
-  const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) });
-  const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome') });
+  // Queries — só executam após resolução do acesso e confirmação de permissão
+  const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }), enabled: hasAccess });
+  const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome'), enabled: hasAccess });
   const { data: acessos = [], error: acessosError } = useQuery({
     queryKey: ['usuariosAcesso'],
     queryFn: () => base44.entities.UsuarioAcesso.list(),
+    enabled: hasAccess,
   });
   const { data: perfis = [] } = useQuery({
     queryKey: ['perfisPermissao'],
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
+    enabled: hasAccess,
   });
 
   const selectedProfilePreview = useMemo(() => {
@@ -92,7 +94,8 @@ export default function PermissoesUsuarios() {
     return perfis.find((p) => p.id === selectedProfileId) || null;
   }, [selectedProfileId, perfis]);
 
-  if (!loadingUser && (!isAdmin && !canAccessAction('gerir_permissoes'))) {
+  if (loadingUser || !isAccessResolved) return null;
+  if (!isAdmin && !canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Permissões de Usuários" />;
   }
 
