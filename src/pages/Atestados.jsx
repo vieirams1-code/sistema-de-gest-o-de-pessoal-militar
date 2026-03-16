@@ -26,7 +26,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, getMilitarScopeFilters, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
 
   const [searchTerm, setSearchTerm] = useState('');

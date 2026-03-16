@@ -22,7 +22,7 @@ import {
 export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { isAdmin, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasConfiguracoesAccess = canAccessModule('configuracoes');
 
   const [novaLotacao, setNovaLotacao] = useState('');

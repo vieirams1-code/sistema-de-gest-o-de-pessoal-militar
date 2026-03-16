@@ -53,6 +53,7 @@ const statusColors = {
 
 export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   const queryClient = useQueryClient();
+  const { canAccessAction } = useCurrentUser();
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [savingJiso, setSavingJiso] = useState(false);

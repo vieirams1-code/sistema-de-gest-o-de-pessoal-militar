@@ -18,7 +18,7 @@ export default function EditarJISO() {
   const [searchParams] = useSearchParams();
   const atestadoId = searchParams.get('atestado_id');
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
   const isAccessPending = isLoading || !isAccessResolved;
 

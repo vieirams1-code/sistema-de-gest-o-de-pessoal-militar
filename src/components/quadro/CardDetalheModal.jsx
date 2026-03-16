@@ -626,7 +626,7 @@ function AcoesSection({ cardId }) {
 
 export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpdate }) {
   const queryClient = useQueryClient();
-  const { userEmail, user } = useCurrentUser();
+  const { userEmail, user, canAccessAction } = useCurrentUser();
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [showSystemActivity, setShowSystemActivity] = useState(false);
