@@ -94,6 +94,10 @@ export default function PermissoesUsuarios() {
     return perfis.find((p) => p.id === selectedProfileId) || null;
   }, [selectedProfileId, perfis]);
 
+  const militaresOrdenados = useMemo(() => {
+    return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
+  }, [militares]);
+
   if (loadingUser || !isAccessResolved) return null;
   if (!canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Permissões de Usuários" />;
@@ -101,10 +105,6 @@ export default function PermissoesUsuarios() {
 
   const grupamentos = subgrupamentos.filter(s => s.tipo === 'Grupamento');
   const subgrupamentosFilhos = subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId);
-
-  const militaresOrdenados = useMemo(() => {
-    return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
-  }, [militares]);
 
   const handleSelectAcesso = (acesso) => {
     setSelectedUser(acesso);
