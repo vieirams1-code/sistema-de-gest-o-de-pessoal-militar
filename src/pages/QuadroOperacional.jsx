@@ -102,7 +102,7 @@ function substituirCardNaLista(cards = [], cardAtualizado) {
 
 export default function QuadroOperacionalPage() {
   const queryClient = useQueryClient();
-  const { canAccessModule, canAccessAction, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   
   const canMoverCard = canAccessAction('mover_card');
   const canGerirColunas = canAccessAction('gerir_colunas');
@@ -529,7 +529,7 @@ export default function QuadroOperacionalPage() {
     queryClient.invalidateQueries({ queryKey: ['cards', quadro?.id] });
   };
 
-  if (!loadingUser && !canAccessModule('quadro_operacional')) return <AccessDenied modulo="Quadro Operacional" />;
+  if (!loadingUser && isAccessResolved && !canAccessModule('quadro_operacional')) return <AccessDenied modulo="Quadro Operacional" />;
 
   if (isLoading) {
     return (

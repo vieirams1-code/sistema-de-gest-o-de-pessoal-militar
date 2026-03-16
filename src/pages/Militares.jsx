@@ -46,8 +46,6 @@ export default function Militares() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
-  if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
-
   const { data: militares = [], isLoading } = useQuery({
     queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
     queryFn: async () => {
@@ -93,8 +91,10 @@ export default function Militares() {
       // Usuário de Subgrupamento: apenas o próprio
       return base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-created_date');
     },
-    enabled: !loadingUser,
+    enabled: isAccessResolved,
   });
+
+  if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Militar.delete(id),

@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 export default function Punicoes() {
   const navigate = useNavigate();
