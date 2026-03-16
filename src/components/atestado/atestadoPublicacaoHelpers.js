@@ -168,3 +168,23 @@ export function existePublicacaoAtivaParaAtestado(publicacoes = [], atestadoId, 
     return false;
   });
 }
+
+export function invalidateFluxoAtaJisoQueries(queryClient, { atestadoId, militarId } = {}) {
+  if (!queryClient) return;
+
+  queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+  queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+  queryClient.invalidateQueries({ queryKey: ['publicacoes-apostila'] });
+  queryClient.invalidateQueries({ queryKey: ['atestados'] });
+  queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
+  queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
+  queryClient.invalidateQueries({ queryKey: ['cards'] });
+
+  if (militarId) {
+    queryClient.invalidateQueries({ queryKey: ['atestados-militar-pub', militarId] });
+  }
+
+  if (atestadoId) {
+    queryClient.invalidateQueries({ queryKey: ['atestado', atestadoId] });
+  }
+}

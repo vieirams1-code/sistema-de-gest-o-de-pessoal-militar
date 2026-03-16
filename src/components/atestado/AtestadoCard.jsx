@@ -39,9 +39,11 @@ import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import {
+  atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
   getStatusDocumentalAtaJiso,
+  invalidateFluxoAtaJisoQueries,
   isPublicacaoAtestadoAtiva,
 } from './atestadoPublicacaoHelpers';
 
@@ -98,6 +100,14 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     return `O(A) Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, resolve: tornar público que recebeu a Ata de Inspeção de Saúde Sessão Nº ${form.secao_jiso || '___'}, de ${formatarDataExtenso(form.data_ata)}, pertencente ao: ${posto} ${atestado.militar_nome}, matrícula ${atestado.militar_matricula}, inspecionado para fins de ${form.finalidade_jiso}, conf. NUP Nº ${form.nup || '___'}, com o parecer: ${form.parecer_jiso || '___'}.`;
   };
 
+
+  const invalidarFluxo = () => {
+    invalidateFluxoAtaJisoQueries(queryClient, {
+      militarId: atestado.militar_id,
+      atestadoId: atestado.id,
+    });
+  };
+
   const handleOpenHomologacao = () => {
     const texto = gerarTextoHomologacao({});
     setHomologacaoForm(prev => ({ ...prev, texto_publicacao: texto }));
@@ -148,13 +158,12 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       data_bg: homologacaoForm.data_bg,
       status
     });
-    await base44.entities.Atestado.update(atestado.id, {
-      homologado_comandante: true,
-      status_jiso: 'Homologado pelo Comandante',
-      status_publicacao: status
-    });
-    queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    await atualizarEstadoAtestadoPelasPublicacoes(
+      atestado.id,
+      base44.entities.Atestado,
+      base44.entities.PublicacaoExOfficio
+    );
+    invalidarFluxo();
     setSavingPublicacao(false);
     setShowHomologacaoModal(false);
   };
@@ -202,12 +211,12 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       data_bg: ataJisoForm.data_bg,
       status
     });
-    await base44.entities.Atestado.update(atestado.id, {
-      status_jiso: 'Homologado pela JISO',
-      status_publicacao: status
-    });
-    queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    await atualizarEstadoAtestadoPelasPublicacoes(
+      atestado.id,
+      base44.entities.Atestado,
+      base44.entities.PublicacaoExOfficio
+    );
+    invalidarFluxo();
     setSavingPublicacao(false);
     setShowAtaJisoModal(false);
   };
@@ -264,9 +273,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       ...atestado,
       data_jiso_agendada: jisoDate,
     });
-    queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['atestados-dashboard'] });
-    queryClient.invalidateQueries({ queryKey: ['cards'] });
+    invalidarFluxo();
     setSavingJiso(false);
     setEditingJiso(false);
   };

@@ -16,6 +16,7 @@ import {
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
   getAtestadoIdsVinculados,
+  invalidateFluxoAtaJisoQueries,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 
@@ -164,7 +165,7 @@ export default function CadastrarPublicacao() {
   });
 
   // Lista filtrada dependendo do tipo de ação
-  const publicacoesElegiveis = React.useMemo(() => {
+  const publicacoesElegiveis = useMemo(() => {
     if (formData.tipo === 'Apostila') {
       // Só originais publicadas — sem Apostilas, sem TSEs
       return todasPublicacoes.filter(p => p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito');
@@ -287,6 +288,17 @@ export default function CadastrarPublicacao() {
       return updated;
     });
   };
+
+  const obterPublicacoesAtivasDoMilitar = async (militarId) => {
+    if (!militarId) return [];
+    const publicacoes = await base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId });
+
+    return publicacoes.filter((publicacao) => {
+      if (publicacaoId && publicacao.id === publicacaoId) return false;
+      return true;
+    });
+  };
+
 
   const formatarDataExtenso = (dataString) => {
     if (!dataString) return '';
@@ -511,10 +523,11 @@ export default function CadastrarPublicacao() {
     setLoading(true);
 
     const publicacaoIgnoradaId = publicacaoId || null;
+    const publicacoesAtivasDoMilitar = await obterPublicacoesAtivasDoMilitar(formData.militar_id);
 
     if (formData.tipo === 'Homologação de Atestado' && formData.atestado_homologado_id) {
       const jaExisteHomologacao = existePublicacaoAtivaParaAtestado(
-        todasPublicacoes,
+        publicacoesAtivasDoMilitar,
         formData.atestado_homologado_id,
         'Homologação de Atestado',
         publicacaoIgnoradaId
@@ -530,7 +543,7 @@ export default function CadastrarPublicacao() {
     if (formData.tipo === 'Ata JISO' && formData.atestados_jiso_ids?.length) {
       const idsDuplicados = formData.atestados_jiso_ids.filter((atestadoId) =>
         existePublicacaoAtivaParaAtestado(
-          todasPublicacoes,
+          publicacoesAtivasDoMilitar,
           atestadoId,
           'Ata JISO',
           publicacaoIgnoradaId
@@ -580,14 +593,14 @@ export default function CadastrarPublicacao() {
       }
     }
 
-    // Marcar atestados homologados para Ata JISO
+    // Recalcular estado documental dos atestados vinculados à Ata JISO
     if (formData.tipo === 'Ata JISO' && formData.atestados_jiso_ids?.length) {
-      const statusAtaJiso = calcStatusPublicacao(formData);
       for (const aid of formData.atestados_jiso_ids) {
-        await base44.entities.Atestado.update(aid, {
-          status_jiso: 'Homologado pela JISO',
-          status_publicacao: statusAtaJiso
-        });
+        await atualizarEstadoAtestadoPelasPublicacoes(
+          aid,
+          base44.entities.Atestado,
+          base44.entities.PublicacaoExOfficio
+        );
       }
     }
 
@@ -636,14 +649,13 @@ export default function CadastrarPublicacao() {
       }
     }
 
-    // Marcar atestado homologado para Homologação de Atestado
+    // Recalcular estado documental do atestado homologado
     if (formData.tipo === 'Homologação de Atestado' && formData.atestado_homologado_id) {
-      const statusHomologacao = calcStatusPublicacao(formData);
-      await base44.entities.Atestado.update(formData.atestado_homologado_id, {
-        homologado_comandante: true,
-        status_jiso: 'Homologado pelo Comandante',
-        status_publicacao: statusHomologacao
-      });
+      await atualizarEstadoAtestadoPelasPublicacoes(
+        formData.atestado_homologado_id,
+        base44.entities.Atestado,
+        base44.entities.PublicacaoExOfficio
+      );
     }
 
     // Atualizar comportamento do militar
@@ -676,9 +688,11 @@ export default function CadastrarPublicacao() {
       }
     }
 
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    invalidateFluxoAtaJisoQueries(queryClient, {
+      militarId: formData.militar_id,
+      atestadoId: formData.atestado_homologado_id || formData.atestados_jiso_ids?.[0] || null,
+    });
     queryClient.invalidateQueries({ queryKey: ['militares'] });
-    queryClient.invalidateQueries({ queryKey: ['atestados'] });
     setLoading(false);
     navigate(createPageUrl('Publicacoes'));
   };

@@ -46,8 +46,8 @@ import {
 } from 'lucide-react';
 import JisoHistoricoModal from '@/components/atestado/JisoHistoricoModal';
 import {
-  existePublicacaoAtivaParaAtestado,
   getStatusDocumentalAtaJiso,
+  invalidateFluxoAtaJisoQueries,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 
 const PRIORIDADE_COR = {
@@ -716,11 +716,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const podeRegistrarDecisaoJiso = fluxoJiso.isCardJisoElegivel;
   const decisaoJisoRegistrada = fluxoJiso.decisaoJisoRegistrada;
   const statusDocumentalAtaJiso = getStatusDocumentalAtaJiso(atestadoVinculado || {}, publicacoesAtestado);
-  const ataJisoAtiva = existePublicacaoAtivaParaAtestado(
-    publicacoesAtestado,
-    vinculoAtestado?.referencia_id,
-    'Ata JISO'
-  );
+  const ataJisoAtiva = statusDocumentalAtaJiso.bloqueiaNovaPublicacao;
 
   const { data: comentarios = [] } = useQuery({
     queryKey: ['card-comentarios', card.id],
@@ -804,9 +800,10 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
         prazo: jisoDate || null,
       });
 
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
-      queryClient.invalidateQueries({ queryKey: ['atestado', vinculoAtestado.referencia_id] });
+      invalidateFluxoAtaJisoQueries(queryClient, {
+        atestadoId: vinculoAtestado.referencia_id,
+        militarId: atestadoVinculado?.militar_id,
+      });
     } finally {
       setSavingJisoDate(false);
     }
