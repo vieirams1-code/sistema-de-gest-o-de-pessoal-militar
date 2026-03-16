@@ -707,8 +707,9 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
     queryKey: ['publicacoes-atestado', vinculoAtestado?.referencia_id],
     queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoVinculado?.militar_id }),
     enabled: !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
-    select: (data) => data.filter((publicacao) =>
-      (publicacao.atestados_jiso_ids || []).includes(vinculoAtestado?.referencia_id)
+    select: (data) => data.filter((p) =>
+      p.atestado_homologado_id === vinculoAtestado?.referencia_id ||
+      (p.atestados_jiso_ids || []).includes(vinculoAtestado?.referencia_id)
     ),
   });
 
@@ -1159,11 +1160,11 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                 <Button
                   type="button"
                   className="h-8 text-xs bg-indigo-700 hover:bg-indigo-800"
-                  disabled={ataJisoAtiva}
-                  title={ataJisoAtiva ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : ''}
+                  disabled={statusDocumentalAtaJiso.bloqueiaNovaPublicacao}
+                  title={statusDocumentalAtaJiso.bloqueiaNovaPublicacao ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : ''}
                   onClick={() => window.open(`${createPageUrl('CadastrarPublicacao')}?tipo=${encodeURIComponent('Ata JISO')}&militar_id=${atestadoVinculado?.militar_id || ''}`, '_blank')}
                 >
-                  {ataJisoAtiva ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : 'Publicar ata JISO'}
+                  {statusDocumentalAtaJiso.bloqueiaNovaPublicacao ? 'Já existe uma nota/publicação ativa para esta Ata JISO.' : 'Publicar ata JISO'}
                 </Button>
               </div>
             </SectionCard>

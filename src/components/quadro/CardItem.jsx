@@ -90,8 +90,9 @@ export default function CardItem({ card, onClick }) {
     queryKey: ['publicacoes-atestado', vinculoAtestado?.referencia_id],
     queryFn: () => base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoVinculado?.militar_id }),
     enabled: !!vinculoAtestado?.referencia_id && !!atestadoVinculado?.militar_id,
-    select: (data) => data.filter((publicacao) =>
-      (publicacao.atestados_jiso_ids || []).includes(vinculoAtestado?.referencia_id)
+    select: (data) => data.filter((p) =>
+      p.atestado_homologado_id === vinculoAtestado?.referencia_id ||
+      (p.atestados_jiso_ids || []).includes(vinculoAtestado?.referencia_id)
     ),
   });
 
@@ -133,17 +134,17 @@ export default function CardItem({ card, onClick }) {
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+        <div className="mt-3 flex flex-wrap gap-1.5 min-w-0">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 truncate max-w-full" title={atestadoVinculado?.status_jiso || 'JISO em análise'}>
             {atestadoVinculado?.status_jiso || 'JISO em análise'}
           </span>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 truncate max-w-full" title={atestadoVinculado?.tipo_afastamento || card.tipo || 'Afastamento'}>
             {atestadoVinculado?.tipo_afastamento || card.tipo || 'Afastamento'}
           </span>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 truncate max-w-full" title={fluxoJiso.jisoAgendada ? 'JISO agendada' : 'JISO pendente'}>
             {fluxoJiso.jisoAgendada ? 'JISO agendada' : 'JISO pendente'}
           </span>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 truncate max-w-full" title={statusDocumentalAtaJiso.texto}>
             {statusDocumentalAtaJiso.texto}
           </span>
         </div>

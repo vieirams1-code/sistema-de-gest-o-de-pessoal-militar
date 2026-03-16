@@ -408,7 +408,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
             </Badge>
           )}
           {isFluxoJiso && (
-            <Badge className="bg-indigo-100 text-indigo-700">
+            <Badge className="bg-indigo-100 text-indigo-700 truncate max-w-full" title={statusDocumentalAtaJiso.texto}>
               {statusDocumentalAtaJiso.texto}
             </Badge>
           )}

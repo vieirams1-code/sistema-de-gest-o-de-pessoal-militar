@@ -50,7 +50,7 @@ function getTipoLabel(r) {
     r.tipo_registro ||
     r.tipo ||
     (r.medico || r.cid_10
-      ? (r.necessita_jiso ? 'Atestado - JISO' : 'Atestado - Homologação')
+      ? (r.necessita_jiso || r.fluxo_homologacao === 'jiso' || Number(r.dias || 0) > 15 ? 'Atestado - JISO' : 'Atestado - Homologação')
       : '');
 
   return getTipoDisplay(tipoBase);

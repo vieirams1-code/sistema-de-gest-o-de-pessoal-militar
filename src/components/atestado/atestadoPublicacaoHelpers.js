@@ -65,9 +65,11 @@ export function getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas = [])
   );
 
   const atasAtivas = atasJiso.filter(isPublicacaoAtestadoAtiva);
-  const ataAtivaMaisRecente = atasAtivas.sort(
-    (a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0)
-  )[0];
+  const ataAtivaMaisRecente = [...atasAtivas].sort((a, b) => {
+    const timeA = new Date(a.created_date || 0).getTime();
+    const timeB = new Date(b.created_date || 0).getTime();
+    return (timeB || 0) - (timeA || 0);
+  })[0];
 
   if (ataAtivaMaisRecente) {
     const statusPublicacao = calcStatusPublicacao(ataAtivaMaisRecente);
@@ -78,7 +80,7 @@ export function getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas = [])
         : dataBg.toLocaleDateString('pt-BR');
       return {
         codigo: 'publicada',
-        texto: `Ata JISO — Publicada no BG ${ataAtivaMaisRecente.numero_bg}, de ${dataFormatada}`,
+        texto: `Ata JISO — BG ${ataAtivaMaisRecente.numero_bg} de ${dataFormatada}`,
         publicacao: ataAtivaMaisRecente,
         bloqueiaNovaPublicacao: true,
       };
@@ -105,10 +107,12 @@ export function getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas = [])
     };
   }
 
-  if ((atestado.status_jiso || '') === 'Homologado pela JISO') {
+  const existeAtaExcluida = atasJiso.some((publicacao) => publicacao.status === 'Excluída');
+
+  if (existeAtaExcluida) {
     return {
       codigo: 'sem_publicacao_ativa',
-      texto: 'Ata JISO — Excluída / sem publicação ativa',
+      texto: 'Ata JISO — Excluída',
       publicacao: null,
       bloqueiaNovaPublicacao: false,
     };
@@ -116,7 +120,7 @@ export function getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas = [])
 
   return {
     codigo: 'nao_publicada',
-    texto: 'Ata JISO — Excluída / sem publicação ativa',
+    texto: 'Ata JISO — Pendente',
     publicacao: null,
     bloqueiaNovaPublicacao: false,
   };

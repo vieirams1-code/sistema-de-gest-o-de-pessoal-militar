@@ -79,9 +79,10 @@ export default function Atestados() {
       a.medico?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.cid_10?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTipoAfastamento = tipoAfastamentoFilter === 'all' || a.tipo_afastamento === tipoAfastamentoFilter;
+    const isFluxoJiso = a.necessita_jiso || a.fluxo_homologacao === 'jiso' || Number(a.dias || 0) > 15;
     const matchesJiso = jisoFilter === 'all' || 
-      (jisoFilter === 'necessita' && a.necessita_jiso) ||
-      (jisoFilter === 'nao_necessita' && !a.necessita_jiso) ||
+      (jisoFilter === 'necessita' && isFluxoJiso) ||
+      (jisoFilter === 'nao_necessita' && !isFluxoJiso) ||
       (jisoFilter === 'aguardando' && a.status_jiso === 'Aguardando JISO') ||
       (jisoFilter === 'homologado' && a.status_jiso === 'Homologado pela JISO');
     const matchesPublicacao = publicacaoFilter === 'all' ||

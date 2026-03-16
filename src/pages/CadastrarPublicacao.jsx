@@ -133,7 +133,7 @@ export default function CadastrarPublicacao() {
         item.tipo_registro ||
         item.tipo ||
         (item.medico || item.cid_10
-          ? item.necessita_jiso
+          ? (item.necessita_jiso || item.fluxo_homologacao === 'jiso' || Number(item.dias || 0) > 15)
             ? 'Atestado - JISO'
             : 'Atestado - Homologação'
           : 'Publicação');
@@ -871,7 +871,11 @@ export default function CadastrarPublicacao() {
       case 'Ata JISO': {
         const finalidadesComAtestados = ['V.A.F', 'LTS', 'Atestado de Origem'];
         const mostrarAtestados = finalidadesComAtestados.includes(formData.finalidade_jiso);
-        const atestadosJISOPendentes = atestadosMilitar.filter(a => a.necessita_jiso && a.status === 'Ativo' && a.status_jiso !== 'Homologado pela JISO');
+        const atestadosJISOPendentes = atestadosMilitar.filter(a => 
+          (a.necessita_jiso || a.fluxo_homologacao === 'jiso' || Number(a.dias || 0) > 15) && 
+          a.status === 'Ativo' && 
+          a.status_jiso !== 'Homologado pela JISO'
+        );
         const selectedIds = formData.atestados_jiso_ids || [];
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
