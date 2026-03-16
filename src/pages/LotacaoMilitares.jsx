@@ -18,7 +18,7 @@ const normalizeTipo = (tipo) => {
 
 export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
   const hasMilitaresAccess = canAccessModule('militares');
 
@@ -124,18 +124,22 @@ export default function LotacaoMilitares() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
+      dismiss();
       toast({
         title: "Lotação Atualizada",
         description: `${selectedMilitares.length} militares movidos com sucesso para ${selectedNode.nome}.`,
-        className: "bg-emerald-50 border-emerald-200 text-emerald-800"
+        className: "bg-emerald-50 border-emerald-200 text-emerald-800",
+        duration: 3000,
       });
       setSelectedMilitares([]); // Limpa a seleção
     },
     onError: () => {
+      dismiss();
       toast({
         title: "Erro",
         description: "Falha ao atualizar a lotação dos militares.",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 3000,
       });
     }
   });
@@ -144,7 +148,8 @@ export default function LotacaoMilitares() {
     if (!selectedNode || selectedMilitares.length === 0) return;
 
     if (!canAccessAction('gerir_estrutura') && !canAccessAction('gerir_permissoes')) {
-      toast({ title: "Ação negada", description: "Permissão insuficiente para mover militares.", variant: "destructive" });
+      dismiss();
+      toast({ title: "Ação negada", description: "Permissão insuficiente para mover militares.", variant: "destructive", duration: 3000 });
       return;
     }
     moveMutation.mutate({ militaresIds: selectedMilitares, targetNode: selectedNode });
