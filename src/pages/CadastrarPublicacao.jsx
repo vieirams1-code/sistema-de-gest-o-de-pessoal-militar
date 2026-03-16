@@ -1199,7 +1199,7 @@ export default function CadastrarPublicacao() {
                       if (feriasAlvo && feriasAlvo.data_inicio && novaData) {
                         const dtSaida = new Date(feriasAlvo.data_inicio + 'T00:00:00');
                         const dtInterrupcao = new Date(novaData + 'T00:00:00');
-                        const diasGozados = Math.max(0, Math.floor((dtInterrupcao - dtSaida) / (1000 * 60 * 60 * 24)));
+                        const diasGozados = Math.max(0, Math.floor((dtInterrupcao - dtSaida) / (1000 * 60 * 60 * 24)) + 1);
                         setFormData(prev => ({ ...prev, data_interrupcao: novaData, dias_gozados_interrupcao: diasGozados }));
                       }
                     }}

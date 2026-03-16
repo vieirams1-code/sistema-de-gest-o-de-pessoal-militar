@@ -592,11 +592,21 @@ export default function CadastrarRegistroLivro() {
 
     const toNumOrUndef = (v) => (v !== '' && v !== undefined && v !== null && !Number.isNaN(Number(v)) ? Number(v) : undefined);
 
+    // Previne salvar "0" dias em registros de férias que não renderizam o campo "dias" na UI
+    let diasFinais = toNumOrUndef(formData.dias);
+    if (selectedFerias) {
+      if (['Saída Férias', 'Interrupção de Férias', 'Retorno Férias'].includes(tipoRegistroEfetivo)) {
+        diasFinais = Number(selectedFerias.dias || 0);
+      } else if (tipoRegistroEfetivo === 'Nova Saída / Retomada') {
+        diasFinais = Number(selectedFerias.saldo_remanescente || 0);
+      }
+    }
+
     const registroData = {
       ...formData,
       tipo_registro: tipoRegistroEfetivo,
       texto_publicacao: textoPublicacao,
-      dias: toNumOrUndef(formData.dias),
+      dias: diasFinais,
       dias_evento: toNumOrUndef(formData.dias_evento),
       dias_restantes: toNumOrUndef(formData.dias_restantes),
       ...(metricasInterrupcao

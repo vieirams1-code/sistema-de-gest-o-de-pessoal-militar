@@ -194,11 +194,13 @@ export function recalcularEstadoFerias(ferias, eventosSobreviventes) {
       e.tipo_registro === TIPOS_EVENTO_FERIAS.INTERRUPCAO
     );
 
-    if (primeiroSaida?.data_inicio && ultimaInterrupcao?.data_inicio) {
-      const diasGozados = Math.round(
-        (new Date(ultimaInterrupcao.data_inicio + 'T00:00:00') - new Date(primeiroSaida.data_inicio + 'T00:00:00')) /
-        (1000 * 60 * 60 * 24)
-      );
+    const dataSaida = getEventoData(primeiroSaida);
+    const dataInt = getEventoData(ultimaInterrupcao);
+
+    if (dataSaida && dataInt) {
+      const dtSaida = new Date(dataSaida + 'T00:00:00');
+      const dtInt = new Date(dataInt + 'T00:00:00');
+      const diasGozados = Math.max(0, Math.floor((dtInt - dtSaida) / (1000 * 60 * 60 * 24)) + 1);
       const saldo = novosDias - diasGozados;
       linhasObs.push(`Saldo: ${Math.max(0, saldo)} dias`);
     }

@@ -336,6 +336,16 @@ export default function CadastrarFerias() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {editId && formData.status && !['Prevista', 'Autorizada'].includes(formData.status) && (
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800 leading-relaxed">
+                <strong>Atenção:</strong> Estas férias estão com status <strong>{formData.status}</strong>. 
+                Alterar dados aqui modifica o plano base, mas <strong>não altera automaticamente</strong> os registros do Livro e as publicações da cadeia operacional. Use o painel da Família na tela de Férias para gerir operações.
+              </p>
+            </div>
+          )}
+
           <FormSection title="Militar" icon={UserIcon} defaultOpen={true}>
             <MilitarSelector value={formData.militar_id} onChange={handleChange} onMilitarSelect={handleMilitarSelect} />
           </FormSection>
