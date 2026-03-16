@@ -34,13 +34,14 @@ export default function Processos() {
   const queryClient = useQueryClient();
   const { isAdmin, subgrupamentoId, modoAcesso, userEmail, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
-  if (!loadingUser && !canAccessModule('processos')) return <AccessDenied modulo="Processos" />;
   const [view, setView] = useState('kanban');
   const [search, setSearch] = useState('');
   const [filterPrio, setFilterPrio] = useState('Todas');
   const [filterTipo, setFilterTipo] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [modal, setModal] = useState({ open: false, processo: null });
+
+  if (!loadingUser && !canAccessModule('processos')) return <AccessDenied modulo="Processos" />;
 
   const { data: processos = [], isLoading } = useQuery({
     queryKey: ['processos', isAdmin, subgrupamentoId],
