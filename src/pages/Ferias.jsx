@@ -86,9 +86,9 @@ function parseDate(dateStr) {
   return new Date(`${dateStr}T00:00:00`);
 }
 
-function formatDateBR(dateStr) {
-  if (!dateStr) return '-';
-  return format(parseDate(dateStr), 'dd/MM/yyyy');
+function formatDate(dateString) {
+  if (!dateString) return '-';
+  return format(new Date(`${dateString}T00:00:00`), 'dd/MM/yyyy');
 }
 
 function getEventDate(evento) {
@@ -237,7 +237,7 @@ function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
   }
 
   if (primeiroEventoDataStr && novaDataDate > parseDate(primeiroEventoDataStr)) {
-    return `A data de início não pode ser posterior ao primeiro evento da cadeia (${NOMES_OPERACIONAIS[primeiroEvento.tipo_registro] || primeiroEvento.tipo_registro} em ${formatDateBR(primeiroEventoDataStr)}).`;
+    return `A data de início não pode ser posterior ao primeiro evento da cadeia (${NOMES_OPERACIONAIS[primeiroEvento.tipo_registro] || primeiroEvento.tipo_registro} em ${formatDate(primeiroEventoDataStr)}).`;
   }
 
   if (
@@ -245,7 +245,7 @@ function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
     getEventDate(estadoAtual.ultimaInterrupcao) &&
     novaDataDate > parseDate(getEventDate(estadoAtual.ultimaInterrupcao))
   ) {
-    return `A data de início não pode ser posterior à interrupção de ${formatDateBR(getEventDate(estadoAtual.ultimaInterrupcao))}.`;
+    return `A data de início não pode ser posterior à interrupção de ${formatDate(getEventDate(estadoAtual.ultimaInterrupcao))}.`;
   }
 
   if (
@@ -253,11 +253,11 @@ function validarEdicaoDataInicio({ ferias, novaData, registrosLivro }) {
     getEventDate(estadoAtual.ultimoRetorno) &&
     novaDataDate > parseDate(getEventDate(estadoAtual.ultimoRetorno))
   ) {
-    return `A data de início não pode ser posterior ao término de ${formatDateBR(getEventDate(estadoAtual.ultimoRetorno))}.`;
+    return `A data de início não pode ser posterior ao término de ${formatDate(getEventDate(estadoAtual.ultimoRetorno))}.`;
   }
 
   if (ultimoEventoDataStr && novaDataDate > parseDate(ultimoEventoDataStr)) {
-    return `A data de início não pode ser posterior ao último evento da cadeia (${NOMES_OPERACIONAIS[ultimoEvento.tipo_registro] || ultimoEvento.tipo_registro} em ${formatDateBR(ultimoEventoDataStr)}).`;
+    return `A data de início não pode ser posterior ao último evento da cadeia (${NOMES_OPERACIONAIS[ultimoEvento.tipo_registro] || ultimoEvento.tipo_registro} em ${formatDate(ultimoEventoDataStr)}).`;
   }
 
   return null;

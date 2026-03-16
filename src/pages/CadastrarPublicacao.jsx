@@ -906,7 +906,7 @@ export default function CadastrarPublicacao() {
                               handleChange('atestados_jiso_ids', ids);
                             }}
                           />
-                          <span className="text-sm">{a.dias} dias — {a.data_inicio} até {a.data_termino} — CID: {a.cid_10 || '—'}</span>
+                          <span className="text-sm">{a.dias} dias — {formatarDataExtenso(a.data_inicio)} até {formatarDataExtenso(a.data_termino)} — CID: {a.cid_10 || '—'}</span>
                         </label>
                       ))}
                     </div>
@@ -934,7 +934,7 @@ export default function CadastrarPublicacao() {
                     checked={formData.atestado_homologado_id === a.id}
                     onChange={() => handleChange('atestado_homologado_id', a.id)}
                   />
-                  <span className="text-sm">{a.dias} dias — {a.data_inicio} até {a.data_termino} — CID: {a.cid_10 || '—'} — {a.tipo_afastamento}</span>
+                  <span className="text-sm">{a.dias} dias — {formatarDataExtenso(a.data_inicio)} até {formatarDataExtenso(a.data_termino)} — CID: {a.cid_10 || '—'} — {a.tipo_afastamento}</span>
                 </label>
               ))}
             </div>
@@ -1069,7 +1069,7 @@ export default function CadastrarPublicacao() {
                     )}
                     {publicacoesElegiveis.map(p => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.tipo_label} — BG {p.numero_bg} ({p.data_bg || ''})
+                        {p.tipo_label} — BG {p.numero_bg} ({p.data_bg ? formatarDataExtenso(p.data_bg) : ''})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1078,7 +1078,7 @@ export default function CadastrarPublicacao() {
               {pubRef && (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
                   <p><span className="font-medium">Publicação:</span> {pubRef.tipo_label} — {pubRef.militar_nome}</p>
-                  {pubRef.numero_bg && <p><span className="font-medium">BG Nº:</span> {pubRef.numero_bg} de {pubRef.data_bg}</p>}
+                  {pubRef.numero_bg && <p><span className="font-medium">BG Nº:</span> {pubRef.numero_bg} de {formatarDataExtenso(pubRef.data_bg)}</p>}
                   {pubRef.nota_para_bg && <p><span className="font-medium">Nota:</span> {pubRef.nota_para_bg}</p>}
                 </div>
               )}
@@ -1140,7 +1140,7 @@ export default function CadastrarPublicacao() {
                     )}
                     {publicacoesElegiveis.map(p => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.tipo_label} — BG {p.numero_bg} ({p.data_bg || ''})
+                        {p.tipo_label} — BG {p.numero_bg} ({p.data_bg ? formatarDataExtenso(p.data_bg) : ''})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1149,7 +1149,7 @@ export default function CadastrarPublicacao() {
               {pubRefTSE && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1">
                   <p><span className="font-medium">Publicação:</span> {pubRefTSE.tipo_label} — {pubRefTSE.militar_nome}</p>
-                  {pubRefTSE.numero_bg && <p><span className="font-medium">BG Nº:</span> {pubRefTSE.numero_bg} de {pubRefTSE.data_bg}</p>}
+                  {pubRefTSE.numero_bg && <p><span className="font-medium">BG Nº:</span> {pubRefTSE.numero_bg} de {formatarDataExtenso(pubRefTSE.data_bg)}</p>}
                   {pubRefTSE.nota_para_bg && <p><span className="font-medium">Nota:</span> {pubRefTSE.nota_para_bg}</p>}
                   {pubRefTSE.texto_publicacao && (
                     <div className="mt-2">
@@ -1179,7 +1179,7 @@ export default function CadastrarPublicacao() {
                     {feriasEmCurso.length === 0 && <SelectItem value="_none" disabled>Nenhuma férias em curso para este militar</SelectItem>}
                     {feriasEmCurso.map(f => (
                       <SelectItem key={f.id} value={f.id}>
-                        {f.periodo_aquisitivo_ref} — {f.data_inicio} a {f.data_fim} ({f.dias}d) — {f.status}
+                        {f.periodo_aquisitivo_ref} — {formatarDataExtenso(f.data_inicio)} a {formatarDataExtenso(f.data_fim)} ({f.dias}d) — {f.status}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1218,7 +1218,7 @@ export default function CadastrarPublicacao() {
                   />
                   {formData.ferias_interrompida_id && formData.data_interrupcao && (() => {
                     const f = feriasEmCurso.find(x => x.id === formData.ferias_interrompida_id);
-                    return f?.data_inicio ? <p className="text-xs text-slate-400 mt-1">Calculado a partir de {f.data_inicio}</p> : null;
+                    return f?.data_inicio ? <p className="text-xs text-slate-400 mt-1">Calculado a partir de {formatarDataExtenso(f.data_inicio)}</p> : null;
                   })()}
                 </div>
               </div>
