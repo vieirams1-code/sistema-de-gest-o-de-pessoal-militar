@@ -715,6 +715,10 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const enviarComentario = async () => {
     if (!mensagem.trim()) return;
+    // INTENCIONAL: comentários são liberados para qualquer usuário com acesso ao módulo
+    // quadro_operacional — não exigem action key específica. Isso é equivalente a uma
+    // conversa aberta entre os membros do quadro. Se necessário restringir no futuro,
+    // usar canAccessAction('gerir_acoes_operacionais').
 
     setSalvando(true);
     try {
@@ -749,6 +753,11 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const salvarDataJiso = async () => {
     if (!permiteEditarDataJiso || savingJisoDate) return;
+    // Revalidação explícita: editar data JISO exige permissão de gerir JISO
+    if (!canAccessAction('gerir_jiso') && !canAccessAction('registrar_decisao_jiso')) {
+      alert('Ação negada: você não tem permissão para editar a data da JISO.');
+      return;
+    }
 
     setSavingJisoDate(true);
     try {
