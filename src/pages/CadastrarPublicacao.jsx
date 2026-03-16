@@ -103,78 +103,65 @@ export default function CadastrarPublicacao() {
 
 
 
-  // Para apostila / tornar sem efeito: buscar publicações publicadas do militar em todas as entidades
-  const { data: todasPublicacoes = [] } = useQuery({
-    queryKey: ['publicacoes-apostila', formData.militar_id],
+  // Buscar TODAS as publicações (incluindo não publicadas) para checagem de duplicidade
+  const { data: todasPublicacoesRaw = {} } = useQuery({
+    queryKey: ['publicacoes-militar-raw', formData.militar_id],
     queryFn: async () => {
       const [exOfficio, livro, atestados] = await Promise.all([
         base44.entities.PublicacaoExOfficio.filter({ militar_id: formData.militar_id }, '-data_publicacao'),
         base44.entities.RegistroLivro.filter({ militar_id: formData.militar_id }, '-data_registro'),
         base44.entities.Atestado.filter({ militar_id: formData.militar_id }, '-data_inicio'),
       ]);
-
-      const normalizar = (item) => {
-        let origem_tipo;
-        if (item.tipo && !item.tipo_registro && !item.medico && !item.cid_10) {
-          origem_tipo = 'ex-officio';
-        } else if (item.medico || item.cid_10) {
-          origem_tipo = 'atestado';
-        } else {
-          origem_tipo = 'livro';
-        }
-
-        const tipo_label =
-          item.tipo_registro ||
-          item.tipo ||
-          (item.medico || item.cid_10
-            ? item.necessita_jiso
-              ? 'Atestado - JISO'
-              : 'Atestado - Homologação'
-            : 'Publicação');
-
-        return {
-          ...item,
-          origem_tipo,
-          tipo_label,
-          status_calculado: item.numero_bg && item.data_bg ? 'Publicado' : item.nota_para_bg ? 'Aguardando Publicação' : 'Aguardando Nota',
-        };
-      };
-
-      // Originais ex-officio publicadas (exceto TSE)
-      const exOfficioFiltrado = exOfficio
-        .filter(p => p.numero_bg && p.data_bg && p.tipo !== 'Tornar sem Efeito')
-        .map(normalizar);
-
-      const livroFiltrado = livro
-        .filter(p => p.numero_bg && p.data_bg)
-        .map(normalizar);
-
-      const atestadosFiltrado = atestados
-        .filter(p => p.numero_bg && p.data_bg)
-        .map(normalizar);
-
-      const todas = [...exOfficioFiltrado, ...livroFiltrado, ...atestadosFiltrado]
-        .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-
-      // Para Apostila: excluir Apostilas e TSEs (só originais)
-      // Para TSE: incluir Apostilas publicadas também (para poder tornar sem efeito uma apostila)
-      return todas;
+      return { exOfficio, livro, atestados };
     },
-    enabled: (formData.tipo === 'Apostila' || formData.tipo === 'Tornar sem Efeito') && !!formData.militar_id,
+    enabled: !!formData.militar_id,
   });
 
-  // Lista filtrada dependendo do tipo de ação
+  const todasPublicacoesFormatadas = React.useMemo(() => {
+    const { exOfficio = [], livro = [], atestados = [] } = todasPublicacoesRaw;
+    const normalizar = (item) => {
+      let origem_tipo;
+      if (item.tipo && !item.tipo_registro && !item.medico && !item.cid_10) {
+        origem_tipo = 'ex-officio';
+      } else if (item.medico || item.cid_10) {
+        origem_tipo = 'atestado';
+      } else {
+        origem_tipo = 'livro';
+      }
+
+      const tipo_label =
+        item.tipo_registro ||
+        item.tipo ||
+        (item.medico || item.cid_10
+          ? item.necessita_jiso
+            ? 'Atestado - JISO'
+            : 'Atestado - Homologação'
+          : 'Publicação');
+
+      return {
+        ...item,
+        origem_tipo,
+        tipo_label,
+        status_calculado: item.numero_bg && item.data_bg ? 'Publicado' : item.nota_para_bg ? 'Aguardando Publicação' : 'Aguardando Nota',
+      };
+    };
+
+    return [...exOfficio, ...livro, ...atestados]
+      .map(normalizar)
+      .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+  }, [todasPublicacoesRaw]);
+
+  // Lista filtrada dependendo do tipo de ação (somente publicadas para Apostila/TSE)
   const publicacoesElegiveis = React.useMemo(() => {
+    const publicadas = todasPublicacoesFormatadas.filter(p => p.numero_bg && p.data_bg);
     if (formData.tipo === 'Apostila') {
-      // Só originais publicadas — sem Apostilas, sem TSEs
-      return todasPublicacoes.filter(p => p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito');
+      return publicadas.filter(p => p.tipo !== 'Apostila' && p.tipo !== 'Tornar sem Efeito');
     }
     if (formData.tipo === 'Tornar sem Efeito') {
-      // Originais + Apostilas publicadas — sem TSEs
-      return todasPublicacoes.filter(p => p.tipo !== 'Tornar sem Efeito');
+      return publicadas.filter(p => p.tipo !== 'Tornar sem Efeito');
     }
-    return todasPublicacoes;
-  }, [todasPublicacoes, formData.tipo]);
+    return publicadas;
+  }, [todasPublicacoesFormatadas, formData.tipo]);
 
   // Templates para Ex Officio
   const { data: templatesExOfficio = [] } = useQuery({
@@ -438,7 +425,7 @@ export default function CadastrarPublicacao() {
       case 'Tornar sem Efeito': {
         const tmplTSE = templatesExOfficio.find(t => t.tipo_registro === 'Tornar sem Efeito' && t.ativo !== false);
         if (tmplTSE?.template) {
-          const pubRefTSE = todasPublicacoes.find(p => p.id === formData.publicacao_referencia_id);
+          const pubRefTSE = todasPublicacoesFormatadas.find(p => p.id === formData.publicacao_referencia_id);
           texto = aplicarTemplate(tmplTSE.template, {
             posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
             numero_bg_ref: formData.publicacao_referencia_numero_bg || '',
@@ -514,7 +501,7 @@ export default function CadastrarPublicacao() {
 
     if (formData.tipo === 'Homologação de Atestado' && formData.atestado_homologado_id) {
       const jaExisteHomologacao = existePublicacaoAtivaParaAtestado(
-        todasPublicacoes,
+        todasPublicacoesFormatadas,
         formData.atestado_homologado_id,
         'Homologação de Atestado',
         publicacaoIgnoradaId
@@ -530,7 +517,7 @@ export default function CadastrarPublicacao() {
     if (formData.tipo === 'Ata JISO' && formData.atestados_jiso_ids?.length) {
       const idsDuplicados = formData.atestados_jiso_ids.filter((atestadoId) =>
         existePublicacaoAtivaParaAtestado(
-          todasPublicacoes,
+          todasPublicacoesFormatadas,
           atestadoId,
           'Ata JISO',
           publicacaoIgnoradaId
@@ -601,7 +588,7 @@ export default function CadastrarPublicacao() {
     // Helper: detectar origem_tipo a partir de todasPublicacoes ou do campo salvo no formData
     const resolverOrigemTipo = (refId) => {
       // Primeiro tenta pelo array carregado (mais confiável)
-      const pubRef = todasPublicacoes.find(p => p.id === refId);
+      const pubRef = todasPublicacoesFormatadas.find(p => p.id === refId);
       if (pubRef?.origem_tipo) return pubRef.origem_tipo;
       // Fallback: campo salvo no formData
       return formData.publicacao_referencia_origem_tipo || 'ex-officio';
@@ -679,6 +666,8 @@ export default function CadastrarPublicacao() {
     queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
     queryClient.invalidateQueries({ queryKey: ['militares'] });
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+    queryClient.invalidateQueries({ queryKey: ['cards'] });
     setLoading(false);
     navigate(createPageUrl('Publicacoes'));
   };
@@ -1291,8 +1280,8 @@ export default function CadastrarPublicacao() {
   // Quando publicacao_referencia_id muda (e temos as publicações carregadas), preencher dados da referência
   // Usa todasPublicacoes (não filtrada) para conseguir encontrar Apostilas vindas da URL
   useEffect(() => {
-    if (!formData.publicacao_referencia_id || todasPublicacoes.length === 0) return;
-    const pub = todasPublicacoes.find(p => p.id === formData.publicacao_referencia_id);
+    if (!formData.publicacao_referencia_id || todasPublicacoesFormatadas.length === 0) return;
+    const pub = todasPublicacoesFormatadas.find(p => p.id === formData.publicacao_referencia_id);
     if (!pub) return;
     setFormData(prev => ({
       ...prev,
@@ -1310,7 +1299,7 @@ export default function CadastrarPublicacao() {
         militar_matricula: pub.militar_matricula || prev.militar_matricula,
       } : {}),
     }));
-  }, [formData.publicacao_referencia_id, todasPublicacoes]);
+  }, [formData.publicacao_referencia_id, todasPublicacoesFormatadas]);
 
   // Gerar texto para tipo customizado Ex Officio
   useEffect(() => {

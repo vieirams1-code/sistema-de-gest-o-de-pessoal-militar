@@ -309,6 +309,8 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
     }
   });
 
@@ -399,6 +401,8 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
     },
     onError: (error) => {
       alert(error?.message || 'Erro ao excluir registro.');

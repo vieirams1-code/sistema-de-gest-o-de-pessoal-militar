@@ -155,6 +155,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     });
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
     queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+    queryClient.invalidateQueries({ queryKey: ['cards'] });
+    queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+    queryClient.invalidateQueries({ queryKey: ['cards'] });
     setSavingPublicacao(false);
     setShowHomologacaoModal(false);
   };
@@ -258,7 +262,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     setSavingJiso(true);
     await base44.entities.Atestado.update(atestado.id, {
       data_jiso_agendada: jisoDate,
-      status_jiso: 'Aguardando JISO'
+      ...((!atestado.status_jiso || atestado.status_jiso === 'Em análise') ? { status_jiso: 'Aguardando JISO' } : {})
     });
     await sincronizarAtestadoJisoNoQuadro({
       ...atestado,

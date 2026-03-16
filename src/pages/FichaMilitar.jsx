@@ -544,6 +544,9 @@ export default function FichaMilitar() {
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
     } catch (error) {
       alert(error?.message || 'Não foi possível excluir o registro com segurança.');
     } finally {
