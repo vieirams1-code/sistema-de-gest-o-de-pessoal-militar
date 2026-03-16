@@ -493,8 +493,6 @@ export default function ConciliacaoBoletim() {
   
   const { isAdmin, getMilitarScopeFilters, canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('publicacoes');
-  
-  if (!loadingUser && !hasAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['conciliacao-registros-livro'],
@@ -886,6 +884,9 @@ export default function ConciliacaoBoletim() {
       setErroVinculo('Falha ao remover vínculo.');
     }
   };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
   return (
     <div className="p-4 md:p-8 space-y-6">
