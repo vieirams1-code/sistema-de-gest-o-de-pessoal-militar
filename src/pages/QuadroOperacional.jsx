@@ -123,28 +123,32 @@ export default function QuadroOperacionalPage() {
     return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
   };
 
+  const canAccessQuadro = canAccessModule('quadro_operacional');
+
   const { data: quadros = [], isLoading: loadQ } = useQuery({
     queryKey: ['quadros'],
     queryFn: () => base44.entities.QuadroOperacional.filter({ ativo: true }, 'ordem'),
+    // Não dispara antes de ter permissão resolvida
+    enabled: isAccessResolved && canAccessQuadro,
   });
   const quadro = quadros[0] || null;
 
   const { data: colunas = [], isLoading: loadC } = useQuery({
     queryKey: ['colunas', quadro?.id],
     queryFn: () => base44.entities.ColunaOperacional.filter({ quadro_id: quadro.id, ativa: true }, 'ordem'),
-    enabled: !!quadro?.id,
+    enabled: isAccessResolved && canAccessQuadro && !!quadro?.id,
   });
 
   const { data: cards = [], isLoading: loadCards } = useQuery({
     queryKey: ['cards', quadro?.id],
     queryFn: fetchCardsDoQuadro,
-    enabled: !!quadro?.id && colunas.length > 0,
+    enabled: isAccessResolved && canAccessQuadro && !!quadro?.id && colunas.length > 0,
   });
 
   const { data: checklistItens = [] } = useQuery({
     queryKey: ['checklist-board', quadro?.id],
     queryFn: () => base44.entities.CardChecklistItem.list('-created_date', 2000),
-    enabled: !!quadro?.id,
+    enabled: isAccessResolved && canAccessQuadro && !!quadro?.id,
   });
 
   const isLoading = loadQ || loadC || loadCards;
@@ -204,6 +208,12 @@ export default function QuadroOperacionalPage() {
   }, [cardsComResumo, searchParams, setSearchParams]);
 
   const criarCard = async (form) => {
+    // Verificação explícita de permissão no handler
+    if (!canAccessAction('criar_processo') && !canAccessAction('gerir_quadro') && !canAccessAction('gerir_acoes_operacionais')) {
+      window.alert('Ação negada: Sem permissão para criar cards.');
+      setColunaNovoCard(null);
+      return;
+    }
     setSalvandoCard(true);
     try {
       const cardsDaColuna = [...cardsComResumo]
