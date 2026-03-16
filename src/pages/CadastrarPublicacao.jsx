@@ -92,8 +92,14 @@ export default function CadastrarPublicacao() {
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
+  const canPublicarBG = canAccessAction('publicar_bg');
+  const canApostilar = canAccessAction('apostilar_publicacao');
+  const canTSE = canAccessAction('tornar_sem_efeito_publicacao');
+  const canPublicarAta = canAccessAction('publicar_ata_jiso');
+  const canPublicarHomologacao = canAccessAction('publicar_homologacao');
+  const canEditarPublicacoes = canAccessAction('editar_publicacoes');
 
 
 
