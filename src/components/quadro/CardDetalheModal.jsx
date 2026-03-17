@@ -815,8 +815,8 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
 
   const salvarClassificacao = async () => {
     if (salvandoClassificacao) return;
-    if (!canAccessAction('gerir_acoes_operacionais')) {
-      alert('Ação negada: você não tem permissão para editar classificação de cards.');
+    if (!canAccessAction('gerir_quadro')) {
+      alert('Ação negada: você não tem permissão para editar a classificação de cards do quadro.');
       return;
     }
 

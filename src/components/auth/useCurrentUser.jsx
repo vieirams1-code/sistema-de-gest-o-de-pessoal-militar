@@ -79,7 +79,7 @@ export function useCurrentUser() {
    * Permissão por módulo via UsuarioAcesso.
    * Campos: acesso_militares, acesso_ferias, acesso_livro, acesso_publicacoes,
    *         acesso_atestados, acesso_armamentos, acesso_medalhas, acesso_templates,
-   *         acesso_configuracoes, acesso_quadro_operacional, acesso_processos
+   *         acesso_configuracoes, acesso_quadro_operacional
    *
    * @param {string} modulo — ex: 'ferias', 'militares', 'configuracoes'
    */
@@ -112,7 +112,6 @@ export function useCurrentUser() {
    *         perm_registrar_decisao_jiso, perm_excluir_atestado, perm_gerir_quadro,
    *         perm_mover_card, perm_gerir_colunas, perm_arquivar_card,
    *         perm_gerir_acoes_operacionais, perm_excluir_acao_operacional,
-   *         perm_criar_processo, perm_editar_processo, perm_excluir_processo,
    *         perm_gerir_configuracoes
    *
    * @param {string} acao — ex: 'admin_mode', 'excluir_ferias', 'gerir_cadeia_ferias'
@@ -199,48 +198,4 @@ export function useCurrentUser() {
       return [{ grupamento_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }];
     }
 
-    if (modoAcesso === 'subsetor' && subgrupamentoId) {
-      const scopeIds = [subgrupamentoId, ...unidadesFilhas.map(u => u.id)];
-      return scopeIds.map(id => ({ subgrupamento_id: id }));
-    }
-
-    if (modoAcesso === 'unidade' && subgrupamentoId) {
-      return [{ subgrupamento_id: subgrupamentoId }];
-    }
-
-    if (modoAcesso === 'proprio' && userEmail) {
-      const filters = [];
-      if (linkedMilitarId) filters.push({ id: linkedMilitarId });
-      filters.push({ email: userEmail }, { email_particular: userEmail }, { email_funcional: userEmail }, { created_by: userEmail });
-      if (linkedMilitarEmail && linkedMilitarEmail !== userEmail) {
-        filters.push({ email: linkedMilitarEmail }, { email_particular: linkedMilitarEmail }, { email_funcional: linkedMilitarEmail }, { militar_email: linkedMilitarEmail });
-      }
-      return filters;
-    }
-
-    return [];
-  };
-
-  // Mantém hasModuleAccess como alias para compatibilidade
-  const hasModuleAccess = canAccessModule;
-
-  return {
-    user,
-    isLoading,
-    isAccessResolved,
-    isAdmin,
-    subgrupamentoId,
-    subgrupamentoTipo,
-    modoAcesso,
-    userEmail,
-    linkedMilitarId,
-    linkedMilitarEmail,
-    hasAccess,
-    hasSelfAccess,
-    hasModuleAccess,
-    canAccessModule,
-    canAccessAction,
-    getAccessModeFromUser,
-    getMilitarScopeFilters,
-  };
-}
+    if (modoAcesso === 'subsetor' && subgrupa

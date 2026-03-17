@@ -108,7 +108,6 @@ export default function QuadroOperacionalPage() {
   const canMoverCard = canAccessAction('mover_card');
   const canGerirColunas = canAccessAction('gerir_colunas');
   const canGerirQuadro = canAccessAction('gerir_quadro');
-  const canGerirAcoesOperacionais = canAccessAction('gerir_acoes_operacionais');
 
   const [busca, setBusca] = useState('');
   const [cardAberto, setCardAberto] = useState(null);
@@ -207,8 +206,8 @@ export default function QuadroOperacionalPage() {
   }, [cardsComResumo, searchParams, setSearchParams]);
 
   const criarCard = async (form) => {
-    if (!canGerirAcoesOperacionais) {
-      window.alert('Ação negada: Sem permissão para criar cards operacionais.');
+    if (!canGerirQuadro) {
+      window.alert('Ação negada: Sem permissão para gerir o quadro e criar cards.');
       return;
     }
     setSalvandoCard(true);

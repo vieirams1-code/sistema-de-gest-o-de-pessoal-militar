@@ -29,8 +29,7 @@ const modulosList = [
   { key: 'acesso_medalhas', label: 'Medalhas' },
   { key: 'acesso_templates', label: 'Templates' },
   { key: 'acesso_configuracoes', label: 'Configurações' },
-  { key: 'acesso_quadro_operacional', label: 'Quadro Operacional' },
-  { key: 'acesso_processos', label: 'Processos' },
+  { key: 'acesso_quadro_operacional', label: 'Quadro Operacional' }
 ];
 
 const acoesSensiveis = [
@@ -56,10 +55,7 @@ const acoesSensiveis = [
   { key: 'perm_gerir_colunas', label: 'Gerir Colunas Quadro' },
   { key: 'perm_arquivar_card', label: 'Arquivar Card' },
   { key: 'perm_gerir_acoes_operacionais', label: 'Gerir Ações Op.' },
-  { key: 'perm_excluir_acao_operacional', label: 'Excluir Ação Op.' },
-  { key: 'perm_criar_processo', label: 'Criar Processo (Legado)' },
-  { key: 'perm_editar_processo', label: 'Editar Processo (Legado)' },
-  { key: 'perm_excluir_processo', label: 'Excluir Processo (Legado)' },
+  { key: 'perm_excluir_acao_operacional', label: 'Excluir Ação Op.' }
 ];
 
 const initialForm = {
