@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Calendar, FileText } from 'lucide-react';
 import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays, format as formatDate } from 'date-fns';
@@ -125,7 +124,6 @@ export default function EditarJISO() {
       dias_original: atestado.dias,
       dias_jiso: formData.dias_jiso ? parseInt(formData.dias_jiso) : null,
       texto_publicacao: gerarTextoPublicacao()
-      texto_publicacao: textoPublicacao
     };
 
     if (jiso) {
