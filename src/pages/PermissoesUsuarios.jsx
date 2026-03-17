@@ -95,8 +95,8 @@ export default function PermissoesUsuarios() {
       // O list() pode não retornar todos os campos booleanos de permissão;
       // ao selecionar, buscamos o registro completo para hidratar corretamente.
       fullAcesso = await base44.entities.UsuarioAcesso.get(acesso.id);
-    } catch (e) {
-      console.error('Falha ao carregar detalhes do acesso selecionado, usando dados da lista.', e);
+    } catch {
+      // Em caso de falha, seguimos com os dados já retornados no list().
     }
 
     setSelectedUser(fullAcesso);
@@ -214,8 +214,7 @@ export default function PermissoesUsuarios() {
 
       queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
       setSelectedUser(null);
-    } catch (e) {
-      console.error(e);
+    } catch {
       alert('Erro ao salvar permissão no Base44.');
     } finally {
       setSavingUser(false);
