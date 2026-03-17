@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { aplicarTemplate } from '@/components/utils/templateUtils';
@@ -92,6 +92,7 @@ export default function CadastrarPublicacao() {
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [camposCustom, setCamposCustom] = useState({});
+  const [templateError, setTemplateError] = useState(null);
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
   const canPublicarBG = canAccessAction('publicar_bg');
@@ -289,65 +290,64 @@ export default function CadastrarPublicacao() {
   }, [formData, templatesExOfficio, militarSelecionado]);
 
   const gerarTextoPublicacao = () => {
+    setTemplateError(null);
     const postoNome = formData.militar_posto ? `${formData.militar_posto} QBMP-1.a` : '';
     const nomeCompleto = formData.militar_nome || '';
     const matricula = formData.militar_matricula || '';
-    const cmd = `${artigo} Comandante do 1° Grupamento de Bombeiros Militar`;
+
+    const aplicarOuErro = (tipoRegistro, varsExtras = {}) => {
+      const tmpl = templatesExOfficio.find(t => t.tipo_registro === tipoRegistro && t.ativo !== false);
+      if (tmpl?.template) {
+        return aplicarTemplate(tmpl.template, {
+          posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
+          ...varsExtras
+        });
+      }
+      setTemplateError(`Template obrigatório não encontrado para '${tipoRegistro}'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
+      return '';
+    };
+
     let texto = '';
 
     switch (formData.tipo) {
-      case 'Elogio Individual': {
-        const tmplElogio = templatesExOfficio.find(t => t.tipo_registro === 'Elogio Individual' && t.ativo !== false);
-        if (tmplElogio?.template) {
-          texto = aplicarTemplate(tmplElogio.template, {
-            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
-            texto_complemento: formData.texto_complemento || '',
-          });
-        } else if (formData.texto_complemento) {
-          texto = `${cmd}, no uso das atribuições que lhe confere o art. 140, §1°, "c" e §2°, da Lei Complementar nº 053, de 30 de agosto de 1990, c/c art. 67, I, e art. 68, "a" e "b", do Decreto nº 1.260, de 2 de outubro de 1981, resolve elogiar e externar sinceros cumprimentos ao ${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${formData.texto_complemento}`;
-        }
+      case 'Elogio Individual':
+        texto = aplicarOuErro('Elogio Individual', {
+          texto_complemento: formData.texto_complemento || '',
+        });
         break;
-      }
 
       case 'Melhoria de Comportamento': {
-        const tmplMelhoria = templatesExOfficio.find(t => t.tipo_registro === 'Melhoria de Comportamento' && t.ativo !== false);
         const dataInclusao = militarSelecionado?.data_inclusao ? formatarDataExtenso(militarSelecionado.data_inclusao) : '';
-        if (tmplMelhoria?.template) {
-          texto = aplicarTemplate(tmplMelhoria.template, {
-            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
-            data_melhoria: formatarDataExtenso(formData.data_melhoria),
-            comportamento_atual: formData.comportamento_atual || '',
-            comportamento_ingressou: formData.comportamento_ingressou || '',
-            data_inclusao: dataInclusao,
-          });
-        } else if (formData.data_melhoria && formData.comportamento_atual && formData.comportamento_ingressou) {
-          texto = `${cmd}, de acordo com o art. 51, § 1° c/c art. 52, inciso I, ambos do Decreto nº 1.260/1981, resolve: conceder melhoria de comportamento, a contar de ${formatarDataExtenso(formData.data_melhoria)}, ao militar a seguir: ${postoNome} ${nomeCompleto}, matrícula n. ${matricula}, por ter completado 08 (oito) meses sucessivos sem sofrer punição, melhorando o comportamento do último para o excepcional.`;
-        }
+        texto = aplicarOuErro('Melhoria de Comportamento', {
+          data_melhoria: formatarDataExtenso(formData.data_melhoria),
+          comportamento_atual: formData.comportamento_atual || '',
+          comportamento_ingressou: formData.comportamento_ingressou || '',
+          data_inclusao: dataInclusao,
+        });
         break;
       }
 
       case 'Punição':
         if (formData.portaria && formData.tipo_punicao) {
-          texto = `${cmd} no uso das atribuições que lhe confere o art. 140, § 1°, "c" e § 2°, "a" e "b", e inc. V do Decreto nº 1.260, de 02 de outubro de 1981, torna pública a Solução PAD instaurado pela Portaria n° ${formData.portaria} de ${formatarDataExtenso(formData.data_portaria)} e respectiva nota de punição, cujos conteúdos seguem em anexo, onde penaliza: ${postoNome} ${nomeCompleto}, mat. ${matricula}, com: ${formData.tipo_punicao} de ${formData.dias_punicao} dias, incurso em: ${formData.itens_enquadramento} transgressão ${formData.graduacao_punicao || ''}, Ingresso no comportamento ${formData.comportamento_ingresso}. A ${formData.tipo_punicao === 'Prisão' ? 'Prisão' : 'Detenção'} será cumprida no 1/1° GBM/CBMMS: 1) Notificar o militar punido; 2) Fazer constar nas observações do Livro de Férias e Outras Concessões.`;
+          texto = aplicarOuErro('Punição', {
+            portaria: formData.portaria || '',
+            data_portaria: formatarDataExtenso(formData.data_portaria),
+            tipo_punicao: formData.tipo_punicao || '',
+            dias_punicao: formData.dias_punicao || '',
+            data_punicao: formatarDataExtenso(formData.data_punicao),
+            itens_enquadramento: formData.itens_enquadramento || '',
+            graduacao_punicao: formData.graduacao_punicao || '',
+            comportamento_ingresso: formData.comportamento_ingresso || '',
+          });
         }
         break;
 
-      case 'Transferência para RR': {
-        const tmplRR = templatesExOfficio.find(t => t.tipo_registro === 'Transferência para RR' && t.ativo !== false);
-        if (tmplRR?.template) {
-          texto = aplicarTemplate(tmplRR.template, {
-            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
-            documento_referencia_rr: formData.documento_referencia_rr || '',
-            data_transferencia_rr: formatarDataExtenso(formData.data_transferencia_rr),
-          });
-        } else if (formData.documento_referencia_rr && formData.data_transferencia_rr) {
-          texto = `${cmd}, no uso das atribuições que lhe confere, torna público que o ${postoNome} ${nomeCompleto}, matrícula ${matricula}, foi transferido para a Reserva Remunerada, conforme ${formData.documento_referencia_rr}, a contar de ${formatarDataExtenso(formData.data_transferencia_rr)}.`;
-        } else {
-          // preserve manual text
-          texto = formData.texto_publicacao || '';
-        }
+      case 'Transferência para RR':
+        texto = aplicarOuErro('Transferência para RR', {
+          documento_referencia_rr: formData.documento_referencia_rr || '',
+          data_transferencia_rr: formatarDataExtenso(formData.data_transferencia_rr),
+        });
         break;
-      }
 
 
       case 'Geral':
@@ -355,87 +355,49 @@ export default function CadastrarPublicacao() {
         break;
 
       case 'Designação de Função':
-      case 'Dispensa de Função': {
-        const tmplDesig = templatesExOfficio.find(t => t.tipo_registro === formData.tipo && t.ativo !== false);
-        if (tmplDesig?.template) {
-          texto = aplicarTemplate(tmplDesig.template, {
-            posto_nome: postoNome,
-            nome_completo: nomeCompleto,
-            matricula,
-            funcao: formData.funcao || '',
-            data_designacao: formatarDataExtenso(formData.data_designacao),
-          });
-        } else if (formData.funcao && formData.data_designacao) {
-          const acao = formData.tipo === 'Dispensa de Função' ? 'dispensar' : 'designar';
-          const preposicao = formData.tipo === 'Dispensa de Função' ? 'da' : 'para exercer a';
-          texto = `${cmd}, no uso de suas atribuições, resolve: ${acao} ${artigo === 'A' ? 'a' : 'o'} ${postoNome} ${nomeCompleto}, matrícula ${matricula}, ${preposicao} função de ${formData.funcao}, a contar de ${formatarDataExtenso(formData.data_designacao)}.`;
-        }
+      case 'Dispensa de Função':
+        texto = aplicarOuErro(formData.tipo, {
+          funcao: formData.funcao || '',
+          data_designacao: formatarDataExtenso(formData.data_designacao),
+        });
         break;
-      }
 
-      case 'Ata JISO': {
-        const tmplJISO = templatesExOfficio.find(t => t.tipo_registro === 'Ata JISO' && t.ativo !== false);
-        if (tmplJISO?.template) {
-          texto = aplicarTemplate(tmplJISO.template, {
-            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
-            finalidade_jiso: formData.finalidade_jiso || '',
-            secao_jiso: formData.secao_jiso || '',
-            data_ata: formatarDataExtenso(formData.data_ata),
-            nup: formData.nup || '',
-            parecer_jiso: formData.parecer_jiso || '',
-          });
-        } else if (formData.finalidade_jiso && formData.data_ata) {
-          texto = `${cmd}, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, resolve: tornar público que recebeu a Ata de Inspeção de Saúde Sessão Nº ${formData.secao_jiso}, de ${formatarDataExtenso(formData.data_ata)}, pertencente ao: ${postoNome} ${nomeCompleto}, matrícula ${matricula}, inspecionado para fins de ${formData.finalidade_jiso}, conf. NUP Nº ${formData.nup}, com o parecer: ${formData.parecer_jiso}.`;
-        }
+      case 'Ata JISO':
+        texto = aplicarOuErro('Ata JISO', {
+          finalidade_jiso: formData.finalidade_jiso || '',
+          secao_jiso: formData.secao_jiso || '',
+          data_ata: formatarDataExtenso(formData.data_ata),
+          nup: formData.nup || '',
+          parecer_jiso: formData.parecer_jiso || '',
+        });
         break;
-      }
 
-      case 'Transcrição de Documentos': {
-        const tmplTranscricao = templatesExOfficio.find(t => t.tipo_registro === 'Transcrição de Documentos' && t.ativo !== false);
-        if (tmplTranscricao?.template) {
-          texto = aplicarTemplate(tmplTranscricao.template, {
-            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
-            documento: formData.documento || '',
-            data_documento: formatarDataExtenso(formData.data_documento),
-            assunto: formData.assunto || '',
-          });
-        } else if (formData.documento && formData.data_documento) {
-          texto = `${cmd} torna público o recebimento do(a) ${formData.documento}, de ${formatarDataExtenso(formData.data_documento)}, ${formData.assunto ? formData.assunto + ', ' : ''}cujo conteúdo segue anexo ao presente Boletim. Em consequência: (1) Ciente; (2) Publicar.`;
-        }
+      case 'Transcrição de Documentos':
+        texto = aplicarOuErro('Transcrição de Documentos', {
+          documento: formData.documento || '',
+          data_documento: formatarDataExtenso(formData.data_documento),
+          assunto: formData.assunto || '',
+        });
         break;
-      }
 
-      case 'Apostila': {
-        const tmplApostila = templatesExOfficio.find(t => t.tipo_registro === 'Apostila' && t.ativo !== false);
-        if (tmplApostila?.template) {
-          texto = aplicarTemplate(tmplApostila.template, {
-            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
-            numero_bg_ref: formData.publicacao_referencia_numero_bg || '',
-            data_bg_ref: formatarDataExtenso(formData.publicacao_referencia_data_bg),
-            nota_ref: formData.publicacao_referencia_nota || '',
-            texto_errado: formData.texto_errado || '',
-            texto_novo: formData.texto_novo || '',
-          });
-        } else if (formData.publicacao_referencia_numero_bg) {
-          texto = `${cmd}, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna público que a publicação do Boletim ${formData.publicacao_referencia_numero_bg} de ${formatarDataExtenso(formData.publicacao_referencia_data_bg)}, que publicou a Nota nº ${formData.publicacao_referencia_nota}, foi apostilada e onde constava "${formData.texto_errado || '...'}" passa a constar com o seguinte texto: "${formData.texto_novo || '...'}".`;
-        }
+      case 'Apostila':
+        texto = aplicarOuErro('Apostila', {
+          numero_bg_ref: formData.publicacao_referencia_numero_bg || '',
+          data_bg_ref: formatarDataExtenso(formData.publicacao_referencia_data_bg),
+          nota_ref: formData.publicacao_referencia_nota || '',
+          texto_errado: formData.texto_errado || '',
+          texto_novo: formData.texto_novo || '',
+        });
         break;
-      }
 
       case 'Tornar sem Efeito': {
-        const tmplTSE = templatesExOfficio.find(t => t.tipo_registro === 'Tornar sem Efeito' && t.ativo !== false);
-        if (tmplTSE?.template) {
-          const pubRefTSE = todasPublicacoesFormatadas.find(p => p.id === formData.publicacao_referencia_id);
-          texto = aplicarTemplate(tmplTSE.template, {
-            posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
-            numero_bg_ref: formData.publicacao_referencia_numero_bg || '',
-            data_bg_ref: formatarDataExtenso(formData.publicacao_referencia_data_bg),
-            nota_ref: formData.publicacao_referencia_nota || '',
-            tipo_ref: pubRefTSE?.tipo_label || pubRefTSE?.tipo || '',
-          });
-        } else if (formData.publicacao_referencia_numero_bg) {
-          texto = `${cmd}, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, torna sem efeito a publicação constante no Boletim nº ${formData.publicacao_referencia_numero_bg}, de ${formatarDataExtenso(formData.publicacao_referencia_data_bg)}, referente à Nota nº ${formData.publicacao_referencia_nota}.`;
-        }
+        const pubRefTSE = todasPublicacoesFormatadas.find(p => p.id === formData.publicacao_referencia_id);
+        texto = aplicarOuErro('Tornar sem Efeito', {
+          numero_bg_ref: formData.publicacao_referencia_numero_bg || '',
+          data_bg_ref: formatarDataExtenso(formData.publicacao_referencia_data_bg),
+          nota_ref: formData.publicacao_referencia_nota || '',
+          tipo_ref: pubRefTSE?.tipo_label || pubRefTSE?.tipo || '',
+        });
         break;
       }
 
@@ -443,10 +405,20 @@ export default function CadastrarPublicacao() {
         const at = atestadosMilitar.find(a => a.id === formData.atestado_homologado_id);
         if (at) {
           const diasExtenso = { 1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze' };
-          texto = `${cmd}, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, homologa o afastamento médico do ${postoNome} ${nomeCompleto}, matrícula ${matricula}, pelo período de ${at.dias} (${diasExtenso[at.dias] || at.dias}) dias, ${at.tipo_afastamento?.toLowerCase() || ''}, a contar de ${formatarDataExtenso(at.data_inicio)}, com término em ${formatarDataExtenso(at.data_termino)}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
+          texto = aplicarOuErro('Homologação de Atestado', {
+            dias: String(at.dias),
+            dias_extenso: String(diasExtenso[at.dias] || at.dias),
+            tipo_afastamento: at.tipo_afastamento?.toLowerCase() || '',
+            data_inicio: formatarDataExtenso(at.data_inicio),
+            data_termino: formatarDataExtenso(at.data_termino)
+          });
         }
         break;
       }
+
+      case 'Interrupção de Férias':
+        texto = aplicarOuErro('Interrupção de Férias', {});
+        break;
     }
 
     setFormData(prev => ({ ...prev, texto_publicacao: texto }));
@@ -1018,22 +990,6 @@ export default function CadastrarPublicacao() {
                 type="date"
                 required
               />
-              {tmplRR ? (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 flex items-center gap-2">
-                  <RefreshCw className="w-3 h-3" /> Template personalizado será aplicado automaticamente.
-                </div>
-              ) : (
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Texto para Publicação</Label>
-                  <Textarea
-                    value={formData.texto_publicacao || ''}
-                    onChange={e => setFormData(prev => ({ ...prev, texto_publicacao: e.target.value }))}
-                    className="mt-1.5"
-                    rows={5}
-                    placeholder="O texto será gerado automaticamente ou edite manualmente aqui."
-                  />
-                </div>
-              )}
             </div>
           </div>
         );
@@ -1354,6 +1310,7 @@ export default function CadastrarPublicacao() {
             onClick={handleSubmit}
             disabled={
               loading ||
+              !!templateError ||
               !formData.militar_id ||
               (formData.tipo === 'Apostila' && !canApostilar) ||
               (formData.tipo === 'Tornar sem Efeito' && !canTSE) ||
@@ -1432,12 +1389,25 @@ export default function CadastrarPublicacao() {
 
           {formData.militar_id && renderSpecificFields()}
 
-          {formData.texto_publicacao && (
+          {templateError && (
+            <div className="bg-red-50 rounded-xl shadow-sm border border-red-200 p-6 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <Label className="text-sm font-bold text-red-800">Ação Bloqueada</Label>
+                <p className="text-sm text-red-700 mt-1">{templateError}</p>
+              </div>
+            </div>
+          )}
+
+          {!templateError && formData.texto_publicacao && formData.tipo !== 'Geral' && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                Texto para publicação
-              </Label>
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium text-slate-700">Texto para publicação</Label>
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+                </span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
                 <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                   {formData.texto_publicacao}
                 </p>

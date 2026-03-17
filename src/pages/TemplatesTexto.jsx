@@ -339,6 +339,23 @@ const VARS_POR_TIPO = {
       { v: '{{data_designacao}}', desc: 'Data da dispensa' },
     ]
   },
+  'Punição': {
+    grupo: 'Punição',
+    cor: 'red',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{portaria}}', desc: 'Número da Portaria' },
+      { v: '{{data_portaria}}', desc: 'Data da Portaria' },
+      { v: '{{tipo_punicao}}', desc: 'Tipo de Punição' },
+      { v: '{{dias_punicao}}', desc: 'Dias de Punição' },
+      { v: '{{data_punicao}}', desc: 'Data da Punição' },
+      { v: '{{itens_enquadramento}}', desc: 'Itens de Enquadramento' },
+      { v: '{{graduacao_punicao}}', desc: 'Graduação da Punição' },
+      { v: '{{comportamento_ingresso}}', desc: 'Comportamento de Ingresso' },
+    ]
+  },
   'Elogio Individual': {
     grupo: 'Elogio Individual',
     cor: 'green',
@@ -395,6 +412,11 @@ const VARS_POR_TIPO = {
       { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{dias}}', desc: 'Quantidade de dias' },
+      { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
+      { v: '{{tipo_afastamento}}', desc: 'Tipo de afastamento' },
+      { v: '{{data_inicio}}', desc: 'Data de início' },
+      { v: '{{data_termino}}', desc: 'Data de término' },
     ]
   },
   'Apostila': {

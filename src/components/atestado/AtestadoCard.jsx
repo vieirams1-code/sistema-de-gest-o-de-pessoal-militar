@@ -16,7 +16,9 @@ import {
   BookOpen,
   Save,
   ChevronRight,
-  Download
+  Download,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
+import { aplicarTemplate } from '@/components/utils/templateUtils';
 import {
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
@@ -86,26 +89,62 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
   };
 
+  const { data: templates = [] } = useQuery({
+    queryKey: ['templates-texto'],
+    queryFn: () => base44.entities.TemplateTexto.list(),
+    staleTime: 30000,
+  });
+
   const diasExtensoMap = { 1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze' };
 
   const gerarTextoHomologacao = (form) => {
+    const tmpl = templates.find(t => t.modulo === 'Publicação Ex Officio' && t.tipo_registro === 'Homologação de Atestado' && t.ativo !== false);
+    if (!tmpl?.template) return null;
     const posto = `${atestado.militar_posto || ''} QOBM`;
-    return `O(A) Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, homologa o afastamento médico do ${posto} ${atestado.militar_nome}, matrícula ${atestado.militar_matricula}, pelo período de ${atestado.dias} (${diasExtensoMap[atestado.dias] || atestado.dias}) dias, ${(atestado.tipo_afastamento || '').toLowerCase()}, a contar de ${formatarDataExtenso(atestado.data_inicio)}, com término em ${formatarDataExtenso(atestado.data_termino)}. Em consequência: (1) Ao Chefe da B-1: proceder nos assentamentos do militar; (2) publique-se.`;
+    return aplicarTemplate(tmpl.template, {
+      posto_nome: posto,
+      nome_completo: atestado.militar_nome,
+      matricula: atestado.militar_matricula,
+      dias: String(atestado.dias),
+      dias_extenso: String(diasExtensoMap[atestado.dias] || atestado.dias),
+      tipo_afastamento: (atestado.tipo_afastamento || '').toLowerCase(),
+      data_inicio: formatarDataExtenso(atestado.data_inicio),
+      data_termino: formatarDataExtenso(atestado.data_termino),
+    });
   };
 
   const gerarTextoAtaJiso = (form) => {
+    const tmpl = templates.find(t => t.modulo === 'Publicação Ex Officio' && t.tipo_registro === 'Ata JISO' && t.ativo !== false);
+    if (!tmpl?.template) return null;
     const posto = `${atestado.militar_posto || ''} QOBM`;
-    return `O(A) Comandante do 1° Grupamento de Bombeiros Militar, no uso das atribuições que lhe confere o art. 49, II, do Decreto nº 5.698, de 21 de novembro de 1990, resolve: tornar público que recebeu a Ata de Inspeção de Saúde Sessão Nº ${form.secao_jiso || '___'}, de ${formatarDataExtenso(form.data_ata)}, pertencente ao: ${posto} ${atestado.militar_nome}, matrícula ${atestado.militar_matricula}, inspecionado para fins de ${form.finalidade_jiso}, conf. NUP Nº ${form.nup || '___'}, com o parecer: ${form.parecer_jiso || '___'}.`;
+    return aplicarTemplate(tmpl.template, {
+      posto_nome: posto,
+      nome_completo: atestado.militar_nome,
+      matricula: atestado.militar_matricula,
+      secao_jiso: form.secao_jiso || '___',
+      data_ata: formatarDataExtenso(form.data_ata),
+      finalidade_jiso: form.finalidade_jiso || '___',
+      nup: form.nup || '___',
+      parecer_jiso: form.parecer_jiso || '___'
+    });
   };
 
   const handleOpenHomologacao = () => {
     const texto = gerarTextoHomologacao({});
+    if (texto === null) {
+      alert("Template obrigatório não encontrado para 'Homologação de Atestado'. Entre em contato com o administrador.");
+      return;
+    }
     setHomologacaoForm(prev => ({ ...prev, texto_publicacao: texto }));
     setShowHomologacaoModal(true);
   };
 
   const handleOpenAtaJiso = () => {
     const texto = gerarTextoAtaJiso(ataJisoForm);
+    if (texto === null) {
+      alert("Template obrigatório não encontrado para 'Ata JISO'. Entre em contato com o administrador.");
+      return;
+    }
     setAtaJisoForm(prev => ({ ...prev, texto_publicacao: texto }));
     setShowAtaJisoModal(true);
   };
@@ -546,8 +585,17 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               <Input type="date" value={homologacaoForm.data_publicacao} onChange={e => setHomologacaoForm(p => ({ ...p, data_publicacao: e.target.value }))} className="mt-1.5" />
             </div>
             <div>
-              <Label className="text-sm font-medium">Texto para Publicação</Label>
-              <Textarea value={homologacaoForm.texto_publicacao} onChange={e => setHomologacaoForm(p => ({ ...p, texto_publicacao: e.target.value }))} className="mt-1.5" rows={5} />
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="text-sm font-medium">Texto para Publicação</Label>
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
+                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {homologacaoForm.texto_publicacao || 'Nenhum texto gerado.'}
+                </p>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div><Label className="text-sm">Nota para BG</Label><Input value={homologacaoForm.nota_para_bg} onChange={e => setHomologacaoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" /></div>
@@ -581,7 +629,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               </div>
               <div>
                 <Label className="text-sm">Finalidade</Label>
-                <select value={ataJisoForm.finalidade_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, finalidade_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5 w-full border rounded-md px-3 py-2 text-sm">
+                <select value={ataJisoForm.finalidade_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, finalidade_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5 w-full border rounded-md px-3 py-2 text-sm">
                   {['V.A.F','LTS','Reserva Remunerada','Atestado de Origem'].map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
@@ -589,26 +637,35 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-sm">Seção JISO</Label>
-                <Input value={ataJisoForm.secao_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, secao_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5" placeholder="62/JISO/2025" />
+                <Input value={ataJisoForm.secao_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, secao_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="62/JISO/2025" />
               </div>
               <div>
                 <Label className="text-sm">Data da Ata</Label>
-                <Input type="date" value={ataJisoForm.data_ata} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, data_ata: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5" />
+                <Input type="date" value={ataJisoForm.data_ata} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, data_ata: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-sm">NUP</Label>
-                <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5" placeholder="31.001.005-12" />
+                <Input value={ataJisoForm.nup} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, nup: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="31.001.005-12" />
               </div>
               <div>
                 <Label className="text-sm">Parecer</Label>
-                <Input value={ataJisoForm.parecer_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, parecer_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np)}; }); }} className="mt-1.5" placeholder="Apto" />
+                <Input value={ataJisoForm.parecer_jiso} onChange={e => { const v = e.target.value; setAtaJisoForm(p => { const np = {...p, parecer_jiso: v}; return {...np, texto_publicacao: gerarTextoAtaJiso(np) || np.texto_publicacao}; }); }} className="mt-1.5" placeholder="Apto" />
               </div>
             </div>
             <div>
-              <Label className="text-sm font-medium">Texto para Publicação</Label>
-              <Textarea value={ataJisoForm.texto_publicacao} onChange={e => setAtaJisoForm(p => ({ ...p, texto_publicacao: e.target.value }))} className="mt-1.5" rows={5} />
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="text-sm font-medium">Texto para Publicação</Label>
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
+                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {ataJisoForm.texto_publicacao || 'Nenhum texto gerado.'}
+                </p>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div><Label className="text-sm">Nota para BG</Label><Input value={ataJisoForm.nota_para_bg} onChange={e => setAtaJisoForm(p => ({ ...p, nota_para_bg: e.target.value }))} className="mt-1.5" placeholder="001/2025" /></div>
