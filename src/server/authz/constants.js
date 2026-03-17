@@ -1,0 +1,40 @@
+export const CANONICAL_MODULE_PERMISSIONS = [
+  'acesso_militares',
+  'acesso_ferias',
+  'acesso_livro',
+  'acesso_publicacoes',
+  'acesso_atestados',
+  'acesso_armamentos',
+  'acesso_medalhas',
+  'acesso_templates',
+  'acesso_configuracoes',
+  'acesso_quadro_operacional',
+];
+
+export const CANONICAL_ACTION_PERMISSIONS = [
+  'perm_admin_mode',
+  'perm_gerir_cadeia_ferias',
+  'perm_excluir_ferias',
+  'perm_recalcular_ferias',
+  'perm_gerir_templates',
+  'perm_gerir_permissoes',
+  'perm_gerir_estrutura',
+  'perm_gerir_configuracoes',
+  'perm_editar_publicacoes',
+  'perm_publicar_bg',
+  'perm_tornar_sem_efeito_publicacao',
+  'perm_apostilar_publicacao',
+  'perm_publicar_ata_jiso',
+  'perm_publicar_homologacao',
+  'perm_gerir_jiso',
+  'perm_registrar_decisao_jiso',
+  'perm_excluir_atestado',
+  'perm_gerir_quadro',
+  'perm_mover_card',
+  'perm_gerir_colunas',
+  'perm_arquivar_card',
+  'perm_gerir_acoes_operacionais',
+  'perm_excluir_acao_operacional',
+];
+
+export const ACCESS_MODES = ['admin', 'setor', 'subsetor', 'unidade', 'proprio'];
