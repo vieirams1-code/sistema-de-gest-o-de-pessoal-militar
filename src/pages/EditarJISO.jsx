@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Calendar, FileText, AlertTriangle
+import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react';
 import { addDays, format as formatDate } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -94,8 +94,11 @@ export default function EditarJISO() {
 
     const postoNome = atestado.militar_posto ? `${atestado.militar_posto} QOBM` : '';
 
-
- totulidade_jiso: formData.finalidade_jiso || '',
+    const vars = {
+      posto_nome: postoNome,
+      nome_completo: atestado.militar_nome || '',
+      matricula: atestado.militar_matricula || '',
+      finalidade_jiso: formData.finalidade_jiso || '',
       secao_jiso: formData.secao_jiso || '',
       data_ata: formatarData(formData.data_jiso),
       nup: formData.nup || '',
@@ -182,7 +185,8 @@ export default function EditarJISO() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-4xl mx-auto px-4 y-8">8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -384,8 +388,9 @@ export default function EditarJISO() {
                 <h3 className="text-lg font-semibold text-[#1e3a5f] flex items-center gap-2">
                   <FileText className="w-5 h-5" />
                   Texto Gerado para Publicação (Ata JISO)
-                </h3>>
-               v className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                </h3>
+              </div>
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                   {textoPublicacao}
                 </p>
@@ -395,4 +400,5 @@ export default function EditarJISO() {
         </form>
       </div>
     </div>
+  );
 }
