@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle } from 'lucide-react';
-import { aplicarTemplate, VARS_PREVIEW } from '@/components/utils/templateUtils';
+import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 
@@ -195,6 +195,7 @@ const VARS_POR_TIPO = {
       { v: '{{conjuge_nome}}', desc: 'Nome do cônjuge' },
       { v: '{{data_inicio}}', desc: 'Data de início' },
       { v: '{{inicio_termino}}', desc: 'Início ou término' },
+      { v: '{{tipo_texto}}', desc: 'Tipo de texto (início ou término)' },
     ]
   },
   'Luto': {
@@ -234,6 +235,7 @@ const VARS_POR_TIPO = {
       { v: '{{destino}}', desc: 'Unidade de destino' },
       { v: '{{data_transferencia}}', desc: 'Data da transferência' },
       { v: '{{publicacao_transferencia}}', desc: 'Publicação da transferência (DOEMS nº XX.XXX...)' },
+      { v: '{{tipo_transferencia}}', desc: 'Tipo de transferência' },
     ]
   },
   'Transferência para RR': {
@@ -248,6 +250,8 @@ const VARS_POR_TIPO = {
       { v: '{{documento_referencia}}', desc: 'Documento de referência' },
       { v: '{{publicacao_transferencia}}', desc: 'Publicação da transferência' },
       { v: '{{data_transferencia}}', desc: 'Data da transferência' },
+      { v: '{{origem}}', desc: 'Unidade de origem' },
+      { v: '{{destino}}', desc: 'Unidade de destino' },
     ]
   },
   'Trânsito': {
@@ -451,14 +455,20 @@ const VARS_POR_TIPO = {
 const GRUPOS_GENERICOS_LIVRO = [
   { grupo: 'Militar (Geral)', cor: 'blue', variaveis: [
     { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+    { v: '{{posto}}', desc: 'Posto/Graduação Abreviado' },
     { v: '{{nome_completo}}', desc: 'Nome completo' },
     { v: '{{matricula}}', desc: 'Matrícula' },
     { v: '{{data_registro}}', desc: 'Data do registro' },
+    { v: '{{data_inicio}}', desc: 'Data de início' },
+    { v: '{{data_termino}}', desc: 'Data de término' },
+    { v: '{{dias}}', desc: 'Dias' },
+    { v: '{{dias_extenso}}', desc: 'Dias por extenso' },
   ]},
 ];
 const GRUPOS_GENERICOS_EXOFFICIO = [
   { grupo: 'Militar (Geral)', cor: 'blue', variaveis: [
     { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+    { v: '{{posto}}', desc: 'Posto/Graduação Abreviado' },
     { v: '{{nome_completo}}', desc: 'Nome completo' },
     { v: '{{matricula}}', desc: 'Matrícula' },
     { v: '{{data_publicacao}}', desc: 'Data da publicação' },
@@ -573,6 +583,33 @@ export default function TemplatesTexto() {
     }
     return null;
   }, [editingTemplate, templates]);
+
+  const getVariaveisValidas = (modulo, tipo) => {
+    if (!modulo) return new Set();
+    const validas = new Set();
+    
+    const genericos = modulo === 'Livro' ? GRUPOS_GENERICOS_LIVRO : modulo === 'Publicação Ex Officio' ? GRUPOS_GENERICOS_EXOFFICIO : [];
+    genericos.forEach(g => g.variaveis.forEach(v => validas.add(v.v.replace(/^\{\{/, '').replace(/\}\}$/, ''))));
+
+    if (tipo && VARS_POR_TIPO[tipo]) {
+      VARS_POR_TIPO[tipo].variaveis.forEach(v => validas.add(v.v.replace(/^\{\{/, '').replace(/\}\}$/, '')));
+    }
+
+    return validas;
+  };
+
+  const variaveisUsadas = useMemo(() => {
+    return extrairVariaveisDoTemplate(editingTemplate?.template || '');
+  }, [editingTemplate?.template]);
+
+  const variaveisValidas = useMemo(() => {
+    return getVariaveisValidas(editingTemplate?.modulo, editingTemplate?.tipo_registro);
+  }, [editingTemplate?.modulo, editingTemplate?.tipo_registro]);
+
+  const variaveisInvalidas = useMemo(() => {
+    if (!editingTemplate?.tipo_registro) return [];
+    return variaveisUsadas.filter(v => !variaveisValidas.has(v));
+  }, [variaveisUsadas, variaveisValidas, editingTemplate?.tipo_registro]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -702,7 +739,28 @@ export default function TemplatesTexto() {
                     <span className="text-xs font-semibold text-emerald-700">Prévia com dados simulados</span>
                   </div>
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {aplicarTemplate(editingTemplate.template, VARS_PREVIEW)}
+                    {(() => {
+                      const prev = aplicarTemplate(editingTemplate.template, VARS_PREVIEW);
+                      const regex = /\{\{([^}]+)\}\}/g;
+                      const parts = [];
+                      let lastIndex = 0;
+                      let match;
+                      let k = 0;
+
+                      while ((match = regex.exec(prev)) !== null) {
+                        parts.push(prev.substring(lastIndex, match.index));
+                        const varName = match[1].trim();
+                        if (variaveisInvalidas.includes(varName)) {
+                          parts.push(<span key={k++} className="bg-red-200 text-red-800 px-1 rounded font-mono font-bold" title="Variável inválida">{match[0]}</span>);
+                        } else {
+                          parts.push(<span key={k++} className="bg-amber-200 text-amber-900 px-1 rounded font-mono" title="Sem valor de demonstração">{match[0]}</span>);
+                        }
+                        lastIndex = regex.lastIndex;
+                      }
+                      parts.push(prev.substring(lastIndex));
+
+                      return parts;
+                    })()}
                   </p>
                 </div>
               )}
@@ -750,10 +808,25 @@ export default function TemplatesTexto() {
                   value={editingTemplate.template}
                   onChange={e => setEditingTemplate(p => ({ ...p, template: e.target.value }))}
                   rows={8}
-                  className="font-mono text-sm"
+                  className={`font-mono text-sm ${variaveisInvalidas.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                   placeholder="Digite o texto do template. Use {{variavel}} para dados dinâmicos."
                 />
               </div>
+
+              {variaveisInvalidas.length > 0 && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-semibold block mb-1">Variáveis não reconhecidas neste template:</span>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {variaveisInvalidas.map((v, i) => (
+                        <li key={i} className="font-mono">{`{{${v}}}`}</li>
+                      ))}
+                    </ul>
+                    <span className="block mt-2 text-xs">As variáveis acima não são suportadas para este tipo de registro. Remova-as ou corrija a digitação para poder salvar.</span>
+                  </div>
+                </div>
+              )}
 
               {(() => {
                 const inserirVar = (v) => {
@@ -832,7 +905,7 @@ export default function TemplatesTexto() {
             </Button>
                 <Button
                   onClick={() => saveMutation.mutate(editingTemplate)}
-                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError}
+                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError || variaveisInvalidas.length > 0}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 >
                   {saveMutation.isPending ? (

@@ -46,6 +46,16 @@ export const formatDateBR = (ds) => {
 };
 
 /**
+ * Extrai as variáveis usadas em um template de texto.
+ * Retorna um array com os nomes das variáveis (sem as chaves).
+ */
+export function extrairVariaveisDoTemplate(template) {
+  if (!template) return [];
+  const matches = [...template.matchAll(/\{\{([^}]+)\}\}/g)];
+  return [...new Set(matches.map(m => m[1].trim()))];
+}
+
+/**
  * Substitui variáveis {{var}} no template pelos valores do mapa.
  */
 export function aplicarTemplate(template, vars) {
