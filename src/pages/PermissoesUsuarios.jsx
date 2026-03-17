@@ -35,6 +35,10 @@ const buildPermissionsFromSource = (source = {}) => {
   return normalizedPermissions;
 };
 
+const buildDiffForKeys = (keys = [], expected = {}, received = {}) => {
+  return keys.filter((key) => toBooleanPermission(expected[key]) !== toBooleanPermission(received[key]));
+};
+
 export default function PermissoesUsuarios() {
   const queryClient = useQueryClient();
   const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
@@ -171,6 +175,7 @@ export default function PermissoesUsuarios() {
 
     setSavingUser(true);
     try {
+      const permissionKeys = Object.keys(initialPermissions);
       const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
       const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
       const uni = subgrupamentos.find(s => s.id === userUnidadeId);
@@ -205,11 +210,50 @@ export default function PermissoesUsuarios() {
 
       const dataToSave = { ...baseData, ...roleData };
 
+      const permissionSubsetKeys = permissionKeys.filter((key) => key.startsWith('acesso_') || key.startsWith('perm_'));
+      const permissionSubsetPayload = permissionSubsetKeys.reduce((acc, key) => {
+        acc[key] = dataToSave[key];
+        return acc;
+      }, {});
+
+      console.log('[PermissoesUsuarios][SAVE] permissionKeys derivadas de initialPermissions', permissionKeys);
+      console.log('[PermissoesUsuarios][SAVE] payload final enviado', dataToSave);
+      console.log('[PermissoesUsuarios][SAVE] subconjunto acesso_/perm_ do payload', permissionSubsetPayload);
+
+      let saveResponse;
+      let savedId = selectedUser.id;
+
       if (isNewAcesso) {
-        await base44.entities.UsuarioAcesso.create(dataToSave);
+        saveResponse = await base44.entities.UsuarioAcesso.create(dataToSave);
+        savedId = saveResponse?.id || savedId;
       } else {
-        await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
+        saveResponse = await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
       }
+
+      console.log('[PermissoesUsuarios][SAVE] retorno imediato create/update', saveResponse);
+
+      if (savedId) {
+        const readBack = await base44.entities.UsuarioAcesso.get(savedId);
+        const missingKeysInResponse = permissionKeys.filter((key) => !(key in (saveResponse || {})));
+        const mismatchedKeysAfterGet = buildDiffForKeys(permissionKeys, dataToSave, readBack || {});
+
+        console.log('[PermissoesUsuarios][READBACK] UsuarioAcesso.get(id) após save', { id: savedId, readBack });
+        console.log('[PermissoesUsuarios][DIFF] comparação payload x save x readback', {
+          id: savedId,
+          payloadSent: dataToSave,
+          saveResponse,
+          readBack,
+          missingKeysInResponse,
+          mismatchedKeysAfterGet
+        });
+      } else {
+        console.warn('[PermissoesUsuarios][READBACK] Sem id para executar UsuarioAcesso.get(id) após save', {
+          isNewAcesso,
+          selectedUserId: selectedUser?.id,
+          saveResponse
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
       setSelectedUser(null);
     } catch (e) {
