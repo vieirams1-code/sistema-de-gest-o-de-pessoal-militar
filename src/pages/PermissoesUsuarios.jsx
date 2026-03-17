@@ -15,6 +15,26 @@ const initialPermissions = {
   ...acoesSensiveis.reduce((acc, a) => ({ ...acc, [a.key]: false }), {})
 };
 
+const toBooleanPermission = (value) => {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0' || normalized === '') return false;
+  }
+
+  return value === true || value === 1;
+};
+
+const buildPermissionsFromSource = (source = {}) => {
+  const normalizedPermissions = {};
+
+  Object.keys(initialPermissions).forEach((key) => {
+    normalizedPermissions[key] = toBooleanPermission(source[key]);
+  });
+
+  return normalizedPermissions;
+};
+
 export default function PermissoesUsuarios() {
   const queryClient = useQueryClient();
   const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
@@ -107,11 +127,7 @@ export default function PermissoesUsuarios() {
     setUserUnidadeId(uId);
     setSelectedProfileId(fullAcesso.perfil_id || '_nenhum');
 
-    const loadedPerms = {};
-    Object.keys(initialPermissions).forEach(key => {
-      loadedPerms[key] = fullAcesso[key] === true;
-    });
-    setUserPermissions(loadedPerms);
+    setUserPermissions(buildPermissionsFromSource(fullAcesso));
   };
 
   const handleCreateNew = () => {
@@ -135,10 +151,10 @@ export default function PermissoesUsuarios() {
 
     const newPerms = { ...userPermissions };
     modulosList.forEach((m) => {
-      newPerms[m.key] = selectedProfilePreview[m.key] === true;
+      newPerms[m.key] = toBooleanPermission(selectedProfilePreview[m.key]);
     });
     acoesSensiveis.forEach((a) => {
-      newPerms[a.key] = selectedProfilePreview[a.key] === true;
+      newPerms[a.key] = toBooleanPermission(selectedProfilePreview[a.key]);
     });
 
     setUserPermissions(newPerms);
@@ -163,13 +179,15 @@ export default function PermissoesUsuarios() {
       const militarVinculado = militares.find((m) => m.id === userMilitarId);
       const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
 
+      const normalizedPermissions = buildPermissionsFromSource(userPermissions);
+
       const baseData = {
         nome_usuario: userNomeUsuario,
         user_email: userUserEmail.trim(),
         ativo: userAtivo,
         perfil_id: perfilSelected ? perfilSelected.id : '',
         perfil_nome: perfilSelected ? perfilSelected.nome_perfil : '',
-        ...userPermissions
+        ...normalizedPermissions
       };
 
       let roleData = {};
