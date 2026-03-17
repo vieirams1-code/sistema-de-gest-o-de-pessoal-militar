@@ -52,6 +52,12 @@ export default function EstruturaOrganizacional() {
     return todos.map(item => ({ ...item, tipoNormalizado: normalizeTipo(item.tipo) }));
   }, [todos]);
 
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
+  if (!canAccessAction('gerir_estrutura')) {
+    return <AccessDenied modulo="Estrutura Organizacional" />;
+  }
+
   const setores = estrutura.filter(s => s.tipoNormalizado === 'Setor');
   const subsetores = estrutura.filter(s => s.tipoNormalizado === 'Subsetor');
   const unidades = estrutura.filter(s => s.tipoNormalizado === 'Unidade');
