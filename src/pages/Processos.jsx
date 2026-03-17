@@ -115,6 +115,15 @@ export default function Processos() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4">
+        <div className="mb-4 bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h2 className="text-sm font-bold text-amber-800">Módulo Depreciado</h2>
+            <p className="text-xs text-amber-700 mt-1">
+              Este módulo de Processos foi substituído funcionalmente pelo <strong>Quadro Operacional</strong>. Ele será removido em uma futura atualização. Recomendamos migrar o acompanhamento de tarefas para o novo Quadro Operacional.
+            </p>
+          </div>
+        </div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-[#1e3a5f]">Processos & Tarefas</h1>
