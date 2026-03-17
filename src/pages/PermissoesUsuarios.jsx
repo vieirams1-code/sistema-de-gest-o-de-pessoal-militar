@@ -94,18 +94,18 @@ export default function PermissoesUsuarios() {
     return perfis.find((p) => p.id === selectedProfileId) || null;
   }, [selectedProfileId, perfis]);
 
-  if (loadingUser || !isAccessResolved) return null;
-  if (!canAccessAction('gerir_permissoes')) {
-    return <AccessDenied modulo="Permissões de Usuários" />;
-  }
-
-  const grupamentos = subgrupamentos.filter(s => s.tipo === 'Grupamento');
-  const subgrupamentosFilhos = subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId);
-  const unidadesFilhas = subgrupamentos.filter(s => s.tipo === 'Unidade' && s.grupamento_id === userSubgrupamentoId);
+  const grupamentos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Grupamento'), [subgrupamentos]);
+  const subgrupamentosFilhos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId), [subgrupamentos, userGrupamentoId]);
+  const unidadesFilhas = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Unidade' && s.grupamento_id === userSubgrupamentoId), [subgrupamentos, userSubgrupamentoId]);
 
   const militaresOrdenados = useMemo(() => {
     return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
   }, [militares]);
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!canAccessAction('gerir_permissoes')) {
+    return <AccessDenied modulo="Permissões de Usuários" />;
+  }
 
   const handleSelectAcesso = (acesso) => {
     setSelectedUser(acesso);
