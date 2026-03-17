@@ -28,6 +28,28 @@ const initialForm = {
   ...acoesSensiveis.reduce((acc, a) => ({ ...acc, [a.key]: false }), {})
 };
 
+const toBooleanPermission = (value) => {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0' || normalized === '') return false;
+  }
+
+  return value === true || value === 1;
+};
+
+const buildPermissionsFromSource = (source = {}) => {
+  const normalizedPermissions = {};
+
+  Object.keys(initialForm)
+    .filter((key) => key.startsWith('acesso_') || key.startsWith('perm_'))
+    .forEach((key) => {
+      normalizedPermissions[key] = toBooleanPermission(source[key]);
+    });
+
+  return normalizedPermissions;
+};
+
 export default function PerfisPermissao() {
   const queryClient = useQueryClient();
   const { canAccessAction, isLoading: loadingUser } = useCurrentUser();
@@ -82,8 +104,7 @@ export default function PerfisPermissao() {
       nome_perfil: p.nome_perfil || '',
       descricao: p.descricao || '',
       ativo: p.ativo !== false,
-      ...modulosList.reduce((acc, m) => ({ ...acc, [m.key]: p[m.key] === true }), {}),
-      ...acoesSensiveis.reduce((acc, a) => ({ ...acc, [a.key]: p[a.key] === true }), {})
+      ...buildPermissionsFromSource(p)
     });
     setEditingId(p.id);
     setShowForm(true);
@@ -101,10 +122,15 @@ export default function PerfisPermissao() {
       alert('Ação negada: você não tem permissão para salvar perfis de permissão.');
       return;
     }
+    const payload = {
+      ...formData,
+      ...buildPermissionsFromSource(formData),
+    };
+
     if (editingId) {
-      updateMutation.mutate({ id: editingId, data: formData });
+      updateMutation.mutate({ id: editingId, data: payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -179,12 +205,11 @@ export default function PerfisPermissao() {
                 </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-6">
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                 <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                   Matriz de Permissões por Categoria e Módulo
                 </h3>
-
                 <div className="space-y-4">
                   {permissionStructure.map((categoryGroup) => (
                     <div key={categoryGroup.category} className="bg-white p-4 rounded-lg border border-slate-200">
@@ -194,9 +219,9 @@ export default function PerfisPermissao() {
                           const isModuleEnabled = formData[mod.key] === true;
 
                           return (
-                            <div key={mod.key} className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50/40">
+                            <div key={mod.key} className={`rounded-lg border ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-slate-50'}`}>
                               <div
-                                className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${isModuleEnabled ? 'bg-blue-50 border-b border-blue-100' : 'bg-white'}`}
+                                className="p-3 flex flex-wrap items-center gap-2 justify-between cursor-pointer"
                                 onClick={() => setFormData((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }))}
                               >
                                 <div className="flex items-center gap-3">
