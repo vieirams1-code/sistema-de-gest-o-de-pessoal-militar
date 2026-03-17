@@ -60,6 +60,7 @@ export default function Home() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#1e3a5f]">Dashboard</h1>
           <p className="text-slate-500">Visão geral do sistema</p>
+          <p className="text-xs text-emerald-600 mt-1 font-medium">Teste de sincronização VS Code -&gt; GitHub -&gt; Base44</p>
         </div>
 
         {/* Stats Cards */}
