@@ -1323,6 +1323,7 @@ export default function CadastrarPublicacao() {
                 {publicacaoId ? 'Editar' : 'Cadastrar'} Publicação
               </h1>
               <p className="text-slate-500 text-sm">Publicação Ex Offício</p>
+              <p className="text-xs text-emerald-600 mt-1 font-medium">Teste de sincronização VS Code -&gt; GitHub -&gt; Base44</p>
             </div>
           </div>
           <Button
