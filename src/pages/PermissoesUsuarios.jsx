@@ -45,10 +45,7 @@ const acoesSensiveis = [
   { key: 'perm_gerir_colunas', label: 'Gerir Colunas Quadro' },
   { key: 'perm_arquivar_card', label: 'Arquivar Card' },
   { key: 'perm_gerir_acoes_operacionais', label: 'Gerir Ações Op.' },
-  { key: 'perm_excluir_acao_operacional', label: 'Excluir Ação Op.' },
-  { key: 'perm_criar_processo', label: 'Criar Processo' },
-  { key: 'perm_editar_processo', label: 'Editar Processo' },
-  { key: 'perm_excluir_processo', label: 'Excluir Processo' }
+  { key: 'perm_excluir_acao_operacional', label: 'Excluir Ação Op.' }
 ];
 
 const initialPermissions = {
