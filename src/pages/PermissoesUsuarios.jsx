@@ -69,38 +69,47 @@ export default function PermissoesUsuarios() {
     return <AccessDenied modulo="Permissões de Usuários" />;
   }
 
-  const handleSelectAcesso = (acesso) => {
-    setSelectedUser(acesso);
-    setIsNewAcesso(false);
-    setUserAccessMode(acesso.tipo_acesso || 'proprio');
-    setUserNomeUsuario(acesso.nome_usuario || '');
-    setUserUserEmail(acesso.user_email || '');
-    setUserAtivo(acesso.ativo !== false);
-    setUserMilitarId(acesso.militar_id || '');
-    setUserMilitarEmail(acesso.militar_email || '');
+  const handleSelectAcesso = async (acesso) => {
+    let fullAcesso = acesso;
+    try {
+      // O list() pode não retornar todos os campos booleanos de permissão;
+      // ao selecionar, buscamos o registro completo para hidratar corretamente.
+      fullAcesso = await base44.entities.UsuarioAcesso.get(acesso.id);
+    } catch (e) {
+      console.error('Falha ao carregar detalhes do acesso selecionado, usando dados da lista.', e);
+    }
 
-    let gId = acesso.grupamento_id || '';
-    let sId = acesso.subgrupamento_id || '';
+    setSelectedUser(fullAcesso);
+    setIsNewAcesso(false);
+    setUserAccessMode(fullAcesso.tipo_acesso || 'proprio');
+    setUserNomeUsuario(fullAcesso.nome_usuario || '');
+    setUserUserEmail(fullAcesso.user_email || '');
+    setUserAtivo(fullAcesso.ativo !== false);
+    setUserMilitarId(fullAcesso.militar_id || '');
+    setUserMilitarEmail(fullAcesso.militar_email || '');
+
+    let gId = fullAcesso.grupamento_id || '';
+    let sId = fullAcesso.subgrupamento_id || '';
     let uId = '';
 
-    if (acesso.tipo_acesso === 'unidade') {
-      uId = acesso.subgrupamento_id || '';
+    if (fullAcesso.tipo_acesso === 'unidade') {
+      uId = fullAcesso.subgrupamento_id || '';
       const uni = subgrupamentos.find(x => x.id === uId);
       if (uni) {
         sId = uni.grupamento_id || '';
       }
-    } else if (acesso.tipo_acesso === 'subsetor') {
-      sId = acesso.subgrupamento_id || '';
+    } else if (fullAcesso.tipo_acesso === 'subsetor') {
+      sId = fullAcesso.subgrupamento_id || '';
     }
 
     setUserGrupamentoId(gId);
     setUserSubgrupamentoId(sId);
     setUserUnidadeId(uId);
-    setSelectedProfileId(acesso.perfil_id || '_nenhum');
+    setSelectedProfileId(fullAcesso.perfil_id || '_nenhum');
 
     const loadedPerms = {};
     Object.keys(initialPermissions).forEach(key => {
-      loadedPerms[key] = acesso[key] === true;
+      loadedPerms[key] = fullAcesso[key] === true;
     });
     setUserPermissions(loadedPerms);
   };
