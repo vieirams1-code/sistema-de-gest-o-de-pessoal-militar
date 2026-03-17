@@ -1008,11 +1008,14 @@ export default function CadastrarRegistroLivro() {
       { value: 'Luto', label: 'Luto', sexo: null },
       { value: 'Cedência', label: 'Cedência', sexo: null },
       { value: 'Transferência', label: 'Transferência', sexo: null },
+      { value: 'Transferência para RR', label: 'Transferência para Reserva Remunerada', sexo: null },
       { value: 'Trânsito', label: 'Trânsito', sexo: null },
       { value: 'Instalação', label: 'Instalação', sexo: null },
       { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
       { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
       { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
+      { value: 'Designação de Função', label: 'Designação de Função', sexo: null },
+      { value: 'Dispensa de Função', label: 'Dispensa de Função', sexo: null },
     ];
     // Adicionar tipos customizados
     const customTipos = tiposCustom.map(t => ({ value: t.nome, label: t.nome, sexo: null }));

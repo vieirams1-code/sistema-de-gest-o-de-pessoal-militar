@@ -15,7 +15,7 @@ import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/com
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 
-const MODULOS = ['Livro', 'Publicação Ex Officio', 'Atestado', 'JISO'];
+const MODULOS = ['Livro', 'Publicação Ex Officio'];
 
 const FERIAS_CANONICAL_TYPES = [
   'Saída Férias',
@@ -68,8 +68,6 @@ const TIPOS_POR_MODULO = {
     'Apostila',
     'Tornar sem Efeito'
   ],
-  'Atestado': ['Homologação pelo Comandante', 'Encaminhamento JISO'],
-  'JISO': ['Ata JISO', 'Resultado JISO'],
 };
 
 function getTipoDisplay(tipo) {
@@ -560,8 +558,6 @@ export default function TemplatesTexto() {
   const moduloColor = {
     'Livro': 'bg-blue-100 text-blue-700',
     'Publicação Ex Officio': 'bg-purple-100 text-purple-700',
-    'Atestado': 'bg-red-100 text-red-700',
-    'JISO': 'bg-orange-100 text-orange-700',
   };
 
   const selectedTipoVars = editingTemplate?.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
