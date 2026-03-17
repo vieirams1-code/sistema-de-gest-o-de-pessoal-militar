@@ -1,52 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Plus, Shield, Check, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert } from 'lucide-react';
+import { Users, Plus, Shield, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-
-const modulosList = [
-  { key: 'acesso_militares', label: 'Militares' },
-  { key: 'acesso_ferias', label: 'Férias' },
-  { key: 'acesso_livro', label: 'Livro' },
-  { key: 'acesso_publicacoes', label: 'Publicações' },
-  { key: 'acesso_atestados', label: 'Atestados' },
-  { key: 'acesso_armamentos', label: 'Armamentos' },
-  { key: 'acesso_medalhas', label: 'Medalhas' },
-  { key: 'acesso_templates', label: 'Templates' },
-  { key: 'acesso_configuracoes', label: 'Configurações' },
-  { key: 'acesso_quadro_operacional', label: 'Quadro Operacional' }
-];
-
-const acoesSensiveis = [
-  { key: 'perm_admin_mode', label: 'Pode Ativar Modo Admin' },
-  { key: 'perm_gerir_cadeia_ferias', label: 'Gerir Cadeia de Férias' },
-  { key: 'perm_excluir_ferias', label: 'Excluir Férias' },
-  { key: 'perm_recalcular_ferias', label: 'Recalcular Férias' },
-  { key: 'perm_gerir_templates', label: 'Gerir Templates' },
-  { key: 'perm_gerir_permissoes', label: 'Gerir Permissões' },
-  { key: 'perm_gerir_estrutura', label: 'Gerir Estrutura Org.' },
-  { key: 'perm_gerir_configuracoes', label: 'Gerir Configurações' },
-  { key: 'perm_editar_publicacoes', label: 'Editar Publicações' },
-  { key: 'perm_publicar_bg', label: 'Publicar em BG' },
-  { key: 'perm_tornar_sem_efeito_publicacao', label: 'Tornar s/ Efeito Pub.' },
-  { key: 'perm_apostilar_publicacao', label: 'Apostilar Pub.' },
-  { key: 'perm_publicar_ata_jiso', label: 'Publicar Ata JISO' },
-  { key: 'perm_publicar_homologacao', label: 'Publicar Homologação' },
-  { key: 'perm_gerir_jiso', label: 'Gerir JISO' },
-  { key: 'perm_registrar_decisao_jiso', label: 'Registrar Decisão JISO' },
-  { key: 'perm_excluir_atestado', label: 'Excluir Atestado' },
-  { key: 'perm_gerir_quadro', label: 'Gerir Quadro Op.' },
-  { key: 'perm_mover_card', label: 'Mover Card' },
-  { key: 'perm_gerir_colunas', label: 'Gerir Colunas Quadro' },
-  { key: 'perm_arquivar_card', label: 'Arquivar Card' },
-  { key: 'perm_gerir_acoes_operacionais', label: 'Gerir Ações Op.' },
-  { key: 'perm_excluir_acao_operacional', label: 'Excluir Ação Op.' }
-];
+import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
 
 const initialPermissions = {
   ...modulosList.reduce((acc, m) => ({ ...acc, [m.key]: false }), {}),
@@ -555,65 +517,82 @@ export default function PermissoesUsuarios() {
                     )}
                   </div>
 
-                  {/* Bloco 5: Módulos Permitidos */}
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                  {/* Bloco 5: Matriz de Permissões */}
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 mb-4">
                     <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                      Módulos Permitidos (Menud do Sistema)
+                      Matriz de Permissões por Categoria e Módulo
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-white p-4 rounded-lg border border-slate-200">
-                      {modulosList.map(mod => {
-                        const isOverride = selectedProfilePreview && (selectedProfilePreview[mod.key] === true) !== (userPermissions[mod.key] === true);
-                        return (
-                          <div key={mod.key} className={`flex flex-col p-3 rounded-lg border transition-colors cursor-pointer select-none ${userPermissions[mod.key] ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-blue-100'}`} onClick={() => setUserPermissions(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}>
-                            <div className="flex items-center gap-3">
-                              <input 
-                                type="checkbox" 
-                                checked={userPermissions[mod.key]}
-                                readOnly
-                                className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
-                              />
-                              <label className="text-sm font-semibold pointer-events-none">{mod.label}</label>
-                            </div>
-                            {isOverride && (
-                              <div className="mt-1.5 ml-7 text-[10px] font-bold text-orange-600 bg-orange-100/50 px-1.5 py-0.5 rounded w-fit uppercase tracking-wider">
-                                Modificado
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                    <div className="space-y-4">
+                      {permissionStructure.map((categoryGroup) => (
+                        <div key={categoryGroup.category} className="bg-white p-4 rounded-lg border border-slate-200">
+                          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">{categoryGroup.category}</h4>
+                          <div className="space-y-3">
+                            {categoryGroup.modules.map((mod) => {
+                              const isModuleEnabled = userPermissions[mod.key] === true;
+                              const moduleOverride = selectedProfilePreview && (selectedProfilePreview[mod.key] === true) !== isModuleEnabled;
+                              return (
+                                <div key={mod.key} className={`rounded-lg border ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-slate-50'}`}>
+                                  <div
+                                    className="p-3 flex flex-wrap items-center gap-2 justify-between cursor-pointer"
+                                    onClick={() => setUserPermissions((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }))}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={isModuleEnabled}
+                                        readOnly
+                                        className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
+                                      />
+                                      <label className="text-sm font-semibold text-slate-800 pointer-events-none">{mod.label}</label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {moduleOverride && (
+                                        <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded uppercase tracking-wide">Modificado</span>
+                                      )}
+                                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isModuleEnabled ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}>
+                                        {isModuleEnabled ? 'Ativo' : 'Inativo'}
+                                      </span>
+                                    </div>
+                                  </div>
 
-                  {/* Bloco 6: Ações Sensíveis */}
-                  <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-5 mb-4">
-                    <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
-                      Ações Sensíveis e Administrativas
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-white p-4 rounded-lg border border-orange-100">
-                      {acoesSensiveis.map(act => {
-                        const isOverride = selectedProfilePreview && (selectedProfilePreview[act.key] === true) !== (userPermissions[act.key] === true);
-                        return (
-                          <div key={act.key} className={`flex flex-col p-3 rounded-lg border transition-colors cursor-pointer select-none ${userPermissions[act.key] ? 'bg-orange-50 border-orange-300 text-orange-900' : 'bg-slate-50 border-slate-100 text-slate-600 hover:border-orange-100'}`} onClick={() => setUserPermissions(prev => ({ ...prev, [act.key]: !prev[act.key] }))}>
-                            <div className="flex items-center gap-3">
-                              <input 
-                                type="checkbox" 
-                                checked={userPermissions[act.key]}
-                                readOnly
-                                className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
-                              />
-                              <label className="text-sm font-bold pointer-events-none">{act.label}</label>
-                            </div>
-                            {isOverride && (
-                              <div className="mt-1.5 ml-7 text-[10px] font-bold text-orange-600 bg-orange-100/50 px-1.5 py-0.5 rounded w-fit uppercase tracking-wider">
-                                Modificado
-                              </div>
-                            )}
+                                  {mod.actions.length > 0 && isModuleEnabled && (
+                                    <div className="px-3 pb-3">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-blue-100 pt-3">
+                                        {mod.actions.map((act) => {
+                                          const isActionEnabled = userPermissions[act.key] === true;
+                                          const actionOverride = selectedProfilePreview && (selectedProfilePreview[act.key] === true) !== isActionEnabled;
+                                          return (
+                                            <div
+                                              key={act.key}
+                                              className={`flex items-center justify-between gap-3 p-2 rounded-md border cursor-pointer ${isActionEnabled ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'} ${act.sensitive ? 'ring-1 ring-orange-100' : ''}`}
+                                              onClick={() => setUserPermissions((prev) => ({ ...prev, [act.key]: !prev[act.key] }))}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isActionEnabled}
+                                                  readOnly
+                                                  className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
+                                                />
+                                                <span className="text-sm text-slate-700">{act.label}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                {act.sensitive && <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded">Sensível</span>}
+                                                {actionOverride && <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">Mod.</span>}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
                   </div>
 
