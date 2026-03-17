@@ -75,11 +75,6 @@ export default function PerfisPermissao() {
   const [formData, setFormData] = useState(initialForm);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
-  if (loadingUser) return null;
-  if (!canAccessAction('gerir_permissoes')) {
-    return <AccessDenied modulo="Perfis de Permissão" />;
-  }
-
   const { data: perfis = [], isLoading } = useQuery({
     queryKey: ['perfisPermissao'],
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
@@ -108,6 +103,11 @@ export default function PerfisPermissao() {
       setDeleteDialog({ open: false, id: null });
     },
   });
+
+  if (loadingUser) return null;
+  if (!canAccessAction('gerir_permissoes')) {
+    return <AccessDenied modulo="Perfis de Permissão" />;
+  }
 
   const handleCreateNew = () => {
     setFormData(initialForm);
