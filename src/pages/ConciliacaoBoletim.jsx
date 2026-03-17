@@ -841,6 +841,7 @@ export default function ConciliacaoBoletim() {
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-[#1e3a5f]">Conciliação com Boletim</CardTitle>
           <p className="text-sm font-semibold text-blue-700">Conciliação Boletim v2.1</p>
+          <p className="text-xs text-emerald-600 mt-1 font-medium">Teste de sincronização VS Code -> GitHub -> Base44</p>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
           <div>
