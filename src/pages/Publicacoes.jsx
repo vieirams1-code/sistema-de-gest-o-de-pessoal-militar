@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, Lock } from 'lucide-react';
+import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
@@ -20,10 +20,6 @@ import {
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
-import {
-  montarCadeia,
-  identificarDescendentes,
-} from '@/components/ferias/feriasAdminUtils';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 
 const TIPOS_FERIAS = [
@@ -32,6 +28,14 @@ const TIPOS_FERIAS = [
   'Nova Saída / Retomada',
   'Retorno Férias',
 ];
+
+const ABAS_ORIGEM = [
+  { key: 'all', label: 'Todos' },
+  { key: 'ex-officio', label: 'Ex Officio' },
+  { key: 'livro', label: 'Livro' },
+  { key: 'atestado', label: 'Atestados' },
+];
+
 
 function detectarOrigemTipo(registro) {
   if (registro.origem_tipo) return registro.origem_tipo;
@@ -217,6 +221,7 @@ function isFeriasOperacional(registro) {
 export default function Publicacoes() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [abaOrigemAtiva, setAbaOrigemAtiva] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
@@ -409,8 +414,13 @@ export default function Publicacoes() {
     }
   });
 
+  const registrosDaAbaAtiva = useMemo(() => {
+    if (abaOrigemAtiva === 'all') return registros;
+    return registros.filter((registro) => registro.origem_tipo === abaOrigemAtiva);
+  }, [registros, abaOrigemAtiva]);
+
   const filteredRegistros = useMemo(() => {
-    return registros.filter((r) => {
+    return registrosDaAbaAtiva.filter((r) => {
       const matchesStatus =
         statusFilter === 'all' || r.status_calculado === statusFilter;
 
@@ -429,17 +439,17 @@ export default function Publicacoes() {
 
       return matchesStatus && matchesSearch;
     });
-  }, [registros, statusFilter, searchTerm]);
+  }, [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
   const stats = useMemo(() => {
     return {
-      total: registros.length,
-      aguardandoNota: registros.filter(r => r.status_calculado === 'Aguardando Nota').length,
-      aguardandoPublicacao: registros.filter(r => r.status_calculado === 'Aguardando Publicação').length,
-      publicados: registros.filter(r => r.status_calculado === 'Publicado').length,
-      inconsistentes: registros.filter(r => r.status_calculado === 'Inconsistente').length
+      total: registrosDaAbaAtiva.length,
+      aguardandoNota: registrosDaAbaAtiva.filter(r => r.status_calculado === 'Aguardando Nota').length,
+      aguardandoPublicacao: registrosDaAbaAtiva.filter(r => r.status_calculado === 'Aguardando Publicação').length,
+      publicados: registrosDaAbaAtiva.filter(r => r.status_calculado === 'Publicado').length,
+      inconsistentes: registrosDaAbaAtiva.filter(r => r.status_calculado === 'Inconsistente').length
     };
-  }, [registros]);
+  }, [registrosDaAbaAtiva]);
 
   const handleUpdate = (id, data, tipo) => {
     // Verificação explícita: atualizar BG/nota exige permissão de publicar
@@ -574,8 +584,35 @@ export default function Publicacoes() {
             </div>
           </div>
 
-          <div className="text-sm font-medium text-slate-500">
-            {filteredRegistros.length} registro(s) encontrado(s)
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {ABAS_ORIGEM.map((aba) => {
+                const totalAba = aba.key === 'all'
+                  ? registros.length
+                  : registros.filter((registro) => registro.origem_tipo === aba.key).length;
+                const ativa = abaOrigemAtiva === aba.key;
+
+                return (
+                  <button
+                    key={aba.key}
+                    type="button"
+                    onClick={() => setAbaOrigemAtiva(aba.key)}
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${ativa
+                      ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                      : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'}`}
+                  >
+                    <span>{aba.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${ativa ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                      {totalAba}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="text-sm font-medium text-slate-500">
+              {filteredRegistros.length} registro(s) encontrado(s)
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -635,6 +672,12 @@ export default function Publicacoes() {
               </CardContent>
             </Card>
           </div>
+
+          {stats.inconsistentes > 0 && (
+            <div className="text-sm text-red-600 font-medium">
+              {stats.inconsistentes} registro(s) inconsistente(s) na aba selecionada
+            </div>
+          )}
 
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
