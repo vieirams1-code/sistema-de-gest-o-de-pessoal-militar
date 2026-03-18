@@ -57,7 +57,6 @@ const TIPOS_POR_MODULO = {
     'Elogio Individual',
     'Melhoria de Comportamento',
     'Punição',
-    'Geral',
     'Designação de Função',
     'Dispensa de Função',
     'Ata JISO',

@@ -422,9 +422,20 @@ export default function CadastrarPublicacao() {
         break;
       }
 
-      case 'Interrupção de Férias':
-        texto = aplicarOuErro('Interrupção de Férias', {});
+      case 'Interrupção de Férias': {
+        const feriasAlvo = feriasEmCurso.find(f => f.id === formData.ferias_interrompida_id);
+        const gozados = Number(formData.dias_gozados_interrupcao) || 0;
+        const saldo = feriasAlvo ? (feriasAlvo.dias || 0) - gozados : 0;
+        texto = aplicarOuErro('Interrupção de Férias', {
+          data_interrupcao: formatarDataExtenso(formData.data_interrupcao),
+          dias: String(feriasAlvo?.dias || ''),
+          dias_gozados: String(gozados),
+          dias_gozados_interrupcao: String(gozados),
+          saldo_remanescente: String(saldo),
+          periodo_aquisitivo: feriasAlvo?.periodo_aquisitivo_ref || ''
+        });
         break;
+      }
     }
 
     setFormData(prev => ({ ...prev, texto_publicacao: texto }));
