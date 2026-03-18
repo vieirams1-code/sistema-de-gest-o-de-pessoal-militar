@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
@@ -487,9 +487,6 @@ export default function TemplatesTexto() {
   const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const canGerirTemplates = canAccessAction('gerir_templates');
 
-  if (loadingUser || !isAccessResolved) return null;
-  if (!canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
-
   const [moduloFiltro, setModuloFiltro] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -606,6 +603,9 @@ export default function TemplatesTexto() {
     if (!editingTemplate?.tipo_registro) return [];
     return variaveisUsadas.filter(v => !variaveisValidas.has(v));
   }, [variaveisUsadas, variaveisValidas, editingTemplate?.tipo_registro]);
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

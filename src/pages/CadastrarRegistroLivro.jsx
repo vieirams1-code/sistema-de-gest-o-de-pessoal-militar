@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -6,16 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+<<<<<<< HEAD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Save, RefreshCw, AlertTriangle, Check, Search, ChevronRight, ChevronLeft, BookOpen, Send } from 'lucide-react';
+=======
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Save, RefreshCw, AlertTriangle, Search, Sparkles, FileText, CalendarRange, UserRound, ShieldCheck, PencilLine, GitBranch } from 'lucide-react';
+>>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
+<<<<<<< HEAD
 import { LIVRO_GRUPOS_TIPOS, LIVRO_TIPOS_FREQUENTES } from '@/components/livro/livroTipoRegistroConfig';
+=======
+import { getTiposLivroFiltrados, groupTiposLivro, matchesTipoLivroSearch } from '@/components/livro/livroTipoRegistroConfig';
+>>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -87,6 +96,36 @@ function resolverOperacaoFerias(ferias) {
 }
 
 
+
+function getStatusPublicacaoVisual({ notaParaBg, numeroBg, dataBg }) {
+  if (numeroBg && dataBg) {
+    return {
+      rotulo: 'Publicado',
+      descricao: `BG ${numeroBg} em ${new Date(`${dataBg}T00:00:00`).toLocaleDateString('pt-BR')}`,
+      classes: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    };
+  }
+
+  if (notaParaBg) {
+    return {
+      rotulo: 'Aguardando publicação',
+      descricao: `Nota pronta: ${notaParaBg}`,
+      classes: 'border-blue-200 bg-blue-50 text-blue-700',
+    };
+  }
+
+  return {
+    rotulo: 'Aguardando nota',
+    descricao: 'Ainda sem nota/BG vinculados',
+    classes: 'border-amber-200 bg-amber-50 text-amber-700',
+  };
+}
+
+function formatDateLabel(dateString) {
+  if (!dateString) return 'Não informado';
+  return new Date(`${dateString}T00:00:00`).toLocaleDateString('pt-BR');
+}
+
 function calcularMetricasInterrupcao(ferias, dataInterrupcaoIso) {
   const diasNoMomento = Number(ferias?.dias || 0);
   const inicioBase = ferias?.data_inicio ? new Date(`${ferias.data_inicio}T00:00:00`) : null;
@@ -121,8 +160,12 @@ export default function CadastrarRegistroLivro() {
   const [textoPublicacao, setTextoPublicacao] = useState('');
   const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
   const [templateError, setTemplateError] = useState(null);
+<<<<<<< HEAD
   const [currentStep, setCurrentStep] = useState(1);
   const [buscaTipo, setBuscaTipo] = useState('');
+=======
+  const [tipoSearch, setTipoSearch] = useState('');
+>>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
 
   // Buscar templates cadastrados
   const { data: templates = [] } = useQuery({
@@ -186,9 +229,6 @@ export default function CadastrarRegistroLivro() {
     if (!feriasEdicao) return;
     setSelectedFerias(feriasEdicao);
   }, [feriasEdicao]);
-
-  if (loadingUser || !isAccessResolved) return null;
-  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
   const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
     ? (selectedFerias ? operacaoFeriasSelecionada : 'Saída Férias')
@@ -981,8 +1021,127 @@ export default function CadastrarRegistroLivro() {
   };
 
   const tipoAtualCustom = tiposCustom.find(t => t.nome === formData.tipo_registro);
-  
+
+  const tiposFiltrados = useMemo(() => getTiposLivroFiltrados({ sexo: formData.militar_sexo, tiposCustom }), [formData.militar_sexo, tiposCustom]);
+  const tiposDisponiveis = useMemo(() => tiposFiltrados.filter((tipo) => matchesTipoLivroSearch(tipo, tipoSearch)), [tiposFiltrados, tipoSearch]);
+  const tiposAgrupados = useMemo(() => groupTiposLivro(tiposDisponiveis), [tiposDisponiveis]);
+  const tipoSelecionado = useMemo(() => tiposFiltrados.find((tipo) => tipo.value === formData.tipo_registro), [tiposFiltrados, formData.tipo_registro]);
+  const tiposDestaque = useMemo(() => tiposFiltrados.filter((tipo) => tipo.destaque).slice(0, 6), [tiposFiltrados]);
+
+  const resumoOperacional = useMemo(() => {
+    if (!tipoSelecionado) return [];
+
+    const itens = [];
+
+    if (tipoRegistroEfetivo === 'Saída Férias') {
+      itens.push('Selecione a cadeia de férias correta para o militar antes de salvar.');
+      itens.push('O texto e a data-base são ajustados conforme a cadeia selecionada.');
+    }
+
+    if (tipoRegistroEfetivo === 'Interrupção de Férias') {
+      itens.push('A data do registro define quantos dias já foram gozados.');
+      itens.push('O saldo remanescente fica pronto para continuação posterior.');
+    }
+
+    if (tipoRegistroEfetivo === 'Nova Saída / Retomada') {
+      itens.push('Use este tipo apenas para férias já interrompidas.');
+      itens.push('O saldo remanescente é reaproveitado automaticamente no texto.');
+    }
+
+    if (tipoRegistroEfetivo === 'Retorno Férias') {
+      itens.push('Use para encerrar a cadeia de férias em curso.');
+    }
+
+    if (['Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade'].includes(tipoRegistroEfetivo)) {
+      itens.push('Confira datas de início e término antes de salvar.');
+    }
+
+    if (['Transferência', 'Transferência para RR', 'Cedência', 'Trânsito', 'Instalação'].includes(tipoRegistroEfetivo)) {
+      itens.push('Preencha origem, destino e referência do ato para evitar ambiguidade operacional.');
+    }
+
+    if (['Núpcias', 'Luto', 'Dispensa Recompensa'].includes(tipoRegistroEfetivo)) {
+      itens.push('Os dias padrão são sugeridos automaticamente quando aplicável.');
+    }
+
+    if (['Deslocamento Missão', 'Curso/Estágio'].includes(tipoRegistroEfetivo)) {
+      itens.push('Detalhe o documento de referência para facilitar consultas futuras.');
+    }
+
+    if (tipoAtualCustom) {
+      itens.push('Este tipo usa campos personalizados e template configurado em Configurações.');
+    }
+
+    return itens.slice(0, 3);
+  }, [tipoSelecionado, tipoRegistroEfetivo, tipoAtualCustom]);
+
   const isFeriasEfetivo = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'].includes(tipoRegistroEfetivo);
+
+  const statusPublicacaoVisual = useMemo(() => getStatusPublicacaoVisual({
+    notaParaBg: formData.nota_para_bg,
+    numeroBg: formData.numero_bg,
+    dataBg: formData.data_bg,
+  }), [formData.nota_para_bg, formData.numero_bg, formData.data_bg]);
+
+  const resumoRegistro = useMemo(() => {
+    const periodoLabel = selectedFerias?.periodo_aquisitivo_ref || formData.periodo_aquisitivo || registroEdicao?.periodo_aquisitivo || 'Sem período vinculado';
+    const origemRegistro = registroEdicao ? 'Registro em edição' : 'Novo registro';
+
+    return [
+      {
+        label: 'Militar',
+        value: formData.militar_nome || 'Selecione o militar',
+        support: formData.militar_posto ? `${formData.militar_posto} • Matrícula ${formData.militar_matricula || '-'}` : 'Sem identificação carregada',
+        icon: UserRound,
+      },
+      {
+        label: 'Tipo operacional',
+        value: tipoSelecionado?.label || tipoRegistroEfetivo || formData.tipo_registro,
+        support: isFeriasEfetivo ? `Fluxo de férias: ${operacaoFeriasSelecionada}` : origemRegistro,
+        icon: PencilLine,
+      },
+      {
+        label: 'Data de referência',
+        value: formatDateLabel(formData.data_registro),
+        support: selectedFerias?.data_inicio ? `Base da cadeia: ${formatDateLabel(selectedFerias.data_inicio)}` : 'Confirme a data antes de salvar',
+        icon: CalendarRange,
+      },
+      {
+        label: 'Publicação',
+        value: statusPublicacaoVisual.rotulo,
+        support: statusPublicacaoVisual.descricao,
+        icon: FileText,
+      },
+      {
+        label: 'Período / vínculo',
+        value: periodoLabel,
+        support: selectedFerias?.status ? `Situação das férias: ${selectedFerias.status}` : 'Sem férias vinculadas',
+        icon: GitBranch,
+      },
+      {
+        label: 'Conferência final',
+        value: id ? 'Editar com segurança' : 'Pronto para cadastrar',
+        support: id ? 'Revise resumo, texto e publicação antes de salvar.' : 'Confira o resumo abaixo antes do primeiro salvamento.',
+        icon: ShieldCheck,
+      },
+    ];
+  }, [
+    formData.militar_nome,
+    formData.militar_posto,
+    formData.militar_matricula,
+    formData.tipo_registro,
+    formData.data_registro,
+    formData.periodo_aquisitivo,
+    id,
+    isFeriasEfetivo,
+    operacaoFeriasSelecionada,
+    registroEdicao,
+    selectedFerias,
+    statusPublicacaoVisual,
+    tipoRegistroEfetivo,
+    tipoSelecionado,
+  ]);
+
 
   // Gerar texto para tipo customizado
   useEffect(() => {
@@ -1003,29 +1162,9 @@ export default function CadastrarRegistroLivro() {
     setTextoPublicacao(texto);
   }, [tipoAtualCustom, formData, camposCustom]);
 
-  const tiposFiltrados = () => {
-    const tipos = [
-      { value: 'Saída Férias', label: 'Férias', sexo: null },
-      { value: 'Licença Maternidade', label: 'Licença Maternidade', sexo: 'Feminino' },
-      { value: 'Prorrogação de Licença Maternidade', label: 'Prorrogação de Licença Maternidade', sexo: 'Feminino' },
-      { value: 'Licença Paternidade', label: 'Licença Paternidade', sexo: 'Masculino' },
-      { value: 'Núpcias', label: 'Núpcias', sexo: null },
-      { value: 'Luto', label: 'Luto', sexo: null },
-      { value: 'Cedência', label: 'Cedência', sexo: null },
-      { value: 'Transferência', label: 'Transferência', sexo: null },
-      { value: 'Transferência para RR', label: 'Transferência para Reserva Remunerada', sexo: null },
-      { value: 'Trânsito', label: 'Trânsito', sexo: null },
-      { value: 'Instalação', label: 'Instalação', sexo: null },
-      { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
-      { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
-      { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
-      { value: 'Designação de Função', label: 'Designação de Função', sexo: null },
-      { value: 'Dispensa de Função', label: 'Dispensa de Função', sexo: null },
-    ];
-    // Adicionar tipos customizados
-    const customTipos = tiposCustom.map(t => ({ value: t.nome, label: t.nome, sexo: null }));
-    return [...tipos, ...customTipos].filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
-  };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
   const canGoNext = () => {
     if (currentStep === 1) return !!formData.tipo_registro;
@@ -1049,6 +1188,7 @@ export default function CadastrarRegistroLivro() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
+<<<<<<< HEAD
               <div>
                 <h1 className="text-xl font-bold text-[#1e3a5f] flex items-center gap-2">
                   <BookOpen className="w-5 h-5" />
@@ -1056,6 +1196,11 @@ export default function CadastrarRegistroLivro() {
                 </h1>
                 <p className="text-slate-500 text-xs mt-0.5">Fluxo guiado de lançamento</p>
               </div>
+=======
+            <div>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">{id ? 'Editar registro do Livro' : 'Cadastrar registro do Livro'}</h1>
+              <p className="text-slate-500 text-sm">{id ? 'Revise o resumo operacional antes de alterar campos sensíveis.' : 'Preencha o registro operacional do Livro.'}</p>
+>>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
             </div>
           </div>
           
@@ -1110,6 +1255,7 @@ export default function CadastrarRegistroLivro() {
           })}
         </div>
 
+<<<<<<< HEAD
         {/* Etapa 1: Tipo */}
         {currentStep === 1 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1169,11 +1315,43 @@ export default function CadastrarRegistroLivro() {
                           );
                         })}
                       </div>
+=======
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {(id || formData.militar_id) && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-[#1e3a5f]">Resumo operacional do registro</h3>
+                  <p className="mt-1 text-sm text-slate-500">Painel rápido para confirmar se você está editando o registro correto antes de mexer nos campos abaixo.</p>
+                </div>
+                <div className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusPublicacaoVisual.classes}`}>
+                  {statusPublicacaoVisual.rotulo}
+                </div>
+              </div>
+
+              {id && registroEdicao && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  Você está editando um registro já existente. Tipo salvo: <strong>{registroEdicao.tipo_registro || 'Não informado'}</strong> • Data salva: <strong>{formatDateLabel(registroEdicao.data_registro)}</strong>.
+                </div>
+              )}
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {resumoRegistro.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <Icon className="h-3.5 w-3.5" /> {item.label}
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
+                      <p className="mt-1 text-xs text-slate-500">{item.support}</p>
+>>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
                     </div>
                   );
                 })}
               </div>
             </div>
+<<<<<<< HEAD
           </div>
         )}
 
@@ -1182,6 +1360,12 @@ export default function CadastrarRegistroLivro() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Militar e Data Base</h3>
+=======
+          )}
+          {/* Identificação */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Identificação</h3>
+>>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
                 <MilitarSelector
@@ -1204,6 +1388,7 @@ export default function CadastrarRegistroLivro() {
           </div>
         )}
 
+<<<<<<< HEAD
         {/* Etapa 3: Texto e Publicação */}
         {currentStep === 3 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1213,6 +1398,175 @@ export default function CadastrarRegistroLivro() {
                 <div>
                   <Label className="text-sm font-bold text-red-800">Ação Bloqueada</Label>
                   <p className="text-sm text-red-700 mt-1">{templateError}</p>
+=======
+          {/* Tipo de Registro */}
+          {formData.militar_id && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
+                  <p className="mt-1 text-xs text-slate-500">Busque pelo tipo operacional e selecione o lançamento correto para evitar confusão entre fluxos parecidos.</p>
+                </div>
+                <div className="relative w-full md:max-w-xs">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Input
+                    value={tipoSearch}
+                    onChange={(e) => setTipoSearch(e.target.value)}
+                    placeholder="Buscar tipo, grupo ou palavra-chave"
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {tiposDestaque.length > 0 && !tipoSearch && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <Sparkles className="w-3.5 h-3.5" /> Tipos frequentes
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {tiposDestaque.map((tipo) => {
+                      const ativo = formData.tipo_registro === tipo.value;
+                      return (
+                        <button
+                          key={tipo.value}
+                          type="button"
+                          onClick={() => {
+                            handleChange('tipo_registro', tipo.value);
+                            setSelectedFerias(null);
+                            setOperacaoFeriasSelecionada('Saída Férias');
+                            setFormData(prev => ({
+                              ...prev,
+                              ferias_id: '',
+                              dias: 0,
+                              data_inicio: '',
+                              data_termino: '',
+                              data_retorno: '',
+                              periodo_aquisitivo: '',
+                            }));
+                          }}
+                          className={`rounded-full border px-3 py-1.5 text-sm transition ${ativo ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100'}`}
+                        >
+                          {tipo.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <Select value={formData.tipo_registro} onValueChange={(v) => {
+                handleChange('tipo_registro', v);
+                setSelectedFerias(null);
+                setOperacaoFeriasSelecionada('Saída Férias');
+                setFormData(prev => ({
+                  ...prev,
+                  ferias_id: '',
+                  dias: 0,
+                  data_inicio: '',
+                  data_termino: '',
+                  data_retorno: '',
+                  periodo_aquisitivo: '',
+                }));
+              }}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(tiposAgrupados).length > 0 ? Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
+                    <SelectGroup key={grupo}>
+                      <SelectLabel className="text-xs uppercase tracking-wide text-slate-500">{grupo}</SelectLabel>
+                      {tipos.map((tipo) => (
+                        <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )) : (
+                    <div className="px-2 py-3 text-sm text-slate-500">Nenhum tipo encontrado para a busca informada.</div>
+                  )}
+                </SelectContent>
+              </Select>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{tipoSelecionado?.label || formData.tipo_registro}</p>
+                    <p className="mt-1 text-sm text-slate-600">{tipoSelecionado?.descricao || 'Registro operacional do Livro.'}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {tipoSelecionado?.grupo && <span className="rounded-full bg-white px-2.5 py-1 text-slate-600 border border-slate-200">Grupo {tipoSelecionado.grupo}</span>}
+                    {isFeriasEfetivo && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-blue-700 border border-blue-200">Fluxo operacional de férias</span>}
+                    {usingCustomTemplate && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 border border-emerald-200">Template aplicado</span>}
+                  </div>
+                </div>
+
+                {resumoOperacional.length > 0 && (
+                  <div className="mt-4 grid gap-2 md:grid-cols-3">
+                    {resumoOperacional.map((item) => (
+                      <div key={item} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Erro de Template Obrigatório */}
+          {templateError && (
+            <div className="bg-red-50 rounded-xl shadow-sm border border-red-200 p-6 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <Label className="text-sm font-bold text-red-800">Ação Bloqueada</Label>
+                <p className="text-sm text-red-700 mt-1">{templateError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Campos Específicos */}
+          {formData.militar_id && renderSpecificFields()}
+
+          {/* Texto para Publicação */}
+          {!templateError && formData.militar_id && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium text-slate-700">Texto para publicação</Label>
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> Gerado automaticamente por template
+                </span>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
+                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {textoPublicacao || 'Nenhum texto gerado.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Publicação e Status */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-[#1e3a5f]">Publicação e Status</h3>
+                <p className="mt-1 text-sm text-slate-500">O status é calculado automaticamente para evitar edição manual incorreta.</p>
+              </div>
+              <div className={`rounded-xl border px-3 py-2 text-xs font-semibold ${statusPublicacaoVisual.classes}`}>
+                {statusPublicacaoVisual.rotulo}
+                <div className="mt-1 text-[11px] font-medium opacity-80">{statusPublicacaoVisual.descricao}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                label="Nota para BG"
+                name="nota_para_bg"
+                value={formData.nota_para_bg}
+                onChange={handleChange}
+                placeholder="Ex: 001/2025"
+              />
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Status</Label>
+                <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
+                  {formData.status || 'Aguardando Nota'}
+>>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
                 </div>
               </div>
             )}
@@ -1278,6 +1632,7 @@ export default function CadastrarRegistroLivro() {
           </div>
         )}
 
+<<<<<<< HEAD
         {/* Etapa 4: Revisão */}
         {currentStep === 4 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1320,6 +1675,19 @@ export default function CadastrarRegistroLivro() {
                 </dl>
               </div>
             </div>
+=======
+          {/* Observações */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-2">Observações para Alterações</h3>
+            <p className="mb-4 text-sm text-slate-500">Use este campo para registrar contexto operacional da edição e reduzir dúvida futura sobre o motivo da alteração.</p>
+            <Textarea
+              value={formData.observacoes}
+              onChange={(e) => handleChange('observacoes', e.target.value)}
+              className="border-slate-200"
+              rows={4}
+              placeholder="Observações gerais..."
+            />
+>>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
           </div>
         )}
       </div>

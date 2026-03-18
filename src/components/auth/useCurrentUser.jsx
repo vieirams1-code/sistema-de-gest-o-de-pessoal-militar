@@ -198,4 +198,39 @@ export function useCurrentUser() {
       return [{ grupamento_id: subgrupamentoId }, { subgrupamento_id: subgrupamentoId }];
     }
 
-    if (modoAcesso === 'subsetor' && subgrupa
+    if (modoAcesso === 'subsetor' && subgrupamentoId) {
+      return [{ subgrupamento_id: subgrupamentoId }, ...unidadesFilhas.map(u => ({ subgrupamento_id: u.id }))];
+    }
+
+    if (modoAcesso === 'unidade' && subgrupamentoId) {
+      return [{ subgrupamento_id: subgrupamentoId }];
+    }
+
+    if (modoAcesso === 'proprio' && linkedMilitarId) {
+      return [{ id: linkedMilitarId }];
+    }
+
+    return [];
+  };
+
+  return {
+    user,
+    acesso,
+    isAdmin,
+    isLoading,
+    isAccessResolved,
+    modoAcesso,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    userEmail,
+    linkedMilitarId,
+    linkedMilitarEmail,
+    unidadesFilhas,
+    canAccessModule,
+    canAccessAction,
+    hasAccess,
+    hasSelfAccess,
+    getMilitarScopeFilters,
+    getAccessModeFromUser,
+  };
+}
