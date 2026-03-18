@@ -14,6 +14,7 @@ import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/uti
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
+import { getDefaultDiasByTipoRegistro, getTiposRegistroLivro } from '@/components/livro/livroTipoRegistroConfig';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -310,21 +311,9 @@ export default function CadastrarRegistroLivro() {
   }, [formData.data_inicio, formData.dias]);
 
   useEffect(() => {
-    if (formData.tipo_registro === 'Núpcias') {
-      setFormData(prev => ({ ...prev, dias: 8 }));
-    } else if (formData.tipo_registro === 'Luto') {
-      setFormData(prev => ({ ...prev, dias: 8 }));
-    } else if (formData.tipo_registro === 'Trânsito') {
-      setFormData(prev => ({ ...prev, dias: 30 }));
-    } else if (formData.tipo_registro === 'Instalação') {
-      setFormData(prev => ({ ...prev, dias: 10 }));
-    } else if (formData.tipo_registro === 'Licença Maternidade') {
-      setFormData(prev => ({ ...prev, dias: 120 }));
-    } else if (formData.tipo_registro === 'Licença Paternidade') {
-      setFormData(prev => ({ ...prev, dias: 5 }));
-    } else if (formData.tipo_registro === 'Dispensa Recompensa') {
-      setFormData(prev => ({ ...prev, dias: 4 }));
-    }
+    const diasPadrao = getDefaultDiasByTipoRegistro(formData.tipo_registro);
+    if (diasPadrao == null) return;
+    setFormData(prev => ({ ...prev, dias: diasPadrao }));
   }, [formData.tipo_registro]);
 
   useEffect(() => {
@@ -1025,24 +1014,7 @@ export default function CadastrarRegistroLivro() {
   }, [tipoAtualCustom, formData, camposCustom]);
 
   const tiposFiltrados = () => {
-    const tipos = [
-      { value: 'Saída Férias', label: 'Férias', sexo: null },
-      { value: 'Licença Maternidade', label: 'Licença Maternidade', sexo: 'Feminino' },
-      { value: 'Prorrogação de Licença Maternidade', label: 'Prorrogação de Licença Maternidade', sexo: 'Feminino' },
-      { value: 'Licença Paternidade', label: 'Licença Paternidade', sexo: 'Masculino' },
-      { value: 'Núpcias', label: 'Núpcias', sexo: null },
-      { value: 'Luto', label: 'Luto', sexo: null },
-      { value: 'Cedência', label: 'Cedência', sexo: null },
-      { value: 'Transferência', label: 'Transferência', sexo: null },
-      { value: 'Trânsito', label: 'Trânsito', sexo: null },
-      { value: 'Instalação', label: 'Instalação', sexo: null },
-      { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
-      { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
-      { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
-    ];
-    // Adicionar tipos customizados
-    const customTipos = tiposCustom.map(t => ({ value: t.nome, label: t.nome, sexo: null }));
-    return [...tipos, ...customTipos].filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
+    return getTiposRegistroLivro(tiposCustom, formData.militar_sexo);
   };
 
   return (
