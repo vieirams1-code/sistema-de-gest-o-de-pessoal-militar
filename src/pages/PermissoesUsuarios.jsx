@@ -265,7 +265,7 @@ export default function PermissoesUsuarios() {
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 lg:p-6">
-      <div className="max-w-[1600px] mx-auto">
+      <div className="max-w-[1780px] mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-[#1e3a5f]/10 text-[#1e3a5f] rounded-xl flex items-center justify-center">
@@ -288,10 +288,10 @@ export default function PermissoesUsuarios() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+        <div className="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
           {/* Coluna da Esquerda: Lista de Usuários */}
-          <div className="xl:col-span-4 2xl:col-span-3 flex flex-col h-[calc(100vh-10rem)]">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
+          <div className="2xl:col-span-3 flex flex-col min-h-[calc(100vh-10rem)]">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col min-h-full overflow-hidden">
               <div className="p-4 border-b border-slate-200 bg-white sticky top-0 z-10">
                 <h2 className="font-semibold text-slate-900">Usuários</h2>
                 <p className="text-xs text-slate-500 mb-3">{acessos.length} registros</p>
@@ -339,9 +339,9 @@ export default function PermissoesUsuarios() {
           </div>
 
           {/* Coluna da Direita: Edição / Detalhes do Usuário */}
-          <div className="xl:col-span-8 2xl:col-span-9">
+          <div className="2xl:col-span-9 min-w-0">
             {selectedUser ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-10rem)]">
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-visible flex flex-col min-h-[calc(100vh-10rem)]">
                 <div className="p-4 lg:p-5 border-b border-slate-200 bg-white sticky top-0 z-20 shrink-0">
                   <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
                     <div>
@@ -363,7 +363,7 @@ export default function PermissoesUsuarios() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5 bg-slate-50/50">
+                <div className="flex-1 p-4 lg:p-6 space-y-5 bg-slate-50/50 min-w-0">
                   <div className="bg-white border border-slate-200 rounded-xl p-2">
                     <div className="flex flex-wrap gap-2">
                       {topPanels.map((panel) => {
@@ -629,13 +629,13 @@ export default function PermissoesUsuarios() {
                   {activePanel === 'matriz' && (
                   <>
                   {/* Bloco 5: Matriz de Permissões */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-4 mb-2">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4">
                     <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                       Matriz de Permissões por Categoria e Módulo
                     </h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                      <aside className="lg:col-span-4 xl:col-span-3 bg-slate-50 border border-slate-200 rounded-xl p-2 h-fit lg:sticky lg:top-24">
+                    <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] gap-4 items-start">
+                      <aside className="bg-slate-50 border border-slate-200 rounded-xl p-2 h-fit sticky top-24">
                         {permissionStructure.map((categoryGroup) => {
                           const isActive = activeCategoryGroup?.category === categoryGroup.category;
                           return (
@@ -652,7 +652,7 @@ export default function PermissoesUsuarios() {
                         })}
                       </aside>
 
-                      <div className="lg:col-span-8 xl:col-span-9 space-y-3">
+                      <div className="space-y-3 min-w-0">
                         <div className="px-1">
                           <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Categoria selecionada</h4>
                           <p className="text-base font-semibold text-slate-900">{activeCategoryGroup?.category}</p>
@@ -684,7 +684,7 @@ export default function PermissoesUsuarios() {
 
                                   {mod.actions.length > 0 && isModuleEnabled && (
                                     <div className="px-3.5 pb-3.5">
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-blue-100 pt-3">
+                                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2 border-t border-blue-100 pt-3">
                                         {mod.actions.map((act) => {
                                           const isActionEnabled = userPermissions[act.key] === true;
                                           const actionOverride = selectedProfilePreview && (selectedProfilePreview[act.key] === true) !== isActionEnabled;
@@ -725,7 +725,7 @@ export default function PermissoesUsuarios() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center p-12 h-[calc(100vh-12rem)]">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center p-12 min-h-[520px]">
                 <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-4">
                   <UserPlus className="w-8 h-8 ml-1" />
                 </div>
