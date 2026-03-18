@@ -148,6 +148,7 @@ export default function PermissoesUsuarios() {
     setSelectedProfileId(fullAcesso.perfil_id || '_nenhum');
 
     setUserPermissions(buildPermissionsFromSource(fullAcesso));
+    setActiveEditTab('dados');
   };
 
   const handleCreateNew = () => {
@@ -164,6 +165,7 @@ export default function PermissoesUsuarios() {
     setUserUnidadeId('');
     setSelectedProfileId('_nenhum');
     setUserPermissions(initialPermissions);
+    setActiveEditTab('dados');
   };
 
   const aplicarPerfil = () => {
@@ -191,7 +193,6 @@ export default function PermissoesUsuarios() {
 
     setSavingUser(true);
     try {
-      const permissionKeys = Object.keys(initialPermissions);
       const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
       const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
       const uni = subgrupamentos.find(s => s.id === userUnidadeId);
@@ -355,185 +356,191 @@ export default function PermissoesUsuarios() {
                 </div>
 
                 <div className="p-3.5 lg:p-4 space-y-4 bg-slate-50/50">
-                  <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-                    {[
-                      { key: 'dados', label: 'Dados' },
-                      { key: 'perfil', label: 'Perfil' },
-                      { key: 'permissoes', label: 'Permissões' },
-                    ].map((tab) => {
-                      const isActive = activeEditTab === tab.key;
-                      return (
-                        <button
-                          key={tab.key}
-                          type="button"
-                          onClick={() => setActiveEditTab(tab.key)}
-                          className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition border ${isActive ? 'bg-[#1e3a5f] text-white border-[#1e3a5f] shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-900'}`}
-                        >
-                          {tab.label}
-                        </button>
-                      );
-                    })}
+                  <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="tablist" aria-label="Abas de edição do usuário">
+                      {[
+                        { key: 'dados', label: 'Dados', icon: UserCircle },
+                        { key: 'perfil', label: 'Perfil', icon: Shield },
+                        { key: 'permissoes', label: 'Permissões', icon: Settings2 },
+                      ].map((tab) => {
+                        const isActive = activeEditTab === tab.key;
+                        const Icon = tab.icon;
+                        return (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={isActive}
+                            aria-controls={`painel-${tab.key}`}
+                            id={`aba-${tab.key}`}
+                            onClick={() => setActiveEditTab(tab.key)}
+                            className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition-all ${isActive ? 'bg-[#1e3a5f] text-white border-[#1e3a5f] shadow-md ring-2 ring-[#1e3a5f]/20' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-white hover:border-slate-300 hover:text-slate-900'}`}
+                          >
+                            <Icon className="w-4 h-4" />
+                            <span>{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {activeEditTab === 'dados' && (
-                    <>
-                  {/* Bloco 1: Dados do Usuário */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-3.5">
-                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <UserCircle className="w-5 h-5 text-slate-400" />
-                      Dados do Usuário
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nome de Usuário</label>
-                        <Input value={userNomeUsuario} onChange={(e) => setUserNomeUsuario(e.target.value)} placeholder="Ex: João da Silva" className="bg-white" />
-                      </div>
-                      <div>
-                        <label className="text-sm font-semibold text-slate-700 block mb-1.5">E-mail do Usuário <span className="text-red-500">*</span></label>
-                        <Input value={userUserEmail} onChange={(e) => setUserUserEmail(e.target.value)} placeholder="email@exemplo.com" className="bg-white" />
-                      </div>
-                      <div className="col-span-1 md:col-span-2 flex items-center gap-2 pt-1 border-t border-slate-200">
-                        <input type="checkbox" id="userAtivo" checked={userAtivo} onChange={(e) => setUserAtivo(e.target.checked)} className="rounded border-slate-300 w-5 h-5 text-[#1e3a5f]" />
-                        <label htmlFor="userAtivo" className="text-sm font-semibold text-slate-700 cursor-pointer">Usuário Ativo e Habilitado para Login</label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bloco 2: Alcance Organizacional */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-3.5">
-                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-blue-500" />
-                      Escopo Organizacional
-                    </h3>
-                    
-                    <div className="mb-4">
-                      <label className="text-sm font-semibold text-slate-700 block mb-1.5">Escopo de Acesso</label>
-                      <Select
-                        value={userAccessMode}
-                        onValueChange={(v) => {
-                          setUserAccessMode(v);
-                          if (v === 'proprio' || v === 'admin') {
-                            setUserGrupamentoId('');
-                            setUserSubgrupamentoId('');
-                            setUserUnidadeId('');
-                          }
-                          if (v !== 'proprio') {
-                            setUserMilitarId('');
-                            setUserMilitarEmail('');
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="bg-white md:max-w-xs"><SelectValue placeholder="Selecione o escopo" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="proprio">Proprio / Sem Setor Visto (Padrão)</SelectItem>
-                          <SelectItem value="unidade">Unidade / Nível 3</SelectItem>
-                          <SelectItem value="subsetor">Subsetor / Seção</SelectItem>
-                          <SelectItem value="setor">Setor / Grupamento Todo</SelectItem>
-                          <SelectItem value="admin">Administrador Global</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {(userAccessMode === 'setor' || userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-3.5 bg-white border border-blue-100 rounded-lg">
-                        <div>
-                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Setor (Obrigatório)</label>
-                          <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); setUserUnidadeId(''); }}>
-                            <SelectTrigger><SelectValue placeholder="Selecione um setor..." /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="_nenhum">— Selecione —</SelectItem>
-                              {grupamentos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          {userAccessMode === 'setor' && userGrupamentoId && !userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados deste setor inteiro.</p>}
-                        </div>
-
-                        {(userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
-                          <div>
-                            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Subsetor/Seção (Obrigatório)</label>
-                            <Select 
-                              value={userSubgrupamentoId || '_nenhum'} 
-                              onValueChange={(v) => { setUserSubgrupamentoId(v === '_nenhum' ? '' : v); setUserUnidadeId(''); }}
-                              disabled={!userGrupamentoId || subgrupamentosFilhos.length === 0}
-                            >
-                              <SelectTrigger><SelectValue placeholder={!userGrupamentoId ? "Selecione o setor primeiro" : (subgrupamentosFilhos.length === 0 ? "Sem subsetores" : "Selecione o subsetor") } /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="_nenhum">— Selecione —</SelectItem>
-                                {subgrupamentosFilhos.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            {userAccessMode === 'subsetor' && userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados apenas deste subsetor e suas unidades.</p>}
-                          </div>
-                        )}
-
-                        {userAccessMode === 'unidade' && (
-                          <div>
-                            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Unidade (Obrigatório)</label>
-                            <Select 
-                              value={userUnidadeId || '_nenhum'} 
-                              onValueChange={(v) => setUserUnidadeId(v === '_nenhum' ? '' : v)}
-                              disabled={!userSubgrupamentoId || unidadesFilhas.length === 0}
-                            >
-                              <SelectTrigger><SelectValue placeholder={!userSubgrupamentoId ? "Selecione o subsetor" : (unidadesFilhas.length === 0 ? "Sem unidades filhas" : "Selecione a unidade") } /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="_nenhum">— Selecione —</SelectItem>
-                                {unidadesFilhas.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}{u.sigla ? ` (${u.sigla})` : ''}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            {userUnidadeId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão estrita e limitada a esta unidade.</p>}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bloco 3: Vínculo com Militar */}
-                  {userAccessMode === 'proprio' && (
-                    <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4">
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                          <Users className="w-5 h-5 text-indigo-500" />
-                          Vínculo do Próprio Militar
+                    <div id="painel-dados" role="tabpanel" aria-labelledby="aba-dados" className="space-y-4">
+                      {/* Bloco 1: Dados do Usuário */}
+                      <div className="bg-white border border-slate-200 rounded-xl p-3.5">
+                        <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                          <UserCircle className="w-5 h-5 text-slate-400" />
+                          Dados do Usuário
                         </h3>
-                        <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200 text-xs">Modo Próprio</Badge>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nome de Usuário</label>
+                            <Input value={userNomeUsuario} onChange={(e) => setUserNomeUsuario(e.target.value)} placeholder="Ex: João da Silva" className="bg-white" />
+                          </div>
+                          <div>
+                            <label className="text-sm font-semibold text-slate-700 block mb-1.5">E-mail do Usuário <span className="text-red-500">*</span></label>
+                            <Input value={userUserEmail} onChange={(e) => setUserUserEmail(e.target.value)} placeholder="email@exemplo.com" className="bg-white" />
+                          </div>
+                          <div className="col-span-1 md:col-span-2 flex items-center gap-2 pt-1 border-t border-slate-200">
+                            <input type="checkbox" id="userAtivo" checked={userAtivo} onChange={(e) => setUserAtivo(e.target.checked)} className="rounded border-slate-300 w-5 h-5 text-[#1e3a5f]" />
+                            <label htmlFor="userAtivo" className="text-sm font-semibold text-slate-700 cursor-pointer">Usuário Ativo e Habilitado para Login</label>
+                          </div>
+                        </div>
                       </div>
-                      
-                      <p className="text-sm text-slate-600 mb-4">
-                        Neste modo, o usuário não gerencia setores. Ele acessa apenas os próprios dados (avaliações, assentamentos pessoais, atestados, etc). Para isso, <b>é obrigatório vinculá-lo a um militar cadastrado</b>.
-                      </p>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-3.5 rounded-lg border border-indigo-50">
-                        <div>
-                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Militar Vinculado <span className="text-red-500">*</span></label>
-                          <Select value={userMilitarId || '_nenhum'} onValueChange={(v) => {
-                            const militarId = v === '_nenhum' ? '' : v;
-                            setUserMilitarId(militarId);
-                            const militar = militares.find((m) => m.id === militarId);
-                            setUserMilitarEmail(militar?.email || militar?.email_particular || militar?.email_funcional || selectedUser?.email || '');
-                          }}>
-                            <SelectTrigger className="border-indigo-200"><SelectValue placeholder="Selecione o militar" /></SelectTrigger>
+                      {/* Bloco 2: Alcance Organizacional */}
+                      <div className="bg-white border border-slate-200 rounded-xl p-3.5">
+                        <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                          <Building2 className="w-5 h-5 text-blue-500" />
+                          Escopo Organizacional
+                        </h3>
+
+                        <div className="mb-4">
+                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Escopo de Acesso</label>
+                          <Select
+                            value={userAccessMode}
+                            onValueChange={(v) => {
+                              setUserAccessMode(v);
+                              if (v === 'proprio' || v === 'admin') {
+                                setUserGrupamentoId('');
+                                setUserSubgrupamentoId('');
+                                setUserUnidadeId('');
+                              }
+                              if (v !== 'proprio') {
+                                setUserMilitarId('');
+                                setUserMilitarEmail('');
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="bg-white md:max-w-xs"><SelectValue placeholder="Selecione o escopo" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="_nenhum">— Selecione —</SelectItem>
-                              {militaresOrdenados.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>{m.posto_graduacao ? `${m.posto_graduacao} ` : ''}{m.nome_completo} {m.matricula ? `- Mat ${m.matricula}` : ''}</SelectItem>
-                              ))}
+                              <SelectItem value="proprio">Proprio / Sem Setor Visto (Padrão)</SelectItem>
+                              <SelectItem value="unidade">Unidade / Nível 3</SelectItem>
+                              <SelectItem value="subsetor">Subsetor / Seção</SelectItem>
+                              <SelectItem value="setor">Setor / Grupamento Todo</SelectItem>
+                              <SelectItem value="admin">Administrador Global</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                        <div>
-                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">E-mail Secundário do Vínculo</label>
-                          <Input value={userMilitarEmail || userUserEmail || ''} onChange={(e) => setUserMilitarEmail(e.target.value)} placeholder="email@militar" className="border-indigo-200 bg-slate-50" />
-                          <p className="text-xs text-slate-500 mt-1.5 font-medium">E-mail principal do acesso: {userUserEmail || 'sem e-mail preenchido'}</p>
-                        </div>
+
+                        {(userAccessMode === 'setor' || userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-3.5 bg-white border border-blue-100 rounded-lg">
+                            <div>
+                              <label className="text-sm font-semibold text-slate-700 block mb-1.5">Setor (Obrigatório)</label>
+                              <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); setUserUnidadeId(''); }}>
+                                <SelectTrigger><SelectValue placeholder="Selecione um setor..." /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                  {grupamentos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              {userAccessMode === 'setor' && userGrupamentoId && !userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados deste setor inteiro.</p>}
+                            </div>
+
+                            {(userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
+                              <div>
+                                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Subsetor/Seção (Obrigatório)</label>
+                                <Select 
+                                  value={userSubgrupamentoId || '_nenhum'} 
+                                  onValueChange={(v) => { setUserSubgrupamentoId(v === '_nenhum' ? '' : v); setUserUnidadeId(''); }}
+                                  disabled={!userGrupamentoId || subgrupamentosFilhos.length === 0}
+                                >
+                                  <SelectTrigger><SelectValue placeholder={!userGrupamentoId ? "Selecione o setor primeiro" : (subgrupamentosFilhos.length === 0 ? "Sem subsetores" : "Selecione o subsetor") } /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                    {subgrupamentosFilhos.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                {userAccessMode === 'subsetor' && userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados apenas deste subsetor e suas unidades.</p>}
+                              </div>
+                            )}
+
+                            {userAccessMode === 'unidade' && (
+                              <div>
+                                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Unidade (Obrigatório)</label>
+                                <Select 
+                                  value={userUnidadeId || '_nenhum'} 
+                                  onValueChange={(v) => setUserUnidadeId(v === '_nenhum' ? '' : v)}
+                                  disabled={!userSubgrupamentoId || unidadesFilhas.length === 0}
+                                >
+                                  <SelectTrigger><SelectValue placeholder={!userSubgrupamentoId ? "Selecione o subsetor" : (unidadesFilhas.length === 0 ? "Sem unidades filhas" : "Selecione a unidade") } /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                    {unidadesFilhas.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}{u.sigla ? ` (${u.sigla})` : ''}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                {userUnidadeId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão estrita e limitada a esta unidade.</p>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {userAccessMode === 'proprio' && (
+                          <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4">
+                            <div className="flex justify-between items-start mb-4">
+                              <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                <Users className="w-5 h-5 text-indigo-500" />
+                                Vínculo do Próprio Militar
+                              </h4>
+                              <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200 text-xs">Modo Próprio</Badge>
+                            </div>
+
+                            <p className="text-sm text-slate-600 mb-4">
+                              Neste modo, o usuário não gerencia setores. Ele acessa apenas os próprios dados (avaliações, assentamentos pessoais, atestados, etc). Para isso, <b>é obrigatório vinculá-lo a um militar cadastrado</b>.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-3.5 rounded-lg border border-indigo-50">
+                              <div>
+                                <label className="text-sm font-semibold text-slate-700 block mb-1.5">Militar Vinculado <span className="text-red-500">*</span></label>
+                                <Select value={userMilitarId || '_nenhum'} onValueChange={(v) => {
+                                  const militarId = v === '_nenhum' ? '' : v;
+                                  setUserMilitarId(militarId);
+                                  const militar = militares.find((m) => m.id === militarId);
+                                  setUserMilitarEmail(militar?.email || militar?.email_particular || militar?.email_funcional || selectedUser?.email || '');
+                                }}>
+                                  <SelectTrigger className="border-indigo-200"><SelectValue placeholder="Selecione o militar" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                    {militaresOrdenados.map((m) => (
+                                      <SelectItem key={m.id} value={m.id}>{m.posto_graduacao ? `${m.posto_graduacao} ` : ''}{m.nome_completo} {m.matricula ? `- Mat ${m.matricula}` : ''}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <label className="text-sm font-semibold text-slate-700 block mb-1.5">E-mail Secundário do Vínculo</label>
+                                <Input value={userMilitarEmail || userUserEmail || ''} onChange={(e) => setUserMilitarEmail(e.target.value)} placeholder="email@militar" className="border-indigo-200 bg-slate-50" />
+                                <p className="text-xs text-slate-500 mt-1.5 font-medium">E-mail principal do acesso: {userUserEmail || 'sem e-mail preenchido'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-
-                    </>
                   )}
 
                   {activeEditTab === 'perfil' && (
-                    <>
+                    <div id="painel-perfil" role="tabpanel" aria-labelledby="aba-perfil" className="space-y-4">
                   {/* Bloco 4: Perfil de Permissões */}
                   <div className="bg-white border border-slate-200 rounded-xl p-3.5">
                     <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -612,11 +619,11 @@ export default function PermissoesUsuarios() {
                     )}
                   </div>
 
-                    </>
+                    </div>
                   )}
 
                   {activeEditTab === 'permissoes' && (
-                    <>
+                    <div id="painel-permissoes" role="tabpanel" aria-labelledby="aba-permissoes" className="space-y-4">
                   {/* Bloco 5: Matriz de Permissões */}
                   <div className="bg-white border border-slate-200 rounded-xl p-3.5 mb-1">
                     <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -708,7 +715,7 @@ export default function PermissoesUsuarios() {
                       </div>
                     </div>
                   </div>
-                    </>
+                    </div>
                   )}
 
                 </div>
