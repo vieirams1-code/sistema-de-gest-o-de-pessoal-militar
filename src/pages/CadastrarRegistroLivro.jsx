@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -7,14 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw, AlertTriangle, Search, Sparkles } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
-import { getTiposLivroFiltrados, groupTiposLivro } from '@/components/livro/livroTipoRegistroConfig';
+import { getTiposLivroFiltrados, groupTiposLivro, matchesTipoLivroSearch } from '@/components/livro/livroTipoRegistroConfig';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -120,6 +120,7 @@ export default function CadastrarRegistroLivro() {
   const [textoPublicacao, setTextoPublicacao] = useState('');
   const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
   const [templateError, setTemplateError] = useState(null);
+  const [tipoSearch, setTipoSearch] = useState('');
 
   // Buscar templates cadastrados
   const { data: templates = [] } = useQuery({
@@ -183,9 +184,6 @@ export default function CadastrarRegistroLivro() {
     if (!feriasEdicao) return;
     setSelectedFerias(feriasEdicao);
   }, [feriasEdicao]);
-
-  if (loadingUser || !isAccessResolved) return null;
-  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
   const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
     ? (selectedFerias ? operacaoFeriasSelecionada : 'Saída Férias')
@@ -977,7 +975,60 @@ export default function CadastrarRegistroLivro() {
   };
 
   const tipoAtualCustom = tiposCustom.find(t => t.nome === formData.tipo_registro);
-  
+
+  const tiposFiltrados = useMemo(() => getTiposLivroFiltrados({ sexo: formData.militar_sexo, tiposCustom }), [formData.militar_sexo, tiposCustom]);
+  const tiposDisponiveis = useMemo(() => tiposFiltrados.filter((tipo) => matchesTipoLivroSearch(tipo, tipoSearch)), [tiposFiltrados, tipoSearch]);
+  const tiposAgrupados = useMemo(() => groupTiposLivro(tiposDisponiveis), [tiposDisponiveis]);
+  const tipoSelecionado = useMemo(() => tiposFiltrados.find((tipo) => tipo.value === formData.tipo_registro), [tiposFiltrados, formData.tipo_registro]);
+  const tiposDestaque = useMemo(() => tiposFiltrados.filter((tipo) => tipo.destaque).slice(0, 6), [tiposFiltrados]);
+
+  const resumoOperacional = useMemo(() => {
+    if (!tipoSelecionado) return [];
+
+    const itens = [];
+
+    if (tipoRegistroEfetivo === 'Saída Férias') {
+      itens.push('Selecione a cadeia de férias correta para o militar antes de salvar.');
+      itens.push('O texto e a data-base são ajustados conforme a cadeia selecionada.');
+    }
+
+    if (tipoRegistroEfetivo === 'Interrupção de Férias') {
+      itens.push('A data do registro define quantos dias já foram gozados.');
+      itens.push('O saldo remanescente fica pronto para continuação posterior.');
+    }
+
+    if (tipoRegistroEfetivo === 'Nova Saída / Retomada') {
+      itens.push('Use este tipo apenas para férias já interrompidas.');
+      itens.push('O saldo remanescente é reaproveitado automaticamente no texto.');
+    }
+
+    if (tipoRegistroEfetivo === 'Retorno Férias') {
+      itens.push('Use para encerrar a cadeia de férias em curso.');
+    }
+
+    if (['Licença Maternidade', 'Prorrogação de Licença Maternidade', 'Licença Paternidade'].includes(tipoRegistroEfetivo)) {
+      itens.push('Confira datas de início e término antes de salvar.');
+    }
+
+    if (['Transferência', 'Transferência para RR', 'Cedência', 'Trânsito', 'Instalação'].includes(tipoRegistroEfetivo)) {
+      itens.push('Preencha origem, destino e referência do ato para evitar ambiguidade operacional.');
+    }
+
+    if (['Núpcias', 'Luto', 'Dispensa Recompensa'].includes(tipoRegistroEfetivo)) {
+      itens.push('Os dias padrão são sugeridos automaticamente quando aplicável.');
+    }
+
+    if (['Deslocamento Missão', 'Curso/Estágio'].includes(tipoRegistroEfetivo)) {
+      itens.push('Detalhe o documento de referência para facilitar consultas futuras.');
+    }
+
+    if (tipoAtualCustom) {
+      itens.push('Este tipo usa campos personalizados e template configurado em Configurações.');
+    }
+
+    return itens.slice(0, 3);
+  }, [tipoSelecionado, tipoRegistroEfetivo, tipoAtualCustom]);
+
   const isFeriasEfetivo = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'].includes(tipoRegistroEfetivo);
 
   // Gerar texto para tipo customizado
@@ -999,12 +1050,9 @@ export default function CadastrarRegistroLivro() {
     setTextoPublicacao(texto);
   }, [tipoAtualCustom, formData, camposCustom]);
 
-  const tiposFiltrados = () => {
-    return getTiposLivroFiltrados({ sexo: formData.militar_sexo, tiposCustom });
-  };
 
-  const tiposAgrupados = groupTiposLivro(tiposFiltrados());
-  const tipoSelecionado = tiposFiltrados().find((tipo) => tipo.value === formData.tipo_registro);
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -1064,8 +1112,59 @@ export default function CadastrarRegistroLivro() {
 
           {/* Tipo de Registro */}
           {formData.militar_id && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
+                  <p className="mt-1 text-xs text-slate-500">Busque pelo tipo operacional e selecione o lançamento correto para evitar confusão entre fluxos parecidos.</p>
+                </div>
+                <div className="relative w-full md:max-w-xs">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Input
+                    value={tipoSearch}
+                    onChange={(e) => setTipoSearch(e.target.value)}
+                    placeholder="Buscar tipo, grupo ou palavra-chave"
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {tiposDestaque.length > 0 && !tipoSearch && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <Sparkles className="w-3.5 h-3.5" /> Tipos frequentes
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {tiposDestaque.map((tipo) => {
+                      const ativo = formData.tipo_registro === tipo.value;
+                      return (
+                        <button
+                          key={tipo.value}
+                          type="button"
+                          onClick={() => {
+                            handleChange('tipo_registro', tipo.value);
+                            setSelectedFerias(null);
+                            setOperacaoFeriasSelecionada('Saída Férias');
+                            setFormData(prev => ({
+                              ...prev,
+                              ferias_id: '',
+                              dias: 0,
+                              data_inicio: '',
+                              data_termino: '',
+                              data_retorno: '',
+                              periodo_aquisitivo: '',
+                            }));
+                          }}
+                          className={`rounded-full border px-3 py-1.5 text-sm transition ${ativo ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100'}`}
+                        >
+                          {tipo.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <Select value={formData.tipo_registro} onValueChange={(v) => {
                 handleChange('tipo_registro', v);
                 setSelectedFerias(null);
@@ -1084,20 +1183,42 @@ export default function CadastrarRegistroLivro() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
+                  {Object.keys(tiposAgrupados).length > 0 ? Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
                     <SelectGroup key={grupo}>
                       <SelectLabel className="text-xs uppercase tracking-wide text-slate-500">{grupo}</SelectLabel>
                       {tipos.map((tipo) => (
                         <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
                       ))}
                     </SelectGroup>
-                  ))}
+                  )) : (
+                    <div className="px-2 py-3 text-sm text-slate-500">Nenhum tipo encontrado para a busca informada.</div>
+                  )}
                 </SelectContent>
               </Select>
-              <p className="mt-2 text-xs text-slate-500">
-                Selecionado: <strong>{tipoSelecionado?.label || formData.tipo_registro}</strong>
-                {tipoSelecionado?.grupo ? ` • Grupo ${tipoSelecionado.grupo}` : ''}
-              </p>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{tipoSelecionado?.label || formData.tipo_registro}</p>
+                    <p className="mt-1 text-sm text-slate-600">{tipoSelecionado?.descricao || 'Registro operacional do Livro.'}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {tipoSelecionado?.grupo && <span className="rounded-full bg-white px-2.5 py-1 text-slate-600 border border-slate-200">Grupo {tipoSelecionado.grupo}</span>}
+                    {isFeriasEfetivo && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-blue-700 border border-blue-200">Fluxo operacional de férias</span>}
+                    {usingCustomTemplate && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 border border-emerald-200">Template aplicado</span>}
+                  </div>
+                </div>
+
+                {resumoOperacional.length > 0 && (
+                  <div className="mt-4 grid gap-2 md:grid-cols-3">
+                    {resumoOperacional.map((item) => (
+                      <div key={item} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
