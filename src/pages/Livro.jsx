@@ -277,11 +277,6 @@ export default function Livro() {
                   </div>
 
                   <div className="flex shrink-0 flex-col gap-2 lg:w-52">
-                    <Button asChild variant="outline" className="justify-between">
-                      <a href={`${createPageUrl('CadastrarRegistroLivro')}?id=${registro.id}`}>
-                        Editar registro <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </Button>
                     {registro.militar?.id && (
                       <Button asChild variant="outline" className="justify-between">
                         <a href={`${createPageUrl('FichaMilitar')}?id=${registro.militar.id}`}>
