@@ -6,25 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-<<<<<<< HEAD
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save, RefreshCw, AlertTriangle, Check, Search, ChevronRight, ChevronLeft, BookOpen, Send } from 'lucide-react';
-=======
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Save, RefreshCw, AlertTriangle, Search, Sparkles, FileText, CalendarRange, UserRound, ShieldCheck, PencilLine, GitBranch } from 'lucide-react';
->>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
-<<<<<<< HEAD
-import { LIVRO_GRUPOS_TIPOS, LIVRO_TIPOS_FREQUENTES } from '@/components/livro/livroTipoRegistroConfig';
-=======
 import { getTiposLivroFiltrados, groupTiposLivro, matchesTipoLivroSearch } from '@/components/livro/livroTipoRegistroConfig';
->>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -160,12 +150,7 @@ export default function CadastrarRegistroLivro() {
   const [textoPublicacao, setTextoPublicacao] = useState('');
   const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
   const [templateError, setTemplateError] = useState(null);
-<<<<<<< HEAD
-  const [currentStep, setCurrentStep] = useState(1);
-  const [buscaTipo, setBuscaTipo] = useState('');
-=======
   const [tipoSearch, setTipoSearch] = useState('');
->>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
 
   // Buscar templates cadastrados
   const { data: templates = [] } = useQuery({
@@ -786,41 +771,12 @@ export default function CadastrarRegistroLivro() {
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Luto</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Falecido(a)"
-                  name="falecido_nome"
-                  value={formData.falecido_nome}
-                  onChange={handleChange}
-                  placeholder="Nome do falecido"
-                  required
-                />
-                <FormField
-                  label="Certidão de Óbito"
-                  name="falecido_certidao"
-                  value={formData.falecido_certidao}
-                  onChange={handleChange}
-                  placeholder="Número da certidão"
-                  required
-                />
+                <FormField label="Falecido(a)" name="falecido_nome" value={formData.falecido_nome} onChange={handleChange} placeholder="Nome do falecido" required />
+                <FormField label="Certidão de Óbito" name="falecido_certidao" value={formData.falecido_certidao} onChange={handleChange} placeholder="Número da certidão" required />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Grau de Parentesco (BM e Cônjuge)"
-                  name="grau_parentesco"
-                  value={formData.grau_parentesco}
-                  onChange={handleChange}
-                  type="select"
-                  options={['Ascendentes', 'Descendentes', 'Cônjuge', 'Irmão(ã)']}
-                  required
-                />
-                <FormField
-                  label="Data de Início"
-                  name="data_inicio"
-                  value={formData.data_inicio}
-                  onChange={handleChange}
-                  type="date"
-                  required
-                />
+                <FormField label="Grau de Parentesco (BM e Cônjuge)" name="grau_parentesco" value={formData.grau_parentesco} onChange={handleChange} type="select" options={['Ascendentes', 'Descendentes', 'Cônjuge', 'Irmão(ã)']} required />
+                <FormField label="Data de Início" name="data_inicio" value={formData.data_inicio} onChange={handleChange} type="date" required />
               </div>
             </div>
           </div>
@@ -832,39 +788,13 @@ export default function CadastrarRegistroLivro() {
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cedência</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  label="Origem"
-                  name="origem"
-                  value={formData.origem}
-                  onChange={handleChange}
-                  placeholder="Unidade de origem"
-                  required
-                />
-                <FormField
-                  label="Destino"
-                  name="destino"
-                  value={formData.destino}
-                  onChange={handleChange}
-                  placeholder="Unidade de destino"
-                  required
-                />
+                <FormField label="Origem" name="origem" value={formData.origem} onChange={handleChange} placeholder="Unidade de origem" required />
+                <FormField label="Destino" name="destino" value={formData.destino} onChange={handleChange} placeholder="Unidade de destino" required />
               </div>
-              <FormField
-                label="Data da Cedência"
-                name="data_cedencia"
-                value={formData.data_cedencia}
-                onChange={handleChange}
-                type="date"
-                required
-              />
+              <FormField label="Data da Cedência" name="data_cedencia" value={formData.data_cedencia} onChange={handleChange} type="date" required />
               <div>
                 <Label>OBS</Label>
-                <Textarea
-                  value={formData.obs_cedencia}
-                  onChange={(e) => handleChange('obs_cedencia', e.target.value)}
-                  className="mt-1.5"
-                  rows={3}
-                />
+                <Textarea value={formData.obs_cedencia} onChange={(e) => handleChange('obs_cedencia', e.target.value)} className="mt-1.5" rows={3} />
               </div>
             </div>
           </div>
@@ -941,7 +871,6 @@ export default function CadastrarRegistroLivro() {
           </div>
         );
 
-
       case 'Deslocamento Missão':
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -977,10 +906,7 @@ export default function CadastrarRegistroLivro() {
           </div>
         );
 
-      
-
       default:
-        // Verifica se é um tipo customizado
         if (tipoAtualCustom) {
           return (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -1166,157 +1092,30 @@ export default function CadastrarRegistroLivro() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
-  const canGoNext = () => {
-    if (currentStep === 1) return !!formData.tipo_registro;
-    if (currentStep === 2) return !!formData.militar_id && !!formData.data_registro && !(isFeriasEfetivo && !formData.ferias_id);
-    if (currentStep === 3) return !templateError;
-    return false;
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-        {/* Header */}
+      {/* Header */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate(-1)}
-                className="hover:bg-slate-100 text-slate-500"
+              className="hover:bg-slate-100 text-slate-500"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-<<<<<<< HEAD
-              <div>
-                <h1 className="text-xl font-bold text-[#1e3a5f] flex items-center gap-2">
-                  <BookOpen className="w-5 h-5" />
-                  Registrar no Livro
-                </h1>
-                <p className="text-slate-500 text-xs mt-0.5">Fluxo guiado de lançamento</p>
-              </div>
-=======
             <div>
               <h1 className="text-2xl font-bold text-[#1e3a5f]">{id ? 'Editar registro do Livro' : 'Cadastrar registro do Livro'}</h1>
               <p className="text-slate-500 text-sm">{id ? 'Revise o resumo operacional antes de alterar campos sensíveis.' : 'Preencha o registro operacional do Livro.'}</p>
->>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
             </div>
-          </div>
-          
-          {/* Resumo compacto / Chips */}
-          <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
-            {formData.tipo_registro && (
-              <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
-                Tipo: {formData.tipo_registro}
-              </Badge>
-            )}
-            {formData.militar_nome && (
-              <Badge className="bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200">
-                {formData.militar_posto} {formData.militar_nome}
-              </Badge>
-            )}
-            {formData.militar_matricula && (
-              <Badge variant="outline" className="text-slate-500 border-slate-200">
-                Matrícula: {formData.militar_matricula}
-              </Badge>
-            )}
-            {formData.data_registro && (
-              <Badge variant="outline" className="text-slate-500 border-slate-200">
-                Ref: {formatarDataExtenso(formData.data_registro)}
-              </Badge>
-            )}
           </div>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8 w-full flex-1 pb-32">
-        {/* Stepper */}
-        <div className="flex items-center justify-between mb-8 max-w-3xl mx-auto relative">
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 rounded-full z-0" />
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-blue-600 rounded-full z-0 transition-all duration-300" style={{ width: `${((currentStep - 1) / 3) * 100}%` }} />
-          
-          {['Tipo', 'Dados', 'Texto', 'Revisão'].map((label, index) => {
-            const stepNum = index + 1;
-            const isActive = stepNum === currentStep;
-            const isCompleted = stepNum < currentStep;
-            return (
-              <div key={label} className="relative z-10 flex flex-col items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors border-2
-                  ${isActive ? 'bg-blue-600 border-blue-600 text-white' : 
-                    isCompleted ? 'bg-white border-blue-600 text-blue-600' : 'bg-white border-slate-300 text-slate-400'}`}>
-                  {isCompleted ? <Check className="w-4 h-4" /> : stepNum}
-                </div>
-                <span className={`text-xs font-semibold ${isActive ? 'text-blue-700' : isCompleted ? 'text-slate-700' : 'text-slate-400'}`}>
-                  {label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-<<<<<<< HEAD
-        {/* Etapa 1: Tipo */}
-        {currentStep === 1 && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <div className="relative mb-6">
-                <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <Input 
-                  placeholder="Buscar tipo de registro..." 
-                  className="pl-10 h-12 text-lg"
-                  value={buscaTipo}
-                  onChange={e => setBuscaTipo(e.target.value)}
-                />
-              </div>
-              
-              {!buscaTipo && (
-                <div className="mb-8">
-                  <h3 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Acesso Rápido</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {LIVRO_TIPOS_FREQUENTES.map(t => {
-                      const isSelected = formData.tipo_registro === t;
-                      return (
-                        <button
-                          key={t}
-                          onClick={() => { handleChange('tipo_registro', t); setCurrentStep(2); }}
-                          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
-                        >
-                          {t}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-8">
-                {LIVRO_GRUPOS_TIPOS.map(grupo => {
-                  const tiposFiltradosBusca = grupo.tipos.filter(t => t.toLowerCase().includes(buscaTipo.toLowerCase()));
-                  if (tiposFiltradosBusca.length === 0) return null;
-                  
-                  return (
-                    <div key={grupo.nome}>
-                      <h3 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">{grupo.nome}</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {tiposFiltradosBusca.map(t => {
-                          const isSelected = formData.tipo_registro === t;
-                          return (
-                            <div 
-                              key={t} 
-                              onClick={() => { handleChange('tipo_registro', t); setCurrentStep(2); }}
-                              className={`p-4 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'}`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className={`font-medium ${isSelected ? 'text-blue-800' : 'text-slate-700'}`}>{t}</span>
-                                {isSelected && <Check className="w-5 h-5 text-blue-600" />}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-=======
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit('back'); }} className="space-y-6">
           {(id || formData.militar_id) && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1345,27 +1144,16 @@ export default function CadastrarRegistroLivro() {
                       </div>
                       <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
                       <p className="mt-1 text-xs text-slate-500">{item.support}</p>
->>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
                     </div>
                   );
                 })}
               </div>
             </div>
-<<<<<<< HEAD
-          </div>
-        )}
-
-        {/* Etapa 2: Dados Essenciais */}
-        {currentStep === 2 && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Militar e Data Base</h3>
-=======
           )}
+
           {/* Identificação */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Identificação</h3>
->>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
                 <MilitarSelector
@@ -1384,21 +1172,7 @@ export default function CadastrarRegistroLivro() {
               />
             </div>
           </div>
-            {formData.militar_id && renderSpecificFields()}
-          </div>
-        )}
 
-<<<<<<< HEAD
-        {/* Etapa 3: Texto e Publicação */}
-        {currentStep === 3 && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {templateError && (
-              <div className="bg-red-50 rounded-xl shadow-sm border border-red-200 p-6 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <Label className="text-sm font-bold text-red-800">Ação Bloqueada</Label>
-                  <p className="text-sm text-red-700 mt-1">{templateError}</p>
-=======
           {/* Tipo de Registro */}
           {formData.militar_id && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
@@ -1555,131 +1329,21 @@ export default function CadastrarRegistroLivro() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                label="Nota para BG"
-                name="nota_para_bg"
-                value={formData.nota_para_bg}
-                onChange={handleChange}
-                placeholder="Ex: 001/2025"
-              />
+              <FormField label="Nota para BG" name="nota_para_bg" value={formData.nota_para_bg} onChange={handleChange} placeholder="Ex: 001/2025" />
+              <FormField label="Número do BG" name="numero_bg" value={formData.numero_bg} onChange={handleChange} />
+              <FormField label="Data do BG" name="data_bg" value={formData.data_bg} onChange={handleChange} type="date" />
               <div>
                 <Label className="text-sm font-medium text-slate-700">Status</Label>
                 <div className="mt-1.5 px-3 py-2 border rounded-md bg-slate-50 text-slate-600 text-sm">
                   {formData.status || 'Aguardando Nota'}
->>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
                 </div>
-              </div>
-            )}
-
-            {!templateError && formData.militar_id && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <Label className="text-base font-semibold text-[#1e3a5f]">Texto Final</Label>
-                  <span className="text-xs text-emerald-600 font-medium flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
-                    <RefreshCw className="w-3 h-3" /> Baseado em template
-                  </span>
-                </div>
-                <div className="p-5 bg-slate-50 border border-slate-200 rounded-lg min-h-[120px]">
-                  <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-                    {textoPublicacao || 'Nenhum texto gerado. Preencha os dados na etapa anterior.'}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dados de Publicação e Observações (Opcional)</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <FormField
-                  label="Nota para BG"
-                  name="nota_para_bg"
-                  value={formData.nota_para_bg}
-                  onChange={handleChange}
-                  placeholder="Ex: 001/2025"
-                />
-                <FormField
-                  label="Número do BG"
-                  name="numero_bg"
-                  value={formData.numero_bg}
-                  onChange={handleChange}
-                />
-                <FormField
-                  label="Data do BG"
-                  name="data_bg"
-                  value={formData.data_bg}
-                  onChange={handleChange}
-                  type="date"
-                />
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Status Processado</Label>
-                  <div className="mt-1.5 px-3 py-2.5 border rounded-md bg-slate-50 text-slate-600 text-sm">
-                    {formData.status || 'Aguardando Nota'}
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <Label className="text-sm font-medium text-slate-700">Observações Complementares</Label>
-                <Textarea
-                  value={formData.observacoes}
-                  onChange={(e) => handleChange('observacoes', e.target.value)}
-                  className="mt-1.5 border-slate-200"
-                  rows={2}
-                  placeholder="Observações de uso interno..."
-                />
               </div>
             </div>
           </div>
-        )}
 
-<<<<<<< HEAD
-        {/* Etapa 4: Revisão */}
-        {currentStep === 4 && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-[#1e3a5f] px-6 py-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Revisão do Lançamento</h3>
-              </div>
-              <div className="p-6">
-                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6 text-sm">
-                  <div>
-                    <dt className="text-slate-500 font-medium">Tipo</dt>
-                    <dd className="mt-1 font-semibold text-slate-800">{formData.tipo_registro}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500 font-medium">Militar</dt>
-                    <dd className="mt-1 font-semibold text-slate-800">{formData.militar_posto} {formData.militar_nome}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500 font-medium">Data do Registro</dt>
-                    <dd className="mt-1 text-slate-800">{formatarDataExtenso(formData.data_registro)}</dd>
-                  </div>
-                  {formData.dias > 0 && (
-                    <div>
-                      <dt className="text-slate-500 font-medium">Dias</dt>
-                      <dd className="mt-1 text-slate-800">{formData.dias}</dd>
-                    </div>
-                  )}
-                  {formData.nota_para_bg && (
-                    <div>
-                      <dt className="text-slate-500 font-medium">Nota BG</dt>
-                      <dd className="mt-1 text-slate-800">{formData.nota_para_bg}</dd>
-                    </div>
-                  )}
-                  <div className="sm:col-span-2 pt-4 border-t border-slate-100">
-                    <dt className="text-slate-500 font-medium mb-2">Texto de Publicação</dt>
-                    <dd className="text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-200 whitespace-pre-wrap">
-                      {textoPublicacao}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            </div>
-=======
           {/* Observações */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-2">Observações para Alterações</h3>
-            <p className="mb-4 text-sm text-slate-500">Use este campo para registrar contexto operacional da edição e reduzir dúvida futura sobre o motivo da alteração.</p>
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-2">Observações</h3>
             <Textarea
               value={formData.observacoes}
               onChange={(e) => handleChange('observacoes', e.target.value)}
@@ -1687,56 +1351,30 @@ export default function CadastrarRegistroLivro() {
               rows={4}
               placeholder="Observações gerais..."
             />
->>>>>>> 5f9289d56b2cd2b2dc454d481952dccd1ee0ce56
           </div>
-        )}
+        </form>
       </div>
 
-      {/* Sticky Footer Navigation */}
+      {/* Sticky Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
-        <div className="max-w-5xl mx-auto px-4 flex items-center justify-between">
-          <Button 
-            variant="outline" 
-            onClick={() => setCurrentStep(prev => prev - 1)}
-            disabled={currentStep === 1 || loading}
-            className="text-slate-600 border-slate-300"
+        <div className="max-w-5xl mx-auto px-4 flex items-center justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={() => handleSubmit('back')}
+            disabled={loading || !!templateError || (isFeriasEfetivo && !formData.ferias_id)}
+            className="border-[#1e3a5f] text-[#1e3a5f] hover:bg-slate-50"
           >
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Voltar
+            {loading ? <div className="w-4 h-4 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+            Salvar e Concluir
           </Button>
-
-          <div className="flex items-center gap-3">
-            {currentStep < 4 ? (
-              <Button 
-                onClick={() => setCurrentStep(prev => prev + 1)}
-                disabled={!canGoNext() || loading}
-                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-8"
-              >
-                Avançar
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            ) : (
-              <>
-                <Button 
-                  variant="outline"
-                  onClick={() => handleSubmit('back')}
-                  disabled={loading || !!templateError || (isFeriasEfetivo && !formData.ferias_id)}
-                  className="border-[#1e3a5f] text-[#1e3a5f] hover:bg-slate-50"
-                >
-                  {loading ? <div className="w-4 h-4 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                  Salvar e Concluir
-                </Button>
-                <Button 
-                  onClick={() => handleSubmit('publicacoes')}
-                  disabled={loading || !!templateError || (isFeriasEfetivo && !formData.ferias_id)}
-                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-                >
-                  {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
-                  Salvar e ir para Publicações
-                </Button>
-              </>
-            )}
-          </div>
+          <Button
+            onClick={() => handleSubmit('publicacoes')}
+            disabled={loading || !!templateError || (isFeriasEfetivo && !formData.ferias_id)}
+            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+          >
+            {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : null}
+            Salvar e ir para Publicações
+          </Button>
         </div>
       </div>
     </div>
