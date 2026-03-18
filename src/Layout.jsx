@@ -58,7 +58,7 @@ const menuGroups = [
     items: [
       { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban, moduleKey: 'quadro_operacional' },
       { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock, moduleKey: 'quadro_operacional' },
-      { name: 'Livro', page: 'CadastrarRegistroLivro', icon: BookOpen, moduleKey: 'livro' },
+      { name: 'Livro', page: 'Livro', icon: BookOpen, moduleKey: 'livro' },
       { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText, moduleKey: 'publicacoes' },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, moduleKey: 'publicacoes' },
       { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, moduleKey: 'publicacoes' },

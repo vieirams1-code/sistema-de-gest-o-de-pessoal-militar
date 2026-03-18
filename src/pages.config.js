@@ -81,6 +81,7 @@ import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
 import EstruturaOrganizacional from './pages/EstruturaOrganizacional';
 import LotacaoMilitares from './pages/LotacaoMilitares';
+import Livro from './pages/Livro';
 import PerfisPermissao from './pages/PerfisPermissao';
 import PermissoesUsuarios from './pages/PermissoesUsuarios';
 import __Layout from './Layout.jsx';
@@ -121,6 +122,7 @@ export const PAGES = {
     "VerMilitar": VerMilitar,
     "EstruturaOrganizacional": EstruturaOrganizacional,
     "LotacaoMilitares": LotacaoMilitares,
+    "Livro": Livro,
     "PerfisPermissao": PerfisPermissao,
     "PermissoesUsuarios": PermissoesUsuarios,
 }
