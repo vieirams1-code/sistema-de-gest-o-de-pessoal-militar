@@ -493,7 +493,10 @@ export default function CadastrarRegistroLivro() {
         break;
 
       case 'Núpcias':
-        texto = aplicarOuErro('Núpcias', { tipo_texto: formData.inicio_termino === 'Início' ? 'início' : 'término' });
+        texto = aplicarOuErro('Núpcias', { 
+          inicio_termino: formData.inicio_termino,
+          tipo_texto: formData.inicio_termino === 'Início' ? 'início' : 'término' 
+        });
         break;
 
       case 'Luto':
