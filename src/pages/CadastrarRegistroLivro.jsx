@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, RefreshCw, AlertTriangle, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw, AlertTriangle, Search, Sparkles, FileText, CalendarRange, UserRound, ShieldCheck, PencilLine, GitBranch } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
 import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/utils/templateUtils';
@@ -85,6 +85,36 @@ function resolverOperacaoFerias(ferias) {
   return getOperacoesDisponiveisFerias(ferias)[0];
 }
 
+
+
+function getStatusPublicacaoVisual({ notaParaBg, numeroBg, dataBg }) {
+  if (numeroBg && dataBg) {
+    return {
+      rotulo: 'Publicado',
+      descricao: `BG ${numeroBg} em ${new Date(`${dataBg}T00:00:00`).toLocaleDateString('pt-BR')}`,
+      classes: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    };
+  }
+
+  if (notaParaBg) {
+    return {
+      rotulo: 'Aguardando publicação',
+      descricao: `Nota pronta: ${notaParaBg}`,
+      classes: 'border-blue-200 bg-blue-50 text-blue-700',
+    };
+  }
+
+  return {
+    rotulo: 'Aguardando nota',
+    descricao: 'Ainda sem nota/BG vinculados',
+    classes: 'border-amber-200 bg-amber-50 text-amber-700',
+  };
+}
+
+function formatDateLabel(dateString) {
+  if (!dateString) return 'Não informado';
+  return new Date(`${dateString}T00:00:00`).toLocaleDateString('pt-BR');
+}
 
 function calcularMetricasInterrupcao(ferias, dataInterrupcaoIso) {
   const diasNoMomento = Number(ferias?.dias || 0);
@@ -1031,6 +1061,72 @@ export default function CadastrarRegistroLivro() {
 
   const isFeriasEfetivo = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'].includes(tipoRegistroEfetivo);
 
+  const statusPublicacaoVisual = useMemo(() => getStatusPublicacaoVisual({
+    notaParaBg: formData.nota_para_bg,
+    numeroBg: formData.numero_bg,
+    dataBg: formData.data_bg,
+  }), [formData.nota_para_bg, formData.numero_bg, formData.data_bg]);
+
+  const resumoRegistro = useMemo(() => {
+    const periodoLabel = selectedFerias?.periodo_aquisitivo_ref || formData.periodo_aquisitivo || registroEdicao?.periodo_aquisitivo || 'Sem período vinculado';
+    const origemRegistro = registroEdicao ? 'Registro em edição' : 'Novo registro';
+
+    return [
+      {
+        label: 'Militar',
+        value: formData.militar_nome || 'Selecione o militar',
+        support: formData.militar_posto ? `${formData.militar_posto} • Matrícula ${formData.militar_matricula || '-'}` : 'Sem identificação carregada',
+        icon: UserRound,
+      },
+      {
+        label: 'Tipo operacional',
+        value: tipoSelecionado?.label || tipoRegistroEfetivo || formData.tipo_registro,
+        support: isFeriasEfetivo ? `Fluxo de férias: ${operacaoFeriasSelecionada}` : origemRegistro,
+        icon: PencilLine,
+      },
+      {
+        label: 'Data de referência',
+        value: formatDateLabel(formData.data_registro),
+        support: selectedFerias?.data_inicio ? `Base da cadeia: ${formatDateLabel(selectedFerias.data_inicio)}` : 'Confirme a data antes de salvar',
+        icon: CalendarRange,
+      },
+      {
+        label: 'Publicação',
+        value: statusPublicacaoVisual.rotulo,
+        support: statusPublicacaoVisual.descricao,
+        icon: FileText,
+      },
+      {
+        label: 'Período / vínculo',
+        value: periodoLabel,
+        support: selectedFerias?.status ? `Situação das férias: ${selectedFerias.status}` : 'Sem férias vinculadas',
+        icon: GitBranch,
+      },
+      {
+        label: 'Conferência final',
+        value: id ? 'Editar com segurança' : 'Pronto para cadastrar',
+        support: id ? 'Revise resumo, texto e publicação antes de salvar.' : 'Confira o resumo abaixo antes do primeiro salvamento.',
+        icon: ShieldCheck,
+      },
+    ];
+  }, [
+    formData.militar_nome,
+    formData.militar_posto,
+    formData.militar_matricula,
+    formData.tipo_registro,
+    formData.data_registro,
+    formData.periodo_aquisitivo,
+    id,
+    isFeriasEfetivo,
+    operacaoFeriasSelecionada,
+    registroEdicao,
+    selectedFerias,
+    statusPublicacaoVisual,
+    tipoRegistroEfetivo,
+    tipoSelecionado,
+  ]);
+
+
   // Gerar texto para tipo customizado
   useEffect(() => {
     if (!tipoAtualCustom) return;
@@ -1069,8 +1165,8 @@ export default function CadastrarRegistroLivro() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">Cadastrar Livro</h1>
-              <p className="text-slate-500 text-sm">Registro de livro</p>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">{id ? 'Editar registro do Livro' : 'Cadastrar registro do Livro'}</h1>
+              <p className="text-slate-500 text-sm">{id ? 'Revise o resumo operacional antes de alterar campos sensíveis.' : 'Preencha o registro operacional do Livro.'}</p>
             </div>
           </div>
           <Button
@@ -1088,6 +1184,40 @@ export default function CadastrarRegistroLivro() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {(id || formData.militar_id) && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-[#1e3a5f]">Resumo operacional do registro</h3>
+                  <p className="mt-1 text-sm text-slate-500">Painel rápido para confirmar se você está editando o registro correto antes de mexer nos campos abaixo.</p>
+                </div>
+                <div className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusPublicacaoVisual.classes}`}>
+                  {statusPublicacaoVisual.rotulo}
+                </div>
+              </div>
+
+              {id && registroEdicao && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  Você está editando um registro já existente. Tipo salvo: <strong>{registroEdicao.tipo_registro || 'Não informado'}</strong> • Data salva: <strong>{formatDateLabel(registroEdicao.data_registro)}</strong>.
+                </div>
+              )}
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {resumoRegistro.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <Icon className="h-3.5 w-3.5" /> {item.label}
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{item.value}</p>
+                      <p className="mt-1 text-xs text-slate-500">{item.support}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {/* Identificação */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Identificação</h3>
@@ -1255,7 +1385,16 @@ export default function CadastrarRegistroLivro() {
 
           {/* Publicação e Status */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Publicação e Status</h3>
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-[#1e3a5f]">Publicação e Status</h3>
+                <p className="mt-1 text-sm text-slate-500">O status é calculado automaticamente para evitar edição manual incorreta.</p>
+              </div>
+              <div className={`rounded-xl border px-3 py-2 text-xs font-semibold ${statusPublicacaoVisual.classes}`}>
+                {statusPublicacaoVisual.rotulo}
+                <div className="mt-1 text-[11px] font-medium opacity-80">{statusPublicacaoVisual.descricao}</div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 label="Nota para BG"
@@ -1288,7 +1427,8 @@ export default function CadastrarRegistroLivro() {
 
           {/* Observações */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Observações para Alterações</h3>
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-2">Observações para Alterações</h3>
+            <p className="mb-4 text-sm text-slate-500">Use este campo para registrar contexto operacional da edição e reduzir dúvida futura sobre o motivo da alteração.</p>
             <Textarea
               value={formData.observacoes}
               onChange={(e) => handleChange('observacoes', e.target.value)}
