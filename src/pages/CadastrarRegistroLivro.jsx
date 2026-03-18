@@ -35,7 +35,7 @@ const initialFormData = {
   data_termino: '',
   data_retorno: '',
   conjuge_nome: '',
-  inicio_termino: 'Início',
+  inicio_termino: 'Início', // Default para Núpcias, Deslocamento Missão, Curso/Estágio
   falecido_nome: '',
   falecido_certidao: '',
   grau_parentesco: '',
@@ -144,7 +144,6 @@ export default function CadastrarRegistroLivro() {
   const [selectedFerias, setSelectedFerias] = useState(null);
   const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState(FERIAS_OPERACOES.INICIO);
   const [textoPublicacao, setTextoPublicacao] = useState('');
-  const [, setUsingCustomTemplate] = useState(false);
   const [templateError, setTemplateError] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [buscaTipo, setBuscaTipo] = useState('');
@@ -390,12 +389,10 @@ export default function CadastrarRegistroLivro() {
           ...varsExtras,
         };
         setUsingCustomTemplate(true);
-        return aplicarTemplate(tmpl.template, vars);
+        return aplicarTemplate(tmpl.template, vars); // `setUsingCustomTemplate` é um resíduo, mas a lógica de retorno é importante.
       }
-      setUsingCustomTemplate(false);
       setTemplateError(`Template obrigatório não encontrado para '${tipoRegistro}'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
       return '';
-    };
 
     let texto = '';
 
@@ -407,9 +404,7 @@ export default function CadastrarRegistroLivro() {
           const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Saída Férias' && t.ativo !== false);
           if (tmpl?.template) {
             texto = aplicarTemplate(tmpl.template, vars);
-            setUsingCustomTemplate(true);
           } else {
-            setUsingCustomTemplate(false);
             setTemplateError(`Template obrigatório não encontrado para 'Saída Férias'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
           }
         }
@@ -441,10 +436,7 @@ export default function CadastrarRegistroLivro() {
           });
           const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Interrupção de Férias' && t.ativo !== false);
           if (tmpl?.template) {
-            texto = aplicarTemplate(tmpl.template, vars);
-            setUsingCustomTemplate(true);
           } else {
-            setUsingCustomTemplate(false);
             setTemplateError(`Template obrigatório não encontrado para 'Interrupção de Férias'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
           }
         }
@@ -462,10 +454,7 @@ export default function CadastrarRegistroLivro() {
           });
           const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Nova Saída / Retomada' && t.ativo !== false);
           if (tmpl?.template) {
-            texto = aplicarTemplate(tmpl.template, vars);
-            setUsingCustomTemplate(true);
           } else {
-            setUsingCustomTemplate(false);
             setTemplateError(`Template obrigatório não encontrado para 'Nova Saída / Retomada'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
           }
         }
@@ -476,11 +465,8 @@ export default function CadastrarRegistroLivro() {
           const periodoFerias = periodosAquisitivos.find(p => p.id === selectedFerias.periodo_aquisitivo_id);
           const vars = buildVarsLivro({ ferias: selectedFerias, dataRegistro: formData.data_registro, periodo: periodoFerias });
           const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === 'Retorno Férias' && t.ativo !== false);
-          if (tmpl?.template) {
-            texto = aplicarTemplate(tmpl.template, vars);
-            setUsingCustomTemplate(true);
+          if (tmpl?.template) { texto = aplicarTemplate(tmpl.template, vars);
           } else {
-            setUsingCustomTemplate(false);
             setTemplateError(`Template obrigatório não encontrado para 'Retorno Férias'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
           }
         }
