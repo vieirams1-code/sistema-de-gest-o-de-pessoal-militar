@@ -388,8 +388,7 @@ export default function CadastrarRegistroLivro() {
           dias_extenso: diasExtenso,
           ...varsExtras,
         };
-        setUsingCustomTemplate(true);
-        return aplicarTemplate(tmpl.template, vars); // `setUsingCustomTemplate` é um resíduo, mas a lógica de retorno é importante.
+        return aplicarTemplate(tmpl.template, vars);
       }
       setTemplateError(`Template obrigatório não encontrado para '${tipoRegistro}'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
       return '';
