@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Save, RefreshCw, AlertTriangle, Check, Search, ChevronRight, ChevronLeft, BookOpen, Send } from 'lucide-react';
 import { createPageUrl } from '@/utils';
@@ -16,6 +15,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { getTiposLivroFiltrados, groupTiposLivro, matchesTipoLivroSearch, getTipoRegistroLabel } from '@/components/livro/livroTipoRegistroConfig';
+import { FERIAS_OPERACOES, getLivroOperacaoFerias, getLivroOperacaoFeriasLabel, isTipoRegistroFerias } from '@/components/livro/feriasOperacaoUtils';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -58,18 +58,6 @@ const initialFormData = {
   status: 'Aguardando Nota',
   observacoes: ''
 };
-
-function getOperacoesDisponiveisFerias(ferias) {
-  if (!ferias) return ['Saída Férias'];
-  if (ferias.status === 'Em Curso') return ['Retorno Férias', 'Interrupção de Férias'];
-  if (ferias.status === 'Interrompida') return ['Nova Saída / Retomada'];
-  return ['Saída Férias'];
-}
-
-function resolverOperacaoFerias(ferias) {
-  return getOperacoesDisponiveisFerias(ferias)[0];
-}
-
 
 function calcularMetricasInterrupcao(ferias, dataInterrupcaoIso) {
   const diasNoMomento = Number(ferias?.dias || 0);
@@ -154,7 +142,7 @@ export default function CadastrarRegistroLivro() {
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [selectedFerias, setSelectedFerias] = useState(null);
-  const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState('Saída Férias');
+  const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState(FERIAS_OPERACOES.INICIO);
   const [textoPublicacao, setTextoPublicacao] = useState('');
   const [, setUsingCustomTemplate] = useState(false);
   const [templateError, setTemplateError] = useState(null);
@@ -215,7 +203,7 @@ export default function CadastrarRegistroLivro() {
     }));
 
     if (registroEdicao.tipo_registro) {
-      setOperacaoFeriasSelecionada(registroEdicao.tipo_registro);
+      setOperacaoFeriasSelecionada(getLivroOperacaoFerias(registroEdicao.tipo_registro) || FERIAS_OPERACOES.INICIO);
     }
     if (registroEdicao.campos_customizados && typeof registroEdicao.campos_customizados === 'object') {
       setCamposCustom(registroEdicao.campos_customizados);
@@ -231,9 +219,8 @@ export default function CadastrarRegistroLivro() {
   }, [feriasEdicao]);
 
 
-  const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
-    ? (selectedFerias ? operacaoFeriasSelecionada : 'Saída Férias')
-    : formData.tipo_registro;
+  const livroOperacaoFerias = getLivroOperacaoFerias(formData.tipo_registro);
+  const tipoRegistroEfetivo = formData.tipo_registro;
 
   const handleChange = (name, value) => {
     if (isEditing && !ADMIN_EDITABLE_FIELDS.has(name)) return;
@@ -275,22 +262,34 @@ export default function CadastrarRegistroLivro() {
       dias_restantes: ''
     }));
     setSelectedFerias(null);
-    setOperacaoFeriasSelecionada('Saída Férias');
+    setOperacaoFeriasSelecionada(livroOperacaoFerias || FERIAS_OPERACOES.INICIO);
   };
 
   const handleFeriasSelect = (ferias) => {
-    const operacao = resolverOperacaoFerias(ferias);
+    if (!ferias) {
+      setSelectedFerias(null);
+      setFormData((prev) => ({
+        ...prev,
+        ferias_id: '',
+        data_inicio: '',
+        data_termino: '',
+        data_retorno: '',
+        periodo_aquisitivo: '',
+      }));
+      return;
+    }
+
     const hoje = new Date().toISOString().split('T')[0];
     let dataRegistro = formData.data_registro || hoje;
 
-    if (operacao === 'Saída Férias') {
+    if (livroOperacaoFerias === FERIAS_OPERACOES.INICIO) {
       dataRegistro = ferias.data_inicio || formData.data_registro || hoje;
-    } else if (operacao === 'Retorno Férias') {
+    } else if (livroOperacaoFerias === FERIAS_OPERACOES.TERMINO) {
       dataRegistro = ferias.data_retorno || formData.data_registro || hoje;
     }
 
     setSelectedFerias(ferias);
-    setOperacaoFeriasSelecionada(operacao);
+    setOperacaoFeriasSelecionada(livroOperacaoFerias || FERIAS_OPERACOES.INICIO);
     setFormData(prev => ({
       ...prev,
       ferias_id: ferias.id,
@@ -298,26 +297,6 @@ export default function CadastrarRegistroLivro() {
     }));
   };
 
-  const handleOperacaoFeriasChange = (operacao) => {
-    if (!selectedFerias) return;
-
-    const hoje = new Date().toISOString().split('T')[0];
-    let dataRegistro = formData.data_registro || hoje;
-
-    if (operacao === 'Saída Férias') {
-      dataRegistro = selectedFerias.data_inicio || formData.data_registro || hoje;
-    } else if (operacao === 'Retorno Férias') {
-      dataRegistro = selectedFerias.data_retorno || formData.data_registro || hoje;
-    } else {
-      dataRegistro = formData.data_registro || hoje;
-    }
-
-    setOperacaoFeriasSelecionada(operacao);
-    setFormData(prev => ({
-      ...prev,
-      data_registro: dataRegistro,
-    }));
-  };
 
   const formatarDataExtenso = (dataString) => {
     if (!dataString) return '';
@@ -608,18 +587,19 @@ export default function CadastrarRegistroLivro() {
 
       const toNumOrUndef = (v) => (v !== '' && v !== undefined && v !== null && !Number.isNaN(Number(v)) ? Number(v) : undefined);
 
+      const tipoRegistroInterno = livroOperacaoFerias ? formData.tipo_registro : tipoRegistroEfetivo;
       let diasFinais = toNumOrUndef(formData.dias);
       if (!isEditing && selectedFerias) {
-        if (['Saída Férias', 'Interrupção de Férias', 'Retorno Férias'].includes(tipoRegistroEfetivo)) {
+        if (['Saída Férias', 'Interrupção de Férias', 'Retorno Férias'].includes(tipoRegistroInterno)) {
           diasFinais = Number(selectedFerias.dias || 0);
-        } else if (tipoRegistroEfetivo === 'Nova Saída / Retomada') {
+        } else if (tipoRegistroInterno === 'Nova Saída / Retomada') {
           diasFinais = Number(selectedFerias.saldo_remanescente || 0);
         }
       }
 
       const basePayload = {
         ...formData,
-        tipo_registro: tipoRegistroEfetivo,
+        tipo_registro: tipoRegistroInterno,
         texto_publicacao: textoPublicacao,
         campos_customizados: Object.keys(camposCustom).length ? camposCustom : formData.campos_customizados,
         dias: diasFinais,
@@ -707,37 +687,25 @@ export default function CadastrarRegistroLivro() {
       );
     }
 
-    if (formData.tipo_registro === 'Saída Férias') {
+    if (isTipoRegistroFerias(formData.tipo_registro)) {
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Férias</h3>
+          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{getLivroOperacaoFeriasLabel(livroOperacaoFerias)}</h3>
 
           <FeriasSelector
             militarId={formData.militar_id}
             value={formData.ferias_id}
             onChange={handleFeriasSelect}
             tipoRegistro={formData.tipo_registro}
+            livroOperacaoFerias={livroOperacaoFerias}
+            dataBase={formData.data_registro}
           />
 
           {selectedFerias && (
             <div className="mt-4 space-y-3">
               <div className="p-3 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800">
-                Ação operacional identificada para esta seleção: <strong>{operacaoFeriasSelecionada === 'Nova Saída / Retomada' ? 'Continuação de férias interrompida' : operacaoFeriasSelecionada === 'Interrupção de Férias' ? 'Interrupção de férias em curso' : operacaoFeriasSelecionada === 'Retorno Férias' ? 'Término de férias em curso' : 'Início de férias'}</strong>.
+                Operação guiada em andamento: <strong>{getLivroOperacaoFeriasLabel(operacaoFeriasSelecionada)}</strong>.
               </div>
-              {selectedFerias.status === 'Em Curso' && (
-                <div className="p-4 bg-white rounded-lg border border-slate-200">
-                  <Label className="text-sm font-medium text-slate-700">Ação para férias em curso</Label>
-                  <Select value={operacaoFeriasSelecionada} onValueChange={handleOperacaoFeriasChange}>
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Retorno Férias">Término</SelectItem>
-                      <SelectItem value="Interrupção de Férias">Interrupção</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -1071,7 +1039,7 @@ export default function CadastrarRegistroLivro() {
 
   const tipoAtualCustom = tiposCustom.find(t => t.nome === formData.tipo_registro);
   
-  const isFeriasEfetivo = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'].includes(tipoRegistroEfetivo);
+  const isFeriasEfetivo = isTipoRegistroFerias(formData.tipo_registro);
 
   // Gerar texto para tipo customizado
   useEffect(() => {
@@ -1109,6 +1077,27 @@ export default function CadastrarRegistroLivro() {
 
   const gruposDeTipos = useMemo(() => groupTiposLivro(tiposDisponiveis), [tiposDisponiveis]);
   const originalActEntries = useMemo(() => getOriginalActEntries(registroEdicao || formData), [registroEdicao, formData]);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setOperacaoFeriasSelecionada(livroOperacaoFerias || FERIAS_OPERACOES.INICIO);
+    setSelectedFerias(null);
+    setFormData((prev) => ({
+      ...prev,
+      militar_id: '',
+      militar_nome: '',
+      militar_posto: '',
+      militar_matricula: '',
+      militar_sexo: '',
+      ferias_id: '',
+      dias: 0,
+      data_inicio: '',
+      data_termino: '',
+      data_retorno: '',
+      periodo_aquisitivo: '',
+      dias_restantes: '',
+    }));
+  }, [formData.tipo_registro, isEditing]);
 
   const canGoNext = () => {
     if (isEditing && !registroEdicao) return false;
@@ -1165,7 +1154,7 @@ export default function CadastrarRegistroLivro() {
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
             {formData.tipo_registro && (
               <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
-                Tipo: {formData.tipo_registro}
+                Tipo: {getTipoRegistroLabel(formData.tipo_registro)}
               </Badge>
             )}
             {formData.militar_nome && (
@@ -1245,7 +1234,7 @@ export default function CadastrarRegistroLivro() {
                       return (
                         <button
                           key={t.value}
-                          onClick={() => { if (!isEditing) { handleChange('tipo_registro', t.value); setCurrentStep(2); } }}
+                          onClick={() => { if (!isEditing) { setFormData((prev) => ({ ...initialFormData, data_registro: prev.data_registro, tipo_registro: t.value })); setSelectedFerias(null); setCurrentStep(2); } }}
                           className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'} ${isEditing ? 'cursor-not-allowed opacity-80' : ''}`}
                         >
                           {t.label}
@@ -1270,7 +1259,7 @@ export default function CadastrarRegistroLivro() {
                           return (
                             <div 
                               key={t.value} 
-                              onClick={() => { if (!isEditing) { handleChange('tipo_registro', t.value); setCurrentStep(2); } }}
+                              onClick={() => { if (!isEditing) { setFormData((prev) => ({ ...initialFormData, data_registro: prev.data_registro, tipo_registro: t.value })); setSelectedFerias(null); setCurrentStep(2); } }}
                               className={`p-4 rounded-lg border transition-all ${isSelected ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'} ${isEditing ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                             >
                               <div className="flex items-center justify-between mb-1">
@@ -1327,6 +1316,9 @@ export default function CadastrarRegistroLivro() {
                       value={formData.militar_id}
                       onChange={(name, value) => handleChange(name, value)}
                       onMilitarSelect={handleMilitarSelect}
+                      livroOperacaoFerias={livroOperacaoFerias}
+                      dataBase={formData.data_registro}
+                      somenteElegiveis={Boolean(livroOperacaoFerias)}
                     />
                   </div>
                   <FormField
@@ -1429,7 +1421,7 @@ export default function CadastrarRegistroLivro() {
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6 text-sm">
                   <div>
                     <dt className="text-slate-500 font-medium">Tipo</dt>
-                    <dd className="mt-1 font-semibold text-slate-800">{formData.tipo_registro}</dd>
+                    <dd className="mt-1 font-semibold text-slate-800">{getTipoRegistroLabel(formData.tipo_registro)}</dd>
                   </div>
                   <div>
                     <dt className="text-slate-500 font-medium">Militar</dt>
