@@ -138,6 +138,7 @@ export const VARS_PREVIEW = {
   data_termino: '30/04/2026',
   data_retorno: '01/05/2026',
   data_registro: '01/04/2026',
+  data_publicacao: '01/04/2026',
   data_interrupcao: '10/04/2026',
   dias: '30',
   dias_extenso: 'trinta',

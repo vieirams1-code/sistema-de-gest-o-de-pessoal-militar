@@ -494,6 +494,7 @@ export default function CadastrarRegistroLivro() {
 
       case 'Núpcias':
         texto = aplicarOuErro('Núpcias', { 
+          conjuge_nome: formData.conjuge_nome,
           inicio_termino: formData.inicio_termino,
           tipo_texto: formData.inicio_termino === 'Início' ? 'início' : 'término' 
         });

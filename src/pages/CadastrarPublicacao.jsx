@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
-import { aplicarTemplate } from '@/components/utils/templateUtils';
+import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
 import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
@@ -291,7 +291,9 @@ export default function CadastrarPublicacao() {
 
   const gerarTextoPublicacao = () => {
     setTemplateError(null);
-    const postoNome = formData.militar_posto ? `${formData.militar_posto} QBMP-1.a` : '';
+    const abreviatura = abreviarPosto(formData.militar_posto);
+    const quadro = militarSelecionado?.quadro || 'QOBM';
+    const postoNome = abreviatura ? `${abreviatura} ${quadro}` : '';
     const nomeCompleto = formData.militar_nome || '';
     const matricula = formData.militar_matricula || '';
 
@@ -299,7 +301,11 @@ export default function CadastrarPublicacao() {
       const tmpl = templatesExOfficio.find(t => t.tipo_registro === tipoRegistro && t.ativo !== false);
       if (tmpl?.template) {
         return aplicarTemplate(tmpl.template, {
-          posto_nome: postoNome, nome_completo: nomeCompleto, matricula,
+          posto_nome: postoNome,
+          posto: abreviatura,
+          nome_completo: nomeCompleto, 
+          matricula,
+          data_publicacao: formatarDataExtenso(formData.data_publicacao),
           ...varsExtras
         });
       }

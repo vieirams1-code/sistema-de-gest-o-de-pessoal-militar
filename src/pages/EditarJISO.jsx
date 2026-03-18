@@ -11,7 +11,7 @@ import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react
 import { addDays, format as formatDate } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { aplicarTemplate } from '@/components/utils/templateUtils';
+import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
 
 export default function EditarJISO() {
   const navigate = useNavigate();
@@ -92,10 +92,12 @@ export default function EditarJISO() {
       return `${dia}/${mes}/${ano}`;
     };
 
-    const postoNome = atestado.militar_posto ? `${atestado.militar_posto} QOBM` : '';
+    const abreviatura = abreviarPosto(atestado.militar_posto);
+    const postoNome = abreviatura ? `${abreviatura} QOBM` : '';
 
     const vars = {
       posto_nome: postoNome,
+      posto: abreviatura,
       nome_completo: atestado.militar_nome || '',
       matricula: atestado.militar_matricula || '',
       finalidade_jiso: formData.finalidade_jiso || '',
