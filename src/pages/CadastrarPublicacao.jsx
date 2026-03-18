@@ -17,7 +17,6 @@ import {
   existePublicacaoAtivaParaAtestado,
   getAtestadoIdsVinculados,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
-import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
@@ -82,7 +81,6 @@ export default function CadastrarPublicacao() {
   const publicacaoId = searchParams.get('id');
   const tipoParam = searchParams.get('tipo');
   const militarIdParam = searchParams.get('militar_id');
-  const feriasIdParam = searchParams.get('ferias_id');
   const refIdParam = searchParams.get('ref_id');
 
   const [formData, setFormData] = useState(initialFormData);
@@ -233,17 +231,16 @@ export default function CadastrarPublicacao() {
 
   // Pré-preencher via URL params (vindo do botão de ação rápida nas férias/atestados/cards)
   useEffect(() => {
-    if (!publicacaoId && (tipoParam || militarIdParam || feriasIdParam || refIdParam)) {
+    if (!publicacaoId && (tipoParam || militarIdParam || refIdParam)) {
       setFormData(prev => ({
         ...prev,
         ...(tipoParam ? { tipo: decodeURIComponent(tipoParam) } : {}),
         ...(militarIdParam ? { militar_id: militarIdParam } : {}),
-        ...(feriasIdParam ? { ferias_interrompida_id: feriasIdParam } : {}),
         ...(refIdParam ? { publicacao_referencia_id: refIdParam } : {}),
         ...(origemTipoParam ? { publicacao_referencia_origem_tipo: origemTipoParam } : {}),
       }));
     }
-  }, [tipoParam, militarIdParam, feriasIdParam, refIdParam, origemTipoParam, publicacaoId]);
+  }, [tipoParam, militarIdParam, refIdParam, origemTipoParam, publicacaoId]);
 
   const handleChange = (name, value) => {
     setFormData(prev => {
