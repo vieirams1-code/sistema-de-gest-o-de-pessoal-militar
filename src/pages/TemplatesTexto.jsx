@@ -61,7 +61,6 @@ const TIPOS_POR_MODULO = {
     'Dispensa de Função',
     'Ata JISO',
     'Transcrição de Documentos',
-    'Interrupção de Férias',
     'Transferência para RR',
     'Homologação de Atestado',
     'Apostila',

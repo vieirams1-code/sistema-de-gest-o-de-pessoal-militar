@@ -30,9 +30,6 @@ const initialFormData = {
   militar_posto: '',
   militar_matricula: '',
   tipo: 'Elogio Individual',
-  ferias_interrompida_id: '',
-  dias_gozados_interrupcao: '',
-  data_interrupcao: '',
   data_publicacao: new Date().toISOString().split('T')[0],
   texto_base: '',
   texto_complemento: '',
@@ -208,14 +205,6 @@ export default function CadastrarPublicacao() {
       comportamento_atual: comp,
     }));
   }, [militarSelecionado?.id]);
-
-  // Férias em curso para interrupção
-  const { data: feriasEmCurso = [] } = useQuery({
-    queryKey: ['ferias-em-curso', formData.militar_id],
-    queryFn: () => base44.entities.Ferias.filter({ militar_id: formData.militar_id }),
-    enabled: !!formData.militar_id && formData.tipo === 'Interrupção de Férias',
-    select: (data) => data.filter(f => f.status === 'Em Curso' || f.status === 'Prevista')
-  });
 
   // Atestados do militar para JISO / homologação
   const { data: atestadosMilitar = [] } = useQuery({
@@ -422,20 +411,6 @@ export default function CadastrarPublicacao() {
         break;
       }
 
-      case 'Interrupção de Férias': {
-        const feriasAlvo = feriasEmCurso.find(f => f.id === formData.ferias_interrompida_id);
-        const gozados = Number(formData.dias_gozados_interrupcao) || 0;
-        const saldo = feriasAlvo ? (feriasAlvo.dias || 0) - gozados : 0;
-        texto = aplicarOuErro('Interrupção de Férias', {
-          data_interrupcao: formatarDataExtenso(formData.data_interrupcao),
-          dias: String(feriasAlvo?.dias || ''),
-          dias_gozados: String(gozados),
-          dias_gozados_interrupcao: String(gozados),
-          saldo_remanescente: String(saldo),
-          periodo_aquisitivo: feriasAlvo?.periodo_aquisitivo_ref || ''
-        });
-        break;
-      }
     }
 
     setFormData(prev => ({ ...prev, texto_publicacao: texto }));
@@ -525,9 +500,6 @@ export default function CadastrarPublicacao() {
       dias_punicao: formData.dias_punicao !== '' && formData.dias_punicao !== undefined && formData.dias_punicao !== null
         ? Number(formData.dias_punicao)
         : undefined,
-      dias_gozados_interrupcao: formData.dias_gozados_interrupcao !== '' && formData.dias_gozados_interrupcao !== undefined && formData.dias_gozados_interrupcao !== null
-        ? Number(formData.dias_gozados_interrupcao)
-        : undefined,
     };
 
     let savedId = publicacaoId;
@@ -536,24 +508,6 @@ export default function CadastrarPublicacao() {
     } else {
       const saved = await base44.entities.PublicacaoExOfficio.create(dataToSave);
       savedId = saved.id;
-    }
-
-    // Interrupção de férias
-    if (formData.tipo === 'Interrupção de Férias' && formData.ferias_interrompida_id) {
-      const feriasAlvo = feriasEmCurso.find(f => f.id === formData.ferias_interrompida_id);
-      if (feriasAlvo) {
-        const diasGozados = Number(formData.dias_gozados_interrupcao) || 0;
-        const diasSaldo = (feriasAlvo.dias || 0) - diasGozados;
-        await base44.entities.Ferias.update(formData.ferias_interrompida_id, {
-          status: 'Interrompida',
-          observacoes: `Interrompida em ${formData.data_interrupcao || formData.data_publicacao}. Dias gozados: ${diasGozados}. Saldo: ${diasSaldo} dias.`
-        });
-        await sincronizarPeriodoAquisitivoDaFerias({
-          periodoAquisitivoId: feriasAlvo.periodo_aquisitivo_id || null,
-          periodoAquisitivoRef: feriasAlvo.periodo_aquisitivo_ref || null,
-          militarId: feriasAlvo.militar_id || formData.militar_id || null,
-        });
-      }
     }
 
     // Marcar atestados homologados para Ata JISO
@@ -1137,83 +1091,6 @@ export default function CadastrarPublicacao() {
         );
       }
 
-      case 'Interrupção de Férias':
-        return (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Interrupção de Férias</h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm text-slate-700 font-medium">Férias a Interromper <span className="text-red-500">*</span></Label>
-                <Select value={formData.ferias_interrompida_id} onValueChange={v => handleChange('ferias_interrompida_id', v)}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue placeholder="Selecione as férias em curso..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {feriasEmCurso.length === 0 && <SelectItem value="_none" disabled>Nenhuma férias em curso para este militar</SelectItem>}
-                    {feriasEmCurso.map(f => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.periodo_aquisitivo_ref} — {formatarDataExtenso(f.data_inicio)} a {formatarDataExtenso(f.data_fim)} ({f.dias}d) — {f.status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm text-slate-700 font-medium">Data da Interrupção <span className="text-red-500">*</span></Label>
-                  <Input
-                    type="date"
-                    value={formData.data_interrupcao}
-                    onChange={e => {
-                      const novaData = e.target.value;
-                      handleChange('data_interrupcao', novaData);
-                      // Calcular dias gozados automaticamente com base na data de saída
-                      const feriasAlvo = feriasEmCurso.find(x => x.id === formData.ferias_interrompida_id);
-                      if (feriasAlvo && feriasAlvo.data_inicio && novaData) {
-                        const dtSaida = new Date(feriasAlvo.data_inicio + 'T00:00:00');
-                        const dtInterrupcao = new Date(novaData + 'T00:00:00');
-                        const diasGozados = Math.max(0, Math.floor((dtInterrupcao - dtSaida) / (1000 * 60 * 60 * 24)) + 1);
-                        setFormData(prev => ({ ...prev, data_interrupcao: novaData, dias_gozados_interrupcao: diasGozados }));
-                      }
-                    }}
-                    className="mt-1.5"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm text-slate-700 font-medium">Dias Efetivamente Gozados</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={formData.dias_gozados_interrupcao}
-                    onChange={e => handleChange('dias_gozados_interrupcao', e.target.value)}
-                    className="mt-1.5"
-                    placeholder="0"
-                  />
-                  {formData.ferias_interrompida_id && formData.data_interrupcao && (() => {
-                    const f = feriasEmCurso.find(x => x.id === formData.ferias_interrompida_id);
-                    return f?.data_inicio ? <p className="text-xs text-slate-400 mt-1">Calculado a partir de {formatarDataExtenso(f.data_inicio)}</p> : null;
-                  })()}
-                </div>
-              </div>
-              {formData.ferias_interrompida_id && formData.dias_gozados_interrupcao !== '' && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                  {(() => {
-                    const f = feriasEmCurso.find(x => x.id === formData.ferias_interrompida_id);
-                    const gozados = Number(formData.dias_gozados_interrupcao) || 0;
-                    const saldo = f ? (f.dias || 0) - gozados : 0;
-                    return (
-                      <div>
-                        <p><strong>Dias gozados:</strong> {gozados}</p>
-                        <p><strong>Saldo a devolver ao militar:</strong> {saldo} dia(s)</p>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
       default: {
         // Tipo customizado Ex Officio
         const tipoCustom = tiposCustomExOfficio.find(t => t.nome === formData.tipo);
@@ -1392,7 +1269,6 @@ export default function CadastrarPublicacao() {
                   <SelectItem value="Dispensa de Função">Dispensa de Função</SelectItem>
                   <SelectItem value="Ata JISO">Ata JISO</SelectItem>
                   <SelectItem value="Transcrição de Documentos">Transcrição de Documentos</SelectItem>
-                  <SelectItem value="Interrupção de Férias">Interrupção de Férias</SelectItem>
                   <SelectItem value="Transferência para RR">Transferência para RR</SelectItem>
                   <SelectItem value="Apostila">Apostila</SelectItem>
                   <SelectItem value="Tornar sem Efeito">Tornar sem Efeito</SelectItem>
