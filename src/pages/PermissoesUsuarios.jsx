@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Plus, Shield, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert } from 'lucide-react';
+import { Users, Plus, Shield, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert, Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -55,6 +55,9 @@ export default function PermissoesUsuarios() {
 
   const [selectedProfileId, setSelectedProfileId] = useState('_nenhum');
   const [savingUser, setSavingUser] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(permissionStructure[0]?.category || '');
+  const [activePanel, setActivePanel] = useState('dados');
 
 
   // Queries — só executam após resolução do acesso e confirmação de permissão
@@ -83,6 +86,23 @@ export default function PermissoesUsuarios() {
   const militaresOrdenados = useMemo(() => {
     return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
   }, [militares]);
+
+  const filteredAcessos = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    if (!query) return acessos;
+
+    return acessos.filter((u) => {
+      const nome = (u.nome_usuario || '').toLowerCase();
+      const email = (u.user_email || '').toLowerCase();
+      const perfil = (u.perfil_nome || '').toLowerCase();
+      const tipo = (u.tipo_acesso || '').toLowerCase();
+      return nome.includes(query) || email.includes(query) || perfil.includes(query) || tipo.includes(query);
+    });
+  }, [acessos, userSearch]);
+
+  const activeCategoryGroup = useMemo(() => {
+    return permissionStructure.find((item) => item.category === selectedCategory) || permissionStructure[0];
+  }, [selectedCategory]);
 
   if (loadingUser || !isAccessResolved) return null;
   if (!canAccessAction('gerir_permissoes')) {
@@ -126,6 +146,7 @@ export default function PermissoesUsuarios() {
     setUserSubgrupamentoId(sId);
     setUserUnidadeId(uId);
     setSelectedProfileId(fullAcesso.perfil_id || '_nenhum');
+    setActivePanel('dados');
 
     setUserPermissions(buildPermissionsFromSource(fullAcesso));
   };
@@ -143,6 +164,7 @@ export default function PermissoesUsuarios() {
     setUserSubgrupamentoId('');
     setUserUnidadeId('');
     setSelectedProfileId('_nenhum');
+    setActivePanel('dados');
     setUserPermissions(initialPermissions);
   };
 
@@ -228,10 +250,23 @@ export default function PermissoesUsuarios() {
     return <Badge variant="outline" className="text-slate-500">Próprio</Badge>;
   };
 
+  const isSaveDisabled = savingUser
+    || (userAccessMode === 'setor' && !userGrupamentoId)
+    || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId))
+    || (userAccessMode === 'unidade' && (!userGrupamentoId || !userSubgrupamentoId || !userUnidadeId))
+    || (userAccessMode === 'proprio' && !userMilitarId);
+
+  const topPanels = [
+    { key: 'dados', label: 'Dados do Usuário' },
+    { key: 'escopo', label: 'Escopo Organizacional' },
+    { key: 'perfil', label: 'Perfil Base' },
+    { key: 'matriz', label: 'Matriz de Permissões' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div className="min-h-screen bg-slate-100 p-4 lg:p-6">
+      <div className="max-w-[1600px] mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-[#1e3a5f]/10 text-[#1e3a5f] rounded-xl flex items-center justify-center">
               <Users className="w-6 h-6" />
@@ -253,35 +288,46 @@ export default function PermissoesUsuarios() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
           {/* Coluna da Esquerda: Lista de Usuários */}
-          <div className="lg:col-span-4 flex flex-col h-[calc(100vh-12rem)]">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                <h2 className="font-semibold text-slate-800">Usuários Cadastrados</h2>
-                <p className="text-xs text-slate-500">{acessos.length} registros</p>
+          <div className="xl:col-span-4 2xl:col-span-3 flex flex-col h-[calc(100vh-10rem)]">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-hidden">
+              <div className="p-4 border-b border-slate-200 bg-white sticky top-0 z-10">
+                <h2 className="font-semibold text-slate-900">Usuários</h2>
+                <p className="text-xs text-slate-500 mb-3">{acessos.length} registros</p>
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Input
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Buscar por nome, e-mail ou perfil"
+                    className="pl-9 h-9 rounded-lg border-slate-200"
+                  />
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {acessos.length === 0 ? (
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50/50">
+                {filteredAcessos.length === 0 ? (
                   <p className="text-center text-slate-400 py-10 text-sm">Nenhum acesso cadastrado</p>
                 ) : (
-                  acessos.map(u => (
+                  filteredAcessos.map((u) => (
                     <div 
                       key={u.id} 
                       onClick={() => handleSelectAcesso(u)} 
-                      className={`p-3 rounded-xl border cursor-pointer transition-all ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 shadow-sm ring-1 ring-[#1e3a5f]/20' : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300'}`}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-md ring-2 ring-[#1e3a5f]/35' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="font-semibold text-sm text-slate-800 truncate" title={u.nome_usuario || u.user_email}>
+                      <div className="flex justify-between items-start mb-1.5 gap-2">
+                        <div className={`font-semibold text-sm truncate ${selectedUser?.id === u.id ? 'text-white' : 'text-slate-800'}`} title={u.nome_usuario || u.user_email}>
                           {u.nome_usuario || u.user_email}
-                          {!u.ativo && <span className="text-red-500 ml-1.5 text-xs font-semibold">(Inativo)</span>}
+                          {!u.ativo && <span className={`ml-1.5 text-xs font-semibold ${selectedUser?.id === u.id ? 'text-rose-100' : 'text-red-500'}`}>(Inativo)</span>}
                         </div>
-                        {getTipoBadge(u)}
+                        <div className="shrink-0 [&_.bg-emerald-100]:bg-white/20 [&_.text-emerald-800]:text-white [&_.bg-emerald-50]:bg-white/20 [&_.text-emerald-700]:text-white [&_.border-emerald-200]:border-white/30 [&_.bg-blue-100]:bg-white/20 [&_.text-blue-800]:text-white [&_.bg-amber-100]:bg-white/20 [&_.text-amber-800]:text-white [&_.text-slate-500]:text-white">
+                          {getTipoBadge(u)}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500 mb-2 truncate" title={u.user_email}>{u.user_email}</div>
+                      <div className={`text-xs mb-2 truncate ${selectedUser?.id === u.id ? 'text-slate-100' : 'text-slate-500'}`} title={u.user_email}>{u.user_email}</div>
                       
                       {u.perfil_nome && (
-                        <div className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full inline-block truncate max-w-full">
+                        <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block truncate max-w-full ${selectedUser?.id === u.id ? 'bg-white/20 text-white border border-white/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100'}`}>
                           Perfil: {u.perfil_nome}
                         </div>
                       )}
@@ -293,35 +339,58 @@ export default function PermissoesUsuarios() {
           </div>
 
           {/* Coluna da Direita: Edição / Detalhes do Usuário */}
-          <div className="lg:col-span-8">
+          <div className="xl:col-span-8 2xl:col-span-9">
             {selectedUser ? (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-12rem)]">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
-                  <h2 className="font-bold text-[#1e3a5f] text-lg">
-                    {isNewAcesso ? 'Criando Novo Usuário' : 'Editar Usuário'}
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setSelectedUser(null)}>Cancelar</Button>
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-10rem)]">
+                <div className="p-4 lg:p-5 border-b border-slate-200 bg-white sticky top-0 z-20 shrink-0">
+                  <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+                    <div>
+                      <h2 className="font-bold text-[#1e3a5f] text-lg lg:text-xl">Editando: {userNomeUsuario || userUserEmail || 'Novo Usuário'}</h2>
+                      <p className="text-sm text-slate-500">Ajuste o escopo organizacional, perfil base e permissões por categoria.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setSelectedUser(null)} className="rounded-lg">Cancelar</Button>
                     <Button 
                       size="sm"
                       onClick={handleSaveUserScope} 
-                      disabled={savingUser || (userAccessMode === 'setor' && !userGrupamentoId) || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId)) || (userAccessMode === 'unidade' && (!userGrupamentoId || !userSubgrupamentoId || !userUnidadeId)) || (userAccessMode === 'proprio' && !userMilitarId)} 
-                      className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+                      disabled={isSaveDisabled}
+                      className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white rounded-lg"
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      {savingUser ? 'Salvando...' : 'Salvar'}
+                      {savingUser ? 'Salvando...' : 'Salvar Alterações'}
                     </Button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5 bg-slate-50/50">
+                  <div className="bg-white border border-slate-200 rounded-xl p-2">
+                    <div className="flex flex-wrap gap-2">
+                      {topPanels.map((panel) => {
+                        const isActive = activePanel === panel.key;
+                        return (
+                          <button
+                            key={panel.key}
+                            type="button"
+                            onClick={() => setActivePanel(panel.key)}
+                            className={`px-3.5 py-2 rounded-lg text-sm font-medium transition ${isActive ? 'bg-[#1e3a5f] text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                          >
+                            {panel.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {activePanel === 'dados' && (
+                  <>
                   {/* Bloco 1: Dados do Usuário */}
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
-                    <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4">
+                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <UserCircle className="w-5 h-5 text-slate-400" />
                       Dados do Usuário
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nome de Usuário</label>
                         <Input value={userNomeUsuario} onChange={(e) => setUserNomeUsuario(e.target.value)} placeholder="Ex: João da Silva" className="bg-white" />
@@ -336,12 +405,16 @@ export default function PermissoesUsuarios() {
                       </div>
                     </div>
                   </div>
+                  </>
+                  )}
 
+                  {activePanel === 'escopo' && (
+                  <>
                   {/* Bloco 2: Alcance Organizacional */}
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
-                    <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4">
+                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <Building2 className="w-5 h-5 text-blue-500" />
-                      Alcance Organizacional
+                      Escopo Organizacional
                     </h3>
                     
                     <div className="mb-5">
@@ -467,11 +540,16 @@ export default function PermissoesUsuarios() {
                     </div>
                   )}
 
+                  </>
+                  )}
+
+                  {activePanel === 'perfil' && (
+                  <>
                   {/* Bloco 4: Perfil de Permissões */}
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
-                    <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4">
+                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <Shield className="w-5 h-5 text-emerald-500" />
-                      Perfil de Permissões
+                      Perfil Base
                     </h3>
                     
                     <div className="flex flex-col sm:flex-row gap-4 items-end bg-white p-4 rounded-lg border border-slate-200">
@@ -545,47 +623,67 @@ export default function PermissoesUsuarios() {
                     )}
                   </div>
 
+                  </>
+                  )}
+
+                  {activePanel === 'matriz' && (
+                  <>
                   {/* Bloco 5: Matriz de Permissões */}
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 mb-4">
-                    <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 mb-2">
+                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                       Matriz de Permissões por Categoria e Módulo
                     </h3>
-                    <div className="space-y-4">
-                      {permissionStructure.map((categoryGroup) => (
-                        <div key={categoryGroup.category} className="bg-white p-4 rounded-lg border border-slate-200">
-                          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">{categoryGroup.category}</h4>
-                          <div className="space-y-3">
-                            {categoryGroup.modules.map((mod) => {
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                      <aside className="lg:col-span-4 xl:col-span-3 bg-slate-50 border border-slate-200 rounded-xl p-2 h-fit lg:sticky lg:top-24">
+                        {permissionStructure.map((categoryGroup) => {
+                          const isActive = activeCategoryGroup?.category === categoryGroup.category;
+                          return (
+                            <button
+                              type="button"
+                              key={categoryGroup.category}
+                              onClick={() => setSelectedCategory(categoryGroup.category)}
+                              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition mb-1 ${isActive ? 'bg-[#1e3a5f] text-white shadow-sm' : 'text-slate-700 hover:bg-white hover:text-slate-900'}`}
+                            >
+                              <div className="font-semibold">{categoryGroup.category}</div>
+                              <div className={`text-[11px] ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>{categoryGroup.modules.length} módulos</div>
+                            </button>
+                          );
+                        })}
+                      </aside>
+
+                      <div className="lg:col-span-8 xl:col-span-9 space-y-3">
+                        <div className="px-1">
+                          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Categoria selecionada</h4>
+                          <p className="text-base font-semibold text-slate-900">{activeCategoryGroup?.category}</p>
+                        </div>
+                        {activeCategoryGroup?.modules.map((mod) => {
                               const isModuleEnabled = userPermissions[mod.key] === true;
                               const moduleOverride = selectedProfilePreview && (selectedProfilePreview[mod.key] === true) !== isModuleEnabled;
                               return (
-                                <div key={mod.key} className={`rounded-lg border ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-slate-50'}`}>
+                                <div key={mod.key} className={`rounded-xl border ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
                                   <div
-                                    className="p-3 flex flex-wrap items-center gap-2 justify-between cursor-pointer"
+                                    className="p-3.5 flex flex-wrap items-center gap-3 justify-between cursor-pointer"
                                     onClick={() => setUserPermissions((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }))}
                                   >
                                     <div className="flex items-center gap-3">
-                                      <input
-                                        type="checkbox"
-                                        checked={isModuleEnabled}
-                                        readOnly
-                                        className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
-                                      />
+                                      <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isModuleEnabled ? 'bg-[#1e3a5f]' : 'bg-slate-300'}`}>
+                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${isModuleEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                                      </span>
                                       <label className="text-sm font-semibold text-slate-800 pointer-events-none">{mod.label}</label>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       {moduleOverride && (
                                         <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded uppercase tracking-wide">Modificado</span>
                                       )}
-                                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isModuleEnabled ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}>
+                                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isModuleEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                                         {isModuleEnabled ? 'Ativo' : 'Inativo'}
                                       </span>
                                     </div>
                                   </div>
 
                                   {mod.actions.length > 0 && isModuleEnabled && (
-                                    <div className="px-3 pb-3">
+                                    <div className="px-3.5 pb-3.5">
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 border-t border-blue-100 pt-3">
                                         {mod.actions.map((act) => {
                                           const isActionEnabled = userPermissions[act.key] === true;
@@ -618,11 +716,11 @@ export default function PermissoesUsuarios() {
                                 </div>
                               );
                             })}
-                          </div>
-                        </div>
-                      ))}
+                      </div>
                     </div>
                   </div>
+                  </>
+                  )}
 
                 </div>
               </div>
