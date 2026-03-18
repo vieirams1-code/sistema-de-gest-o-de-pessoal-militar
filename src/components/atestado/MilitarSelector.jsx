@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Search, User, X } from 'lucide-react';
@@ -16,8 +16,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { getFeriasElegiveisPorOperacao, getMensagemSemElegibilidade } from '@/components/livro/feriasOperacaoUtils';
 
-export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
+export default function MilitarSelector({ value, onChange, onMilitarSelect, livroOperacaoFerias = null, dataBase = '', somenteElegiveis = false }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const { isAdmin, modoAcesso, subgrupamentoId, userEmail, linkedMilitarId, linkedMilitarEmail, hasAccess, hasSelfAccess } = useCurrentUser();
@@ -80,6 +81,16 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
     }
   });
 
+  const { data: feriasElegibilidade = [], isLoading: isLoadingElegibilidade } = useQuery({
+    queryKey: ['militares-ativos-selector-ferias-elegibilidade', somenteElegiveis, livroOperacaoFerias, dataBase, militares.map((m) => m.id).join('|')],
+    queryFn: async () => {
+      if (!somenteElegiveis || !livroOperacaoFerias || militares.length === 0) return [];
+      const lotes = await Promise.all(militares.map((militar) => base44.entities.Ferias.filter({ militar_id: militar.id })));
+      return militares.filter((militar, index) => getFeriasElegiveisPorOperacao(lotes[index] || [], livroOperacaoFerias).length > 0);
+    },
+    enabled: somenteElegiveis && !!livroOperacaoFerias && militares.length > 0,
+  });
+
   const { data: selectedMilitar } = useQuery({
     queryKey: ['militar-selected', value],
     queryFn: async () => {
@@ -90,7 +101,9 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
     enabled: !!value
   });
 
-  const filteredMilitares = militares.filter(m => 
+  const militaresDisponiveis = useMemo(() => (somenteElegiveis && livroOperacaoFerias ? feriasElegibilidade : militares), [feriasElegibilidade, livroOperacaoFerias, militares, somenteElegiveis]);
+
+  const filteredMilitares = militaresDisponiveis.filter(m => 
     m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.nome_guerra?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.matricula?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -122,6 +135,8 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
       });
     }
   };
+
+  const emptyState = getMensagemSemElegibilidade(livroOperacaoFerias);
 
   return (
     <div className="space-y-2">
@@ -159,6 +174,11 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
             <X className="w-4 h-4" />
           </Button>
         </div>
+      ) : somenteElegiveis && livroOperacaoFerias && !isLoadingElegibilidade && militaresDisponiveis.length === 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-800">{emptyState.titulo}</p>
+          <p className="mt-1 text-xs text-amber-700">{emptyState.texto}</p>
+        </div>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
@@ -178,9 +198,11 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect }) {
                 value={searchTerm}
                 onValueChange={setSearchTerm}
               />
-              <CommandEmpty>Nenhum militar encontrado.</CommandEmpty>
+              <CommandEmpty>{somenteElegiveis && livroOperacaoFerias ? emptyState.titulo : 'Nenhum militar encontrado.'}</CommandEmpty>
               <CommandGroup className="max-h-64 overflow-auto">
-                {filteredMilitares.map((militar) => (
+                {isLoadingElegibilidade ? (
+                  <div className="px-3 py-4 text-sm text-slate-500">Carregando militares elegíveis...</div>
+                ) : filteredMilitares.map((militar) => (
                   <CommandItem
                     key={militar.id}
                     onSelect={() => handleSelect(militar)}

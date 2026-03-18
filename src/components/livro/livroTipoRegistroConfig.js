@@ -2,10 +2,10 @@ const DEFAULT_GROUP = 'Outros';
 const ORIGINAL_GROUP = 'Registro Original';
 
 export const LIVRO_TIPOS_BASE = [
-  { value: 'Saída Férias', label: 'Férias', grupo: 'Férias', sexo: null, descricao: 'Fluxo operacional de saída, retorno, interrupção ou retomada de férias.', palavrasChave: ['ferias', 'saida', 'retorno', 'interrupcao', 'retomada'], destaque: true },
-  { value: 'Retorno Férias', label: 'Retorno de Férias', grupo: 'Férias', sexo: null, descricao: 'Encerramento do gozo de férias em curso.', palavrasChave: ['ferias', 'retorno', 'termino'] },
+  { value: 'Saída Férias', label: 'Início de Férias', grupo: 'Férias', sexo: null, descricao: 'Fluxo operacional de saída, retorno, interrupção ou retomada de férias.', palavrasChave: ['ferias', 'saida', 'retorno', 'interrupcao', 'retomada'], destaque: true },
+  { value: 'Retorno Férias', label: 'Término de Férias', grupo: 'Férias', sexo: null, descricao: 'Encerramento do gozo de férias em curso.', palavrasChave: ['ferias', 'retorno', 'termino'] },
   { value: 'Interrupção de Férias', label: 'Interrupção de Férias', grupo: 'Férias', sexo: null, descricao: 'Interrupção formal de férias em andamento.', palavrasChave: ['ferias', 'interrupcao'] },
-  { value: 'Nova Saída / Retomada', label: 'Nova Saída / Retomada', grupo: 'Férias', sexo: null, descricao: 'Retomada do gozo após interrupção.', palavrasChave: ['ferias', 'nova saida', 'retomada', 'continuacao'] },
+  { value: 'Nova Saída / Retomada', label: 'Continuação de Férias', grupo: 'Férias', sexo: null, descricao: 'Retomada do gozo após interrupção.', palavrasChave: ['ferias', 'nova saida', 'retomada', 'continuacao'] },
   { value: 'Licença Maternidade', label: 'Licença Maternidade', grupo: 'Licenças', sexo: 'Feminino', descricao: 'Afastamento por maternidade com período integral previsto.', palavrasChave: ['licenca', 'maternidade', 'afastamento'], destaque: true },
   { value: 'Prorrogação de Licença Maternidade', label: 'Prorrogação de Licença Maternidade', grupo: 'Licenças', sexo: 'Feminino', descricao: 'Extensão do período de licença maternidade.', palavrasChave: ['prorrogacao', 'licenca', 'maternidade'] },
   { value: 'Licença Paternidade', label: 'Licença Paternidade', grupo: 'Licenças', sexo: 'Masculino', descricao: 'Afastamento por paternidade com duração padrão.', palavrasChave: ['licenca', 'paternidade', 'afastamento'], destaque: true },
@@ -24,10 +24,10 @@ export const LIVRO_TIPOS_BASE = [
 ];
 
 export const LIVRO_TIPO_LABELS = {
-  'Saída Férias': 'Saída de Férias',
-  'Retorno Férias': 'Retorno de Férias',
+  'Saída Férias': 'Início de Férias',
+  'Retorno Férias': 'Término de Férias',
   'Interrupção de Férias': 'Interrupção de Férias',
-  'Nova Saída / Retomada': 'Nova Saída / Retomada',
+  'Nova Saída / Retomada': 'Continuação de Férias',
 };
 
 function normalizeText(value) {
