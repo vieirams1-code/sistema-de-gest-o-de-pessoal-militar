@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
@@ -14,6 +14,7 @@ import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/uti
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
+import { getTiposLivroFiltrados, groupTiposLivro } from '@/components/livro/livroTipoRegistroConfig';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -999,28 +1000,11 @@ export default function CadastrarRegistroLivro() {
   }, [tipoAtualCustom, formData, camposCustom]);
 
   const tiposFiltrados = () => {
-    const tipos = [
-      { value: 'Saída Férias', label: 'Férias', sexo: null },
-      { value: 'Licença Maternidade', label: 'Licença Maternidade', sexo: 'Feminino' },
-      { value: 'Prorrogação de Licença Maternidade', label: 'Prorrogação de Licença Maternidade', sexo: 'Feminino' },
-      { value: 'Licença Paternidade', label: 'Licença Paternidade', sexo: 'Masculino' },
-      { value: 'Núpcias', label: 'Núpcias', sexo: null },
-      { value: 'Luto', label: 'Luto', sexo: null },
-      { value: 'Cedência', label: 'Cedência', sexo: null },
-      { value: 'Transferência', label: 'Transferência', sexo: null },
-      { value: 'Transferência para RR', label: 'Transferência para Reserva Remunerada', sexo: null },
-      { value: 'Trânsito', label: 'Trânsito', sexo: null },
-      { value: 'Instalação', label: 'Instalação', sexo: null },
-      { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
-      { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
-      { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
-      { value: 'Designação de Função', label: 'Designação de Função', sexo: null },
-      { value: 'Dispensa de Função', label: 'Dispensa de Função', sexo: null },
-    ];
-    // Adicionar tipos customizados
-    const customTipos = tiposCustom.map(t => ({ value: t.nome, label: t.nome, sexo: null }));
-    return [...tipos, ...customTipos].filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
+    return getTiposLivroFiltrados({ sexo: formData.militar_sexo, tiposCustom });
   };
+
+  const tiposAgrupados = groupTiposLivro(tiposFiltrados());
+  const tipoSelecionado = tiposFiltrados().find((tipo) => tipo.value === formData.tipo_registro);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -1100,11 +1084,20 @@ export default function CadastrarRegistroLivro() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {tiposFiltrados().map(tipo => (
-                    <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+                  {Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
+                    <SelectGroup key={grupo}>
+                      <SelectLabel className="text-xs uppercase tracking-wide text-slate-500">{grupo}</SelectLabel>
+                      {tipos.map((tipo) => (
+                        <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="mt-2 text-xs text-slate-500">
+                Selecionado: <strong>{tipoSelecionado?.label || formData.tipo_registro}</strong>
+                {tipoSelecionado?.grupo ? ` • Grupo ${tipoSelecionado.grupo}` : ''}
+              </p>
             </div>
           )}
 

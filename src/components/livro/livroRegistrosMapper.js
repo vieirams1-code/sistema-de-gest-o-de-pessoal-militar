@@ -1,11 +1,5 @@
 import { format } from 'date-fns';
-
-const TIPO_LABELS = {
-  'Saída Férias': 'Saída de Férias',
-  'Retorno Férias': 'Retorno de Férias',
-  'Interrupção de Férias': 'Interrupção de Férias',
-  'Nova Saída / Retomada': 'Nova Saída / Retomada',
-};
+import { getTipoRegistroLabel } from '@/components/livro/livroTipoRegistroConfig';
 
 const STATUS_LABELS = {
   ativo: 'Ativo',
@@ -43,8 +37,7 @@ function toCodigo(value) {
 }
 
 function getTipoLabel(tipoRegistro) {
-  if (TIPO_LABELS[tipoRegistro]) return TIPO_LABELS[tipoRegistro];
-  return tipoRegistro || 'Registro';
+  return getTipoRegistroLabel(tipoRegistro);
 }
 
 function getStatusCodigo(registro, inconsistencia) {
