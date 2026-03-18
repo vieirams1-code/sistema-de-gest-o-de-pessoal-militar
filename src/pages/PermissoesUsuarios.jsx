@@ -57,6 +57,7 @@ export default function PermissoesUsuarios() {
   const [savingUser, setSavingUser] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(permissionStructure[0]?.category || '');
+  const [activeEditTab, setActiveEditTab] = useState('dados');
 
 
   // Queries — só executam após resolução do acesso e confirmação de permissão
@@ -354,6 +355,28 @@ export default function PermissoesUsuarios() {
                 </div>
 
                 <div className="p-3.5 lg:p-4 space-y-4 bg-slate-50/50">
+                  <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+                    {[
+                      { key: 'dados', label: 'Dados' },
+                      { key: 'perfil', label: 'Perfil' },
+                      { key: 'permissoes', label: 'Permissões' },
+                    ].map((tab) => {
+                      const isActive = activeEditTab === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setActiveEditTab(tab.key)}
+                          className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition border ${isActive ? 'bg-[#1e3a5f] text-white border-[#1e3a5f] shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-900'}`}
+                        >
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {activeEditTab === 'dados' && (
+                    <>
                   {/* Bloco 1: Dados do Usuário */}
                   <div className="bg-white border border-slate-200 rounded-xl p-3.5">
                     <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -506,6 +529,11 @@ export default function PermissoesUsuarios() {
                     </div>
                   )}
 
+                    </>
+                  )}
+
+                  {activeEditTab === 'perfil' && (
+                    <>
                   {/* Bloco 4: Perfil de Permissões */}
                   <div className="bg-white border border-slate-200 rounded-xl p-3.5">
                     <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -584,6 +612,11 @@ export default function PermissoesUsuarios() {
                     )}
                   </div>
 
+                    </>
+                  )}
+
+                  {activeEditTab === 'permissoes' && (
+                    <>
                   {/* Bloco 5: Matriz de Permissões */}
                   <div className="bg-white border border-slate-200 rounded-xl p-3.5 mb-1">
                     <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
@@ -675,6 +708,8 @@ export default function PermissoesUsuarios() {
                       </div>
                     </div>
                   </div>
+                    </>
+                  )}
 
                 </div>
               </div>
