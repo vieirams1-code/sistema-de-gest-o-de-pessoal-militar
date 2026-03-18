@@ -205,7 +205,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeApostilar = isPublicado && !foiTornadaSemEfeito && !isDerivado;
   const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
   const podeMarcarPrioridade = !isPublicado;
-  const podeEditar = !isPublicado;
+  const podeEditar = !isPublicado && origemTipo !== 'livro';
   const temPermissaoAdmin = canAccessAction('admin_mode');
   const podeExcluir = !isPublicado && temPermissaoAdmin && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && temPermissaoAdmin && !modoAdmin;

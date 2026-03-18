@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -15,7 +15,7 @@ import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/uti
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
-import { getTiposLivroFiltrados, groupTiposLivro, matchesTipoLivroSearch } from '@/components/livro/livroTipoRegistroConfig';
+import { getTiposLivroFiltrados, groupTiposLivro, matchesTipoLivroSearch, getTipoRegistroLabel } from '@/components/livro/livroTipoRegistroConfig';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -59,22 +59,6 @@ const initialFormData = {
   observacoes: ''
 };
 
-function getPeriodoSortKey(periodoRef, fallbackDate = '') {
-  if (periodoRef) {
-    const match = String(periodoRef).match(/(\d{4})\s*\/\s*(\d{4})/);
-    if (match) {
-      return Number(match[1]);
-    }
-  }
-
-  if (fallbackDate) {
-    const d = new Date(`${fallbackDate}T00:00:00`);
-    if (!Number.isNaN(d.getTime())) return d.getTime();
-  }
-
-  return Number.MAX_SAFE_INTEGER;
-}
-
 function getOperacoesDisponiveisFerias(ferias) {
   if (!ferias) return ['Saída Férias'];
   if (ferias.status === 'Em Curso') return ['Retorno Férias', 'Interrupção de Férias'];
@@ -105,11 +89,64 @@ function calcularMetricasInterrupcao(ferias, dataInterrupcaoIso) {
   return { diasNoMomento, diasGozados, saldoRemanescente };
 }
 
+
+const ADMIN_EDITABLE_FIELDS = new Set(['nota_para_bg', 'numero_bg', 'data_bg', 'observacoes', 'texto_publicacao']);
+const SEMANTIC_FIELDS_TO_PRESERVE = [
+  'militar_id', 'militar_nome', 'militar_posto', 'militar_matricula', 'militar_sexo',
+  'tipo_registro', 'ferias_id', 'data_registro', 'data_inicio', 'data_termino', 'data_retorno',
+  'dias', 'dias_evento', 'dias_restantes', 'dias_no_momento', 'dias_gozados', 'saldo_remanescente',
+  'origem', 'destino', 'funcao', 'lotacao', 'data_cedencia', 'data_transferencia', 'tipo_transferencia',
+  'curso_nome', 'curso_local', 'documento_referencia', 'periodo_aquisitivo', 'campos_customizados',
+  'publicacao_transferencia', 'motivo_dispensa', 'missao_descricao', 'conjuge_nome', 'inicio_termino',
+  'falecido_nome', 'falecido_certidao', 'grau_parentesco', 'edicao_ano', 'documento_texto', 'obs_cedencia',
+  'data_designacao', 'dias_evento', 'dias_restantes'
+];
+
+function mergeCamposPreservados(registroOriginal = {}, draft = {}) {
+  const preserved = { ...draft };
+  for (const field of SEMANTIC_FIELDS_TO_PRESERVE) {
+    if (Object.prototype.hasOwnProperty.call(registroOriginal, field)) {
+      preserved[field] = registroOriginal[field];
+    }
+  }
+  return preserved;
+}
+
+function getOriginalActEntries(registro = {}) {
+  return [
+    ['Tipo do ato', getTipoRegistroLabel(registro.tipo_registro)],
+    ['Militar', [registro.militar_posto, registro.militar_nome].filter(Boolean).join(' ')],
+    ['Matrícula', registro.militar_matricula],
+    ['Data-base', registro.data_registro],
+    ['Férias vinculadas', registro.ferias_id],
+    ['Data de início', registro.data_inicio],
+    ['Data de término', registro.data_termino],
+    ['Data de retorno', registro.data_retorno],
+    ['Dias', registro.dias],
+    ['Dias do evento', registro.dias_evento],
+    ['Dias restantes', registro.dias_restantes],
+    ['Dias no momento', registro.dias_no_momento],
+    ['Dias gozados', registro.dias_gozados],
+    ['Saldo remanescente', registro.saldo_remanescente],
+    ['Período aquisitivo', registro.periodo_aquisitivo],
+    ['Origem', registro.origem],
+    ['Destino', registro.destino],
+    ['Função', registro.funcao],
+    ['Lotação', registro.lotacao],
+    ['Data de cedência', registro.data_cedencia],
+    ['Data de transferência', registro.data_transferencia],
+    ['Tipo de transferência', registro.tipo_transferencia],
+    ['Curso', registro.curso_nome],
+    ['Local do curso', registro.curso_local],
+    ['Documento de referência', registro.documento_referencia],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+}
+
 export default function CadastrarRegistroLivro() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
-  const id = editId;
+  const isEditing = !!editId;
   const queryClient = useQueryClient();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasLivroAccess = canAccessModule('livro');
@@ -119,7 +156,7 @@ export default function CadastrarRegistroLivro() {
   const [selectedFerias, setSelectedFerias] = useState(null);
   const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState('Saída Férias');
   const [textoPublicacao, setTextoPublicacao] = useState('');
-  const [usingCustomTemplate, setUsingCustomTemplate] = useState(false);
+  const [, setUsingCustomTemplate] = useState(false);
   const [templateError, setTemplateError] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [buscaTipo, setBuscaTipo] = useState('');
@@ -150,13 +187,13 @@ export default function CadastrarRegistroLivro() {
   const [camposCustom, setCamposCustom] = useState({});
 
   const { data: registroEdicao } = useQuery({
-    queryKey: ['registro-livro-edicao', id],
+    queryKey: ['registro-livro-edicao', editId],
     queryFn: async () => {
-      if (!id) return null;
-      const list = await base44.entities.RegistroLivro.filter({ id });
+      if (!editId) return null;
+      const list = await base44.entities.RegistroLivro.filter({ id: editId });
       return list[0] || null;
     },
-    enabled: !!id,
+    enabled: isEditing,
   });
 
   const { data: feriasEdicao } = useQuery({
@@ -177,8 +214,14 @@ export default function CadastrarRegistroLivro() {
       ...registroEdicao,
     }));
 
-    if (registroEdicao.tipo_registro && registroEdicao.tipo_registro !== 'Saída Férias') {
+    if (registroEdicao.tipo_registro) {
       setOperacaoFeriasSelecionada(registroEdicao.tipo_registro);
+    }
+    if (registroEdicao.campos_customizados && typeof registroEdicao.campos_customizados === 'object') {
+      setCamposCustom(registroEdicao.campos_customizados);
+    }
+    if (registroEdicao.texto_publicacao) {
+      setTextoPublicacao(registroEdicao.texto_publicacao);
     }
   }, [registroEdicao]);
 
@@ -187,14 +230,14 @@ export default function CadastrarRegistroLivro() {
     setSelectedFerias(feriasEdicao);
   }, [feriasEdicao]);
 
-  if (loadingUser || !isAccessResolved) return null;
-  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
   const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
     ? (selectedFerias ? operacaoFeriasSelecionada : 'Saída Férias')
     : formData.tipo_registro;
 
   const handleChange = (name, value) => {
+    if (isEditing && !ADMIN_EDITABLE_FIELDS.has(name)) return;
+
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
       if (name === 'nota_para_bg' || name === 'numero_bg' || name === 'data_bg') {
@@ -557,67 +600,113 @@ export default function CadastrarRegistroLivro() {
   const handleSubmit = async (redirectTarget) => {
     setLoading(true);
 
-    const metricasInterrupcao =
-      tipoRegistroEfetivo === 'Interrupção de Férias' && selectedFerias
-        ? calcularMetricasInterrupcao(selectedFerias, formData.data_registro)
-        : null;
+    try {
+      const metricasInterrupcao =
+        tipoRegistroEfetivo === 'Interrupção de Férias' && selectedFerias
+          ? calcularMetricasInterrupcao(selectedFerias, formData.data_registro)
+          : null;
 
-    const toNumOrUndef = (v) => (v !== '' && v !== undefined && v !== null && !Number.isNaN(Number(v)) ? Number(v) : undefined);
+      const toNumOrUndef = (v) => (v !== '' && v !== undefined && v !== null && !Number.isNaN(Number(v)) ? Number(v) : undefined);
 
-    // Previne salvar "0" dias em registros de férias que não renderizam o campo "dias" na UI
-    let diasFinais = toNumOrUndef(formData.dias);
-    if (selectedFerias) {
-      if (['Saída Férias', 'Interrupção de Férias', 'Retorno Férias'].includes(tipoRegistroEfetivo)) {
-        diasFinais = Number(selectedFerias.dias || 0);
-      } else if (tipoRegistroEfetivo === 'Nova Saída / Retomada') {
-        diasFinais = Number(selectedFerias.saldo_remanescente || 0);
+      let diasFinais = toNumOrUndef(formData.dias);
+      if (!isEditing && selectedFerias) {
+        if (['Saída Férias', 'Interrupção de Férias', 'Retorno Férias'].includes(tipoRegistroEfetivo)) {
+          diasFinais = Number(selectedFerias.dias || 0);
+        } else if (tipoRegistroEfetivo === 'Nova Saída / Retomada') {
+          diasFinais = Number(selectedFerias.saldo_remanescente || 0);
+        }
       }
+
+      const basePayload = {
+        ...formData,
+        tipo_registro: tipoRegistroEfetivo,
+        texto_publicacao: textoPublicacao,
+        campos_customizados: Object.keys(camposCustom).length ? camposCustom : formData.campos_customizados,
+        dias: diasFinais,
+        dias_evento: toNumOrUndef(formData.dias_evento),
+        dias_restantes: toNumOrUndef(formData.dias_restantes),
+        ...(metricasInterrupcao
+          ? {
+              dias_no_momento: metricasInterrupcao.diasNoMomento,
+              dias_gozados: metricasInterrupcao.diasGozados,
+              saldo_remanescente: metricasInterrupcao.saldoRemanescente,
+            }
+          : {}),
+      };
+
+      if (isEditing) {
+        const finalData = mergeCamposPreservados(registroEdicao, {
+          ...basePayload,
+          tipo_registro: registroEdicao?.tipo_registro,
+          ferias_id: registroEdicao?.ferias_id,
+          data_registro: registroEdicao?.data_registro,
+          militar_id: registroEdicao?.militar_id,
+          militar_nome: registroEdicao?.militar_nome,
+          militar_posto: registroEdicao?.militar_posto,
+          militar_matricula: registroEdicao?.militar_matricula,
+          militar_sexo: registroEdicao?.militar_sexo,
+          texto_publicacao: registroEdicao?.texto_publicacao || basePayload.texto_publicacao,
+        });
+
+        await base44.entities.RegistroLivro.update(editId, finalData);
+
+        if (registroEdicao?.ferias_id) {
+          await reconciliarCadeiaFerias({
+            feriasId: registroEdicao.ferias_id,
+            ferias: selectedFerias || feriasEdicao || null,
+          });
+        }
+      } else {
+        await base44.entities.RegistroLivro.create(basePayload);
+
+        if (formData.ferias_id) {
+          await reconciliarCadeiaFerias({
+            feriasId: formData.ferias_id,
+            ferias: selectedFerias || null,
+          });
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registro-livro-edicao'] });
+      queryClient.invalidateQueries({ queryKey: ['livro-consulta'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
+
+      if (redirectTarget === 'publicacoes') navigate(createPageUrl('Publicacoes'));
+      else navigate(-1);
+    } finally {
+      setLoading(false);
     }
-
-    const registroData = {
-      ...formData,
-      tipo_registro: tipoRegistroEfetivo,
-      texto_publicacao: textoPublicacao,
-      dias: diasFinais,
-      dias_evento: toNumOrUndef(formData.dias_evento),
-      dias_restantes: toNumOrUndef(formData.dias_restantes),
-      ...(metricasInterrupcao
-        ? {
-            dias_no_momento: metricasInterrupcao.diasNoMomento,
-            dias_gozados: metricasInterrupcao.diasGozados,
-            saldo_remanescente: metricasInterrupcao.saldoRemanescente,
-          }
-        : {}),
-    };
-
-    if (id) {
-      await base44.entities.RegistroLivro.update(id, registroData);
-    } else {
-      await base44.entities.RegistroLivro.create(registroData);
-    }
-
-
-    if (formData.ferias_id) {
-      await reconciliarCadeiaFerias({
-        feriasId: formData.ferias_id,
-        ferias: selectedFerias || null,
-      });
-    }
-
-    queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-    queryClient.invalidateQueries({ queryKey: ['ferias'] });
-    queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
-    queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos-livro'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
-    
-    setLoading(false);
-    
-    if (redirectTarget === 'publicacoes') navigate(createPageUrl('Publicacoes'));
-    else navigate(-1);
   };
 
+
   const renderSpecificFields = () => {
+    if (isEditing) {
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900">Dados originais do ato</h3>
+              <p className="mt-1 text-sm text-amber-800">Os campos materiais permanecem bloqueados para impedir transformação do ato original.</p>
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+            {originalActEntries.map(([label, value]) => (
+              <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+                <p className="mt-1 text-sm font-medium text-slate-800">{String(value)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     if (formData.tipo_registro === 'Saída Férias') {
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -1003,15 +1092,49 @@ export default function CadastrarRegistroLivro() {
     setTextoPublicacao(texto);
   }, [tipoAtualCustom, formData, camposCustom]);
 
+  const templatesLivroAtivos = useMemo(
+    () => templates.filter((template) => template.modulo === 'Livro' && template.ativo !== false),
+    [templates],
+  );
+
+  const tiposDisponiveis = useMemo(
+    () => getTiposLivroFiltrados({
+      sexo: formData.militar_sexo,
+      tiposCustom,
+      templatesAtivos: templatesLivroAtivos,
+      tipoAtualEdicao: registroEdicao?.tipo_registro || null,
+    }),
+    [formData.militar_sexo, tiposCustom, templatesLivroAtivos, registroEdicao?.tipo_registro],
+  );
+
+  const gruposDeTipos = useMemo(() => groupTiposLivro(tiposDisponiveis), [tiposDisponiveis]);
+  const originalActEntries = useMemo(() => getOriginalActEntries(registroEdicao || formData), [registroEdicao, formData]);
+
   const canGoNext = () => {
+    if (isEditing && !registroEdicao) return false;
     if (currentStep === 1) return !!formData.tipo_registro;
-    if (currentStep === 2) return !!formData.militar_id && !!formData.data_registro && !(isFeriasEfetivo && !formData.ferias_id);
+    if (currentStep === 2) {
+      if (isEditing) return true;
+      return !!formData.militar_id && !!formData.data_registro && !(isFeriasEfetivo && !formData.ferias_id);
+    }
     if (currentStep === 3) return !templateError;
     return false;
   };
 
-  const tiposDisponiveis = getTiposLivroFiltrados({ sexo: formData.militar_sexo, tiposCustom });
-  const gruposDeTipos = groupTiposLivro(tiposDisponiveis);
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
+
+  if (isEditing && !registroEdicao) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 h-10 w-10 rounded-full border-2 border-[#1e3a5f] border-t-transparent animate-spin" />
+          <h1 className="text-lg font-semibold text-[#1e3a5f]">Carregando registro para edição</h1>
+          <p className="mt-2 text-sm text-slate-500">Aguarde para evitar que o wizard exiba um tipo transitório incorreto.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -1031,7 +1154,7 @@ export default function CadastrarRegistroLivro() {
               <div>
                 <h1 className="text-xl font-bold text-[#1e3a5f] flex items-center gap-2">
                   <BookOpen className="w-5 h-5" /> 
-                  Registrar no Livro
+                  {isEditing ? 'Editar registro do Livro' : 'Registrar no Livro'}
                 </h1>
                 <p className="text-slate-500 text-xs mt-0.5">Fluxo guiado de lançamento</p>
               </div>
@@ -1103,6 +1226,16 @@ export default function CadastrarRegistroLivro() {
                 />
               </div>
               
+              {isEditing && (
+                <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">Edição restrita: este modo permite apenas ajustes administrativos e de publicação.</p>
+                    <p className="mt-1 text-sm text-amber-800">O tipo exibido abaixo reflete o ato original e permanece bloqueado durante a edição.</p>
+                  </div>
+                </div>
+              )}
+
               {!buscaTipo && (
                 <div className="mb-8">
                   <h3 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Acesso Rápido</h3>
@@ -1112,8 +1245,8 @@ export default function CadastrarRegistroLivro() {
                       return (
                         <button
                           key={t.value}
-                          onClick={() => { handleChange('tipo_registro', t.value); setCurrentStep(2); }}
-                          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
+                          onClick={() => { if (!isEditing) { handleChange('tipo_registro', t.value); setCurrentStep(2); } }}
+                          className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'} ${isEditing ? 'cursor-not-allowed opacity-80' : ''}`}
                         >
                           {t.label}
                         </button>
@@ -1137,8 +1270,8 @@ export default function CadastrarRegistroLivro() {
                           return (
                             <div 
                               key={t.value} 
-                              onClick={() => { handleChange('tipo_registro', t.value); setCurrentStep(2); }}
-                              className={`p-4 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'}`}
+                              onClick={() => { if (!isEditing) { handleChange('tipo_registro', t.value); setCurrentStep(2); } }}
+                              className={`p-4 rounded-lg border transition-all ${isSelected ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'} ${isEditing ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                             >
                               <div className="flex items-center justify-between mb-1">
                                 <span className={`font-medium ${isSelected ? 'text-blue-800' : 'text-slate-700'}`}>{t.label}</span>
@@ -1160,27 +1293,54 @@ export default function CadastrarRegistroLivro() {
         {/* Etapa 2: Dados Essenciais */}
         {currentStep === 2 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Militar e Data Base</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <MilitarSelector
-                  value={formData.militar_id}
-                  onChange={(name, value) => handleChange(name, value)}
-                  onMilitarSelect={handleMilitarSelect}
-                />
+            {isEditing ? (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Militar e data-base do ato</h3>
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">Edição restrita: este modo permite apenas ajustes administrativos e de publicação.</p>
+                    <p className="mt-1 text-sm text-amber-800">Militar, vínculo de férias, tipo do lançamento e data-base permanecem preservados exatamente como no registro original.</p>
+                  </div>
+                </div>
+                <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Militar</p>
+                    <p className="mt-1 text-sm font-medium text-slate-800">{[formData.militar_posto, formData.militar_nome].filter(Boolean).join(' ') || '—'}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Matrícula</p>
+                    <p className="mt-1 text-sm font-medium text-slate-800">{formData.militar_matricula || '—'}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Data-base</p>
+                    <p className="mt-1 text-sm font-medium text-slate-800">{formatarDataExtenso(formData.data_registro) || '—'}</p>
+                  </div>
+                </div>
               </div>
-              <FormField
-                label="Data"
-                name="data_registro"
-                value={formData.data_registro}
-                onChange={handleChange}
-                type="date"
-                required
-              />
-            </div>
-          </div>
-            {formData.militar_id && renderSpecificFields()}
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Militar e Data Base</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <MilitarSelector
+                      value={formData.militar_id}
+                      onChange={(name, value) => handleChange(name, value)}
+                      onMilitarSelect={handleMilitarSelect}
+                    />
+                  </div>
+                  <FormField
+                    label="Data"
+                    name="data_registro"
+                    value={formData.data_registro}
+                    onChange={handleChange}
+                    type="date"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+            {(isEditing || formData.militar_id) && renderSpecificFields()}
           </div>
         )}
 
@@ -1197,7 +1357,7 @@ export default function CadastrarRegistroLivro() {
               </div>
             )}
 
-            {!templateError && formData.militar_id && (
+            {!templateError && (isEditing || formData.militar_id) && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <Label className="text-base font-semibold text-[#1e3a5f]">Texto Final</Label>

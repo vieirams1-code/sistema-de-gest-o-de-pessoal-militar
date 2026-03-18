@@ -92,14 +92,14 @@ function gerarCodigoTSE(baseId, idx) {
 }
 
 function getEditUrl(registro) {
-  if (!registro) return '#';
+  if (!registro) return null;
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
     return `${createPageUrl('CadastrarPublicacao')}?id=${registro.id}`;
   }
   if (registro.medico || registro.cid_10) {
     return `${createPageUrl('CadastrarAtestado')}?id=${registro.id}`;
   }
-  return `${createPageUrl('CadastrarRegistroLivro')}?id=${registro.id}`;
+  return null;
 }
 
 // Card de um item da família
@@ -382,10 +382,10 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
               status={raizStatus}
               isSelected={selectedId === raiz.id}
               onClick={() => setSelectedId(raiz.id)}
-              onNavigate={() => {
+              onNavigate={getEditUrl(raiz) ? () => {
                 navigate(getEditUrl(raiz));
                 onClose();
-              }}
+              } : null}
               variant="original"
             />
 
@@ -400,10 +400,10 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                   status={calcStatus(ap)}
                   isSelected={selectedId === ap.id}
                   onClick={() => setSelectedId(ap.id)}
-                  onNavigate={() => {
+                  onNavigate={getEditUrl(ap) ? () => {
                     navigate(getEditUrl(ap));
                     onClose();
-                  }}
+                  } : null}
                   indent
                   variant="apostila"
                 />
@@ -417,10 +417,10 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                     status={calcStatus(tseAp)}
                     isSelected={selectedId === tseAp.id}
                     onClick={() => setSelectedId(tseAp.id)}
-                    onNavigate={() => {
+                    onNavigate={getEditUrl(tseAp) ? () => {
                       navigate(getEditUrl(tseAp));
                       onClose();
-                    }}
+                    } : null}
                     indent
                     variant="tse"
                   />
@@ -438,10 +438,10 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                 status={calcStatus(tseRaiz)}
                 isSelected={selectedId === tseRaiz.id}
                 onClick={() => setSelectedId(tseRaiz.id)}
-                onNavigate={() => {
+                onNavigate={getEditUrl(tseRaiz) ? () => {
                   navigate(getEditUrl(tseRaiz));
                   onClose();
-                }}
+                } : null}
                 indent
                 variant="tse"
               />
