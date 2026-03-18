@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { addDays } from 'date-fns';
@@ -14,6 +13,8 @@ import { aplicarTemplate, buildVarsLivro, abreviarPosto } from '@/components/uti
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
+import { getTiposLivroFiltrados, groupTiposLivro } from '@/components/livro/livroTipoRegistroConfig';
+import { cn } from '@/lib/utils';
 
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FeriasSelector from '@/components/livro/FeriasSelector';
@@ -999,28 +1000,27 @@ export default function CadastrarRegistroLivro() {
   }, [tipoAtualCustom, formData, camposCustom]);
 
   const tiposFiltrados = () => {
-    const tipos = [
-      { value: 'Saída Férias', label: 'Férias', sexo: null },
-      { value: 'Licença Maternidade', label: 'Licença Maternidade', sexo: 'Feminino' },
-      { value: 'Prorrogação de Licença Maternidade', label: 'Prorrogação de Licença Maternidade', sexo: 'Feminino' },
-      { value: 'Licença Paternidade', label: 'Licença Paternidade', sexo: 'Masculino' },
-      { value: 'Núpcias', label: 'Núpcias', sexo: null },
-      { value: 'Luto', label: 'Luto', sexo: null },
-      { value: 'Cedência', label: 'Cedência', sexo: null },
-      { value: 'Transferência', label: 'Transferência', sexo: null },
-      { value: 'Transferência para RR', label: 'Transferência para Reserva Remunerada', sexo: null },
-      { value: 'Trânsito', label: 'Trânsito', sexo: null },
-      { value: 'Instalação', label: 'Instalação', sexo: null },
-      { value: 'Dispensa Recompensa', label: 'Dispensa como Recompensa', sexo: null },
-      { value: 'Deslocamento Missão', label: 'Deslocamento para Missões', sexo: null },
-      { value: 'Curso/Estágio', label: 'Cursos / Estágios / Capacitações', sexo: null },
-      { value: 'Designação de Função', label: 'Designação de Função', sexo: null },
-      { value: 'Dispensa de Função', label: 'Dispensa de Função', sexo: null },
-    ];
-    // Adicionar tipos customizados
-    const customTipos = tiposCustom.map(t => ({ value: t.nome, label: t.nome, sexo: null }));
-    return [...tipos, ...customTipos].filter(tipo => !tipo.sexo || tipo.sexo === formData.militar_sexo);
+    return getTiposLivroFiltrados({ sexo: formData.militar_sexo, tiposCustom });
   };
+
+  const handleTipoRegistroSelect = (value) => {
+    handleChange('tipo_registro', value);
+    setSelectedFerias(null);
+    setOperacaoFeriasSelecionada('Saída Férias');
+    setFormData(prev => ({
+      ...prev,
+      ferias_id: '',
+      dias: 0,
+      data_inicio: '',
+      data_termino: '',
+      data_retorno: '',
+      periodo_aquisitivo: '',
+    }));
+  };
+
+  const tiposDisponiveis = tiposFiltrados();
+  const tiposAgrupados = groupTiposLivro(tiposDisponiveis);
+  const tipoSelecionado = tiposDisponiveis.find((tipo) => tipo.value === formData.tipo_registro);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -1081,30 +1081,43 @@ export default function CadastrarRegistroLivro() {
           {/* Tipo de Registro */}
           {formData.militar_id && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
-              <Select value={formData.tipo_registro} onValueChange={(v) => {
-                handleChange('tipo_registro', v);
-                setSelectedFerias(null);
-                setOperacaoFeriasSelecionada('Saída Férias');
-                setFormData(prev => ({
-                  ...prev,
-                  ferias_id: '',
-                  dias: 0,
-                  data_inicio: '',
-                  data_termino: '',
-                  data_retorno: '',
-                  periodo_aquisitivo: '',
-                }));
-              }}>
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {tiposFiltrados().map(tipo => (
-                    <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <Label className="text-sm font-medium text-slate-700">Tipo de Registro</Label>
+                <span className="text-xs text-slate-500">Selecione um tipo para liberar o formulário operacional</span>
+              </div>
+
+              <div className="space-y-4">
+                {Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
+                  <div key={grupo} className="rounded-lg border border-slate-200 p-3 bg-slate-50/70">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{grupo}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      {tipos.map((tipo) => {
+                        const selecionado = formData.tipo_registro === tipo.value;
+                        return (
+                          <button
+                            key={tipo.value}
+                            type="button"
+                            onClick={() => handleTipoRegistroSelect(tipo.value)}
+                            className={cn(
+                              'rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                              selecionado
+                                ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-sm'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-[#1e3a5f]/60 hover:bg-slate-100'
+                            )}
+                          >
+                            {tipo.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-2 text-xs text-slate-500">
+                Selecionado: <strong>{tipoSelecionado?.label || formData.tipo_registro}</strong>
+                {tipoSelecionado?.grupo ? ` • Grupo ${tipoSelecionado.grupo}` : ''}
+              </p>
             </div>
           )}
 
