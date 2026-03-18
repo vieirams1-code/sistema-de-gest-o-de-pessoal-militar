@@ -392,6 +392,7 @@ export default function CadastrarRegistroLivro() {
       }
       setTemplateError(`Template obrigatório não encontrado para '${tipoRegistro}'. Entre em contato com o administrador para cadastrar o template antes de continuar.`);
       return '';
+    }; // <-- Chave de fechamento adicionada aqui
 
     let texto = '';
 
