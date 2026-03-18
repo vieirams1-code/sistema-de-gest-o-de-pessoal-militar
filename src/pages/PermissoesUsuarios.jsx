@@ -266,68 +266,70 @@ export default function PermissoesUsuarios() {
   return (
     <div className="min-h-screen bg-slate-100 p-4 lg:p-6">
       <div className="max-w-[1780px] mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-[#1e3a5f]/10 text-[#1e3a5f] rounded-xl flex items-center justify-center">
-              <Users className="w-6 h-6" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#1e3a5f]/10 text-[#1e3a5f]">
+              <Users className="h-6 w-6" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-[#1e3a5f]">Permissões de Usuários</h1>
               <p className="text-sm text-slate-500">Gerencie contas, acessos organizacionais e permissões</p>
             </div>
           </div>
-          <Button onClick={handleCreateNew} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-            <UserPlus className="w-4 h-4 mr-2" /> Novo Usuário
+          <Button onClick={handleCreateNew} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
+            <UserPlus className="mr-2 h-4 w-4" /> Novo Usuário
           </Button>
         </div>
 
         {acessosError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6 flex gap-3">
-            <Info className="w-5 h-5 shrink-0" />
+          <div className="mb-6 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            <Info className="h-5 w-5 shrink-0" />
             <p className="text-sm">Falha ao carregar acessos. Verifique a existência da entidade UsuarioAcesso no Base44.</p>
           </div>
         )}
 
-        <div className="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
-          {/* Coluna da Esquerda: Lista de Usuários */}
+        <div className="grid grid-cols-1 gap-5 2xl:grid-cols-12 items-start">
           <div className="2xl:col-span-3 flex flex-col min-h-[calc(100vh-10rem)]">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col min-h-full overflow-hidden">
-              <div className="p-4 border-b border-slate-200 bg-white sticky top-0 z-10">
+            <div className="flex min-h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-4">
                 <h2 className="font-semibold text-slate-900">Usuários</h2>
-                <p className="text-xs text-slate-500 mb-3">{acessos.length} registros</p>
+                <p className="mb-3 text-xs text-slate-500">{acessos.length} registros</p>
                 <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
                     placeholder="Buscar por nome, e-mail ou perfil"
-                    className="pl-9 h-9 rounded-lg border-slate-200"
+                    className="h-9 rounded-lg border-slate-200 pl-9"
                   />
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50/50">
+
+              <div className="flex-1 space-y-2 overflow-y-auto bg-slate-50/50 p-3">
                 {filteredAcessos.length === 0 ? (
-                  <p className="text-center text-slate-400 py-10 text-sm">Nenhum acesso cadastrado</p>
+                  <p className="py-10 text-center text-sm text-slate-400">Nenhum acesso cadastrado</p>
                 ) : (
                   filteredAcessos.map((u) => (
-                    <div 
-                      key={u.id} 
-                      onClick={() => handleSelectAcesso(u)} 
-                      className={`p-3 rounded-xl border cursor-pointer transition-all ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-md ring-2 ring-[#1e3a5f]/35' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}
+                    <div
+                      key={u.id}
+                      onClick={() => handleSelectAcesso(u)}
+                      className={`cursor-pointer rounded-xl border p-3 transition-all ${selectedUser?.id === u.id ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-md ring-2 ring-[#1e3a5f]/35' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}
                     >
-                      <div className="flex justify-between items-start mb-1.5 gap-2">
-                        <div className={`font-semibold text-sm truncate ${selectedUser?.id === u.id ? 'text-white' : 'text-slate-800'}`} title={u.nome_usuario || u.user_email}>
+                      <div className="mb-1.5 flex items-start justify-between gap-2">
+                        <div className={`truncate text-sm font-semibold ${selectedUser?.id === u.id ? 'text-white' : 'text-slate-800'}`} title={u.nome_usuario || u.user_email}>
                           {u.nome_usuario || u.user_email}
-                          {!u.ativo && <span className={`ml-1.5 text-xs font-semibold ${selectedUser?.id === u.id ? 'text-rose-100' : 'text-red-500'}`}>(Inativo)</span>}
+                          {!u.ativo && (
+                            <span className={`ml-1.5 text-xs font-semibold ${selectedUser?.id === u.id ? 'text-rose-100' : 'text-red-500'}`}>(Inativo)</span>
+                          )}
                         </div>
-                        <div className="shrink-0 [&_.bg-emerald-100]:bg-white/20 [&_.text-emerald-800]:text-white [&_.bg-emerald-50]:bg-white/20 [&_.text-emerald-700]:text-white [&_.border-emerald-200]:border-white/30 [&_.bg-blue-100]:bg-white/20 [&_.text-blue-800]:text-white [&_.bg-amber-100]:bg-white/20 [&_.text-amber-800]:text-white [&_.text-slate-500]:text-white">
+                        <div className="shrink-0 [&_.bg-amber-100]:bg-white/20 [&_.bg-blue-100]:bg-white/20 [&_.bg-emerald-100]:bg-white/20 [&_.bg-emerald-50]:bg-white/20 [&_.border-emerald-200]:border-white/30 [&_.text-amber-800]:text-white [&_.text-blue-800]:text-white [&_.text-emerald-700]:text-white [&_.text-emerald-800]:text-white [&_.text-slate-500]:text-white">
                           {getTipoBadge(u)}
                         </div>
                       </div>
-                      <div className={`text-xs mb-2 truncate ${selectedUser?.id === u.id ? 'text-slate-100' : 'text-slate-500'}`} title={u.user_email}>{u.user_email}</div>
-                      
+                      <div className={`mb-2 truncate text-xs ${selectedUser?.id === u.id ? 'text-slate-100' : 'text-slate-500'}`} title={u.user_email}>{u.user_email}</div>
+
                       {u.perfil_nome && (
-                        <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-block truncate max-w-full ${selectedUser?.id === u.id ? 'bg-white/20 text-white border border-white/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100'}`}>
+                        <div className={`inline-block max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-medium ${selectedUser?.id === u.id ? 'border border-white/30 bg-white/20 text-white' : 'border border-indigo-100 bg-indigo-50 text-indigo-600'}`}>
                           Perfil: {u.perfil_nome}
                         </div>
                       )}
@@ -338,33 +340,32 @@ export default function PermissoesUsuarios() {
             </div>
           </div>
 
-          {/* Coluna da Direita: Edição / Detalhes do Usuário */}
           <div className="2xl:col-span-9 min-w-0">
             {selectedUser ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-visible flex flex-col min-h-[calc(100vh-10rem)]">
-                <div className="p-4 lg:p-5 border-b border-slate-200 bg-white sticky top-0 z-20 shrink-0">
-                  <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+              <div className="flex min-h-[calc(100vh-10rem)] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-white p-4 lg:p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <h2 className="font-bold text-[#1e3a5f] text-lg lg:text-xl">Editando: {userNomeUsuario || userUserEmail || 'Novo Usuário'}</h2>
+                      <h2 className="text-lg font-bold text-[#1e3a5f] lg:text-xl">Editando: {userNomeUsuario || userUserEmail || 'Novo Usuário'}</h2>
                       <p className="text-sm text-slate-500">Ajuste o escopo organizacional, perfil base e permissões por categoria.</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => setSelectedUser(null)} className="rounded-lg">Cancelar</Button>
-                    <Button 
-                      size="sm"
-                      onClick={handleSaveUserScope} 
-                      disabled={isSaveDisabled}
-                      className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white rounded-lg"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {savingUser ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveUserScope}
+                        disabled={isSaveDisabled}
+                        className="rounded-lg bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]"
+                      >
+                        <Save className="mr-2 h-4 w-4" />
+                        {savingUser ? 'Salvando...' : 'Salvar Alterações'}
+                      </Button>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex-1 p-4 lg:p-6 space-y-5 bg-slate-50/50 min-w-0">
-                  <div className="bg-white border border-slate-200 rounded-xl p-2">
+                <div className="min-w-0 flex-1 space-y-5 bg-slate-50/50 p-4 lg:p-6">
+                  <div className="rounded-xl border border-slate-200 bg-white p-2">
                     <div className="flex flex-wrap gap-2">
                       {topPanels.map((panel) => {
                         const isActive = activePanel === panel.key;
@@ -373,7 +374,7 @@ export default function PermissoesUsuarios() {
                             key={panel.key}
                             type="button"
                             onClick={() => setActivePanel(panel.key)}
-                            className={`px-3.5 py-2 rounded-lg text-sm font-medium transition ${isActive ? 'bg-[#1e3a5f] text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                            className={`rounded-lg px-3.5 py-2 text-sm font-medium transition ${isActive ? 'bg-[#1e3a5f] text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
                           >
                             {panel.label}
                           </button>
@@ -383,358 +384,328 @@ export default function PermissoesUsuarios() {
                   </div>
 
                   {activePanel === 'dados' && (
-                  <>
-                  {/* Bloco 1: Dados do Usuário */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-4">
-                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <UserCircle className="w-5 h-5 text-slate-400" />
-                      Dados do Usuário
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-semibold text-slate-700 block mb-1.5">Nome de Usuário</label>
-                        <Input value={userNomeUsuario} onChange={(e) => setUserNomeUsuario(e.target.value)} placeholder="Ex: João da Silva" className="bg-white" />
-                      </div>
-                      <div>
-                        <label className="text-sm font-semibold text-slate-700 block mb-1.5">E-mail do Usuário <span className="text-red-500">*</span></label>
-                        <Input value={userUserEmail} onChange={(e) => setUserUserEmail(e.target.value)} placeholder="email@exemplo.com" className="bg-white" />
-                      </div>
-                      <div className="col-span-1 md:col-span-2 flex items-center gap-2 pt-1 border-t border-slate-200">
-                        <input type="checkbox" id="userAtivo" checked={userAtivo} onChange={(e) => setUserAtivo(e.target.checked)} className="rounded border-slate-300 w-5 h-5 text-[#1e3a5f]" />
-                        <label htmlFor="userAtivo" className="text-sm font-semibold text-slate-700 cursor-pointer">Usuário Ativo e Habilitado para Login</label>
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
+                        <UserCircle className="h-5 w-5 text-slate-400" />
+                        Dados do Usuário
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-1.5 block text-sm font-semibold text-slate-700">Nome de Usuário</label>
+                          <Input value={userNomeUsuario} onChange={(e) => setUserNomeUsuario(e.target.value)} placeholder="Ex: João da Silva" className="bg-white" />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-sm font-semibold text-slate-700">E-mail do Usuário <span className="text-red-500">*</span></label>
+                          <Input value={userUserEmail} onChange={(e) => setUserUserEmail(e.target.value)} placeholder="email@exemplo.com" className="bg-white" />
+                        </div>
+                        <div className="col-span-1 flex items-center gap-2 border-t border-slate-200 pt-1 md:col-span-2">
+                          <input type="checkbox" id="userAtivo" checked={userAtivo} onChange={(e) => setUserAtivo(e.target.checked)} className="h-5 w-5 rounded border-slate-300 text-[#1e3a5f]" />
+                          <label htmlFor="userAtivo" className="cursor-pointer text-sm font-semibold text-slate-700">Usuário Ativo e Habilitado para Login</label>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  </>
                   )}
 
                   {activePanel === 'escopo' && (
-                  <>
-                  {/* Bloco 2: Alcance Organizacional */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-4">
-                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-blue-500" />
-                      Escopo Organizacional
-                    </h3>
-                    
-                    <div className="mb-5">
-                      <label className="text-sm font-semibold text-slate-700 block mb-1.5">Escopo de Acesso</label>
-                      <Select
-                        value={userAccessMode}
-                        onValueChange={(v) => {
-                          setUserAccessMode(v);
-                          if (v === 'proprio' || v === 'admin') {
-                            setUserGrupamentoId('');
-                            setUserSubgrupamentoId('');
-                            setUserUnidadeId('');
-                          }
-                          if (v !== 'proprio') {
-                            setUserMilitarId('');
-                            setUserMilitarEmail('');
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="bg-white md:max-w-xs"><SelectValue placeholder="Selecione o escopo" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="proprio">Proprio / Sem Setor Visto (Padrão)</SelectItem>
-                          <SelectItem value="unidade">Unidade / Nível 3</SelectItem>
-                          <SelectItem value="subsetor">Subsetor / Seção</SelectItem>
-                          <SelectItem value="setor">Setor / Grupamento Todo</SelectItem>
-                          <SelectItem value="admin">Administrador Global</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {(userAccessMode === 'setor' || userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5 p-4 bg-white border border-blue-100 rounded-lg">
-                        <div>
-                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Setor (Obrigatório)</label>
-                          <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); setUserUnidadeId(''); }}>
-                            <SelectTrigger><SelectValue placeholder="Selecione um setor..." /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="_nenhum">— Selecione —</SelectItem>
-                              {grupamentos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          {userAccessMode === 'setor' && userGrupamentoId && !userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados deste setor inteiro.</p>}
-                        </div>
-
-                        {(userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
-                          <div>
-                            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Subsetor/Seção (Obrigatório)</label>
-                            <Select 
-                              value={userSubgrupamentoId || '_nenhum'} 
-                              onValueChange={(v) => { setUserSubgrupamentoId(v === '_nenhum' ? '' : v); setUserUnidadeId(''); }}
-                              disabled={!userGrupamentoId || subgrupamentosFilhos.length === 0}
-                            >
-                              <SelectTrigger><SelectValue placeholder={!userGrupamentoId ? "Selecione o setor primeiro" : (subgrupamentosFilhos.length === 0 ? "Sem subsetores" : "Selecione o subsetor") } /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="_nenhum">— Selecione —</SelectItem>
-                                {subgrupamentosFilhos.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            {userAccessMode === 'subsetor' && userSubgrupamentoId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão de dados apenas deste subsetor e suas unidades.</p>}
-                          </div>
-                        )}
-
-                        {userAccessMode === 'unidade' && (
-                          <div>
-                            <label className="text-sm font-semibold text-slate-700 block mb-1.5">Unidade (Obrigatório)</label>
-                            <Select 
-                              value={userUnidadeId || '_nenhum'} 
-                              onValueChange={(v) => setUserUnidadeId(v === '_nenhum' ? '' : v)}
-                              disabled={!userSubgrupamentoId || unidadesFilhas.length === 0}
-                            >
-                              <SelectTrigger><SelectValue placeholder={!userSubgrupamentoId ? "Selecione o subsetor" : (unidadesFilhas.length === 0 ? "Sem unidades filhas" : "Selecione a unidade") } /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="_nenhum">— Selecione —</SelectItem>
-                                {unidadesFilhas.map(u => <SelectItem key={u.id} value={u.id}>{u.nome}{u.sigla ? ` (${u.sigla})` : ''}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            {userUnidadeId && <p className="text-xs font-medium text-blue-600 mt-2">✓ Terá visão estrita e limitada a esta unidade.</p>}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Bloco 3: Vínculo com Militar */}
-                  {userAccessMode === 'proprio' && (
-                    <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-5">
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                          <Users className="w-5 h-5 text-indigo-500" />
-                          Vínculo do Próprio Militar
+                    <div className="space-y-5">
+                      <div className="rounded-xl border border-slate-200 bg-white p-4">
+                        <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
+                          <Building2 className="h-5 w-5 text-blue-500" />
+                          Escopo Organizacional
                         </h3>
-                        <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200 text-xs">Modo Próprio</Badge>
-                      </div>
-                      
-                      <p className="text-sm text-slate-600 mb-4">
-                        Neste modo, o usuário não gerencia setores. Ele acessa apenas os próprios dados (avaliações, assentamentos pessoais, atestados, etc). Para isso, <b>é obrigatório vinculá-lo a um militar cadastrado</b>.
-                      </p>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-white p-4 rounded-lg border border-indigo-50">
-                        <div>
-                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Militar Vinculado <span className="text-red-500">*</span></label>
-                          <Select value={userMilitarId || '_nenhum'} onValueChange={(v) => {
-                            const militarId = v === '_nenhum' ? '' : v;
-                            setUserMilitarId(militarId);
-                            const militar = militares.find((m) => m.id === militarId);
-                            setUserMilitarEmail(militar?.email || militar?.email_particular || militar?.email_funcional || selectedUser?.email || '');
-                          }}>
-                            <SelectTrigger className="border-indigo-200"><SelectValue placeholder="Selecione o militar" /></SelectTrigger>
+                        <div className="mb-5">
+                          <label className="mb-1.5 block text-sm font-semibold text-slate-700">Escopo de Acesso</label>
+                          <Select
+                            value={userAccessMode}
+                            onValueChange={(v) => {
+                              setUserAccessMode(v);
+                              if (v === 'proprio' || v === 'admin') {
+                                setUserGrupamentoId('');
+                                setUserSubgrupamentoId('');
+                                setUserUnidadeId('');
+                              }
+                              if (v !== 'proprio') {
+                                setUserMilitarId('');
+                                setUserMilitarEmail('');
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="bg-white md:max-w-xs"><SelectValue placeholder="Selecione o escopo" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="_nenhum">— Selecione —</SelectItem>
-                              {militaresOrdenados.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>{m.posto_graduacao ? `${m.posto_graduacao} ` : ''}{m.nome_completo} {m.matricula ? `- Mat ${m.matricula}` : ''}</SelectItem>
-                              ))}
+                              <SelectItem value="proprio">Proprio / Sem Setor Visto (Padrão)</SelectItem>
+                              <SelectItem value="unidade">Unidade / Nível 3</SelectItem>
+                              <SelectItem value="subsetor">Subsetor / Seção</SelectItem>
+                              <SelectItem value="setor">Setor / Grupamento Todo</SelectItem>
+                              <SelectItem value="admin">Administrador Global</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                        <div>
-                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">E-mail Secundário do Vínculo</label>
-                          <Input value={userMilitarEmail || userUserEmail || ''} onChange={(e) => setUserMilitarEmail(e.target.value)} placeholder="email@militar" className="border-indigo-200 bg-slate-50" />
-                          <p className="text-xs text-slate-500 mt-1.5 font-medium">E-mail principal do acesso: {userUserEmail || 'sem e-mail preenchido'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
-                  </>
+                        {(userAccessMode === 'setor' || userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
+                          <div className="grid grid-cols-1 gap-5 rounded-lg border border-blue-100 bg-white p-4 md:grid-cols-3">
+                            <div>
+                              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Setor (Obrigatório)</label>
+                              <Select value={userGrupamentoId || '_nenhum'} onValueChange={(v) => { setUserGrupamentoId(v === '_nenhum' ? '' : v); setUserSubgrupamentoId(''); setUserUnidadeId(''); }}>
+                                <SelectTrigger><SelectValue placeholder="Selecione um setor..." /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                  {grupamentos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}{g.sigla ? ` (${g.sigla})` : ''}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              {userAccessMode === 'setor' && userGrupamentoId && !userSubgrupamentoId && <p className="mt-2 text-xs font-medium text-blue-600">✓ Terá visão de dados deste setor inteiro.</p>}
+                            </div>
+
+                            {(userAccessMode === 'subsetor' || userAccessMode === 'unidade') && (
+                              <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Subsetor/Seção (Obrigatório)</label>
+                                <Select
+                                  value={userSubgrupamentoId || '_nenhum'}
+                                  onValueChange={(v) => { setUserSubgrupamentoId(v === '_nenhum' ? '' : v); setUserUnidadeId(''); }}
+                                  disabled={!userGrupamentoId || subgrupamentosFilhos.length === 0}
+                                >
+                                  <SelectTrigger><SelectValue placeholder={!userGrupamentoId ? 'Selecione o setor primeiro' : (subgrupamentosFilhos.length === 0 ? 'Sem subsetores' : 'Selecione o subsetor')} /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                    {subgrupamentosFilhos.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}{s.sigla ? ` (${s.sigla})` : ''}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                {userAccessMode === 'subsetor' && userSubgrupamentoId && <p className="mt-2 text-xs font-medium text-blue-600">✓ Terá visão de dados apenas deste subsetor e suas unidades.</p>}
+                              </div>
+                            )}
+
+                            {userAccessMode === 'unidade' && (
+                              <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Unidade (Obrigatório)</label>
+                                <Select
+                                  value={userUnidadeId || '_nenhum'}
+                                  onValueChange={(v) => setUserUnidadeId(v === '_nenhum' ? '' : v)}
+                                  disabled={!userSubgrupamentoId || unidadesFilhas.length === 0}
+                                >
+                                  <SelectTrigger><SelectValue placeholder={!userSubgrupamentoId ? 'Selecione o subsetor' : (unidadesFilhas.length === 0 ? 'Sem unidades filhas' : 'Selecione a unidade')} /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                    {unidadesFilhas.map((u) => <SelectItem key={u.id} value={u.id}>{u.nome}{u.sigla ? ` (${u.sigla})` : ''}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                                {userUnidadeId && <p className="mt-2 text-xs font-medium text-blue-600">✓ Terá visão estrita e limitada a esta unidade.</p>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {userAccessMode === 'proprio' && (
+                        <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5">
+                          <div className="mb-4 flex items-start justify-between">
+                            <h3 className="flex items-center gap-2 text-base font-bold text-slate-800">
+                              <Users className="h-5 w-5 text-indigo-500" />
+                              Vínculo do Próprio Militar
+                            </h3>
+                            <Badge variant="outline" className="border-indigo-200 bg-indigo-100 text-xs text-indigo-800">Modo Próprio</Badge>
+                          </div>
+
+                          <p className="mb-4 text-sm text-slate-600">
+                            Neste modo, o usuário não gerencia setores. Ele acessa apenas os próprios dados (avaliações, assentamentos pessoais, atestados, etc). Para isso, <b>é obrigatório vinculá-lo a um militar cadastrado</b>.
+                          </p>
+
+                          <div className="grid grid-cols-1 gap-5 rounded-lg border border-indigo-50 bg-white p-4 md:grid-cols-2">
+                            <div>
+                              <label className="mb-1.5 block text-sm font-semibold text-slate-700">Militar Vinculado <span className="text-red-500">*</span></label>
+                              <Select value={userMilitarId || '_nenhum'} onValueChange={(v) => {
+                                const militarId = v === '_nenhum' ? '' : v;
+                                setUserMilitarId(militarId);
+                                const militar = militares.find((m) => m.id === militarId);
+                                setUserMilitarEmail(militar?.email || militar?.email_particular || militar?.email_funcional || selectedUser?.email || '');
+                              }}>
+                                <SelectTrigger className="border-indigo-200"><SelectValue placeholder="Selecione o militar" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="_nenhum">— Selecione —</SelectItem>
+                                  {militaresOrdenados.map((m) => (
+                                    <SelectItem key={m.id} value={m.id}>{m.posto_graduacao ? `${m.posto_graduacao} ` : ''}{m.nome_completo} {m.matricula ? `- Mat ${m.matricula}` : ''}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-sm font-semibold text-slate-700">E-mail Secundário do Vínculo</label>
+                              <Input value={userMilitarEmail || userUserEmail || ''} onChange={(e) => setUserMilitarEmail(e.target.value)} placeholder="email@militar" className="border-indigo-200 bg-slate-50" />
+                              <p className="mt-1.5 text-xs font-medium text-slate-500">E-mail principal do acesso: {userUserEmail || 'sem e-mail preenchido'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {activePanel === 'perfil' && (
-                  <>
-                  {/* Bloco 4: Perfil de Permissões */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-4">
-                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <Shield className="w-5 h-5 text-emerald-500" />
-                      Perfil Base
-                    </h3>
-                    
-                    <div className="flex flex-col sm:flex-row gap-4 items-end bg-white p-4 rounded-lg border border-slate-200">
-                      <div className="flex-1 w-full">
-                        <label className="text-sm font-semibold text-slate-700 block mb-1.5">Carregar permissões de um Perfil existente</label>
-                        <Select value={selectedProfileId} onValueChange={(v) => setSelectedProfileId(v)}>
-                          <SelectTrigger><SelectValue placeholder="Escolha um perfil para aplicar" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="_nenhum">— Personalizado / Não aplicar perfil —</SelectItem>
-                            {perfis.map(p => (
-                              <SelectItem key={p.id} value={p.id}>{p.nome_perfil}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
+                        <Shield className="h-5 w-5 text-emerald-500" />
+                        Perfil Base
+                      </h3>
+
+                      <div className="flex flex-col items-end gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row">
+                        <div className="w-full flex-1">
+                          <label className="mb-1.5 block text-sm font-semibold text-slate-700">Carregar permissões de um Perfil existente</label>
+                          <Select value={selectedProfileId} onValueChange={(v) => setSelectedProfileId(v)}>
+                            <SelectTrigger><SelectValue placeholder="Escolha um perfil para aplicar" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="_nenhum">— Personalizado / Não aplicar perfil —</SelectItem>
+                              {perfis.map((p) => <SelectItem key={p.id} value={p.id}>{p.nome_perfil}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          variant="secondary"
+                          onClick={aplicarPerfil}
+                          disabled={selectedProfileId === '_nenhum'}
+                          className="w-full shrink-0 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 sm:w-auto"
+                        >
+                          <Settings2 className="mr-2 h-4 w-4" /> Aplicar Perfil
+                        </Button>
                       </div>
-                      <Button 
-                        variant="secondary" 
-                        onClick={aplicarPerfil}
-                        disabled={selectedProfileId === '_nenhum'}
-                        className="w-full sm:w-auto shrink-0 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                      >
-                        <Settings2 className="w-4 h-4 mr-2" /> Aplicar Perfil
-                      </Button>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-3 flex items-center gap-1">
-                      <Info className="w-4 h-4" /> Selecionar um perfil apenas exibe a prévia abaixo. As permissões do formulário só mudam ao clicar em <b>Aplicar Perfil</b>.
-                    </p>
+                      <p className="mt-3 flex items-center gap-1 text-xs text-slate-500">
+                        <Info className="h-4 w-4" /> Selecionar um perfil apenas exibe a prévia abaixo. As permissões do formulário só mudam ao clicar em <b>Aplicar Perfil</b>.
+                      </p>
 
-                    {selectedProfilePreview && (
-                      <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
-                        <h4 className="text-sm font-bold text-emerald-800 mb-3 flex items-center gap-2">
-                          <BadgeAlert className="w-4 h-4" />
-                          Prévia do Perfil: {selectedProfilePreview.nome_perfil}
-                        </h4>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="bg-white border border-emerald-100 rounded-lg p-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">Módulos do perfil</p>
-                            <div className="space-y-2">
-                              {modulosList.map((mod) => (
-                                <label key={`preview_mod_${mod.key}`} className="flex items-center gap-2 text-sm text-slate-700">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedProfilePreview[mod.key] === true}
-                                    readOnly
-                                    className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
-                                  />
-                                  <span>{mod.label}</span>
-                                </label>
-                              ))}
+                      {selectedProfilePreview && (
+                        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+                          <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-emerald-800">
+                            <BadgeAlert className="h-4 w-4" />
+                            Prévia do Perfil: {selectedProfilePreview.nome_perfil}
+                          </h4>
+                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div className="rounded-lg border border-emerald-100 bg-white p-3">
+                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Módulos do perfil</p>
+                              <div className="space-y-2">
+                                {modulosList.map((mod) => (
+                                  <label key={`preview_mod_${mod.key}`} className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input type="checkbox" checked={selectedProfilePreview[mod.key] === true} readOnly className="h-4 w-4 rounded border-slate-300 text-blue-600 pointer-events-none" />
+                                    <span>{mod.label}</span>
+                                  </label>
+                                ))}
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="bg-white border border-orange-100 rounded-lg p-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 mb-2">Ações sensíveis do perfil</p>
-                            <div className="space-y-2">
-                              {acoesSensiveis.map((act) => (
-                                <label key={`preview_act_${act.key}`} className="flex items-center gap-2 text-sm text-slate-700">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedProfilePreview[act.key] === true}
-                                    readOnly
-                                    className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
-                                  />
-                                  <span>{act.label}</span>
-                                </label>
-                              ))}
+                            <div className="rounded-lg border border-orange-100 bg-white p-3">
+                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-orange-700">Ações sensíveis do perfil</p>
+                              <div className="space-y-2">
+                                {acoesSensiveis.map((act) => (
+                                  <label key={`preview_act_${act.key}`} className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input type="checkbox" checked={selectedProfilePreview[act.key] === true} readOnly className="h-4 w-4 rounded border-orange-300 text-orange-600 pointer-events-none" />
+                                    <span>{act.label}</span>
+                                  </label>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-
-                  </>
+                      )}
+                    </div>
                   )}
 
                   {activePanel === 'matriz' && (
-                  <>
-                  {/* Bloco 5: Matriz de Permissões */}
-                  <div className="bg-white border border-slate-200 rounded-xl p-4">
-                    <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                      Matriz de Permissões por Categoria e Módulo
-                    </h3>
-                    <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] gap-4 items-start">
-                      <aside className="bg-slate-50 border border-slate-200 rounded-xl p-2 h-fit sticky top-24">
-                        {permissionStructure.map((categoryGroup) => {
-                          const isActive = activeCategoryGroup?.category === categoryGroup.category;
-                          return (
-                            <button
-                              type="button"
-                              key={categoryGroup.category}
-                              onClick={() => setSelectedCategory(categoryGroup.category)}
-                              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition mb-1 ${isActive ? 'bg-[#1e3a5f] text-white shadow-sm' : 'text-slate-700 hover:bg-white hover:text-slate-900'}`}
-                            >
-                              <div className="font-semibold">{categoryGroup.category}</div>
-                              <div className={`text-[11px] ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>{categoryGroup.modules.length} módulos</div>
-                            </button>
-                          );
-                        })}
-                      </aside>
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
+                        <span className="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
+                        Matriz de Permissões por Categoria e Módulo
+                      </h3>
 
-                      <div className="space-y-3 min-w-0">
-                        <div className="px-1">
-                          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Categoria selecionada</h4>
-                          <p className="text-base font-semibold text-slate-900">{activeCategoryGroup?.category}</p>
-                        </div>
-                        {activeCategoryGroup?.modules.map((mod) => {
-                              const isModuleEnabled = userPermissions[mod.key] === true;
-                              const moduleOverride = selectedProfilePreview && (selectedProfilePreview[mod.key] === true) !== isModuleEnabled;
-                              return (
-                                <div key={mod.key} className={`rounded-xl border ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
-                                  <div
-                                    className="p-3.5 flex flex-wrap items-center gap-3 justify-between cursor-pointer"
-                                    onClick={() => setUserPermissions((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }))}
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isModuleEnabled ? 'bg-[#1e3a5f]' : 'bg-slate-300'}`}>
-                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${isModuleEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
-                                      </span>
-                                      <label className="text-sm font-semibold text-slate-800 pointer-events-none">{mod.label}</label>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      {moduleOverride && (
-                                        <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded uppercase tracking-wide">Modificado</span>
-                                      )}
-                                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isModuleEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                                        {isModuleEnabled ? 'Ativo' : 'Inativo'}
-                                      </span>
+                      <div className="grid items-start gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+                        <aside className="sticky top-24 h-fit rounded-xl border border-slate-200 bg-slate-50 p-2">
+                          {permissionStructure.map((categoryGroup) => {
+                            const isActive = activeCategoryGroup?.category === categoryGroup.category;
+                            return (
+                              <button
+                                type="button"
+                                key={categoryGroup.category}
+                                onClick={() => setSelectedCategory(categoryGroup.category)}
+                                className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-sm transition ${isActive ? 'bg-[#1e3a5f] text-white shadow-sm' : 'text-slate-700 hover:bg-white hover:text-slate-900'}`}
+                              >
+                                <div className="font-semibold">{categoryGroup.category}</div>
+                                <div className={`text-[11px] ${isActive ? 'text-slate-200' : 'text-slate-500'}`}>{categoryGroup.modules.length} módulos</div>
+                              </button>
+                            );
+                          })}
+                        </aside>
+
+                        <div className="min-w-0 space-y-3">
+                          <div className="px-1">
+                            <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Categoria selecionada</h4>
+                            <p className="text-base font-semibold text-slate-900">{activeCategoryGroup?.category}</p>
+                          </div>
+
+                          {activeCategoryGroup?.modules.map((mod) => {
+                            const isModuleEnabled = userPermissions[mod.key] === true;
+                            const moduleOverride = selectedProfilePreview && (selectedProfilePreview[mod.key] === true) !== isModuleEnabled;
+
+                            return (
+                              <div key={mod.key} className={`rounded-xl border ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
+                                <div
+                                  className="flex cursor-pointer flex-wrap items-center justify-between gap-3 p-3.5"
+                                  onClick={() => setUserPermissions((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }))}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isModuleEnabled ? 'bg-[#1e3a5f]' : 'bg-slate-300'}`}>
+                                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${isModuleEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                                    </span>
+                                    <label className="pointer-events-none text-sm font-semibold text-slate-800">{mod.label}</label>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {moduleOverride && <span className="rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-700 bg-orange-100">Modificado</span>}
+                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${isModuleEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                                      {isModuleEnabled ? 'Ativo' : 'Inativo'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {mod.actions.length > 0 && isModuleEnabled && (
+                                  <div className="px-3.5 pb-3.5">
+                                    <div className="grid grid-cols-1 gap-2 border-t border-blue-100 pt-3 xl:grid-cols-2">
+                                      {mod.actions.map((act) => {
+                                        const isActionEnabled = userPermissions[act.key] === true;
+                                        const actionOverride = selectedProfilePreview && (selectedProfilePreview[act.key] === true) !== isActionEnabled;
+                                        return (
+                                          <div
+                                            key={act.key}
+                                            className={`flex cursor-pointer items-center justify-between gap-3 rounded-md border p-2 ${isActionEnabled ? 'border-orange-200 bg-orange-50' : 'border-slate-200 bg-white'} ${act.sensitive ? 'ring-1 ring-orange-100' : ''}`}
+                                            onClick={() => setUserPermissions((prev) => ({ ...prev, [act.key]: !prev[act.key] }))}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <input type="checkbox" checked={isActionEnabled} readOnly className="pointer-events-none h-4 w-4 rounded border-orange-300 text-orange-600" />
+                                              <span className="text-sm text-slate-700">{act.label}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              {act.sensitive && <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">Sensível</span>}
+                                              {actionOverride && <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">Mod.</span>}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
-
-                                  {mod.actions.length > 0 && isModuleEnabled && (
-                                    <div className="px-3.5 pb-3.5">
-                                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2 border-t border-blue-100 pt-3">
-                                        {mod.actions.map((act) => {
-                                          const isActionEnabled = userPermissions[act.key] === true;
-                                          const actionOverride = selectedProfilePreview && (selectedProfilePreview[act.key] === true) !== isActionEnabled;
-                                          return (
-                                            <div
-                                              key={act.key}
-                                              className={`flex items-center justify-between gap-3 p-2 rounded-md border cursor-pointer ${isActionEnabled ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'} ${act.sensitive ? 'ring-1 ring-orange-100' : ''}`}
-                                              onClick={() => setUserPermissions((prev) => ({ ...prev, [act.key]: !prev[act.key] }))}
-                                            >
-                                              <div className="flex items-center gap-2">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={isActionEnabled}
-                                                  readOnly
-                                                  className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
-                                                />
-                                                <span className="text-sm text-slate-700">{act.label}</span>
-                                              </div>
-                                              <div className="flex items-center gap-1">
-                                                {act.sensitive && <span className="text-[10px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded">Sensível</span>}
-                                                {actionOverride && <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">Mod.</span>}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  </>
                   )}
-
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center p-12 min-h-[520px]">
-                <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-4">
-                  <UserPlus className="w-8 h-8 ml-1" />
+              <div className="flex min-h-[520px] flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-12 shadow-sm">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 text-slate-300">
+                  <UserPlus className="ml-1 h-8 w-8" />
                 </div>
-                <h2 className="text-lg font-bold text-slate-700 mb-2">Nenhum usuário selecionado</h2>
-                <p className="text-slate-500 text-center max-w-sm mb-6">
+                <h2 className="mb-2 text-lg font-bold text-slate-700">Nenhum usuário selecionado</h2>
+                <p className="mb-6 max-w-sm text-center text-slate-500">
                   Selecione um usuário na lista à esquerda para gerenciar seus acessos, ou crie um novo.
                 </p>
-                <Button onClick={handleCreateNew} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-                  <Plus className="w-4 h-4 mr-2" /> Cadastrar Novo Usuário
+                <Button onClick={handleCreateNew} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
+                  <Plus className="mr-2 h-4 w-4" /> Cadastrar Novo Usuário
                 </Button>
               </div>
             )}
