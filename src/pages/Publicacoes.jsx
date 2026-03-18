@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, Lock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
@@ -218,6 +219,7 @@ export default function Publicacoes() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState('all');
+  const [origemFilter, setOrigemFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
@@ -252,12 +254,19 @@ export default function Publicacoes() {
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
   }, [registrosLivro, publicacoesExOfficio, atestados]);
 
+
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
       const registroAtual = registros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
 
-      if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
+      if (tipo === 'ex-officio') {
+        // Se for uma interrupção de férias, invalidar a query de férias para refletir o status
+        if (payloadFinal.tipo === 'Interrupção de Férias') {
+          queryClient.invalidateQueries({ queryKey: ['ferias'] });
+        }
+        return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
+      }
       if (tipo === 'atestado') return base44.entities.Atestado.update(id, payloadFinal);
 
       await base44.entities.RegistroLivro.update(id, payloadFinal);
@@ -293,8 +302,8 @@ export default function Publicacoes() {
         const origemTipo = origemTipoHint || detectarTipo(refId);
         const entityOriginal =
           origemTipo === 'atestado' ? base44.entities.Atestado :
-          origemTipo === 'livro' ? base44.entities.RegistroLivro :
-          base44.entities.PublicacaoExOfficio;
+            origemTipo === 'livro' ? base44.entities.RegistroLivro :
+              base44.entities.PublicacaoExOfficio;
 
         const originais = await entityOriginal.filter({ id: refId });
         const original = originais[0];
@@ -372,9 +381,14 @@ export default function Publicacoes() {
   });
 
   const filteredRegistros = useMemo(() => {
-    return registros.filter((r) => {
+    const source = origemFilter === 'todos'
+      ? registros
+      : registros.filter(r => r.origem_tipo === origemFilter);
+
+    return source.filter((r) => {
       const matchesStatus =
         statusFilter === 'all' || r.status_calculado === statusFilter;
+
 
       const termo = searchTerm.toLowerCase().trim();
       const matchesSearch =
@@ -391,17 +405,22 @@ export default function Publicacoes() {
 
       return matchesStatus && matchesSearch;
     });
-  }, [registros, statusFilter, searchTerm]);
+  }, [registros, statusFilter, searchTerm, origemFilter]);
 
   const stats = useMemo(() => {
+    const source = origemFilter === 'todos'
+      ? registros
+      : registros.filter(r => r.origem_tipo === origemFilter);
+
     return {
-      total: registros.length,
-      aguardandoNota: registros.filter(r => r.status_calculado === 'Aguardando Nota').length,
-      aguardandoPublicacao: registros.filter(r => r.status_calculado === 'Aguardando Publicação').length,
-      publicados: registros.filter(r => r.status_calculado === 'Publicado').length,
-      inconsistentes: registros.filter(r => r.status_calculado === 'Inconsistente').length
+      total: source.length,
+      aguardandoNota: source.filter(r => r.status_calculado === 'Aguardando Nota').length,
+      aguardandoPublicacao: source.filter(r => r.status_calculado === 'Aguardando Publicação').length,
+      publicados: source.filter(r => r.status_calculado === 'Publicado').length,
+      inconsistentes: source.filter(r => r.status_calculado === 'Inconsistente').length
     };
-  }, [registros]);
+  }, [registros, origemFilter]);
+
 
   const handleUpdate = (id, data, tipo) => {
     updateMutation.mutate({ id, data, tipo });
@@ -477,6 +496,22 @@ export default function Publicacoes() {
     <div className="min-h-screen bg-slate-100">
       <div className="px-4 py-6 lg:px-8">
         <div className="flex flex-col gap-5">
+          <Tabs value={origemFilter} onValueChange={setOrigemFilter}>
+            <TabsList className="grid w-full grid-cols-4 max-w-lg mx-auto bg-slate-200/80">
+              <TabsTrigger value="todos">Todos</TabsTrigger>
+              <TabsTrigger value="ex-officio">Ex Officio</TabsTrigger>
+              <TabsTrigger value="livro">Livro</TabsTrigger>
+              <TabsTrigger value="atestado">Atestados</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-[#1e3a5f]">Controle de Publicações</h1>
+            <p className="text-sm text-slate-500">
+              Gerencie notas e publicações de todos os módulos do sistema
+            </p>
+          </div>
+
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex-1">
               <div className="relative">
