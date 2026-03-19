@@ -246,9 +246,9 @@ export default function CadastrarRegistroRP() {
   }, [formData.tipo_registro, moduloAtual, templatesAtivos]);
 
   const templateObrigatorioAusente = useMemo(() => {
-    if (!formData.tipo_registro) return false;
+    if (isEditing || !formData.tipo_registro) return false;
     return tipoExigeTemplate(formData.tipo_registro) && !templateAtivoSelecionado;
-  }, [formData.tipo_registro, templateAtivoSelecionado]);
+  }, [isEditing, formData.tipo_registro, templateAtivoSelecionado]);
 
   // Populate form when editing
   useEffect(() => {
@@ -345,7 +345,17 @@ export default function CadastrarRegistroRP() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (step !== 4) return;
-    if (templateObrigatorioAusente) return;
+
+    const moduloValidacao = getModuloByTipo(formData.tipo_registro, tiposCustom);
+    const templateAtivoNoSubmit = getTemplateAtivoPorTipo(
+      formData.tipo_registro,
+      moduloValidacao,
+      templatesAtivos,
+    );
+    const templateObrigatorioAusenteNoSubmit =
+      !isEditing && tipoExigeTemplate(formData.tipo_registro) && !templateAtivoNoSubmit;
+
+    if (templateObrigatorioAusenteNoSubmit) return;
 
     const payload = {
       ...formData,
