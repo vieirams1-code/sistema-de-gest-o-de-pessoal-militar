@@ -266,22 +266,37 @@ export default function CadastrarRegistroRP() {
       const modulo = getModuloByTipo(data.tipo_registro, tiposCustom);
       const isLivro = modulo === MODULO_LIVRO;
 
+      const payloadLivro = {
+        ...data,
+        origem: data.origem || 'Manual',
+      };
+
+      const { tipo_registro, ...exOfficioBase } = data;
+      const payloadExOfficio = {
+        ...exOfficioBase,
+        tipo: tipo_registro || data.tipo || '',
+        data_publicacao: exOfficioBase.data_publicacao || data.data_registro || '',
+        status: exOfficioBase.status || 'Aguardando Nota',
+      };
+
       if (isEditing) {
         if (moduloOrigemEdicao === 'Livro') {
-          return base44.entities.RegistroLivro.update(registroId, data);
+          return base44.entities.RegistroLivro.update(registroId, payloadLivro);
         }
 
-        return base44.entities.PublicacaoExOfficio.update(registroId, data);
-      } else {
-        if (isLivro) {
-          return base44.entities.RegistroLivro.create(data);
-        } else {
-          return base44.entities.PublicacaoExOfficio.create({ ...data, tipo: data.tipo_registro });
-        }
+        return base44.entities.PublicacaoExOfficio.update(registroId, payloadExOfficio);
       }
+
+      if (isLivro) {
+        return base44.entities.RegistroLivro.create(payloadLivro);
+      }
+
+      return base44.entities.PublicacaoExOfficio.create(payloadExOfficio);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       navigate(createPageUrl('RP'));
     },
   });
