@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, BookOpenText, Filter } from 'lucide-react';
+import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, BookOpenText, Filter, Sparkles, LayoutGrid, Inbox } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
@@ -34,7 +34,6 @@ const ABAS_ORIGEM = [
   { key: 'livro', label: 'Livro' },
   { key: 'atestado', label: 'Atestados' },
 ];
-
 
 function detectarOrigemTipo(registro) {
   if (registro.origem_tipo) return registro.origem_tipo;
@@ -231,7 +230,6 @@ export default function Publicacoes() {
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
     queryFn: () => getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
-    // Só dispara após resolução de acesso e confirmação de permissão
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
@@ -239,14 +237,14 @@ export default function Publicacoes() {
     queryKey: ['publicacoes-ex-officio', isAdmin],
     queryFn: async () => {
       if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
-      
+
       const scopeFilters = getMilitarScopeFilters();
       if (!scopeFilters.length) return [];
       const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
       const militaresAcess = militarQueries.flat();
       const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
       if (!militarIds.length) return [];
-      
+
       const queryPromises = militarIds.map(id => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date'));
       const arrays = await Promise.all(queryPromises);
       const m = new Map();
@@ -263,14 +261,14 @@ export default function Publicacoes() {
         const all = await base44.entities.Atestado.list('-created_date');
         return all.filter(a => a.nota_para_bg || a.numero_bg);
       }
-      
+
       const scopeFilters = getMilitarScopeFilters();
       if (!scopeFilters.length) return [];
       const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
       const militaresAcess = militarQueries.flat();
       const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
       if (!militarIds.length) return [];
-      
+
       const queryPromises = militarIds.map(id => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
       const arrays = await Promise.all(queryPromises);
       const m = new Map();
@@ -386,7 +384,6 @@ export default function Publicacoes() {
           base44.entities.PublicacaoExOfficio
         );
 
-
         return base44.entities.PublicacaoExOfficio.delete(id);
       }
 
@@ -451,7 +448,6 @@ export default function Publicacoes() {
   }, [registrosDaAbaAtiva]);
 
   const handleUpdate = (id, data, tipo) => {
-    // Verificação explícita: atualizar BG/nota exige permissão de publicar
     if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) {
       alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
       return;
@@ -529,130 +525,164 @@ export default function Publicacoes() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#1e3a5f]/15 bg-white px-3 py-1 text-xs font-medium text-[#1e3a5f] shadow-sm">
-              <BookOpenText className="h-3.5 w-3.5" />
-              Controle de Publicações
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Publicações</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Acompanhe publicações do Livro, Ex Officio e Atestados com o mesmo padrão visual e foco operacional do módulo RP.
-            </p>
-          </div>
+        <section className="mb-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(30,58,95,0.12),_transparent_45%),linear-gradient(135deg,_#ffffff_0%,_#f8fafc_55%,_#eef2ff_100%)] px-6 py-6 lg:px-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#1e3a5f]/15 bg-white px-3 py-1 text-xs font-medium text-[#1e3a5f] shadow-sm">
+                  <BookOpenText className="h-3.5 w-3.5" />
+                  Controle de Publicações
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Publicações</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                  Consolide Livro, Ex Officio e Atestados no mesmo fluxo operacional, mantendo a leitura visual, a priorização e o acompanhamento rápido no padrão do módulo RP.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <InfoPill icon={LayoutGrid} label={`${stats.total} registros na origem selecionada`} />
+                  <InfoPill icon={Sparkles} label={`${filteredRegistros.length} itens compatíveis com os filtros`} />
+                  {stats.inconsistentes > 0 && (
+                    <InfoPill icon={ShieldAlert} label={`${stats.inconsistentes} inconsistência(s) para conferência`} tone="danger" />
+                  )}
+                </div>
+              </div>
 
-          <div className="flex flex-wrap gap-2">
-            {canAccessAction('admin_mode') && (
-              <Button
-                variant="outline"
-                onClick={() => setModoAdmin((v) => !v)}
-                className={modoAdmin
-                  ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-                  : 'border-red-200 text-red-700 hover:bg-red-50'}
-                title={modoAdmin ? 'Desativar modo admin' : 'Ativar modo admin para ações sensíveis'}
-              >
-                <ShieldAlert className="mr-2 h-4 w-4" />
-                {modoAdmin ? 'Modo admin ativo' : 'Modo admin'}
-              </Button>
-            )}
-
-            <Button asChild variant="outline">
-              <button onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nova publicação
-              </button>
-            </Button>
-          </div>
-        </div>
-
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard icon={FileText} label="Total" value={stats.total} helper="Todos os registros visíveis" />
-          <MetricCard icon={Clock} label="Aguardando nota" value={stats.aguardandoNota} helper="Dependem de nota para BG" />
-          <MetricCard icon={AlertCircle} label="Aguardando publicação" value={stats.aguardandoPublicacao} helper="Prontos para boletim" />
-          <MetricCard icon={CheckCircle} label="Publicados" value={stats.publicados} helper="Já lançados em BG" />
-          <MetricCard icon={ShieldAlert} label="Inconsistências" value={stats.inconsistentes} helper="Requer conferência" />
-        </div>
-
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Filter className="h-3.5 w-3.5" />
-            Filtros operacionais
-          </div>
-
-          <div className="grid gap-3 lg:grid-cols-[1.25fr,0.75fr,1fr]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Status</SelectItem>
-                <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                <SelectItem value="Publicado">Publicado</SelectItem>
-                <SelectItem value="Inconsistente">Inconsistente</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="flex flex-wrap gap-2">
-              {ABAS_ORIGEM.map((aba) => {
-                const totalAba = aba.key === 'all'
-                  ? registros.length
-                  : registros.filter((registro) => registro.origem_tipo === aba.key).length;
-                const ativa = abaOrigemAtiva === aba.key;
-
-                return (
-                  <button
-                    key={aba.key}
-                    type="button"
-                    onClick={() => setAbaOrigemAtiva(aba.key)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${ativa
-                      ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-sm'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-900'}`}
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                {canAccessAction('admin_mode') && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setModoAdmin((v) => !v)}
+                    className={modoAdmin
+                      ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                      : 'border-red-200 text-red-700 hover:bg-red-50'}
+                    title={modoAdmin ? 'Desativar modo admin' : 'Ativar modo admin para ações sensíveis'}
                   >
-                    <span>{aba.label}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${ativa ? 'bg-white/15 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
-                      {totalAba}
-                    </span>
+                    <ShieldAlert className="mr-2 h-4 w-4" />
+                    {modoAdmin ? 'Modo admin ativo' : 'Modo admin'}
+                  </Button>
+                )}
+
+                <Button asChild variant="outline">
+                  <button onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nova publicação
                   </button>
-                );
-              })}
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-            <span>{filteredRegistros.length} registro(s) encontrado(s)</span>
-            {stats.inconsistentes > 0 && (
-              <span className="font-medium text-red-600">
-                {stats.inconsistentes} registro(s) inconsistente(s) na aba selecionada
-              </span>
-            )}
+          <div className="grid gap-4 border-t border-slate-100 bg-slate-50/70 px-6 py-5 md:grid-cols-2 xl:grid-cols-5 lg:px-8">
+            <MetricCard icon={FileText} label="Total" value={stats.total} helper="Todos os registros visíveis" />
+            <MetricCard icon={Clock} label="Aguardando nota" value={stats.aguardandoNota} helper="Dependem de nota para BG" tone="amber" />
+            <MetricCard icon={AlertCircle} label="Aguardando publicação" value={stats.aguardandoPublicacao} helper="Prontos para boletim" tone="blue" />
+            <MetricCard icon={CheckCircle} label="Publicados" value={stats.publicados} helper="Já lançados em BG" tone="emerald" />
+            <MetricCard icon={ShieldAlert} label="Inconsistências" value={stats.inconsistentes} helper="Requer conferência" tone="red" />
           </div>
-        </div>
+        </section>
+
+        <section className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
+          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <Filter className="h-3.5 w-3.5" />
+                Filtros operacionais
+              </div>
+              <p className="mt-2 text-sm text-slate-500">
+                Refine a visualização sem alterar o fluxo atual de cadastro, publicação ou conferência.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <span className="font-semibold text-slate-900">{filteredRegistros.length}</span> registro(s) encontrado(s)
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1.25fr,0.75fr,1fr]">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Busca</label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-11 rounded-xl border-slate-200 pl-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-11 rounded-xl border-slate-200">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Status</SelectItem>
+                  <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
+                  <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
+                  <SelectItem value="Publicado">Publicado</SelectItem>
+                  <SelectItem value="Inconsistente">Inconsistente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Origem</label>
+              <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                {ABAS_ORIGEM.map((aba) => {
+                  const totalAba = aba.key === 'all'
+                    ? registros.length
+                    : registros.filter((registro) => registro.origem_tipo === aba.key).length;
+                  const ativa = abaOrigemAtiva === aba.key;
+
+                  return (
+                    <button
+                      key={aba.key}
+                      type="button"
+                      onClick={() => setAbaOrigemAtiva(aba.key)}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${ativa
+                        ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-900'}`}
+                    >
+                      <span>{aba.label}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${ativa ? 'bg-white/15 text-white' : 'border border-slate-200 bg-slate-50 text-slate-500'}`}>
+                        {totalAba}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {stats.inconsistentes > 0 && (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {stats.inconsistentes} registro(s) inconsistente(s) na aba selecionada exigem conferência operacional.
+            </div>
+          )}
+        </section>
 
         {isLoading ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
             Carregando registros...
           </div>
         ) : filteredRegistros.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
-            <FileText className="mx-auto mb-3 h-8 w-8 text-slate-400" />
-            <h3 className="text-base font-semibold text-slate-700">Nenhum registro encontrado</h3>
-            <p className="mt-1 text-sm text-slate-500">
+          <section className="rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+              <Inbox className="h-8 w-8" />
+            </div>
+            <h3 className="mt-5 text-lg font-semibold text-slate-800">Nenhum registro encontrado</h3>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
               {searchTerm || statusFilter !== 'all'
-                ? 'Ajuste os filtros para localizar publicações compatíveis com a busca.'
-                : 'Os registros de publicação aparecerão aqui conforme forem disponibilizados.'}
+                ? 'Ajuste os filtros para localizar publicações compatíveis com a busca atual.'
+                : 'Os registros de publicação aparecerão aqui conforme forem disponibilizados pelas origens integradas do painel.'}
             </p>
-          </div>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <InfoPill icon={Search} label="Revise os termos da busca" />
+              <InfoPill icon={Filter} label="Valide status e origem selecionados" />
+            </div>
+          </section>
         ) : (
           <div className="space-y-8">
             {grupos.map((grupo) => {
@@ -691,7 +721,7 @@ export default function Publicacoes() {
       {familiaPanel.open && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 z-40"
+            className="fixed inset-0 z-40 bg-black/30"
             onClick={() => setFamiliaPanel({ open: false, registro: null })}
           />
           <FamiliaPublicacaoPanel
@@ -705,14 +735,58 @@ export default function Publicacoes() {
   );
 }
 
-function MetricCard({ icon: Icon, label, value, helper }) {
+function InfoPill({ icon: Icon, label, tone = 'default' }) {
+  const toneClasses = {
+    default: 'border-slate-200 bg-white text-slate-600',
+    danger: 'border-red-200 bg-red-50 text-red-700',
+  };
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="rounded-xl bg-[#1e3a5f]/10 p-2 text-[#1e3a5f]">
+    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm ${toneClasses[tone] || toneClasses.default}`}>
+      <Icon className="h-3.5 w-3.5" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, helper, tone = 'slate' }) {
+  const toneClasses = {
+    slate: {
+      icon: 'bg-[#1e3a5f]/10 text-[#1e3a5f]',
+      value: 'text-[#1e3a5f]',
+      ring: 'border-slate-200 bg-white',
+    },
+    amber: {
+      icon: 'bg-amber-100 text-amber-700',
+      value: 'text-amber-700',
+      ring: 'border-amber-200 bg-white',
+    },
+    blue: {
+      icon: 'bg-blue-100 text-blue-700',
+      value: 'text-blue-700',
+      ring: 'border-blue-200 bg-white',
+    },
+    emerald: {
+      icon: 'bg-emerald-100 text-emerald-700',
+      value: 'text-emerald-700',
+      ring: 'border-emerald-200 bg-white',
+    },
+    red: {
+      icon: 'bg-red-100 text-red-700',
+      value: 'text-red-700',
+      ring: 'border-red-200 bg-white',
+    },
+  };
+
+  const palette = toneClasses[tone] || toneClasses.slate;
+
+  return (
+    <div className={`rounded-2xl border p-4 shadow-sm ${palette.ring}`}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className={`rounded-xl p-2 ${palette.icon}`}>
           <Icon className="h-4 w-4" />
         </div>
-        <span className="text-2xl font-bold text-[#1e3a5f]">{value}</span>
+        <span className={`text-2xl font-bold ${palette.value}`}>{value}</span>
       </div>
       <p className="text-sm font-medium text-slate-700">{label}</p>
       <p className="mt-1 text-xs text-slate-500">{helper}</p>
