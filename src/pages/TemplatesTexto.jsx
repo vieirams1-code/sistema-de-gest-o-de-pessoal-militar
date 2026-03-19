@@ -481,6 +481,16 @@ export default function TemplatesTexto() {
   const saveMutation = useMutation({
     mutationFn: (data) => {
       if (!canGerirTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
+      const templatesParaValidacao = [
+        ...templates.filter((template) => template.id !== data.id),
+        { ...data, modulo: serializeTemplateModulo(data.modulo) },
+      ];
+      const conflitoTemplate = getConflitoTemplatePorTipo(data.tipo_registro, templatesParaValidacao);
+
+      if (conflitoTemplate.temConflito) {
+        throw new Error('Já existe template ativo para este tipo em outro módulo. Resolva o conflito antes de salvar.');
+      }
+
       const payload = {
         ...data,
         modulo: serializeTemplateModulo(data.modulo),
@@ -579,7 +589,7 @@ export default function TemplatesTexto() {
     const conflitoGlobal = getConflitoTemplatePorTipo(editingTemplate.tipo_registro, templatesParaValidacao);
 
     if (conflitoGlobal.temConflito) {
-      return 'Já existe template ativo para este tipo em outro módulo. Resolva antes de cadastrar.';
+      return 'Já existe template ativo para este tipo em outro módulo. Resolva o conflito antes de salvar.';
     }
 
     return null;
@@ -612,6 +622,12 @@ export default function TemplatesTexto() {
     if (!editingTemplate?.tipo_registro) return [];
     return variaveisUsadas.filter(v => !variaveisValidas.has(v));
   }, [variaveisUsadas, variaveisValidas, editingTemplate?.tipo_registro]);
+
+  const handleSaveTemplate = () => {
+    if (!editingTemplate) return;
+    if (templateConflictError || variaveisInvalidas.length > 0) return;
+    saveMutation.mutate(editingTemplate);
+  };
 
   if (loadingUser || !isAccessResolved) return null;
   if (!canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
@@ -674,8 +690,18 @@ export default function TemplatesTexto() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map(t => (
-              <div key={t.id} className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+            {filtered.map(t => {
+              const templateEmConflito = conflitosPorTipo[t.tipo_registro]?.temConflito;
+
+              return (
+              <div
+                key={t.id}
+                className={`rounded-xl p-4 shadow-sm border ${
+                  templateEmConflito
+                    ? 'border-red-300 bg-red-50/40'
+                    : 'border-slate-100 bg-white'
+                }`}
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -685,7 +711,7 @@ export default function TemplatesTexto() {
                       {isLivroFeriasTipo(t.tipo_registro) && (
                         <Badge className="bg-slate-100 text-slate-600 text-[10px]">{t.tipo_registro}</Badge>
                       )}
-                      {conflitosPorTipo[t.tipo_registro]?.temConflito && (
+                      {templateEmConflito && (
                         <Badge className="bg-red-600 text-white">Conflito</Badge>
                       )}
                       {!t.ativo && <Badge className="bg-red-100 text-red-600">Inativo</Badge>}
@@ -703,7 +729,7 @@ export default function TemplatesTexto() {
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>
@@ -914,7 +940,7 @@ export default function TemplatesTexto() {
               Cancelar
             </Button>
                 <Button
-                  onClick={() => saveMutation.mutate(editingTemplate)}
+                  onClick={handleSaveTemplate}
                   disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError || variaveisInvalidas.length > 0}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 >
