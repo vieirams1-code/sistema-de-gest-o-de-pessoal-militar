@@ -27,7 +27,6 @@ import { getLivroOperacaoFerias } from '@/components/livro/feriasOperacaoUtils';
 import {
   getTemplateAtivoPorTipo,
   tipoExigeTemplate,
-  TEMPLATE_BLOQUEIO_MENSAGEM,
 } from '@/components/rp/templateValidation';
 
 const STATUS_OPTIONS = ['Aguardando Nota', 'Aguardando Publicação', 'Publicado'];
@@ -399,12 +398,6 @@ export default function CadastrarRegistroRP() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {templateObrigatorioAusente && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-              {TEMPLATE_BLOQUEIO_MENSAGEM}
-            </div>
-          )}
-
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               {[
@@ -527,6 +520,15 @@ export default function CadastrarRegistroRP() {
                   </div>
                 )}
               </div>
+
+              {templateObrigatorioAusente && (
+                <div
+                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-sm"
+                  role="alert"
+                >
+                  Template obrigatório não encontrado para este tipo de registro. Cadastre um template antes de continuar.
+                </div>
+              )}
 
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => navigate(createPageUrl('RP'))}>
@@ -698,6 +700,15 @@ export default function CadastrarRegistroRP() {
                   />
                 </div>
               </div>
+
+              {templateObrigatorioAusente && (
+                <div
+                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 shadow-sm"
+                  role="alert"
+                >
+                  Template obrigatório não encontrado para este tipo de registro. Cadastre um template antes de continuar.
+                </div>
+              )}
 
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => setStep(3)}>
