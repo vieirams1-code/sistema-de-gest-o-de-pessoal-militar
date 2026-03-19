@@ -3,6 +3,7 @@
  * Configuração central de tipos do módulo RP (Registro de Publicações).
  * Unifica os antigos módulos Livro e PublicacaoExOfficio em uma única fonte de verdade.
  */
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 
 // ─── Constantes de módulo ───────────────────────────────────────────────────
 export const MODULO_LIVRO = 'Livro';
@@ -417,14 +418,15 @@ export function getTiposRPFiltrados({
 
   // 3. Templates ativos de ambos os módulos
   templatesAtivos
-    .filter((tmpl) => (tmpl?.modulo === 'Livro' || tmpl?.modulo === 'ExOfficio') && tmpl?.ativo !== false)
     .forEach((tmpl) => {
       if (!tmpl?.tipo_registro) return;
+      const moduloTemplate = getTemplateAtivoPorTipo(tmpl.tipo_registro, tmpl.modulo, templatesAtivos)?.modulo;
+      if (!moduloTemplate) return;
       mergeTipoMaps(map, {
         value: tmpl.tipo_registro,
         label: RP_TIPO_LABELS[tmpl.tipo_registro] || tmpl.tipo_registro,
         grupo: 'Outros',
-        modulo: tmpl.modulo === 'Livro' ? MODULO_LIVRO : MODULO_EX_OFFICIO,
+        modulo: moduloTemplate === 'Livro' ? MODULO_LIVRO : MODULO_EX_OFFICIO,
         descricao: tmpl.nome ? `Template ativo: ${tmpl.nome}` : 'Tipo derivado de template ativo.',
         palavrasChave: ['template', tmpl.nome].filter(Boolean),
         destaque: false,

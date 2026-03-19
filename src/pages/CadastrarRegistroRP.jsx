@@ -23,7 +23,12 @@ import {
   MODULO_LIVRO,
   MODULO_EX_OFFICIO,
 } from '@/components/rp/rpTiposConfig';
-import { getLivroOperacaoFeriasLabel, isTipoRegistroFerias, getLivroOperacaoFerias } from '@/components/livro/feriasOperacaoUtils';
+import { getLivroOperacaoFerias } from '@/components/livro/feriasOperacaoUtils';
+import {
+  getTemplateAtivoPorTipo,
+  tipoExigeTemplate,
+  TEMPLATE_BLOQUEIO_MENSAGEM,
+} from '@/components/rp/templateValidation';
 
 const STATUS_OPTIONS = ['Aguardando Nota', 'Aguardando Publicação', 'Publicado'];
 
@@ -228,13 +233,22 @@ export default function CadastrarRegistroRP() {
 
     setSelectedTipo(tipoEncontrado);
     setFormData(prev => ({ ...prev, tipo_registro: tipoEncontrado.value }));
-    setStep(2);
   }, [searchParams, isEditing, selectedTipo, formData.tipo_registro, step, tiposFiltrados]);
 
   const moduloAtual = useMemo(() => {
     if (!formData.tipo_registro) return null;
     return getModuloByTipo(formData.tipo_registro, tiposCustom);
   }, [formData.tipo_registro, tiposCustom]);
+
+  const templateAtivoSelecionado = useMemo(() => {
+    if (!formData.tipo_registro || !moduloAtual) return null;
+    return getTemplateAtivoPorTipo(formData.tipo_registro, moduloAtual, templatesAtivos);
+  }, [formData.tipo_registro, moduloAtual, templatesAtivos]);
+
+  const templateObrigatorioAusente = useMemo(() => {
+    if (!formData.tipo_registro) return false;
+    return tipoExigeTemplate(formData.tipo_registro) && !templateAtivoSelecionado;
+  }, [formData.tipo_registro, templateAtivoSelecionado]);
 
   // Populate form when editing
   useEffect(() => {
@@ -331,6 +345,7 @@ export default function CadastrarRegistroRP() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (step !== 4) return;
+    if (templateObrigatorioAusente) return;
 
     const payload = {
       ...formData,
@@ -339,7 +354,7 @@ export default function CadastrarRegistroRP() {
     saveMutation.mutate(payload);
   };
 
-  const canAdvanceFromStep1 = !!formData.tipo_registro;
+  const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente;
   const canAdvanceFromStep2 = !!formData.militar_id;
   const canAdvanceFromStep3 = !!formData.data_registro;
 
@@ -374,6 +389,12 @@ export default function CadastrarRegistroRP() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {templateObrigatorioAusente && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
+              {TEMPLATE_BLOQUEIO_MENSAGEM}
+            </div>
+          )}
+
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               {[
@@ -505,7 +526,10 @@ export default function CadastrarRegistroRP() {
                   type="button"
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
                   disabled={!canAdvanceFromStep1}
-                  onClick={() => setStep(2)}
+                  onClick={() => {
+                    if (!canAdvanceFromStep1) return;
+                    setStep(2);
+                  }}
                 >
                   Avançar
                 </Button>
@@ -672,7 +696,7 @@ export default function CadastrarRegistroRP() {
                 <Button
                   type="submit"
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                  disabled={saveMutation.isPending}
+                  disabled={saveMutation.isPending || templateObrigatorioAusente}
                 >
                   <Save className="mr-2 h-4 w-4" />
                   {saveMutation.isPending ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar'}
