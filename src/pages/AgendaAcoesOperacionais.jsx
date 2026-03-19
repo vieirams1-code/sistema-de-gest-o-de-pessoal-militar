@@ -103,7 +103,7 @@ function GrupoAcoes({
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                               <span>Prazo: {formatarDataBR(draft.data_prevista)}</span>
                               <span className={concluida ? 'font-semibold text-emerald-700' : ''}>
-                                {concluida ? 'Concluída' : (draft.status || 'Pendente')}
+                                {concluida ? 'Concluu00edda' : (draft.status || 'Pendente')}
                               </span>
                             </div>
                           </div>
@@ -128,7 +128,7 @@ function GrupoAcoes({
                                 disabled={loadingToggleId === acao.id}
                               >
                                 <Check className="w-3.5 h-3.5 mr-1" />
-                                {concluida ? 'Desmarcar concluída' : 'Marcar concluída'}
+                                {concluida ? 'Desmarcar concluu00edda' : 'Marcar concluu00edda'}
                               </Button>
                             )}
 
@@ -159,7 +159,7 @@ function GrupoAcoes({
                             <Input
                               value={draft.titulo || ''}
                               onChange={(event) => onChangeDraft(acao.id, 'titulo', event.target.value)}
-                              placeholder="Título da ação"
+                              placeholder="Tu00edtulo da au00e7u00e3o"
                             />
                             <Input
                               type="date"
@@ -186,7 +186,13 @@ export default function AgendaAcoesOperacionaisPage() {
   const [cardAbertoId, setCardAbertoId] = useState(null);
   const [editingAcaoId, setEditingAcaoId] = useState(null);
   const [acaoDrafts, setAcaoDrafts] = useState({});
-  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const {
+    canAccessModule,
+    canAccessAction,
+    isLoading: loadingUser,
+    isAccessResolved,
+    getMilitarScopeFilters,
+  } = useCurrentUser();
   const hasQuadroOperacionalAccess = canAccessModule('quadro_operacional');
 
 
@@ -230,7 +236,6 @@ export default function AgendaAcoesOperacionaisPage() {
         const militarQueries = await Promise.all(militarScopeFilters.map(f => base44.entities.Militar.filter(f)));
         accessibleMilitarIds = [...new Set(militarQueries.flat().map(m => m.id).filter(Boolean))];
       }
-      // Pass filter to listAllCardAcoes. If no accessible militar IDs, pass a filter that returns no cards.
       return listAllCardAcoes(3000, accessibleMilitarIds.length > 0 ? { militar_id: { $in: accessibleMilitarIds } } : { militar_id: null });
     },
     enabled: canFetch,
@@ -353,21 +358,21 @@ export default function AgendaAcoesOperacionaisPage() {
     onOpenCard: setCardAbertoId,
     onToggleConcluida: (acao, concluir) => {
       if (!canAccessAction('gerir_acoes_operacionais')) {
-        alert('Ação negada: você não tem permissão para alterar ações operacionais.');
+        alert('Au00e7u00e3o negada: vocu00ea nu00e3o tem permissu00e3o para alterar au00e7u00f5es operacionais.');
         return;
       }
-      toggleConclusaoMutation.mutate({ acao, status: concluir ? 'Concluída' : 'Pendente' });
+      toggleConclusaoMutation.mutate({ acao, status: concluir ? 'Concluu00edda' : 'Pendente' });
     },
     onDelete: (acao) => {
       if (!canAccessAction('excluir_acao_operacional')) {
-        alert('Ação negada: você não tem permissão para excluir ações operacionais.');
+        alert('Au00e7u00e3o negada: vocu00ea nu00e3o tem permissu00e3o para excluir au00e7u00f5es operacionais.');
         return;
       }
       excluirAcaoMutation.mutate(acao.id);
     },
     onStartEdit: (acao) => {
       if (!canAccessAction('gerir_acoes_operacionais')) {
-        alert('Ação negada: você não tem permissão para editar ações operacionais.');
+        alert('Au00e7u00e3o negada: vocu00ea nu00e3o tem permissu00e3o para editar au00e7u00f5es operacionais.');
         return;
       }
       setEditingAcaoId(acao.id);
@@ -381,7 +386,7 @@ export default function AgendaAcoesOperacionaisPage() {
     },
     onSaveEdit: (acao) => {
       if (!canAccessAction('gerir_acoes_operacionais')) {
-        alert('Ação negada: você não tem permissão para salvar edições de ações operacionais.');
+        alert('Au00e7u00e3o negada: vocu00ea nu00e3o tem permissu00e3o para salvar ediu00e7u00f5es de au00e7u00f5es operacionais.');
         return;
       }
       salvarEdicaoMutation.mutate({ acaoId: acao.id, payload: acaoDrafts[acao.id] || acao });
@@ -403,12 +408,12 @@ export default function AgendaAcoesOperacionaisPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 space-y-4">
       <header className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Ações v3.1</p>
+        <p className="text-[11px] font-semibold tracking-wide uppercase text-indigo-600">Au00e7u00f5es v3.1</p>
         <div className="mt-1 flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-slate-500" />
-          <h1 className="text-lg font-bold text-slate-800">Ações Operacionais</h1>
+          <h1 className="text-lg font-bold text-slate-800">Au00e7u00f5es Operacionais</h1>
         </div>
-        <p className="text-xs text-slate-500 mt-1">Visão consolidada de ações abertas do Quadro Operacional.</p>
+        <p className="text-xs text-slate-500 mt-1">Vistu00e3o consolidada de au00e7u00f5es abertas do Quadro Operacional.</p>
       </header>
 
       <GrupoAcoes
@@ -428,7 +433,7 @@ export default function AgendaAcoesOperacionaisPage() {
       />
 
       <GrupoAcoes
-        titulo="Próximas"
+        titulo="Pru00f3ximas"
         descricao="Sem prazo vencido"
         icon={CalendarClock}
         grupos={proximas}
