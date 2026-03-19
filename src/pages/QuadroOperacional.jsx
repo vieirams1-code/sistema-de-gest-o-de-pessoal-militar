@@ -102,7 +102,7 @@ function substituirCardNaLista(cards = [], cardAtualizado) {
 
 export default function QuadroOperacionalPage() {
   const queryClient = useQueryClient();
-  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, isAdmin, getMilitarScopeFilters } = useCurrentUser();
   
   const hasAccess = canAccessModule('quadro_operacional');
   const canMoverCard = canAccessAction('mover_card');
@@ -117,9 +117,22 @@ export default function QuadroOperacionalPage() {
   const [novaColuna, setNovaColuna] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const fetchAccessibleMilitarIds = async () => {
+    if (isAdmin) return null; // Admin sees all, no need to filter by militar_id
+
+    const militarScopeFilters = getMilitarScopeFilters();
+    if (militarScopeFilters.length === 0) return []; // No accessible military members, so no cards
+
+    const militarQueries = await Promise.all(militarScopeFilters.map(f => base44.entities.Militar.filter(f)));
+    return [...new Set(militarQueries.flat().map(m => m.id).filter(Boolean))];
+  };
+
   const fetchCardsDoQuadro = async () => {
     if (!colunas.length) return [];
-    const cardsBrutos = await base44.entities.CardOperacional.filter({ arquivado: false }, '-created_date', 500);
+    
+    let filters = { arquivado: false };
+    if (!isAdmin) filters.militar_id = { $in: await fetchAccessibleMilitarIds() };
+    const cardsBrutos = await base44.entities.CardOperacional.filter(filters, '-created_date', 500);
     const colunasIds = new Set(colunas.map((coluna) => coluna.id));
     return cardsBrutos.filter((card) => colunasIds.has(card.coluna_id));
   };
@@ -223,6 +236,10 @@ export default function QuadroOperacionalPage() {
         status: 'Ativo',
         arquivado: false,
         criado_automaticamente: false,
+        // Assuming these fields are passed from NovoCardModal
+        militar_id: form.militar_id,
+        militar_nome_snapshot: form.militar_nome_snapshot,
+        militar_posto_snapshot: form.militar_posto_snapshot,
         comentarios_count: 0,
       });
 

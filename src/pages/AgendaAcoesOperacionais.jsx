@@ -218,8 +218,20 @@ export default function AgendaAcoesOperacionaisPage() {
   });
 
   const { data: acoesRaw = [] } = useQuery({
-    queryKey: ['acoes-consolidadas-quadro'],
-    queryFn: () => listAllCardAcoes(3000),
+    queryKey: ['acoes-consolidadas-quadro', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) {
+        return listAllCardAcoes(3000);
+      }
+      const militarScopeFilters = getMilitarScopeFilters();
+      let accessibleMilitarIds = [];
+      if (militarScopeFilters.length > 0) {
+        const militarQueries = await Promise.all(militarScopeFilters.map(f => base44.entities.Militar.filter(f)));
+        accessibleMilitarIds = [...new Set(militarQueries.flat().map(m => m.id).filter(Boolean))];
+      }
+      // Pass filter to listAllCardAcoes. If no accessible militar IDs, pass a filter that returns no cards.
+      return listAllCardAcoes(3000, accessibleMilitarIds.length > 0 ? { militar_id: { $in: accessibleMilitarIds } } : { militar_id: null });
+    },
     enabled: canFetch,
   });
 
