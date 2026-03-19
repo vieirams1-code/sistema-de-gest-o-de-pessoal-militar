@@ -287,24 +287,6 @@ export default function RP() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button asChild className="bg-[#1e3a5f] hover:bg-[#2c517f]">
-              <a href={createPageUrl('CadastrarRegistroRP') + '?tipo=inicio_ferias'}>
-                <CalendarRange className="mr-2 h-4 w-4" />
-                Início de férias
-              </a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href={createPageUrl('CadastrarRegistroRP') + '?tipo=termino_ferias'}>
-                <CalendarRange className="mr-2 h-4 w-4" />
-                Término de férias
-              </a>
-            </Button>
-            <Button asChild variant="secondary">
-              <a href={createPageUrl('CadastrarRegistroRP') + '?tipo=dispensa'}>
-                <ShieldAlert className="mr-2 h-4 w-4" />
-                Dispensa de função
-              </a>
-            </Button>
             <Button asChild variant="outline">
               <a href={createPageUrl('CadastrarRegistroRP')}>
                 <Plus className="mr-2 h-4 w-4" />
