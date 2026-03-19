@@ -204,6 +204,33 @@ export default function CadastrarRegistroRP() {
 
   const tiposAgrupados = useMemo(() => groupTiposRP(tiposFiltradosBusca), [tiposFiltradosBusca]);
 
+  useEffect(() => {
+    const tipoParam = searchParams.get('tipo');
+
+    if (!tipoParam || isEditing || selectedTipo || formData.tipo_registro || step !== 1 || tiposFiltrados.length === 0) {
+      return;
+    }
+
+    const normalizarTexto = (valor = '') =>
+      valor
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+
+    const tipoEncontrado = tiposFiltrados.find(tipo => {
+      if (tipo.value === tipoParam) return true;
+      return normalizarTexto(tipo.label) === normalizarTexto(tipoParam);
+    });
+
+    if (!tipoEncontrado) return;
+
+    setSelectedTipo(tipoEncontrado);
+    setFormData(prev => ({ ...prev, tipo_registro: tipoEncontrado.value }));
+    setStep(2);
+  }, [searchParams, isEditing, selectedTipo, formData.tipo_registro, step, tiposFiltrados]);
+
   const moduloAtual = useMemo(() => {
     if (!formData.tipo_registro) return null;
     return getModuloByTipo(formData.tipo_registro, tiposCustom);
