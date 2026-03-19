@@ -43,6 +43,7 @@ export default function CadastrarRegistroRP() {
   const { canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('livro') || canAccessModule('publicacoes');
 
+  const [step, setStep] = useState(1);
   const [tipoSearch, setTipoSearch] = useState('');
   const [selectedTipo, setSelectedTipo] = useState(null);
   const [formData, setFormData] = useState({
@@ -285,12 +286,18 @@ export default function CadastrarRegistroRP() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (step !== 4) return;
+
     const payload = {
       ...formData,
       ...(Object.keys(camposCustom).length > 0 ? { campos_custom: camposCustom } : {}),
     };
     saveMutation.mutate(payload);
   };
+
+  const canAdvanceFromStep1 = !!formData.tipo_registro;
+  const canAdvanceFromStep2 = !!formData.militar_id;
+  const canAdvanceFromStep3 = !!formData.data_registro;
 
   if (!loadingUser && isAccessResolved && !hasAccess) {
     return <AccessDenied modulo="RP — Registro de Publicações" />;
@@ -323,189 +330,286 @@ export default function CadastrarRegistroRP() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Militar */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Militar</h2>
-            <MilitarSelector
-              value={formData.militar_id}
-              onChange={handleChange}
-              onMilitarSelect={handleMilitarSelect}
-            />
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              {[
+                { id: 1, label: 'Tipo' },
+                { id: 2, label: 'Militar' },
+                { id: 3, label: 'Registro' },
+                { id: 4, label: 'Finalização' },
+              ].map(item => {
+                const isActive = step === item.id;
+                const isDone = step > item.id;
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center gap-2 rounded-full px-3 py-1.5 ${
+                      isActive
+                        ? 'bg-[#1e3a5f] text-white'
+                        : isDone
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/80 text-xs font-bold text-inherit">
+                      {item.id}
+                    </span>
+                    <span className="font-medium">{item.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Tipo de Registro */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Tipo de Registro</h2>
+          {step === 1 && (
+            <>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Tipo de Registro</h2>
 
-            {selectedTipo ? (
-              <div className="flex items-center justify-between rounded-lg border border-[#1e3a5f]/20 bg-[#1e3a5f]/5 px-4 py-3">
-                <div>
-                  <p className="font-semibold text-[#1e3a5f]">{selectedTipo.label}</p>
-                  <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}</p>
-                </div>
-                {!isEditing && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => { setSelectedTipo(null); setFormData(prev => ({ ...prev, tipo_registro: '' })); }}>
-                    Alterar
-                  </Button>
+                {selectedTipo ? (
+                  <div className="flex items-center justify-between rounded-lg border border-[#1e3a5f]/20 bg-[#1e3a5f]/5 px-4 py-3">
+                    <div>
+                      <p className="font-semibold text-[#1e3a5f]">{selectedTipo.label}</p>
+                      <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}</p>
+                    </div>
+                    {!isEditing && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedTipo(null);
+                          setFormData(prev => ({ ...prev, tipo_registro: '' }));
+                        }}
+                      >
+                        Alterar
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        value={tipoSearch}
+                        onChange={e => setTipoSearch(e.target.value)}
+                        placeholder="Buscar tipo de registro..."
+                        className="pl-9"
+                      />
+                    </div>
+                    <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
+                      {Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
+                        <div key={grupo}>
+                          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{grupo}</p>
+                          <div className="grid gap-1 sm:grid-cols-2">
+                            {tipos.map(tipo => (
+                              <button
+                                key={tipo.value}
+                                type="button"
+                                onClick={() => handleTipoSelect(tipo)}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:border-[#1e3a5f]/40 hover:bg-[#1e3a5f]/5"
+                              >
+                                {tipo.label}
+                                <span className="ml-2 text-xs font-normal text-slate-400">
+                                  {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {tiposFiltradosBusca.length === 0 && (
+                        <p className="py-4 text-center text-sm text-slate-400">Nenhum tipo encontrado.</p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <Input
-                    value={tipoSearch}
-                    onChange={e => setTipoSearch(e.target.value)}
-                    placeholder="Buscar tipo de registro..."
-                    className="pl-9"
+
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => navigate(createPageUrl('RP'))}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                  disabled={!canAdvanceFromStep1}
+                  onClick={() => setStep(2)}
+                >
+                  Avançar
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Militar</h2>
+                <MilitarSelector
+                  value={formData.militar_id}
+                  onChange={handleChange}
+                  onMilitarSelect={handleMilitarSelect}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                  Voltar
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                  disabled={!canAdvanceFromStep2}
+                  onClick={() => setStep(3)}
+                >
+                  Avançar
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              {selectedTipo && moduloAtual === MODULO_LIVRO && (
+                <RPSpecificFieldsLivro
+                  tipoRegistro={formData.tipo_registro}
+                  formData={formData}
+                  handleChange={handleChange}
+                  selectedFerias={selectedFerias}
+                  handleFeriasSelect={handleFeriasSelect}
+                  livroOperacaoFerias={livroOperacaoFerias}
+                  operacaoFeriasSelecionada={operacaoFeriasSelecionada}
+                  formatarDataExtenso={formatarDataExtenso}
+                  isEditing={isEditing}
+                  registroEdicao={registroEdicao}
+                  originalActEntries={originalActEntries}
+                />
+              )}
+
+              {selectedTipo && moduloAtual === MODULO_EX_OFFICIO && (
+                <RPSpecificFieldsExOfficio
+                  tipoRegistro={formData.tipo_registro}
+                  formData={formData}
+                  handleChange={handleChange}
+                  camposCustom={camposCustom}
+                  setCamposCustom={setCamposCustom}
+                  tiposCustom={tiposCustom}
+                  atestadosMilitar={atestadosMilitar}
+                  todasPublicacoesFormatadas={publicacoesMilitar}
+                  publicacoesElegiveis={publicacoesMilitar}
+                  formatarDataExtenso={formatarDataExtenso}
+                />
+              )}
+
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Dados do Registro</h2>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    label="Data do Registro"
+                    name="data_registro"
+                    value={formData.data_registro}
+                    onChange={handleChange}
+                    type="date"
+                    required
+                  />
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700">Status</Label>
+                    <Select value={formData.status} onValueChange={v => handleChange('status', v)}>
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setStep(2)}>
+                  Voltar
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                  disabled={!canAdvanceFromStep3}
+                  onClick={() => setStep(4)}
+                >
+                  Avançar
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 4 && (
+            <>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Finalização</h2>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    label="Nota para BG"
+                    name="nota_para_bg"
+                    value={formData.nota_para_bg}
+                    onChange={handleChange}
+                    placeholder="Ex: 01"
+                  />
+                  <FormField
+                    label="Número do BG"
+                    name="numero_bg"
+                    value={formData.numero_bg}
+                    onChange={handleChange}
+                    placeholder="Ex: 123"
+                  />
+                  <FormField
+                    label="Data do BG"
+                    name="data_bg"
+                    value={formData.data_bg}
+                    onChange={handleChange}
+                    type="date"
                   />
                 </div>
-                <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
-                  {Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
-                    <div key={grupo}>
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{grupo}</p>
-                      <div className="grid gap-1 sm:grid-cols-2">
-                        {tipos.map(tipo => (
-                          <button
-                            key={tipo.value}
-                            type="button"
-                            onClick={() => handleTipoSelect(tipo)}
-                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:border-[#1e3a5f]/40 hover:bg-[#1e3a5f]/5"
-                          >
-                            {tipo.label}
-                            <span className="ml-2 text-xs font-normal text-slate-400">
-                              {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  {tiposFiltradosBusca.length === 0 && (
-                    <p className="py-4 text-center text-sm text-slate-400">Nenhum tipo encontrado.</p>
-                  )}
+                <div className="mt-4">
+                  <Label className="text-sm font-medium text-slate-700">Texto de Publicação</Label>
+                  <Textarea
+                    value={formData.texto_publicacao || ''}
+                    onChange={e => handleChange('texto_publicacao', e.target.value)}
+                    className="mt-1.5"
+                    rows={4}
+                    placeholder="Texto gerado para o BG..."
+                  />
+                </div>
+                <div className="mt-4">
+                  <Label className="text-sm font-medium text-slate-700">Observações</Label>
+                  <Textarea
+                    value={formData.observacoes || ''}
+                    onChange={e => handleChange('observacoes', e.target.value)}
+                    className="mt-1.5"
+                    rows={2}
+                    placeholder="Observações internas..."
+                  />
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Specific Fields */}
-          {selectedTipo && moduloAtual === MODULO_LIVRO && (
-            <RPSpecificFieldsLivro
-              tipoRegistro={formData.tipo_registro}
-              formData={formData}
-              handleChange={handleChange}
-              selectedFerias={selectedFerias}
-              handleFeriasSelect={handleFeriasSelect}
-              livroOperacaoFerias={livroOperacaoFerias}
-              operacaoFeriasSelecionada={operacaoFeriasSelecionada}
-              formatarDataExtenso={formatarDataExtenso}
-              isEditing={isEditing}
-              registroEdicao={registroEdicao}
-              originalActEntries={originalActEntries}
-            />
-          )}
-
-          {selectedTipo && moduloAtual === MODULO_EX_OFFICIO && (
-            <RPSpecificFieldsExOfficio
-              tipoRegistro={formData.tipo_registro}
-              formData={formData}
-              handleChange={handleChange}
-              camposCustom={camposCustom}
-              setCamposCustom={setCamposCustom}
-              tiposCustom={tiposCustom}
-              atestadosMilitar={atestadosMilitar}
-              todasPublicacoesFormatadas={publicacoesMilitar}
-              publicacoesElegiveis={publicacoesMilitar}
-              formatarDataExtenso={formatarDataExtenso}
-            />
-          )}
-
-          {/* Data e Status */}
-          {selectedTipo && (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Publicação</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  label="Data do Registro"
-                  name="data_registro"
-                  value={formData.data_registro}
-                  onChange={handleChange}
-                  type="date"
-                  required
-                />
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Status</Label>
-                  <Select value={formData.status} onValueChange={v => handleChange('status', v)}>
-                    <SelectTrigger className="mt-1.5">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map(s => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <FormField
-                  label="Nota para BG"
-                  name="nota_para_bg"
-                  value={formData.nota_para_bg}
-                  onChange={handleChange}
-                  placeholder="Ex: 01"
-                />
-                <FormField
-                  label="Número do BG"
-                  name="numero_bg"
-                  value={formData.numero_bg}
-                  onChange={handleChange}
-                  placeholder="Ex: 123"
-                />
-                <FormField
-                  label="Data do BG"
-                  name="data_bg"
-                  value={formData.data_bg}
-                  onChange={handleChange}
-                  type="date"
-                />
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setStep(3)}>
+                  Voltar
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                  disabled={saveMutation.isPending}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {saveMutation.isPending ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar'}
+                </Button>
               </div>
-              <div className="mt-4">
-                <Label className="text-sm font-medium text-slate-700">Texto de Publicação</Label>
-                <Textarea
-                  value={formData.texto_publicacao || ''}
-                  onChange={e => handleChange('texto_publicacao', e.target.value)}
-                  className="mt-1.5"
-                  rows={4}
-                  placeholder="Texto gerado para o BG..."
-                />
-              </div>
-              <div className="mt-4">
-                <Label className="text-sm font-medium text-slate-700">Observações</Label>
-                <Textarea
-                  value={formData.observacoes || ''}
-                  onChange={e => handleChange('observacoes', e.target.value)}
-                  className="mt-1.5"
-                  rows={2}
-                  placeholder="Observações internas..."
-                />
-              </div>
-            </div>
+            </>
           )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => navigate(createPageUrl('RP'))}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-              disabled={!formData.militar_id || !formData.tipo_registro || saveMutation.isPending}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {saveMutation.isPending ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Cadastrar Registro'}
-            </Button>
-          </div>
         </form>
       </div>
     </div>
