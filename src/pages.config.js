@@ -84,6 +84,8 @@ import LotacaoMilitares from './pages/LotacaoMilitares';
 import Livro from './pages/Livro';
 import PerfisPermissao from './pages/PerfisPermissao';
 import PermissoesUsuarios from './pages/PermissoesUsuarios';
+import RP from './pages/RP';
+import CadastrarRegistroRP from './pages/CadastrarRegistroRP';
 import __Layout from './Layout.jsx';
 
 
@@ -125,6 +127,8 @@ export const PAGES = {
     "Livro": Livro,
     "PerfisPermissao": PerfisPermissao,
     "PermissoesUsuarios": PermissoesUsuarios,
+    "RP": RP,
+    "CadastrarRegistroRP": CadastrarRegistroRP,
 }
 
 export const pagesConfig = {

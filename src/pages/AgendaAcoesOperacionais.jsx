@@ -217,10 +217,11 @@ export default function AgendaAcoesOperacionaisPage() {
     enabled: canFetch && !!quadro?.id && colunas.length > 0,
   });
 
+  const canManageAcoes = canAccessAction('gerir_acoes_operacionais');
   const { data: acoesRaw = [] } = useQuery({
-    queryKey: ['acoes-consolidadas-quadro', isAdmin],
+    queryKey: ['acoes-consolidadas-quadro', canManageAcoes],
     queryFn: async () => {
-      if (isAdmin) {
+      if (canManageAcoes) {
         return listAllCardAcoes(3000);
       }
       const militarScopeFilters = getMilitarScopeFilters();
