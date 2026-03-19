@@ -121,6 +121,7 @@ export default function CadastrarRegistroRP() {
   const [selectedFerias, setSelectedFerias] = useState(null);
   const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState(null);
   const [originalActEntries, setOriginalActEntries] = useState([]);
+  const [moduloOrigemEdicao, setModuloOrigemEdicao] = useState(null);
 
   // Fetch existing record when editing
   const { data: registroEdicao, isLoading: loadingRegistro } = useQuery({
@@ -211,6 +212,7 @@ export default function CadastrarRegistroRP() {
   // Populate form when editing
   useEffect(() => {
     if (!registroEdicao) return;
+    setModuloOrigemEdicao(registroEdicao._modulo === 'Livro' ? 'Livro' : 'ExOfficio');
     const d = registroEdicao;
     const tipoVal = d.tipo_registro || d.tipo || '';
     setFormData(prev => ({
@@ -265,11 +267,11 @@ export default function CadastrarRegistroRP() {
       const isLivro = modulo === MODULO_LIVRO;
 
       if (isEditing) {
-        if (registroEdicao?._modulo === 'Livro' || isLivro) {
+        if (moduloOrigemEdicao === 'Livro') {
           return base44.entities.RegistroLivro.update(registroId, data);
-        } else {
-          return base44.entities.PublicacaoExOfficio.update(registroId, data);
         }
+
+        return base44.entities.PublicacaoExOfficio.update(registroId, data);
       } else {
         if (isLivro) {
           return base44.entities.RegistroLivro.create(data);
