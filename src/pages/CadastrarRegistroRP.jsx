@@ -31,6 +31,8 @@ import {
 } from '@/components/rp/templateValidation';
 
 const STATUS_OPTIONS = ['Aguardando Nota', 'Aguardando Publicação', 'Publicado'];
+const TEMPLATE_CONFLITO_MENSAGEM =
+  'Conflito de template detectado para este tipo. Verifique os templates cadastrados.';
 
 function formatarDataExtenso(dataStr) {
   if (!dataStr) return '';
@@ -258,6 +260,8 @@ export default function CadastrarRegistroRP() {
     return getConflitoTemplatePorTipo(formData.tipo_registro, templatesAtivos);
   }, [formData.tipo_registro, templatesAtivos]);
 
+  const hasTemplateConflict = conflitoTemplateSelecionado.temConflito;
+
   // Populate form when editing
   useEffect(() => {
     if (!registroEdicao) return;
@@ -375,7 +379,7 @@ export default function CadastrarRegistroRP() {
     saveMutation.mutate(payload);
   };
 
-  const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente && !conflitoTemplateSelecionado.temConflito;
+  const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente && !hasTemplateConflict;
   const canAdvanceFromStep2 = !!formData.militar_id;
   const canAdvanceFromStep3 = !!formData.data_registro;
 
@@ -542,12 +546,12 @@ export default function CadastrarRegistroRP() {
                 </div>
               )}
 
-              {conflitoTemplateSelecionado.temConflito && (
+              {hasTemplateConflict && (
                 <div
                   className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900 shadow-sm"
                   role="alert"
                 >
-                  Conflito de template detectado para este tipo. Verifique os templates cadastrados.
+                  {TEMPLATE_CONFLITO_MENSAGEM}
                 </div>
               )}
 
@@ -731,12 +735,12 @@ export default function CadastrarRegistroRP() {
                 </div>
               )}
 
-              {conflitoTemplateSelecionado.temConflito && (
+              {hasTemplateConflict && (
                 <div
                   className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900 shadow-sm"
                   role="alert"
                 >
-                  Conflito de template detectado para este tipo. Verifique os templates cadastrados.
+                  {TEMPLATE_CONFLITO_MENSAGEM}
                 </div>
               )}
 
@@ -747,7 +751,7 @@ export default function CadastrarRegistroRP() {
                 <Button
                   type="submit"
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                  disabled={saveMutation.isPending || templateObrigatorioAusente || conflitoTemplateSelecionado.temConflito}
+                  disabled={saveMutation.isPending || templateObrigatorioAusente || hasTemplateConflict}
                 >
                   <Save className="mr-2 h-4 w-4" />
                   {saveMutation.isPending ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar'}
