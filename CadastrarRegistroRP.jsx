@@ -1,312 +1,463 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/lib/base44';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, Save, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, BookOpenText, Search } from 'lucide-react';
 
+import { base44 } from '@/api/base44Client';
+import { createPageUrl } from '@/utils';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { formatarDataExtenso } from '@/components/livro/livroUtils';
 import {
+  getModuloByTipo,
   getTiposRPFiltrados,
   groupTiposRP,
   matchesTipoRPSearch,
-  getRPTipoLabel,
-  getModuloByTipo,
   MODULO_LIVRO,
-  MODULO_EX_OFFICIO
+  getLivroOperacaoFerias,
 } from '@/components/rp/rpTiposConfig';
+import MilitarSelector from '@/components/livro/MilitarSelector';
+import CamposLivroDinamicos from '@/components/livro/CamposLivroDinamicos';
 
-import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
-import RPSpecificFieldsExOfficio from '@/components/rp/RPSpecificFieldsExOfficio';
-
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SearchMilitar } from '@/components/SearchMilitar';
+const initialState = {
+  militar_id: '',
+  militar_nome: '',
+  militar_posto_graduacao: '',
+  militar_matricula: '',
+  tipo_registro: '',
+  status: 'Aguardando Nota',
+  observacoes: '',
+  nota_para_bg: '',
+  numero_bg: '',
+  data_bg: '',
+  ferias_id: '',
+};
 
 export default function CadastrarRegistroRP() {
-  const { id: editId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule } = useAuth();
+  const [searchParams] = useSearchParams();
+  const registroId = searchParams.get('id');
+  const tipoInicial = searchParams.get('tipo');
+  const isEditing = !!registroId;
 
-  // 10. ACESSO
-  if (!canAccessModule('livro') && !canAccessModule('publicacoes')) {
+  const { canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const hasAccess = canAccessModule('livro') || canAccessModule('publicacoes');
+
+  const [formData, setFormData] = useState(initialState);
+  const [camposCustom, setCamposCustom] = useState({});
+  const [selectedTipo, setSelectedTipo] = useState(null);
+  const [tipoSearch, setTipoSearch] = useState('');
+  const [selectedFerias, setSelectedFerias] = useState(null);
+  const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState(null);
+  const [registroEdicao, setRegistroEdicao] = useState(null);
+  const [moduloOrigemEdicao, setModuloOrigemEdicao] = useState(null);
+  const [originalActEntries, setOriginalActEntries] = useState([]);
+
+  const { data: tiposCustom = [] } = useQuery({
+    queryKey: ['tipos-publicacao-custom'],
+    queryFn: async () => {
+      try {
+        return await base44.entities.TipoPublicacaoCustom.list();
+      } catch {
+        return [];
+      }
+    },
+    enabled: isAccessResolved && hasAccess,
+  });
+
+  const { data: templatesAtivos = [] } = useQuery({
+    queryKey: ['templates-texto-ativos'],
+    queryFn: async () => {
+      try {
+        return await base44.entities.TemplateTexto.filter({ ativo: true });
+      } catch {
+        return [];
+      }
+    },
+    enabled: isAccessResolved && hasAccess,
+  });
+
+  const { data: militarSelecionado } = useQuery({
+    queryKey: ['militar-rp', formData.militar_id],
+    queryFn: async () => {
+      if (!formData.militar_id) return null;
+      const result = await base44.entities.Militar.filter({ id: formData.militar_id });
+      return result?.[0] || null;
+    },
+    enabled: !!formData.militar_id,
+  });
+
+  const { isLoading: loadingRegistro } = useQuery({
+    queryKey: ['registro-rp-edicao', registroId],
+    queryFn: async () => {
+      if (!registroId) return null;
+
+      const [livro, exofficio] = await Promise.all([
+        base44.entities.RegistroLivro.filter({ id: registroId }),
+        base44.entities.PublicacaoExOfficio.filter({ id: registroId }),
+      ]);
+
+      const registroLivro = livro?.[0];
+      if (registroLivro) {
+        setRegistroEdicao({ ...registroLivro, _modulo: 'Livro' });
+        return registroLivro;
+      }
+
+      const registroExOfficio = exofficio?.[0];
+      if (registroExOfficio) {
+        setRegistroEdicao({
+          ...registroExOfficio,
+          tipo_registro: registroExOfficio.tipo,
+          _modulo: 'ExOfficio',
+        });
+        return registroExOfficio;
+      }
+
+      return null;
+    },
+    enabled: isEditing,
+  });
+
+  useQuery({
+    queryKey: ['publicacoes-militar-rp', formData.militar_id],
+    queryFn: async () => {
+      if (!formData.militar_id) return [];
+
+      const [livros, exoff] = await Promise.all([
+        base44.entities.RegistroLivro.filter({ militar_id: formData.militar_id }),
+        base44.entities.PublicacaoExOfficio.filter({ militar_id: formData.militar_id }),
+      ]);
+
+      return [
+        ...livros.map((r) => ({ ...r, origem_tipo: 'Livro', tipo_label: r.tipo_registro })),
+        ...exoff.map((r) => ({ ...r, origem_tipo: 'ExOfficio', tipo_label: r.tipo })),
+      ].filter((p) => p.numero_bg && p.data_bg);
+    },
+    enabled: !!formData.militar_id,
+  });
+
+  const livroOperacaoFerias = useMemo(
+    () => getLivroOperacaoFerias(formData.tipo_registro),
+    [formData.tipo_registro]
+  );
+
+  const tiposFiltrados = useMemo(() => {
+    const sexo = militarSelecionado?.sexo;
+    return getTiposRPFiltrados({
+      sexo,
+      tiposCustom,
+      templatesAtivos,
+      tipoAtualEdicao: isEditing ? registroEdicao?.tipo_registro || registroEdicao?.tipo : null,
+    });
+  }, [militarSelecionado, tiposCustom, templatesAtivos, isEditing, registroEdicao]);
+
+  const tiposFiltradosBusca = useMemo(() => {
+    return tiposFiltrados.filter((t) => matchesTipoRPSearch(t, tipoSearch));
+  }, [tiposFiltrados, tipoSearch]);
+
+  const tiposAgrupados = useMemo(() => groupTiposRP(tiposFiltradosBusca), [tiposFiltradosBusca]);
+
+  const moduloAtual = useMemo(() => {
+    if (!formData.tipo_registro) return null;
+    return getModuloByTipo(formData.tipo_registro, tiposCustom);
+  }, [formData.tipo_registro, tiposCustom]);
+
+  useEffect(() => {
+    if (isEditing || !tipoInicial || selectedTipo || !tiposFiltrados.length) return;
+    const tipoPreselecionado = tiposFiltrados.find((tipo) => tipo.value === tipoInicial);
+    if (!tipoPreselecionado) return;
+    setSelectedTipo(tipoPreselecionado);
+    setFormData((prev) => ({ ...prev, tipo_registro: tipoPreselecionado.value }));
+  }, [isEditing, tipoInicial, selectedTipo, tiposFiltrados]);
+
+  useEffect(() => {
+    if (!registroEdicao) return;
+    const d = registroEdicao;
+    const tipoVal = d.tipo_registro || d.tipo || '';
+
+    setModuloOrigemEdicao(d._modulo || null);
+    setFormData((prev) => ({
+      ...prev,
+      ...d,
+      tipo_registro: tipoVal,
+      status: d.status || d.status_publicacao || 'Aguardando Nota',
+    }));
+
+    const tipo = tiposFiltrados.find((t) => t.value === tipoVal);
+    if (tipo) setSelectedTipo(tipo);
+
+    const entries = [];
+    if (d.data_inicio) entries.push(['Data Início', formatarDataExtenso(d.data_inicio)]);
+    if (d.data_termino) entries.push(['Data Término', formatarDataExtenso(d.data_termino)]);
+    if (d.data_retorno) entries.push(['Data Retorno', formatarDataExtenso(d.data_retorno)]);
+    if (d.dias) entries.push(['Dias', String(d.dias)]);
+    if (d.conjuge_nome) entries.push(['Cônjuge', d.conjuge_nome]);
+    if (d.falecido_nome) entries.push(['Falecido(a)', d.falecido_nome]);
+    if (d.origem) entries.push(['Origem', d.origem]);
+    if (d.destino) entries.push(['Destino', d.destino]);
+    if (d.curso_nome) entries.push(['Curso', d.curso_nome]);
+    if (d.missao_descricao) entries.push(['Missão', d.missao_descricao]);
+    setOriginalActEntries(entries);
+  }, [registroEdicao, tiposFiltrados]);
+
+  const handleChange = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleMilitarSelect = (data) => {
+    setFormData((prev) => ({ ...prev, ...data }));
+  };
+
+  const handleFeriasSelect = (ferias) => {
+    setSelectedFerias(ferias);
+    if (ferias) {
+      setFormData((prev) => ({ ...prev, ferias_id: ferias.id }));
+      setOperacaoFeriasSelecionada(livroOperacaoFerias);
+    }
+  };
+
+  const handleTipoSelect = (tipo) => {
+    setSelectedTipo(tipo);
+    setFormData((prev) => ({ ...prev, tipo_registro: tipo.value }));
+    setTipoSearch('');
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data) => {
+      const modulo = getModuloByTipo(data.tipo_registro, tiposCustom);
+      const isLivro = modulo === MODULO_LIVRO;
+
+      if (isEditing) {
+        if (moduloOrigemEdicao === 'Livro') {
+          return base44.entities.RegistroLivro.update(registroId, data);
+        }
+
+        return base44.entities.PublicacaoExOfficio.update(registroId, {
+          ...data,
+          tipo: data.tipo_registro,
+        });
+      }
+
+      if (isLivro) {
+        return base44.entities.RegistroLivro.create(data);
+      }
+
+      return base44.entities.PublicacaoExOfficio.create({
+        ...data,
+        tipo: data.tipo_registro,
+      });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] }),
+        queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
+        queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+        queryClient.invalidateQueries({ queryKey: ['publicacoes-militar-rp'] }),
+      ]);
+      navigate(createPageUrl('RP'));
+    },
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const payload = {
+      ...formData,
+      ...(Object.keys(camposCustom).length > 0 ? { campos_custom: camposCustom } : {}),
+    };
+    saveMutation.mutate(payload);
+  };
+
+  if (!loadingUser && isAccessResolved && !hasAccess) {
+    return <AccessDenied modulo="RP — Registro de Publicações" />;
+  }
+
+  if (loadingUser || (isEditing && loadingRegistro)) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-red-600">Acesso Negado</h1>
-        <p className="mt-2 text-gray-600">Você não tem permissão para acessar esta área.</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#1e3a5f] border-t-transparent" />
       </div>
     );
   }
 
-  // ESTADOS (2. Adicionado moduloAtual)
-  const [step, setStep] = useState(1);
-  const [militarSelecionado, setMilitarSelecionado] = useState(null);
-  const [moduloAtual, setModuloAtual] = useState(null);
-  
-  const [formData, setFormData] = useState({
-    tipo_registro: '',
-    data_fato: new Date().toISOString().split('T')[0],
-    bg_numero: '',
-    bg_data: '',
-    texto_gerado: '',
-    // Campos que podem ser usados por Livro ou ExOfficio
-    assunto: '',
-    referencia: '',
-    dias: '',
-    comportamento_novo: '',
-    atestado_id: '',
-    observacoes: '',
-  });
-
-  // 5. TIPOS CUSTOMIZADOS (sem filtro de modulo)
-  const { data: tiposCustom = [] } = useQuery({
-    queryKey: ['tipos-custom-rp'],
-    queryFn: () => base44.entities.TipoPublicacaoCustom.filter({ ativo: true })
-  });
-
-  // 4. BUSCA DE TEMPLATES (sem filtro de modulo)
-  const { data: templates = [] } = useQuery({
-    queryKey: ['templates-texto'],
-    queryFn: () => base44.entities.TemplateTexto.list()
-  });
-
-  // 3. DETECÇÃO AUTOMÁTICA DE MÓDULO
-  useEffect(() => {
-    if (formData.tipo_registro) {
-      const modulo = getModuloByTipo(formData.tipo_registro, tiposCustom);
-      setModuloAtual(modulo);
-    } else {
-      setModuloAtual(null);
-    }
-  }, [formData.tipo_registro, tiposCustom]);
-
-  // Função de gerar texto 
-  const gerarTextoPublicacao = () => {
-    // O aplicarOuErro deve buscar template usando modulo === 'Livro' ou modulo === 'ExOfficio'
-    const templateModulo = moduloAtual === MODULO_LIVRO ? 'Livro' : 'ExOfficio';
-    
-    const templateEncontrado = templates.find(t => 
-      t.tipo_registro === formData.tipo_registro && 
-      t.modulo === templateModulo
-    );
-
-    if (!templateEncontrado) {
-      toast.error(`Template não configurado para ${formData.tipo_registro} (${templateModulo}).`);
-      return false;
-    }
-
-    let texto = templateEncontrado.texto_padrao || '';
-
-    // Variáveis universais
-    texto = texto.replace(/{{NOME}}/g, militarSelecionado?.nome || '');
-    texto = texto.replace(/{{MATRICULA}}/g, militarSelecionado?.matricula || '');
-    texto = texto.replace(/{{POSTO_GRADUACAO}}/g, militarSelecionado?.posto_graduacao || '');
-    texto = texto.replace(/{{DATA}}/g, formData.data_fato || '');
-
-    // Lógica do Livro
-    if (moduloAtual === MODULO_LIVRO) {
-      texto = texto.replace(/{{ASSUNTO}}/g, formData.assunto || '');
-      texto = texto.replace(/{{REFERENCIA}}/g, formData.referencia || '');
-    }
-
-    // Cases do gerarTextoPublicacao do CadastrarPublicacao.jsx (ExOfficio)
-    if (moduloAtual === MODULO_EX_OFFICIO) {
-      if (formData.tipo_registro === 'Punição') {
-        texto = texto.replace(/{{DIAS_PUNICAO}}/g, formData.dias || '');
-      } 
-      if (formData.tipo_registro === 'Ata JISO' || formData.tipo_registro === 'Homologação de Atestado') {
-        texto = texto.replace(/{{DIAS_AFASTAMENTO}}/g, formData.dias || '');
-      }
-      if (formData.tipo_registro === 'Melhoria de Comportamento' || formData.tipo_registro === 'Punição') {
-        texto = texto.replace(/{{COMPORTAMENTO_NOVO}}/g, formData.comportamento_novo || '');
-      }
-    }
-
-    setFormData(prev => ({ ...prev, texto_gerado: texto }));
-    return true;
-  };
-
-  // 6. renderSpecificFields()
-  const renderSpecificFields = () => {
-    if (moduloAtual === MODULO_LIVRO) {
-      return (
-        <RPSpecificFieldsLivro 
-          formData={formData} 
-          setFormData={setFormData} 
-          militar={militarSelecionado} 
-        />
-      );
-    }
-    if (moduloAtual === MODULO_EX_OFFICIO) {
-      return (
-        <RPSpecificFieldsExOfficio 
-          formData={formData} 
-          setFormData={setFormData} 
-          militar={militarSelecionado} 
-        />
-      );
-    }
-    return null;
-  };
-
-  const handleNext = () => {
-    if (step === 1 && !militarSelecionado) {
-      return toast.warning('Selecione um militar para continuar.');
-    }
-    if (step === 2 && !formData.tipo_registro) {
-      return toast.warning('Selecione o tipo de registro.');
-    }
-    if (step === 2) {
-      const gerou = gerarTextoPublicacao();
-      if (!gerou) return;
-    }
-    setStep(prev => prev + 1);
-  };
-
-  const handleBack = () => {
-    setStep(prev => prev - 1);
-  };
-
-  // 7. handleSubmit
-  const handleSubmit = async () => {
-    try {
-      // Validação de duplicidade (Ata JISO / Homologação) mantida do CadastrarPublicacao
-      if (moduloAtual === MODULO_EX_OFFICIO && (formData.tipo_registro === 'Ata JISO' || formData.tipo_registro === 'Homologação de Atestado')) {
-        if (!formData.atestado_id) {
-          toast.warning('Obrigatório vincular um atestado para este tipo de registro.');
-          return;
-        }
-      }
-
-      const basePayload = {
-        ...formData,
-        militar_id: militarSelecionado.id,
-      };
-
-      if (editId) {
-        await base44.entities.RegistroRP.update(editId, basePayload);
-      } else {
-        // Adicionado o modulo no create
-        await base44.entities.RegistroRP.create({ ...basePayload, modulo: moduloAtual });
-
-        // Lógica ExOfficio após o save
-        if (moduloAtual === MODULO_EX_OFFICIO) {
-          // Punição ou Melhoria de Comportamento
-          if (['Melhoria de Comportamento', 'Punição'].includes(formData.tipo_registro) && formData.comportamento_novo) {
-            await base44.entities.Militar.update(militarSelecionado.id, { 
-              comportamento: formData.comportamento_novo 
-            });
-            await base44.entities.HistoricoComportamento.create({
-              militar_id: militarSelecionado.id,
-              comportamento: formData.comportamento_novo,
-              data: formData.data_fato,
-              motivo: formData.tipo_registro,
-              bg_numero: formData.bg_numero
-            });
-          }
-
-          // Atualização de Atestado
-          if (['Ata JISO', 'Homologação de Atestado'].includes(formData.tipo_registro) && formData.atestado_id) {
-            await base44.entities.Atestado.update(formData.atestado_id, {
-              status: 'Homologado',
-              bg_publicacao: formData.bg_numero
-            });
-          }
-        }
-      }
-
-      // 8. INVALIDAÇÕES DE CACHE
-      const queryKeys = [
-        ['registros-rp'], ['publicacoes'], ['ferias'], ['periodos-aquisitivos'],
-        ['livro-consulta'], ['atestados'], ['cards'], ['militares']
-      ];
-      queryKeys.forEach(key => queryClient.invalidateQueries({ queryKey: key }));
-
-      toast.success('Registro salvo com sucesso!');
-      navigate('/rp');
-    } catch (error) {
-      console.error(error);
-      toast.error('Erro ao salvar registro.');
-    }
-  };
-
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      {/* 9. TÍTULO DO WIZARD */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">{editId ? 'Editar Registro RP' : 'Novo Registro RP'}</h1>
-        <p className="text-gray-500">Livro · Ex Officio unificado</p>
-      </div>
-
-      <Card>
-        <CardContent className="pt-6">
-          {step === 1 && (
-            <div className="space-y-4">
-              <Label>Militar</Label>
-              <SearchMilitar onSelect={setMilitarSelecionado} selected={militarSelecionado} />
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-6 flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('RP'))}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <BookOpenText className="h-3.5 w-3.5" />
+              RP — Registro de Publicações
             </div>
-          )}
+            <h1 className="text-2xl font-bold text-[#1e3a5f]">
+              {isEditing ? 'Editar Registro' : 'Novo Registro'}
+            </h1>
+          </div>
+        </div>
 
-          {step === 2 && (
-            <div className="space-y-4">
-              <Label>Tipo de Registro</Label>
-              <Select value={formData.tipo_registro} onValueChange={(val) => setFormData(p => ({ ...p, tipo_registro: val }))}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  {getTiposRPFiltrados(tiposCustom).map(tipo => (
-                    <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Militar</h2>
+            <MilitarSelector
+              value={formData.militar_id}
+              onChange={handleChange}
+              onMilitarSelect={handleMilitarSelect}
+            />
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Tipo de Registro</h2>
+
+            {selectedTipo ? (
+              <div className="flex items-center justify-between rounded-lg border border-[#1e3a5f]/20 bg-[#1e3a5f]/5 px-4 py-3">
+                <div>
+                  <p className="font-semibold text-[#1e3a5f]">{selectedTipo.label}</p>
+                  <p className="text-xs text-slate-500">
+                    {selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}
+                  </p>
+                </div>
+                {!isEditing && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedTipo(null);
+                      setFormData((prev) => ({ ...prev, tipo_registro: '' }));
+                    }}
+                  >
+                    Alterar
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={tipoSearch}
+                    onChange={(e) => setTipoSearch(e.target.value)}
+                    placeholder="Buscar tipo de registro..."
+                    className="pl-9"
+                  />
+                </div>
+
+                <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
+                  {Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
+                    <div key={grupo}>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {grupo}
+                      </p>
+                      <div className="grid gap-1 sm:grid-cols-2">
+                        {tipos.map((tipo) => (
+                          <button
+                            key={tipo.value}
+                            type="button"
+                            onClick={() => handleTipoSelect(tipo)}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:border-[#1e3a5f]/40 hover:bg-[#1e3a5f]/5"
+                          >
+                            {tipo.label}
+                            <span className="ml-2 text-xs font-normal text-slate-400">
+                              {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-              
-              {formData.tipo_registro && renderSpecificFields()}
+
+                  {tiposFiltradosBusca.length === 0 && (
+                    <p className="py-4 text-center text-sm text-slate-400">Nenhum tipo encontrado.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {isEditing && moduloOrigemEdicao && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Registro em edição vinculado ao módulo{' '}
+              <strong>{moduloOrigemEdicao === 'Livro' ? 'Livro' : 'Ex Officio'}</strong>.
+              O tipo pode ser ajustado apenas dentro da mesma origem para evitar gravação em entidade incorreta.
             </div>
           )}
 
-          {step === 3 && (
-            <div className="space-y-4">
-              <Label>Texto do Registro</Label>
-              <Textarea 
-                rows={10} 
-                value={formData.texto_gerado} 
-                onChange={(e) => setFormData(p => ({ ...p, texto_gerado: e.target.value }))}
+          {selectedTipo && (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Dados do Registro</h2>
+
+              <CamposLivroDinamicos
+                tipoRegistro={formData.tipo_registro}
+                formData={formData}
+                onChange={handleChange}
+                camposCustom={camposCustom}
+                setCamposCustom={setCamposCustom}
+                selectedFerias={selectedFerias}
+                onFeriasSelect={handleFeriasSelect}
+                operacaoFeriasSelecionada={operacaoFeriasSelecionada}
+                setOperacaoFeriasSelecionada={setOperacaoFeriasSelecionada}
+                originalActEntries={originalActEntries}
               />
             </div>
           )}
 
-          {step === 4 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Resumo do Registro</h3>
-              <div className="bg-gray-50 p-4 rounded-md space-y-2">
-                <p><strong>Militar:</strong> {militarSelecionado?.nome}</p>
-                <p><strong>Módulo:</strong> {moduloAtual === MODULO_LIVRO ? 'Livro' : 'Ex Officio'}</p>
-                <p><strong>Tipo:</strong> {formData.tipo_registro}</p>
-                <p><strong>Texto Final:</strong> {formData.texto_gerado}</p>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Publicação</h2>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Nota para BG</label>
+                <Input
+                  value={formData.nota_para_bg || ''}
+                  onChange={(e) => handleChange('nota_para_bg', e.target.value)}
+                  placeholder="Ex.: Encaminhar para BG"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Número do BG</label>
+                <Input
+                  value={formData.numero_bg || ''}
+                  onChange={(e) => handleChange('numero_bg', e.target.value)}
+                  placeholder="Ex.: 045"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Data do BG</label>
+                <Input
+                  type="date"
+                  value={formData.data_bg || ''}
+                  onChange={(e) => handleChange('data_bg', e.target.value)}
+                />
               </div>
             </div>
-          )}
-        </CardContent>
-        <div className="flex justify-between p-6 border-t">
-          <Button variant="outline" onClick={step === 1 ? () => navigate('/rp') : handleBack}>
-            {step === 1 ? 'Cancelar' : <><ArrowLeft className="w-4 h-4 mr-2" /> Voltar</>}
-          </Button>
-          
-          {step < 4 ? (
-            <Button onClick={handleNext}>
-              Avançar <ArrowRight className="w-4 h-4 ml-2" />
+
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-slate-700">Observações</label>
+              <Input
+                value={formData.observacoes || ''}
+                onChange={(e) => handleChange('observacoes', e.target.value)}
+                placeholder="Observações gerais do registro"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3">
+            <Button type="button" variant="outline" onClick={() => navigate(createPageUrl('RP'))}>
+              Cancelar
             </Button>
-          ) : (
-            <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
-              <Save className="w-4 h-4 mr-2" /> Concluir e Salvar
+            <Button type="submit" className="bg-[#1e3a5f] hover:bg-[#2c517f]" disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? 'Salvando...' : isEditing ? 'Salvar alterações' : 'Salvar registro'}
             </Button>
-          )}
-        </div>
-      </Card>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
