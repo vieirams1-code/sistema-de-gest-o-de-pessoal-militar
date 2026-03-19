@@ -222,8 +222,7 @@ export default function CadastrarRegistroRP() {
 
       // 8. INVALIDAÇÕES DE CACHE
       const queryKeys = [
-        ['registros-livro'], ['registros-rp'], ['publicacoes-ex-officio'],
-        ['publicacoes'], ['ferias'], ['periodos-aquisitivos'],
+        ['registros-rp'], ['publicacoes'], ['ferias'], ['periodos-aquisitivos'],
         ['livro-consulta'], ['atestados'], ['cards'], ['militares']
       ];
       queryKeys.forEach(key => queryClient.invalidateQueries({ queryKey: key }));
