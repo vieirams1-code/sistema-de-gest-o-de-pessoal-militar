@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { Fragment, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Plus, FileText, Filter, CalendarRange, ShieldAlert, UserRound, ExternalLink, BookOpenText } from 'lucide-react';
 
@@ -25,6 +25,51 @@ const MODULO_OPTIONS = [
   { value: 'Livro', label: 'Livro' },
   { value: 'Ex Officio', label: 'Ex Officio' },
 ];
+
+const STATUS_PRIORITY = {
+  inconsistente: 0,
+  aguardando_publicacao: 1,
+  aguardando_nota: 2,
+  gerada: 3,
+};
+
+const STATUS_GROUP_CONFIG = {
+  inconsistente: {
+    title: 'INCONSISTENTES',
+    cardClasses: 'border-red-300 bg-red-50/40',
+    actionLabel: 'AÇÃO NECESSÁRIA',
+    actionClasses: 'border border-red-200 bg-red-100 text-red-700',
+    sectionClasses: 'text-red-700 border-red-200 bg-red-50',
+  },
+  aguardando_publicacao: {
+    title: 'AGUARDANDO PUBLICAÇÃO',
+    cardClasses: 'border-amber-300 bg-amber-50/40',
+    actionLabel: 'PRONTO PARA PUBLICAR',
+    actionClasses: 'border border-amber-200 bg-amber-100 text-amber-800',
+    sectionClasses: 'text-amber-700 border-amber-200 bg-amber-50',
+  },
+  aguardando_nota: {
+    title: 'AGUARDANDO NOTA',
+    cardClasses: 'border-blue-300 bg-blue-50/40',
+    actionLabel: 'AGUARDANDO DOCUMENTO',
+    actionClasses: 'border border-blue-200 bg-blue-100 text-blue-700',
+    sectionClasses: 'text-blue-700 border-blue-200 bg-blue-50',
+  },
+  gerada: {
+    title: 'PUBLICADOS',
+    cardClasses: 'border-slate-200 bg-white',
+    actionLabel: '',
+    actionClasses: '',
+    sectionClasses: 'text-emerald-700 border-emerald-200 bg-emerald-50',
+  },
+  default: {
+    title: 'OUTROS',
+    cardClasses: 'border-slate-200 bg-white',
+    actionLabel: '',
+    actionClasses: '',
+    sectionClasses: 'text-slate-700 border-slate-200 bg-slate-50',
+  },
+};
 
 function getStatusClasses(statusCodigo) {
   switch (statusCodigo) {
@@ -172,6 +217,37 @@ function sortRegistrosDesc(registros = []) {
   });
 }
 
+function getStatusPriority(statusCodigo = '') {
+  return STATUS_PRIORITY[statusCodigo] ?? 99;
+}
+
+function sortRegistrosByOperationalPriority(registros = []) {
+  return [...registros].sort((a, b) => {
+    const priorityDiff = getStatusPriority(a.status_codigo) - getStatusPriority(b.status_codigo);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const dataA = new Date(a.data_registro || a.data_inicio || a.created_date || 0).getTime();
+    const dataB = new Date(b.data_registro || b.data_inicio || b.created_date || 0).getTime();
+    return dataB - dataA;
+  });
+}
+
+function getStatusGroupConfig(statusCodigo = '') {
+  return STATUS_GROUP_CONFIG[statusCodigo] || STATUS_GROUP_CONFIG.default;
+}
+
+function formatOperationalSummary({ inconsistentes = 0, aguardando_publicacao = 0 } = {}) {
+  if (!inconsistentes && !aguardando_publicacao) {
+    return 'Nenhum registro crítico no momento. Revise os demais status conforme necessário.';
+  }
+
+  const partes = [];
+  if (inconsistentes) partes.push(`${inconsistentes} registro${inconsistentes > 1 ? 's' : ''} inconsistente${inconsistentes > 1 ? 's' : ''}`);
+  if (aguardando_publicacao) partes.push(`${aguardando_publicacao} pronto${aguardando_publicacao > 1 ? 's' : ''} para publicação`);
+
+  return `Você possui ${partes.join(' e ')}.`;
+}
+
 async function getPublicacoesExOfficioRP({ isAdmin, getMilitarScopeFilters }) {
   if (isAdmin) {
     return base44.entities.PublicacaoExOfficio.list('-created_date');
@@ -239,14 +315,35 @@ export default function RP() {
   const registrosFiltrados = useMemo(() => {
     const buscaNormalizada = busca.trim().toLowerCase();
 
-    return registros.filter((registro) => {
+    const filtrados = registros.filter((registro) => {
       if (statusFilter !== 'todos' && registro.status_codigo !== statusFilter) return false;
       if (tipoFilter !== 'todos' && registro.tipo_label !== tipoFilter) return false;
       if (moduloFilter !== 'todos' && registro.modulo_normalizado !== moduloFilter) return false;
       if (buscaNormalizada && !buildSearchText(registro).includes(buscaNormalizada)) return false;
       return true;
     });
+
+    return sortRegistrosByOperationalPriority(filtrados);
   }, [registros, busca, statusFilter, tipoFilter, moduloFilter]);
+
+  const registrosAgrupados = useMemo(() => {
+    const grupos = [];
+    let grupoAtual = null;
+
+    registrosFiltrados.forEach((registro) => {
+      if (!grupoAtual || grupoAtual.statusCodigo !== registro.status_codigo) {
+        grupoAtual = {
+          statusCodigo: registro.status_codigo,
+          registros: [],
+        };
+        grupos.push(grupoAtual);
+      }
+
+      grupoAtual.registros.push(registro);
+    });
+
+    return grupos;
+  }, [registrosFiltrados]);
 
   const metricas = useMemo(() => {
     const totais = {
@@ -266,6 +363,11 @@ export default function RP() {
 
     return totais;
   }, [registros]);
+
+  const resumoOperacional = useMemo(
+    () => formatOperationalSummary(metricas),
+    [metricas]
+  );
 
   if (!loadingUser && isAccessResolved && !hasAccess) {
     return <AccessDenied modulo="RP — Registro de Publicações" />;
@@ -294,6 +396,10 @@ export default function RP() {
               </a>
             </Button>
           </div>
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-[#1e3a5f]/10 bg-white px-5 py-4 shadow-sm">
+          <p className="text-sm font-medium text-slate-600">{resumoOperacional}</p>
         </div>
 
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -372,69 +478,98 @@ export default function RP() {
               </p>
             </div>
           ) : (
-            registrosFiltrados.map((registro) => {
-              const grupo = getTipoGrupo(registro.tipo_label);
+            registrosAgrupados.map((grupoStatus) => {
+              const statusConfig = getStatusGroupConfig(grupoStatus.statusCodigo);
+
               return (
-                <div key={`${registro.modulo_normalizado}-${registro.id}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getModuloBadgeClasses(registro.modulo_normalizado)}`}>
-                          {registro.modulo_normalizado}
-                        </span>
-                        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getTipoGrupoClasses(grupo)}`}>
-                          {grupo}
-                        </span>
-                        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(registro.status_codigo)}`}>
-                          {registro.status_label}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="truncate text-lg font-semibold text-[#1e3a5f]">{registro.tipo_label}</h2>
-                      </div>
-
-                      <div className="mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
-                        <InfoLine icon={UserRound} label="Militar" value={registro.militar?.nome_guerra} />
-                        <InfoLine label="Posto/Graduação" value={registro.militar?.posto_graduacao} />
-                        <InfoLine label="Matrícula" value={registro.militar?.matricula} />
-                        <InfoLine label="Data" value={registro.data_display} />
-                        <InfoLine label="Nota p/ BG" value={registro.publicacao?.nota_para_bg || '-'} />
-                        <InfoLine label="Nº BG" value={registro.publicacao?.numero_bg || '-'} />
-                        <InfoLine label="Data BG" value={registro.publicacao?.data_bg || '-'} />
-                        <InfoLine label="Origem" value={registro.origem || '-'} />
-                      </div>
-
-                      {(registro.detalhes?.observacoes || registro.inconsistencia?.motivo_curto || registro.vinculos?.periodo?.label) && (
-                        <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-4">
-                          {registro.vinculos?.periodo?.label && (
-                            <p className="text-sm text-slate-600">
-                              <span className="font-medium text-slate-700">Período vinculado:</span> {registro.vinculos.periodo.label}
-                            </p>
-                          )}
-                          {registro.detalhes?.observacoes && (
-                            <p className="text-sm text-slate-600">
-                              <span className="font-medium text-slate-700">Observações:</span> {registro.detalhes.observacoes}
-                            </p>
-                          )}
-                          {registro.inconsistencia?.motivo_curto && (
-                            <p className="text-sm text-red-700">
-                              <span className="font-medium">Inconsistência:</span> {registro.inconsistencia.motivo_curto}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex shrink-0 justify-start lg:justify-end">
-                      <Button asChild variant="ghost">
-                        <a href={createPageUrl('Publicacoes')}>
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          Publicações
-                        </a>
-                      </Button>
-                    </div>
+                <div key={grupoStatus.statusCodigo} className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className={`text-sm font-bold uppercase tracking-[0.18em] ${statusConfig.sectionClasses.split(' ')[0]}`}>
+                      {statusConfig.title}
+                    </h2>
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusConfig.sectionClasses}`}>
+                      {grupoStatus.registros.length} registro{grupoStatus.registros.length > 1 ? 's' : ''}
+                    </span>
                   </div>
+
+                  {grupoStatus.registros.map((registro) => {
+                    const grupo = getTipoGrupo(registro.tipo_label);
+                    const cardStatusConfig = getStatusGroupConfig(registro.status_codigo);
+
+                    return (
+                      <Fragment key={`${registro.modulo_normalizado}-${registro.id}`}>
+                        <div className={`rounded-2xl border p-5 shadow-sm ${cardStatusConfig.cardClasses}`}>
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getModuloBadgeClasses(registro.modulo_normalizado)}`}>
+                                    {registro.modulo_normalizado}
+                                  </span>
+                                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getTipoGrupoClasses(grupo)}`}>
+                                    {grupo}
+                                  </span>
+                                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(registro.status_codigo)}`}>
+                                    {registro.status_label}
+                                  </span>
+                                </div>
+
+                                {cardStatusConfig.actionLabel ? (
+                                  <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${cardStatusConfig.actionClasses}`}>
+                                    {cardStatusConfig.actionLabel}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate text-lg font-semibold text-[#1e3a5f]">{registro.tipo_label}</h3>
+                              </div>
+
+                              <div className="mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
+                                <InfoLine icon={UserRound} label="Militar" value={registro.militar?.nome_guerra} />
+                                <InfoLine label="Posto/Graduação" value={registro.militar?.posto_graduacao} />
+                                <InfoLine label="Matrícula" value={registro.militar?.matricula} />
+                                <InfoLine label="Data" value={registro.data_display} />
+                                <InfoLine label="Nota p/ BG" value={registro.publicacao?.nota_para_bg || '-'} />
+                                <InfoLine label="Nº BG" value={registro.publicacao?.numero_bg || '-'} />
+                                <InfoLine label="Data BG" value={registro.publicacao?.data_bg || '-'} />
+                                <InfoLine label="Origem" value={registro.origem || '-'} />
+                              </div>
+
+                              {(registro.detalhes?.observacoes || registro.inconsistencia?.motivo_curto || registro.vinculos?.periodo?.label) && (
+                                <div className="mt-4 space-y-2 rounded-xl bg-white/70 p-4">
+                                  {registro.vinculos?.periodo?.label && (
+                                    <p className="text-sm text-slate-600">
+                                      <span className="font-medium text-slate-700">Período vinculado:</span> {registro.vinculos.periodo.label}
+                                    </p>
+                                  )}
+                                  {registro.detalhes?.observacoes && (
+                                    <p className="text-sm text-slate-600">
+                                      <span className="font-medium text-slate-700">Observações:</span> {registro.detalhes.observacoes}
+                                    </p>
+                                  )}
+                                  {registro.inconsistencia?.motivo_curto && (
+                                    <p className="text-sm text-red-700">
+                                      <span className="font-medium">Inconsistência:</span> {registro.inconsistencia.motivo_curto}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex shrink-0 justify-start lg:justify-end">
+                              <Button asChild variant="ghost">
+                                <a href={createPageUrl('Publicacoes')}>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Publicações
+                                </a>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </Fragment>
+                    );
+                  })}
                 </div>
               );
             })
