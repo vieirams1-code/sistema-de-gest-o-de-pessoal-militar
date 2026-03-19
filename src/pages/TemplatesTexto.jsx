@@ -14,8 +14,7 @@ import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle } from 'lu
 import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-
-const MODULOS = ['Livro', 'Publicação Ex Officio'];
+import { RP_TIPOS_BASE, getModuloByTipo, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
 
 const FERIAS_CANONICAL_TYPES = [
   'Saída Férias',
@@ -31,49 +30,29 @@ const FERIAS_LABELS = {
   'Retorno Férias': 'Término',
 };
 
-const TIPOS_POR_MODULO = {
-  'Livro': [
-    'Saída Férias',
-    'Interrupção de Férias',
-    'Nova Saída / Retomada',
-    'Retorno Férias',
-    'Licença Maternidade',
-    'Prorrogação de Licença Maternidade',
-    'Licença Paternidade',
-    'Núpcias',
-    'Luto',
-    'Cedência',
-    'Transferência',
-    'Transferência para RR',
-    'Trânsito',
-    'Instalação',
-    'Dispensa Recompensa',
-    'Deslocamento Missão',
-    'Curso/Estágio',
-    'Designação de Função',
-    'Dispensa de Função'
-  ],
-  'Publicação Ex Officio': [
-    'Elogio Individual',
-    'Melhoria de Comportamento',
-    'Punição',
-    'Designação de Função',
-    'Dispensa de Função',
-    'Ata JISO',
-    'Transcrição de Documentos',
-    'Transferência para RR',
-    'Homologação de Atestado',
-    'Apostila',
-    'Tornar sem Efeito'
-  ],
+const MODULO_LABELS = {
+  [MODULO_LIVRO]: 'Livro',
+  [MODULO_EX_OFFICIO]: 'Ex Offício',
 };
+
+function normalizeTemplateModulo(modulo) {
+  return modulo === 'Publicação Ex Officio' ? MODULO_EX_OFFICIO : modulo || '';
+}
+
+function getModuloDisplay(modulo) {
+  return MODULO_LABELS[normalizeTemplateModulo(modulo)] || modulo || 'Não definido';
+}
+
+function serializeTemplateModulo(modulo) {
+  return normalizeTemplateModulo(modulo) === MODULO_EX_OFFICIO ? 'Publicação Ex Officio' : modulo;
+}
 
 function getTipoDisplay(tipo) {
   return FERIAS_LABELS[tipo] || tipo;
 }
 
 function getTipoSelectLabel(modulo, tipo) {
-  if (modulo === 'Livro' && FERIAS_LABELS[tipo]) {
+  if (normalizeTemplateModulo(modulo) === MODULO_LIVRO && FERIAS_LABELS[tipo]) {
     return `${getTipoDisplay(tipo)} (${tipo})`;
   }
   return getTipoDisplay(tipo);
@@ -501,9 +480,13 @@ export default function TemplatesTexto() {
   const saveMutation = useMutation({
     mutationFn: (data) => {
       if (!canGerirTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
+      const payload = {
+        ...data,
+        modulo: serializeTemplateModulo(data.modulo),
+      };
       return data.id
-        ? base44.entities.TemplateTexto.update(data.id, data)
-        : base44.entities.TemplateTexto.create(data);
+        ? base44.entities.TemplateTexto.update(data.id, payload)
+        : base44.entities.TemplateTexto.create(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
@@ -531,7 +514,7 @@ export default function TemplatesTexto() {
   });
 
   const filtered = templates.filter(t => {
-    const matchesModulo = moduloFiltro === 'all' || t.modulo === moduloFiltro;
+    const matchesModulo = moduloFiltro === 'all' || normalizeTemplateModulo(t.modulo) === moduloFiltro;
     const tipoBusca = getTipoDisplay(t.tipo_registro || '');
     const matchesSearch = !searchTerm || 
       t.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -541,19 +524,25 @@ export default function TemplatesTexto() {
   });
 
   const handleEdit = (t) => {
-    setEditingTemplate({ ...t });
+    setEditingTemplate({ ...t, modulo: normalizeTemplateModulo(t.modulo) });
     setShowForm(true);
   };
 
   const handleNew = () => {
-    setEditingTemplate({ modulo: 'Livro', tipo_registro: '', nome: '', template: '', observacoes: '', ativo: true });
+    setEditingTemplate({ modulo: '', tipo_registro: '', nome: '', template: '', observacoes: '', ativo: true });
     setShowForm(true);
   };
 
   const moduloColor = {
-    'Livro': 'bg-blue-100 text-blue-700',
-    'Publicação Ex Officio': 'bg-purple-100 text-purple-700',
+    [MODULO_LIVRO]: 'bg-blue-100 text-blue-700',
+    [MODULO_EX_OFFICIO]: 'bg-purple-100 text-purple-700',
   };
+
+  const tiposRegistroOptions = useMemo(() => (
+    RP_TIPOS_BASE
+      .map((tipo) => ({ ...tipo, modulo: normalizeTemplateModulo(tipo.modulo) }))
+      .sort((a, b) => getTipoDisplay(a.value).localeCompare(getTipoDisplay(b.value), 'pt-BR'))
+  ), []);
 
   const selectedTipoVars = editingTemplate?.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
 
@@ -563,14 +552,14 @@ export default function TemplatesTexto() {
     }
 
     const conflict = templates.find(t =>
-      t.modulo === editingTemplate.modulo &&
+      normalizeTemplateModulo(t.modulo) === normalizeTemplateModulo(editingTemplate.modulo) &&
       t.tipo_registro === editingTemplate.tipo_registro &&
       t.ativo !== false &&
       t.id !== editingTemplate.id
     );
 
     if (conflict) {
-      return `Já existe um template ativo para '${getTipoDisplay(editingTemplate.tipo_registro)}' no módulo '${editingTemplate.modulo}'. Desative ou edite o template existente antes de ativar este.`;
+      return `Já existe um template ativo para '${getTipoDisplay(editingTemplate.tipo_registro)}' no módulo '${getModuloDisplay(editingTemplate.modulo)}'. Desative ou edite o template existente antes de ativar este.`;
     }
     return null;
   }, [editingTemplate, templates]);
@@ -579,7 +568,8 @@ export default function TemplatesTexto() {
     if (!modulo) return new Set();
     const validas = new Set();
     
-    const genericos = modulo === 'Livro' ? GRUPOS_GENERICOS_LIVRO : modulo === 'Publicação Ex Officio' ? GRUPOS_GENERICOS_EXOFFICIO : [];
+    const moduloNormalizado = normalizeTemplateModulo(modulo);
+    const genericos = moduloNormalizado === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : moduloNormalizado === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : [];
     genericos.forEach(g => g.variaveis.forEach(v => validas.add(v.v.replace(/^\{\{/, '').replace(/\}\}$/, ''))));
 
     if (tipo && VARS_POR_TIPO[tipo]) {
@@ -647,7 +637,7 @@ export default function TemplatesTexto() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Módulos</SelectItem>
-              {MODULOS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              {Object.entries(MODULO_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -669,7 +659,7 @@ export default function TemplatesTexto() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-semibold text-slate-800">{t.nome}</span>
-                      <Badge className={moduloColor[t.modulo] || 'bg-slate-100 text-slate-700'}>{t.modulo}</Badge>
+                      <Badge className={moduloColor[normalizeTemplateModulo(t.modulo)] || 'bg-slate-100 text-slate-700'}>{getModuloDisplay(t.modulo)}</Badge>
                       <Badge variant="outline" className="text-xs">{getTipoDisplay(t.tipo_registro)}</Badge>
                       {isLivroFeriasTipo(t.tipo_registro) && (
                         <Badge className="bg-slate-100 text-slate-600 text-[10px]">{t.tipo_registro}</Badge>
@@ -761,28 +751,30 @@ export default function TemplatesTexto() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-slate-700">Módulo <span className="text-red-500">*</span></Label>
-                  <Select value={editingTemplate.modulo} onValueChange={v => setEditingTemplate(p => ({ ...p, modulo: v, tipo_registro: '' }))}>
-                    <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {MODULOS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-sm font-medium text-slate-700">Módulo</Label>
+                  <Input
+                    value={editingTemplate.modulo ? getModuloDisplay(editingTemplate.modulo) : 'Será definido automaticamente pelo tipo de registro'}
+                    readOnly
+                    className="mt-1.5 bg-slate-50 text-slate-600"
+                  />
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-slate-700">Tipo de Registro <span className="text-red-500">*</span></Label>
-                  <Select value={editingTemplate.tipo_registro} onValueChange={v => setEditingTemplate(p => ({ ...p, tipo_registro: v }))}>
+                  <Select
+                    value={editingTemplate.tipo_registro}
+                    onValueChange={v => setEditingTemplate(p => ({ ...p, tipo_registro: v, modulo: getModuloByTipo(v) }))}
+                  >
                     <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      {(TIPOS_POR_MODULO[editingTemplate.modulo] || []).map(t => (
-                        <SelectItem key={t} value={t}>{getTipoSelectLabel(editingTemplate.modulo, t)}</SelectItem>
+                      {tiposRegistroOptions.map(tipo => (
+                        <SelectItem key={tipo.value} value={tipo.value}>{getTipoSelectLabel(tipo.modulo, tipo.value)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              {editingTemplate.modulo === 'Livro' && isLivroFeriasTipo(editingTemplate.tipo_registro) && (
+              {normalizeTemplateModulo(editingTemplate.modulo) === MODULO_LIVRO && isLivroFeriasTipo(editingTemplate.tipo_registro) && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                   Este template será exibido ao usuário como <strong>{getTipoDisplay(editingTemplate.tipo_registro)}</strong>, mas será salvo internamente como <strong>{editingTemplate.tipo_registro}</strong> para manter compatibilidade com o sistema.
                 </div>
@@ -842,7 +834,7 @@ export default function TemplatesTexto() {
 
                 const gruposParaMostrar = selectedTipoVars
                   ? [selectedTipoVars]
-                  : (editingTemplate.modulo === 'Livro' ? GRUPOS_GENERICOS_LIVRO : editingTemplate.modulo === 'Publicação Ex Officio' ? GRUPOS_GENERICOS_EXOFFICIO : []);
+                  : (normalizeTemplateModulo(editingTemplate.modulo) === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : normalizeTemplateModulo(editingTemplate.modulo) === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : []);
 
                 if (gruposParaMostrar.length === 0) return null;
 
