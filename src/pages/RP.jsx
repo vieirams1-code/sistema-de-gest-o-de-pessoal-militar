@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, Plus, FileText, Filter, CalendarRange, ShieldAlert, UserRound, ExternalLink, BookOpenText, Pencil } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
+import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -65,13 +66,16 @@ function getTipoGrupoClasses(grupo) {
   }
 }
 
-function normalizeModulo(modulo = '') {
-  const valor = String(modulo).trim().toLowerCase();
+function normalizeModulo(modulo = '', registro = {}) {
+  const valor = String(modulo || registro?.modulo || registro?.origem_tipo || '').trim().toLowerCase();
 
   if (valor === 'livro') return 'Livro';
-  if (valor === 'ex officio' || valor === 'exofficio' || valor === 'publicação ex officio' || valor === 'publicacao ex officio') {
+  if (valor === 'ex officio' || valor === 'exofficio' || valor === 'ex-officio' || valor === 'publicação ex officio' || valor === 'publicacao ex officio') {
     return 'Ex Officio';
   }
+
+  if (registro?.origem_tipo === 'livro' || registro?.tipo_label || registro?.status_codigo || registro?.vinculos) return 'Livro';
+  if (registro?.origem_tipo === 'ex-officio' || registro?.tipo || registro?._origem === 'ex-officio') return 'Ex Officio';
 
   return modulo || 'Livro';
 }
@@ -112,7 +116,7 @@ function normalizeStatusLabel(registro, statusCodigo) {
 
 function normalizeRegistro(registro) {
   const statusCodigo = normalizeStatus(registro);
-  const modulo = normalizeModulo(registro.modulo);
+  const modulo = normalizeModulo(registro.modulo, registro);
   const militar = registro.militar || {};
 
   return {
@@ -160,8 +164,38 @@ function buildSearchText(registro) {
     .toLowerCase();
 }
 
+function sortRegistrosDesc(registros = []) {
+  return [...registros].sort((a, b) => {
+    const dataA = new Date(a.data_registro || a.data_inicio || a.created_date || 0).getTime();
+    const dataB = new Date(b.data_registro || b.data_inicio || b.created_date || 0).getTime();
+    return dataB - dataA;
+  });
+}
+
+async function getPublicacoesExOfficioRP({ isAdmin, getMilitarScopeFilters }) {
+  if (isAdmin) {
+    return base44.entities.PublicacaoExOfficio.list('-created_date');
+  }
+
+  const scopeFilters = getMilitarScopeFilters();
+  if (!scopeFilters.length) return [];
+
+  const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
+  const militaresAcesso = militarQueries.flat();
+  const militarIds = [...new Set(militaresAcesso.map((m) => m.id).filter(Boolean))];
+  if (!militarIds.length) return [];
+
+  const arrays = await Promise.all(
+    militarIds.map((id) => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date'))
+  );
+
+  const map = new Map();
+  arrays.flat().forEach((item) => map.set(item.id, item));
+  return Array.from(map.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+}
+
 export default function RP() {
-  const { canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, isAccessResolved, isLoading: loadingUser, isAdmin, getMilitarScopeFilters } = useCurrentUser();
   const [busca, setBusca] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const [tipoFilter, setTipoFilter] = useState('todos');
@@ -170,8 +204,27 @@ export default function RP() {
   const hasAccess = canAccessModule('livro') || canAccessModule('publicacoes');
 
   const { data: registrosBrutos = [], isLoading } = useQuery({
-    queryKey: ['registro-rp-lista'],
-    queryFn: () => base44.entities.RegistroRP.list('-data_registro'),
+    queryKey: ['registro-rp-lista', isAdmin],
+    queryFn: async () => {
+      const [contratoLivro, publicacoesExOfficio] = await Promise.all([
+        getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
+        getPublicacoesExOfficioRP({ isAdmin, getMilitarScopeFilters }),
+      ]);
+
+      const registrosLivro = (contratoLivro?.registros_livro || []).map((registro) => ({
+        ...registro,
+        modulo: 'Livro',
+        origem_tipo: 'livro',
+      }));
+
+      const registrosExOfficio = publicacoesExOfficio.map((registro) => ({
+        ...registro,
+        modulo: 'Ex Officio',
+        origem_tipo: 'ex-officio',
+      }));
+
+      return sortRegistrosDesc([...registrosLivro, ...registrosExOfficio]);
+    },
     enabled: isAccessResolved && hasAccess,
     staleTime: 30000,
   });
@@ -180,114 +233,103 @@ export default function RP() {
 
   const tiposDisponiveis = useMemo(() => {
     const tipos = [...new Set(registros.map((registro) => registro.tipo_label).filter(Boolean))];
-    return tipos.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return tipos.sort((a, b) => a.localeCompare(b));
   }, [registros]);
 
   const registrosFiltrados = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
+    const buscaNormalizada = busca.trim().toLowerCase();
 
     return registros.filter((registro) => {
       if (statusFilter !== 'todos' && registro.status_codigo !== statusFilter) return false;
       if (tipoFilter !== 'todos' && registro.tipo_label !== tipoFilter) return false;
       if (moduloFilter !== 'todos' && registro.modulo_normalizado !== moduloFilter) return false;
-      if (termo && !buildSearchText(registro).includes(termo)) return false;
+      if (buscaNormalizada && !buildSearchText(registro).includes(buscaNormalizada)) return false;
       return true;
     });
   }, [registros, busca, statusFilter, tipoFilter, moduloFilter]);
 
-  const metricas = useMemo(() => ({
-    total: registros.length,
-    aguardandoNota: registros.filter((item) => item.status_codigo === 'aguardando_nota').length,
-    aguardandoPublicacao: registros.filter((item) => item.status_codigo === 'aguardando_publicacao').length,
-    publicados: registros.filter((item) => item.status_codigo === 'gerada').length,
-  }), [registros]);
+  const metricas = useMemo(() => {
+    const totais = {
+      total: registros.length,
+      aguardando_publicacao: 0,
+      aguardando_nota: 0,
+      gerada: 0,
+      inconsistentes: 0,
+    };
+
+    registros.forEach((registro) => {
+      if (registro.status_codigo === 'aguardando_publicacao') totais.aguardando_publicacao += 1;
+      if (registro.status_codigo === 'aguardando_nota') totais.aguardando_nota += 1;
+      if (registro.status_codigo === 'gerada') totais.gerada += 1;
+      if (registro.status_codigo === 'inconsistente') totais.inconsistentes += 1;
+    });
+
+    return totais;
+  }, [registros]);
 
   if (!loadingUser && isAccessResolved && !hasAccess) {
     return <AccessDenied modulo="RP — Registro de Publicações" />;
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 font-medium">Carregando registros RP...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-              <BookOpenText className="h-4 w-4" /> RP — Registro de Publicações
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#1e3a5f]/15 bg-white px-3 py-1 text-xs font-medium text-[#1e3a5f] shadow-sm">
+              <BookOpenText className="h-3.5 w-3.5" />
+              RP — Registro de Publicações
             </div>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#1e3a5f]">RP — Registro de Publicações</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Registros</h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Livro e Ex Officio unificados
+              Gestão unificada dos registros do Livro e das publicações Ex Officio, com foco em ação rápida e conferência operacional.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button asChild className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+          <div className="flex flex-wrap gap-2">
+            <Button asChild className="bg-[#1e3a5f] hover:bg-[#2c517f]">
+              <a href={createPageUrl('CadastrarRegistroRP') + '?tipo=inicio_ferias'}>
+                <CalendarRange className="mr-2 h-4 w-4" />
+                Início de férias
+              </a>
+            </Button>
+            <Button asChild variant="secondary">
+              <a href={createPageUrl('CadastrarRegistroRP') + '?tipo=termino_ferias'}>
+                <CalendarRange className="mr-2 h-4 w-4" />
+                Término de férias
+              </a>
+            </Button>
+            <Button asChild variant="secondary">
+              <a href={createPageUrl('CadastrarRegistroRP') + '?tipo=dispensa'}>
+                <ShieldAlert className="mr-2 h-4 w-4" />
+                Dispensa de função
+              </a>
+            </Button>
+            <Button asChild variant="outline">
               <a href={createPageUrl('CadastrarRegistroRP')}>
-                <Plus className="mr-2 h-4 w-4" /> Novo registro
+                <Plus className="mr-2 h-4 w-4" />
+                Novo registro
               </a>
             </Button>
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
-            <p className="mt-3 text-3xl font-bold text-slate-900">{metricas.total}</p>
-          </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Ag. nota</p>
-            <p className="mt-3 text-3xl font-bold text-amber-900">{metricas.aguardandoNota}</p>
-          </div>
-          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Ag. publicação</p>
-            <p className="mt-3 text-3xl font-bold text-blue-900">{metricas.aguardandoPublicacao}</p>
-          </div>
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Publicado</p>
-            <p className="mt-3 text-3xl font-bold text-emerald-900">{metricas.publicados}</p>
-          </div>
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <MetricCard icon={FileText} label="Total" value={metricas.total} helper="Todos os registros visíveis" />
+          <MetricCard icon={Filter} label="Aguardando publicação" value={metricas.aguardando_publicacao} helper="Prontos para boletim" />
+          <MetricCard icon={CalendarRange} label="Aguardando nota" value={metricas.aguardando_nota} helper="Dependem de nota para BG" />
+          <MetricCard icon={BookOpenText} label="Publicados" value={metricas.gerada} helper="Já lançados em BG" />
+          <MetricCard icon={ShieldAlert} label="Inconsistências" value={metricas.inconsistentes} helper="Requer conferência" />
         </div>
 
-        <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <Filter className="h-4 w-4" /> Filtros de consulta
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2 rounded-2xl bg-slate-50 p-2">
-            {MODULO_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setModuloFilter(option.value)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  moduloFilter === option.value
-                    ? 'bg-[#1e3a5f] text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.7fr)_minmax(260px,0.9fr)]">
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="grid gap-3 lg:grid-cols-[1.4fr,0.8fr,0.8fr,0.8fr]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={busca}
-                onChange={(event) => setBusca(event.target.value)}
-                placeholder="Buscar por militar, tipo, módulo, matrícula, BG, nota ou observação"
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por militar, matrícula, tipo, nota ou observação"
                 className="pl-9"
               />
             </div>
@@ -297,8 +339,23 @@ export default function RP() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                {STATUS_OPTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={moduloFilter} onValueChange={setModuloFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Módulo" />
+              </SelectTrigger>
+              <SelectContent>
+                {MODULO_OPTIONS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -310,107 +367,132 @@ export default function RP() {
               <SelectContent>
                 <SelectItem value="todos">Todos os tipos</SelectItem>
                 {tiposDisponiveis.map((tipo) => (
-                  <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                  <SelectItem key={tipo} value={tipo}>
+                    {tipo}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        <div className="mt-6 space-y-4">
-          {!isLoading && registrosFiltrados.length === 0 && (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
-              <p className="text-lg font-semibold text-slate-800">Nenhum registro encontrado</p>
-              <p className="mt-2 text-sm text-slate-500">Ajuste os filtros ou cadastre um novo registro em RP.</p>
+        <div className="space-y-4">
+          {isLoading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
+              Carregando registros...
             </div>
-          )}
+          ) : registrosFiltrados.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+              <FileText className="mx-auto mb-3 h-8 w-8 text-slate-400" />
+              <h3 className="text-base font-semibold text-slate-700">Nenhum registro encontrado</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Ajuste os filtros ou cadastre um novo registro para iniciar o fluxo.
+              </p>
+            </div>
+          ) : (
+            registrosFiltrados.map((registro) => {
+              const grupo = getTipoGrupo(registro.tipo_label);
+              const editUrl = `${createPageUrl('CadastrarRegistroRP')}?id=${registro.id}`;
 
-          {registrosFiltrados.map((registro) => {
-            const grupoTipo = getTipoGrupo(registro.tipo_label);
-
-            return (
-              <article key={registro.id} className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
-                <span className={`absolute right-5 top-5 rounded-full border px-3 py-1 text-[11px] font-semibold ${getModuloBadgeClasses(registro.modulo_normalizado)}`}>
-                  {registro.modulo_normalizado}
-                </span>
-
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 pr-28">
-                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getTipoGrupoClasses(grupoTipo)}`}>{grupoTipo}</span>
-                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(registro.status_codigo)}`}>{registro.status_label}</span>
-                      {registro.vinculos?.cadeia?.existe && (
-                        <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                          Cadeia com {registro.vinculos.cadeia.total_eventos} evento(s)
+              return (
+                <div key={`${registro.modulo_normalizado}-${registro.id}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getModuloBadgeClasses(registro.modulo_normalizado)}`}>
+                          {registro.modulo_normalizado}
                         </span>
+                        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getTipoGrupoClasses(grupo)}`}>
+                          {grupo}
+                        </span>
+                        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(registro.status_codigo)}`}>
+                          {registro.status_label}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="truncate text-lg font-semibold text-[#1e3a5f]">{registro.tipo_label}</h2>
+                      </div>
+
+                      <div className="mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
+                        <InfoLine icon={UserRound} label="Militar" value={registro.militar?.nome_guerra} />
+                        <InfoLine label="Posto/Graduação" value={registro.militar?.posto_graduacao} />
+                        <InfoLine label="Matrícula" value={registro.militar?.matricula} />
+                        <InfoLine label="Data" value={registro.data_display} />
+                        <InfoLine label="Nota p/ BG" value={registro.publicacao?.nota_para_bg || '-'} />
+                        <InfoLine label="Nº BG" value={registro.publicacao?.numero_bg || '-'} />
+                        <InfoLine label="Data BG" value={registro.publicacao?.data_bg || '-'} />
+                        <InfoLine label="Origem" value={registro.origem || '-'} />
+                      </div>
+
+                      {(registro.detalhes?.observacoes || registro.inconsistencia?.motivo_curto || registro.vinculos?.periodo?.label) && (
+                        <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-4">
+                          {registro.vinculos?.periodo?.label && (
+                            <p className="text-sm text-slate-600">
+                              <span className="font-medium text-slate-700">Período vinculado:</span> {registro.vinculos.periodo.label}
+                            </p>
+                          )}
+                          {registro.detalhes?.observacoes && (
+                            <p className="text-sm text-slate-600">
+                              <span className="font-medium text-slate-700">Observações:</span> {registro.detalhes.observacoes}
+                            </p>
+                          )}
+                          {registro.inconsistencia?.motivo_curto && (
+                            <p className="text-sm text-red-700">
+                              <span className="font-medium">Inconsistência:</span> {registro.inconsistencia.motivo_curto}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
 
-                    <h2 className="mt-3 text-xl font-bold text-slate-900">{registro.tipo_label}</h2>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          <UserRound className="h-3.5 w-3.5" /> Militar
-                        </div>
-                        <p className="mt-2 text-sm font-semibold text-slate-900">{registro.militar?.nome_guerra || 'Não informado'}</p>
-                        <p className="text-sm text-slate-600">{registro.militar?.posto_graduacao || 'Posto não informado'}</p>
-                        <p className="text-xs text-slate-500">Matrícula: {registro.militar?.matricula || '-'}</p>
-                      </div>
-
-                      <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          <CalendarRange className="h-3.5 w-3.5" /> Período
-                        </div>
-                        <p className="mt-2 text-sm font-semibold text-slate-900">{registro.data_display || '-'}</p>
-                        <p className="text-xs text-slate-500">Origem: {registro.origem || '-'}</p>
-                        {registro.vinculos?.periodo?.label && (
-                          <p className="text-xs text-slate-500">Período aquisitivo: {registro.vinculos.periodo.label}</p>
-                        )}
-                      </div>
-
-                      <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          <FileText className="h-3.5 w-3.5" /> Publicação
-                        </div>
-                        <p className="mt-2 text-sm font-semibold text-slate-900">{registro.publicacao?.numero_bg ? `BG ${registro.publicacao.numero_bg}` : 'Sem BG gerado'}</p>
-                        <p className="text-xs text-slate-500">Data BG: {registro.publicacao?.data_bg || '-'}</p>
-                        <p className="text-xs text-slate-500 line-clamp-2">Nota: {registro.publicacao?.nota_para_bg || '-'}</p>
-                      </div>
-
-                      <div className="rounded-2xl bg-slate-50 p-3">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          <ShieldAlert className="h-3.5 w-3.5" /> Atenção operacional
-                        </div>
-                        <p className="mt-2 text-sm font-semibold text-slate-900">
-                          {registro.inconsistencia?.motivo_curto || 'Sem alerta crítico'}
-                        </p>
-                        <p className="text-xs text-slate-500 line-clamp-2">
-                          {registro.inconsistencia?.detalhe || registro.detalhes?.observacoes || 'Registro sem observações operacionais adicionais.'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex shrink-0 flex-col gap-2 lg:w-52">
-                    <Button asChild className="justify-between bg-[#1e3a5f] hover:bg-[#2d4a6f]">
-                      <a href={`${createPageUrl('CadastrarRegistroRP')}?id=${registro.id}`}>
-                        Editar registro <Pencil className="h-4 w-4" />
-                      </a>
-                    </Button>
-                    {registro.militar?.id && (
-                      <Button asChild variant="outline" className="justify-between">
-                        <a href={`${createPageUrl('FichaMilitar')}?id=${registro.militar.id}`}>
-                          Ver ficha militar <ExternalLink className="h-4 w-4" />
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button asChild variant="outline">
+                        <a href={editUrl}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
                         </a>
                       </Button>
-                    )}
+                      <Button asChild variant="ghost">
+                        <a href={createPageUrl('Publicacoes')}>
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Publicações
+                        </a>
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </article>
-            );
-          })}
+              );
+            })
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, helper }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="rounded-xl bg-[#1e3a5f]/10 p-2 text-[#1e3a5f]">
+          <Icon className="h-4 w-4" />
+        </div>
+        <span className="text-2xl font-bold text-[#1e3a5f]">{value}</span>
+      </div>
+      <p className="text-sm font-medium text-slate-700">{label}</p>
+      <p className="mt-1 text-xs text-slate-500">{helper}</p>
+    </div>
+  );
+}
+
+function InfoLine({ icon: Icon, label, value }) {
+  return (
+    <div className="min-w-0">
+      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
+      <div className="flex items-center gap-2">
+        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : null}
+        <p className="truncate text-sm font-medium text-slate-700">{value || '-'}</p>
       </div>
     </div>
   );
