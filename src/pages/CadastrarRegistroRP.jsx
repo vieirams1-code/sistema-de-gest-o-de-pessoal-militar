@@ -25,6 +25,7 @@ import {
 } from '@/components/rp/rpTiposConfig';
 import { getLivroOperacaoFerias } from '@/components/livro/feriasOperacaoUtils';
 import {
+  getConflitoTemplatePorTipo,
   getTemplateAtivoPorTipo,
   tipoExigeTemplate,
 } from '@/components/rp/templateValidation';
@@ -249,6 +250,14 @@ export default function CadastrarRegistroRP() {
     return tipoExigeTemplate(formData.tipo_registro) && !templateAtivoSelecionado;
   }, [isEditing, formData.tipo_registro, templateAtivoSelecionado]);
 
+  const conflitoTemplateSelecionado = useMemo(() => {
+    if (!formData.tipo_registro) {
+      return { temConflito: false, modulos: [] };
+    }
+
+    return getConflitoTemplatePorTipo(formData.tipo_registro, templatesAtivos);
+  }, [formData.tipo_registro, templatesAtivos]);
+
   // Populate form when editing
   useEffect(() => {
     if (!registroEdicao) return;
@@ -354,7 +363,10 @@ export default function CadastrarRegistroRP() {
     const templateObrigatorioAusenteNoSubmit =
       !isEditing && tipoExigeTemplate(formData.tipo_registro) && !templateAtivoNoSubmit;
 
+    const conflitoTemplateNoSubmit = getConflitoTemplatePorTipo(formData.tipo_registro, templatesAtivos);
+
     if (templateObrigatorioAusenteNoSubmit) return;
+    if (conflitoTemplateNoSubmit.temConflito) return;
 
     const payload = {
       ...formData,
@@ -363,7 +375,7 @@ export default function CadastrarRegistroRP() {
     saveMutation.mutate(payload);
   };
 
-  const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente;
+  const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente && !conflitoTemplateSelecionado.temConflito;
   const canAdvanceFromStep2 = !!formData.militar_id;
   const canAdvanceFromStep3 = !!formData.data_registro;
 
@@ -527,6 +539,15 @@ export default function CadastrarRegistroRP() {
                   role="alert"
                 >
                   Template obrigatório não encontrado para este tipo de registro. Cadastre um template antes de continuar.
+                </div>
+              )}
+
+              {conflitoTemplateSelecionado.temConflito && (
+                <div
+                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900 shadow-sm"
+                  role="alert"
+                >
+                  Conflito de template detectado para este tipo. Verifique os templates cadastrados.
                 </div>
               )}
 
@@ -710,6 +731,15 @@ export default function CadastrarRegistroRP() {
                 </div>
               )}
 
+              {conflitoTemplateSelecionado.temConflito && (
+                <div
+                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900 shadow-sm"
+                  role="alert"
+                >
+                  Conflito de template detectado para este tipo. Verifique os templates cadastrados.
+                </div>
+              )}
+
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => setStep(3)}>
                   Voltar
@@ -717,7 +747,7 @@ export default function CadastrarRegistroRP() {
                 <Button
                   type="submit"
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                  disabled={saveMutation.isPending || templateObrigatorioAusente}
+                  disabled={saveMutation.isPending || templateObrigatorioAusente || conflitoTemplateSelecionado.temConflito}
                 >
                   <Save className="mr-2 h-4 w-4" />
                   {saveMutation.isPending ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Salvar'}
