@@ -26,6 +26,7 @@ import {
   ArrowLeftRight,
   Building2,
   GitBranch,
+  BookMarked,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,6 +60,7 @@ const menuGroups = [
       { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban, moduleKey: 'quadro_operacional' },
       { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock, moduleKey: 'quadro_operacional' },
       { name: 'Livro', page: 'Livro', icon: BookOpen, moduleKey: 'livro' },
+      { name: 'RP', page: 'RP', icon: BookMarked, moduleKey: 'livro' },
       { name: 'Publicação Ex Officio', page: 'CadastrarPublicacao', icon: FileText, moduleKey: 'publicacoes' },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, moduleKey: 'publicacoes' },
       { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, moduleKey: 'publicacoes' },
