@@ -637,13 +637,12 @@ export default function CadastrarRegistroLivro() {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['registro-livro-edicao'] });
       queryClient.invalidateQueries({ queryKey: ['livro-consulta'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
 
       if (redirectTarget === 'publicacoes') navigate(createPageUrl('Publicacoes'));

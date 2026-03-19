@@ -603,7 +603,7 @@ export default function CadastrarPublicacao() {
       }
     }
 
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
     queryClient.invalidateQueries({ queryKey: ['militares'] });
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
     queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });

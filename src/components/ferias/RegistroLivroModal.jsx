@@ -536,7 +536,7 @@ export default function RegistroLivroModal({
 
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-ferias-modal', ferias.id] });
       queryClient.invalidateQueries({ queryKey: ['ferias-militar-modal', ferias.militar_id] });
 

@@ -542,8 +542,7 @@ export default function FichaMilitar() {
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });

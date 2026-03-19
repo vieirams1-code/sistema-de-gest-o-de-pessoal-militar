@@ -256,7 +256,7 @@ export async function executarExclusaoAdminCadeia({
   await reconciliarCadeiaFerias({ feriasId: ferias.id, ferias: feriasFresh });
 
   queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-  queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+  queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
   queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
   queryClient.invalidateQueries({ queryKey: ['ferias'] });
   queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });

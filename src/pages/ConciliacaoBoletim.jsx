@@ -693,8 +693,7 @@ export default function ConciliacaoBoletim() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
@@ -809,9 +808,8 @@ export default function ConciliacaoBoletim() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
     } catch (error) {
       setVinculos((prev) => ({ ...prev, [pubId]: estadoAnteriorVinculo }));
@@ -839,9 +837,8 @@ export default function ConciliacaoBoletim() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
 
       if (notasDuplicadasNoSistema.length > 0) {
@@ -878,9 +875,8 @@ export default function ConciliacaoBoletim() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
     } catch (error) {
       setVinculos((prev) => ({ ...prev, [pub.id]: estadoAnteriorVinculo }));

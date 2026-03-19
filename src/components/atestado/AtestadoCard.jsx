@@ -193,7 +193,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       status_publicacao: status
     });
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
     queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
     queryClient.invalidateQueries({ queryKey: ['cards'] });
     queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
@@ -250,7 +250,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       status_publicacao: status
     });
     queryClient.invalidateQueries({ queryKey: ['atestados'] });
-    queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+    queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
     setSavingPublicacao(false);
     setShowAtaJisoModal(false);
   };

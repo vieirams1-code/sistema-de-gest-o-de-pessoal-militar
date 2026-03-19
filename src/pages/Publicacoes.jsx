@@ -19,7 +19,6 @@ import {
   getAtestadoIdsVinculados,
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
-import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 
 const TIPOS_FERIAS = [
@@ -39,13 +38,10 @@ const ABAS_ORIGEM = [
 
 function detectarOrigemTipo(registro) {
   if (registro.origem_tipo) return registro.origem_tipo;
+  if (registro.medico || registro.cid_10) return 'atestado';
+  if (registro.modulo) return registro.modulo === 'Livro' ? 'livro' : 'ex-officio';
   if (registro.tipo_label || registro.status_codigo || registro.origem) return 'livro';
-  if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
-    return 'ex-officio';
-  }
-  if (registro.medico || registro.cid_10) {
-    return 'atestado';
-  }
+  if (registro.tipo && !registro.tipo_registro) return 'ex-officio';
   return 'livro';
 }
 
@@ -114,7 +110,9 @@ function montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao }) {
 }
 
 function normalizarRegistro(registro) {
-  const origemTipo = detectarOrigemTipo(registro);
+  const origemTipo = (registro.medico || registro.cid_10)
+    ? 'atestado'
+    : (registro.modulo === 'Livro' ? 'livro' : 'ex-officio');
   const militarContrato = registro?.militar || {};
   const militarNome = origemTipo === 'livro'
     ? (militarContrato?.nome_guerra || militarContrato?.nome || registro?.militar_nome || '')
@@ -229,31 +227,9 @@ export default function Publicacoes() {
   const { isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
 
-  const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
-    queryKey: ['registros-livro'],
-    queryFn: () => getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
-    // Só dispara após resolução de acesso e confirmação de permissão
-    enabled: isAccessResolved && hasPublicacoesAccess,
-  });
-
-  const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
-    queryKey: ['publicacoes-ex-officio', isAdmin],
-    queryFn: async () => {
-      if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
-      
-      const scopeFilters = getMilitarScopeFilters();
-      if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
-      const militaresAcess = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
-      if (!militarIds.length) return [];
-      
-      const queryPromises = militarIds.map(id => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date'));
-      const arrays = await Promise.all(queryPromises);
-      const m = new Map();
-      arrays.flat().forEach(item => m.set(item.id, item));
-      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
-    },
+  const { data: registrosRP = [], isLoading: loadingRegistrosRP } = useQuery({
+    queryKey: ['registros-rp'],
+    queryFn: () => base44.entities.RegistroRP.list('-data_registro'),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
@@ -281,15 +257,13 @@ export default function Publicacoes() {
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
-  const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
-
-  const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
+  const isLoading = loadingRegistrosRP || loadingAtestados;
 
   const registros = useMemo(() => {
-    return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
+    return [...registrosRP, ...atestados]
       .map(normalizarRegistro)
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-  }, [registrosLivro, publicacoesExOfficio, atestados]);
+  }, [registrosRP, atestados]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
@@ -306,8 +280,7 @@ export default function Publicacoes() {
       return null;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
@@ -324,7 +297,7 @@ export default function Publicacoes() {
       if (tipo === 'atestado') return;
 
       const detectarTipo = (refId) => {
-        const found = [...registrosLivro, ...publicacoesExOfficio, ...atestados].find(r => r.id === refId);
+        const found = [...registrosRP, ...atestados].find(r => r.id === refId);
         if (!found) return 'ex-officio';
         return detectarOrigemTipo(found);
       };
@@ -400,8 +373,7 @@ export default function Publicacoes() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-rp'] });
       queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['atestados'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
