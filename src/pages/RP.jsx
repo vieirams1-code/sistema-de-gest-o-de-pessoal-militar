@@ -206,6 +206,17 @@ export default function RP() {
     return <AccessDenied modulo="RP — Registro de Publicações" />;
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">Carregando registros RP...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -307,12 +318,6 @@ export default function RP() {
         </div>
 
         <div className="mt-6 space-y-4">
-          {isLoading && (
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
-              Carregando registros RP...
-            </div>
-          )}
-
           {!isLoading && registrosFiltrados.length === 0 && (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
               <p className="text-lg font-semibold text-slate-800">Nenhum registro encontrado</p>

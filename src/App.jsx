@@ -44,6 +44,8 @@ const moduleGuardByPage = {
   PeriodosAquisitivos: { moduleKey: 'ferias', moduleName: 'Férias' },
   CadastrarRegistroLivro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   Livro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
+  RP: { moduleKey: 'livro', moduleName: 'Registro de Publicações' },
+  CadastrarRegistroRP: { moduleKey: 'livro', moduleName: 'Registro de Publicações' },
   CadastrarMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   CadastrarPunicao: { moduleKey: 'militares', moduleName: 'Efetivo' },
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
