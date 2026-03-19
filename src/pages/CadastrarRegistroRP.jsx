@@ -408,11 +408,23 @@ export default function CadastrarRegistroRP() {
 
           {step === 1 && (
             <>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold text-[#1e3a5f]">Tipo de Registro</h2>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:p-7">
+                <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-[#1e3a5f]">Tipo de Registro</h2>
+                    <p className="text-sm text-slate-500">
+                      Selecione o tipo para continuar o cadastro. Use a busca para localizar rapidamente o registro desejado.
+                    </p>
+                  </div>
+                  {!selectedTipo && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                      {tiposFiltradosBusca.length} tipo{tiposFiltradosBusca.length !== 1 ? 's' : ''} disponível{tiposFiltradosBusca.length !== 1 ? 'eis' : ''}
+                    </div>
+                  )}
+                </div>
 
                 {selectedTipo ? (
-                  <div className="flex items-center justify-between rounded-lg border border-[#1e3a5f]/20 bg-[#1e3a5f]/5 px-4 py-3">
+                  <div className="flex flex-col gap-3 rounded-xl border border-[#1e3a5f]/20 bg-[#1e3a5f]/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="font-semibold text-[#1e3a5f]">{selectedTipo.label}</p>
                       <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}</p>
@@ -422,6 +434,7 @@ export default function CadastrarRegistroRP() {
                         type="button"
                         variant="ghost"
                         size="sm"
+                        className="self-start sm:self-auto"
                         onClick={() => {
                           setSelectedTipo(null);
                           setFormData(prev => ({ ...prev, tipo_registro: '' }));
@@ -432,40 +445,53 @@ export default function CadastrarRegistroRP() {
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        value={tipoSearch}
-                        onChange={e => setTipoSearch(e.target.value)}
-                        placeholder="Buscar tipo de registro..."
-                        className="pl-9"
-                      />
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70">
+                    <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-5">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          value={tipoSearch}
+                          onChange={e => setTipoSearch(e.target.value)}
+                          placeholder="Buscar tipo de registro..."
+                          className="h-11 border-slate-300 bg-white pl-9"
+                        />
+                      </div>
                     </div>
-                    <div className="max-h-72 overflow-y-auto space-y-3 pr-1">
-                      {Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
-                        <div key={grupo}>
-                          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">{grupo}</p>
-                          <div className="grid gap-1 sm:grid-cols-2">
-                            {tipos.map(tipo => (
-                              <button
-                                key={tipo.value}
-                                type="button"
-                                onClick={() => handleTipoSelect(tipo)}
-                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium text-slate-800 transition hover:border-[#1e3a5f]/40 hover:bg-[#1e3a5f]/5"
-                              >
-                                {tipo.label}
-                                <span className="ml-2 text-xs font-normal text-slate-400">
-                                  {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      {tiposFiltradosBusca.length === 0 && (
-                        <p className="py-4 text-center text-sm text-slate-400">Nenhum tipo encontrado.</p>
-                      )}
+
+                    <div className="max-h-[32rem] overflow-y-auto px-4 py-4 sm:px-5">
+                      <div className="space-y-5">
+                        {Object.entries(tiposAgrupados).map(([grupo, tipos]) => (
+                          <section key={grupo} className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{grupo}</p>
+                              <div className="h-px flex-1 bg-slate-200" />
+                              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-500">
+                                {tipos.length}
+                              </span>
+                            </div>
+                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                              {tipos.map(tipo => (
+                                <button
+                                  key={tipo.value}
+                                  type="button"
+                                  onClick={() => handleTipoSelect(tipo)}
+                                  className="group rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-[#1e3a5f]/40 hover:bg-[#1e3a5f]/5 hover:shadow-sm"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <span className="text-sm font-semibold text-slate-800">{tipo.label}</span>
+                                    <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 group-hover:bg-white">
+                                      {tipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}
+                                    </span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </section>
+                        ))}
+                        {tiposFiltradosBusca.length === 0 && (
+                          <p className="py-8 text-center text-sm text-slate-400">Nenhum tipo encontrado.</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
