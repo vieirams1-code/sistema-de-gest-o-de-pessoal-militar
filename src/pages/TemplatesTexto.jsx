@@ -15,6 +15,7 @@ import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/com
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, getModuloByTipo, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
+import { getConflitoTemplatePorTipo } from '@/components/rp/templateValidation';
 
 const FERIAS_CANONICAL_TYPES = [
   'Saída Férias',
@@ -513,6 +514,15 @@ export default function TemplatesTexto() {
     }
   });
 
+  const conflitosPorTipo = useMemo(() => {
+    return templates.reduce((acc, template) => {
+      const tipo = template?.tipo_registro;
+      if (!tipo) return acc;
+      acc[tipo] = getConflitoTemplatePorTipo(tipo, templates);
+      return acc;
+    }, {});
+  }, [templates]);
+
   const filtered = templates.filter(t => {
     const matchesModulo = moduloFiltro === 'all' || normalizeTemplateModulo(t.modulo) === moduloFiltro;
     const tipoBusca = getTipoDisplay(t.tipo_registro || '');
@@ -551,16 +561,27 @@ export default function TemplatesTexto() {
       return null;
     }
 
-    const conflict = templates.find(t =>
+    const sameModuleConflict = templates.find(t =>
       normalizeTemplateModulo(t.modulo) === normalizeTemplateModulo(editingTemplate.modulo) &&
       t.tipo_registro === editingTemplate.tipo_registro &&
       t.ativo !== false &&
       t.id !== editingTemplate.id
     );
 
-    if (conflict) {
+    if (sameModuleConflict) {
       return `Já existe um template ativo para '${getTipoDisplay(editingTemplate.tipo_registro)}' no módulo '${getModuloDisplay(editingTemplate.modulo)}'. Desative ou edite o template existente antes de ativar este.`;
     }
+
+    const templatesParaValidacao = [
+      ...templates.filter(t => t.id !== editingTemplate.id),
+      { ...editingTemplate, modulo: serializeTemplateModulo(editingTemplate.modulo) },
+    ];
+    const conflitoGlobal = getConflitoTemplatePorTipo(editingTemplate.tipo_registro, templatesParaValidacao);
+
+    if (conflitoGlobal.temConflito) {
+      return 'Já existe template ativo para este tipo em outro módulo. Resolva antes de cadastrar.';
+    }
+
     return null;
   }, [editingTemplate, templates]);
 
@@ -663,6 +684,9 @@ export default function TemplatesTexto() {
                       <Badge variant="outline" className="text-xs">{getTipoDisplay(t.tipo_registro)}</Badge>
                       {isLivroFeriasTipo(t.tipo_registro) && (
                         <Badge className="bg-slate-100 text-slate-600 text-[10px]">{t.tipo_registro}</Badge>
+                      )}
+                      {conflitosPorTipo[t.tipo_registro]?.temConflito && (
+                        <Badge className="bg-red-600 text-white">Conflito</Badge>
                       )}
                       {!t.ativo && <Badge className="bg-red-100 text-red-600">Inativo</Badge>}
                     </div>
