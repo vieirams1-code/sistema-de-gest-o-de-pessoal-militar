@@ -307,8 +307,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200">
+      <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-5 py-4">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
             <div className="flex items-start gap-4 min-w-0">
               <div className="w-14 h-14 rounded-full border-2 border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
@@ -323,7 +323,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   {registro.urgente && !isPublicado && <Badge className="border bg-red-100 text-red-700 border-red-200">URGENTE</Badge>}
                   {registro.importante && !registro.urgente && !isPublicado && <Badge className="border bg-amber-100 text-amber-700 border-amber-200">IMPORTANTE</Badge>}
 
-                  <h3 className="text-[2rem] leading-none font-bold text-slate-900 tracking-tight">{nomeInstitucional}</h3>
+                  <h3 className="text-xl font-semibold tracking-tight text-[#1e3a5f] sm:text-2xl">{nomeInstitucional}</h3>
 
                   <Badge className={`border ${statusColors[registro.status_calculado] || statusColors[currentStatus] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                     {registro.status_calculado || currentStatus}

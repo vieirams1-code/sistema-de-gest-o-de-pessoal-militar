@@ -4,9 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert } from 'lucide-react';
+import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, BookOpenText, Filter } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
@@ -528,63 +527,82 @@ export default function Publicacoes() {
   if (!hasPublicacoesAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="px-4 py-6 lg:px-8">
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <Input
-                  placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-11 pl-11 border-slate-300 bg-white rounded-xl shadow-sm"
-                />
-              </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#1e3a5f]/15 bg-white px-3 py-1 text-xs font-medium text-[#1e3a5f] shadow-sm">
+              <BookOpenText className="h-3.5 w-3.5" />
+              Controle de Publicações
             </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {canAccessAction('admin_mode') && (
-                <Button
-                  variant={modoAdmin ? 'default' : 'outline'}
-                  onClick={() => setModoAdmin((v) => !v)}
-                  className={modoAdmin
-                    ? 'h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white animate-pulse'
-                    : 'h-11 rounded-xl border-red-300 text-red-600 hover:bg-red-50'}
-                  title={modoAdmin ? 'Desativar modo admin' : 'Ativar modo admin para ações sensíveis'}
-                >
-                  <ShieldAlert className="w-4 h-4 mr-2" />
-                  {modoAdmin ? 'Admin Ativo' : 'Modo Admin'}
-                </Button>
-              )}
-
-              <div className="min-w-[170px]">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-white shadow-sm">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Status</SelectItem>
-                    <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                    <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                    <SelectItem value="Publicado">Publicado</SelectItem>
-                    <SelectItem value="Inconsistente">Inconsistente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Publicação
-              </Button>
-            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Publicações</h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-600">
+              Acompanhe publicações do Livro, Ex Officio e Atestados com o mesmo padrão visual e foco operacional do módulo RP.
+            </p>
           </div>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {canAccessAction('admin_mode') && (
+              <Button
+                variant="outline"
+                onClick={() => setModoAdmin((v) => !v)}
+                className={modoAdmin
+                  ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                  : 'border-red-200 text-red-700 hover:bg-red-50'}
+                title={modoAdmin ? 'Desativar modo admin' : 'Ativar modo admin para ações sensíveis'}
+              >
+                <ShieldAlert className="mr-2 h-4 w-4" />
+                {modoAdmin ? 'Modo admin ativo' : 'Modo admin'}
+              </Button>
+            )}
+
+            <Button asChild variant="outline">
+              <button onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova publicação
+              </button>
+            </Button>
+          </div>
+        </div>
+
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <MetricCard icon={FileText} label="Total" value={stats.total} helper="Todos os registros visíveis" />
+          <MetricCard icon={Clock} label="Aguardando nota" value={stats.aguardandoNota} helper="Dependem de nota para BG" />
+          <MetricCard icon={AlertCircle} label="Aguardando publicação" value={stats.aguardandoPublicacao} helper="Prontos para boletim" />
+          <MetricCard icon={CheckCircle} label="Publicados" value={stats.publicados} helper="Já lançados em BG" />
+          <MetricCard icon={ShieldAlert} label="Inconsistências" value={stats.inconsistentes} helper="Requer conferência" />
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <Filter className="h-3.5 w-3.5" />
+            Filtros operacionais
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-[1.25fr,0.75fr,1fr]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Status</SelectItem>
+                <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
+                <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
+                <SelectItem value="Publicado">Publicado</SelectItem>
+                <SelectItem value="Inconsistente">Inconsistente</SelectItem>
+              </SelectContent>
+            </Select>
+
             <div className="flex flex-wrap gap-2">
               {ABAS_ORIGEM.map((aba) => {
                 const totalAba = aba.key === 'all'
@@ -597,140 +615,77 @@ export default function Publicacoes() {
                     key={aba.key}
                     type="button"
                     onClick={() => setAbaOrigemAtiva(aba.key)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${ativa
-                      ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                      : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'}`}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${ativa
+                      ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-sm'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-900'}`}
                   >
                     <span>{aba.label}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${ativa ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${ativa ? 'bg-white/15 text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>
                       {totalAba}
                     </span>
                   </button>
                 );
               })}
             </div>
-
-            <div className="text-sm font-medium text-slate-500">
-              {filteredRegistros.length} registro(s) encontrado(s)
-            </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#e8eef5] flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-[#1e3a5f]" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[#1e3a5f]">{stats.total}</p>
-                    <p className="text-xs text-slate-500">Total</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-amber-600">{stats.aguardandoNota}</p>
-                    <p className="text-xs text-slate-500">Aguardando Nota</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <AlertCircle className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-blue-600">{stats.aguardandoPublicacao}</p>
-                    <p className="text-xs text-slate-500">Aguardando Publ.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-emerald-600">{stats.publicados}</p>
-                    <p className="text-xs text-slate-500">Publicados</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <span>{filteredRegistros.length} registro(s) encontrado(s)</span>
+            {stats.inconsistentes > 0 && (
+              <span className="font-medium text-red-600">
+                {stats.inconsistentes} registro(s) inconsistente(s) na aba selecionada
+              </span>
+            )}
           </div>
-
-          {stats.inconsistentes > 0 && (
-            <div className="text-sm text-red-600 font-medium">
-              {stats.inconsistentes} registro(s) inconsistente(s) na aba selecionada
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : filteredRegistros.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
-              <FileText className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                Nenhum registro encontrado
-              </h3>
-              <p className="text-slate-500">
-                {searchTerm || statusFilter !== 'all'
-                  ? 'Tente ajustar os filtros de busca'
-                  : 'Os registros de publicação aparecerão aqui'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {grupos.map((grupo) => {
-                const items = filteredRegistros.filter(r => r.status_calculado === grupo.key);
-                if (items.length === 0) return null;
-
-                return (
-                  <div key={grupo.key} className="space-y-3">
-                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${grupo.border} ${grupo.bg}`}>
-                      <span className={`font-bold text-sm ${grupo.color}`}>{grupo.label}</span>
-                      <span className={`text-xs ${grupo.color} opacity-70`}>
-                        {items.length} registro(s)
-                      </span>
-                    </div>
-
-                    <div className="space-y-3">
-                      {items.map((registro) => (
-                        <PublicacaoCard
-                          key={registro.id}
-                          registro={registro}
-                          onUpdate={handleUpdate}
-                          onDelete={handleDelete}
-                          onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
-                          todosRegistros={registros}
-                          isAdmin={isAdmin}
-                          modoAdmin={modoAdmin}
-                          canAccessAction={canAccessAction}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
+
+        {isLoading ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
+            Carregando registros...
+          </div>
+        ) : filteredRegistros.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+            <FileText className="mx-auto mb-3 h-8 w-8 text-slate-400" />
+            <h3 className="text-base font-semibold text-slate-700">Nenhum registro encontrado</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {searchTerm || statusFilter !== 'all'
+                ? 'Ajuste os filtros para localizar publicações compatíveis com a busca.'
+                : 'Os registros de publicação aparecerão aqui conforme forem disponibilizados.'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {grupos.map((grupo) => {
+              const items = filteredRegistros.filter(r => r.status_calculado === grupo.key);
+              if (items.length === 0) return null;
+
+              return (
+                <section key={grupo.key} className="space-y-3">
+                  <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${grupo.border} ${grupo.bg}`}>
+                    <span className={`text-sm font-bold ${grupo.color}`}>{grupo.label}</span>
+                    <span className={`text-xs ${grupo.color} opacity-70`}>{items.length} registro(s)</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {items.map((registro) => (
+                      <PublicacaoCard
+                        key={registro.id}
+                        registro={registro}
+                        onUpdate={handleUpdate}
+                        onDelete={handleDelete}
+                        onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
+                        todosRegistros={registros}
+                        isAdmin={isAdmin}
+                        modoAdmin={modoAdmin}
+                        canAccessAction={canAccessAction}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {familiaPanel.open && (
@@ -746,6 +701,21 @@ export default function Publicacoes() {
           />
         </>
       )}
+    </div>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, helper }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="rounded-xl bg-[#1e3a5f]/10 p-2 text-[#1e3a5f]">
+          <Icon className="h-4 w-4" />
+        </div>
+        <span className="text-2xl font-bold text-[#1e3a5f]">{value}</span>
+      </div>
+      <p className="text-sm font-medium text-slate-700">{label}</p>
+      <p className="mt-1 text-xs text-slate-500">{helper}</p>
     </div>
   );
 }
