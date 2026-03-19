@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, FileText, Filter, CalendarRange, ShieldAlert, UserRound, ExternalLink, BookOpenText, Pencil } from 'lucide-react';
+import { Search, Plus, FileText, Filter, CalendarRange, ShieldAlert, UserRound, ExternalLink, BookOpenText } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
@@ -374,8 +374,6 @@ export default function RP() {
           ) : (
             registrosFiltrados.map((registro) => {
               const grupo = getTipoGrupo(registro.tipo_label);
-              const editUrl = `${createPageUrl('CadastrarRegistroRP')}?id=${registro.id}`;
-
               return (
                 <div key={`${registro.modulo_normalizado}-${registro.id}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -428,13 +426,7 @@ export default function RP() {
                       )}
                     </div>
 
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      <Button asChild variant="outline">
-                        <a href={editUrl}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </a>
-                      </Button>
+                    <div className="flex shrink-0 justify-start lg:justify-end">
                       <Button asChild variant="ghost">
                         <a href={createPageUrl('Publicacoes')}>
                           <ExternalLink className="mr-2 h-4 w-4" />
