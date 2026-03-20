@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, BookOpenText, Filter, Sparkles, LayoutGrid, Inbox } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
+import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, BookOpenText, Filter, Sparkles, LayoutGrid, Inbox, Layers3 } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
@@ -20,7 +21,13 @@ import {
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
-import { isRegistroEmLoteCompilado } from '@/components/publicacao/publicacaoCompiladaService';
+import {
+  buildPayloadPublicacaoCompilada,
+  buildTextoCompiladoFerias,
+  isRegistroElegivelParaCompilacaoFerias,
+  isRegistroEmLoteCompilado,
+  validarCompatibilidadeLoteFerias,
+} from '@/components/publicacao/publicacaoCompiladaService';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -237,6 +244,7 @@ export default function Publicacoes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
+  const [selectedRegistros, setSelectedRegistros] = useState([]);
   const { isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
 
@@ -327,6 +335,45 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
     }
+  });
+
+  const compilarMutation = useMutation({
+    mutationFn: async (registrosSelecionados) => {
+      const compatibilidade = validarCompatibilidadeLoteFerias(registrosSelecionados);
+      if (!compatibilidade.compativel) {
+        throw new Error(compatibilidade.motivo);
+      }
+
+      const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados);
+      const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, { texto_publicacao: textoCompilado, nota_para_bg: textoCompilado });
+
+      if (!payloadLote.ok) {
+        throw new Error(payloadLote.erro || 'Não foi possível montar o lote compilado.');
+      }
+
+      const loteCriado = await base44.entities.PublicacaoCompilada.create(payloadLote.payload);
+
+      await Promise.all(registrosSelecionados.map((registro, index) => (
+        base44.entities.RegistroLivro.update(registro.id, {
+          publicacao_compilada_id: loteCriado.id,
+          compilado_em_lote: true,
+          publicacao_compilada_ordem: index + 1,
+        })
+      )));
+
+      return loteCriado;
+    },
+    onSuccess: () => {
+      setSelectedRegistros([]);
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
+      alert('Lote compilado de férias criado com sucesso.');
+    },
+    onError: (error) => {
+      alert(error?.message || 'Erro ao compilar registros selecionados.');
+    },
   });
 
   const deleteMutation = useMutation({
@@ -450,6 +497,44 @@ export default function Publicacoes() {
     });
   }, [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
+  const registrosElegiveisParaCompilacao = useMemo(() => (
+    registros.filter((registro) => isRegistroElegivelParaCompilacaoFerias(registro))
+  ), [registros]);
+
+  const elegiveisIds = useMemo(() => new Set(registrosElegiveisParaCompilacao.map((registro) => registro.id)), [registrosElegiveisParaCompilacao]);
+
+  const selectedRegistrosDetalhados = useMemo(() => (
+    registros.filter((registro) => selectedRegistros.includes(registro.id))
+  ), [registros, selectedRegistros]);
+
+  const podeCompilarSelecionados = selectedRegistrosDetalhados.length >= 2 && selectedRegistrosDetalhados.every((registro) => elegiveisIds.has(registro.id));
+
+  useEffect(() => {
+    setSelectedRegistros((atual) => atual.filter((id) => elegiveisIds.has(id)));
+  }, [elegiveisIds]);
+
+  const toggleRegistroSelecionado = (registroId, checked) => {
+    setSelectedRegistros((atual) => {
+      if (checked) {
+        return atual.includes(registroId) ? atual : [...atual, registroId];
+      }
+      return atual.filter((id) => id !== registroId);
+    });
+  };
+
+  const selecionarTodosVisiveisElegiveis = (checked) => {
+    const idsVisiveis = filteredRegistros.filter((registro) => elegiveisIds.has(registro.id)).map((registro) => registro.id);
+    setSelectedRegistros((atual) => {
+      if (checked) {
+        return Array.from(new Set([...atual, ...idsVisiveis]));
+      }
+      return atual.filter((id) => !idsVisiveis.includes(id));
+    });
+  };
+
+  const totalElegiveisVisiveis = filteredRegistros.filter((registro) => elegiveisIds.has(registro.id)).length;
+  const totalElegiveisSelecionadosVisiveis = filteredRegistros.filter((registro) => elegiveisIds.has(registro.id) && selectedRegistros.includes(registro.id)).length;
+
   const stats = useMemo(() => {
     return {
       total: registrosDaAbaAtiva.length,
@@ -499,6 +584,17 @@ export default function Publicacoes() {
     }
 
     deleteMutation.mutate({ id, tipo, registro });
+  };
+
+  const handleCompilarSelecionados = () => {
+    const compatibilidade = validarCompatibilidadeLoteFerias(selectedRegistrosDetalhados);
+
+    if (!compatibilidade.compativel) {
+      alert(compatibilidade.motivo);
+      return;
+    }
+
+    compilarMutation.mutate(selectedRegistrosDetalhados);
   };
 
   const grupos = [
@@ -553,7 +649,7 @@ export default function Publicacoes() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <InfoPill icon={LayoutGrid} label={`${stats.total} registros na origem selecionada`} />
                   <InfoPill icon={Sparkles} label={`${filteredRegistros.length} itens compatíveis com os filtros`} />
-                  {stats.inconsistentes > 0 && (
+          {stats.inconsistentes > 0 && (
                     <InfoPill icon={ShieldAlert} label={`${stats.inconsistentes} inconsistência(s) para conferência`} tone="danger" />
                   )}
                 </div>
@@ -669,6 +765,37 @@ export default function Publicacoes() {
             </div>
           </div>
 
+          <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-indigo-900">Compilação mínima de férias</p>
+                <p className="text-sm text-indigo-700">Selecione apenas registros elegíveis do Livro em status aguardando publicação. Esta fase não altera o fluxo individual existente.</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="inline-flex items-center gap-2 text-sm text-indigo-900">
+                  <Checkbox
+                    checked={totalElegiveisVisiveis > 0 && totalElegiveisSelecionadosVisiveis === totalElegiveisVisiveis}
+                    onCheckedChange={(checked) => selecionarTodosVisiveisElegiveis(Boolean(checked))}
+                    disabled={totalElegiveisVisiveis === 0}
+                  />
+                  <span>Selecionar elegíveis visíveis</span>
+                </label>
+                <span className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
+                  {selectedRegistrosDetalhados.length} selecionado(s)
+                </span>
+                <Button
+                  onClick={handleCompilarSelecionados}
+                  disabled={!podeCompilarSelecionados || compilarMutation.isPending}
+                  className="bg-indigo-700 hover:bg-indigo-800"
+                >
+                  <Layers3 className="mr-2 h-4 w-4" />
+                  {compilarMutation.isPending ? 'Compilando...' : 'Compilar selecionados'}
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {stats.inconsistentes > 0 && (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {stats.inconsistentes} registro(s) inconsistente(s) na aba selecionada exigem conferência operacional.
@@ -710,19 +837,42 @@ export default function Publicacoes() {
                   </div>
 
                   <div className="space-y-3">
-                    {items.map((registro) => (
-                      <PublicacaoCard
-                        key={registro.id}
-                        registro={registro}
-                        onUpdate={handleUpdate}
-                        onDelete={handleDelete}
-                        onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
-                        todosRegistros={registros}
-                        isAdmin={isAdmin}
-                        modoAdmin={modoAdmin}
-                        canAccessAction={canAccessAction}
-                      />
-                    ))}
+                    {items.map((registro) => {
+                      const elegivelCompilacao = elegiveisIds.has(registro.id);
+                      const selecionado = selectedRegistros.includes(registro.id);
+
+                      return (
+                        <div key={registro.id} className={`rounded-[24px] ${selecionado ? 'ring-2 ring-indigo-200' : ''}`}>
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-3 px-1">
+                            <label className={`inline-flex items-center gap-2 text-sm font-medium ${elegivelCompilacao ? 'text-slate-700' : 'text-slate-400'}`}>
+                              <Checkbox
+                                checked={selecionado}
+                                disabled={!elegivelCompilacao}
+                                onCheckedChange={(checked) => toggleRegistroSelecionado(registro.id, Boolean(checked))}
+                              />
+                              <span>{elegivelCompilacao ? 'Selecionar para compilação' : (registro.compilado_em_lote ? 'Já vinculado a lote' : 'Não elegível para compilação')}</span>
+                            </label>
+
+                            {registro.compilado_em_lote && (
+                              <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                Lote #{registro.publicacao_compilada_ordem || '—'}
+                              </span>
+                            )}
+                          </div>
+
+                          <PublicacaoCard
+                            registro={registro}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
+                            todosRegistros={registros}
+                            isAdmin={isAdmin}
+                            modoAdmin={modoAdmin}
+                            canAccessAction={canAccessAction}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </section>
               );
