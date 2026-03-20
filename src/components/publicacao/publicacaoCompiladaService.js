@@ -16,6 +16,7 @@ const STATUS_COMPATIVEIS = new Set([
   'aguardando_publicacao',
   'aguardando_publicacao_no_bg',
   'aguardando_publicacao_bg',
+  'aguardando_nota',
 ]);
 
 function toCodigo(value) {
