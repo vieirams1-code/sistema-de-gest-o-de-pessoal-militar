@@ -111,6 +111,45 @@ export function isRegistroEmLoteCompilado(registro = {}) {
   return Boolean(registro?.publicacao_compilada_id || registro?.compilado_em_lote);
 }
 
+
+export function isRegistroFilhoDePublicacaoCompilada(registro = {}) {
+  return detectarOrigemLivro(registro) && isRegistroEmLoteCompilado(registro);
+}
+
+export function isLoteCompiladoPublicado(lote = {}) {
+  return Boolean(
+    isPublicado(lote) ||
+    toCodigo(lote?.status) === 'publicado' ||
+    toCodigo(lote?.status_calculado) === 'publicado'
+  );
+}
+
+export function podeDesfazerLoteCompilado(lote = {}) {
+  return !isLoteCompiladoPublicado(lote);
+}
+
+export async function limparVinculoLoteDosFilhos({
+  entity,
+  loteId,
+  filhos = [],
+} = {}) {
+  if (!entity || !loteId) return [];
+
+  const registrosFilhos = filhos.length
+    ? filhos.filter((registro) => registro?.publicacao_compilada_id === loteId)
+    : await entity.filter({ publicacao_compilada_id: loteId });
+
+  await Promise.all(
+    registrosFilhos.map((filho) => entity.update(filho.id, {
+      publicacao_compilada_id: null,
+      compilado_em_lote: false,
+      publicacao_compilada_ordem: null,
+    }))
+  );
+
+  return registrosFilhos;
+}
+
 export function isRegistroElegivelParaCompilacaoFerias(registro = {}) {
   return (
     detectarOrigemLivro(registro) &&
