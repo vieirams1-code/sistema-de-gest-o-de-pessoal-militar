@@ -18,8 +18,6 @@ const STATUS_COMPATIVEIS = new Set([
   'aguardando_publicacao_bg',
 ]);
 
-const STATUS_PUBLICADOS = new Set(['publicado', 'gerada', 'gerado']);
-
 function toCodigo(value) {
   if (!value) return '';
   return String(value)
@@ -51,11 +49,7 @@ function isTipoFeriasCompilavel(registro = {}) {
 }
 
 function isPublicado(registro = {}) {
-  const statusCodigo = toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado || registro?.status_publicacao);
-  return Boolean(
-    (registro?.numero_bg && registro?.data_bg) ||
-    STATUS_PUBLICADOS.has(statusCodigo)
-  );
+  return Boolean(registro?.numero_bg && registro?.data_bg);
 }
 
 function hasInconsistencia(registro = {}) {
@@ -117,11 +111,7 @@ export function isRegistroFilhoDePublicacaoCompilada(registro = {}) {
 }
 
 export function isLoteCompiladoPublicado(lote = {}) {
-  return Boolean(
-    isPublicado(lote) ||
-    toCodigo(lote?.status) === 'publicado' ||
-    toCodigo(lote?.status_calculado) === 'publicado'
-  );
+  return Boolean(lote?.numero_bg && lote?.data_bg);
 }
 
 export function podeDesfazerLoteCompilado(lote = {}) {
