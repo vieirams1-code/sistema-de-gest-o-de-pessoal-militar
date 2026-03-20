@@ -160,14 +160,6 @@ export function isRegistroElegivelParaCompilacaoFerias(registro = {}) {
   const publicacaoCompiladaId = hasPublicacaoCompiladaId(registro);
   const compiladoEmLote = isCompiladoEmLoteTrue(registro);
 
-  console.log('[compilacao] verificação de elegibilidade', {
-    registroId: registro?.id,
-    publicacao_compilada_id: registro?.publicacao_compilada_id,
-    compilado_em_lote: registro?.compilado_em_lote,
-    publicacao_compilada_ordem: registro?.publicacao_compilada_ordem,
-    status_verificado: statusCodigo,
-  });
-
   return (
     detectarOrigemLivro(registro) &&
     isFeriasOperacional(registro) &&
