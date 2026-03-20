@@ -20,6 +20,7 @@ import {
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
+import { isRegistroEmLoteCompilado } from '@/components/publicacao/publicacaoCompiladaService';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -164,6 +165,18 @@ function normalizarRegistro(registro) {
     nota_para_bg: origemTipo === 'livro' ? (registro?.publicacao?.nota_para_bg || registro.nota_para_bg || '') : (registro.nota_para_bg || ''),
     numero_bg: origemTipo === 'livro' ? (registro?.publicacao?.numero_bg || registro.numero_bg || '') : (registro.numero_bg || ''),
     data_bg: origemTipo === 'livro' ? (registro?.publicacao?.data_bg || registro.data_bg || '') : (registro.data_bg || ''),
+    publicacao_compilada_id: origemTipo === 'livro'
+      ? (registro?.publicacao_compilada_id || registro?.publicacao?.publicacao_compilada_id || null)
+      : (registro.publicacao_compilada_id || null),
+    publicacao_compilada_ordem: origemTipo === 'livro'
+      ? (registro?.publicacao_compilada_ordem ?? registro?.publicacao?.publicacao_compilada_ordem ?? null)
+      : (registro.publicacao_compilada_ordem ?? null),
+    compilado_em_lote: origemTipo === 'livro'
+      ? isRegistroEmLoteCompilado({
+          publicacao_compilada_id: registro?.publicacao_compilada_id || registro?.publicacao?.publicacao_compilada_id,
+          compilado_em_lote: registro?.compilado_em_lote || registro?.publicacao?.compilado_em_lote,
+        })
+      : isRegistroEmLoteCompilado(registro),
     detalhes_contrato: origemTipo === 'livro' ? (registro?.detalhes || null) : registro.detalhes_contrato,
     vinculos_contrato: origemTipo === 'livro' ? (registro?.vinculos || null) : registro.vinculos_contrato,
     publicacao_contrato: origemTipo === 'livro' ? (registro?.publicacao || null) : registro.publicacao_contrato,
