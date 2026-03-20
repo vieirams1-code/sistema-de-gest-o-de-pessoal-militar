@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +33,7 @@ function calcStatus(registro) {
 }
 
 function detectarOrigemTipo(registro) {
+  if (registro?.tipo_lote || registro?.quantidade_itens) return 'publicacao-compilada';
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) return 'ex-officio';
   if (registro.medico || registro.cid_10) return 'atestado';
   return 'livro';
@@ -534,6 +535,28 @@ export default function ConciliacaoBoletim() {
     enabled: isAccessResolved && hasAccess
   });
 
+  const publicacaoCompiladaIds = useMemo(() => (
+    [...new Set(
+      registrosLivro
+        .map((registro) => registro?.publicacao_compilada_id)
+        .filter(Boolean)
+    )]
+  ), [registrosLivro]);
+
+  const { data: publicacoesCompiladas = [], isLoading: isLoadingPublicacoesCompiladas } = useQuery({
+    queryKey: ['conciliacao-publicacoes-compiladas', publicacaoCompiladaIds],
+    queryFn: async () => {
+      if (!publicacaoCompiladaIds.length) return [];
+      const arrays = await Promise.all(
+        publicacaoCompiladaIds.map((id) => base44.entities.PublicacaoCompilada.filter({ id }, '-created_date'))
+      );
+      const mapa = new Map();
+      arrays.flat().forEach((item) => mapa.set(item.id, item));
+      return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+    },
+    enabled: isAccessResolved && hasAccess && publicacaoCompiladaIds.length > 0,
+  });
+
   const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
     queryKey: ['conciliacao-atestados-publicacao'],
     queryFn: async () => {
@@ -558,7 +581,9 @@ export default function ConciliacaoBoletim() {
   });
 
   const pendentes = useMemo(() => {
-    return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
+    const registrosLivroIndividuais = registrosLivro.filter((registro) => !registro?.publicacao_compilada_id);
+
+    return [...registrosLivroIndividuais, ...publicacoesCompiladas, ...publicacoesExOfficio, ...atestados]
       .map((registro) => ({
         ...registro,
         origem_tipo: detectarOrigemTipo(registro),
@@ -568,7 +593,7 @@ export default function ConciliacaoBoletim() {
       }))
       .filter((registro) => registro.status_calculado === 'Aguardando Publicação' && registro.nota_para_bg)
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-  }, [registrosLivro, publicacoesExOfficio, atestados]);
+  }, [registrosLivro, publicacoesCompiladas, publicacoesExOfficio, atestados]);
 
   const ocorrenciasNotasPendentes = useMemo(() => contarOcorrenciasNotasPendentes(pendentes), [pendentes]);
 
@@ -633,6 +658,20 @@ export default function ConciliacaoBoletim() {
 
   const notasConciliadasIds = useMemo(() => new Set(Object.values(vinculosEfetivos)), [vinculosEfetivos]);
 
+  useEffect(() => {
+    setVinculos((atual) => {
+      const permitidos = new Set(pendentes.map((item) => item.id));
+      const filtrados = Object.fromEntries(Object.entries(atual).filter(([pubId]) => permitidos.has(pubId)));
+      return Object.keys(filtrados).length === Object.keys(atual).length ? atual : filtrados;
+    });
+
+    setVinculosRemovidos((atual) => {
+      const permitidos = new Set(pendentes.map((item) => item.id));
+      const filtrados = Object.fromEntries(Object.entries(atual).filter(([pubId]) => permitidos.has(pubId)));
+      return Object.keys(filtrados).length === Object.keys(atual).length ? atual : filtrados;
+    });
+  }, [pendentes]);
+
   const pendentesSemCorrespondencia = pendentes.filter((pub) => !vinculosEfetivos[pub.id]);
   const publicacoesConciliadas = pendentes.filter((pub) => !!vinculosEfetivos[pub.id]);
   const notasSemItem = notasEncontradas.filter((nota) => !notasConciliadasIds.has(nota.id));
@@ -667,7 +706,7 @@ export default function ConciliacaoBoletim() {
         throw new Error('Há a mesma nota do boletim vinculada a mais de uma publicação. Revise os vínculos antes de confirmar.');
       }
 
-      const updates = publicacoesConciliadas.map((pub) => {
+      const updates = publicacoesConciliadas.flatMap((pub) => {
         const notaId = vinculosEfetivos[pub.id];
         const nota = notasEncontradas.find((item) => item.id === notaId);
         const payloadBase = {
@@ -676,15 +715,25 @@ export default function ConciliacaoBoletim() {
           nota_conciliada_boletim: nota?.nota_normalizada || '',
         };
 
+        if (pub.origem_tipo === 'publicacao-compilada') {
+          const filhosDoLote = registrosLivro.filter((registro) => registro?.publicacao_compilada_id === pub.id);
+          return [
+            base44.entities.PublicacaoCompilada.update(pub.id, { ...payloadBase, status: 'Publicado' }),
+            ...filhosDoLote.map((filho) => (
+              base44.entities.RegistroLivro.update(filho.id, { ...payloadBase, status: 'Publicado' })
+            )),
+          ];
+        }
+
         if (pub.origem_tipo === 'atestado') {
-          return base44.entities.Atestado.update(pub.id, { ...payloadBase, status_publicacao: 'Publicado' });
+          return [base44.entities.Atestado.update(pub.id, { ...payloadBase, status_publicacao: 'Publicado' })];
         }
 
         if (pub.origem_tipo === 'ex-officio') {
-          return base44.entities.PublicacaoExOfficio.update(pub.id, { ...payloadBase, status: 'Publicado' });
+          return [base44.entities.PublicacaoExOfficio.update(pub.id, { ...payloadBase, status: 'Publicado' })];
         }
 
-        return base44.entities.RegistroLivro.update(pub.id, { ...payloadBase, status: 'Publicado' });
+        return [base44.entities.RegistroLivro.update(pub.id, { ...payloadBase, status: 'Publicado' })];
       });
 
       await Promise.all(updates);
@@ -692,6 +741,7 @@ export default function ConciliacaoBoletim() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
@@ -724,6 +774,11 @@ export default function ConciliacaoBoletim() {
 
     if (pub.origem_tipo === 'ex-officio') {
       await base44.entities.PublicacaoExOfficio.update(pub.id, payload);
+      return;
+    }
+
+    if (pub.origem_tipo === 'publicacao-compilada') {
+      await base44.entities.PublicacaoCompilada.update(pub.id, payload);
       return;
     }
 
@@ -808,6 +863,7 @@ export default function ConciliacaoBoletim() {
       await atualizarPersistenciaVinculo(pub, notaSelecionada.nota_normalizada);
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
@@ -838,6 +894,7 @@ export default function ConciliacaoBoletim() {
 
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
@@ -877,6 +934,7 @@ export default function ConciliacaoBoletim() {
       await atualizarPersistenciaVinculo(pub, '');
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
@@ -892,7 +950,7 @@ export default function ConciliacaoBoletim() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
-  const isCarregandoDados = isLoadingLivro || isLoadingExOfficio || isLoadingAtestados;
+  const isCarregandoDados = isLoadingLivro || isLoadingExOfficio || isLoadingPublicacoesCompiladas || isLoadingAtestados;
 
   if (isCarregandoDados) {
     return (
