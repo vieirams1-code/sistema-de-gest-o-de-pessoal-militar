@@ -424,8 +424,13 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   </div>
                 )}
                 {isLoteCompilado && (
-                  <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
-                    <span className="font-semibold">Lote pai operacional.</span> Este registro controla {registro.quantidade_itens || 0} filho(s) vinculados e concentra a publicação/conciliação do conjunto.
+                  <div className="mt-3 space-y-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+                    <div>
+                      <span className="font-semibold">Lote pai operacional.</span> Este registro controla {registro.quantidade_itens || 0} filho(s) vinculados e concentra a publicação/conciliação do conjunto.
+                    </div>
+                    <div className="text-xs font-medium text-indigo-800">
+                      Resumo: {registro.quantidade_itens || filhosDoLote.length || 0} publicação(ões) agrupada(s).
+                    </div>
                   </div>
                 )}
                 {isFilhoLoteCompilado && podeDesagruparFilho && (

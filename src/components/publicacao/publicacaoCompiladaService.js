@@ -244,7 +244,13 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
     };
   }
 
-  const textoPublicacao = buildTextoCompiladoFerias(registros);
+  const textoPublicacao = overrides?.texto_publicacao || buildTextoCompiladoFerias(registros);
+  const {
+    nota_para_bg: _notaParaBgIgnorada,
+    numero_bg: _numeroBgIgnorado,
+    data_bg: _dataBgIgnorada,
+    ...safeOverrides
+  } = overrides || {};
 
   return {
     ok: true,
@@ -262,7 +268,11 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
       ativo: true,
       escopo_inicial: 'ferias',
       origem: 'livro',
-      ...overrides,
+      ...safeOverrides,
+      nota_para_bg: '',
+      numero_bg: '',
+      data_bg: '',
+      texto_publicacao: textoPublicacao,
     },
   };
 }

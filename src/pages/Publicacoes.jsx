@@ -361,7 +361,12 @@ export default function Publicacoes() {
       }
 
       const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados);
-      const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, { texto_publicacao: textoCompilado });
+      const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, {
+        texto_publicacao: textoCompilado,
+        nota_para_bg: '',
+        numero_bg: '',
+        data_bg: '',
+      });
 
       if (!payloadLote.ok) {
         throw new Error(payloadLote.erro || 'Não foi possível montar o lote compilado.');
