@@ -244,11 +244,12 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
     };
   }
 
-  const textoPublicacao = overrides?.texto_publicacao || buildTextoCompiladoFerias(registros);
+  const textoPublicacao = overrides?.texto_publicacao ?? buildTextoCompiladoFerias(registros);
   const {
     nota_para_bg: _notaParaBgIgnorada,
     numero_bg: _numeroBgIgnorado,
     data_bg: _dataBgIgnorada,
+    texto_publicacao: _textoPublicacaoOverride,
     ...safeOverrides
   } = overrides || {};
 
@@ -259,11 +260,7 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
     payload: {
       tipo_lote: 'ferias',
       status: 'Aguardando Publicação',
-      nota_para_bg: '',
-      numero_bg: '',
-      data_bg: '',
       nota_conciliada_boletim: '',
-      texto_publicacao: textoPublicacao,
       quantidade_itens: registros.length,
       ativo: true,
       escopo_inicial: 'ferias',
