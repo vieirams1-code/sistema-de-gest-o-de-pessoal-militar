@@ -253,7 +253,7 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
     payload: {
       tipo_lote: 'ferias',
       status: 'Aguardando Publicação',
-      nota_para_bg: textoPublicacao,
+      nota_para_bg: '',
       numero_bg: '',
       data_bg: '',
       nota_conciliada_boletim: '',

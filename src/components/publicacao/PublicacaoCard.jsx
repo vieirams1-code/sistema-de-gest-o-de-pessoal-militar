@@ -171,9 +171,10 @@ function FieldBlock({ label, children, className = '' }) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, onDesagruparFilho, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isChildrenExpanded, setIsChildrenExpanded] = useState(false);
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bgData, setBgData] = useState({
@@ -227,6 +228,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const mensagemRegistroFilho = 'Registro vinculado a publicação compilada. Edite o lote pai.';
   const mensagemExclusaoFilho = 'Registro vinculado a publicação compilada e não pode ser excluído isoladamente.';
   const mensagemLotePublicado = 'Publicação compilada já publicada não pode ser removida.';
+  const filhosDoLote = isLoteCompilado
+    ? todosRegistros
+      .filter((item) => item?.publicacao_compilada_id === registro.id)
+      .sort((a, b) => (a?.publicacao_compilada_ordem ?? 0) - (b?.publicacao_compilada_ordem ?? 0))
+    : [];
+  const podeDesagruparFilho = isFilhoLoteCompilado && !isPublicado && temPermissaoAdmin && modoAdmin && typeof onDesagruparFilho === 'function';
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -307,6 +314,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const handleTornarSemEfeito = () => {
     navigate(`${createPageUrl('CadastrarPublicacao')}?tipo=Tornar+sem+Efeito&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`);
+  };
+
+  const handleDesagruparFilho = async () => {
+    if (!podeDesagruparFilho) return;
+    await onDesagruparFilho(registro);
   };
 
   const integridadeBadge = getIntegridadeBadge(registro);
@@ -416,6 +428,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     <span className="font-semibold">Lote pai operacional.</span> Este registro controla {registro.quantidade_itens || 0} filho(s) vinculados e concentra a publicação/conciliação do conjunto.
                   </div>
                 )}
+                {isFilhoLoteCompilado && podeDesagruparFilho && (
+                  <div className="mt-3 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm text-indigo-900">
+                    Filho elegível para desagrupar antes da publicação do lote.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -498,6 +515,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   <GitBranch className="w-4 h-4" /><span className="hidden sm:inline">Família</span>
                 </Button>
               )}
+              {podeDesagruparFilho && (
+                <Button variant="ghost" size="sm" onClick={handleDesagruparFilho} className="text-indigo-600 hover:text-indigo-800 text-xs gap-1">
+                  <Layers3 className="w-4 h-4" /><span className="hidden sm:inline">Desagrupar</span>
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)}>
                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </Button>
@@ -564,6 +586,51 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                       {registro.publicacao_referencia_id && <p><span className="font-semibold">Código principal:</span> {gerarCodigo(registro.publicacao_referencia_id)}</p>}
                     </div>
                   </FieldBlock>
+
+                  {isLoteCompilado && (
+                    <FieldBlock label="Filhos agrupados">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-sm text-slate-600">
+                            {filhosDoLote.length} filho(s) vinculado(s) por <span className="font-semibold">publicacao_compilada_id</span>.
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsChildrenExpanded((value) => !value)}
+                            className="gap-2"
+                          >
+                            {isChildrenExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            {isChildrenExpanded ? 'Recolher filhos' : 'Expandir filhos'}
+                          </Button>
+                        </div>
+
+                        {isChildrenExpanded && (
+                          filhosDoLote.length > 0 ? (
+                            <div className="space-y-2">
+                              {filhosDoLote.map((filho) => (
+                                <div key={filho.id} className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-sm text-slate-700">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-semibold text-indigo-900">Ordem {filho.publicacao_compilada_ordem ?? '—'}</span>
+                                    <span className="text-xs text-slate-500">ID: {filho.id}</span>
+                                  </div>
+                                  <div className="mt-1 text-sm">
+                                    {filho.militar_nome_institucional || filho.militar_nome || 'Militar não identificado'}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {filho.tipo_composto_display || filho.tipo_registro || filho.tipo || 'Registro'} • MAT {filho.militar_matricula || '—'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-slate-500">Nenhum filho vinculado a este lote.</div>
+                          )
+                        )}
+                      </div>
+                    </FieldBlock>
+                  )}
 
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Texto da Publicação</p>

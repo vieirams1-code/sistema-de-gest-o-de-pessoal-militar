@@ -361,7 +361,7 @@ export default function Publicacoes() {
       }
 
       const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados);
-      const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, { texto_publicacao: textoCompilado, nota_para_bg: textoCompilado });
+      const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, { texto_publicacao: textoCompilado });
 
       if (!payloadLote.ok) {
         throw new Error(payloadLote.erro || 'Não foi possível montar o lote compilado.');
@@ -499,6 +499,85 @@ export default function Publicacoes() {
       alert(error?.message || 'Erro ao excluir registro.');
     }
   });
+
+  const desagruparFilhoMutation = useMutation({
+    mutationFn: async (filho) => {
+      if (!filho?.id || !filho?.publicacao_compilada_id) {
+        throw new Error('Registro filho inválido para desagrupar.');
+      }
+
+      const loteId = filho.publicacao_compilada_id;
+      const lotePai = publicacoesCompiladas.find((lote) => lote.id === loteId);
+
+      if (!lotePai) {
+        throw new Error('Lote pai não localizado.');
+      }
+
+      if (isLoteCompiladoPublicado(lotePai)) {
+        throw new Error('Lote pai já publicado. Não é possível desagrupar o filho.');
+      }
+
+      if (filho?.numero_bg || filho?.data_bg || filho?.status_calculado === 'Publicado') {
+        throw new Error('Filho já publicado. Não é possível desagrupar o registro.');
+      }
+
+      const filhosDoLote = registrosLivro
+        .filter((registro) => registro?.publicacao_compilada_id === loteId)
+        .sort((a, b) => (a?.publicacao_compilada_ordem ?? 0) - (b?.publicacao_compilada_ordem ?? 0));
+
+      if (filhosDoLote.length <= 2) {
+        return {
+          ok: false,
+          tratamento: 'remocao_impedida_lote_invalido',
+          message: 'Remoção impedida para não invalidar o lote com menos de 2 itens.',
+        };
+      }
+
+      const filhosRemanescentes = filhosDoLote.filter((registro) => registro.id !== filho.id);
+
+      await base44.entities.RegistroLivro.update(filho.id, {
+        publicacao_compilada_id: null,
+        compilado_em_lote: false,
+        publicacao_compilada_ordem: null,
+      });
+
+      await Promise.all(
+        filhosRemanescentes.map((registro, index) => base44.entities.RegistroLivro.update(registro.id, {
+          publicacao_compilada_ordem: index + 1,
+        }))
+      );
+
+      await base44.entities.PublicacaoCompilada.update(loteId, {
+        quantidade_itens: filhosRemanescentes.length,
+      });
+
+      return {
+        ok: true,
+        tratamento: 'filho_desagrupado',
+        quantidade_itens: filhosRemanescentes.length,
+      };
+    },
+    onSuccess: (resultado) => {
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
+
+      if (resultado?.ok) {
+        alert('Filho desagrupado do lote com sucesso.');
+        return;
+      }
+
+      alert(resultado?.message || 'Não foi possível desagrupar o filho.');
+    },
+    onError: (error) => {
+      alert(error?.message || 'Erro ao desagrupar filho do lote.');
+    },
+  });
+
+  const handleDesagruparFilho = async (registro) => {
+    const resultado = await desagruparFilhoMutation.mutateAsync(registro);
+    return resultado;
+  };
 
   const registrosDaAbaAtiva = useMemo(() => {
     if (abaOrigemAtiva === 'all') return registros;
@@ -916,6 +995,7 @@ export default function Publicacoes() {
                             registro={registro}
                             onUpdate={handleUpdate}
                             onDelete={handleDelete}
+                            onDesagruparFilho={handleDesagruparFilho}
                             onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
                             todosRegistros={registros}
                             isAdmin={isAdmin}
