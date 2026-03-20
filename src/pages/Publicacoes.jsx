@@ -24,8 +24,12 @@ import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeia
 import {
   buildPayloadPublicacaoCompilada,
   buildTextoCompiladoFerias,
+  limparVinculoLoteDosFilhos,
+  isLoteCompiladoPublicado,
   isRegistroElegivelParaCompilacaoFerias,
+  isRegistroFilhoDePublicacaoCompilada,
   isRegistroEmLoteCompilado,
+  podeDesfazerLoteCompilado,
   validarCompatibilidadeLoteFerias,
 } from '@/components/publicacao/publicacaoCompiladaService';
 
@@ -40,10 +44,12 @@ const ABAS_ORIGEM = [
   { key: 'all', label: 'Todos' },
   { key: 'ex-officio', label: 'Ex Officio' },
   { key: 'livro', label: 'Livro' },
+  { key: 'publicacao-compilada', label: 'Lotes' },
   { key: 'atestado', label: 'Atestados' },
 ];
 
 function detectarOrigemTipo(registro) {
+  if (registro?.tipo_lote || registro?.quantidade_itens) return 'publicacao-compilada';
   if (registro.origem_tipo) return registro.origem_tipo;
   if (registro.tipo_label || registro.status_codigo || registro.origem) return 'livro';
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
@@ -121,10 +127,13 @@ function montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao }) {
 
 function normalizarRegistro(registro) {
   const origemTipo = detectarOrigemTipo(registro);
+  const isLoteCompilado = origemTipo === 'publicacao-compilada';
   const militarContrato = registro?.militar || {};
   const militarNome = origemTipo === 'livro'
     ? (militarContrato?.nome_guerra || militarContrato?.nome || registro?.militar_nome || '')
-    : (registro?.militar_nome || registro?.nome_guerra || registro?.nome || '');
+    : (isLoteCompilado
+      ? (registro?.titulo || `Publicação compilada${registro?.tipo_lote ? ` • ${String(registro.tipo_lote).toUpperCase()}` : ''}`)
+      : (registro?.militar_nome || registro?.nome_guerra || registro?.nome || ''));
 
   const postoGraduacaoBruto = origemTipo === 'livro'
     ? (militarContrato?.posto_graduacao || militarContrato?.posto || militarContrato?.graduacao || '')
@@ -150,10 +159,13 @@ function normalizarRegistro(registro) {
     origem_tipo: origemTipo,
     status_calculado: registro.status_calculado || (origemTipo === 'livro'
       ? mapStatusContratoParaControle(registro.status_codigo)
+      : isLoteCompilado
+        ? (registro.status || (registro.numero_bg && registro.data_bg ? 'Publicado' : registro.nota_para_bg ? 'Aguardando Publicação' : 'Aguardando Nota'))
       : calcStatusPublicacao(registro)),
     tipo_display: tipoDisplay,
     grupo_display: grupoDisplay,
     tipo_composto_display: tipoCompostoDisplay,
+    quantidade_itens: registro?.quantidade_itens ?? 0,
     tipo: origemTipo === 'livro' ? (registro.tipo_label || registro.tipo) : registro.tipo,
     tipo_registro: origemTipo === 'livro' ? tipoBase : registro.tipo_registro,
     militar_nome: militarNome,
@@ -219,10 +231,6 @@ function montarPayloadAtualizacao(registroAtual, dataParcial, tipo) {
     ...payloadParcial,
     status: statusCalculado,
   };
-}
-
-function getEventDate(registro) {
-  return registro?.data_registro || registro?.data_inicio || registro?.data_inicio_iso || null;
 }
 
 function isFeriasOperacional(registro) {
@@ -299,21 +307,28 @@ export default function Publicacoes() {
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
-  const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
+  const { data: publicacoesCompiladas = [], isLoading: loadingCompiladas } = useQuery({
+    queryKey: ['publicacoes-compiladas', isAdmin],
+    queryFn: async () => base44.entities.PublicacaoCompilada.list('-created_date'),
+    enabled: isAccessResolved && hasPublicacoesAccess,
+  });
+
+  const isLoading = loadingLivro || loadingExOfficio || loadingAtestados || loadingCompiladas;
 
   const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
 
   const registros = useMemo(() => {
-    return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
+    return [...registrosLivro, ...publicacoesExOfficio, ...atestados, ...publicacoesCompiladas]
       .map(normalizarRegistro)
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-  }, [registrosLivro, publicacoesExOfficio, atestados]);
+  }, [registrosLivro, publicacoesExOfficio, atestados, publicacoesCompiladas]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
       const registroAtual = registros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
 
+      if (tipo === 'publicacao-compilada') return base44.entities.PublicacaoCompilada.update(id, payloadFinal);
       if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
       if (tipo === 'atestado') return base44.entities.Atestado.update(id, payloadFinal);
 
@@ -333,6 +348,7 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
     }
   });
@@ -378,6 +394,19 @@ export default function Publicacoes() {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, tipo, registro }) => {
+      if (tipo === 'publicacao-compilada') {
+        if (!podeDesfazerLoteCompilado(registro)) {
+          throw new Error('Publicação compilada já conciliada/publicada não pode ser removida diretamente.');
+        }
+
+        await limparVinculoLoteDosFilhos({
+          entity: base44.entities.RegistroLivro,
+          loteId: id,
+        });
+
+        return base44.entities.PublicacaoCompilada.delete(id);
+      }
+
       if (tipo === 'atestado') return;
 
       const detectarTipo = (refId) => {
@@ -463,6 +492,7 @@ export default function Publicacoes() {
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['cards'] });
     },
     onError: (error) => {
@@ -550,6 +580,18 @@ export default function Publicacoes() {
       alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
       return;
     }
+
+    const registro = registros.find((item) => item.id === id);
+    if (isRegistroFilhoDePublicacaoCompilada(registro)) {
+      const tentouEditarCamposProtegidos = ['nota_para_bg', 'numero_bg', 'data_bg', 'texto_publicacao']
+        .some((campo) => Object.prototype.hasOwnProperty.call(data || {}, campo));
+
+      if (tentouEditarCamposProtegidos) {
+        alert('Este registro está vinculado a uma publicação compilada. Edite ou concilie o lote pai.');
+        return;
+      }
+    }
+
     updateMutation.mutate({ id, data, tipo });
   };
 
@@ -564,6 +606,16 @@ export default function Publicacoes() {
 
     if (tipo === 'atestado') {
       alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
+      return;
+    }
+
+    if (isRegistroFilhoDePublicacaoCompilada(registro)) {
+      alert('Este registro está vinculado a uma publicação compilada e não pode ser excluído isoladamente.');
+      return;
+    }
+
+    if (tipo === 'publicacao-compilada' && isLoteCompiladoPublicado(registro)) {
+      alert('Publicação compilada já conciliada/publicada não pode ser removida diretamente.');
       return;
     }
 
