@@ -120,6 +120,7 @@ function mapCadeiaEventos(registro, cadeiaRaw) {
 function mapPublicacao(registro) {
   const hasPublicacao =
     !!registro?.publicacao_id ||
+    !!registro?.publicacao_compilada_id ||
     !!registro?.numero_bg ||
     !!registro?.data_bg ||
     !!registro?.nota_para_bg ||
@@ -138,6 +139,9 @@ function mapPublicacao(registro) {
   return {
     id: publicacaoId,
     status,
+    publicacao_compilada_id: registro?.publicacao_compilada_id || null,
+    publicacao_compilada_ordem: registro?.publicacao_compilada_ordem ?? null,
+    compilado_em_lote: Boolean(registro?.compilado_em_lote || registro?.publicacao_compilada_id),
     nota_para_bg: registro?.nota_para_bg || null,
     numero_bg: registro?.numero_bg || null,
     data_bg: registro?.data_bg || null,
@@ -207,6 +211,9 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
       tipo_codigo: toCodigo(registro?.tipo_registro),
       tipo_label: getTipoLabel(registro?.tipo_registro),
       origem: registro?.origem || (registro?.ferias_id ? 'Automática' : 'Manual'),
+      publicacao_compilada_id: registro?.publicacao_compilada_id || null,
+      publicacao_compilada_ordem: registro?.publicacao_compilada_ordem ?? null,
+      compilado_em_lote: Boolean(registro?.compilado_em_lote || registro?.publicacao_compilada_id),
       ...getDataRange(registro, feriasRegistro),
       dias: Number(registro?.dias ?? feriasRegistro?.dias ?? 0),
       status_codigo: statusCodigo,

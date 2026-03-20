@@ -65,6 +65,9 @@ export default function CadastrarRegistroRP() {
     numero_bg: '',
     data_bg: '',
     texto_publicacao: '',
+    publicacao_compilada_id: '',
+    publicacao_compilada_ordem: '',
+    compilado_em_lote: false,
     observacoes: '',
     // Livro fields
     ferias_id: '',
