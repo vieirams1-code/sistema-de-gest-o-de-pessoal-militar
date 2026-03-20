@@ -396,7 +396,7 @@ export default function Publicacoes() {
     mutationFn: async ({ id, tipo, registro }) => {
       if (tipo === 'publicacao-compilada') {
         if (!podeDesfazerLoteCompilado(registro)) {
-          throw new Error('Publicação compilada já conciliada/publicada não pode ser removida diretamente.');
+          throw new Error('Publicação compilada já publicada não pode ser removida.');
         }
 
         await limparVinculoLoteDosFilhos({
@@ -587,7 +587,7 @@ export default function Publicacoes() {
         .some((campo) => Object.prototype.hasOwnProperty.call(data || {}, campo));
 
       if (tentouEditarCamposProtegidos) {
-        alert('Este registro está vinculado a uma publicação compilada. Edite ou concilie o lote pai.');
+        alert('Registro vinculado a publicação compilada. Edite o lote pai.');
         return;
       }
     }
@@ -610,12 +610,12 @@ export default function Publicacoes() {
     }
 
     if (isRegistroFilhoDePublicacaoCompilada(registro)) {
-      alert('Este registro está vinculado a uma publicação compilada e não pode ser excluído isoladamente.');
+      alert('Registro vinculado a publicação compilada e não pode ser excluído isoladamente.');
       return;
     }
 
     if (tipo === 'publicacao-compilada' && isLoteCompiladoPublicado(registro)) {
-      alert('Publicação compilada já conciliada/publicada não pode ser removida diretamente.');
+      alert('Publicação compilada já publicada não pode ser removida.');
       return;
     }
 

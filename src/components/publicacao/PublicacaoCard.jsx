@@ -219,14 +219,14 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const podeApostilar = isPublicado && !foiTornadaSemEfeito && !isDerivado;
   const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
-  const podeMarcarPrioridade = !isPublicado;
+  const podeMarcarPrioridade = !isPublicado && !isFilhoLoteCompilado;
   const podeEditar = !isPublicado && origemTipo !== 'livro' && origemTipo !== 'publicacao-compilada';
   const temPermissaoAdmin = canAccessAction('admin_mode');
   const podeExcluir = !isPublicado && temPermissaoAdmin && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && temPermissaoAdmin && !modoAdmin;
-  const mensagemRegistroFilho = 'Este registro está vinculado a uma publicação compilada. Edite ou concilie o lote pai.';
-  const mensagemExclusaoFilho = 'Este registro está vinculado a uma publicação compilada e não pode ser excluído isoladamente.';
-  const mensagemLotePublicado = 'Publicação compilada já conciliada/publicada não pode ser removida diretamente.';
+  const mensagemRegistroFilho = 'Registro vinculado a publicação compilada. Edite o lote pai.';
+  const mensagemExclusaoFilho = 'Registro vinculado a publicação compilada e não pode ser excluído isoladamente.';
+  const mensagemLotePublicado = 'Publicação compilada já publicada não pode ser removida.';
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -325,7 +325,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             <AlertDialogTitle>{isLoteCompilado ? 'Confirmar desfazer lote' : 'Confirmar exclusão'}</AlertDialogTitle>
             <AlertDialogDescription>
               {isLoteCompilado
-                ? 'Este lote ainda não foi publicado. Ao desfazer, os filhos serão preservados e terão apenas o vínculo com o lote removido.'
+                ? 'Desfazer publicação compilada? Os registros voltarão ao estado individual.'
                 : `Esta publicação ainda não foi publicada oficialmente. A exclusão só deve ser permitida
               se não houver movimentações posteriores dependentes dela. Em fluxos encadeados, como
               férias, exclusões intermediárias podem causar inconsistências.`}
@@ -408,7 +408,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 )}
                 {isFilhoLoteCompilado && (
                   <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900">
-                    Este registro pertence a uma publicação compilada. Edite ou concilie o lote pai.
+                    Registro vinculado a publicação compilada. Edite o lote pai.
                   </div>
                 )}
                 {isLoteCompilado && (
