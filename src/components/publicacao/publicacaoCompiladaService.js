@@ -62,8 +62,12 @@ function hasInconsistencia(registro = {}) {
   );
 }
 
+function getStatusCodigoNormalizado(registro = {}) {
+  return toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado || registro?.status_publicacao);
+}
+
 function isStatusCompativel(registro = {}) {
-  const statusCodigo = toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado || registro?.status_publicacao);
+  const statusCodigo = getStatusCodigoNormalizado(registro);
   return STATUS_COMPATIVEIS.has(statusCodigo);
 }
 
@@ -101,8 +105,19 @@ function getPeriodoDescricao(registro = {}) {
   return datas.join(' | ');
 }
 
+function hasPublicacaoCompiladaId(registro = {}) {
+  const value = registro?.publicacao_compilada_id;
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  return true;
+}
+
+function isCompiladoEmLoteTrue(registro = {}) {
+  return registro?.compilado_em_lote === true;
+}
+
 export function isRegistroEmLoteCompilado(registro = {}) {
-  return Boolean(registro?.publicacao_compilada_id || registro?.compilado_em_lote);
+  return hasPublicacaoCompiladaId(registro) || isCompiladoEmLoteTrue(registro);
 }
 
 
@@ -141,16 +156,29 @@ export async function limparVinculoLoteDosFilhos({
 }
 
 export function isRegistroElegivelParaCompilacaoFerias(registro = {}) {
+  const statusCodigo = getStatusCodigoNormalizado(registro);
+  const publicacaoCompiladaId = hasPublicacaoCompiladaId(registro);
+  const compiladoEmLote = isCompiladoEmLoteTrue(registro);
+
+  console.log('[compilacao] verificação de elegibilidade', {
+    registroId: registro?.id,
+    publicacao_compilada_id: registro?.publicacao_compilada_id,
+    compilado_em_lote: registro?.compilado_em_lote,
+    publicacao_compilada_ordem: registro?.publicacao_compilada_ordem,
+    status_verificado: statusCodigo,
+  });
+
   return (
     detectarOrigemLivro(registro) &&
     isFeriasOperacional(registro) &&
     isTipoFeriasCompilavel(registro) &&
-    isStatusCompativel(registro) &&
+    STATUS_COMPATIVEIS.has(statusCodigo) &&
     !registro?.numero_bg &&
     !registro?.data_bg &&
     !isPublicado(registro) &&
     !hasInconsistencia(registro) &&
-    !isRegistroEmLoteCompilado(registro)
+    !publicacaoCompiladaId &&
+    !compiladoEmLote
   );
 }
 
