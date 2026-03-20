@@ -40,6 +40,11 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
+import {
+  isLoteCompiladoPublicado,
+  isRegistroFilhoDePublicacaoCompilada,
+  podeDesfazerLoteCompilado,
+} from '@/components/publicacao/publicacaoCompiladaService';
 
 const statusColors = {
   'Aguardando Nota': 'bg-amber-100 text-amber-700 border-amber-200',
@@ -55,6 +60,9 @@ function calcStatus(nota, numBg, dataBg) {
 }
 
 function detectarOrigemTipo(registro) {
+  if (registro?.tipo_lote || registro?.quantidade_itens) {
+    return 'publicacao-compilada';
+  }
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
     return 'ex-officio';
   }
@@ -100,6 +108,10 @@ function getEditUrl(registro) {
 
   if (tipo === 'atestado') {
     return `${createPageUrl('CadastrarAtestado')}?id=${registro.id}`;
+  }
+
+  if (tipo === 'publicacao-compilada') {
+    return null;
   }
 
   return `${createPageUrl('CadastrarRegistroLivro')}?id=${registro.id}`;
@@ -159,7 +171,7 @@ function FieldBlock({ label, children, className = '' }) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [], isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditingBg, setIsEditingBg] = useState(false);
@@ -172,6 +184,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const origemTipo = detectarOrigemTipo(registro);
   const contratoLivro = origemTipo === 'livro';
+  const isLoteCompilado = origemTipo === 'publicacao-compilada';
+  const isFilhoLoteCompilado = isRegistroFilhoDePublicacaoCompilada(registro);
   const detalhesContrato = registro.detalhes_contrato;
   const vinculosContrato = registro.vinculos_contrato;
   const publicacaoContrato = registro.publicacao_contrato;
@@ -184,7 +198,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     registro.data_bg
   );
 
-  const isPublicado = currentStatus === 'Publicado';
+  const isPublicado = isLoteCompilado ? isLoteCompiladoPublicado(registro) : currentStatus === 'Publicado';
   const isApostila = registro.tipo === 'Apostila';
   const isTSE = registro.tipo === 'Tornar sem Efeito';
   const isDerivado = isApostila || isTSE;
@@ -206,10 +220,13 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeApostilar = isPublicado && !foiTornadaSemEfeito && !isDerivado;
   const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
   const podeMarcarPrioridade = !isPublicado;
-  const podeEditar = !isPublicado && origemTipo !== 'livro';
+  const podeEditar = !isPublicado && origemTipo !== 'livro' && origemTipo !== 'publicacao-compilada';
   const temPermissaoAdmin = canAccessAction('admin_mode');
   const podeExcluir = !isPublicado && temPermissaoAdmin && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && temPermissaoAdmin && !modoAdmin;
+  const mensagemRegistroFilho = 'Este registro está vinculado a uma publicação compilada. Edite ou concilie o lote pai.';
+  const mensagemExclusaoFilho = 'Este registro está vinculado a uma publicação compilada e não pode ser excluído isoladamente.';
+  const mensagemLotePublicado = 'Publicação compilada já conciliada/publicada não pode ser removida diretamente.';
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -242,6 +259,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   };
 
   const handleSaveBg = () => {
+    if (isFilhoLoteCompilado) {
+      alert(mensagemRegistroFilho);
+      return;
+    }
+
     const novoStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
     const updateData =
@@ -267,6 +289,14 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
       alert('Ação restrita. Exige permissão de administração e modo admin ativo.');
       return;
     }
+    if (isFilhoLoteCompilado) {
+      alert(mensagemExclusaoFilho);
+      return;
+    }
+    if (isLoteCompilado && !podeDesfazerLoteCompilado(registro)) {
+      alert(mensagemLotePublicado);
+      return;
+    }
     onDelete(registro.id, origemTipo);
     setShowDeleteConfirm(false);
   };
@@ -285,24 +315,26 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const textoPublicacao = publicacaoContrato?.texto || registro.texto_publicacao || 'Sem texto gerado.';
   const origemLabel = contratoLivro
     ? (registro.origem || 'Automática')
-    : (origemTipo === 'ex-officio' ? 'Ex Officio' : origemTipo === 'atestado' ? 'Atestado' : 'Manual');
+    : (origemTipo === 'ex-officio' ? 'Ex Officio' : origemTipo === 'atestado' ? 'Atestado' : isLoteCompilado ? 'Lote compilado' : 'Manual');
 
   return (
     <>
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogTitle>{isLoteCompilado ? 'Confirmar desfazer lote' : 'Confirmar exclusão'}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta publicação ainda não foi publicada oficialmente. A exclusão só deve ser permitida
+              {isLoteCompilado
+                ? 'Este lote ainda não foi publicado. Ao desfazer, os filhos serão preservados e terão apenas o vínculo com o lote removido.'
+                : `Esta publicação ainda não foi publicada oficialmente. A exclusão só deve ser permitida
               se não houver movimentações posteriores dependentes dela. Em fluxos encadeados, como
-              férias, exclusões intermediárias podem causar inconsistências.
+              férias, exclusões intermediárias podem causar inconsistências.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDelete}>
-              Excluir
+              {isLoteCompilado ? 'Desfazer lote' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -323,10 +355,16 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   {foiApostilada && !isDerivado && !foiTornadaSemEfeito && <Badge className="border bg-purple-50 text-purple-700 border-purple-200">Apostilada</Badge>}
                   {registro.urgente && !isPublicado && <Badge className="border bg-red-100 text-red-700 border-red-200">URGENTE</Badge>}
                   {registro.importante && !registro.urgente && !isPublicado && <Badge className="border bg-amber-100 text-amber-700 border-amber-200">IMPORTANTE</Badge>}
-                  {registro.compilado_em_lote && (
+                  {isFilhoLoteCompilado && (
                     <Badge className="border bg-indigo-50 text-indigo-700 border-indigo-200">
                       <Layers3 className="mr-1 h-3.5 w-3.5" />
                       Em lote compilado
+                    </Badge>
+                  )}
+                  {isLoteCompilado && (
+                    <Badge className="border bg-indigo-100 text-indigo-800 border-indigo-200">
+                      <Layers3 className="mr-1 h-3.5 w-3.5" />
+                      Lote pai
                     </Badge>
                   )}
 
@@ -368,6 +406,16 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     <ExternalLink className="w-3.5 h-3.5" />{atestadosJISOIds.length} atestado(s) vinculado(s)
                   </span>
                 )}
+                {isFilhoLoteCompilado && (
+                  <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900">
+                    Este registro pertence a uma publicação compilada. Edite ou concilie o lote pai.
+                  </div>
+                )}
+                {isLoteCompilado && (
+                  <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+                    <span className="font-semibold">Lote pai operacional.</span> Este registro controla {registro.quantidade_itens || 0} filho(s) vinculados e concentra a publicação/conciliação do conjunto.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -383,7 +431,19 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 </>
               )}
               {!isEditingBg && (
-                <Button variant="ghost" size="sm" onClick={() => { setIsEditingBg(true); setIsExpanded(true); }} className="text-slate-500 hover:text-blue-600 text-xs gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (isFilhoLoteCompilado) {
+                      alert(mensagemRegistroFilho);
+                      return;
+                    }
+                    setIsEditingBg(true);
+                    setIsExpanded(true);
+                  }}
+                  className="text-slate-500 hover:text-blue-600 text-xs gap-1"
+                >
                   <FileText className="w-4 h-4" /><span className="hidden sm:inline">Nota/BG</span>
                 </Button>
               )}
@@ -402,8 +462,23 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   <Ban className="w-4 h-4" /><span className="hidden sm:inline">Tornar s/ Efeito</span>
                 </Button>
               )}
-              {podeExcluir && (
-                <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(true)} className="text-slate-500 hover:text-red-600">
+              {(podeExcluir || (isFilhoLoteCompilado && temPermissaoAdmin && modoAdmin) || (isLoteCompilado && temPermissaoAdmin && modoAdmin)) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (isFilhoLoteCompilado) {
+                      alert(mensagemExclusaoFilho);
+                      return;
+                    }
+                    if (isLoteCompilado && !podeDesfazerLoteCompilado(registro)) {
+                      alert(mensagemLotePublicado);
+                      return;
+                    }
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="text-slate-500 hover:text-red-600"
+                >
                   <Trash2 className="w-4 h-4" />
                 </Button>
               )}
@@ -483,6 +558,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                       <p><span className="font-semibold">Férias:</span> {vinculosContrato?.ferias?.label || (registro.ferias_id ? `Vinculada (${registro.ferias_id})` : '—')}</p>
                       <p><span className="font-semibold">Lote compilado:</span> {registro.publicacao_compilada_id ? `Sim (${registro.publicacao_compilada_id})` : 'Não'}</p>
                       <p><span className="font-semibold">Ordem no lote:</span> {registro.publicacao_compilada_ordem ?? '—'}</p>
+                      {isLoteCompilado && <p><span className="font-semibold">Itens controlados:</span> {registro.quantidade_itens || 0}</p>}
                       <p><span className="font-semibold">Período:</span> {vinculosContrato?.periodo?.label || registro.periodo_aquisitivo || '—'}</p>
                       <p><span className="font-semibold">Cadeia:</span> {vinculosContrato?.cadeia?.existe ? `${vinculosContrato.cadeia.total_eventos} evento(s)` : (cadeiaEventosContrato.length ? `${cadeiaEventosContrato.length} evento(s)` : 'Sem cadeia')}</p>
                       {registro.publicacao_referencia_id && <p><span className="font-semibold">Código principal:</span> {gerarCodigo(registro.publicacao_referencia_id)}</p>}
