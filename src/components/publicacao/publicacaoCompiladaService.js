@@ -12,6 +12,12 @@ const TIPOS_CODIGO_COMPILAVEIS = new Set([
   'retorno_ferias',
 ]);
 
+const STATUS_COMPATIVEIS = new Set([
+  'aguardando_publicacao',
+  'aguardando_publicacao_no_bg',
+  'aguardando_publicacao_bg',
+]);
+
 const STATUS_PUBLICADOS = new Set(['publicado', 'gerada', 'gerado']);
 
 function toCodigo(value) {
@@ -30,7 +36,12 @@ function detectarOrigemLivro(registro = {}) {
 }
 
 function isFeriasOperacional(registro = {}) {
-  return Boolean(registro?.ferias_id || registro?.vinculos?.ferias?.id);
+  return Boolean(
+    registro?.ferias_id ||
+    registro?.vinculos?.ferias?.id ||
+    registro?.vinculos_contrato?.ferias?.id ||
+    registro?.grupo_display === 'Férias'
+  );
 }
 
 function isTipoFeriasCompilavel(registro = {}) {
@@ -40,10 +51,10 @@ function isTipoFeriasCompilavel(registro = {}) {
 }
 
 function isPublicado(registro = {}) {
-  const statusCodigo = toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado);
+  const statusCodigo = toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado || registro?.status_publicacao);
   return Boolean(
     (registro?.numero_bg && registro?.data_bg) ||
-    STATUS_PUBLICADOS.has(statusCodigo),
+    STATUS_PUBLICADOS.has(statusCodigo)
   );
 }
 
@@ -53,19 +64,59 @@ function hasInconsistencia(registro = {}) {
     registro?.inconsistencia_contrato ||
     registro?.motivo_inconsistencia ||
     registro?.inconsistencia_motivo_curto ||
-    toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado) === 'inconsistente',
+    toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado || registro?.status_publicacao) === 'inconsistente'
   );
+}
+
+function isStatusCompativel(registro = {}) {
+  const statusCodigo = toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado || registro?.status_publicacao);
+  return STATUS_COMPATIVEIS.has(statusCodigo);
+}
+
+function formatDate(value) {
+  if (!value) return null;
+  try {
+    const date = String(value).includes('T') ? new Date(value) : new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
+  } catch {
+    return String(value);
+  }
+}
+
+function getPeriodoDescricao(registro = {}) {
+  const datas = [
+    ['Início', registro?.data_inicio || registro?.data_inicio_iso || registro?.data_registro],
+    ['Término', registro?.data_termino || registro?.data_fim],
+    ['Retorno', registro?.data_retorno],
+  ]
+    .map(([label, value]) => {
+      const formatada = formatDate(value);
+      return formatada ? `${label}: ${formatada}` : null;
+    })
+    .filter(Boolean);
+
+  if (registro?.periodo_aquisitivo) {
+    datas.push(`Período aquisitivo: ${registro.periodo_aquisitivo}`);
+  }
+
+  if (registro?.dias) {
+    datas.push(`Dias: ${registro.dias}`);
+  }
+
+  return datas.join(' | ');
 }
 
 export function isRegistroEmLoteCompilado(registro = {}) {
   return Boolean(registro?.publicacao_compilada_id || registro?.compilado_em_lote);
 }
 
-export function isRegistroElegivelParaPublicacaoCompiladaFerias(registro = {}) {
+export function isRegistroElegivelParaCompilacaoFerias(registro = {}) {
   return (
     detectarOrigemLivro(registro) &&
     isFeriasOperacional(registro) &&
     isTipoFeriasCompilavel(registro) &&
+    isStatusCompativel(registro) &&
     !registro?.numero_bg &&
     !registro?.data_bg &&
     !isPublicado(registro) &&
@@ -74,30 +125,30 @@ export function isRegistroElegivelParaPublicacaoCompiladaFerias(registro = {}) {
   );
 }
 
-export function validarCompatibilidadeBasicaPublicacaoCompilada(registros = []) {
+export function validarCompatibilidadeLoteFerias(registros = []) {
   const lista = registros.filter(Boolean);
 
-  if (!lista.length) {
+  if (lista.length < 2) {
     return {
       compativel: false,
-      motivo: 'Nenhum registro informado para o lote compilado.',
+      motivo: 'Selecione pelo menos 2 registros elegíveis para montar o lote de férias.',
     };
   }
 
-  const inelegivel = lista.find((registro) => !isRegistroElegivelParaPublicacaoCompiladaFerias(registro));
+  const inelegivel = lista.find((registro) => !isRegistroElegivelParaCompilacaoFerias(registro));
   if (inelegivel) {
     return {
       compativel: false,
-      motivo: 'Um ou mais registros não atendem às regras iniciais de compilação de férias.',
+      motivo: 'Um ou mais registros não atendem às regras mínimas de compilação de férias.',
       registro_id: inelegivel.id,
     };
   }
 
-  const escopos = new Set(lista.map((registro) => registro?.origem_tipo || 'livro'));
-  if (escopos.size > 1) {
+  const origens = new Set(lista.map((registro) => registro?.origem_tipo || 'livro'));
+  if (origens.size > 1 || !origens.has('livro')) {
     return {
       compativel: false,
-      motivo: 'O lote deve conter registros da mesma origem funcional.',
+      motivo: 'O lote compilado desta fase aceita somente registros do módulo Livro.',
     };
   }
 
@@ -110,14 +161,29 @@ export function validarCompatibilidadeBasicaPublicacaoCompilada(registros = []) 
   };
 }
 
-export function prepararPayloadPublicacaoCompilada({
-  registros = [],
-  notaParaBg = '',
-  textoPublicacao = '',
-  origem = 'livro',
-  overrides = {},
-} = {}) {
-  const compatibilidade = validarCompatibilidadeBasicaPublicacaoCompilada(registros);
+export function buildTextoCompiladoFerias(registros = []) {
+  const lista = registros.filter(Boolean);
+  if (!lista.length) return '';
+
+  const itens = lista.map((registro, index) => {
+    const nome = registro?.militar_nome_institucional || registro?.militar_nome || 'Militar não identificado';
+    const matricula = registro?.militar_matricula || '—';
+    const tipo = registro?.tipo_registro || registro?.tipo_label || registro?.tipo || 'Registro';
+    const periodo = getPeriodoDescricao(registro);
+    return `${index + 1}. ${nome} - Matrícula: ${matricula} - Tipo: ${tipo}${periodo ? ` - ${periodo}` : ''}`;
+  });
+
+  return [
+    'PUBLICAÇÃO COMPILADA DE FÉRIAS',
+    '',
+    'Relação consolidada dos registros elegíveis do Livro para publicação em lote:',
+    '',
+    ...itens,
+  ].join('\n');
+}
+
+export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) {
+  const compatibilidade = validarCompatibilidadeLoteFerias(registros);
 
   if (!compatibilidade.compativel) {
     return {
@@ -128,26 +194,34 @@ export function prepararPayloadPublicacaoCompilada({
     };
   }
 
+  const textoPublicacao = buildTextoCompiladoFerias(registros);
+
   return {
     ok: true,
     erro: null,
     detalhes: compatibilidade,
     payload: {
       tipo_lote: 'ferias',
-      status: notaParaBg ? 'Aguardando Publicação' : 'Aguardando Nota',
-      nota_para_bg: notaParaBg || '',
+      status: 'Aguardando Publicação',
+      nota_para_bg: textoPublicacao,
       numero_bg: '',
       data_bg: '',
       nota_conciliada_boletim: '',
-      texto_publicacao: textoPublicacao || '',
+      texto_publicacao: textoPublicacao,
       quantidade_itens: registros.length,
       ativo: true,
       escopo_inicial: 'ferias',
-      origem,
+      origem: 'livro',
       ...overrides,
     },
   };
 }
+
+export const isRegistroElegivelParaPublicacaoCompiladaFerias = isRegistroElegivelParaCompilacaoFerias;
+export const validarCompatibilidadeBasicaPublicacaoCompilada = validarCompatibilidadeLoteFerias;
+export const prepararPayloadPublicacaoCompilada = ({ registros = [], overrides = {} } = {}) => (
+  buildPayloadPublicacaoCompilada(registros, overrides)
+);
 
 export {
   TIPOS_FERIAS_COMPILAVEIS,

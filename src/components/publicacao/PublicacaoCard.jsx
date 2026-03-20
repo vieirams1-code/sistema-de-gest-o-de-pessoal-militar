@@ -35,7 +35,8 @@ import {
   BadgeCheck,
   FileBadge,
   User,
-  Lock
+  Lock,
+  Layers3
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
@@ -322,6 +323,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   {foiApostilada && !isDerivado && !foiTornadaSemEfeito && <Badge className="border bg-purple-50 text-purple-700 border-purple-200">Apostilada</Badge>}
                   {registro.urgente && !isPublicado && <Badge className="border bg-red-100 text-red-700 border-red-200">URGENTE</Badge>}
                   {registro.importante && !registro.urgente && !isPublicado && <Badge className="border bg-amber-100 text-amber-700 border-amber-200">IMPORTANTE</Badge>}
+                  {registro.compilado_em_lote && (
+                    <Badge className="border bg-indigo-50 text-indigo-700 border-indigo-200">
+                      <Layers3 className="mr-1 h-3.5 w-3.5" />
+                      Em lote compilado
+                    </Badge>
+                  )}
 
                   <h3 className="text-xl font-semibold tracking-tight text-[#1e3a5f] sm:text-2xl">{nomeInstitucional}</h3>
 
@@ -474,6 +481,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   <FieldBlock label="Origem e Vínculos">
                     <div className="space-y-1.5">
                       <p><span className="font-semibold">Férias:</span> {vinculosContrato?.ferias?.label || (registro.ferias_id ? `Vinculada (${registro.ferias_id})` : '—')}</p>
+                      <p><span className="font-semibold">Lote compilado:</span> {registro.publicacao_compilada_id ? `Sim (${registro.publicacao_compilada_id})` : 'Não'}</p>
+                      <p><span className="font-semibold">Ordem no lote:</span> {registro.publicacao_compilada_ordem ?? '—'}</p>
                       <p><span className="font-semibold">Período:</span> {vinculosContrato?.periodo?.label || registro.periodo_aquisitivo || '—'}</p>
                       <p><span className="font-semibold">Cadeia:</span> {vinculosContrato?.cadeia?.existe ? `${vinculosContrato.cadeia.total_eventos} evento(s)` : (cadeiaEventosContrato.length ? `${cadeiaEventosContrato.length} evento(s)` : 'Sem cadeia')}</p>
                       {registro.publicacao_referencia_id && <p><span className="font-semibold">Código principal:</span> {gerarCodigo(registro.publicacao_referencia_id)}</p>}
