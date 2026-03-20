@@ -501,76 +501,67 @@ export default function Publicacoes() {
   });
 
   const desagruparFilhoMutation = useMutation({
-    mutationFn: async (filho) => {
-      if (!filho?.id || !filho?.publicacao_compilada_id) {
-        throw new Error('Registro filho inválido para desagrupar.');
+    mutationFn: async (registroFilho) => {
+      if (!registroFilho?.publicacao_compilada_id) {
+        throw new Error('Registro não está vinculado a lote compilado.');
       }
 
-      const loteId = filho.publicacao_compilada_id;
-      const lotePai = publicacoesCompiladas.find((lote) => lote.id === loteId);
+      const loteId = registroFilho.publicacao_compilada_id;
 
-      if (!lotePai) {
-        throw new Error('Lote pai não localizado.');
+      const lote = registros.find(
+        (item) => item.id === loteId && item.origem_tipo === 'publicacao-compilada'
+      );
+      if (!lote) {
+        throw new Error('Lote pai não encontrado.');
       }
 
-      if (isLoteCompiladoPublicado(lotePai)) {
-        throw new Error('Lote pai já publicado. Não é possível desagrupar o filho.');
+      if (isLoteCompiladoPublicado(lote)) {
+        throw new Error('Publicação compilada já publicada não pode ser alterada.');
       }
 
-      if (filho?.numero_bg || filho?.data_bg || filho?.status_calculado === 'Publicado') {
-        throw new Error('Filho já publicado. Não é possível desagrupar o registro.');
+      if (registroFilho.numero_bg || registroFilho.data_bg) {
+        throw new Error('Registro filho já publicado não pode ser desagrupado.');
       }
 
-      const filhosDoLote = registrosLivro
-        .filter((registro) => registro?.publicacao_compilada_id === loteId)
-        .sort((a, b) => (a?.publicacao_compilada_ordem ?? 0) - (b?.publicacao_compilada_ordem ?? 0));
+      const filhosDoLote = registros
+        .filter((item) => item.publicacao_compilada_id === loteId)
+        .sort((a, b) => (a.publicacao_compilada_ordem ?? 0) - (b.publicacao_compilada_ordem ?? 0));
 
-      if (filhosDoLote.length <= 2) {
-        return {
-          ok: false,
-          tratamento: 'remocao_impedida_lote_invalido',
-          message: 'Remoção impedida para não invalidar o lote com menos de 2 itens.',
-        };
+      const filhosRestantes = filhosDoLote.filter((item) => item.id !== registroFilho.id);
+
+      if (filhosRestantes.length < 2) {
+        throw new Error('Não é possível desagrupar este registro, pois o lote ficaria com menos de 2 itens.');
       }
 
-      const filhosRemanescentes = filhosDoLote.filter((registro) => registro.id !== filho.id);
-
-      await base44.entities.RegistroLivro.update(filho.id, {
+      await base44.entities.RegistroLivro.update(registroFilho.id, {
         publicacao_compilada_id: null,
         compilado_em_lote: false,
         publicacao_compilada_ordem: null,
       });
 
       await Promise.all(
-        filhosRemanescentes.map((registro, index) => base44.entities.RegistroLivro.update(registro.id, {
-          publicacao_compilada_ordem: index + 1,
-        }))
+        filhosRestantes.map((filho, index) =>
+          base44.entities.RegistroLivro.update(filho.id, {
+            publicacao_compilada_ordem: index + 1,
+          })
+        )
       );
 
       await base44.entities.PublicacaoCompilada.update(loteId, {
-        quantidade_itens: filhosRemanescentes.length,
+        quantidade_itens: filhosRestantes.length,
       });
 
-      return {
-        ok: true,
-        tratamento: 'filho_desagrupado',
-        quantidade_itens: filhosRemanescentes.length,
-      };
+      return true;
     },
-    onSuccess: (resultado) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
-
-      if (resultado?.ok) {
-        alert('Filho desagrupado do lote com sucesso.');
-        return;
-      }
-
-      alert(resultado?.message || 'Não foi possível desagrupar o filho.');
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
+      alert('Registro removido do lote com sucesso.');
     },
     onError: (error) => {
-      alert(error?.message || 'Erro ao desagrupar filho do lote.');
+      alert(error?.message || 'Erro ao desagrupar registro.');
     },
   });
 
