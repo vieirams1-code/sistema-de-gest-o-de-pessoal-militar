@@ -327,19 +327,19 @@ export default function Publicacoes() {
 
   const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
 
-  const registros = useMemo(() => {
+  const todosRegistros = useMemo(() => {
     return [...registrosLivro, ...publicacoesExOfficio, ...atestados, ...publicacoesCompiladas]
       .map(normalizarRegistro)
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
   }, [registrosLivro, publicacoesExOfficio, atestados, publicacoesCompiladas]);
 
-  const registrosVisiveisNaListaPrincipal = useMemo(() => (
-    registros.filter((registro) => !isFilhoDeLoteNaListaPrincipal(registro))
-  ), [registros]);
+  const registrosVisiveis = useMemo(() => (
+    todosRegistros.filter((registro) => !isFilhoDeLoteNaListaPrincipal(registro))
+  ), [todosRegistros]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
-      const registroAtual = registros.find((item) => item.id === id);
+      const registroAtual = todosRegistros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
 
       if (tipo === 'publicacao-compilada') return base44.entities.PublicacaoCompilada.update(id, payloadFinal);
@@ -527,7 +527,7 @@ export default function Publicacoes() {
 
       const loteId = registroFilho.publicacao_compilada_id;
 
-      const lote = registros.find(
+      const lote = todosRegistros.find(
         (item) => item.id === loteId && item.origem_tipo === 'publicacao-compilada'
       );
       if (!lote) {
@@ -542,7 +542,7 @@ export default function Publicacoes() {
         throw new Error('Registro filho já publicado não pode ser desagrupado.');
       }
 
-      const filhosDoLote = registros
+      const filhosDoLote = todosRegistros
         .filter((item) => item.publicacao_compilada_id === loteId)
         .sort((a, b) => (a.publicacao_compilada_ordem ?? 0) - (b.publicacao_compilada_ordem ?? 0));
 
@@ -590,9 +590,9 @@ export default function Publicacoes() {
   };
 
   const registrosDaAbaAtiva = useMemo(() => {
-    if (abaOrigemAtiva === 'all') return registrosVisiveisNaListaPrincipal;
-    return registrosVisiveisNaListaPrincipal.filter((registro) => registro.origem_tipo === abaOrigemAtiva);
-  }, [registrosVisiveisNaListaPrincipal, abaOrigemAtiva]);
+    if (abaOrigemAtiva === 'all') return registrosVisiveis;
+    return registrosVisiveis.filter((registro) => registro.origem_tipo === abaOrigemAtiva);
+  }, [registrosVisiveis, abaOrigemAtiva]);
 
   const filteredRegistros = useMemo(() => {
     return registrosDaAbaAtiva.filter((r) => {
@@ -617,14 +617,14 @@ export default function Publicacoes() {
   }, [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
   const registrosElegiveisParaCompilacao = useMemo(() => (
-    registros.filter((registro) => isRegistroElegivelParaCompilacaoFerias(registro))
-  ), [registros]);
+    todosRegistros.filter((registro) => isRegistroElegivelParaCompilacaoFerias(registro))
+  ), [todosRegistros]);
 
   const elegiveisIds = useMemo(() => new Set(registrosElegiveisParaCompilacao.map((registro) => registro.id)), [registrosElegiveisParaCompilacao]);
 
   const selectedRegistrosDetalhados = useMemo(() => (
-    registros.filter((registro) => selectedRegistros.includes(registro.id))
-  ), [registros, selectedRegistros]);
+    todosRegistros.filter((registro) => selectedRegistros.includes(registro.id))
+  ), [todosRegistros, selectedRegistros]);
 
   const podeCompilarSelecionados = selectedRegistrosDetalhados.length >= 2 && selectedRegistrosDetalhados.every((registro) => elegiveisIds.has(registro.id));
 
@@ -670,7 +670,7 @@ export default function Publicacoes() {
       return;
     }
 
-    const registro = registros.find((item) => item.id === id);
+    const registro = todosRegistros.find((item) => item.id === id);
     if (isRegistroFilhoDePublicacaoCompilada(registro)) {
       const tentouEditarCamposProtegidos = ['nota_para_bg', 'numero_bg', 'data_bg', 'texto_publicacao']
         .some((campo) => Object.prototype.hasOwnProperty.call(data || {}, campo));
@@ -690,7 +690,7 @@ export default function Publicacoes() {
       return;
     }
 
-    const registro = registros.find(r => r.id === id);
+    const registro = todosRegistros.find(r => r.id === id);
     if (!registro) return;
 
     if (tipo === 'atestado') {
@@ -882,8 +882,8 @@ export default function Publicacoes() {
               <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
                 {ABAS_ORIGEM.map((aba) => {
                   const totalAba = aba.key === 'all'
-                    ? registrosVisiveisNaListaPrincipal.length
-                    : registrosVisiveisNaListaPrincipal.filter((registro) => registro.origem_tipo === aba.key).length;
+                    ? registrosVisiveis.length
+                    : registrosVisiveis.filter((registro) => registro.origem_tipo === aba.key).length;
                   const ativa = abaOrigemAtiva === aba.key;
 
                   return (
@@ -1007,7 +1007,7 @@ export default function Publicacoes() {
                             onDelete={handleDelete}
                             onDesagruparFilho={handleDesagruparFilho}
                             onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
-                            todosRegistros={registros}
+                            todosRegistros={todosRegistros}
                             isAdmin={isAdmin}
                             modoAdmin={modoAdmin}
                             canAccessAction={canAccessAction}
@@ -1031,7 +1031,7 @@ export default function Publicacoes() {
           />
           <FamiliaPublicacaoPanel
             registro={familiaPanel.registro}
-            todosRegistros={registros}
+            todosRegistros={todosRegistros}
             onClose={() => setFamiliaPanel({ open: false, registro: null })}
           />
         </>
