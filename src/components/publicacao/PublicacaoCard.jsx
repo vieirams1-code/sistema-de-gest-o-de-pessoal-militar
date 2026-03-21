@@ -334,6 +334,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     const nomeFilho = filho.militar_nome_institucional || filho.militar_nome || 'Militar não identificado';
     const tipoFilhoBase = filho.tipo_composto_display || filho.tipo_registro || filho.tipo || 'Registro';
     const tipoFilho = getTipoDisplay(tipoFilhoBase);
+    const filhoPublicado = Boolean(filho?.numero_bg && filho?.data_bg);
+    const podeDesagruparFilhoExpandido = podeDesagruparFilhoDoLote && !filhoPublicado;
 
     return (
       <div
@@ -361,7 +363,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             </div>
           </div>
 
-          {podeDesagruparFilhoDoLote && (
+          {podeDesagruparFilhoExpandido && (
             <Button
               type="button"
               variant="outline"
