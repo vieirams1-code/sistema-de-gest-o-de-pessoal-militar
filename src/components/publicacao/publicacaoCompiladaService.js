@@ -260,8 +260,13 @@ export function buildItensTextoCompiladoFerias(registros = [], itemTemplate = nu
     const tipo = registro?.tipo_registro || registro?.tipo_label || registro?.tipo || 'Registro';
     const periodo = getPeriodoDescricao(registro) || '';
 
-    let linha = tmpl.replace(/\{\{ordem\}\}/g, ordem).replace(/\{\{posto\}\}/g, posto).replace(/\{\{nome\}\}/g, nomeInst)
-      .replace(/\{\{matricula\}\}/g, matricula).replace(/\{\{tipo\}\}/g, tipo).replace(/\{\{periodo\}\}/g, periodo)
+    let linha = tmpl
+      .replace(/\{\{ordem\}\}/g, String(ordem))
+      .replace(/\{\{posto\}\}/g, String(posto))
+      .replace(/\{\{nome\}\}/g, String(nomeInst))
+      .replace(/\{\{matricula\}\}/g, String(matricula))
+      .replace(/\{\{tipo\}\}/g, String(tipo))
+      .replace(/\{\{periodo\}\}/g, String(periodo))
       .replace(/\{\{separador_periodo\}\}/g, periodo ? ' - ' : '');
 
     return linha.replace(/\s+/g, ' ').trim();

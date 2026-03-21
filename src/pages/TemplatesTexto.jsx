@@ -798,7 +798,15 @@ export default function TemplatesTexto() {
                   </div>
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                     {(() => {
-                      const prev = aplicarTemplate(editingTemplate.template, VARS_PREVIEW);
+                      const previewVars = {
+                        ...VARS_PREVIEW,
+                        itens_compilados: '1. Cap João da Silva - Matrícula: 12345 - Tipo: Saída Férias - Início: 01/12/2024 | Término: 30/12/2024\n2. 1º Sgt Maria Souza - Matrícula: 54321 - Tipo: Retorno Férias - Retorno: 15/12/2024\n3. Cb Pedro Santos - Matrícula: 98765 - Tipo: Interrupção de Férias',
+                        quantidade_itens: '3',
+                        data_geracao: new Date().toLocaleDateString('pt-BR'),
+                        codigo_publicacao: 'publicacao_compilada_ferias',
+                        tipo_publicacao: 'Publicação Compilada - Férias',
+                      };
+                      const prev = aplicarTemplate(editingTemplate.template, previewVars);
                       const regex = /\{\{([^}]+)\}\}/g;
                       const parts = [];
                       let lastIndex = 0;
