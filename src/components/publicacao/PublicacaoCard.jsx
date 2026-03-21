@@ -171,9 +171,10 @@ function FieldBlock({ label, children, className = '' }) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, onDesagruparFilho, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isChildrenExpanded, setIsChildrenExpanded] = useState(false);
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bgData, setBgData] = useState({
@@ -227,7 +228,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const mensagemRegistroFilho = 'Registro vinculado a publicação compilada. Edite o lote pai.';
   const mensagemExclusaoFilho = 'Registro vinculado a publicação compilada e não pode ser excluído isoladamente.';
   const mensagemLotePublicado = 'Publicação compilada já publicada não pode ser removida.';
-  const mensagemLoteAguardandoPub = 'Lote em Aguardando Publicação não permite inclusão ou remoção de filhos. Essa restrição evita erro de registro das notas e inconsistência na publicação.';
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -314,6 +314,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     navigate(`${createPageUrl('CadastrarPublicacao')}?tipo=Tornar+sem+Efeito&militar_id=${registro.militar_id}&ref_id=${registro.id}&origem_tipo=${origemTipo}`);
   };
 
+  const handleDesagruparFilho = async () => {
+    if (!podeDesagruparFilho) return;
+    await onDesagruparFilho(registro);
+  };
+
   const integridadeBadge = getIntegridadeBadge(registro);
   const nomeInstitucional = registro.militar_nome_institucional || registro.militar_nome || 'Militar';
   const dataHeader = formatDate(registro.data_registro || registro.created_date || registro.data_inicio);
@@ -321,6 +326,56 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const origemLabel = contratoLivro
     ? (registro.origem || 'Automática')
     : (origemTipo === 'ex-officio' ? 'Ex Officio' : origemTipo === 'atestado' ? 'Atestado' : isLoteCompilado ? 'Lote compilado' : 'Manual');
+
+  const renderFilhoAgrupado = (filho) => {
+    const nomeFilho = filho.militar_nome_institucional || filho.militar_nome || 'Militar não identificado';
+    const tipoFilhoBase = filho.tipo_composto_display || filho.tipo_registro || filho.tipo || 'Registro';
+    const tipoFilho = getTipoDisplay(tipoFilhoBase);
+    const filhoPublicado = Boolean(filho?.numero_bg && filho?.data_bg);
+    const podeDesagruparFilhoExpandido = podeDesagruparFilhoDoLote && !filhoPublicado;
+
+    return (
+      <div
+        key={filho.id}
+        className="rounded-xl border border-indigo-100 bg-white px-4 py-3 shadow-sm"
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border border-indigo-200 bg-indigo-50 text-indigo-700">
+                Filho {filho.publicacao_compilada_ordem ?? '—'}
+              </Badge>
+              <span className="text-sm font-semibold text-slate-900">{nomeFilho}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-700">
+                MAT: {filho.militar_matricula || '—'}
+              </span>
+              <span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-700">
+                Tipo: {tipoFilho}
+              </span>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">Nota para BG:</span> {filho.nota_para_bg || '—'}
+            </div>
+          </div>
+
+          {podeDesagruparFilhoExpandido && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onDesagruparFilho(filho)}
+              className="shrink-0 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800"
+            >
+              <Layers3 className="mr-2 h-4 w-4" />
+              Desagrupar
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -417,8 +472,44 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   </div>
                 )}
                 {isLoteCompilado && (
-                  <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
-                    <span className="font-semibold">Lote pai operacional.</span> Este registro controla {registro.quantidade_itens || 0} filho(s) vinculados e concentra a publicação/conciliação do conjunto.
+                  <div className="mt-3 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-3 text-sm text-indigo-900">
+                    <div>
+                      <span className="font-semibold">Lote pai operacional.</span> Este registro controla {registro.quantidade_itens || filhosDoLote.length || 0} filho(s) vinculados e concentra a publicação/conciliação do conjunto.
+                    </div>
+                    <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-white/70 p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="text-xs font-medium text-indigo-800">
+                          Resumo: {registro.quantidade_itens || filhosDoLote.length || 0} publicação(ões) agrupada(s).
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsChildrenExpanded((value) => !value)}
+                          className="gap-2 border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800"
+                        >
+                          {isChildrenExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          {isChildrenExpanded ? 'Recolher filhos' : 'Expandir filhos'}
+                        </Button>
+                      </div>
+
+                      {isChildrenExpanded && (
+                        filhosDoLote.length > 0 ? (
+                          <div className="space-y-3 border-l-2 border-indigo-200 pl-4">
+                            {filhosDoLote.map(renderFilhoAgrupado)}
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-dashed border-indigo-200 bg-white px-3 py-4 text-sm text-slate-500">
+                            Nenhum filho vinculado a este lote.
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+                {isFilhoLoteCompilado && podeDesagruparFilho && (
+                  <div className="mt-3 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm text-indigo-900">
+                    Filho elegível para desagrupar antes da publicação do lote.
                   </div>
                 )}
               </div>
@@ -505,6 +596,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               {temFamilia && onVerFamilia && (
                 <Button variant="ghost" size="sm" onClick={onVerFamilia} className="text-[#1e3a5f] hover:bg-[#1e3a5f]/10 text-xs gap-1">
                   <GitBranch className="w-4 h-4" /><span className="hidden sm:inline">Família</span>
+                </Button>
+              )}
+              {podeDesagruparFilho && (
+                <Button variant="ghost" size="sm" onClick={handleDesagruparFilho} className="text-indigo-600 hover:text-indigo-800 text-xs gap-1">
+                  <Layers3 className="w-4 h-4" /><span className="hidden sm:inline">Desagrupar</span>
                 </Button>
               )}
               <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)}>

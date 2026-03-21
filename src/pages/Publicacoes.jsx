@@ -24,6 +24,7 @@ import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeia
 import {
   buildPayloadPublicacaoCompilada,
   buildTextoCompiladoFerias,
+  PUBLICACAO_COMPILADA_FERIAS_TIPO,
   limparVinculoLoteDosFilhos,
   isLoteCompiladoPublicado,
   isRegistroElegivelParaCompilacaoFerias,
@@ -244,6 +245,16 @@ function isFeriasOperacional(registro) {
   );
 }
 
+function isFilhoDeLoteNaListaPrincipal(registro) {
+  return (
+    detectarOrigemTipo(registro) === 'livro' &&
+    (
+      !!registro?.publicacao_compilada_id ||
+      registro?.compilado_em_lote === true
+    )
+  );
+}
+
 export default function Publicacoes() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -253,6 +264,7 @@ export default function Publicacoes() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
+  const [loteDestinoId, setLoteDestinoId] = useState('');
   const { isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
 
@@ -313,22 +325,71 @@ export default function Publicacoes() {
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
+  const { data: templatesTexto = [] } = useQuery({
+    queryKey: ['templates-texto'],
+    queryFn: () => base44.entities.TemplateTexto.list('-created_date'),
+    enabled: isAccessResolved && hasPublicacoesAccess,
+  });
+
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados || loadingCompiladas;
 
   const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
 
-  const registros = useMemo(() => {
+  const todosRegistros = useMemo(() => {
     return [...registrosLivro, ...publicacoesExOfficio, ...atestados, ...publicacoesCompiladas]
       .map(normalizarRegistro)
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
   }, [registrosLivro, publicacoesExOfficio, atestados, publicacoesCompiladas]);
 
+  const registrosVisiveis = useMemo(() => (
+    todosRegistros.filter((registro) => !isFilhoDeLoteNaListaPrincipal(registro))
+  ), [todosRegistros]);
+
+  const refrescarDadosPublicacoes = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] }),
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] }),
+      queryClient.invalidateQueries({ queryKey: ['atestados'] }),
+      queryClient.invalidateQueries({ queryKey: ['ferias'] }),
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] }),
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] }),
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] }),
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] }),
+      queryClient.invalidateQueries({ queryKey: ['cards'] }),
+    ]);
+
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['registros-livro'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['publicacoes-compiladas'], type: 'active' }),
+    ]);
+  };
+
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
-      const registroAtual = registros.find((item) => item.id === id);
+      const registroAtual = todosRegistros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
 
-      if (tipo === 'publicacao-compilada') return base44.entities.PublicacaoCompilada.update(id, payloadFinal);
+      if (tipo === 'publicacao-compilada') {
+        const notaFoiAlterada = Object.prototype.hasOwnProperty.call(data || {}, 'nota_para_bg')
+          && data?.nota_para_bg !== registroAtual?.nota_para_bg;
+
+        const loteAtualizado = await base44.entities.PublicacaoCompilada.update(id, payloadFinal);
+
+        if (registroAtual?.origem_tipo === 'publicacao-compilada' && notaFoiAlterada) {
+          const filhosDoLote = todosRegistros.filter((item) => item?.publicacao_compilada_id === id);
+          const filhosNaoPublicados = filhosDoLote.filter((filho) => !(filho?.numero_bg && filho?.data_bg));
+
+          await Promise.all(
+            filhosNaoPublicados.map((filho) =>
+              base44.entities.RegistroLivro.update(filho.id, { nota_para_bg: data.nota_para_bg })
+            )
+          );
+        }
+
+        return loteAtualizado;
+      }
       if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
       if (tipo === 'atestado') return base44.entities.Atestado.update(id, payloadFinal);
 
@@ -338,18 +399,8 @@ export default function Publicacoes() {
       }
       return null;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
+    onSuccess: async () => {
+      await refrescarDadosPublicacoes();
     }
   });
 
@@ -360,31 +411,79 @@ export default function Publicacoes() {
         throw new Error(compatibilidade.motivo);
       }
 
-      const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados);
-      const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, { texto_publicacao: textoCompilado, nota_para_bg: textoCompilado });
+      // Verificar se algum registro já está compilado (usando dados locais — mais rápido e sem risco de leitura atrasada)
+      const registrosJaCompilados = registrosSelecionados.filter((registro) =>
+        isRegistroEmLoteCompilado(registro) || !!registro?.publicacao_compilada_id
+      );
+
+      if (registrosJaCompilados.length > 0) {
+        throw new Error('Não é possível compilar novamente: há registros selecionados já vinculados a um lote compilado.');
+      }
+
+      const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados, templatesTexto);
+      const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, {
+        texto_publicacao: textoCompilado,
+        nota_para_bg: '',
+        numero_bg: '',
+        data_bg: '',
+      }, templatesTexto);
 
       if (!payloadLote.ok) {
         throw new Error(payloadLote.erro || 'Não foi possível montar o lote compilado.');
       }
 
-      const loteCriado = await base44.entities.PublicacaoCompilada.create(payloadLote.payload);
+      let loteCriado = null;
+      const filhosVinculados = [];
 
-      await Promise.all(registrosSelecionados.map((registro, index) => (
-        base44.entities.RegistroLivro.update(registro.id, {
-          publicacao_compilada_id: loteCriado.id,
-          compilado_em_lote: true,
-          publicacao_compilada_ordem: index + 1,
-        })
-      )));
+      try {
+        loteCriado = await base44.entities.PublicacaoCompilada.create(payloadLote.payload);
 
-      return loteCriado;
+        if (!loteCriado?.id) {
+          throw new Error('Falha ao criar o lote compilado: ID não retornado pelo servidor.');
+        }
+
+        // Vincular todos os filhos em paralelo — sem get() posterior para evitar atraso de leitura
+        await Promise.all(
+          registrosSelecionados.map((registro, index) =>
+            base44.entities.RegistroLivro.update(registro.id, {
+              publicacao_compilada_id: loteCriado.id,
+              compilado_em_lote: true,
+              publicacao_compilada_ordem: index + 1,
+              nota_para_bg: loteCriado?.nota_para_bg || '',
+            }).then(() => {
+              filhosVinculados.push(registro.id);
+            })
+          )
+        );
+
+        return loteCriado;
+      } catch (error) {
+        // Rollback: limpar vínculos dos filhos já atualizados
+        await Promise.allSettled(
+          filhosVinculados.map((registroId) =>
+            base44.entities.RegistroLivro.update(registroId, {
+              publicacao_compilada_id: null,
+              compilado_em_lote: false,
+              publicacao_compilada_ordem: null,
+            })
+          )
+        );
+
+        // Rollback: excluir o lote pai criado
+        if (loteCriado?.id) {
+          try {
+            await base44.entities.PublicacaoCompilada.delete(loteCriado.id);
+          } catch (_deleteError) {
+            // ignora erro de delete no rollback — lote órfão pode ser limpo manualmente
+          }
+        }
+
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setSelectedRegistros([]);
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
+      await refrescarDadosPublicacoes();
       alert('Lote compilado de férias criado com sucesso.');
     },
     onError: (error) => {
@@ -484,26 +583,163 @@ export default function Publicacoes() {
         return base44.entities.RegistroLivro.delete(id);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
+    onSuccess: async () => {
+      await Promise.all([
+        refrescarDadosPublicacoes(),
+        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+      ]);
     },
     onError: (error) => {
       alert(error?.message || 'Erro ao excluir registro.');
     }
   });
 
+  const adicionarAoLoteMutation = useMutation({
+    mutationFn: async ({ loteId, registrosSelecionados }) => {
+      if (!loteId) {
+        throw new Error('Selecione um lote pai.');
+      }
+
+      const lotePai = todosRegistros.find(
+        (item) => item.id === loteId && item.origem_tipo === 'publicacao-compilada'
+      );
+
+      if (!lotePai) {
+        throw new Error('Lote pai não encontrado.');
+      }
+
+      if (isLoteCompiladoPublicado(lotePai)) {
+        throw new Error('Só é permitido adicionar a um lote pai que ainda não foi publicado.');
+      }
+
+      const registrosInvalidos = registrosSelecionados.filter((registro) => (
+        !isRegistroElegivelParaCompilacaoFerias(registro) ||
+        !!registro?.publicacao_compilada_id ||
+        registro?.compilado_em_lote === true
+      ));
+
+      if (registrosInvalidos.length > 0) {
+        throw new Error('Há registro(s) selecionado(s) inelegível(is) ou já vinculado(s) a outro lote.');
+      }
+
+      const filhosAtuais = todosRegistros
+        .filter((item) => item.publicacao_compilada_id === loteId)
+        .sort((a, b) => (a.publicacao_compilada_ordem ?? 0) - (b.publicacao_compilada_ordem ?? 0));
+
+      await Promise.all(
+        registrosSelecionados.map((registro, index) =>
+          base44.entities.RegistroLivro.update(registro.id, {
+            publicacao_compilada_id: loteId,
+            compilado_em_lote: true,
+            publicacao_compilada_ordem: filhosAtuais.length + index + 1,
+            nota_para_bg: lotePai?.nota_para_bg || '',
+          })
+        )
+      );
+
+      const filhosAtualizados = [...filhosAtuais, ...registrosSelecionados].map((registro, index) => ({
+        ...registro,
+        publicacao_compilada_id: loteId,
+        compilado_em_lote: true,
+        publicacao_compilada_ordem: index + 1,
+        nota_para_bg: lotePai?.nota_para_bg || '',
+      }));
+
+      await base44.entities.PublicacaoCompilada.update(loteId, {
+        quantidade_itens: filhosAtualizados.length,
+        tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
+        texto_publicacao: buildTextoCompiladoFerias(filhosAtualizados, templatesTexto),
+      });
+
+      return true;
+    },
+    onSuccess: async () => {
+      setSelectedRegistros([]);
+      setLoteDestinoId('');
+      await refrescarDadosPublicacoes();
+      alert('Registro(s) adicionado(s) ao lote com sucesso.');
+    },
+    onError: (error) => {
+      alert(error?.message || 'Erro ao adicionar registro(s) ao lote.');
+    },
+  });
+
+  const desagruparFilhoMutation = useMutation({
+    mutationFn: async (registroFilho) => {
+      if (!registroFilho?.publicacao_compilada_id) {
+        throw new Error('Registro não está vinculado a lote compilado.');
+      }
+
+      const loteId = registroFilho.publicacao_compilada_id;
+
+      const lote = todosRegistros.find(
+        (item) => item.id === loteId && item.origem_tipo === 'publicacao-compilada'
+      );
+      if (!lote) {
+        throw new Error('Lote pai não encontrado.');
+      }
+
+      if (isLoteCompiladoPublicado(lote)) {
+        throw new Error('Publicação compilada já publicada não pode ser alterada.');
+      }
+
+      if (registroFilho.numero_bg || registroFilho.data_bg) {
+        throw new Error('Registro filho já publicado não pode ser desagrupado.');
+      }
+
+      const filhosDoLote = todosRegistros
+        .filter((item) => item.publicacao_compilada_id === loteId)
+        .sort((a, b) => (a.publicacao_compilada_ordem ?? 0) - (b.publicacao_compilada_ordem ?? 0));
+
+      const filhosRestantes = filhosDoLote.filter((item) => item.id !== registroFilho.id);
+
+      if (filhosRestantes.length < 2) {
+        throw new Error('Não é possível desagrupar este registro, pois o lote ficaria com menos de 2 itens.');
+      }
+
+      await base44.entities.RegistroLivro.update(registroFilho.id, {
+        publicacao_compilada_id: null,
+        compilado_em_lote: false,
+        publicacao_compilada_ordem: null,
+        nota_para_bg: '',
+        numero_bg: '',
+        data_bg: '',
+      });
+
+      await Promise.all(
+        filhosRestantes.map((filho, index) =>
+          base44.entities.RegistroLivro.update(filho.id, {
+            publicacao_compilada_ordem: index + 1,
+          })
+        )
+      );
+
+      await base44.entities.PublicacaoCompilada.update(loteId, {
+        quantidade_itens: filhosRestantes.length,
+        tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
+        texto_publicacao: buildTextoCompiladoFerias(filhosRestantes, templatesTexto),
+      });
+
+      return true;
+    },
+    onSuccess: async () => {
+      await refrescarDadosPublicacoes();
+      alert('Registro removido do lote com sucesso.');
+    },
+    onError: (error) => {
+      alert(error?.message || 'Erro ao desagrupar registro.');
+    },
+  });
+
+  const handleDesagruparFilho = async (registro) => {
+    const resultado = await desagruparFilhoMutation.mutateAsync(registro);
+    return resultado;
+  };
+
   const registrosDaAbaAtiva = useMemo(() => {
-    if (abaOrigemAtiva === 'all') return registros;
-    return registros.filter((registro) => registro.origem_tipo === abaOrigemAtiva);
-  }, [registros, abaOrigemAtiva]);
+    if (abaOrigemAtiva === 'all') return registrosVisiveis;
+    return registrosVisiveis.filter((registro) => registro.origem_tipo === abaOrigemAtiva);
+  }, [registrosVisiveis, abaOrigemAtiva]);
 
   const filteredRegistros = useMemo(() => {
     return registrosDaAbaAtiva.filter((r) => {
@@ -528,16 +764,26 @@ export default function Publicacoes() {
   }, [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
   const registrosElegiveisParaCompilacao = useMemo(() => (
-    registros.filter((registro) => isRegistroElegivelParaCompilacaoFerias(registro))
-  ), [registros]);
+    todosRegistros.filter((registro) => isRegistroElegivelParaCompilacaoFerias(registro))
+  ), [todosRegistros]);
 
   const elegiveisIds = useMemo(() => new Set(registrosElegiveisParaCompilacao.map((registro) => registro.id)), [registrosElegiveisParaCompilacao]);
 
   const selectedRegistrosDetalhados = useMemo(() => (
-    registros.filter((registro) => selectedRegistros.includes(registro.id))
-  ), [registros, selectedRegistros]);
+    todosRegistros.filter((registro) => selectedRegistros.includes(registro.id))
+  ), [todosRegistros, selectedRegistros]);
 
   const podeCompilarSelecionados = selectedRegistrosDetalhados.length >= 2 && selectedRegistrosDetalhados.every((registro) => elegiveisIds.has(registro.id));
+  const podeAdicionarSelecionadosAoLote = selectedRegistrosDetalhados.length >= 1
+    && selectedRegistrosDetalhados.every((registro) => elegiveisIds.has(registro.id))
+    && Boolean(loteDestinoId);
+
+  const lotesPaisNaoPublicados = useMemo(() => (
+    todosRegistros.filter((registro) => (
+      registro.origem_tipo === 'publicacao-compilada' &&
+      !isLoteCompiladoPublicado(registro)
+    ))
+  ), [todosRegistros]);
 
   useEffect(() => {
     setSelectedRegistros((atual) => atual.filter((id) => elegiveisIds.has(id)));
@@ -581,7 +827,7 @@ export default function Publicacoes() {
       return;
     }
 
-    const registro = registros.find((item) => item.id === id);
+    const registro = todosRegistros.find((item) => item.id === id);
     if (isRegistroFilhoDePublicacaoCompilada(registro)) {
       const tentouEditarCamposProtegidos = ['nota_para_bg', 'numero_bg', 'data_bg', 'texto_publicacao']
         .some((campo) => Object.prototype.hasOwnProperty.call(data || {}, campo));
@@ -601,7 +847,7 @@ export default function Publicacoes() {
       return;
     }
 
-    const registro = registros.find(r => r.id === id);
+    const registro = todosRegistros.find(r => r.id === id);
     if (!registro) return;
 
     if (tipo === 'atestado') {
@@ -647,6 +893,18 @@ export default function Publicacoes() {
     }
 
     compilarMutation.mutate(selectedRegistrosDetalhados);
+  };
+
+  const handleAdicionarSelecionadosAoLote = () => {
+    if (!loteDestinoId) {
+      alert('Selecione um lote pai.');
+      return;
+    }
+
+    adicionarAoLoteMutation.mutate({
+      loteId: loteDestinoId,
+      registrosSelecionados: selectedRegistrosDetalhados,
+    });
   };
 
   const grupos = [
@@ -793,8 +1051,8 @@ export default function Publicacoes() {
               <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
                 {ABAS_ORIGEM.map((aba) => {
                   const totalAba = aba.key === 'all'
-                    ? registros.length
-                    : registros.filter((registro) => registro.origem_tipo === aba.key).length;
+                    ? registrosVisiveis.length
+                    : registrosVisiveis.filter((registro) => registro.origem_tipo === aba.key).length;
                   const ativa = abaOrigemAtiva === aba.key;
 
                   return (
@@ -836,6 +1094,33 @@ export default function Publicacoes() {
                 <span className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
                   {selectedRegistrosDetalhados.length} selecionado(s)
                 </span>
+                <Select value={loteDestinoId} onValueChange={setLoteDestinoId}>
+                  <SelectTrigger className="w-[280px] bg-white">
+                    <SelectValue placeholder="Adicionar a lote pai existente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lotesPaisNaoPublicados.length > 0 ? (
+                      lotesPaisNaoPublicados.map((lote) => (
+                        <SelectItem key={lote.id} value={lote.id}>
+                          {`${lote.militar_nome || 'Lote compilado'} • ${lote.quantidade_itens || 0} item(ns)`}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="__sem_lotes__" disabled>
+                        Nenhum lote pai disponível
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAdicionarSelecionadosAoLote}
+                  disabled={!podeAdicionarSelecionadosAoLote || adicionarAoLoteMutation.isPending}
+                  variant="outline"
+                  className="border-indigo-300 text-indigo-800 hover:bg-indigo-100"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {adicionarAoLoteMutation.isPending ? 'Adicionando...' : 'Adicionar ao lote'}
+                </Button>
                 <Button
                   onClick={handleCompilarSelecionados}
                   disabled={!podeCompilarSelecionados || compilarMutation.isPending}
@@ -916,8 +1201,9 @@ export default function Publicacoes() {
                             registro={registro}
                             onUpdate={handleUpdate}
                             onDelete={handleDelete}
+                            onDesagruparFilho={handleDesagruparFilho}
                             onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
-                            todosRegistros={registros}
+                            todosRegistros={todosRegistros}
                             isAdmin={isAdmin}
                             modoAdmin={modoAdmin}
                             canAccessAction={canAccessAction}
@@ -941,7 +1227,7 @@ export default function Publicacoes() {
           />
           <FamiliaPublicacaoPanel
             registro={familiaPanel.registro}
-            todosRegistros={registros}
+            todosRegistros={todosRegistros}
             onClose={() => setFamiliaPanel({ open: false, registro: null })}
           />
         </>

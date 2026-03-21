@@ -1,3 +1,18 @@
+import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+
+export const PUBLICACAO_COMPILADA_FERIAS_TIPO = 'Publicação Compilada - Férias';
+export const PUBLICACAO_COMPILADA_FERIAS_CODIGO = 'publicacao_compilada_ferias';
+
+const TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS = [
+  'PUBLICAÇÃO COMPILADA DE FÉRIAS',
+  '',
+  'Quantidade de itens: {{quantidade_itens}}',
+  'Data de geração: {{data_geracao}}',
+  '',
+  '{{itens_compilados}}',
+].join('\n');
+
 const TIPOS_FERIAS_COMPILAVEIS = new Set([
   'Saída Férias',
   'Interrupção de Férias',
@@ -130,6 +145,14 @@ export function isLoteCompiladoPublicado(lote = {}) {
   return Boolean(lote?.numero_bg && lote?.data_bg);
 }
 
+export function getTemplatePublicacaoCompiladaFerias(templates = []) {
+  return (
+    getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_FERIAS_TIPO, 'Livro', templates) ||
+    getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_FERIAS_CODIGO, 'Livro', templates) ||
+    null
+  );
+}
+
 export function podeDesfazerLoteCompilado(lote = {}) {
   const statusCodigo = getStatusCodigoNormalizado(lote);
   if (statusCodigo === 'aguardando_publicacao' || statusCodigo === 'gerada' || statusCodigo === 'publicado') {
@@ -157,6 +180,9 @@ export async function limparVinculoLoteDosFilhos({
       publicacao_compilada_id: null,
       compilado_em_lote: false,
       publicacao_compilada_ordem: null,
+      nota_para_bg: '',
+      numero_bg: '',
+      data_bg: '',
     }))
   );
 
@@ -218,28 +244,39 @@ export function validarCompatibilidadeLoteFerias(registros = []) {
   };
 }
 
-export function buildTextoCompiladoFerias(registros = []) {
+export function buildItensTextoCompiladoFerias(registros = []) {
   const lista = registros.filter(Boolean);
-  if (!lista.length) return '';
-
-  const itens = lista.map((registro, index) => {
+  return lista.map((registro, index) => {
     const nome = registro?.militar_nome_institucional || registro?.militar_nome || 'Militar não identificado';
     const matricula = registro?.militar_matricula || '—';
     const tipo = registro?.tipo_registro || registro?.tipo_label || registro?.tipo || 'Registro';
     const periodo = getPeriodoDescricao(registro);
     return `${index + 1}. ${nome} - Matrícula: ${matricula} - Tipo: ${tipo}${periodo ? ` - ${periodo}` : ''}`;
   });
-
-  return [
-    'PUBLICAÇÃO COMPILADA DE FÉRIAS',
-    '',
-    'Relação consolidada dos registros elegíveis do Livro para publicação em lote:',
-    '',
-    ...itens,
-  ].join('\n');
 }
 
-export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) {
+export function buildVarsPublicacaoCompiladaFerias(registros = []) {
+  const lista = registros.filter(Boolean);
+  return {
+    quantidade_itens: String(lista.length),
+    data_geracao: formatDateBR(new Date().toISOString().slice(0, 10)),
+    itens_compilados: buildItensTextoCompiladoFerias(lista).join('\n'),
+    tipo_publicacao: PUBLICACAO_COMPILADA_FERIAS_TIPO,
+    codigo_publicacao: PUBLICACAO_COMPILADA_FERIAS_CODIGO,
+  };
+}
+
+export function buildTextoCompiladoFerias(registros = [], templates = []) {
+  const lista = registros.filter(Boolean);
+  if (!lista.length) return '';
+
+  const templateAtivo = getTemplatePublicacaoCompiladaFerias(templates);
+  const template = templateAtivo?.template || TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS;
+
+  return aplicarTemplate(template, buildVarsPublicacaoCompiladaFerias(lista));
+}
+
+export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}, templates = []) {
   const compatibilidade = validarCompatibilidadeLoteFerias(registros);
 
   if (!compatibilidade.compativel) {
@@ -251,7 +288,14 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
     };
   }
 
-  const textoPublicacao = buildTextoCompiladoFerias(registros);
+  const textoPublicacao = overrides?.texto_publicacao ?? buildTextoCompiladoFerias(registros, templates);
+  const {
+    nota_para_bg: _notaParaBgIgnorada,
+    numero_bg: _numeroBgIgnorado,
+    data_bg: _dataBgIgnorada,
+    texto_publicacao: _textoPublicacaoOverride,
+    ...safeOverrides
+  } = overrides || {};
 
   return {
     ok: true,
@@ -259,28 +303,31 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
     detalhes: compatibilidade,
     payload: {
       tipo_lote: 'ferias',
-      status: 'Aguardando Publicação',
-      nota_para_bg: textoPublicacao,
-      numero_bg: '',
-      data_bg: '',
+      status: 'Aguardando Nota',
       nota_conciliada_boletim: '',
-      texto_publicacao: textoPublicacao,
       quantidade_itens: registros.length,
       ativo: true,
       escopo_inicial: 'ferias',
       origem: 'livro',
-      ...overrides,
+      tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
+      tipo_codigo: PUBLICACAO_COMPILADA_FERIAS_CODIGO,
+      ...safeOverrides,
+      nota_para_bg: '',
+      numero_bg: '',
+      data_bg: '',
+      texto_publicacao: textoPublicacao,
     },
   };
 }
 
 export const isRegistroElegivelParaPublicacaoCompiladaFerias = isRegistroElegivelParaCompilacaoFerias;
 export const validarCompatibilidadeBasicaPublicacaoCompilada = validarCompatibilidadeLoteFerias;
-export const prepararPayloadPublicacaoCompilada = ({ registros = [], overrides = {} } = {}) => (
-  buildPayloadPublicacaoCompilada(registros, overrides)
+export const prepararPayloadPublicacaoCompilada = ({ registros = [], overrides = {}, templates = [] } = {}) => (
+  buildPayloadPublicacaoCompilada(registros, overrides, templates)
 );
 
 export {
   TIPOS_FERIAS_COMPILAVEIS,
   TIPOS_CODIGO_COMPILAVEIS,
+  TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS,
 };
