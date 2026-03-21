@@ -42,6 +42,8 @@ import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import {
   isLoteCompiladoPublicado,
+  MENSAGEM_BLOQUEIO_MANUTENCAO_LOTE,
+  podeManterFilhosNoLoteCompilado,
   isRegistroFilhoDePublicacaoCompilada,
   podeDesfazerLoteCompilado,
 } from '@/components/publicacao/publicacaoCompiladaService';
@@ -228,13 +230,15 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const mensagemRegistroFilho = 'Registro vinculado a publicação compilada. Edite o lote pai.';
   const mensagemExclusaoFilho = 'Registro vinculado a publicação compilada e não pode ser excluído isoladamente.';
   const mensagemLotePublicado = 'Publicação compilada já publicada não pode ser removida.';
+  const mensagemBloqueioManutencaoLote = MENSAGEM_BLOQUEIO_MANUTENCAO_LOTE;
   const filhosDoLote = isLoteCompilado
     ? todosRegistros
       .filter((item) => item?.publicacao_compilada_id === registro.id)
       .sort((a, b) => (a?.publicacao_compilada_ordem ?? 0) - (b?.publicacao_compilada_ordem ?? 0))
     : [];
+  const lotePermiteManutencaoFilhos = isLoteCompilado ? podeManterFilhosNoLoteCompilado(registro) : true;
   const podeDesagruparFilho = isFilhoLoteCompilado && !isPublicado && temPermissaoAdmin && modoAdmin && typeof onDesagruparFilho === 'function';
-  const podeDesagruparFilhoDoLote = isLoteCompilado && !isPublicado && temPermissaoAdmin && modoAdmin && typeof onDesagruparFilho === 'function';
+  const podeDesagruparFilhoDoLote = isLoteCompilado && lotePermiteManutencaoFilhos && !isPublicado && temPermissaoAdmin && modoAdmin && typeof onDesagruparFilho === 'function';
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -481,8 +485,15 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     </div>
                     <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-white/70 p-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="text-xs font-medium text-indigo-800">
-                          Resumo: {registro.quantidade_itens || filhosDoLote.length || 0} publicação(ões) agrupada(s).
+                        <div className="space-y-2">
+                          <div className="text-xs font-medium text-indigo-800">
+                            Resumo: {registro.quantidade_itens || filhosDoLote.length || 0} publicação(ões) agrupada(s).
+                          </div>
+                          {!lotePermiteManutencaoFilhos && (
+                            <div className="text-xs font-medium text-amber-700">
+                              {mensagemBloqueioManutencaoLote}
+                            </div>
+                          )}
                         </div>
                         <Button
                           type="button"

@@ -27,6 +27,8 @@ import {
   PUBLICACAO_COMPILADA_FERIAS_TIPO,
   limparVinculoLoteDosFilhos,
   isLoteCompiladoPublicado,
+  MENSAGEM_BLOQUEIO_MANUTENCAO_LOTE,
+  podeManterFilhosNoLoteCompilado,
   isRegistroElegivelParaCompilacaoFerias,
   isRegistroFilhoDePublicacaoCompilada,
   isRegistroEmLoteCompilado,
@@ -607,8 +609,8 @@ export default function Publicacoes() {
         throw new Error('Lote pai não encontrado.');
       }
 
-      if (isLoteCompiladoPublicado(lote)) {
-        throw new Error('Publicação compilada já publicada não pode ser alterada.');
+      if (!podeManterFilhosNoLoteCompilado(lote)) {
+        throw new Error(MENSAGEM_BLOQUEIO_MANUTENCAO_LOTE);
       }
 
       if (registroFilho.numero_bg || registroFilho.data_bg) {
@@ -800,6 +802,11 @@ export default function Publicacoes() {
   };
 
   const handleCompilarSelecionados = () => {
+    if (!canAccessAction('admin_mode') || !modoAdmin) {
+      alert('Ação restrita. Exige permissão de administração e modo admin ativo.');
+      return;
+    }
+
     const compatibilidade = validarCompatibilidadeLoteFerias(selectedRegistrosDetalhados);
 
     if (!compatibilidade.compativel) {
@@ -982,7 +989,7 @@ export default function Publicacoes() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-sm font-semibold text-indigo-900">Compilação mínima de férias</p>
-                <p className="text-sm text-indigo-700">Selecione apenas registros elegíveis do Livro em status aguardando publicação. Esta fase não altera o fluxo individual existente.</p>
+                <p className="text-sm text-indigo-700">Selecione apenas registros elegíveis do Livro em status Aguardando Nota. Inclusão de filhos exige modo admin e permissão administrativa.</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -999,7 +1006,7 @@ export default function Publicacoes() {
                 </span>
                 <Button
                   onClick={handleCompilarSelecionados}
-                  disabled={!podeCompilarSelecionados || compilarMutation.isPending}
+                  disabled={!podeCompilarSelecionados || compilarMutation.isPending || !canAccessAction('admin_mode') || !modoAdmin}
                   className="bg-indigo-700 hover:bg-indigo-800"
                 >
                   <Layers3 className="mr-2 h-4 w-4" />

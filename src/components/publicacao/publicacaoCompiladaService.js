@@ -28,11 +28,10 @@ const TIPOS_CODIGO_COMPILAVEIS = new Set([
 ]);
 
 const STATUS_COMPATIVEIS = new Set([
-  'aguardando_publicacao',
-  'aguardando_publicacao_no_bg',
-  'aguardando_publicacao_bg',
   'aguardando_nota',
 ]);
+
+export const MENSAGEM_BLOQUEIO_MANUTENCAO_LOTE = 'Lote em Aguardando Publicação não permite inclusão ou remoção de filhos. Essa restrição evita erro de registro das notas e inconsistência na publicação.';
 
 function toCodigo(value) {
   if (!value) return '';
@@ -143,6 +142,17 @@ export function isRegistroFilhoDePublicacaoCompilada(registro = {}) {
 
 export function isLoteCompiladoPublicado(lote = {}) {
   return Boolean(lote?.numero_bg && lote?.data_bg);
+}
+
+
+export function getStatusLoteCompilado(lote = {}) {
+  if (lote?.numero_bg && lote?.data_bg) return 'Publicado';
+  if (lote?.nota_para_bg) return 'Aguardando Publicação';
+  return 'Aguardando Nota';
+}
+
+export function podeManterFilhosNoLoteCompilado(lote = {}) {
+  return getStatusLoteCompilado(lote) === 'Aguardando Nota';
 }
 
 export function podeDesfazerLoteCompilado(lote = {}) {
