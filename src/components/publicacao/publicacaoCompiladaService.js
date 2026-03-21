@@ -131,7 +131,14 @@ export function isLoteCompiladoPublicado(lote = {}) {
 }
 
 export function podeDesfazerLoteCompilado(lote = {}) {
-  return !isLoteCompiladoPublicado(lote);
+  const statusCodigo = getStatusCodigoNormalizado(lote);
+  if (statusCodigo === 'aguardando_publicacao' || statusCodigo === 'gerada' || statusCodigo === 'publicado') {
+    return false;
+  }
+  if (statusCodigo === 'aguardando_nota') {
+    return true;
+  }
+  return !isLoteCompiladoPublicado(lote) && !lote?.nota_para_bg;
 }
 
 export async function limparVinculoLoteDosFilhos({

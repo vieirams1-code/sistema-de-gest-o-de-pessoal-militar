@@ -227,6 +227,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const mensagemRegistroFilho = 'Registro vinculado a publicação compilada. Edite o lote pai.';
   const mensagemExclusaoFilho = 'Registro vinculado a publicação compilada e não pode ser excluído isoladamente.';
   const mensagemLotePublicado = 'Publicação compilada já publicada não pode ser removida.';
+  const mensagemLoteAguardandoPub = 'Lote em Aguardando Publicação não permite inclusão ou remoção de filhos. Essa restrição evita erro de registro das notas e inconsistência na publicação.';
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
@@ -294,7 +295,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
       return;
     }
     if (isLoteCompilado && !podeDesfazerLoteCompilado(registro)) {
-      alert(mensagemLotePublicado);
+      if (currentStatus === 'Aguardando Publicação') {
+        alert(mensagemLoteAguardandoPub);
+      } else {
+        alert(mensagemLotePublicado);
+      }
       return;
     }
     onDelete(registro.id, origemTipo);
@@ -472,7 +477,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                       return;
                     }
                     if (isLoteCompilado && !podeDesfazerLoteCompilado(registro)) {
-                      alert(mensagemLotePublicado);
+                      if (currentStatus === 'Aguardando Publicação') {
+                        alert(mensagemLoteAguardandoPub);
+                      } else {
+                        alert(mensagemLotePublicado);
+                      }
                       return;
                     }
                     setShowDeleteConfirm(true);
