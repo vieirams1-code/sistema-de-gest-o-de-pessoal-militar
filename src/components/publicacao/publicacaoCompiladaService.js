@@ -259,7 +259,7 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
     detalhes: compatibilidade,
     payload: {
       tipo_lote: 'ferias',
-      status: 'Aguardando Publicação',
+      status: 'Aguardando Nota',
       nota_conciliada_boletim: '',
       quantidade_itens: registros.length,
       ativo: true,
