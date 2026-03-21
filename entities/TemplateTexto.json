@@ -1,0 +1,36 @@
+{
+  "name": "TemplateTexto",
+  "type": "object",
+  "title": "Template de Texto",
+  "description": "Templates de texto parametrizáveis utilizados pelos módulos operacionais do sistema.",
+  "properties": {
+    "modulo": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_registro": {
+      "type": "string",
+      "default": ""
+    },
+    "nome": {
+      "type": "string",
+      "default": ""
+    },
+    "template": {
+      "type": "string",
+      "default": ""
+    },
+    "item_template": {
+      "type": "string",
+      "default": ""
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

@@ -5,6 +5,7 @@ export const PUBLICACAO_COMPILADA_FERIAS_CODIGO = 'publicacao_compilada_ferias';
 export const TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS = '{{ordem}}. {{posto}} {{nome}} - Matrícula: {{matricula}} - Tipo: {{tipo}}{{separador_periodo}}{{periodo}}';
 
 export const VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS = [
+  'ordem',
   'nome',
   'nome_institucional',
   'matricula',
@@ -14,7 +15,6 @@ export const VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS = [
   'cargo',
   'lotacao',
   'subunidade',
-  'ordem',
   'tipo',
   'tipo_composto',
   'grupo',
@@ -359,6 +359,68 @@ export function buildVarsPublicacaoCompiladaFerias(registros = [], itemTemplate 
     tipo_publicacao: PUBLICACAO_COMPILADA_FERIAS_TIPO,
     codigo_publicacao: PUBLICACAO_COMPILADA_FERIAS_CODIGO,
   };
+}
+
+export function buildPreviewRegistrosCompiladoFerias() {
+  return [
+    {
+      publicacao_compilada_ordem: 1,
+      militar_nome: 'João da Silva',
+      militar_nome_institucional: 'Cap QOBM João da Silva',
+      militar_posto_graduacao: 'Cap',
+      militar_quadro: 'QOBM',
+      militar_matricula: '123456',
+      tipo_registro: 'Saída Férias',
+      grupo_display: 'Férias',
+      periodo_aquisitivo: '01/09/2024 a 31/08/2025',
+      data_registro: '2026-03-21',
+      data_inicio: '2026-04-01',
+      data_termino: '2026-04-30',
+      data_retorno: '2026-05-01',
+      dias: 30,
+      lotacao: '1º GBM',
+      subunidade: 'Comando',
+      cargo: 'Chefe de Seção',
+    },
+    {
+      publicacao_compilada_ordem: 2,
+      militar_nome: 'Maria Souza',
+      militar_nome_institucional: '1º Sgt QOBM Maria Souza',
+      militar_posto_graduacao: '1º Sgt',
+      militar_quadro: 'QOBM',
+      militar_matricula: '654321',
+      tipo_registro: 'Retorno Férias',
+      grupo_display: 'Férias',
+      periodo_aquisitivo: '01/02/2024 a 31/01/2025',
+      data_registro: '2026-03-22',
+      data_inicio: '2026-03-01',
+      data_termino: '2026-03-30',
+      data_retorno: '2026-03-31',
+      dias: 30,
+      lotacao: '2º GBM',
+      subunidade: 'Operações',
+      cargo: 'Adjunta',
+    },
+    {
+      publicacao_compilada_ordem: 3,
+      militar_nome: 'Pedro Santos',
+      militar_nome_institucional: 'Cb QOBM Pedro Santos',
+      militar_posto_graduacao: 'Cb',
+      militar_quadro: 'QOBM',
+      militar_matricula: '987654',
+      tipo_registro: 'Interrupção de Férias',
+      grupo_display: 'Férias',
+      periodo_aquisitivo: '01/06/2024 a 31/05/2025',
+      data_registro: '2026-03-23',
+      data_inicio: '2026-03-10',
+      data_termino: '2026-04-08',
+      data_retorno: '2026-04-09',
+      dias: 20,
+      lotacao: '3º GBM',
+      subunidade: 'Administração',
+      cargo: 'Auxiliar',
+    },
+  ];
 }
 
 export function buildTextoCompiladoFerias(registros = [], templates = []) {
