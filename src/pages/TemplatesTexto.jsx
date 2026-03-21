@@ -12,7 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle } from 'lucide-react';
 import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
-import { TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS, VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS } from '@/components/publicacao/publicacaoCompiladaService';
+import {
+  buildPreviewRegistrosCompiladoFerias,
+  buildTextoCompiladoFerias,
+  TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS,
+  VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS,
+} from '@/components/publicacao/publicacaoCompiladaService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, getModuloByTipo, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
@@ -744,6 +749,22 @@ export default function TemplatesTexto() {
 
   const inserirVarTemplatePrincipal = (value) => inserirVarNoTextarea(textareaRef, 'template', value);
   const inserirVarItemTemplate = (value) => inserirVarNoTextarea(itemTemplateTextareaRef, 'item_template', value);
+  const previewTextoCompiladoFerias = useMemo(() => {
+    if (editingTemplate?.tipo_registro !== TIPO_PUBLICACAO_COMPILADA_FERIAS || !editingTemplate?.template) {
+      return '';
+    }
+
+    return buildTextoCompiladoFerias(
+      buildPreviewRegistrosCompiladoFerias(),
+      [{
+        modulo: 'Livro',
+        tipo_registro: TIPO_PUBLICACAO_COMPILADA_FERIAS,
+        ativo: true,
+        template: editingTemplate.template,
+        item_template: editingTemplate.item_template ?? '',
+      }],
+    );
+  }, [editingTemplate?.item_template, editingTemplate?.template, editingTemplate?.tipo_registro]);
 
   if (loadingUser || !isAccessResolved) return null;
   if (!canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
@@ -890,22 +911,17 @@ export default function TemplatesTexto() {
                   </div>
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                     {(() => {
-                      const previewVars = {
-                        ...VARS_PREVIEW,
-                        quantidade_itens: '3',
-                        data_geracao: new Date().toLocaleDateString('pt-BR'),
-                        codigo_publicacao: 'publicacao_compilada_ferias',
-                        tipo_publicacao: 'Publicação Compilada - Férias',
-                      };
-                      const prev = aplicarTemplate(editingTemplate.template, previewVars);
+                      const textoPreview = editingTemplate.tipo_registro === TIPO_PUBLICACAO_COMPILADA_FERIAS
+                        ? previewTextoCompiladoFerias
+                        : aplicarTemplate(editingTemplate.template, VARS_PREVIEW);
                       const regex = /\{\{([^}]+)\}\}/g;
                       const parts = [];
                       let lastIndex = 0;
                       let match;
                       let k = 0;
 
-                      while ((match = regex.exec(prev)) !== null) {
-                        parts.push(prev.substring(lastIndex, match.index));
+                      while ((match = regex.exec(textoPreview)) !== null) {
+                        parts.push(textoPreview.substring(lastIndex, match.index));
                         const varName = match[1].trim();
                         if (variaveisInvalidas.includes(varName)) {
                           parts.push(<span key={k++} className="bg-red-200 text-red-800 px-1 rounded font-mono font-bold" title="Variável inválida">{match[0]}</span>);
@@ -914,7 +930,7 @@ export default function TemplatesTexto() {
                         }
                         lastIndex = regex.lastIndex;
                       }
-                      parts.push(prev.substring(lastIndex));
+                      parts.push(textoPreview.substring(lastIndex));
 
                       return parts;
                     })()}
