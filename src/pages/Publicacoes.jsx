@@ -420,8 +420,14 @@ export default function Publicacoes() {
         throw new Error('Não é possível compilar novamente: há registros selecionados já vinculados a um lote compilado.');
       }
 
-      const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados, templatesTexto);
-      const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, {
+      // Garante em memória a ordem correta para construção sequencial do texto
+      const registrosComOrdem = registrosSelecionados.map((registro, index) => ({
+        ...registro,
+        publicacao_compilada_ordem: index + 1
+      }));
+
+      const textoCompilado = buildTextoCompiladoFerias(registrosComOrdem, templatesTexto);
+      const payloadLote = buildPayloadPublicacaoCompilada(registrosComOrdem, {
         texto_publicacao: textoCompilado,
         nota_para_bg: '',
         numero_bg: '',
@@ -697,6 +703,12 @@ export default function Publicacoes() {
         throw new Error('Não é possível desagrupar este registro, pois o lote ficaria com menos de 2 itens.');
       }
 
+      // Atualiza na memória a ordem dos itens restantes antes de gerar o novo texto do Lote
+      const filhosRestantesAtualizados = filhosRestantes.map((filho, index) => ({
+        ...filho,
+        publicacao_compilada_ordem: index + 1
+      }));
+
       await base44.entities.RegistroLivro.update(registroFilho.id, {
         publicacao_compilada_id: null,
         compilado_em_lote: false,
@@ -707,17 +719,17 @@ export default function Publicacoes() {
       });
 
       await Promise.all(
-        filhosRestantes.map((filho, index) =>
+        filhosRestantesAtualizados.map((filho) =>
           base44.entities.RegistroLivro.update(filho.id, {
-            publicacao_compilada_ordem: index + 1,
+            publicacao_compilada_ordem: filho.publicacao_compilada_ordem,
           })
         )
       );
 
       await base44.entities.PublicacaoCompilada.update(loteId, {
-        quantidade_itens: filhosRestantes.length,
+        quantidade_itens: filhosRestantesAtualizados.length,
         tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
-        texto_publicacao: buildTextoCompiladoFerias(filhosRestantes, templatesTexto),
+        texto_publicacao: buildTextoCompiladoFerias(filhosRestantesAtualizados, templatesTexto),
       });
 
       return true;

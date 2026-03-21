@@ -146,11 +146,12 @@ export function isLoteCompiladoPublicado(lote = {}) {
 }
 
 export function getTemplatePublicacaoCompiladaFerias(templates = []) {
-  return (
-    getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_FERIAS_TIPO, 'Livro', templates) ||
-    getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_FERIAS_CODIGO, 'Livro', templates) ||
-    null
-  );
+  if (!Array.isArray(templates)) return null;
+  return templates.find((t) =>
+    (t.tipo_registro === PUBLICACAO_COMPILADA_FERIAS_TIPO || t.tipo_registro === PUBLICACAO_COMPILADA_FERIAS_CODIGO) &&
+    t.modulo === 'Livro' &&
+    t.ativo !== false
+  ) || null;
 }
 
 export function podeDesfazerLoteCompilado(lote = {}) {
@@ -244,14 +245,26 @@ export function validarCompatibilidadeLoteFerias(registros = []) {
   };
 }
 
-export function buildItensTextoCompiladoFerias(registros = []) {
+export function buildItensTextoCompiladoFerias(registros = [], itemTemplate = null) {
   const lista = registros.filter(Boolean);
+
+  // Formato padrão melhor estruturado e preparado para receber itemTemplate no futuro
+  const defaultItemTmpl = "{{ordem}}. {{posto}} {{nome}} - Matrícula: {{matricula}} - Tipo: {{tipo}}{{separador_periodo}}{{periodo}}";
+  const tmpl = itemTemplate || defaultItemTmpl;
+
   return lista.map((registro, index) => {
-    const nome = registro?.militar_nome_institucional || registro?.militar_nome || 'Militar não identificado';
+    const ordem = registro?.publicacao_compilada_ordem || (index + 1);
+    const nomeInst = registro?.militar_nome_institucional || registro?.militar_nome || 'Militar não identificado';
+    const posto = registro?.militar_posto_graduacao || registro?.militar_posto || '';
     const matricula = registro?.militar_matricula || '—';
     const tipo = registro?.tipo_registro || registro?.tipo_label || registro?.tipo || 'Registro';
-    const periodo = getPeriodoDescricao(registro);
-    return `${index + 1}. ${nome} - Matrícula: ${matricula} - Tipo: ${tipo}${periodo ? ` - ${periodo}` : ''}`;
+    const periodo = getPeriodoDescricao(registro) || '';
+
+    let linha = tmpl.replace(/\{\{ordem\}\}/g, ordem).replace(/\{\{posto\}\}/g, posto).replace(/\{\{nome\}\}/g, nomeInst)
+      .replace(/\{\{matricula\}\}/g, matricula).replace(/\{\{tipo\}\}/g, tipo).replace(/\{\{periodo\}\}/g, periodo)
+      .replace(/\{\{separador_periodo\}\}/g, periodo ? ' - ' : '');
+
+    return linha.replace(/\s+/g, ' ').trim();
   });
 }
 
