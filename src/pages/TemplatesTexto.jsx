@@ -31,6 +31,8 @@ const FERIAS_LABELS = {
   'Retorno Férias': 'Término',
 };
 
+const TIPO_PUBLICACAO_COMPILADA_FERIAS = 'Publicação Compilada - Férias';
+
 const MODULO_LABELS = {
   [MODULO_LIVRO]: 'Livro',
   [MODULO_EX_OFFICIO]: 'Ex Offício',
@@ -109,6 +111,17 @@ const VARS_POR_TIPO = {
       { v: '{{dias}}', desc: 'Dias retomados / saldo retomado' },
       { v: '{{saldo_remanescente}}', desc: 'Saldo remanescente da interrupção anterior' },
       { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+    ]
+  },
+  [TIPO_PUBLICACAO_COMPILADA_FERIAS]: {
+    grupo: 'Publicação Compilada',
+    cor: 'blue',
+    variaveis: [
+      { v: '{{quantidade_itens}}', desc: 'Quantidade de registros compilados' },
+      { v: '{{data_geracao}}', desc: 'Data de geração do lote compilado' },
+      { v: '{{itens_compilados}}', desc: 'Lista textual final dos itens compilados' },
+      { v: '{{tipo_publicacao}}', desc: 'Nome do tipo da publicação compilada' },
+      { v: '{{codigo_publicacao}}', desc: 'Código interno da publicação compilada' },
     ]
   },
   'Retorno Férias': {
@@ -559,7 +572,18 @@ export default function TemplatesTexto() {
   };
 
   const tiposRegistroOptions = useMemo(() => (
-    RP_TIPOS_BASE
+    [
+      ...RP_TIPOS_BASE,
+      {
+        value: TIPO_PUBLICACAO_COMPILADA_FERIAS,
+        label: TIPO_PUBLICACAO_COMPILADA_FERIAS,
+        grupo: 'Publicação Compilada',
+        modulo: MODULO_LIVRO,
+        descricao: 'Template operacional do pai da publicação compilada de férias.',
+        palavrasChave: ['publicacao', 'compilada', 'ferias'],
+        destaque: false,
+      },
+    ]
       .map((tipo) => ({ ...tipo, modulo: normalizeTemplateModulo(tipo.modulo) }))
       .sort((a, b) => getTipoDisplay(a.value).localeCompare(getTipoDisplay(b.value), 'pt-BR'))
   ), []);

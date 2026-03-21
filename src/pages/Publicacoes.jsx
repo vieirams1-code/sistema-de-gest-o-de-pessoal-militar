@@ -24,6 +24,7 @@ import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeia
 import {
   buildPayloadPublicacaoCompilada,
   buildTextoCompiladoFerias,
+  PUBLICACAO_COMPILADA_FERIAS_TIPO,
   limparVinculoLoteDosFilhos,
   isLoteCompiladoPublicado,
   isRegistroElegivelParaCompilacaoFerias,
@@ -323,6 +324,12 @@ export default function Publicacoes() {
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
+  const { data: templatesTexto = [] } = useQuery({
+    queryKey: ['templates-texto'],
+    queryFn: () => base44.entities.TemplateTexto.list('-created_date'),
+    enabled: isAccessResolved && hasPublicacoesAccess,
+  });
+
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados || loadingCompiladas;
 
   const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
@@ -336,6 +343,27 @@ export default function Publicacoes() {
   const registrosVisiveis = useMemo(() => (
     todosRegistros.filter((registro) => !isFilhoDeLoteNaListaPrincipal(registro))
   ), [todosRegistros]);
+
+  const refrescarDadosPublicacoes = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] }),
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] }),
+      queryClient.invalidateQueries({ queryKey: ['atestados'] }),
+      queryClient.invalidateQueries({ queryKey: ['ferias'] }),
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] }),
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] }),
+      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] }),
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] }),
+      queryClient.invalidateQueries({ queryKey: ['cards'] }),
+    ]);
+
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['registros-livro'], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['publicacoes-compiladas'], type: 'active' }),
+    ]);
+  };
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
@@ -370,18 +398,8 @@ export default function Publicacoes() {
       }
       return null;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
+    onSuccess: async () => {
+      await refrescarDadosPublicacoes();
     }
   });
 
@@ -401,7 +419,7 @@ export default function Publicacoes() {
         throw new Error('Não é possível compilar novamente: há registros selecionados já vinculados a um lote compilado.');
       }
 
-      const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados);
+      const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados, templatesTexto);
       const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, {
         texto_publicacao: textoCompilado,
         nota_para_bg: '',
@@ -461,12 +479,9 @@ export default function Publicacoes() {
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setSelectedRegistros([]);
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
+      await refrescarDadosPublicacoes();
       alert('Lote compilado de férias criado com sucesso.');
     },
     onError: (error) => {
@@ -566,16 +581,11 @@ export default function Publicacoes() {
         return base44.entities.RegistroLivro.delete(id);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
+    onSuccess: async () => {
+      await Promise.all([
+        refrescarDadosPublicacoes(),
+        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+      ]);
     },
     onError: (error) => {
       alert(error?.message || 'Erro ao excluir registro.');
@@ -631,15 +641,14 @@ export default function Publicacoes() {
 
       await base44.entities.PublicacaoCompilada.update(loteId, {
         quantidade_itens: filhosRestantes.length,
+        tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
+        texto_publicacao: buildTextoCompiladoFerias(filhosRestantes, templatesTexto),
       });
 
       return true;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-compiladas'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
+    onSuccess: async () => {
+      await refrescarDadosPublicacoes();
       alert('Registro removido do lote com sucesso.');
     },
     onError: (error) => {
