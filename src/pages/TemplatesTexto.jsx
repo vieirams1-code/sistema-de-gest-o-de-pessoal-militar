@@ -800,7 +800,7 @@ export default function TemplatesTexto() {
                     {(() => {
                       const previewVars = {
                         ...VARS_PREVIEW,
-                        itens_compilados: '1. Cap João da Silva - Matrícula: 12345 - Tipo: Saída Férias - Início: 01/12/2024 | Término: 30/12/2024\n2. 1º Sgt Maria Souza - Matrícula: 54321 - Tipo: Retorno Férias - Retorno: 15/12/2024\n3. Cb Pedro Santos - Matrícula: 98765 - Tipo: Interrupção de Férias',
+                        itens_compilados: '1. Cap João da Silva - Matrícula: 12345 - Tipo: Saída Férias - Início: 01/12/2024 | Término: 30/12/2024 2. 1º Sgt Maria Souza - Matrícula: 54321 - Tipo: Retorno Férias - Retorno: 15/12/2024 3. Cb Pedro Santos - Matrícula: 98765 - Tipo: Interrupção de Férias',
                         quantidade_itens: '3',
                         data_geracao: new Date().toLocaleDateString('pt-BR'),
                         codigo_publicacao: 'publicacao_compilada_ferias',

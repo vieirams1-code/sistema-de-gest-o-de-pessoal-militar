@@ -278,7 +278,7 @@ export function buildVarsPublicacaoCompiladaFerias(registros = []) {
   return {
     quantidade_itens: String(lista.length),
     data_geracao: formatDateBR(new Date().toISOString().slice(0, 10)),
-    itens_compilados: buildItensTextoCompiladoFerias(lista).join('\n'),
+    itens_compilados: buildItensTextoCompiladoFerias(lista).join(' '),
     tipo_publicacao: PUBLICACAO_COMPILADA_FERIAS_TIPO,
     codigo_publicacao: PUBLICACAO_COMPILADA_FERIAS_CODIGO,
   };
