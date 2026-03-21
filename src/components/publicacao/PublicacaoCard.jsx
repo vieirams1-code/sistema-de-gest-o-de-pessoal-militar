@@ -218,6 +218,15 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const foiTornadaSemEfeito = !!registro.tornada_sem_efeito_por_id || !!tseDaApostila;
   const temFamilia = foiApostilada || foiTornadaSemEfeito || !!registro.publicacao_referencia_id;
 
+  const filhosDoLote = isLoteCompilado
+    ? todosRegistros.filter((r) => r.publicacao_compilada_id === registro.id)
+        .sort((a, b) => (a.publicacao_compilada_ordem ?? 0) - (b.publicacao_compilada_ordem ?? 0))
+    : [];
+  const podeDesagruparFilhoDoLote = isLoteCompilado && !isLoteCompiladoPublicado(registro);
+  const podeDesagruparFilho = isFilhoLoteCompilado && !isPublicado && podeDesfazerLoteCompilado(
+    todosRegistros.find((r) => r.id === registro.publicacao_compilada_id) || {}
+  );
+
   const podeApostilar = isPublicado && !foiTornadaSemEfeito && !isDerivado;
   const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
   const podeMarcarPrioridade = !isPublicado && !isFilhoLoteCompilado;
