@@ -51,6 +51,52 @@ function serializeTemplateModulo(modulo) {
   return normalizeTemplateModulo(modulo) === MODULO_EX_OFFICIO ? 'Publicação Ex Officio' : modulo;
 }
 
+function createEmptyTemplateForm() {
+  return {
+    modulo: '',
+    tipo_registro: '',
+    nome: '',
+    template: '',
+    item_template: '',
+    observacoes: '',
+    ativo: true,
+  };
+}
+
+function normalizeTemplateForForm(template) {
+  if (!template) return createEmptyTemplateForm();
+
+  return {
+    ...createEmptyTemplateForm(),
+    ...template,
+    modulo: normalizeTemplateModulo(template.modulo),
+    template: template.template || '',
+    item_template: template.item_template || '',
+    observacoes: template.observacoes || '',
+    ativo: template.ativo ?? true,
+  };
+}
+
+function buildTemplatePayload(data) {
+  const payload = {
+    modulo: serializeTemplateModulo(data.modulo),
+    tipo_registro: data.tipo_registro || '',
+    nome: data.nome || '',
+    template: data.template || '',
+    item_template: data.item_template || '',
+    observacoes: data.observacoes || '',
+    ativo: data.ativo ?? true,
+  };
+
+  console.info('[TemplatesTexto] payload de save', {
+    id: data.id || null,
+    template: payload.template,
+    item_template: payload.item_template,
+  });
+
+  return payload;
+}
+
 function getTipoDisplay(tipo) {
   return FERIAS_LABELS[tipo] || tipo;
 }
@@ -506,11 +552,7 @@ export default function TemplatesTexto() {
         throw new Error('Já existe template ativo para este tipo em outro módulo. Resolva o conflito antes de salvar.');
       }
 
-      const payload = {
-        ...data,
-        modulo: serializeTemplateModulo(data.modulo),
-        item_template: data.item_template || '',
-      };
+      const payload = buildTemplatePayload(data);
       return data.id
         ? base44.entities.TemplateTexto.update(data.id, payload)
         : base44.entities.TemplateTexto.create(payload);
@@ -560,12 +602,12 @@ export default function TemplatesTexto() {
   });
 
   const handleEdit = (t) => {
-    setEditingTemplate({ ...t, modulo: normalizeTemplateModulo(t.modulo), item_template: t.item_template || '' });
+    setEditingTemplate(normalizeTemplateForForm(t));
     setShowForm(true);
   };
 
   const handleNew = () => {
-    setEditingTemplate({ modulo: '', tipo_registro: '', nome: '', template: '', item_template: '', observacoes: '', ativo: true });
+    setEditingTemplate(createEmptyTemplateForm());
     setShowForm(true);
   };
 
