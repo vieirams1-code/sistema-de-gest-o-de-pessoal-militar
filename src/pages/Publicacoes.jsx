@@ -374,11 +374,8 @@ export default function Publicacoes() {
         throw new Error(compatibilidade.motivo);
       }
 
-      const registrosPersistidos = await Promise.all(
-        registrosSelecionados.map((registro) => base44.entities.RegistroLivro.get(registro.id))
-      );
-
-      const registrosJaCompilados = registrosPersistidos.filter((registro) =>
+      // Verificar se algum registro já está compilado (usando dados locais — mais rápido e sem risco de leitura atrasada)
+      const registrosJaCompilados = registrosSelecionados.filter((registro) =>
         isRegistroEmLoteCompilado(registro) || !!registro?.publicacao_compilada_id
       );
 
@@ -404,33 +401,27 @@ export default function Publicacoes() {
       try {
         loteCriado = await base44.entities.PublicacaoCompilada.create(payloadLote.payload);
 
-        for (const [index, registro] of registrosSelecionados.entries()) {
-          const ordem = index + 1;
-          const payloadVinculoFilho = {
-            publicacao_compilada_id: loteCriado.id,
-            compilado_em_lote: true,
-            publicacao_compilada_ordem: ordem,
-          };
-
-          await base44.entities.RegistroLivro.update(registro.id, payloadVinculoFilho);
-
-          const registroPersistido = await base44.entities.RegistroLivro.get(registro.id);
-
-          const vinculoPersistido =
-            registroPersistido?.publicacao_compilada_id === loteCriado.id &&
-            registroPersistido?.compilado_em_lote === true &&
-            registroPersistido?.publicacao_compilada_ordem === ordem;
-
-          if (!vinculoPersistido) {
-            throw new Error(`Falha ao vincular o registro ${registro.id} ao lote compilado criado.`);
-          }
-
-          filhosVinculados.push(registro.id);
+        if (!loteCriado?.id) {
+          throw new Error('Falha ao criar o lote compilado: ID não retornado pelo servidor.');
         }
+
+        // Vincular todos os filhos em paralelo — sem get() posterior para evitar atraso de leitura
+        await Promise.all(
+          registrosSelecionados.map((registro, index) =>
+            base44.entities.RegistroLivro.update(registro.id, {
+              publicacao_compilada_id: loteCriado.id,
+              compilado_em_lote: true,
+              publicacao_compilada_ordem: index + 1,
+            }).then(() => {
+              filhosVinculados.push(registro.id);
+            })
+          )
+        );
 
         return loteCriado;
       } catch (error) {
-        const rollbackFilhos = await Promise.allSettled(
+        // Rollback: limpar vínculos dos filhos já atualizados
+        await Promise.allSettled(
           filhosVinculados.map((registroId) =>
             base44.entities.RegistroLivro.update(registroId, {
               publicacao_compilada_id: null,
@@ -440,22 +431,13 @@ export default function Publicacoes() {
           )
         );
 
-        let erroRollback = null;
-        const falhasRollbackFilhos = rollbackFilhos.filter((resultado) => resultado.status === 'rejected');
-        if (falhasRollbackFilhos.length > 0) {
-          erroRollback = new Error('Falha ao desfazer os vínculos dos filhos após erro na compilação.');
-        }
-
+        // Rollback: excluir o lote pai criado
         if (loteCriado?.id) {
           try {
             await base44.entities.PublicacaoCompilada.delete(loteCriado.id);
-          } catch (deleteError) {
-            erroRollback = erroRollback || new Error('Falha ao excluir o lote compilado após erro na vinculação dos filhos.');
+          } catch (_deleteError) {
+            // ignora erro de delete no rollback — lote órfão pode ser limpo manualmente
           }
-        }
-
-        if (erroRollback) {
-          throw erroRollback;
         }
 
         throw error;
