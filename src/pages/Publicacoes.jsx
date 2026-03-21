@@ -342,7 +342,25 @@ export default function Publicacoes() {
       const registroAtual = todosRegistros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
 
-      if (tipo === 'publicacao-compilada') return base44.entities.PublicacaoCompilada.update(id, payloadFinal);
+      if (tipo === 'publicacao-compilada') {
+        const notaFoiAlterada = Object.prototype.hasOwnProperty.call(data || {}, 'nota_para_bg')
+          && data?.nota_para_bg !== registroAtual?.nota_para_bg;
+
+        const loteAtualizado = await base44.entities.PublicacaoCompilada.update(id, payloadFinal);
+
+        if (registroAtual?.origem_tipo === 'publicacao-compilada' && notaFoiAlterada) {
+          const filhosDoLote = todosRegistros.filter((item) => item?.publicacao_compilada_id === id);
+          const filhosNaoPublicados = filhosDoLote.filter((filho) => !(filho?.numero_bg && filho?.data_bg));
+
+          await Promise.all(
+            filhosNaoPublicados.map((filho) =>
+              base44.entities.RegistroLivro.update(filho.id, { nota_para_bg: data.nota_para_bg })
+            )
+          );
+        }
+
+        return loteAtualizado;
+      }
       if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
       if (tipo === 'atestado') return base44.entities.Atestado.update(id, payloadFinal);
 
