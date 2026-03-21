@@ -374,6 +374,18 @@ export default function Publicacoes() {
         throw new Error(compatibilidade.motivo);
       }
 
+      const registrosPersistidos = await Promise.all(
+        registrosSelecionados.map((registro) => base44.entities.RegistroLivro.get(registro.id))
+      );
+
+      const registrosJaCompilados = registrosPersistidos.filter((registro) =>
+        isRegistroEmLoteCompilado(registro) || !!registro?.publicacao_compilada_id
+      );
+
+      if (registrosJaCompilados.length > 0) {
+        throw new Error('Não é possível compilar novamente: há registros selecionados já vinculados a um lote compilado.');
+      }
+
       const textoCompilado = buildTextoCompiladoFerias(registrosSelecionados);
       const payloadLote = buildPayloadPublicacaoCompilada(registrosSelecionados, {
         texto_publicacao: textoCompilado,
@@ -386,28 +398,68 @@ export default function Publicacoes() {
         throw new Error(payloadLote.erro || 'Não foi possível montar o lote compilado.');
       }
 
-      const loteCriado = await base44.entities.PublicacaoCompilada.create(payloadLote.payload);
+      let loteCriado = null;
+      const filhosVinculados = [];
 
-      for (const [index, registro] of registrosSelecionados.entries()) {
-        const payloadVinculoFilho = {
-          publicacao_compilada_id: loteCriado.id,
-          compilado_em_lote: true,
-          publicacao_compilada_ordem: index + 1,
-        };
+      try {
+        loteCriado = await base44.entities.PublicacaoCompilada.create(payloadLote.payload);
 
-        const registroAtualizado = await base44.entities.RegistroLivro.update(registro.id, payloadVinculoFilho);
+        for (const [index, registro] of registrosSelecionados.entries()) {
+          const ordem = index + 1;
+          const payloadVinculoFilho = {
+            publicacao_compilada_id: loteCriado.id,
+            compilado_em_lote: true,
+            publicacao_compilada_ordem: ordem,
+          };
 
-        const vinculoPersistido =
-          registroAtualizado?.publicacao_compilada_id === loteCriado.id &&
-          registroAtualizado?.compilado_em_lote === true &&
-          registroAtualizado?.publicacao_compilada_ordem === index + 1;
+          await base44.entities.RegistroLivro.update(registro.id, payloadVinculoFilho);
 
-        if (!vinculoPersistido) {
-          throw new Error(`Falha ao vincular o registro ${registro.id} ao lote compilado criado.`);
+          const registroPersistido = await base44.entities.RegistroLivro.get(registro.id);
+
+          const vinculoPersistido =
+            registroPersistido?.publicacao_compilada_id === loteCriado.id &&
+            registroPersistido?.compilado_em_lote === true &&
+            registroPersistido?.publicacao_compilada_ordem === ordem;
+
+          if (!vinculoPersistido) {
+            throw new Error(`Falha ao vincular o registro ${registro.id} ao lote compilado criado.`);
+          }
+
+          filhosVinculados.push(registro.id);
         }
-      }
 
-      return loteCriado;
+        return loteCriado;
+      } catch (error) {
+        const rollbackFilhos = await Promise.allSettled(
+          filhosVinculados.map((registroId) =>
+            base44.entities.RegistroLivro.update(registroId, {
+              publicacao_compilada_id: null,
+              compilado_em_lote: false,
+              publicacao_compilada_ordem: null,
+            })
+          )
+        );
+
+        let erroRollback = null;
+        const falhasRollbackFilhos = rollbackFilhos.filter((resultado) => resultado.status === 'rejected');
+        if (falhasRollbackFilhos.length > 0) {
+          erroRollback = new Error('Falha ao desfazer os vínculos dos filhos após erro na compilação.');
+        }
+
+        if (loteCriado?.id) {
+          try {
+            await base44.entities.PublicacaoCompilada.delete(loteCriado.id);
+          } catch (deleteError) {
+            erroRollback = erroRollback || new Error('Falha ao excluir o lote compilado após erro na vinculação dos filhos.');
+          }
+        }
+
+        if (erroRollback) {
+          throw erroRollback;
+        }
+
+        throw error;
+      }
     },
     onSuccess: () => {
       setSelectedRegistros([]);
