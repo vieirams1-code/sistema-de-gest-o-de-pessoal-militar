@@ -388,13 +388,24 @@ export default function Publicacoes() {
 
       const loteCriado = await base44.entities.PublicacaoCompilada.create(payloadLote.payload);
 
-      await Promise.all(registrosSelecionados.map((registro, index) => (
-        base44.entities.RegistroLivro.update(registro.id, {
+      for (const [index, registro] of registrosSelecionados.entries()) {
+        const payloadVinculoFilho = {
           publicacao_compilada_id: loteCriado.id,
           compilado_em_lote: true,
           publicacao_compilada_ordem: index + 1,
-        })
-      )));
+        };
+
+        const registroAtualizado = await base44.entities.RegistroLivro.update(registro.id, payloadVinculoFilho);
+
+        const vinculoPersistido =
+          registroAtualizado?.publicacao_compilada_id === loteCriado.id &&
+          registroAtualizado?.compilado_em_lote === true &&
+          registroAtualizado?.publicacao_compilada_ordem === index + 1;
+
+        if (!vinculoPersistido) {
+          throw new Error(`Falha ao vincular o registro ${registro.id} ao lote compilado criado.`);
+        }
+      }
 
       return loteCriado;
     },
