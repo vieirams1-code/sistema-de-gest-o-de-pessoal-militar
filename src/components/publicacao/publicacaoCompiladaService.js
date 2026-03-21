@@ -1,5 +1,4 @@
 import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils';
-import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 
 export const PUBLICACAO_COMPILADA_FERIAS_TIPO = 'Publicação Compilada - Férias';
 export const PUBLICACAO_COMPILADA_FERIAS_CODIGO = 'publicacao_compilada_ferias';
@@ -246,7 +245,10 @@ export function validarCompatibilidadeLoteFerias(registros = []) {
 }
 
 export function buildItensTextoCompiladoFerias(registros = [], itemTemplate = null) {
-  const lista = registros.filter(Boolean);
+  const lista = registros
+    .filter(Boolean)
+    .slice()
+    .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
 
   // Formato padrão melhor estruturado e preparado para receber itemTemplate no futuro
   const defaultItemTmpl = "{{ordem}}. {{posto}} {{nome}} - Matrícula: {{matricula}} - Tipo: {{tipo}}{{separador_periodo}}{{periodo}}";
@@ -260,7 +262,7 @@ export function buildItensTextoCompiladoFerias(registros = [], itemTemplate = nu
     const tipo = registro?.tipo_registro || registro?.tipo_label || registro?.tipo || 'Registro';
     const periodo = getPeriodoDescricao(registro) || '';
 
-    let linha = tmpl
+    const linha = tmpl
       .replace(/\{\{ordem\}\}/g, String(ordem))
       .replace(/\{\{posto\}\}/g, String(posto))
       .replace(/\{\{nome\}\}/g, String(nomeInst))
@@ -273,12 +275,22 @@ export function buildItensTextoCompiladoFerias(registros = [], itemTemplate = nu
   });
 }
 
+export function buildListaCompiladaTextoFerias(registros = [], itemTemplate = null) {
+  return buildItensTextoCompiladoFerias(registros, itemTemplate)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function buildVarsPublicacaoCompiladaFerias(registros = []) {
   const lista = registros.filter(Boolean);
+  const listaCompilada = buildListaCompiladaTextoFerias(lista);
+
   return {
     quantidade_itens: String(lista.length),
     data_geracao: formatDateBR(new Date().toISOString().slice(0, 10)),
-    itens_compilados: buildItensTextoCompiladoFerias(lista).join(' '),
+    itens_compilados: listaCompilada,
+    lista_compilada: listaCompilada,
     tipo_publicacao: PUBLICACAO_COMPILADA_FERIAS_TIPO,
     codigo_publicacao: PUBLICACAO_COMPILADA_FERIAS_CODIGO,
   };

@@ -119,7 +119,8 @@ const VARS_POR_TIPO = {
     variaveis: [
       { v: '{{quantidade_itens}}', desc: 'Quantidade de registros compilados' },
       { v: '{{data_geracao}}', desc: 'Data de geração do lote compilado' },
-      { v: '{{itens_compilados}}', desc: 'Lista textual final dos itens compilados' },
+      { v: '{{itens_compilados}}', desc: 'Lista textual final dos itens compilados em sequência corrida' },
+      { v: '{{lista_compilada}}', desc: 'Alias da lista textual final dos itens compilados em sequência corrida' },
       { v: '{{tipo_publicacao}}', desc: 'Nome do tipo da publicação compilada' },
       { v: '{{codigo_publicacao}}', desc: 'Código interno da publicação compilada' },
     ]
