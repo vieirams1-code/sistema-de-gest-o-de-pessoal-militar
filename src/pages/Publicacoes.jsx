@@ -244,6 +244,16 @@ function isFeriasOperacional(registro) {
   );
 }
 
+function isFilhoDeLoteNaListaPrincipal(registro) {
+  return (
+    detectarOrigemTipo(registro) === 'livro' &&
+    (
+      !!registro?.publicacao_compilada_id ||
+      registro?.compilado_em_lote === true
+    )
+  );
+}
+
 export default function Publicacoes() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -322,6 +332,10 @@ export default function Publicacoes() {
       .map(normalizarRegistro)
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
   }, [registrosLivro, publicacoesExOfficio, atestados, publicacoesCompiladas]);
+
+  const registrosVisiveisNaListaPrincipal = useMemo(() => (
+    registros.filter((registro) => !isFilhoDeLoteNaListaPrincipal(registro))
+  ), [registros]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
@@ -576,9 +590,9 @@ export default function Publicacoes() {
   };
 
   const registrosDaAbaAtiva = useMemo(() => {
-    if (abaOrigemAtiva === 'all') return registros;
-    return registros.filter((registro) => registro.origem_tipo === abaOrigemAtiva);
-  }, [registros, abaOrigemAtiva]);
+    if (abaOrigemAtiva === 'all') return registrosVisiveisNaListaPrincipal;
+    return registrosVisiveisNaListaPrincipal.filter((registro) => registro.origem_tipo === abaOrigemAtiva);
+  }, [registrosVisiveisNaListaPrincipal, abaOrigemAtiva]);
 
   const filteredRegistros = useMemo(() => {
     return registrosDaAbaAtiva.filter((r) => {
@@ -868,8 +882,8 @@ export default function Publicacoes() {
               <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
                 {ABAS_ORIGEM.map((aba) => {
                   const totalAba = aba.key === 'all'
-                    ? registros.length
-                    : registros.filter((registro) => registro.origem_tipo === aba.key).length;
+                    ? registrosVisiveisNaListaPrincipal.length
+                    : registrosVisiveisNaListaPrincipal.filter((registro) => registro.origem_tipo === aba.key).length;
                   const ativa = abaOrigemAtiva === aba.key;
 
                   return (
