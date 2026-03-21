@@ -264,6 +264,7 @@ export default function Publicacoes() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
+  const [loteDestinoId, setLoteDestinoId] = useState('');
   const { isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
 
@@ -425,7 +426,7 @@ export default function Publicacoes() {
         nota_para_bg: '',
         numero_bg: '',
         data_bg: '',
-      });
+      }, templatesTexto);
 
       if (!payloadLote.ok) {
         throw new Error(payloadLote.erro || 'Não foi possível montar o lote compilado.');
@@ -448,6 +449,7 @@ export default function Publicacoes() {
               publicacao_compilada_id: loteCriado.id,
               compilado_em_lote: true,
               publicacao_compilada_ordem: index + 1,
+              nota_para_bg: loteCriado?.nota_para_bg || '',
             }).then(() => {
               filhosVinculados.push(registro.id);
             })
@@ -592,6 +594,76 @@ export default function Publicacoes() {
     }
   });
 
+  const adicionarAoLoteMutation = useMutation({
+    mutationFn: async ({ loteId, registrosSelecionados }) => {
+      if (!loteId) {
+        throw new Error('Selecione um lote pai.');
+      }
+
+      const lotePai = todosRegistros.find(
+        (item) => item.id === loteId && item.origem_tipo === 'publicacao-compilada'
+      );
+
+      if (!lotePai) {
+        throw new Error('Lote pai não encontrado.');
+      }
+
+      if (isLoteCompiladoPublicado(lotePai)) {
+        throw new Error('Só é permitido adicionar a um lote pai que ainda não foi publicado.');
+      }
+
+      const registrosInvalidos = registrosSelecionados.filter((registro) => (
+        !isRegistroElegivelParaCompilacaoFerias(registro) ||
+        !!registro?.publicacao_compilada_id ||
+        registro?.compilado_em_lote === true
+      ));
+
+      if (registrosInvalidos.length > 0) {
+        throw new Error('Há registro(s) selecionado(s) inelegível(is) ou já vinculado(s) a outro lote.');
+      }
+
+      const filhosAtuais = todosRegistros
+        .filter((item) => item.publicacao_compilada_id === loteId)
+        .sort((a, b) => (a.publicacao_compilada_ordem ?? 0) - (b.publicacao_compilada_ordem ?? 0));
+
+      await Promise.all(
+        registrosSelecionados.map((registro, index) =>
+          base44.entities.RegistroLivro.update(registro.id, {
+            publicacao_compilada_id: loteId,
+            compilado_em_lote: true,
+            publicacao_compilada_ordem: filhosAtuais.length + index + 1,
+            nota_para_bg: lotePai?.nota_para_bg || '',
+          })
+        )
+      );
+
+      const filhosAtualizados = [...filhosAtuais, ...registrosSelecionados].map((registro, index) => ({
+        ...registro,
+        publicacao_compilada_id: loteId,
+        compilado_em_lote: true,
+        publicacao_compilada_ordem: index + 1,
+        nota_para_bg: lotePai?.nota_para_bg || '',
+      }));
+
+      await base44.entities.PublicacaoCompilada.update(loteId, {
+        quantidade_itens: filhosAtualizados.length,
+        tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
+        texto_publicacao: buildTextoCompiladoFerias(filhosAtualizados, templatesTexto),
+      });
+
+      return true;
+    },
+    onSuccess: async () => {
+      setSelectedRegistros([]);
+      setLoteDestinoId('');
+      await refrescarDadosPublicacoes();
+      alert('Registro(s) adicionado(s) ao lote com sucesso.');
+    },
+    onError: (error) => {
+      alert(error?.message || 'Erro ao adicionar registro(s) ao lote.');
+    },
+  });
+
   const desagruparFilhoMutation = useMutation({
     mutationFn: async (registroFilho) => {
       if (!registroFilho?.publicacao_compilada_id) {
@@ -629,6 +701,9 @@ export default function Publicacoes() {
         publicacao_compilada_id: null,
         compilado_em_lote: false,
         publicacao_compilada_ordem: null,
+        nota_para_bg: '',
+        numero_bg: '',
+        data_bg: '',
       });
 
       await Promise.all(
@@ -699,6 +774,16 @@ export default function Publicacoes() {
   ), [todosRegistros, selectedRegistros]);
 
   const podeCompilarSelecionados = selectedRegistrosDetalhados.length >= 2 && selectedRegistrosDetalhados.every((registro) => elegiveisIds.has(registro.id));
+  const podeAdicionarSelecionadosAoLote = selectedRegistrosDetalhados.length >= 1
+    && selectedRegistrosDetalhados.every((registro) => elegiveisIds.has(registro.id))
+    && Boolean(loteDestinoId);
+
+  const lotesPaisNaoPublicados = useMemo(() => (
+    todosRegistros.filter((registro) => (
+      registro.origem_tipo === 'publicacao-compilada' &&
+      !isLoteCompiladoPublicado(registro)
+    ))
+  ), [todosRegistros]);
 
   useEffect(() => {
     setSelectedRegistros((atual) => atual.filter((id) => elegiveisIds.has(id)));
@@ -808,6 +893,18 @@ export default function Publicacoes() {
     }
 
     compilarMutation.mutate(selectedRegistrosDetalhados);
+  };
+
+  const handleAdicionarSelecionadosAoLote = () => {
+    if (!loteDestinoId) {
+      alert('Selecione um lote pai.');
+      return;
+    }
+
+    adicionarAoLoteMutation.mutate({
+      loteId: loteDestinoId,
+      registrosSelecionados: selectedRegistrosDetalhados,
+    });
   };
 
   const grupos = [
@@ -997,6 +1094,33 @@ export default function Publicacoes() {
                 <span className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
                   {selectedRegistrosDetalhados.length} selecionado(s)
                 </span>
+                <Select value={loteDestinoId} onValueChange={setLoteDestinoId}>
+                  <SelectTrigger className="w-[280px] bg-white">
+                    <SelectValue placeholder="Adicionar a lote pai existente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lotesPaisNaoPublicados.length > 0 ? (
+                      lotesPaisNaoPublicados.map((lote) => (
+                        <SelectItem key={lote.id} value={lote.id}>
+                          {`${lote.militar_nome || 'Lote compilado'} • ${lote.quantidade_itens || 0} item(ns)`}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="__sem_lotes__" disabled>
+                        Nenhum lote pai disponível
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAdicionarSelecionadosAoLote}
+                  disabled={!podeAdicionarSelecionadosAoLote || adicionarAoLoteMutation.isPending}
+                  variant="outline"
+                  className="border-indigo-300 text-indigo-800 hover:bg-indigo-100"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {adicionarAoLoteMutation.isPending ? 'Adicionando...' : 'Adicionar ao lote'}
+                </Button>
                 <Button
                   onClick={handleCompilarSelecionados}
                   disabled={!podeCompilarSelecionados || compilarMutation.isPending}

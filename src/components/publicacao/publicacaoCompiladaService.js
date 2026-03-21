@@ -145,6 +145,14 @@ export function isLoteCompiladoPublicado(lote = {}) {
   return Boolean(lote?.numero_bg && lote?.data_bg);
 }
 
+export function getTemplatePublicacaoCompiladaFerias(templates = []) {
+  return (
+    getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_FERIAS_TIPO, 'Livro', templates) ||
+    getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_FERIAS_CODIGO, 'Livro', templates) ||
+    null
+  );
+}
+
 export function podeDesfazerLoteCompilado(lote = {}) {
   return !isLoteCompiladoPublicado(lote);
 }
@@ -165,6 +173,9 @@ export async function limparVinculoLoteDosFilhos({
       publicacao_compilada_id: null,
       compilado_em_lote: false,
       publicacao_compilada_ordem: null,
+      nota_para_bg: '',
+      numero_bg: '',
+      data_bg: '',
     }))
   );
 
@@ -252,13 +263,13 @@ export function buildTextoCompiladoFerias(registros = [], templates = []) {
   const lista = registros.filter(Boolean);
   if (!lista.length) return '';
 
-  const templateAtivo = getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_FERIAS_TIPO, 'Livro', templates);
+  const templateAtivo = getTemplatePublicacaoCompiladaFerias(templates);
   const template = templateAtivo?.template || TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS;
 
   return aplicarTemplate(template, buildVarsPublicacaoCompiladaFerias(lista));
 }
 
-export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) {
+export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}, templates = []) {
   const compatibilidade = validarCompatibilidadeLoteFerias(registros);
 
   if (!compatibilidade.compativel) {
@@ -270,7 +281,7 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
     };
   }
 
-  const textoPublicacao = overrides?.texto_publicacao ?? buildTextoCompiladoFerias(registros);
+  const textoPublicacao = overrides?.texto_publicacao ?? buildTextoCompiladoFerias(registros, templates);
   const {
     nota_para_bg: _notaParaBgIgnorada,
     numero_bg: _numeroBgIgnorado,
@@ -304,8 +315,8 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
 
 export const isRegistroElegivelParaPublicacaoCompiladaFerias = isRegistroElegivelParaCompilacaoFerias;
 export const validarCompatibilidadeBasicaPublicacaoCompilada = validarCompatibilidadeLoteFerias;
-export const prepararPayloadPublicacaoCompilada = ({ registros = [], overrides = {} } = {}) => (
-  buildPayloadPublicacaoCompilada(registros, overrides)
+export const prepararPayloadPublicacaoCompilada = ({ registros = [], overrides = {}, templates = [] } = {}) => (
+  buildPayloadPublicacaoCompilada(registros, overrides, templates)
 );
 
 export {
