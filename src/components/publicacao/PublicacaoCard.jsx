@@ -41,6 +41,7 @@ import {
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import {
+  buildTextoCompiladoFerias,
   isLoteCompiladoPublicado,
   isRegistroFilhoDePublicacaoCompilada,
   podeDesfazerLoteCompilado,
@@ -171,7 +172,7 @@ function FieldBlock({ label, children, className = '' }) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, onDesagruparFilho, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, onDesagruparFilho, todosRegistros = [], templates = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isChildrenExpanded, setIsChildrenExpanded] = useState(false);
@@ -332,7 +333,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const integridadeBadge = getIntegridadeBadge(registro);
   const nomeInstitucional = registro.militar_nome_institucional || registro.militar_nome || 'Militar';
   const dataHeader = formatDate(registro.data_registro || registro.created_date || registro.data_inicio);
-  const textoPublicacao = publicacaoContrato?.texto || registro.texto_publicacao || 'Sem texto gerado.';
+  const textoPublicacao = isLoteCompilado
+    ? (buildTextoCompiladoFerias(filhosDoLote, templates) || registro.texto_publicacao || 'Sem texto gerado.')
+    : (publicacaoContrato?.texto || registro.texto_publicacao || 'Sem texto gerado.');
   const origemLabel = contratoLivro
     ? (registro.origem || 'Automática')
     : (origemTipo === 'ex-officio' ? 'Ex Officio' : origemTipo === 'atestado' ? 'Atestado' : isLoteCompilado ? 'Lote compilado' : 'Manual');

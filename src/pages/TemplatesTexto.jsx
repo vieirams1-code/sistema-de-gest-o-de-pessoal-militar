@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle } from 'lucide-react';
 import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
+import { TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS } from '@/components/publicacao/publicacaoCompiladaService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, getModuloByTipo, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
@@ -119,8 +120,7 @@ const VARS_POR_TIPO = {
     variaveis: [
       { v: '{{quantidade_itens}}', desc: 'Quantidade de registros compilados' },
       { v: '{{data_geracao}}', desc: 'Data de geração do lote compilado' },
-      { v: '{{itens_compilados}}', desc: 'Lista textual final dos itens compilados em sequência corrida' },
-      { v: '{{lista_compilada}}', desc: 'Alias da lista textual final dos itens compilados em sequência corrida' },
+      { v: '{{lista_compilada}}', desc: 'Lista textual final dos itens compilados em sequência corrida' },
       { v: '{{tipo_publicacao}}', desc: 'Nome do tipo da publicação compilada' },
       { v: '{{codigo_publicacao}}', desc: 'Código interno da publicação compilada' },
     ]
@@ -558,12 +558,12 @@ export default function TemplatesTexto() {
   });
 
   const handleEdit = (t) => {
-    setEditingTemplate({ ...t, modulo: normalizeTemplateModulo(t.modulo) });
+    setEditingTemplate({ ...t, modulo: normalizeTemplateModulo(t.modulo), item_template: t.item_template || '' });
     setShowForm(true);
   };
 
   const handleNew = () => {
-    setEditingTemplate({ modulo: '', tipo_registro: '', nome: '', template: '', observacoes: '', ativo: true });
+    setEditingTemplate({ modulo: '', tipo_registro: '', nome: '', template: '', item_template: '', observacoes: '', ativo: true });
     setShowForm(true);
   };
 
@@ -639,6 +639,10 @@ export default function TemplatesTexto() {
     return extrairVariaveisDoTemplate(editingTemplate?.template || '');
   }, [editingTemplate?.template]);
 
+  const variaveisUsadasItemTemplate = useMemo(() => {
+    return extrairVariaveisDoTemplate(editingTemplate?.item_template || '');
+  }, [editingTemplate?.item_template]);
+
   const variaveisValidas = useMemo(() => {
     return getVariaveisValidas(editingTemplate?.modulo, editingTemplate?.tipo_registro);
   }, [editingTemplate?.modulo, editingTemplate?.tipo_registro]);
@@ -648,9 +652,19 @@ export default function TemplatesTexto() {
     return variaveisUsadas.filter(v => !variaveisValidas.has(v));
   }, [variaveisUsadas, variaveisValidas, editingTemplate?.tipo_registro]);
 
+  const variaveisItemTemplateValidas = useMemo(() => {
+    if (editingTemplate?.tipo_registro !== TIPO_PUBLICACAO_COMPILADA_FERIAS) return new Set();
+    return new Set(['ordem', 'posto', 'nome', 'matricula', 'tipo', 'periodo', 'separador_periodo']);
+  }, [editingTemplate?.tipo_registro]);
+
+  const variaveisInvalidasItemTemplate = useMemo(() => {
+    if (editingTemplate?.tipo_registro !== TIPO_PUBLICACAO_COMPILADA_FERIAS) return [];
+    return variaveisUsadasItemTemplate.filter(v => !variaveisItemTemplateValidas.has(v));
+  }, [editingTemplate?.tipo_registro, variaveisUsadasItemTemplate, variaveisItemTemplateValidas]);
+
   const handleSaveTemplate = () => {
     if (!editingTemplate) return;
-    if (templateConflictError || variaveisInvalidas.length > 0) return;
+    if (templateConflictError || variaveisInvalidas.length > 0 || variaveisInvalidasItemTemplate.length > 0) return;
     saveMutation.mutate(editingTemplate);
   };
 
@@ -801,7 +815,6 @@ export default function TemplatesTexto() {
                     {(() => {
                       const previewVars = {
                         ...VARS_PREVIEW,
-                        itens_compilados: '1. Cap João da Silva - Matrícula: 12345 - Tipo: Saída Férias - Início: 01/12/2024 | Término: 30/12/2024 2. 1º Sgt Maria Souza - Matrícula: 54321 - Tipo: Retorno Férias - Retorno: 15/12/2024 3. Cb Pedro Santos - Matrícula: 98765 - Tipo: Interrupção de Férias',
                         quantidade_itens: '3',
                         data_geracao: new Date().toLocaleDateString('pt-BR'),
                         codigo_publicacao: 'publicacao_compilada_ferias',
@@ -882,6 +895,23 @@ export default function TemplatesTexto() {
                 />
               </div>
 
+              {editingTemplate.tipo_registro === TIPO_PUBLICACAO_COMPILADA_FERIAS && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-sm font-medium text-slate-700">Template de Item</Label>
+                    <span className="text-xs text-slate-500">Opcional. Se vazio, usa o padrão do sistema.</span>
+                  </div>
+                  <Textarea
+                    value={editingTemplate.item_template || ''}
+                    onChange={e => setEditingTemplate(p => ({ ...p, item_template: e.target.value }))}
+                    rows={4}
+                    className={`font-mono text-sm ${variaveisInvalidasItemTemplate.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
+                    placeholder={TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS}
+                  />
+                  <p className="mt-2 text-xs text-slate-500">Variáveis permitidas no item: {'{{ordem}}'}, {'{{posto}}'}, {'{{nome}}'}, {'{{matricula}}'}, {'{{tipo}}'}, {'{{periodo}}'}.</p>
+                </div>
+              )}
+
               {variaveisInvalidas.length > 0 && (
                 <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -893,6 +923,20 @@ export default function TemplatesTexto() {
                       ))}
                     </ul>
                     <span className="block mt-2 text-xs">As variáveis acima não são suportadas para este tipo de registro. Remova-as ou corrija a digitação para poder salvar.</span>
+                  </div>
+                </div>
+              )}
+
+              {variaveisInvalidasItemTemplate.length > 0 && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-semibold block mb-1">Variáveis não reconhecidas no template de item:</span>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {variaveisInvalidasItemTemplate.map((v, i) => (
+                        <li key={i} className="font-mono">{`{{${v}}}`}</li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               )}
@@ -974,7 +1018,7 @@ export default function TemplatesTexto() {
             </Button>
                 <Button
                   onClick={handleSaveTemplate}
-                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError || variaveisInvalidas.length > 0}
+                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError || variaveisInvalidas.length > 0 || variaveisInvalidasItemTemplate.length > 0}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 >
                   {saveMutation.isPending ? (

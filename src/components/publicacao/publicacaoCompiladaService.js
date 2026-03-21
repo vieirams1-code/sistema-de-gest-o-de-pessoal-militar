@@ -2,6 +2,7 @@ import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils'
 
 export const PUBLICACAO_COMPILADA_FERIAS_TIPO = 'Publicação Compilada - Férias';
 export const PUBLICACAO_COMPILADA_FERIAS_CODIGO = 'publicacao_compilada_ferias';
+export const TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS = '{{ordem}}. {{posto}} {{nome}} - Matrícula: {{matricula}} - Tipo: {{tipo}}{{separador_periodo}}{{periodo}}';
 
 const TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS = [
   'PUBLICAÇÃO COMPILADA DE FÉRIAS',
@@ -9,7 +10,7 @@ const TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS = [
   'Quantidade de itens: {{quantidade_itens}}',
   'Data de geração: {{data_geracao}}',
   '',
-  '{{itens_compilados}}',
+  '{{lista_compilada}}',
 ].join('\n');
 
 const TIPOS_FERIAS_COMPILAVEIS = new Set([
@@ -81,11 +82,6 @@ function getStatusCodigoNormalizado(registro = {}) {
   return toCodigo(registro?.status_codigo || registro?.status || registro?.status_calculado || registro?.status_publicacao);
 }
 
-function isStatusCompativel(registro = {}) {
-  const statusCodigo = getStatusCodigoNormalizado(registro);
-  return STATUS_COMPATIVEIS.has(statusCodigo);
-}
-
 function formatDate(value) {
   if (!value) return null;
   try {
@@ -131,10 +127,32 @@ function isCompiladoEmLoteTrue(registro = {}) {
   return registro?.compilado_em_lote === true;
 }
 
+function sanitizeTextoContinuo(texto = '') {
+  return String(texto).replace(/\s+/g, ' ').trim();
+}
+
+function buildItemVarsCompiladoFerias(registro = {}, index = 0) {
+  const ordem = registro?.publicacao_compilada_ordem ?? (index + 1);
+  const nomeInst = registro?.militar_nome_institucional || registro?.militar_nome || 'Militar não identificado';
+  const posto = registro?.militar_posto_graduacao || registro?.militar_posto || '';
+  const matricula = registro?.militar_matricula || '—';
+  const tipo = registro?.tipo_registro || registro?.tipo_label || registro?.tipo || 'Registro';
+  const periodo = getPeriodoDescricao(registro) || '';
+
+  return {
+    ordem: String(ordem),
+    posto: String(posto),
+    nome: String(nomeInst),
+    matricula: String(matricula),
+    tipo: String(tipo),
+    periodo: String(periodo),
+    separador_periodo: periodo ? ' - ' : '',
+  };
+}
+
 export function isRegistroEmLoteCompilado(registro = {}) {
   return hasPublicacaoCompiladaId(registro) || isCompiladoEmLoteTrue(registro);
 }
-
 
 export function isRegistroFilhoDePublicacaoCompilada(registro = {}) {
   return detectarOrigemLivro(registro) && isRegistroEmLoteCompilado(registro);
@@ -250,46 +268,22 @@ export function buildItensTextoCompiladoFerias(registros = [], itemTemplate = nu
     .slice()
     .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
 
-  // Formato padrão melhor estruturado e preparado para receber itemTemplate no futuro
-  const defaultItemTmpl = "{{ordem}}. {{posto}} {{nome}} - Matrícula: {{matricula}} - Tipo: {{tipo}}{{separador_periodo}}{{periodo}}";
-  const tmpl = itemTemplate || defaultItemTmpl;
+  const tmpl = itemTemplate || TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS;
 
-  return lista.map((registro, index) => {
-    const ordem = registro?.publicacao_compilada_ordem || (index + 1);
-    const nomeInst = registro?.militar_nome_institucional || registro?.militar_nome || 'Militar não identificado';
-    const posto = registro?.militar_posto_graduacao || registro?.militar_posto || '';
-    const matricula = registro?.militar_matricula || '—';
-    const tipo = registro?.tipo_registro || registro?.tipo_label || registro?.tipo || 'Registro';
-    const periodo = getPeriodoDescricao(registro) || '';
-
-    const linha = tmpl
-      .replace(/\{\{ordem\}\}/g, String(ordem))
-      .replace(/\{\{posto\}\}/g, String(posto))
-      .replace(/\{\{nome\}\}/g, String(nomeInst))
-      .replace(/\{\{matricula\}\}/g, String(matricula))
-      .replace(/\{\{tipo\}\}/g, String(tipo))
-      .replace(/\{\{periodo\}\}/g, String(periodo))
-      .replace(/\{\{separador_periodo\}\}/g, periodo ? ' - ' : '');
-
-    return linha.replace(/\s+/g, ' ').trim();
-  });
+  return lista.map((registro, index) => sanitizeTextoContinuo(aplicarTemplate(tmpl, buildItemVarsCompiladoFerias(registro, index))));
 }
 
 export function buildListaCompiladaTextoFerias(registros = [], itemTemplate = null) {
-  return buildItensTextoCompiladoFerias(registros, itemTemplate)
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return sanitizeTextoContinuo(buildItensTextoCompiladoFerias(registros, itemTemplate).join(' '));
 }
 
-export function buildVarsPublicacaoCompiladaFerias(registros = []) {
+export function buildVarsPublicacaoCompiladaFerias(registros = [], itemTemplate = null) {
   const lista = registros.filter(Boolean);
-  const listaCompilada = buildListaCompiladaTextoFerias(lista);
+  const listaCompilada = buildListaCompiladaTextoFerias(lista, itemTemplate);
 
   return {
     quantidade_itens: String(lista.length),
     data_geracao: formatDateBR(new Date().toISOString().slice(0, 10)),
-    itens_compilados: listaCompilada,
     lista_compilada: listaCompilada,
     tipo_publicacao: PUBLICACAO_COMPILADA_FERIAS_TIPO,
     codigo_publicacao: PUBLICACAO_COMPILADA_FERIAS_CODIGO,
@@ -302,8 +296,9 @@ export function buildTextoCompiladoFerias(registros = [], templates = []) {
 
   const templateAtivo = getTemplatePublicacaoCompiladaFerias(templates);
   const template = templateAtivo?.template || TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS;
+  const itemTemplate = templateAtivo?.item_template || TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS;
 
-  return aplicarTemplate(template, buildVarsPublicacaoCompiladaFerias(lista));
+  return aplicarTemplate(template, buildVarsPublicacaoCompiladaFerias(lista, itemTemplate));
 }
 
 export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}, templates = []) {

@@ -1216,6 +1216,7 @@ export default function Publicacoes() {
                             onDesagruparFilho={handleDesagruparFilho}
                             onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
                             todosRegistros={todosRegistros}
+                            templates={templatesTexto}
                             isAdmin={isAdmin}
                             modoAdmin={modoAdmin}
                             canAccessAction={canAccessAction}
