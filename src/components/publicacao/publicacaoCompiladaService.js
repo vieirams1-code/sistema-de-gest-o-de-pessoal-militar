@@ -4,6 +4,32 @@ export const PUBLICACAO_COMPILADA_FERIAS_TIPO = 'Publicação Compilada - Féria
 export const PUBLICACAO_COMPILADA_FERIAS_CODIGO = 'publicacao_compilada_ferias';
 export const TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS = '{{ordem}}. {{posto}} {{nome}} - Matrícula: {{matricula}} - Tipo: {{tipo}}{{separador_periodo}}{{periodo}}';
 
+export const VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS = [
+  'nome',
+  'nome_institucional',
+  'matricula',
+  'posto',
+  'posto_graduacao',
+  'quadro',
+  'cargo',
+  'lotacao',
+  'subunidade',
+  'ordem',
+  'tipo',
+  'tipo_composto',
+  'grupo',
+  'data_registro',
+  'periodo',
+  'periodo_aquisitivo',
+  'data_inicio',
+  'data_fim',
+  'data_termino',
+  'data_retorno',
+  'dias',
+  'separador_periodo',
+  'separador_retorno',
+];
+
 const TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS = [
   'PUBLICAÇÃO COMPILADA DE FÉRIAS',
   '',
@@ -131,22 +157,67 @@ function sanitizeTextoContinuo(texto = '') {
   return String(texto).replace(/\s+/g, ' ').trim();
 }
 
+function getFirstFilled(...values) {
+  const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== '');
+  return value ?? '';
+}
+
 function buildItemVarsCompiladoFerias(registro = {}, index = 0) {
   const ordem = registro?.publicacao_compilada_ordem ?? (index + 1);
-  const nomeInst = registro?.militar_nome_institucional || registro?.militar_nome || 'Militar não identificado';
-  const posto = registro?.militar_posto_graduacao || registro?.militar_posto || '';
-  const matricula = registro?.militar_matricula || '—';
-  const tipo = registro?.tipo_registro || registro?.tipo_label || registro?.tipo || 'Registro';
-  const periodo = getPeriodoDescricao(registro) || '';
+  const nome = getFirstFilled(registro?.militar_nome, registro?.nome, 'Militar não identificado');
+  const nomeInstitucional = getFirstFilled(registro?.militar_nome_institucional, nome);
+  const postoGraduacao = getFirstFilled(registro?.militar_posto_graduacao, registro?.militar_posto, registro?.posto_graduacao, registro?.posto);
+  const quadro = getFirstFilled(registro?.militar_quadro, registro?.quadro);
+  const cargo = getFirstFilled(registro?.militar_cargo, registro?.cargo, registro?.funcao);
+  const lotacao = getFirstFilled(registro?.militar_lotacao, registro?.lotacao);
+  const subunidade = getFirstFilled(registro?.militar_subunidade, registro?.subunidade);
+  const matricula = getFirstFilled(registro?.militar_matricula, registro?.matricula, '—');
+  const tipo = getFirstFilled(registro?.tipo_registro, registro?.tipo_label, registro?.tipo, 'Registro');
+  const tipoComposto = getFirstFilled(registro?.tipo_composto_display, registro?.tipo_composto, tipo);
+  const grupo = getFirstFilled(registro?.grupo_display, registro?.grupo, 'Férias');
+  const dataRegistro = formatDate(getFirstFilled(registro?.data_registro, registro?.created_date));
+  const periodoAquisitivo = getFirstFilled(
+    registro?.periodo_aquisitivo,
+    registro?.vinculos?.periodo?.label,
+    registro?.vinculos_contrato?.periodo?.label,
+    registro?.periodo_aquisitivo_ref,
+  );
+  const dataInicio = formatDate(getFirstFilled(registro?.data_inicio, registro?.data_inicio_iso, registro?.data_registro));
+  const dataFim = formatDate(getFirstFilled(registro?.data_fim, registro?.data_termino));
+  const dataTermino = formatDate(getFirstFilled(registro?.data_termino, registro?.data_fim));
+  const dataRetorno = formatDate(registro?.data_retorno);
+  const dias = getFirstFilled(registro?.dias);
+  const periodo = getPeriodoDescricao({
+    ...registro,
+    periodo_aquisitivo: periodoAquisitivo || registro?.periodo_aquisitivo,
+    data_inicio: registro?.data_inicio || registro?.data_inicio_iso || registro?.data_registro,
+    data_termino: registro?.data_termino || registro?.data_fim,
+  }) || '';
 
   return {
     ordem: String(ordem),
-    posto: String(posto),
-    nome: String(nomeInst),
+    nome: String(nome),
+    nome_institucional: String(nomeInstitucional),
     matricula: String(matricula),
+    posto: String(postoGraduacao),
+    posto_graduacao: String(postoGraduacao),
+    quadro: String(quadro),
+    cargo: String(cargo),
+    lotacao: String(lotacao),
+    subunidade: String(subunidade),
     tipo: String(tipo),
+    tipo_composto: String(tipoComposto),
+    grupo: String(grupo),
+    data_registro: String(dataRegistro || ''),
     periodo: String(periodo),
+    periodo_aquisitivo: String(periodoAquisitivo),
+    data_inicio: String(dataInicio || ''),
+    data_fim: String(dataFim || ''),
+    data_termino: String(dataTermino || ''),
+    data_retorno: String(dataRetorno || ''),
+    dias: String(dias),
     separador_periodo: periodo ? ' - ' : '',
+    separador_retorno: dataRetorno ? ' - Retorno: ' : '',
   };
 }
 

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle } from 'lucide-react';
 import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
-import { TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS } from '@/components/publicacao/publicacaoCompiladaService';
+import { TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS, VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS } from '@/components/publicacao/publicacaoCompiladaService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, getModuloByTipo, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
@@ -654,7 +654,7 @@ export default function TemplatesTexto() {
 
   const variaveisItemTemplateValidas = useMemo(() => {
     if (editingTemplate?.tipo_registro !== TIPO_PUBLICACAO_COMPILADA_FERIAS) return new Set();
-    return new Set(['ordem', 'posto', 'nome', 'matricula', 'tipo', 'periodo', 'separador_periodo']);
+    return new Set(VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS);
   }, [editingTemplate?.tipo_registro]);
 
   const variaveisInvalidasItemTemplate = useMemo(() => {
@@ -908,7 +908,15 @@ export default function TemplatesTexto() {
                     className={`font-mono text-sm ${variaveisInvalidasItemTemplate.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                     placeholder={TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS}
                   />
-                  <p className="mt-2 text-xs text-slate-500">Variáveis permitidas no item: {'{{ordem}}'}, {'{{posto}}'}, {'{{nome}}'}, {'{{matricula}}'}, {'{{tipo}}'}, {'{{periodo}}'}.</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Variáveis permitidas no item:{' '}
+                    {VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS.map((variavel, index) => (
+                      <React.Fragment key={variavel}>
+                        {index > 0 ? ', ' : ''}
+                        <code className="rounded bg-slate-100 px-1 py-0.5">{`{{${variavel}}}`}</code>
+                      </React.Fragment>
+                    ))}.
+                  </p>
                 </div>
               )}
 
