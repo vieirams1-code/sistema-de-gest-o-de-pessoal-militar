@@ -63,6 +63,14 @@ function createEmptyTemplateForm() {
   };
 }
 
+function getFormTextValue(value) {
+  return value ?? '';
+}
+
+function getPersistedItemTemplateValue(template) {
+  return template?.item_template ?? '';
+}
+
 function normalizeTemplateForForm(template) {
   if (!template) return createEmptyTemplateForm();
 
@@ -70,9 +78,9 @@ function normalizeTemplateForForm(template) {
     ...createEmptyTemplateForm(),
     ...template,
     modulo: normalizeTemplateModulo(template.modulo),
-    template: template.template || '',
-    item_template: template.item_template || '',
-    observacoes: template.observacoes || '',
+    template: getFormTextValue(template.template),
+    item_template: getPersistedItemTemplateValue(template),
+    observacoes: getFormTextValue(template.observacoes),
     ativo: template.ativo ?? true,
   };
 }
@@ -81,10 +89,10 @@ function buildTemplatePayload(data) {
   const payload = {
     modulo: serializeTemplateModulo(data.modulo),
     tipo_registro: data.tipo_registro || '',
-    nome: data.nome || '',
-    template: data.template || '',
-    item_template: data.item_template || '',
-    observacoes: data.observacoes || '',
+    nome: getFormTextValue(data.nome),
+    template: getFormTextValue(data.template),
+    item_template: getPersistedItemTemplateValue(data),
+    observacoes: getFormTextValue(data.observacoes),
     ativo: data.ativo ?? true,
   };
 
@@ -972,7 +980,7 @@ export default function TemplatesTexto() {
                   </div>
                   <Textarea
                     ref={itemTemplateTextareaRef}
-                    value={editingTemplate.item_template || ''}
+                    value={getPersistedItemTemplateValue(editingTemplate)}
                     onChange={e => setEditingTemplate(p => ({ ...p, item_template: e.target.value }))}
                     rows={4}
                     className={`font-mono text-sm ${variaveisInvalidasItemTemplate.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
