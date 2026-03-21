@@ -237,6 +237,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const mensagemRegistroFilho = 'Registro vinculado a publicação compilada. Edite o lote pai.';
   const mensagemExclusaoFilho = 'Registro vinculado a publicação compilada e não pode ser excluído isoladamente.';
   const mensagemLotePublicado = 'Publicação compilada já publicada não pode ser removida.';
+  const mensagemLoteAguardandoPub = 'Publicação compilada aguardando publicação não pode ser removida diretamente.';
 
   const liveStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
 
