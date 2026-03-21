@@ -485,6 +485,7 @@ export default function TemplatesTexto() {
   const [showForm, setShowForm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const textareaRef = useRef(null);
+  const itemTemplateTextareaRef = useRef(null);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['templates-texto'],
@@ -508,6 +509,7 @@ export default function TemplatesTexto() {
       const payload = {
         ...data,
         modulo: serializeTemplateModulo(data.modulo),
+        item_template: data.item_template || '',
       };
       return data.id
         ? base44.entities.TemplateTexto.update(data.id, payload)
@@ -667,6 +669,31 @@ export default function TemplatesTexto() {
     if (templateConflictError || variaveisInvalidas.length > 0 || variaveisInvalidasItemTemplate.length > 0) return;
     saveMutation.mutate(editingTemplate);
   };
+
+  const inserirVarNoTextarea = (ref, field, value) => {
+    const textArea = ref.current;
+
+    if (textArea) {
+      const start = textArea.selectionStart ?? 0;
+      const end = textArea.selectionEnd ?? 0;
+      const textoAtual = editingTemplate?.[field] || '';
+      const newText = textoAtual.substring(0, start) + value + textoAtual.substring(end);
+
+      setEditingTemplate((prev) => ({ ...prev, [field]: newText }));
+
+      setTimeout(() => {
+        textArea.focus();
+        textArea.selectionStart = start + value.length;
+        textArea.selectionEnd = start + value.length;
+      }, 0);
+      return;
+    }
+
+    setEditingTemplate((prev) => ({ ...prev, [field]: `${prev?.[field] || ''}${value}` }));
+  };
+
+  const inserirVarTemplatePrincipal = (value) => inserirVarNoTextarea(textareaRef, 'template', value);
+  const inserirVarItemTemplate = (value) => inserirVarNoTextarea(itemTemplateTextareaRef, 'item_template', value);
 
   if (loadingUser || !isAccessResolved) return null;
   if (!canGerirTemplates) return <AccessDenied modulo="Templates de Texto" />;
@@ -902,21 +929,33 @@ export default function TemplatesTexto() {
                     <span className="text-xs text-slate-500">Opcional. Se vazio, usa o padrão do sistema.</span>
                   </div>
                   <Textarea
+                    ref={itemTemplateTextareaRef}
                     value={editingTemplate.item_template || ''}
                     onChange={e => setEditingTemplate(p => ({ ...p, item_template: e.target.value }))}
                     rows={4}
                     className={`font-mono text-sm ${variaveisInvalidasItemTemplate.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
                     placeholder={TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS}
                   />
-                  <p className="mt-2 text-xs text-slate-500">
-                    Variáveis permitidas no item:{' '}
-                    {VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS.map((variavel, index) => (
-                      <React.Fragment key={variavel}>
-                        {index > 0 ? ', ' : ''}
-                        <code className="rounded bg-slate-100 px-1 py-0.5">{`{{${variavel}}}`}</code>
-                      </React.Fragment>
-                    ))}.
-                  </p>
+                  <div className={`mt-3 rounded-lg border p-3 ${COR_GRUPO.blue.box}`}>
+                    <p className={`text-xs font-bold mb-2 ${COR_GRUPO.blue.titulo}`}>
+                      Variáveis do Template de Item (clique para inserir):
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS.map((variavel) => {
+                        const token = `{{${variavel}}}`;
+                        return (
+                          <button
+                            key={variavel}
+                            type="button"
+                            onClick={() => inserirVarItemTemplate(token)}
+                            className={`text-xs border rounded px-2 py-0.5 font-mono transition-colors ${COR_GRUPO.blue.badge}`}
+                          >
+                            {token}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -950,23 +989,6 @@ export default function TemplatesTexto() {
               )}
 
               {(() => {
-                const inserirVar = (v) => {
-              const textArea = textareaRef.current;
-                  if (textArea) {
-                    const start = textArea.selectionStart;
-                    const end = textArea.selectionEnd;
-                const newText = (editingTemplate.template || '').substring(0, start) + v + (editingTemplate.template || '').substring(end);
-                    setEditingTemplate(p => ({ ...p, template: newText }));
-                    setTimeout(() => {
-                      textArea.selectionStart = start + v.length;
-                      textArea.selectionEnd = start + v.length;
-                      textArea.focus();
-                    }, 0);
-                  } else {
-                setEditingTemplate(p => ({ ...p, template: (p.template || '') + v }));
-                  }
-                };
-
                 const gruposParaMostrar = selectedTipoVars
                   ? [selectedTipoVars]
                   : (normalizeTemplateModulo(editingTemplate.modulo) === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : normalizeTemplateModulo(editingTemplate.modulo) === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : []);
@@ -989,7 +1011,7 @@ export default function TemplatesTexto() {
                                 key={v}
                                 type="button"
                                 title={desc}
-                                onClick={() => inserirVar(v)}
+                                onClick={() => inserirVarTemplatePrincipal(v)}
                                 className={`text-xs border rounded px-2 py-0.5 font-mono transition-colors ${cores.badge}`}
                               >
                                 {v}
