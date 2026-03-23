@@ -14,7 +14,7 @@ import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle } from 'lu
 import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
 import {
   buildPreviewRegistrosCompiladoFerias,
-  buildTextoCompiladoFerias,
+  renderPublicacaoCompiladaFerias,
   TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS,
   VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS,
 } from '@/components/publicacao/publicacaoCompiladaService';
@@ -72,10 +72,6 @@ function getFormTextValue(value) {
   return value ?? '';
 }
 
-function getPersistedItemTemplateValue(template) {
-  return template?.item_template ?? '';
-}
-
 function normalizeTemplateForForm(template) {
   if (!template) return createEmptyTemplateForm();
 
@@ -84,30 +80,22 @@ function normalizeTemplateForForm(template) {
     ...template,
     modulo: normalizeTemplateModulo(template.modulo),
     template: getFormTextValue(template.template),
-    item_template: getPersistedItemTemplateValue(template),
+    item_template: getFormTextValue(template.item_template),
     observacoes: getFormTextValue(template.observacoes),
     ativo: template.ativo ?? true,
   };
 }
 
 function buildTemplatePayload(data) {
-  const payload = {
+  return {
     modulo: serializeTemplateModulo(data.modulo),
     tipo_registro: data.tipo_registro || '',
     nome: getFormTextValue(data.nome),
     template: getFormTextValue(data.template),
-    item_template: getPersistedItemTemplateValue(data),
+    item_template: getFormTextValue(data.item_template),
     observacoes: getFormTextValue(data.observacoes),
     ativo: data.ativo ?? true,
   };
-
-  console.info('[TemplatesTexto] payload de save', {
-    id: data.id || null,
-    template: payload.template,
-    item_template: payload.item_template,
-  });
-
-  return payload;
 }
 
 function getTipoDisplay(tipo) {
@@ -678,14 +666,21 @@ export default function TemplatesTexto() {
   }, [editingTemplate, templates]);
 
   const getVariaveisValidas = (modulo, tipo) => {
-    if (!modulo) return new Set();
+    if (!modulo || !tipo) return new Set();
+
+    if (tipo === TIPO_PUBLICACAO_COMPILADA_FERIAS) {
+      return new Set(
+        (VARS_POR_TIPO[TIPO_PUBLICACAO_COMPILADA_FERIAS]?.variaveis || [])
+          .map(({ v }) => v.replace(/^\{\{/, '').replace(/\}\}$/, ''))
+      );
+    }
+
     const validas = new Set();
-    
     const moduloNormalizado = normalizeTemplateModulo(modulo);
     const genericos = moduloNormalizado === MODULO_LIVRO ? GRUPOS_GENERICOS_LIVRO : moduloNormalizado === MODULO_EX_OFFICIO ? GRUPOS_GENERICOS_EXOFFICIO : [];
     genericos.forEach(g => g.variaveis.forEach(v => validas.add(v.v.replace(/^\{\{/, '').replace(/\}\}$/, ''))));
 
-    if (tipo && VARS_POR_TIPO[tipo]) {
+    if (VARS_POR_TIPO[tipo]) {
       VARS_POR_TIPO[tipo].variaveis.forEach(v => validas.add(v.v.replace(/^\{\{/, '').replace(/\}\}$/, '')));
     }
 
@@ -754,16 +749,11 @@ export default function TemplatesTexto() {
       return '';
     }
 
-    return buildTextoCompiladoFerias(
-      buildPreviewRegistrosCompiladoFerias(),
-      [{
-        modulo: 'Livro',
-        tipo_registro: TIPO_PUBLICACAO_COMPILADA_FERIAS,
-        ativo: true,
-        template: editingTemplate.template,
-        item_template: editingTemplate.item_template ?? '',
-      }],
-    );
+    return renderPublicacaoCompiladaFerias({
+      registros: buildPreviewRegistrosCompiladoFerias(),
+      template: editingTemplate.template,
+      itemTemplate: editingTemplate.item_template,
+    });
   }, [editingTemplate?.item_template, editingTemplate?.template, editingTemplate?.tipo_registro]);
 
   if (loadingUser || !isAccessResolved) return null;
@@ -996,7 +986,7 @@ export default function TemplatesTexto() {
                   </div>
                   <Textarea
                     ref={itemTemplateTextareaRef}
-                    value={getPersistedItemTemplateValue(editingTemplate)}
+                    value={editingTemplate.item_template}
                     onChange={e => setEditingTemplate(p => ({ ...p, item_template: e.target.value }))}
                     rows={4}
                     className={`font-mono text-sm ${variaveisInvalidasItemTemplate.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}

@@ -423,16 +423,24 @@ export function buildPreviewRegistrosCompiladoFerias() {
   ];
 }
 
-export function buildTextoCompiladoFerias(registros = [], templates = []) {
+export function renderPublicacaoCompiladaFerias({ registros = [], template = '', itemTemplate = '' } = {}) {
   const lista = registros.filter(Boolean);
   if (!lista.length) return '';
 
-  const templateAtivo = getTemplatePublicacaoCompiladaFerias(templates);
-  const template = templateAtivo?.template || TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS;
-  // O fallback padrão do item_template deve existir somente em runtime/renderização.
-  const itemTemplate = templateAtivo?.item_template || TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS;
+  const templatePrincipal = template || TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS;
+  const templateItem = itemTemplate || TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS;
 
-  return aplicarTemplate(template, buildVarsPublicacaoCompiladaFerias(lista, itemTemplate));
+  return aplicarTemplate(templatePrincipal, buildVarsPublicacaoCompiladaFerias(lista, templateItem));
+}
+
+export function buildTextoCompiladoFerias(registros = [], templates = []) {
+  const templateAtivo = getTemplatePublicacaoCompiladaFerias(templates);
+
+  return renderPublicacaoCompiladaFerias({
+    registros,
+    template: templateAtivo?.template || '',
+    itemTemplate: templateAtivo?.item_template || '',
+  });
 }
 
 export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}, templates = []) {
