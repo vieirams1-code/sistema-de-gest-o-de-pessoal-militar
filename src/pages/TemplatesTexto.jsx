@@ -87,6 +87,7 @@ function normalizeTemplateForForm(template) {
 
 function buildTemplatePayload(data) {
   return {
+    ...data,
     modulo: serializeTemplateModulo(data.modulo),
     tipo_registro: data.tipo_registro || '',
     nome: getFormTextValue(data.nome),
