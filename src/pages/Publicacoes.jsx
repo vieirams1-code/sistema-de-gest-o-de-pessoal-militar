@@ -325,12 +325,6 @@ export default function Publicacoes() {
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
-  const { data: templatesTexto = [] } = useQuery({
-    queryKey: ['templates-texto'],
-    queryFn: () => base44.entities.TemplateTexto.list('-created_date'),
-    enabled: isAccessResolved && hasPublicacoesAccess,
-  });
-
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados || loadingCompiladas;
 
   const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
@@ -426,13 +420,13 @@ export default function Publicacoes() {
         publicacao_compilada_ordem: index + 1
       }));
 
-      const textoCompilado = buildTextoCompiladoFerias(registrosComOrdem, templatesTexto);
+      const textoCompilado = buildTextoCompiladoFerias(registrosComOrdem);
       const payloadLote = buildPayloadPublicacaoCompilada(registrosComOrdem, {
         texto_publicacao: textoCompilado,
         nota_para_bg: '',
         numero_bg: '',
         data_bg: '',
-      }, templatesTexto);
+      });
 
       if (!payloadLote.ok) {
         throw new Error(payloadLote.erro || 'Não foi possível montar o lote compilado.');
@@ -654,7 +648,7 @@ export default function Publicacoes() {
       await base44.entities.PublicacaoCompilada.update(loteId, {
         quantidade_itens: filhosAtualizados.length,
         tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
-        texto_publicacao: buildTextoCompiladoFerias(filhosAtualizados, templatesTexto),
+        texto_publicacao: buildTextoCompiladoFerias(filhosAtualizados),
       });
 
       return true;
@@ -729,7 +723,7 @@ export default function Publicacoes() {
       await base44.entities.PublicacaoCompilada.update(loteId, {
         quantidade_itens: filhosRestantesAtualizados.length,
         tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
-        texto_publicacao: buildTextoCompiladoFerias(filhosRestantesAtualizados, templatesTexto),
+        texto_publicacao: buildTextoCompiladoFerias(filhosRestantesAtualizados),
       });
 
       return true;
@@ -1216,7 +1210,6 @@ export default function Publicacoes() {
                             onDesagruparFilho={handleDesagruparFilho}
                             onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
                             todosRegistros={todosRegistros}
-                            templates={templatesTexto}
                             isAdmin={isAdmin}
                             modoAdmin={modoAdmin}
                             canAccessAction={canAccessAction}

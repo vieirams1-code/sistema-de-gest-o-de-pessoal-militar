@@ -172,7 +172,7 @@ function FieldBlock({ label, children, className = '' }) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, onDesagruparFilho, todosRegistros = [], templates = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, onDesagruparFilho, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isChildrenExpanded, setIsChildrenExpanded] = useState(false);
@@ -334,7 +334,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const nomeInstitucional = registro.militar_nome_institucional || registro.militar_nome || 'Militar';
   const dataHeader = formatDate(registro.data_registro || registro.created_date || registro.data_inicio);
   const textoPublicacao = isLoteCompilado
-    ? (buildTextoCompiladoFerias(filhosDoLote, templates) || registro.texto_publicacao || 'Sem texto gerado.')
+    ? (buildTextoCompiladoFerias(filhosDoLote) || registro.texto_publicacao || 'Sem texto gerado.')
     : (publicacaoContrato?.texto || registro.texto_publicacao || 'Sem texto gerado.');
   const origemLabel = contratoLivro
     ? (registro.origem || 'Automática')
