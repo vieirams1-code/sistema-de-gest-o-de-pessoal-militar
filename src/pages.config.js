@@ -49,6 +49,7 @@
  */
 import AgendaAcoesOperacionais from './pages/AgendaAcoesOperacionais';
 import AgendarJISO from './pages/AgendarJISO';
+import AvaliacaoComportamento from './pages/AvaliacaoComportamento';
 import Armamentos from './pages/Armamentos';
 import Atestados from './pages/Atestados';
 import CadastrarArmamento from './pages/CadastrarArmamento';
@@ -62,6 +63,7 @@ import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import Configuracoes from './pages/Configuracoes';
 import DashboardAtestados from './pages/DashboardAtestados';
+import DetalheComportamento from './pages/DetalheComportamento';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
 import FichaMilitar from './pages/FichaMilitar';
@@ -92,6 +94,7 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AgendarJISO": AgendarJISO,
+    "AvaliacaoComportamento": AvaliacaoComportamento,
     "Armamentos": Armamentos,
     "Atestados": Atestados,
     "CadastrarArmamento": CadastrarArmamento,
@@ -105,6 +108,7 @@ export const PAGES = {
     "ConciliacaoBoletim": ConciliacaoBoletim,
     "Configuracoes": Configuracoes,
     "DashboardAtestados": DashboardAtestados,
+    "DetalheComportamento": DetalheComportamento,
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
     "FichaMilitar": FichaMilitar,
