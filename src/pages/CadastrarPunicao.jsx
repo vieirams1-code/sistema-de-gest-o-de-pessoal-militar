@@ -23,7 +23,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
-import { calcularComportamento } from '@/components/utils/comportamentoCalculator';
+import { calcularComportamento } from '@/utils/calcularComportamento';
 
 export default function CadastrarPunicao() {
   const navigate = useNavigate();
@@ -92,19 +92,28 @@ export default function CadastrarPunicao() {
       const militarList = await base44.entities.Militar.filter({ id: formData.militar_id });
       const militar = militarList[0];
       
-      // Verificar se é praça
-      const pracas = ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente', 'Aspirante'];
-      if (militar && pracas.includes(militar.posto_graduacao)) {
+      if (militar) {
         // Buscar todas as punições do militar (incluindo a recém-criada)
         const punicoesMilitar = await base44.entities.Punicao.filter({ militar_id: formData.militar_id });
         
         // Calcular novo comportamento
-        const resultado = calcularComportamento(punicoesMilitar, militar.data_inclusao);
-        
-        // Atualizar comportamento do militar
-        await base44.entities.Militar.update(militar.id, {
-          comportamento: resultado.comportamento
-        });
+        const resultado = calcularComportamento(punicoesMilitar, militar.posto_graduacao);
+
+        if (resultado?.comportamento && resultado.comportamento !== militar.comportamento) {
+          // Atualizar comportamento do militar
+          await base44.entities.Militar.update(militar.id, {
+            comportamento: resultado.comportamento
+          });
+
+          await base44.entities.HistoricoComportamento.create({
+            militar_id: militar.id,
+            comportamento_anterior: militar.comportamento || 'Bom',
+            comportamento_novo: resultado.comportamento,
+            fundamento_legal: resultado.fundamento,
+            motivo: punicaoId ? 'Punição atualizada' : 'Nova punição registrada',
+            data_alteracao: new Date().toISOString().slice(0, 10),
+          });
+        }
       }
       
       queryClient.invalidateQueries({ queryKey: ['punicoes'] });

@@ -29,6 +29,7 @@ import {
   getTemplateAtivoPorTipo,
   tipoExigeTemplate,
 } from '@/components/rp/templateValidation';
+import { calcularComportamento } from '@/utils/calcularComportamento';
 
 const STATUS_OPTIONS = ['Aguardando Nota', 'Aguardando Publicação', 'Publicado'];
 const TEMPLATE_CONFLITO_MENSAGEM =
@@ -317,6 +318,32 @@ export default function CadastrarRegistroRP() {
     setTipoSearch('');
   };
 
+  const processarComportamentoPosPunicao = async (militarId) => {
+    if (!militarId) return;
+
+    const [militar] = await base44.entities.Militar.filter({ id: militarId });
+    if (!militar) return;
+
+    const punicoes = await base44.entities.Punicao.filter({ militar_id: militarId });
+    const resultado = calcularComportamento(punicoes, militar.posto_graduacao);
+    if (!resultado?.comportamento) return;
+
+    if (resultado.comportamento !== militar.comportamento) {
+      await base44.entities.Militar.update(militar.id, {
+        comportamento: resultado.comportamento,
+      });
+
+      await base44.entities.HistoricoComportamento.create({
+        militar_id: militar.id,
+        comportamento_anterior: militar.comportamento || 'Bom',
+        comportamento_novo: resultado.comportamento,
+        fundamento_legal: resultado.fundamento,
+        motivo: 'Nova punição registrada',
+        data_alteracao: new Date().toISOString().slice(0, 10),
+      });
+    }
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       const modulo = getModuloByTipo(data.tipo_registro, tiposCustom);
@@ -349,10 +376,32 @@ export default function CadastrarRegistroRP() {
 
       return base44.entities.PublicacaoExOfficio.create(payloadExOfficio);
     },
-    onSuccess: () => {
+    onSuccess: async (resultado, payload) => {
+      const isNovaPunicao = !isEditing && payload?.tipo_registro === 'Punição';
+      if (isNovaPunicao) {
+        const dataFimCumprimento = payload.data_punicao || payload.data_registro;
+        const existeEntidadePunicaoRP = Boolean(base44?.entities?.PunicaoRP);
+
+        if (existeEntidadePunicaoRP) {
+          await base44.entities.PunicaoRP.create({
+            militar_id: payload.militar_id,
+            militar_nome: payload.militar_nome,
+            militar_posto: payload.militar_posto,
+            tipo: payload.tipo_punicao,
+            data_fim_cumprimento: dataFimCumprimento,
+            dias: Number(payload.dias_punicao || 0),
+            status: 'Ativa',
+            origem_publicacao_id: resultado?.id || null,
+          });
+        }
+
+        await processarComportamentoPosPunicao(payload.militar_id);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['militares'] });
       navigate(createPageUrl('RP'));
     },
   });

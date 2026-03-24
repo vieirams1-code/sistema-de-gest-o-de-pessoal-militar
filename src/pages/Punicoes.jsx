@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { calcularComportamento } from '@/utils/calcularComportamento';
 
 export default function Punicoes() {
   const navigate = useNavigate();
@@ -105,6 +106,12 @@ export default function Punicoes() {
     'Repreensão': 'bg-yellow-100 text-yellow-700',
     'Detenção': 'bg-orange-100 text-orange-700',
     'Prisão': 'bg-red-100 text-red-700'
+  };
+
+  const getImpactoComportamento = (punicao) => {
+    const r = calcularComportamento([punicao], punicao.militar_posto);
+    if (!r?.comportamento) return 'Sem impacto (oficial)';
+    return `${r.comportamento} (${punicao.data_termino || punicao.data_aplicacao || 'sem data base'})`;
   };
 
   return (
@@ -198,6 +205,9 @@ export default function Punicoes() {
                     {punicao.motivo && (
                       <p className="text-sm text-slate-600 mt-2">{punicao.motivo}</p>
                     )}
+                    <p className="text-sm text-slate-700 mt-2">
+                      <span className="font-medium">Impacto no comportamento:</span> {getImpactoComportamento(punicao)}
+                    </p>
                     {(punicao.data_inicio || punicao.data_termino) && (
                       <p className="text-sm text-slate-500 mt-2">
                         Período: {punicao.data_inicio ? format(new Date(punicao.data_inicio + 'T00:00:00'), 'dd/MM/yyyy') : '-'} até {punicao.data_termino ? format(new Date(punicao.data_termino + 'T00:00:00'), 'dd/MM/yyyy') : '-'}

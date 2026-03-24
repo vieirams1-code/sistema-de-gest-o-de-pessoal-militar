@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
 
 const menuGroups = [
   {
@@ -45,6 +46,7 @@ const menuGroups = [
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
       { name: 'Alterações Militar', page: 'FichaMilitar', icon: FilePenLine, moduleKey: 'militares' },
+      { name: 'Avaliação Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, moduleKey: 'militares' },
     ],
   },
   {
@@ -105,6 +107,7 @@ export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState(['Configurações']);
   const { isAdmin, canAccessModule, canAccessAction } = useCurrentUser();
+  useVerificacaoComportamentoDiaria({ enabled: canAccessModule('militares') || isAdmin });
 
   const toggleExpanded = (itemName) => {
     setExpandedItems((prev) =>
