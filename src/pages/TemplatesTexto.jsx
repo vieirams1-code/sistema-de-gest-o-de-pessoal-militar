@@ -98,6 +98,14 @@ function buildTemplatePayload(data) {
   };
 }
 
+async function createTemplate(payload) {
+  return base44.entities.TemplateTexto.create(payload);
+}
+
+async function updateTemplate(id, payload) {
+  return base44.entities.TemplateTexto.update(id, payload);
+}
+
 function getTipoDisplay(tipo) {
   return FERIAS_LABELS[tipo] || tipo;
 }
@@ -554,9 +562,11 @@ export default function TemplatesTexto() {
       }
 
       const payload = buildTemplatePayload(data);
-      return data.id
-        ? base44.entities.TemplateTexto.update(data.id, payload)
-        : base44.entities.TemplateTexto.create(payload);
+      if (data.id) {
+        return updateTemplate(data.id, payload);
+      }
+
+      return createTemplate(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
