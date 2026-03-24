@@ -15,7 +15,6 @@ import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/com
 import {
   buildPreviewRegistrosCompiladoFerias,
   renderPublicacaoCompiladaFerias,
-  TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS,
   VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS,
 } from '@/components/publicacao/publicacaoCompiladaService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -995,7 +994,7 @@ export default function TemplatesTexto() {
                     onChange={e => setEditingTemplate(p => ({ ...p, item_template: e.target.value }))}
                     rows={4}
                     className={`font-mono text-sm ${variaveisInvalidasItemTemplate.length > 0 ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
-                    placeholder={TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS}
+                    placeholder="Digite o template de item (opcional)."
                   />
                   <div className={`mt-3 rounded-lg border p-3 ${COR_GRUPO.blue.box}`}>
                     <p className={`text-xs font-bold mb-2 ${COR_GRUPO.blue.titulo}`}>
