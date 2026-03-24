@@ -1,43 +1,7 @@
-import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils';
+import { formatDateBR } from '@/components/utils/templateUtils';
 
 export const PUBLICACAO_COMPILADA_FERIAS_TIPO = 'Publicação Compilada - Férias';
 export const PUBLICACAO_COMPILADA_FERIAS_CODIGO = 'publicacao_compilada_ferias';
-export const TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS = '{{ordem}}. {{posto}} {{nome}} - Matrícula: {{matricula}} - Tipo: {{tipo}}{{separador_periodo}}{{periodo}}';
-
-export const VARIAVEIS_ITEM_TEMPLATE_PUBLICACAO_COMPILADA_FERIAS = [
-  'ordem',
-  'nome',
-  'nome_institucional',
-  'matricula',
-  'posto',
-  'posto_graduacao',
-  'quadro',
-  'cargo',
-  'lotacao',
-  'subunidade',
-  'tipo',
-  'tipo_composto',
-  'grupo',
-  'data_registro',
-  'periodo',
-  'periodo_aquisitivo',
-  'data_inicio',
-  'data_fim',
-  'data_termino',
-  'data_retorno',
-  'dias',
-  'separador_periodo',
-  'separador_retorno',
-];
-
-const TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS = [
-  'PUBLICAÇÃO COMPILADA DE FÉRIAS',
-  '',
-  'Quantidade de itens: {{quantidade_itens}}',
-  'Data de geração: {{data_geracao}}',
-  '',
-  '{{lista_compilada}}',
-].join('\n');
 
 const TIPOS_FERIAS_COMPILAVEIS = new Set([
   'Saída Férias',
@@ -153,34 +117,17 @@ function isCompiladoEmLoteTrue(registro = {}) {
   return registro?.compilado_em_lote === true;
 }
 
-function sanitizeTextoContinuo(texto = '') {
-  return String(texto).replace(/\s+/g, ' ').trim();
-}
-
-function getTemplateValueOrFallback(value, fallback) {
-  if (value === null || value === undefined) return fallback;
-  return String(value).trim() ? String(value) : fallback;
-}
-
 function getFirstFilled(...values) {
   const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== '');
   return value ?? '';
 }
 
-function buildItemVarsCompiladoFerias(registro = {}, index = 0) {
+function buildTextoItemCompiladoFerias(registro = {}, index = 0) {
   const ordem = registro?.publicacao_compilada_ordem ?? (index + 1);
   const nome = getFirstFilled(registro?.militar_nome, registro?.nome, 'Militar não identificado');
-  const nomeInstitucional = getFirstFilled(registro?.militar_nome_institucional, nome);
   const postoGraduacao = getFirstFilled(registro?.militar_posto_graduacao, registro?.militar_posto, registro?.posto_graduacao, registro?.posto);
-  const quadro = getFirstFilled(registro?.militar_quadro, registro?.quadro);
-  const cargo = getFirstFilled(registro?.militar_cargo, registro?.cargo, registro?.funcao);
-  const lotacao = getFirstFilled(registro?.militar_lotacao, registro?.lotacao);
-  const subunidade = getFirstFilled(registro?.militar_subunidade, registro?.subunidade);
   const matricula = getFirstFilled(registro?.militar_matricula, registro?.matricula, '—');
   const tipo = getFirstFilled(registro?.tipo_registro, registro?.tipo_label, registro?.tipo, 'Registro');
-  const tipoComposto = getFirstFilled(registro?.tipo_composto_display, registro?.tipo_composto, tipo);
-  const grupo = getFirstFilled(registro?.grupo_display, registro?.grupo, 'Férias');
-  const dataRegistro = formatDate(getFirstFilled(registro?.data_registro, registro?.created_date));
   const periodoAquisitivo = getFirstFilled(
     registro?.periodo_aquisitivo,
     registro?.vinculos?.periodo?.label,
@@ -199,31 +146,21 @@ function buildItemVarsCompiladoFerias(registro = {}, index = 0) {
     data_termino: registro?.data_termino || registro?.data_fim,
   }) || '';
 
-  return {
-    ordem: String(ordem),
-    nome: String(nome),
-    nome_institucional: String(nomeInstitucional),
-    matricula: String(matricula),
-    posto: String(postoGraduacao),
-    posto_graduacao: String(postoGraduacao),
-    quadro: String(quadro),
-    cargo: String(cargo),
-    lotacao: String(lotacao),
-    subunidade: String(subunidade),
-    tipo: String(tipo),
-    tipo_composto: String(tipoComposto),
-    grupo: String(grupo),
-    data_registro: String(dataRegistro || ''),
-    periodo: String(periodo),
-    periodo_aquisitivo: String(periodoAquisitivo),
-    data_inicio: String(dataInicio || ''),
-    data_fim: String(dataFim || ''),
-    data_termino: String(dataTermino || ''),
-    data_retorno: String(dataRetorno || ''),
-    dias: String(dias),
-    separador_periodo: periodo ? ' - ' : '',
-    separador_retorno: dataRetorno ? ' - Retorno: ' : '',
-  };
+  const identificacao = [postoGraduacao, nome].filter(Boolean).join(' ').trim();
+  const detalhes = [
+    `Matrícula: ${matricula}`,
+    `Tipo: ${tipo}`,
+  ];
+
+  if (periodo) detalhes.push(periodo);
+  if (!periodo && periodoAquisitivo) detalhes.push(`Período aquisitivo: ${periodoAquisitivo}`);
+  if (!periodo && dataInicio) detalhes.push(`Início: ${dataInicio}`);
+  if (!periodo && dataTermino) detalhes.push(`Término: ${dataTermino}`);
+  if (!periodo && dataFim) detalhes.push(`Fim: ${dataFim}`);
+  if (!periodo && dataRetorno) detalhes.push(`Retorno: ${dataRetorno}`);
+  if (!periodo && dias) detalhes.push(`Dias: ${dias}`);
+
+  return `${ordem}. ${identificacao || nome} - ${detalhes.filter(Boolean).join(' | ')}`;
 }
 
 export function isRegistroEmLoteCompilado(registro = {}) {
@@ -236,15 +173,6 @@ export function isRegistroFilhoDePublicacaoCompilada(registro = {}) {
 
 export function isLoteCompiladoPublicado(lote = {}) {
   return Boolean(lote?.numero_bg && lote?.data_bg);
-}
-
-export function getTemplatePublicacaoCompiladaFerias(templates = []) {
-  if (!Array.isArray(templates)) return null;
-  return templates.find((t) =>
-    (t.tipo_registro === PUBLICACAO_COMPILADA_FERIAS_TIPO || t.tipo_registro === PUBLICACAO_COMPILADA_FERIAS_CODIGO) &&
-    t.modulo === 'Livro' &&
-    t.ativo !== false
-  ) || null;
 }
 
 export function podeDesfazerLoteCompilado(lote = {}) {
@@ -338,31 +266,23 @@ export function validarCompatibilidadeLoteFerias(registros = []) {
   };
 }
 
-export function buildItensTextoCompiladoFerias(registros = [], itemTemplate = null) {
+export function buildItensTextoCompiladoFerias(registros = []) {
   const lista = registros
     .filter(Boolean)
     .slice()
     .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
 
-  const tmpl = getTemplateValueOrFallback(itemTemplate, TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS);
-
-  return lista.map((registro, index) => sanitizeTextoContinuo(aplicarTemplate(tmpl, buildItemVarsCompiladoFerias(registro, index))));
+  return lista.map((registro, index) => buildTextoItemCompiladoFerias(registro, index));
 }
 
-export function buildListaCompiladaTextoFerias(registros = [], itemTemplate = null) {
-  return sanitizeTextoContinuo(buildItensTextoCompiladoFerias(registros, itemTemplate).join(' '));
-}
-
-export function buildVarsPublicacaoCompiladaFerias(registros = [], itemTemplate = null) {
+export function buildVarsPublicacaoCompiladaFerias(registros = []) {
   const lista = registros.filter(Boolean);
-  const listaCompilada = buildListaCompiladaTextoFerias(lista, itemTemplate);
+  const itens = buildItensTextoCompiladoFerias(lista);
 
   return {
     quantidade_itens: String(lista.length),
     data_geracao: formatDateBR(new Date().toISOString().slice(0, 10)),
-    lista_compilada: listaCompilada,
-    tipo_publicacao: PUBLICACAO_COMPILADA_FERIAS_TIPO,
-    codigo_publicacao: PUBLICACAO_COMPILADA_FERIAS_CODIGO,
+    itens,
   };
 }
 
@@ -428,27 +348,27 @@ export function buildPreviewRegistrosCompiladoFerias() {
   ];
 }
 
-export function renderPublicacaoCompiladaFerias({ registros = [], template = '', itemTemplate = '' } = {}) {
+export function renderPublicacaoCompiladaFerias({ registros = [] } = {}) {
   const lista = registros.filter(Boolean);
   if (!lista.length) return '';
 
-  const templatePrincipal = getTemplateValueOrFallback(template, TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS);
-  const templateItem = getTemplateValueOrFallback(itemTemplate, TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS);
+  const vars = buildVarsPublicacaoCompiladaFerias(lista);
 
-  return aplicarTemplate(templatePrincipal, buildVarsPublicacaoCompiladaFerias(lista, templateItem));
+  return [
+    'PUBLICAÇÃO COMPILADA DE FÉRIAS',
+    '',
+    `Quantidade de itens: ${vars.quantidade_itens}`,
+    `Data de geração: ${vars.data_geracao}`,
+    '',
+    ...vars.itens,
+  ].join('\n');
 }
 
-export function buildTextoCompiladoFerias(registros = [], templates = []) {
-  const templateAtivo = getTemplatePublicacaoCompiladaFerias(templates);
-
-  return renderPublicacaoCompiladaFerias({
-    registros,
-    template: templateAtivo?.template || '',
-    itemTemplate: templateAtivo?.item_template || '',
-  });
+export function buildTextoCompiladoFerias(registros = []) {
+  return renderPublicacaoCompiladaFerias({ registros });
 }
 
-export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}, templates = []) {
+export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) {
   const compatibilidade = validarCompatibilidadeLoteFerias(registros);
 
   if (!compatibilidade.compativel) {
@@ -460,7 +380,7 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}, 
     };
   }
 
-  const textoPublicacao = overrides?.texto_publicacao ?? buildTextoCompiladoFerias(registros, templates);
+  const textoPublicacao = overrides?.texto_publicacao ?? buildTextoCompiladoFerias(registros);
   const {
     nota_para_bg: _notaParaBgIgnorada,
     numero_bg: _numeroBgIgnorado,
@@ -494,12 +414,7 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}, 
 
 export const isRegistroElegivelParaPublicacaoCompiladaFerias = isRegistroElegivelParaCompilacaoFerias;
 export const validarCompatibilidadeBasicaPublicacaoCompilada = validarCompatibilidadeLoteFerias;
-export const prepararPayloadPublicacaoCompilada = ({ registros = [], overrides = {}, templates = [] } = {}) => (
-  buildPayloadPublicacaoCompilada(registros, overrides, templates)
+export const prepararPayloadPublicacaoCompilada = ({ registros = [], overrides = {} } = {}) => (
+  buildPayloadPublicacaoCompilada(registros, overrides)
 );
-
-export {
-  TIPOS_FERIAS_COMPILAVEIS,
-  TIPOS_CODIGO_COMPILAVEIS,
-  TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS,
-};
+export { TIPOS_FERIAS_COMPILAVEIS, TIPOS_CODIGO_COMPILAVEIS };
