@@ -157,6 +157,11 @@ function sanitizeTextoContinuo(texto = '') {
   return String(texto).replace(/\s+/g, ' ').trim();
 }
 
+function getTemplateValueOrFallback(value, fallback) {
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim() ? String(value) : fallback;
+}
+
 function getFirstFilled(...values) {
   const value = values.find((item) => item !== null && item !== undefined && String(item).trim() !== '');
   return value ?? '';
@@ -339,7 +344,7 @@ export function buildItensTextoCompiladoFerias(registros = [], itemTemplate = nu
     .slice()
     .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
 
-  const tmpl = itemTemplate || TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS;
+  const tmpl = getTemplateValueOrFallback(itemTemplate, TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS);
 
   return lista.map((registro, index) => sanitizeTextoContinuo(aplicarTemplate(tmpl, buildItemVarsCompiladoFerias(registro, index))));
 }
@@ -427,8 +432,8 @@ export function renderPublicacaoCompiladaFerias({ registros = [], template = '',
   const lista = registros.filter(Boolean);
   if (!lista.length) return '';
 
-  const templatePrincipal = template || TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS;
-  const templateItem = itemTemplate || TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS;
+  const templatePrincipal = getTemplateValueOrFallback(template, TEMPLATE_PADRAO_PUBLICACAO_COMPILADA_FERIAS);
+  const templateItem = getTemplateValueOrFallback(itemTemplate, TEMPLATE_PADRAO_ITEM_PUBLICACAO_COMPILADA_FERIAS);
 
   return aplicarTemplate(templatePrincipal, buildVarsPublicacaoCompiladaFerias(lista, templateItem));
 }

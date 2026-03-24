@@ -20,7 +20,7 @@ import {
 } from '@/components/publicacao/publicacaoCompiladaService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { RP_TIPOS_BASE, getModuloByTipo, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
+import { RP_TIPOS_BASE, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
 import { getConflitoTemplatePorTipo } from '@/components/rp/templateValidation';
 
 const FERIAS_CANONICAL_TYPES = [
@@ -634,6 +634,11 @@ export default function TemplatesTexto() {
       .sort((a, b) => getTipoDisplay(a.value).localeCompare(getTipoDisplay(b.value), 'pt-BR'))
   ), []);
 
+  const getModuloByTipoOption = (tipo) => {
+    const option = tiposRegistroOptions.find((item) => item.value === tipo);
+    return option?.modulo || '';
+  };
+
   const selectedTipoVars = editingTemplate?.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
 
   const templateConflictError = useMemo(() => {
@@ -745,7 +750,7 @@ export default function TemplatesTexto() {
   const inserirVarTemplatePrincipal = (value) => inserirVarNoTextarea(textareaRef, 'template', value);
   const inserirVarItemTemplate = (value) => inserirVarNoTextarea(itemTemplateTextareaRef, 'item_template', value);
   const previewTextoCompiladoFerias = useMemo(() => {
-    if (editingTemplate?.tipo_registro !== TIPO_PUBLICACAO_COMPILADA_FERIAS || !editingTemplate?.template) {
+    if (editingTemplate?.tipo_registro !== TIPO_PUBLICACAO_COMPILADA_FERIAS) {
       return '';
     }
 
@@ -941,7 +946,7 @@ export default function TemplatesTexto() {
                   <Label className="text-sm font-medium text-slate-700">Tipo de Registro <span className="text-red-500">*</span></Label>
                   <Select
                     value={editingTemplate.tipo_registro}
-                    onValueChange={v => setEditingTemplate(p => ({ ...p, tipo_registro: v, modulo: getModuloByTipo(v) }))}
+                    onValueChange={v => setEditingTemplate(p => ({ ...p, tipo_registro: v, modulo: getModuloByTipoOption(v) }))}
                   >
                     <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
