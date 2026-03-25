@@ -535,13 +535,14 @@ export default function QuadroOperacionalPage() {
       { nome: 'PENDENTE', cor: '#94a3b8', ordem: 1, fixa: false, origem_coluna: 'manual' },
       { nome: 'ATENÇÃO AO PRAZO', cor: '#f59e0b', ordem: 2, fixa: false, origem_coluna: 'manual' },
       { nome: 'JISO', cor: '#8b5cf6', ordem: 3, fixa: true, origem_coluna: 'automacao' },
-      { nome: 'ATESTADOS', cor: '#ef4444', ordem: 4, fixa: false, origem_coluna: 'manual' },
-      { nome: 'FÉRIAS', cor: '#10b981', ordem: 5, fixa: false, origem_coluna: 'manual' },
-      { nome: 'NOTAS BG', cor: '#3b82f6', ordem: 6, fixa: false, origem_coluna: 'manual' },
-      { nome: 'ASSINATURAS', cor: '#f97316', ordem: 7, fixa: false, origem_coluna: 'manual' },
-      { nome: 'PROCESSOS E-MS', cor: '#6366f1', ordem: 8, fixa: false, origem_coluna: 'manual' },
-      { nome: 'ACESSOS', cor: '#0ea5e9', ordem: 9, fixa: false, origem_coluna: 'manual' },
-      { nome: 'COBRANÇAS', cor: '#dc2626', ordem: 10, fixa: false, origem_coluna: 'manual' },
+      { nome: 'PUNIÇÕES', cor: '#dc2626', ordem: 4, fixa: true, origem_coluna: 'automacao' },
+      { nome: 'ATESTADOS', cor: '#ef4444', ordem: 5, fixa: false, origem_coluna: 'manual' },
+      { nome: 'FÉRIAS', cor: '#10b981', ordem: 6, fixa: false, origem_coluna: 'manual' },
+      { nome: 'NOTAS BG', cor: '#3b82f6', ordem: 7, fixa: false, origem_coluna: 'manual' },
+      { nome: 'ASSINATURAS', cor: '#f97316', ordem: 8, fixa: false, origem_coluna: 'manual' },
+      { nome: 'PROCESSOS E-MS', cor: '#6366f1', ordem: 9, fixa: false, origem_coluna: 'manual' },
+      { nome: 'ACESSOS', cor: '#0ea5e9', ordem: 10, fixa: false, origem_coluna: 'manual' },
+      { nome: 'COBRANÇAS', cor: '#dc2626', ordem: 11, fixa: false, origem_coluna: 'manual' },
     ];
 
     await base44.entities.ColunaOperacional.bulkCreate(

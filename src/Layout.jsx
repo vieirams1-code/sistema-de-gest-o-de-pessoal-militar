@@ -44,7 +44,13 @@ const menuGroups = [
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
       { name: 'Alterações Militar', page: 'FichaMilitar', icon: FilePenLine, moduleKey: 'militares' },
-      { name: 'Avaliação Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, moduleKey: 'militares' },
+    ],
+  },
+  {
+    title: 'Justiça e Disciplina',
+    items: [
+      { name: 'Controle de Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, moduleKey: 'militares' },
+      { name: 'Lançamento de Punições', page: 'Punicoes', icon: Shield, moduleKey: 'militares' },
     ],
   },
   {

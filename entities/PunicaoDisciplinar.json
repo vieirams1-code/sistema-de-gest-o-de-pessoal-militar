@@ -1,0 +1,27 @@
+{
+  "name": "PunicaoDisciplinar",
+  "type": "object",
+  "title": "Punição Disciplinar",
+  "description": "Registro disciplinar de punições para cálculo de comportamento e acompanhamento operacional.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "militar_nome": { "type": "string", "default": "" },
+    "posto_graduacao": { "type": "string", "default": "" },
+    "tipo_punicao": {
+      "type": "string",
+      "enum": ["Advertência", "Repreensão", "Detenção", "Prisão", "Prisão em Separado"],
+      "default": "Advertência"
+    },
+    "dias_punicao": { "type": "number", "default": 0 },
+    "data_inicio_cumprimento": { "type": "string", "default": "" },
+    "data_fim_cumprimento": { "type": "string", "default": "" },
+    "agravada_prisao_em_separado": { "type": "boolean", "default": false },
+    "status_punicao": { "type": "string", "default": "Ativa" },
+    "boletim_numero": { "type": "string", "default": "" },
+    "boletim_data": { "type": "string", "default": "" },
+    "autoridade_aplicadora": { "type": "string", "default": "" },
+    "observacoes": { "type": "string", "default": "" },
+    "publicada_no_livro": { "type": "boolean", "default": false },
+    "card_operacional_id": { "type": "string", "default": "" }
+  }
+}

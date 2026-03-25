@@ -7,11 +7,13 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
+import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [filtro, setFiltro] = useState('');
+  const punicaoEntity = getPunicaoEntity();
 
   const { data: militares = [], isLoading } = useQuery({
     queryKey: ['avaliacao-comportamento-militares'],
@@ -19,7 +21,7 @@ export default function AvaliacaoComportamento() {
   });
   const { data: punicoes = [], isLoading: loadingPunicoes } = useQuery({
     queryKey: ['avaliacao-comportamento-punicoes'],
-    queryFn: () => base44.entities.Punicao.list(),
+    queryFn: () => punicaoEntity.list(),
   });
   const { data: pendencias = [] } = useQuery({
     queryKey: ['pendencias-comportamento'],
@@ -196,3 +198,4 @@ export default function AvaliacaoComportamento() {
     </div>
   );
 }
+  const punicaoEntity = getPunicaoEntity();

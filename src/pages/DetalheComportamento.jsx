@@ -5,11 +5,13 @@ import { ArrowLeft, Gavel } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
+import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 
 export default function DetalheComportamento() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+  const punicaoEntity = getPunicaoEntity();
 
   const { data: militar } = useQuery({
     queryKey: ['detalhe-comportamento-militar', id],
@@ -19,7 +21,7 @@ export default function DetalheComportamento() {
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['detalhe-comportamento-punicoes', id],
-    queryFn: () => base44.entities.Punicao.filter({ militar_id: id }, '-data_termino'),
+    queryFn: () => punicaoEntity.filter({ militar_id: id }, '-data_fim_cumprimento'),
     enabled: !!id,
   });
 
@@ -111,3 +113,4 @@ export default function DetalheComportamento() {
     </div>
   );
 }
+  const punicaoEntity = getPunicaoEntity();

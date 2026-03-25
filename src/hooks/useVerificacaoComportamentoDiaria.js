@@ -5,6 +5,7 @@ import {
   calcularComportamento,
   compararComportamentos,
 } from '@/utils/calcularComportamento';
+import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 
 const LAST_RUN_KEY = 'sgp_militar_comportamento_last_run';
 
@@ -32,6 +33,7 @@ export default function useVerificacaoComportamentoDiaria({ incluirReabilitadas 
 
     const run = async () => {
       try {
+        const punicaoEntity = getPunicaoEntity();
         const todosMilitares = await base44.entities.Militar.list();
         if (cancelled) return;
 
@@ -42,7 +44,7 @@ export default function useVerificacaoComportamentoDiaria({ incluirReabilitadas 
           if (cancelled) return;
 
           await Promise.all(bloco.map(async (militar) => {
-            const punicoes = await base44.entities.Punicao.filter({ militar_id: militar.id });
+            const punicoes = await punicaoEntity.filter({ militar_id: militar.id });
             const calculado = calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
               incluirReabilitadas,
               dataInclusaoMilitar: militar.data_inclusao,

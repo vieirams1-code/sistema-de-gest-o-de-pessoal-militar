@@ -3,7 +3,6 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -22,7 +21,12 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
-import { calcularComportamento } from '@/utils/calcularComportamento';
+import {
+  getPunicaoEntity,
+  validarPunicaoDisciplinar,
+  recalcularComportamentoEMarcarPendencia,
+  criarCardPunicaoNoQuadro,
+} from '@/services/justicaDisciplinaService';
 
 export default function CadastrarPunicao() {
   const navigate = useNavigate();
@@ -34,24 +38,31 @@ export default function CadastrarPunicao() {
   const punicaoId = searchParams.get('id');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [erroValidacao, setErroValidacao] = useState('');
   const [formData, setFormData] = useState({
     militar_id: '',
     militar_nome: '',
-    militar_posto: '',
-    militar_matricula: '',
-    tipo: 'Advertência Verbal',
-    data_aplicacao: new Date().toISOString().split('T')[0],
-    data_inicio: '',
-    data_termino: '',
-    motivo: '',
-    documento_referencia: '',
-    observacoes: ''
+    posto_graduacao: '',
+    tipo_punicao: 'Advertência',
+    dias_punicao: 0,
+    data_inicio_cumprimento: new Date().toISOString().split('T')[0],
+    data_fim_cumprimento: '',
+    agravada_prisao_em_separado: false,
+    status_punicao: 'Ativa',
+    boletim_numero: '',
+    boletim_data: '',
+    autoridade_aplicadora: '',
+    observacoes: '',
+    publicada_no_livro: false,
+    card_operacional_id: ''
   });
 
+  const entity = getPunicaoEntity();
+
   const { data: punicaoExistente, isLoading: loadingPunicao } = useQuery({
-    queryKey: ['punicao', punicaoId],
+    queryKey: ['punicao-disciplinar', punicaoId],
     queryFn: async () => {
-      const result = await base44.entities.Punicao.filter({ id: punicaoId });
+      const result = await entity.filter({ id: punicaoId });
       return result[0];
     },
     enabled: !!punicaoId
@@ -59,7 +70,7 @@ export default function CadastrarPunicao() {
 
   useEffect(() => {
     if (punicaoExistente) {
-      setFormData(punicaoExistente);
+      setFormData((prev) => ({ ...prev, ...punicaoExistente }));
     }
   }, [punicaoExistente]);
 
@@ -68,61 +79,46 @@ export default function CadastrarPunicao() {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Punicao.delete(id),
+    mutationFn: (id) => entity.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['punicoes'] });
+      queryClient.invalidateQueries({ queryKey: ['punicoes-disciplinares'] });
       navigate(createPageUrl('Punicoes'));
     }
   });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Criar ou atualizar punição
+      setErroValidacao('');
+      validarPunicaoDisciplinar(formData);
+
+      let punicaoSalva;
       if (punicaoId) {
-        await base44.entities.Punicao.update(punicaoId, formData);
+        punicaoSalva = await entity.update(punicaoId, formData);
       } else {
-        await base44.entities.Punicao.create(formData);
-      }
-      
-      // Buscar militar e todas as suas punições
-      const militarList = await base44.entities.Militar.filter({ id: formData.militar_id });
-      const militar = militarList[0];
-      
-      if (militar) {
-        // Buscar todas as punições do militar (incluindo a recém-criada)
-        const punicoesMilitar = await base44.entities.Punicao.filter({ militar_id: formData.militar_id });
-        
-        // Calcular novo comportamento
-        const resultado = calcularComportamento(punicoesMilitar, militar.posto_graduacao, new Date(), {
-          dataInclusaoMilitar: militar.data_inclusao,
+        punicaoSalva = await entity.create({
+          ...formData,
+          created_date: new Date().toISOString(),
         });
+      }
 
-        if (resultado?.comportamento && resultado.comportamento !== militar.comportamento) {
-          // Atualizar comportamento do militar
-          await base44.entities.Militar.update(militar.id, {
-            comportamento: resultado.comportamento
-          });
+      await recalcularComportamentoEMarcarPendencia(formData.militar_id, punicaoId ? 'Punição disciplinar atualizada' : 'Punição disciplinar registrada');
 
-          await base44.entities.HistoricoComportamento.create({
-            militar_id: militar.id,
-            comportamento_anterior: militar.comportamento || 'Bom',
-            comportamento_novo: resultado.comportamento,
-            fundamento_legal: resultado.fundamento,
-            motivo: punicaoId ? 'Punição atualizada' : 'Nova punição registrada',
-            data_alteracao: new Date().toISOString().slice(0, 10),
-          });
+      if (!punicaoId) {
+        const card = await criarCardPunicaoNoQuadro(punicaoSalva);
+        if (card?.id) {
+          await entity.update(punicaoSalva.id, { card_operacional_id: card.id });
         }
       }
-      
-      queryClient.invalidateQueries({ queryKey: ['punicoes'] });
+
+      queryClient.invalidateQueries({ queryKey: ['punicoes-disciplinares'] });
       queryClient.invalidateQueries({ queryKey: ['militares'] });
-      queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
+      queryClient.invalidateQueries({ queryKey: ['cards'] });
     },
     onSuccess: () => {
       navigate(createPageUrl('Punicoes'));
     },
     onError: (error) => {
-      console.error('Erro ao salvar:', error);
+      setErroValidacao(error?.message || 'Não foi possível salvar a punição.');
     },
     onSettled: () => {
       isSubmittingRef.current = false;
@@ -136,10 +132,10 @@ export default function CadastrarPunicao() {
     saveMutation.mutate();
   };
 
-  const necessitaPeriodo = ['Detenção', 'Prisão'].includes(formData.tipo);
+  const necessitaDias = ['Detenção', 'Prisão', 'Prisão em Separado'].includes(formData.tipo_punicao);
 
   if (loadingUser || !isAccessResolved) return null;
-  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
+  if (!hasMilitaresAccess) return <AccessDenied modulo="Justiça e Disciplina" />;
 
   if (loadingPunicao) {
     return (
@@ -158,8 +154,8 @@ export default function CadastrarPunicao() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">{punicaoId ? 'Editar' : 'Cadastrar'} Punição</h1>
-              <p className="text-slate-500 text-sm">{punicaoId ? 'Editar punição disciplinar' : 'Registrar punição disciplinar'}</p>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">{punicaoId ? 'Editar' : 'Lançar'} Punição Disciplinar</h1>
+              <p className="text-slate-500 text-sm">Módulo próprio para controle disciplinar e cálculo de comportamento</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -195,8 +191,7 @@ export default function CadastrarPunicao() {
                   ...prev,
                   militar_id: data.id || prev.militar_id,
                   militar_nome: data.militar_nome || data.nome_completo,
-                  militar_posto: data.militar_posto || data.posto_graduacao,
-                  militar_matricula: data.militar_matricula || data.matricula
+                  posto_graduacao: data.posto_graduacao || data.militar_posto,
                 }));
               }}
             />
@@ -204,77 +199,53 @@ export default function CadastrarPunicao() {
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dados da Punição</h3>
+            {erroValidacao && <p className="text-sm text-red-600 mb-3">{erroValidacao}</p>}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Tipo de Punição</Label>
-                <Select value={formData.tipo} onValueChange={(v) => handleChange('tipo', v)}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={formData.tipo_punicao} onValueChange={(v) => handleChange('tipo_punicao', v)}>
+                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Advertência Verbal">Advertência Verbal</SelectItem>
+                    <SelectItem value="Advertência">Advertência</SelectItem>
                     <SelectItem value="Repreensão">Repreensão</SelectItem>
                     <SelectItem value="Detenção">Detenção</SelectItem>
                     <SelectItem value="Prisão">Prisão</SelectItem>
+                    <SelectItem value="Prisão em Separado">Prisão em Separado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <FormField
-                label="Data de Aplicação"
-                name="data_aplicacao"
-                value={formData.data_aplicacao}
-                onChange={handleChange}
-                type="date"
-                required
-              />
-              {necessitaPeriodo && (
-                <>
-                  <FormField
-                    label="Data de Início"
-                    name="data_inicio"
-                    value={formData.data_inicio}
-                    onChange={handleChange}
-                    type="date"
-                    required
-                  />
-                  <FormField
-                    label="Data de Término"
-                    name="data_termino"
-                    value={formData.data_termino}
-                    onChange={handleChange}
-                    type="date"
-                    required
-                  />
-                </>
-              )}
-            </div>
-            <div className="mt-4">
-              <Label>Motivo</Label>
-              <Textarea
-                value={formData.motivo}
-                onChange={(e) => handleChange('motivo', e.target.value)}
-                className="mt-1.5"
-                rows={3}
-                placeholder="Descreva o motivo da punição..."
-              />
-            </div>
-            <div className="mt-4">
-              <FormField
-                label="Documento de Referência"
-                name="documento_referencia"
-                value={formData.documento_referencia}
-                onChange={handleChange}
-                placeholder="Ex: Portaria nº 123/2025"
-              />
+              <FormField label="Data Início Cumprimento" name="data_inicio_cumprimento" value={formData.data_inicio_cumprimento} onChange={handleChange} type="date" required />
+              <FormField label="Data Fim Cumprimento" name="data_fim_cumprimento" value={formData.data_fim_cumprimento} onChange={handleChange} type="date" />
+              <FormField label="Dias de Punição" name="dias_punicao" value={formData.dias_punicao} onChange={handleChange} type="number" required={necessitaDias} />
+              <div>
+                <Label>Status</Label>
+                <Select value={formData.status_punicao || 'Ativa'} onValueChange={(v) => handleChange('status_punicao', v)}>
+                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ativa">Ativa</SelectItem>
+                    <SelectItem value="Cumprida">Cumprida</SelectItem>
+                    <SelectItem value="Reabilitada">Reabilitada</SelectItem>
+                    <SelectItem value="Anulada">Anulada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Agravada p/ Prisão em Separado</Label>
+                <Select value={formData.agravada_prisao_em_separado ? 'sim' : 'nao'} onValueChange={(v) => handleChange('agravada_prisao_em_separado', v === 'sim')}>
+                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nao">Não</SelectItem>
+                    <SelectItem value="sim">Sim</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <FormField label="Boletim Número" name="boletim_numero" value={formData.boletim_numero} onChange={handleChange} placeholder="Ex: 021/2026" />
+              <FormField label="Data do Boletim" name="boletim_data" value={formData.boletim_data} onChange={handleChange} type="date" />
+              <FormField label="Autoridade Aplicadora" name="autoridade_aplicadora" value={formData.autoridade_aplicadora} onChange={handleChange} />
             </div>
             <div className="mt-4">
               <Label>Observações</Label>
-              <Textarea
-                value={formData.observacoes}
-                onChange={(e) => handleChange('observacoes', e.target.value)}
-                className="mt-1.5"
-                rows={2}
-              />
+              <Textarea value={formData.observacoes} onChange={(e) => handleChange('observacoes', e.target.value)} className="mt-1.5" rows={2} />
             </div>
           </div>
         </form>
@@ -284,7 +255,7 @@ export default function CadastrarPunicao() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir esta punição? Esta ação não pode ser desfeita e pode afetar o cálculo de comportamento do militar.
+                Tem certeza que deseja excluir esta punição?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
