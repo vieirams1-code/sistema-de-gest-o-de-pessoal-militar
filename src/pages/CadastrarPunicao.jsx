@@ -7,7 +7,8 @@ import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, CheckCircle2 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -180,6 +181,11 @@ export default function CadastrarPunicao() {
             <div>
               <h1 className="text-2xl font-bold text-[#1e3a5f]">{punicaoId ? 'Editar' : 'Lançar'} Punição Disciplinar</h1>
               <p className="text-slate-500 text-sm">Módulo próprio para controle disciplinar e cálculo de comportamento</p>
+              {base44.entities.PunicaoDisciplinar && (
+                <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                  <CheckCircle2 className="w-3 h-3" /> schema-punicao-ok
+                </span>
+              )}
             </div>
           </div>
           <div className="flex gap-2">

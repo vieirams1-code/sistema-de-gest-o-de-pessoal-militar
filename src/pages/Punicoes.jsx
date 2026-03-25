@@ -27,12 +27,13 @@ export default function Punicoes() {
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
-  const entity = getPunicaoEntity();
+  let entity = null;
+  try { entity = getPunicaoEntity(); } catch (_) {}
 
   const { data: punicoes = [], isLoading } = useQuery({
     queryKey: ['punicoes-disciplinares'],
     queryFn: async () => entity.list('-created_date'),
-    enabled: isAccessResolved
+    enabled: isAccessResolved && !!entity
   });
 
   const deleteMutation = useMutation({
