@@ -1,13 +1,12 @@
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import {
@@ -33,8 +32,8 @@ export default function CadastrarPunicao() {
 
   const [searchParams] = useSearchParams();
   const punicaoId = searchParams.get('id');
-  const [loading, setLoading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [formData, setFormData] = useState({
     militar_id: '',
     militar_nome: '',
@@ -76,11 +75,8 @@ export default function CadastrarPunicao() {
     }
   });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       // Criar ou atualizar punição
       if (punicaoId) {
         await base44.entities.Punicao.update(punicaoId, formData);
@@ -121,12 +117,23 @@ export default function CadastrarPunicao() {
       queryClient.invalidateQueries({ queryKey: ['punicoes'] });
       queryClient.invalidateQueries({ queryKey: ['militares'] });
       queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
+    },
+    onSuccess: () => {
       navigate(createPageUrl('Punicoes'));
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Erro ao salvar:', error);
-    } finally {
-      setLoading(false);
-    }
+    },
+    onSettled: () => {
+      isSubmittingRef.current = false;
+    },
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (isSubmittingRef.current || saveMutation.isPending) return;
+    isSubmittingRef.current = true;
+    saveMutation.mutate();
   };
 
   const necessitaPeriodo = ['Detenção', 'Prisão'].includes(formData.tipo);
@@ -166,9 +173,13 @@ export default function CadastrarPunicao() {
                 Excluir
               </Button>
             )}
-            <Button onClick={handleSubmit} disabled={loading || !formData.militar_id} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
-              {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
-              Salvar
+            <Button
+              onClick={handleSubmit}
+              disabled={saveMutation.isPending || !formData.militar_id}
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+            >
+              {saveMutation.isPending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
+              {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>
         </div>
