@@ -45,6 +45,7 @@ export default function useVerificacaoComportamentoDiaria({ incluirReabilitadas 
             const punicoes = await base44.entities.Punicao.filter({ militar_id: militar.id });
             const calculado = calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
               incluirReabilitadas,
+              dataInclusaoMilitar: militar.data_inclusao,
             });
 
             if (!calculado?.comportamento) return;
@@ -54,17 +55,24 @@ export default function useVerificacaoComportamentoDiaria({ incluirReabilitadas 
 
             if (!mudouParaMelhor) return;
 
-            await base44.entities.Militar.update(militar.id, {
-              comportamento: calculado.comportamento,
-            });
-
-            await base44.entities.HistoricoComportamento.create({
+            const pendencias = await base44.entities.PendenciaComportamento.filter({
               militar_id: militar.id,
-              comportamento_anterior: atual,
-              comportamento_novo: calculado.comportamento,
+              status_pendencia: 'Pendente',
+            });
+            const jaExiste = pendencias.some((p) => p.comportamento_sugerido === calculado.comportamento);
+            if (jaExiste) return;
+
+            await base44.entities.PendenciaComportamento.create({
+              militar_id: militar.id,
+              militar_nome: militar.nome_completo,
+              comportamento_atual: atual,
+              comportamento_sugerido: calculado.comportamento,
               fundamento_legal: calculado.fundamento,
-              motivo: 'Melhoria automática por decurso de tempo',
-              data_alteracao: today,
+              detalhes_calculo: JSON.stringify(calculado.detalhes || {}),
+              data_detectada: today,
+              status_pendencia: 'Pendente',
+              confirmado_por: null,
+              data_confirmacao: null,
             });
           }));
         }

@@ -31,12 +31,16 @@ export default function DetalheComportamento() {
 
   const calculado = useMemo(() => {
     if (!militar) return null;
-    return calcularComportamento(punicoes, militar.posto_graduacao);
+    return calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
+      dataInclusaoMilitar: militar.data_inclusao,
+    });
   }, [militar, punicoes]);
 
   const proximaMelhoria = useMemo(() => {
     if (!militar) return null;
-    return calcularProximaMelhoria(punicoes, militar.posto_graduacao);
+    return calcularProximaMelhoria(punicoes, militar.posto_graduacao, new Date(), {
+      dataInclusaoMilitar: militar.data_inclusao,
+    });
   }, [militar, punicoes]);
 
   if (!militar) return <div className="p-6">Carregando...</div>;

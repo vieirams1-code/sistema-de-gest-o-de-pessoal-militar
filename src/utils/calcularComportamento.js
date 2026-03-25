@@ -94,9 +94,7 @@ function isInWindow(date, start, end) {
   return date >= start && date <= end;
 }
 
-function summarizeWindow(punicoesNormalizadas, hoje, anos) {
-  const inicio = subtractYears(hoje, anos);
-  const fim = hoje;
+function summarizeWindowWithStart(punicoesNormalizadas, inicio, fim, anos) {
   const dentroJanela = punicoesNormalizadas.filter((p) => isInWindow(p.data_base, inicio, fim));
 
   const prisao_equivalente = dentroJanela.reduce((acc, p) => acc + p.prisao_equivalente, 0);
@@ -122,6 +120,16 @@ function summarizeWindow(punicoesNormalizadas, hoje, anos) {
   };
 }
 
+function getServiceYears(dataInclusao, referencia) {
+  if (!dataInclusao || !referencia) return 0;
+  let anos = referencia.getFullYear() - dataInclusao.getFullYear();
+  const mes = referencia.getMonth() - dataInclusao.getMonth();
+  if (mes < 0 || (mes === 0 && referencia.getDate() < dataInclusao.getDate())) {
+    anos -= 1;
+  }
+  return Math.max(anos, 0);
+}
+
 function temRegraArt53(punicoesNormalizadas, postoGraduacao) {
   if (postoGraduacao !== 'Soldado') return null;
 
@@ -133,7 +141,7 @@ function temRegraArt53(punicoesNormalizadas, postoGraduacao) {
   }) || null;
 }
 
-function resolveComportamentoPorJanelas(j1, j2, j4, j8) {
+function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
   if (j1.prisao_equivalente > 2) {
     return {
       comportamento: 'Mau',
@@ -148,6 +156,13 @@ function resolveComportamentoPorJanelas(j1, j2, j4, j8) {
     };
   }
 
+  if (!elegibilidade.bom) {
+    return {
+      comportamento: 'Insuficiente',
+      fundamento: 'Art. 52, alíneas c-e c/c tempo mínimo: sem 2 anos completos de efetivo serviço, não há classificação em Bom ou superior.',
+    };
+  }
+
   if (j2.quantidade > 0 && j2.prisao_equivalente <= 2) {
     return {
       comportamento: 'Bom',
@@ -155,14 +170,14 @@ function resolveComportamentoPorJanelas(j1, j2, j4, j8) {
     };
   }
 
-  if (j4.quantidade > 0 && j4.detencao_equivalente <= 1) {
+  if (elegibilidade.otimo && j4.quantidade > 0 && j4.detencao_equivalente <= 1) {
     return {
       comportamento: 'Ótimo',
       fundamento: 'Art. 52, alínea b: até 1 detenção equivalente no período de 4 anos.',
     };
   }
 
-  if (j8.quantidade === 0) {
+  if (elegibilidade.excepcional && j8.quantidade === 0) {
     return {
       comportamento: 'Excepcional',
       fundamento: 'Art. 52, alínea a: sem punição válida no período de 8 anos.',
@@ -179,6 +194,7 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
   if (!isPraca(postoGraduacao)) return null;
 
   const referencia = toDate(hoje) || new Date();
+  const dataInclusao = toDate(config.dataInclusaoMilitar || config.data_inclusao || null);
   const punicoesEntrada = Array.isArray(punicoes) ? punicoes : [];
 
   const punicoesValidas = punicoesEntrada
@@ -189,10 +205,22 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
 
   const art53 = temRegraArt53(punicoesValidas, postoGraduacao);
 
-  const janela_1_ano = summarizeWindow(punicoesValidas, referencia, 1);
-  const janela_2_anos = summarizeWindow(punicoesValidas, referencia, 2);
-  const janela_4_anos = summarizeWindow(punicoesValidas, referencia, 4);
-  const janela_8_anos = summarizeWindow(punicoesValidas, referencia, 8);
+  const construirJanela = (anos) => {
+    const inicioLegal = subtractYears(referencia, anos);
+    const inicio = dataInclusao && dataInclusao > inicioLegal ? dataInclusao : inicioLegal;
+    return summarizeWindowWithStart(punicoesValidas, inicio, referencia, anos);
+  };
+
+  const janela_1_ano = construirJanela(1);
+  const janela_2_anos = construirJanela(2);
+  const janela_4_anos = construirJanela(4);
+  const janela_8_anos = construirJanela(8);
+  const tempoServicoAnos = getServiceYears(dataInclusao, referencia);
+  const elegibilidade = {
+    bom: !dataInclusao || tempoServicoAnos >= 2,
+    otimo: !dataInclusao || tempoServicoAnos >= 4,
+    excepcional: !dataInclusao || tempoServicoAnos >= 8,
+  };
 
   const ultimaPunicao = punicoesValidas.at(-1);
 
@@ -217,7 +245,7 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
     };
   }
 
-  const resultado = resolveComportamentoPorJanelas(janela_1_ano, janela_2_anos, janela_4_anos, janela_8_anos);
+  const resultado = resolveComportamentoPorJanelas(janela_1_ano, janela_2_anos, janela_4_anos, janela_8_anos, elegibilidade);
 
   return {
     ...resultado,
@@ -228,6 +256,9 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
       janela_8_anos,
       total_punicoes_consideradas: punicoesValidas.length,
       ultima_punicao_data: ultimaPunicao?.data_base_iso || null,
+      data_inclusao_militar: formatDateISO(dataInclusao),
+      tempo_servico_anos: tempoServicoAnos,
+      elegibilidade_classificacao: elegibilidade,
       regra_critica_art53: { aplicada: false },
     },
   };
