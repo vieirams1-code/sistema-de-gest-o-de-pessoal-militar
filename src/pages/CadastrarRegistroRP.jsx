@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -133,6 +133,7 @@ export default function CadastrarRegistroRP() {
   const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState(null);
   const [originalActEntries, setOriginalActEntries] = useState([]);
   const [moduloOrigemEdicao, setModuloOrigemEdicao] = useState(null);
+  const isSubmittingRef = useRef(false);
 
   // Fetch existing record when editing
   const { data: registroEdicao, isLoading: loadingRegistro } = useQuery({
@@ -346,6 +347,42 @@ export default function CadastrarRegistroRP() {
     }
   };
 
+  const espelharPunicaoEstruturada = async (registroIdOrigem, payload) => {
+    if (!payload?.militar_id) return;
+
+    const dataAplicacao = payload.data_punicao || payload.data_registro || new Date().toISOString().slice(0, 10);
+    const diasPunicao = Number(payload.dias_punicao || 0);
+    const tipoPunicao = payload.tipo_punicao || payload.tipo || 'Advertência';
+    const dadosPunicao = {
+      militar_id: payload.militar_id,
+      militar_nome: payload.militar_nome,
+      militar_posto: payload.militar_posto,
+      militar_matricula: payload.militar_matricula,
+      tipo: tipoPunicao,
+      tipo_punicao: tipoPunicao,
+      data_aplicacao: dataAplicacao,
+      data_punicao: dataAplicacao,
+      data_termino: payload.data_termino || dataAplicacao,
+      data_fim_cumprimento: payload.data_termino || dataAplicacao,
+      dias: diasPunicao,
+      dias_punicao: diasPunicao,
+      motivo: payload.itens_enquadramento || payload.observacoes || '',
+      documento_referencia: payload.portaria || '',
+      observacoes: payload.observacoes || '',
+      status: 'Ativa',
+      status_punicao: 'Ativa',
+      origem_publicacao_id: registroIdOrigem,
+    };
+
+    const punicoesVinculadas = await base44.entities.Punicao.filter({ origem_publicacao_id: registroIdOrigem });
+    if (punicoesVinculadas.length > 0) {
+      await base44.entities.Punicao.update(punicoesVinculadas[0].id, dadosPunicao);
+      return;
+    }
+
+    await base44.entities.Punicao.create(dadosPunicao);
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       const modulo = getModuloByTipo(data.tipo_registro, tiposCustom);
@@ -379,24 +416,9 @@ export default function CadastrarRegistroRP() {
       return base44.entities.PublicacaoExOfficio.create(payloadExOfficio);
     },
     onSuccess: async (resultado, payload) => {
-      const isNovaPunicao = !isEditing && payload?.tipo_registro === 'Punição';
-      if (isNovaPunicao) {
-        const dataFimCumprimento = payload.data_punicao || payload.data_registro;
-        const existeEntidadePunicaoRP = Boolean(base44?.entities?.PunicaoRP);
-
-        if (existeEntidadePunicaoRP) {
-          await base44.entities.PunicaoRP.create({
-            militar_id: payload.militar_id,
-            militar_nome: payload.militar_nome,
-            militar_posto: payload.militar_posto,
-            tipo: payload.tipo_punicao,
-            data_fim_cumprimento: dataFimCumprimento,
-            dias: Number(payload.dias_punicao || 0),
-            status: 'Ativa',
-            origem_publicacao_id: resultado?.id || null,
-          });
-        }
-
+      const isPunicao = payload?.tipo_registro === 'Punição';
+      if (isPunicao) {
+        await espelharPunicaoEstruturada(resultado?.id || registroId, payload);
         await processarComportamentoPosPunicao(payload.militar_id);
       }
 
@@ -404,13 +426,18 @@ export default function CadastrarRegistroRP() {
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['militares'] });
+      queryClient.invalidateQueries({ queryKey: ['punicoes'] });
       navigate(createPageUrl('RP'));
+    },
+    onSettled: () => {
+      isSubmittingRef.current = false;
     },
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (step !== 4) return;
+    if (isSubmittingRef.current || saveMutation.isPending) return;
 
     const moduloValidacao = getModuloByTipo(formData.tipo_registro, tiposCustom);
     const templateAtivoNoSubmit = getTemplateAtivoPorTipo(
@@ -430,6 +457,7 @@ export default function CadastrarRegistroRP() {
       ...formData,
       ...(Object.keys(camposCustom).length > 0 ? { campos_custom: camposCustom } : {}),
     };
+    isSubmittingRef.current = true;
     saveMutation.mutate(payload);
   };
 
