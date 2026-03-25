@@ -142,6 +142,8 @@ function temRegraArt53(punicoesNormalizadas, postoGraduacao) {
 }
 
 function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
+  const atingiuPatamarInsuficienteAnual = j1.prisao_equivalente > 0 && j1.prisao_equivalente <= 2;
+
   if (j1.prisao_equivalente > 2) {
     return {
       comportamento: 'Mau',
@@ -149,10 +151,10 @@ function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
     };
   }
 
-  if (j1.quantidade > 0 && j1.prisao_equivalente <= 2) {
+  if (atingiuPatamarInsuficienteAnual) {
     return {
       comportamento: 'Insuficiente',
-      fundamento: 'Art. 52, alínea d: até 2 prisões equivalentes no período de 1 ano.',
+      fundamento: 'Art. 52, alínea d: até 2 prisões equivalentes no período de 1 ano (com precedência material sobre a janela de 2 anos).',
     };
   }
 
@@ -163,10 +165,10 @@ function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
     };
   }
 
-  if (j2.quantidade > 0 && j2.prisao_equivalente <= 2) {
+  if (!atingiuPatamarInsuficienteAnual && j2.prisao_equivalente > 0 && j2.prisao_equivalente <= 2) {
     return {
       comportamento: 'Bom',
-      fundamento: 'Art. 52, alínea c: até 2 prisões equivalentes no período de 2 anos.',
+      fundamento: 'Art. 52, alínea c: até 2 prisões equivalentes no período de 2 anos, sem enquadramento em Insuficiente na janela de 1 ano.',
     };
   }
 
