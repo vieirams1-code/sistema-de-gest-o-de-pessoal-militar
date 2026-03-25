@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +74,7 @@ function ShortcutButton({ icon: Icon, label, to, navigate }) {
 
 export default function Home() {
   const navigate = useNavigate();
+  const punicaoEntity = getPunicaoEntity();
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
@@ -97,7 +99,7 @@ export default function Home() {
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['punicoes-ativas'],
-    queryFn: () => base44.entities.Punicao.list(),
+    queryFn: () => punicaoEntity.list(),
   });
 
   const { data: armamentos = [] } = useQuery({
@@ -138,7 +140,7 @@ export default function Home() {
   }).sort((a, b) => a.diasRestantes - b.diasRestantes);
 
   const atestadosAtivos = atestados.filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
-  const punicoesAtivas = punicoes.filter(p => p.status === 'Ativa' || p.status === 'Em Curso');
+  const punicoesAtivas = punicoes.filter(p => p.status_punicao === 'Ativa' || p.status_punicao === 'Em Curso');
   const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamento.length;
   const registrosRecentes = registrosLivro.slice(0, 5);
 

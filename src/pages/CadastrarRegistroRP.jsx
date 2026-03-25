@@ -29,7 +29,6 @@ import {
   getTemplateAtivoPorTipo,
   tipoExigeTemplate,
 } from '@/components/rp/templateValidation';
-import { calcularComportamento } from '@/utils/calcularComportamento';
 
 const STATUS_OPTIONS = ['Aguardando Nota', 'Aguardando Publicação', 'Publicado'];
 const TEMPLATE_CONFLITO_MENSAGEM =
@@ -319,69 +318,6 @@ export default function CadastrarRegistroRP() {
     setTipoSearch('');
   };
 
-  const processarComportamentoPosPunicao = async (militarId) => {
-    if (!militarId) return;
-
-    const [militar] = await base44.entities.Militar.filter({ id: militarId });
-    if (!militar) return;
-
-    const punicoes = await base44.entities.Punicao.filter({ militar_id: militarId });
-    const resultado = calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
-      dataInclusaoMilitar: militar.data_inclusao,
-    });
-    if (!resultado?.comportamento) return;
-
-    if (resultado.comportamento !== militar.comportamento) {
-      await base44.entities.Militar.update(militar.id, {
-        comportamento: resultado.comportamento,
-      });
-
-      await base44.entities.HistoricoComportamento.create({
-        militar_id: militar.id,
-        comportamento_anterior: militar.comportamento || 'Bom',
-        comportamento_novo: resultado.comportamento,
-        fundamento_legal: resultado.fundamento,
-        motivo: 'Nova punição registrada',
-        data_alteracao: new Date().toISOString().slice(0, 10),
-      });
-    }
-  };
-
-  const espelharPunicaoEstruturada = async (registroIdOrigem, payload) => {
-    if (!payload?.militar_id) return;
-
-    const dataAplicacao = payload.data_punicao || payload.data_registro || new Date().toISOString().slice(0, 10);
-    const diasPunicao = Number(payload.dias_punicao || 0);
-    const tipoPunicao = payload.tipo_punicao || payload.tipo || 'Advertência';
-    const dadosPunicao = {
-      militar_id: payload.militar_id,
-      militar_nome: payload.militar_nome,
-      militar_posto: payload.militar_posto,
-      militar_matricula: payload.militar_matricula,
-      tipo: tipoPunicao,
-      tipo_punicao: tipoPunicao,
-      data_aplicacao: dataAplicacao,
-      data_punicao: dataAplicacao,
-      data_termino: payload.data_termino || dataAplicacao,
-      data_fim_cumprimento: payload.data_termino || dataAplicacao,
-      dias: diasPunicao,
-      dias_punicao: diasPunicao,
-      motivo: payload.itens_enquadramento || payload.observacoes || '',
-      documento_referencia: payload.portaria || '',
-      observacoes: payload.observacoes || '',
-      status: 'Ativa',
-      status_punicao: 'Ativa',
-      origem_publicacao_id: registroIdOrigem,
-    };
-
-    const punicoesVinculadas = await base44.entities.Punicao.filter({ origem_publicacao_id: registroIdOrigem });
-    if (punicoesVinculadas.length > 0) {
-      await base44.entities.Punicao.update(punicoesVinculadas[0].id, dadosPunicao);
-      return;
-    }
-
-    await base44.entities.Punicao.create(dadosPunicao);
-  };
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
@@ -416,17 +352,11 @@ export default function CadastrarRegistroRP() {
       return base44.entities.PublicacaoExOfficio.create(payloadExOfficio);
     },
     onSuccess: async (resultado, payload) => {
-      const isPunicao = payload?.tipo_registro === 'Punição';
-      if (isPunicao) {
-        await espelharPunicaoEstruturada(resultado?.id || registroId, payload);
-        await processarComportamentoPosPunicao(payload.militar_id);
-      }
-
       queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['militares'] });
-      queryClient.invalidateQueries({ queryKey: ['punicoes'] });
+      queryClient.invalidateQueries({ queryKey: ['punicoes-disciplinares'] });
       navigate(createPageUrl('RP'));
     },
     onSettled: () => {

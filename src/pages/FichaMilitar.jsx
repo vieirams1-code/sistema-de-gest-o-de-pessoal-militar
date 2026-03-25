@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } from '@/components/ferias/feriasAdminUtils';
 import { reverterAtestadosPorExclusaoPublicacao } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
+import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 
 const TIPOS = [
@@ -250,7 +251,7 @@ export default function FichaMilitar() {
 
   const { data: punicoes = [], refetch: refetchPunicoes } = useQuery({
     queryKey: ['ficha-punicoes', militarId],
-    queryFn: () => base44.entities.Punicao.filter({ militar_id: militarId }),
+    queryFn: () => punicaoEntity.filter({ militar_id: militarId }),
     enabled: !!militarId && isAccessResolved && canViewMilitar
   });
 
@@ -297,15 +298,15 @@ export default function FichaMilitar() {
     const lista = [];
 
     punicoes.forEach(p => lista.push({
-      tipo: 'punicao', data: p.data_aplicacao, id: p.id, raw: p,
-      titulo: `${p.tipo}${p.motivo ? ` — ${p.motivo}` : ''}`,
-      resumo: p.motivo, subtipo: p.tipo,
+      tipo: 'punicao', data: p.data_inicio_cumprimento || p.data_aplicacao, id: p.id, raw: p,
+      titulo: `${p.tipo_punicao || p.tipo}${p.observacoes ? ` — ${p.observacoes}` : ''}`,
+      resumo: p.observacoes, subtipo: p.tipo_punicao || p.tipo,
       detalhes: [
-        { label: 'Tipo', valor: p.tipo },
-        { label: 'Data Aplicação', valor: formatDate(p.data_aplicacao) },
-        { label: 'Data Início', valor: formatDate(p.data_inicio) },
-        { label: 'Data Término', valor: formatDate(p.data_termino) },
-        { label: 'Documento', valor: p.documento_referencia },
+        { label: 'Tipo', valor: p.tipo_punicao || p.tipo },
+        { label: 'Data Início', valor: formatDate(p.data_inicio_cumprimento || p.data_inicio) },
+        { label: 'Data Término', valor: formatDate(p.data_fim_cumprimento || p.data_termino) },
+        { label: 'Dias', valor: p.dias_punicao || p.dias },
+        { label: 'Boletim', valor: p.boletim_numero },
         { label: 'Observações', valor: p.observacoes },
       ]
     }));
@@ -539,7 +540,7 @@ export default function FichaMilitar() {
       }
 
       if (event.tipo === 'punicao') {
-        await base44.entities.Punicao.delete(event.id);
+        await punicaoEntity.delete(event.id);
       } else if (event.tipo === 'atestado') {
         await excluirAtestadoComReflexoNoQuadro(event.raw || { id: event.id });
       } else if (event.tipo === 'livro') {
@@ -819,3 +820,4 @@ export default function FichaMilitar() {
     </div>
   );
 }
+  const punicaoEntity = getPunicaoEntity();
