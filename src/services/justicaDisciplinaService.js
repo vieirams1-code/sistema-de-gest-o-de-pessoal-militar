@@ -4,7 +4,11 @@ import { calcularComportamento } from '@/utils/calcularComportamento';
 const TIPOS_COM_DIAS_OBRIGATORIO = new Set(['Detenção', 'Prisão', 'Prisão em Separado']);
 
 export function getPunicaoEntity() {
-  return base44.entities.PunicaoDisciplinar || base44.entities.Punicao;
+  const entity = base44.entities.PunicaoDisciplinar;
+  if (!entity) {
+    throw new Error('Entidade PunicaoDisciplinar não encontrada. Verifique o schema do app.');
+  }
+  return entity;
 }
 
 export function validarPunicaoDisciplinar(payload) {

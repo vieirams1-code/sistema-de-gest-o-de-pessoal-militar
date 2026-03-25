@@ -57,7 +57,13 @@ export default function CadastrarPunicao() {
     card_operacional_id: ''
   });
 
-  const entity = getPunicaoEntity();
+  const [entityError, setEntityError] = useState(null);
+  let entity = null;
+  try {
+    entity = getPunicaoEntity();
+  } catch (err) {
+    if (!entityError) setEntityError(err.message);
+  }
 
   const { data: punicaoExistente, isLoading: loadingPunicao } = useQuery({
     queryKey: ['punicao-disciplinar', punicaoId],
@@ -65,7 +71,7 @@ export default function CadastrarPunicao() {
       const result = await entity.filter({ id: punicaoId });
       return result[0];
     },
-    enabled: !!punicaoId
+    enabled: !!punicaoId && !!entity
   });
 
   useEffect(() => {
@@ -136,6 +142,24 @@ export default function CadastrarPunicao() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMilitaresAccess) return <AccessDenied modulo="Justiça e Disciplina" />;
+
+  if (entityError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-8">
+        <div className="bg-white rounded-xl shadow-sm border border-red-200 p-8 max-w-md text-center">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-red-700 mb-2">Schema não encontrado</h2>
+          <p className="text-slate-600 text-sm mb-4">
+            A entidade <strong>PunicaoDisciplinar</strong> não está disponível no app.
+            Aguarde a publicação do schema e recarregue a página.
+          </p>
+          <Button onClick={() => window.location.reload()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+            Recarregar página
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loadingPunicao) {
     return (
