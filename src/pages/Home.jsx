@@ -120,6 +120,10 @@ export default function Home() {
       return [...exofficio, ...livro].filter(p => p.status !== 'Publicado' && (p.urgente || p.importante));
     },
   });
+  const { data: pendenciasComportamento = [] } = useQuery({
+    queryKey: ['dashboard-pendencias-comportamento'],
+    queryFn: () => base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' }),
+  });
 
   // Alertas de férias por nível
   const periodosAlerta = periodos.filter(p => {
@@ -135,7 +139,7 @@ export default function Home() {
 
   const atestadosAtivos = atestados.filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
   const punicoesAtivas = punicoes.filter(p => p.status === 'Ativa' || p.status === 'Em Curso');
-  const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length;
+  const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamento.length;
   const registrosRecentes = registrosLivro.slice(0, 5);
 
   return (
@@ -234,6 +238,32 @@ export default function Home() {
                       nivel={p.urgente ? 'critico' : 'aviso'}
                       titulo={`${p.militar_posto ? p.militar_posto + ' ' : ''}${p.militar_nome}`}
                       subtitulo={`${p.tipo || p.tipo_registro} — ${p.status}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pendências de comportamento */}
+            {pendenciasComportamento.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-indigo-500" />
+                    <h2 className="font-semibold text-slate-800">Pendências de Comportamento</h2>
+                    <Badge className="bg-indigo-100 text-indigo-700">{pendenciasComportamento.length}</Badge>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => navigate(createPageUrl('AvaliacaoComportamento'))}>
+                    Validar <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {pendenciasComportamento.slice(0, 10).map((p) => (
+                    <AlertItem
+                      key={p.id}
+                      nivel="atencao"
+                      titulo={p.militar_nome}
+                      subtitulo={`${p.comportamento_atual || 'Bom'} → ${p.comportamento_sugerido} (${p.data_detectada || 'sem data'})`}
                     />
                   ))}
                 </div>

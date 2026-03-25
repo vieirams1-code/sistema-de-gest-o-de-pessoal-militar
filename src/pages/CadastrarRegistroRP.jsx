@@ -325,7 +325,9 @@ export default function CadastrarRegistroRP() {
     if (!militar) return;
 
     const punicoes = await base44.entities.Punicao.filter({ militar_id: militarId });
-    const resultado = calcularComportamento(punicoes, militar.posto_graduacao);
+    const resultado = calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
+      dataInclusaoMilitar: militar.data_inclusao,
+    });
     if (!resultado?.comportamento) return;
 
     if (resultado.comportamento !== militar.comportamento) {

@@ -97,7 +97,9 @@ export default function CadastrarPunicao() {
         const punicoesMilitar = await base44.entities.Punicao.filter({ militar_id: formData.militar_id });
         
         // Calcular novo comportamento
-        const resultado = calcularComportamento(punicoesMilitar, militar.posto_graduacao);
+        const resultado = calcularComportamento(punicoesMilitar, militar.posto_graduacao, new Date(), {
+          dataInclusaoMilitar: militar.data_inclusao,
+        });
 
         if (resultado?.comportamento && resultado.comportamento !== militar.comportamento) {
           // Atualizar comportamento do militar
