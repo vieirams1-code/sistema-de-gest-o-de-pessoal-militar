@@ -385,15 +385,15 @@ export default function FichaMilitar() {
       ]
     }));
 
-    historico.filter(h => h.motivo !== 'Manual').forEach(h => lista.push({
-      tipo: 'comportamento', data: h.data_alteracao, id: h.id, raw: h,
-      titulo: `Comportamento: ${h.comportamento_anterior || 'N/D'} → ${h.comportamento_novo}`,
-      resumo: `Motivo: ${h.motivo}`, subtipo: h.motivo,
+    historico.forEach(h => lista.push({
+      tipo: 'comportamento', data: h.data_vigencia || h.data_alteracao, id: h.id, raw: h,
+      titulo: `Comportamento: ${h.comportamento_anterior || 'N/D'} → ${h.comportamento || 'N/D'}`,
+      resumo: `Motivo: ${h.motivo_mudanca || 'Marco disciplinar'}`, subtipo: h.motivo_mudanca || 'Marco disciplinar',
       detalhes: [
         { label: 'Anterior', valor: h.comportamento_anterior },
-        { label: 'Novo', valor: h.comportamento_novo },
-        { label: 'Motivo', valor: h.motivo },
-        { label: 'Data', valor: formatDate(h.data_alteracao) },
+        { label: 'Novo', valor: h.comportamento },
+        { label: 'Motivo', valor: h.motivo_mudanca },
+        { label: 'Data', valor: formatDate(h.data_vigencia || h.data_alteracao) },
         { label: 'Observações', valor: h.observacoes },
       ]
     }));

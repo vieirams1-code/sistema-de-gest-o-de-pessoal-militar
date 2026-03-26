@@ -18,7 +18,7 @@ import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { registrarEventoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import { garantirImplantacaoHistoricoComportamento, registrarEventoHistoricoComportamento } from '@/services/justicaDisciplinaService';
 
 const initialFormData = {
   nome_completo: '',
@@ -176,25 +176,29 @@ export default function CadastrarMilitar() {
     }
 
     if (!editId && militarId) {
-      await registrarEventoHistoricoComportamento({
+      await garantirImplantacaoHistoricoComportamento({
         militarId,
-        tipoEvento: 'Implantação',
-        comportamentoAnterior: '',
-        comportamentoNovo: formData.comportamento || 'Bom',
+        comportamentoAtual: formData.comportamento || 'Bom',
         origemTipo: 'Militar',
         origemId: militarId,
-        observacoes: 'Implantação inicial do comportamento no cadastro do militar.',
         createdBy: user?.email || '',
       });
     } else if (editId && formData.comportamento !== comportamentoOriginal && militarId) {
-      await registrarEventoHistoricoComportamento({
+      await garantirImplantacaoHistoricoComportamento({
         militarId,
-        tipoEvento: 'Revisão',
-        comportamentoAnterior: comportamentoOriginal || 'Bom',
-        comportamentoNovo: formData.comportamento || 'Bom',
+        comportamentoAtual: comportamentoOriginal || 'Bom',
         origemTipo: 'Militar',
         origemId: militarId,
-        observacoes: motivoComportamento || 'Revisão manual de comportamento no cadastro do militar.',
+        createdBy: user?.email || '',
+      });
+      await registrarEventoHistoricoComportamento({
+        militarId,
+        comportamentoAnterior: comportamentoOriginal || 'Bom',
+        comportamento: formData.comportamento || 'Bom',
+        motivoMudanca: motivoComportamento || 'Revisão manual de comportamento no cadastro do militar.',
+        origemTipo: 'Militar',
+        origemId: militarId,
+        observacoes: motivoComportamento || '',
         createdBy: user?.email || '',
       });
     }

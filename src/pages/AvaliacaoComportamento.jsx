@@ -7,7 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
-import { getPunicaoEntity, registrarEventoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import { garantirImplantacaoHistoricoComportamento, getPunicaoEntity, registrarEventoHistoricoComportamento } from '@/services/justicaDisciplinaService';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
@@ -60,11 +60,18 @@ export default function AvaliacaoComportamento() {
       comportamento: linha.calculado.comportamento,
     });
 
+    await garantirImplantacaoHistoricoComportamento({
+      militarId: linha.militar.id,
+      comportamentoAtual: linha.militar.comportamento || 'Bom',
+      origemTipo: 'Militar',
+      origemId: linha.militar.id,
+    });
+
     await registrarEventoHistoricoComportamento({
       militarId: linha.militar.id,
-      tipoEvento: 'Mudança',
       comportamentoAnterior: linha.militar.comportamento || 'Bom',
-      comportamentoNovo: linha.calculado.comportamento,
+      comportamento: linha.calculado.comportamento,
+      motivoMudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
       fundamentoLegal: linha.calculado.fundamento,
       origemTipo: 'PendenciaComportamento',
       origemId: linha.pendenciaExistente?.id || '',

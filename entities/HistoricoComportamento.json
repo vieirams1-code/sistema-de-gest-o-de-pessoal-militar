@@ -5,14 +5,10 @@
   "description": "Linha do tempo disciplinar do militar no módulo Justiça e Disciplina.",
   "properties": {
     "militar_id": { "type": "string", "default": "" },
-    "data_evento": { "type": "date", "default": "" },
-    "tipo_evento": {
-      "type": "string",
-      "enum": ["Implantação", "Punição", "Recalculo", "Mudança", "Revisão"],
-      "default": "Implantação"
-    },
+    "data_vigencia": { "type": "date", "default": "" },
+    "comportamento": { "type": "string", "default": "Bom" },
     "comportamento_anterior": { "type": "string", "default": "" },
-    "comportamento_novo": { "type": "string", "default": "" },
+    "motivo_mudanca": { "type": "string", "default": "" },
     "fundamento_legal": { "type": "string", "default": "" },
     "origem_tipo": { "type": "string", "default": "" },
     "origem_id": { "type": "string", "default": "" },
