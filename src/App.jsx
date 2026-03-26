@@ -12,9 +12,8 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 
-const { Pages, Layout, mainPage } = pagesConfig;
-const mainPageKey = mainPage ?? Object.keys(Pages)[0];
-const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
+const { Pages, Layout } = pagesConfig;
+const homeRoute = '/VerMilitar';
 
 const adminOnlyPages = new Set([
   // Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação
@@ -93,9 +92,7 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route path="/" element={
-        <LayoutWrapper currentPageName={mainPageKey}>
-          <MainPage />
-        </LayoutWrapper>
+        <Navigate to={homeRoute} replace />
       } />
       {Object.entries(Pages).map(([path, Page]) => {
         let pageContent = <Page />;
