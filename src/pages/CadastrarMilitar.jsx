@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, History, GitBranch } from 'lucide-react';
+import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, GitBranch } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 
 import FormSection from '@/components/militar/FormSection';
@@ -13,7 +13,6 @@ import PhotoUpload from '@/components/militar/PhotoUpload';
 import TagInput from '@/components/militar/TagInput';
 import LotacaoSelector from '@/components/militar/LotacaoSelector';
 import FuncaoSelector from '@/components/militar/FuncaoSelector';
-import HistoricoComportamentoModal from '@/components/militar/HistoricoComportamentoModal';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -112,7 +111,6 @@ export default function CadastrarMilitar() {
   const [formData, setFormData] = useState(initialFormData);
 
   const [loading, setLoading] = useState(false);
-  const [historicoOpen, setHistoricoOpen] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
 
   const { data: subgrupamentosAll = [] } = useQuery({
@@ -454,18 +452,6 @@ export default function CadastrarMilitar() {
                       options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
                     />
                   </div>
-                  {editId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setHistoricoOpen(true)}
-                      className="flex-shrink-0 self-end h-10 w-10"
-                      title="Ver histórico de comportamento"
-                    >
-                      <History className="w-4 h-4" />
-                    </Button>
-                  )}
                 </div>
               )}
               {!isOficial(formData.posto_graduacao) && formData.comportamento !== comportamentoOriginal && comportamentoOriginal !== null && (
@@ -815,13 +801,6 @@ export default function CadastrarMilitar() {
               />
             </div>
           </FormSection>
-
-          {/* Histórico de Comportamento */}
-          <HistoricoComportamentoModal
-            militarId={editId}
-            open={historicoOpen}
-            onClose={() => setHistoricoOpen(false)}
-          />
 
           {/* Submit Button Mobile */}
           <div className="md:hidden">
