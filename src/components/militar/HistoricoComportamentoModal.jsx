@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
@@ -17,7 +17,7 @@ const comportamentoColors = {
 export default function HistoricoComportamentoModal({ militarId, open, onClose }) {
   const { data: historico = [], isLoading } = useQuery({
     queryKey: ['historico-comportamento', militarId],
-    queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: militarId }, 'data_vigencia'),
+    queryFn: () => obterHistoricoComportamentoMilitar(militarId, { ordem: 'asc' }),
     enabled: !!militarId && open
   });
 
