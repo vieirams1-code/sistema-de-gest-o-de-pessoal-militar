@@ -23,6 +23,7 @@ import { reverterAtestadosPorExclusaoPublicacao } from '@/components/atestado/at
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
+import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 
 const TIPOS = [
   { value: 'todos', label: 'Todos os Registros' },
@@ -631,6 +632,13 @@ export default function FichaMilitar() {
             {avaliacaoComportamento?.fundamento && (
               <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
             )}
+          </div>
+        )}
+
+        {militar && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Tela do Tempo do Comportamento</h3>
+            <ComportamentoTimeline eventos={historico} />
           </div>
         )}
 
