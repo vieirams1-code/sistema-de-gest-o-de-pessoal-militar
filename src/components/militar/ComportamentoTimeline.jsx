@@ -20,18 +20,46 @@ function formatarData(data) {
   }
 }
 
+function normalizarDataVigencia(data) {
+  if (!data) return '';
+  const texto = String(data);
+  return texto.length >= 10 ? texto.slice(0, 10) : texto;
+}
+
+function ehDataValida(data) {
+  const normalizada = normalizarDataVigencia(data);
+  if (!normalizada) return false;
+  const parsed = new Date(`${normalizada}T00:00:00`);
+  return !Number.isNaN(parsed.getTime());
+}
+
+function ehComportamentoValido(comportamento) {
+  if (!comportamento) return false;
+  return String(comportamento).trim().toUpperCase() !== 'N/D';
+}
+
+function limparEventos(eventos = []) {
+  const ordenados = [...eventos]
+    .filter((evento) => ehDataValida(evento?.data_vigencia))
+    .filter((evento) => ehComportamentoValido(evento?.comportamento))
+    .sort((a, b) => new Date(`${normalizarDataVigencia(a.data_vigencia)}T00:00:00`) - new Date(`${normalizarDataVigencia(b.data_vigencia)}T00:00:00`));
+
+  const marcosReais = [];
+  for (const evento of ordenados) {
+    const ultimo = marcosReais[marcosReais.length - 1];
+    if (ultimo?.comportamento === evento.comportamento) continue;
+    marcosReais.push(evento);
+  }
+
+  return marcosReais;
+}
+
 export default function ComportamentoTimeline({ eventos = [] }) {
-  if (!eventos.length) {
+  const eventosOrdenados = limparEventos(eventos);
+
+  if (!eventosOrdenados.length) {
     return <p className="text-sm text-slate-500">Nenhum marco de comportamento registrado.</p>;
   }
-  const eventosOrdenados = [...eventos].sort((a, b) => {
-    const dataA = a.data_vigencia;
-    const dataB = b.data_vigencia;
-    if (!dataA && !dataB) return 0;
-    if (!dataA) return 1;
-    if (!dataB) return -1;
-    return new Date(dataA) - new Date(dataB);
-  });
 
   return (
     <div className="space-y-3">

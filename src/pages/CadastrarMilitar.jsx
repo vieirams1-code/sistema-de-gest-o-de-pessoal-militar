@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -191,6 +191,7 @@ export default function CadastrarMilitar() {
       });
       await registrarMarcoHistoricoComportamento({
         militarId,
+        dataVigencia: new Date().toISOString().slice(0, 10),
         comportamentoAnterior: comportamentoOriginal || 'Bom',
         comportamento: formData.comportamento || 'Bom',
         motivoMudanca: motivoComportamento || 'Revisão manual de comportamento no cadastro do militar.',

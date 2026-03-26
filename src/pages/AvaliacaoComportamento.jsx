@@ -69,6 +69,7 @@ export default function AvaliacaoComportamento() {
 
     await registrarMarcoHistoricoComportamento({
       militarId: linha.militar.id,
+      dataVigencia: new Date().toISOString().slice(0, 10),
       comportamentoAnterior: linha.militar.comportamento || 'Bom',
       comportamento: linha.calculado.comportamento,
       motivoMudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
