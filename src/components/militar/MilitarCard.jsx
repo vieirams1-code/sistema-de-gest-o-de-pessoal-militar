@@ -91,11 +91,11 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
                   <Eye className="w-4 h-4 mr-2" />
                   Visualizar
                  </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => navigate(createPageUrl('FichaMilitar') + `?id=${militar.id}`)}>
+                 <DropdownMenuItem onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}&tab=comportamento`)}>
                   <ClipboardList className="w-4 h-4 mr-2" />
-                  Ficha Militar
+                  Comportamento Militar
                  </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => navigate(createPageUrl('FichaMilitar') + `?id=${militar.id}&filtro=elogios_punicoes`)}>
+                 <DropdownMenuItem onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}&tab=comportamento`)}>
                   <FileText className="w-4 h-4 mr-2" />
                   Extrato de Elogios e Punições
                  </DropdownMenuItem>
