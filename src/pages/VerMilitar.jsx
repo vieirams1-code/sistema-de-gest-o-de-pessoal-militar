@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Pencil, User, Briefcase, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send
+  Shield, Award, Send, Activity, AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
@@ -18,6 +18,7 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
@@ -101,6 +102,32 @@ export default function VerMilitar() {
     queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: id }, 'data_vigencia'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
+
+  const { data: punicoes = [] } = useQuery({
+    queryKey: ['ver-punicoes-comportamento', id],
+    queryFn: () => base44.entities.PunicaoDisciplinar.filter({ militar_id: id }, '-data_inicio_cumprimento'),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+
+  const { data: pendenciasComportamento = [] } = useQuery({
+    queryKey: ['ver-pendencias-comportamento', id],
+    queryFn: () => base44.entities.PendenciaComportamento.filter({ militar_id: id, status_pendencia: 'Pendente' }),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+
+  const avaliacaoComportamento = React.useMemo(() => {
+    if (!militar) return null;
+    return calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
+      dataInclusaoMilitar: militar.data_inclusao,
+    });
+  }, [militar, punicoes]);
+
+  const proximaMelhoria = React.useMemo(() => {
+    if (!militar) return null;
+    return calcularProximaMelhoria(punicoes, militar.posto_graduacao, new Date(), {
+      dataInclusaoMilitar: militar.data_inclusao,
+    });
+  }, [militar, punicoes]);
 
 
   if (loadingUser || isLoading) {
@@ -218,15 +245,12 @@ export default function VerMilitar() {
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
             <TabsTrigger value="medalhas"><Award className="w-4 h-4 mr-1" />Medalhas</TabsTrigger>
             <TabsTrigger value="armamentos"><Shield className="w-4 h-4 mr-1" />Armamentos</TabsTrigger>
+            <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
           </TabsList>
 
           {/* Dados Pessoais */}
           <TabsContent value="dados">
             <div className="space-y-6">
-              <Section title="Linha do Tempo do Comportamento">
-                <ComportamentoTimeline eventos={historicoComportamento} />
-              </Section>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Section title="Dados Funcionais" icon={Briefcase}>
                   <div className="grid grid-cols-2 gap-x-4">
@@ -300,6 +324,71 @@ export default function VerMilitar() {
                 </Section>
               )}
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="comportamento">
+            <div className="space-y-6">
+              <Section title="Situação Atual do Comportamento" icon={Activity}>
+                <div className="grid md:grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-slate-500">Atual</p>
+                    <p className="font-semibold">{militar.comportamento || 'Bom'}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-slate-500">Calculado</p>
+                    <p className="font-semibold">{avaliacaoComportamento?.comportamento || '—'}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-slate-500">Próxima melhoria</p>
+                    <p className="font-semibold">{proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—'}</p>
+                  </div>
+                </div>
+                {avaliacaoComportamento?.fundamento && (
+                  <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
+                )}
+              </Section>
+
+              <Section title="Pendências de Comportamento" icon={AlertTriangle}>
+                {pendenciasComportamento.length === 0 ? (
+                  <p className="text-sm text-slate-500">Sem pendências de comportamento no momento.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {pendenciasComportamento.map((pendencia) => (
+                      <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-sm font-semibold text-amber-900">
+                          {pendencia.comportamento_atual || 'N/D'} → {pendencia.comportamento_calculado || 'N/D'}
+                        </p>
+                        <p className="text-xs text-amber-800 mt-1">
+                          Última punição: {formatDate(pendencia.data_ultima_punicao) || 'Não informada'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              <Section title="Linha do Tempo / Histórico">
+                <ComportamentoTimeline eventos={historicoComportamento} />
+              </Section>
+
+              <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
+                {punicoes.length === 0 ? (
+                  <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {punicoes.slice(0, 5).map((punicao) => (
+                      <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
+                        <p className="text-sm font-medium text-slate-800">{punicao.tipo_punicao || punicao.tipo || 'Punição'}</p>
+                        <p className="text-xs text-slate-500">
+                          Início: {formatDate(punicao.data_inicio_cumprimento || punicao.data_inicio)} ·
+                          Término: {formatDate(punicao.data_fim_cumprimento || punicao.data_termino)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
             </div>
           </TabsContent>
 
