@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -22,6 +23,8 @@ import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } fr
 import { reverterAtestadosPorExclusaoPublicacao } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
+import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
+import { calcularComportamento } from '@/utils/calcularComportamento';
 
 const TIPOS = [
   { value: 'todos', label: 'Todos os Registros' },
@@ -32,7 +35,6 @@ const TIPOS = [
   { value: 'livro', label: 'Registros do Livro' },
   { value: 'publicacao', label: 'Publicações Ex Officio' },
   { value: 'medalha', label: 'Medalhas' },
-  { value: 'comportamento', label: 'Histórico de Comportamento' },
 ];
 
 const tipoConfig = {
@@ -42,7 +44,6 @@ const tipoConfig = {
   livro: { label: 'Registro do Livro', color: 'bg-purple-100 text-purple-700', icon: BookOpen },
   publicacao: { label: 'Publicação Ex Officio', color: 'bg-amber-100 text-amber-700', icon: ClipboardList },
   medalha: { label: 'Medalha', color: 'bg-yellow-100 text-yellow-700', icon: Award },
-  comportamento: { label: 'Comportamento', color: 'bg-slate-100 text-slate-700', icon: Activity },
 };
 
 function getTipoDisplay(tipo) {
@@ -230,6 +231,7 @@ export default function FichaMilitar() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
+  const [activeTab, setActiveTab] = useState('alteracoes');
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteDeps, setDeleteDeps] = useState(null);
@@ -283,6 +285,19 @@ export default function FichaMilitar() {
     queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: militarId }),
     enabled: !!militarId && isAccessResolved && canViewMilitar
   });
+  const { data: pendenciasComportamento = [] } = useQuery({
+    queryKey: ['ficha-pendencias-comportamento', militarId],
+    queryFn: () => base44.entities.PendenciaComportamento.filter({ militar_id: militarId, status_pendencia: 'Pendente' }),
+    enabled: !!militarId && isAccessResolved && canViewMilitar
+  });
+
+  const avaliacaoComportamento = useMemo(() => {
+    if (!militar) return null;
+    return calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
+      dataInclusaoMilitar: militar.data_inclusao,
+      comportamentoAtual: militar.comportamento,
+    });
+  }, [punicoes, militar]);
 
   const refetchAll = () => {
     refetchPunicoes();
@@ -384,26 +399,13 @@ export default function FichaMilitar() {
       ]
     }));
 
-    historico.forEach(h => lista.push({
-      tipo: 'comportamento', data: h.data_vigencia || h.data_alteracao, id: h.id, raw: h,
-      titulo: `Comportamento: ${h.comportamento_anterior || 'N/D'} → ${h.comportamento || 'N/D'}`,
-      resumo: `Motivo: ${h.motivo_mudanca || 'Marco disciplinar'}`, subtipo: h.motivo_mudanca || 'Marco disciplinar',
-      detalhes: [
-        { label: 'Anterior', valor: h.comportamento_anterior },
-        { label: 'Novo', valor: h.comportamento },
-        { label: 'Motivo', valor: h.motivo_mudanca },
-        { label: 'Data', valor: formatDate(h.data_vigencia || h.data_alteracao) },
-        { label: 'Observações', valor: h.observacoes },
-      ]
-    }));
-
     return lista.sort((a, b) => {
       if (!a.data && !b.data) return 0;
       if (!a.data) return 1;
       if (!b.data) return -1;
       return new Date(b.data) - new Date(a.data);
     });
-  }, [punicoes, atestados, registrosLivro, publicacoes, medalhas, historico]);
+  }, [punicoes, atestados, registrosLivro, publicacoes, medalhas]);
 
   const ELOGIOS_PUNICOES_TIPOS_PUB = ['Elogio Individual', 'Melhoria de Comportamento', 'Punição', 'Geral'];
 
@@ -535,8 +537,6 @@ export default function FichaMilitar() {
         await base44.entities.PublicacaoExOfficio.delete(event.id);
       } else if (event.tipo === 'medalha') {
         await base44.entities.Medalha.delete(event.id);
-      } else if (event.tipo === 'comportamento') {
-        await base44.entities.HistoricoComportamento.delete(event.id);
       }
 
       refetchAll();
@@ -596,6 +596,13 @@ export default function FichaMilitar() {
           )}
         </div>
 
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="w-full justify-start mb-6 h-auto flex-wrap">
+            <TabsTrigger value="alteracoes">Alterações Cadastrais</TabsTrigger>
+            <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="alteracoes" className="space-y-0">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6 space-y-3">
           <div className="flex items-center gap-2 text-slate-600 font-medium text-sm">
             <Filter className="w-4 h-4" />
@@ -720,6 +727,45 @@ export default function FichaMilitar() {
             ))}
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="comportamento" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <p className="text-xs text-slate-500 mb-1">Comportamento atual</p>
+                <p className="text-lg font-semibold text-slate-900">{avaliacaoComportamento?.comportamento || militar?.comportamento || '—'}</p>
+                {avaliacaoComportamento?.fundamento && (
+                  <p className="text-xs text-slate-600 mt-2">{avaliacaoComportamento.fundamento}</p>
+                )}
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 p-4 lg:col-span-2">
+                <p className="text-xs text-slate-500 mb-2">Pendências de comportamento</p>
+                {pendenciasComportamento.length === 0 ? (
+                  <p className="text-sm text-slate-500">Sem pendências no momento.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {pendenciasComportamento.map((pendencia) => (
+                      <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-sm font-medium text-amber-800">{pendencia.comportamento_anterior || '—'} → {pendencia.comportamento_sugerido || '—'}</p>
+                        <p className="text-xs text-amber-700 mt-1">{pendencia.motivo || 'Aguardando análise disciplinar.'}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <h3 className="font-semibold text-slate-800 mb-3">Linha do tempo / histórico de comportamento</h3>
+              <ComportamentoTimeline eventos={historico} />
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <h3 className="font-semibold text-slate-800 mb-2">Informações disciplinares relacionadas</h3>
+              <p className="text-sm text-slate-600">Punições vinculadas ao militar: <span className="font-semibold text-slate-800">{punicoes.length}</span></p>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
