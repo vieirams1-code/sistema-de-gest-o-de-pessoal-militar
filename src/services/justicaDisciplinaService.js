@@ -78,18 +78,26 @@ export async function garantirImplantacaoHistoricoComportamento({
   if (!hasEntityMethod(historicoEntity, 'filter') || !hasEntityMethod(historicoEntity, 'create')) return null;
 
   const existentes = await historicoEntity.filter({ militar_id: militarIdNormalizado }, 'data_vigencia');
-  if (existentes.length > 0) {
+  const historicoExistenteSanitizado = sanitizarHistoricoComportamento(existentes, { ordem: 'asc' });
+
+  if (historicoExistenteSanitizado.length > 0) {
     console.info('[HIST] duplicidade evitada', {
       militar_id: militarIdNormalizado,
       motivo: 'implantacao_ja_existente',
     });
-    return existentes[0];
+    return historicoExistenteSanitizado[0];
   }
+
+  const dataVigenciaInicial = normalizarDataVigencia(dataVigencia || militarPayload?.data_inclusao || new Date().toISOString().slice(0, 10));
+  const comportamentoInicial = militarPayload?.comportamento || comportamentoAtual;
+
+  if (!ehDataVigenciaValida(dataVigenciaInicial)) return null;
+  if (!ehComportamentoValido(comportamentoInicial)) return null;
 
   const marcoImplantacao = await historicoEntity.create({
     militar_id: militarIdNormalizado,
-    data_vigencia: dataVigencia || militarPayload?.data_inclusao || new Date().toISOString().slice(0, 10),
-    comportamento: militarPayload?.comportamento || comportamentoAtual || 'Bom',
+    data_vigencia: dataVigenciaInicial,
+    comportamento: comportamentoInicial,
     comportamento_anterior: '',
     motivo_mudanca: 'Implantação do sistema',
     fundamento_legal: 'Registro inicial do comportamento no momento da implantação',
@@ -168,7 +176,10 @@ export async function registrarMarcoHistoricoComportamento({
   const historicoEntity = getEntitySafe('HistoricoComportamento');
   if (!hasEntityMethod(historicoEntity, 'create') || !hasEntityMethod(historicoEntity, 'filter')) return null;
 
-  const [ultimoMarco] = await historicoEntity.filter({ militar_id: militarId }, '-data_vigencia', 1);
+  const registrosExistentes = await historicoEntity.filter({ militar_id: militarId }, 'data_vigencia');
+  const historicoSanitizado = sanitizarHistoricoComportamento(registrosExistentes, { ordem: 'desc' });
+  const ultimoMarco = historicoSanitizado[0];
+
   const dataVigenciaNormalizada = normalizarDataVigencia(dataVigencia);
   const ultimaDataNormalizada = normalizarDataVigencia(ultimoMarco?.data_vigencia);
   const ultimoComportamento = ultimoMarco?.comportamento;
