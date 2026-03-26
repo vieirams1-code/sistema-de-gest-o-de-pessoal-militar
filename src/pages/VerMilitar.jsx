@@ -106,7 +106,11 @@ export default function VerMilitar() {
 
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
-    queryFn: () => obterHistoricoComportamentoMilitar(id),
+    queryFn: async () => {
+      const historico = await obterHistoricoComportamentoMilitar(id);
+      console.log('[HIST] resultado query:', historico);
+      return historico;
+    },
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
