@@ -218,13 +218,11 @@ export async function criarCardPunicaoNoQuadro(punicao) {
       nome: 'PUNIÇÕES',
       cor: '#dc2626',
       ordem: (colunas.at(-1)?.ordem || colunas.length) + 1,
-      fixa: true,
       ativa: true,
-      origem_coluna: 'automacao',
     });
   }
 
-  const cards = await cardEntity.filter({ coluna_id: colunaPunicoes.id, arquivado: false }, '-created_date', 500);
+  const cards = await cardEntity.filter({ coluna_id: colunaPunicoes.id, status: 'Ativo' }, '-created_date', 500);
   const ordem = cards.length + 1;
   const titulo = `Punição - ${punicao.posto_graduacao || ''} ${punicao.militar_nome || ''}`.trim();
 
@@ -232,9 +230,9 @@ export async function criarCardPunicaoNoQuadro(punicao) {
     coluna_id: colunaPunicoes.id,
     ordem,
     titulo,
-    tipo: 'Punição',
-    origem_tipo: 'Punição',
-    referencia_externa_id: punicao.id,
+    origem_tipo: 'Manual',
+    origem_modulo: 'Militar',
+    origem_registro_id: punicao.id,
     militar_nome_snapshot: punicao.militar_nome || '',
     descricao: [
       `Tipo: ${punicao.tipo_punicao || '-'}`,
@@ -247,6 +245,8 @@ export async function criarCardPunicaoNoQuadro(punicao) {
     arquivado: false,
     criado_automaticamente: true,
     protocolo: `PUNICAO:${punicao.id}`,
+    etiqueta_cor: '#dc2626',
+    etiqueta_texto: 'Punição',
   });
   console.info('[JD] card criado', { card_id: card?.id, punicao_id: punicao?.id });
 
