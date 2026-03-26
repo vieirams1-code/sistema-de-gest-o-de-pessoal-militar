@@ -63,32 +63,58 @@ export async function diagnosticarFluxoPunicaoRuntime() {
 export async function garantirImplantacaoHistoricoComportamento({
   militarId,
   comportamentoAtual,
+  dataVigencia,
   origemTipo = 'Militar',
   origemId = '',
   createdBy = '',
 }) {
-  if (!militarId) return null;
+  const militarPayload = (militarId && typeof militarId === 'object')
+    ? militarId
+    : { id: militarId, comportamento: comportamentoAtual };
+  const militarIdNormalizado = militarPayload?.id;
+  if (!militarIdNormalizado) return null;
+
   const historicoEntity = getEntitySafe('HistoricoComportamento');
   if (!hasEntityMethod(historicoEntity, 'filter') || !hasEntityMethod(historicoEntity, 'create')) return null;
 
-  const existentes = await historicoEntity.filter({ militar_id: militarId }, 'data_vigencia');
-  if (existentes.length > 0) return existentes[0];
+  const existentes = await historicoEntity.filter({ militar_id: militarIdNormalizado }, 'data_vigencia');
+  if (existentes.length > 0) {
+    console.info('[HIST] duplicidade evitada', {
+      militar_id: militarIdNormalizado,
+      motivo: 'implantacao_ja_existente',
+    });
+    return existentes[0];
+  }
 
-  return historicoEntity.create({
-    militar_id: militarId,
-    data_vigencia: new Date().toISOString().slice(0, 10),
-    comportamento: comportamentoAtual || 'Bom',
+  const marcoImplantacao = await historicoEntity.create({
+    militar_id: militarIdNormalizado,
+    data_vigencia: dataVigencia || militarPayload?.data_inclusao || new Date().toISOString().slice(0, 10),
+    comportamento: militarPayload?.comportamento || comportamentoAtual || 'Bom',
     comportamento_anterior: '',
-    motivo_mudanca: 'Implantação inicial do comportamento homologado.',
-    fundamento_legal: '',
-    origem_tipo: origemTipo,
-    origem_id: origemId,
+    motivo_mudanca: 'Implantação do sistema',
+    fundamento_legal: 'Registro inicial do comportamento no momento da implantação',
+    origem_tipo: origemTipo || 'Implantacao',
+    origem_id: origemId || militarIdNormalizado,
     observacoes: 'Registro inicial criado automaticamente para a linha do tempo disciplinar.',
     created_by: createdBy || '',
   });
+
+  console.info('[HIST] implantação criada', {
+    militar_id: militarIdNormalizado,
+    historico_id: marcoImplantacao?.id,
+    comportamento: marcoImplantacao?.comportamento,
+  });
+
+  return marcoImplantacao;
 }
 
-export async function registrarEventoHistoricoComportamento({
+function normalizarDataVigencia(data) {
+  if (!data) return '';
+  const texto = String(data);
+  return texto.length >= 10 ? texto.slice(0, 10) : texto;
+}
+
+export async function registrarMarcoHistoricoComportamento({
   militarId,
   dataVigencia,
   comportamentoAnterior,
@@ -101,22 +127,146 @@ export async function registrarEventoHistoricoComportamento({
   createdBy,
 }) {
   if (!militarId || !comportamento) return null;
-  if (comportamentoAnterior && comportamentoAnterior === comportamento) return null;
+  if (comportamentoAnterior && comportamentoAnterior === comportamento) {
+    console.info('[HIST] sem mudança de comportamento', { militar_id: militarId, comportamento });
+    return null;
+  }
 
   const historicoEntity = getEntitySafe('HistoricoComportamento');
-  if (!hasEntityMethod(historicoEntity, 'create')) return null;
+  if (!hasEntityMethod(historicoEntity, 'create') || !hasEntityMethod(historicoEntity, 'filter')) return null;
 
-  return historicoEntity.create({
-    militar_id: militarId,
-    data_vigencia: dataVigencia || new Date().toISOString().slice(0, 10),
+  const [ultimoMarco] = await historicoEntity.filter({ militar_id: militarId }, '-data_vigencia', 1);
+  const dataVigenciaNormalizada = normalizarDataVigencia(dataVigencia || new Date().toISOString().slice(0, 10));
+  const ultimaDataNormalizada = normalizarDataVigencia(ultimoMarco?.data_vigencia);
+  const ultimoComportamento = ultimoMarco?.comportamento;
+
+  if (ultimoComportamento === comportamento && ultimaDataNormalizada === dataVigenciaNormalizada) {
+    console.info('[HIST] duplicidade evitada', {
+      militar_id: militarId,
+      motivo: 'mesma_data_e_mesmo_comportamento',
+      data_vigencia: dataVigenciaNormalizada,
+      comportamento,
+    });
+    return null;
+  }
+
+  if (ultimoComportamento === comportamento) {
+    console.info('[HIST] duplicidade evitada', {
+      militar_id: militarId,
+      motivo: 'mesmo_comportamento_do_ultimo_marco',
+      comportamento,
+    });
+    return null;
+  }
+
+  const comportamentoAnteriorFinal = comportamentoAnterior || ultimoComportamento || '';
+
+  if (comportamentoAnteriorFinal === comportamento) {
+    console.info('[HIST] sem mudança de comportamento', { militar_id: militarId, comportamento });
+    return null;
+  }
+
+  try {
+    const marco = await historicoEntity.create({
+      militar_id: militarId,
+      data_vigencia: dataVigenciaNormalizada,
+      comportamento,
+      comportamento_anterior: comportamentoAnteriorFinal,
+      motivo_mudanca: motivoMudanca || '',
+      fundamento_legal: fundamentoLegal || '',
+      origem_tipo: origemTipo || '',
+      origem_id: origemId || '',
+      observacoes: observacoes || '',
+      created_by: createdBy || '',
+    });
+
+    console.info('[HIST] marco criado', {
+      militar_id: militarId,
+      historico_id: marco?.id,
+      data_vigencia: dataVigenciaNormalizada,
+      comportamento_anterior: comportamentoAnteriorFinal,
+      comportamento,
+    });
+
+    return marco;
+  } catch (error) {
+    console.error('[HIST] erro ao registrar marco', {
+      militar_id: militarId,
+      data_vigencia: dataVigenciaNormalizada,
+      comportamento,
+      erro: error?.message || error,
+    });
+    throw error;
+  }
+}
+
+export async function registrarEventoHistoricoComportamento(payload) {
+  return registrarMarcoHistoricoComportamento(payload);
+}
+
+export async function obterHistoricoComportamentoMilitar(militarId, { ordem = 'asc' } = {}) {
+  if (!militarId) return [];
+  const historicoEntity = getEntitySafe('HistoricoComportamento');
+  if (!hasEntityMethod(historicoEntity, 'filter')) return [];
+
+  const sort = ordem === 'desc' ? '-data_vigencia' : 'data_vigencia';
+  const registros = await historicoEntity.filter({ militar_id: militarId }, sort);
+  return Array.isArray(registros) ? registros : [];
+}
+
+export async function criarMarcoHistoricoComportamento({
+  militar_id,
+  data_vigencia,
+  comportamento,
+  comportamento_anterior,
+  motivo_mudanca,
+  fundamento_legal,
+  origem_tipo,
+  origem_id,
+  observacoes,
+  created_by,
+}) {
+  return registrarMarcoHistoricoComportamento({
+    militarId: militar_id,
+    dataVigencia: data_vigencia,
     comportamento,
-    comportamento_anterior: comportamentoAnterior || '',
-    motivo_mudanca: motivoMudanca || '',
-    fundamento_legal: fundamentoLegal || '',
-    origem_tipo: origemTipo || '',
-    origem_id: origemId || '',
-    observacoes: observacoes || '',
-    created_by: createdBy || '',
+    comportamentoAnterior: comportamento_anterior,
+    motivoMudanca: motivo_mudanca,
+    fundamentoLegal: fundamento_legal,
+    origemTipo: origem_tipo,
+    origemId: origem_id,
+    observacoes,
+    createdBy: created_by,
+  });
+}
+
+export async function registrarHistoricoComportamento(payload) {
+  return registrarMarcoHistoricoComportamento(payload);
+}
+
+export async function criarHistoricoComportamento({
+  militarId,
+  dataVigencia,
+  comportamentoAnterior,
+  comportamento,
+  motivoMudanca,
+  fundamentoLegal,
+  origemTipo,
+  origemId,
+  observacoes,
+  createdBy,
+}) {
+  return registrarMarcoHistoricoComportamento({
+    militarId,
+    dataVigencia,
+    comportamento,
+    comportamentoAnterior,
+    motivoMudanca,
+    fundamentoLegal,
+    origemTipo,
+    origemId,
+    observacoes,
+    createdBy,
   });
 }
 

@@ -7,7 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
-import { garantirImplantacaoHistoricoComportamento, getPunicaoEntity, registrarEventoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import { garantirImplantacaoHistoricoComportamento, getPunicaoEntity, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
@@ -67,7 +67,7 @@ export default function AvaliacaoComportamento() {
       origemId: linha.militar.id,
     });
 
-    await registrarEventoHistoricoComportamento({
+    await registrarMarcoHistoricoComportamento({
       militarId: linha.militar.id,
       comportamentoAnterior: linha.militar.comportamento || 'Bom',
       comportamento: linha.calculado.comportamento,
