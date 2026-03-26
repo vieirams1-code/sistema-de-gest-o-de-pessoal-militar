@@ -7,7 +7,12 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
-import { garantirImplantacaoHistoricoComportamento, getPunicaoEntity, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import {
+  criarPendenciaComportamentoSemDuplicidade,
+  garantirImplantacaoHistoricoComportamento,
+  getPunicaoEntity,
+  registrarMarcoHistoricoComportamento,
+} from '@/services/justicaDisciplinaService';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
@@ -92,7 +97,7 @@ export default function AvaliacaoComportamento() {
 
   const gerarPendencia = async (linha) => {
     if (!linha.divergente || linha.pendenciaExistente || !linha.calculado?.comportamento) return;
-    await base44.entities.PendenciaComportamento.create({
+    await criarPendenciaComportamentoSemDuplicidade({
       militar_id: linha.militar.id,
       militar_nome: linha.militar.nome_completo,
       comportamento_atual: linha.militar.comportamento || 'Bom',

@@ -60,18 +60,22 @@ export async function diagnosticarFluxoPunicaoRuntime() {
 }
 
 
-export async function garantirImplantacaoHistoricoComportamento({
-  militarId,
-  comportamentoAtual,
-  dataVigencia,
-  origemTipo = 'Militar',
-  origemId = '',
-  createdBy = '',
-}) {
+export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
   try {
-    const militarPayload = (militarId && typeof militarId === 'object')
-      ? militarId
-      : { id: militarId, comportamento: comportamentoAtual };
+    const origemPayload = (payload && typeof payload === 'object') ? payload : {};
+    const militarPayload = origemPayload?.militarId && typeof origemPayload.militarId === 'object'
+      ? origemPayload.militarId
+      : (origemPayload?.id ? origemPayload : {
+          id: origemPayload?.militarId,
+          comportamento: origemPayload?.comportamentoAtual,
+          data_inclusao: origemPayload?.dataVigencia,
+        });
+    const {
+      dataVigencia,
+      origemTipo = 'Militar',
+      origemId = '',
+      createdBy = '',
+    } = origemPayload;
     const militarIdNormalizado = militarPayload?.id;
     if (!militarIdNormalizado) return null;
 
@@ -82,6 +86,10 @@ export async function garantirImplantacaoHistoricoComportamento({
     const historicoExistenteSanitizado = sanitizarHistoricoComportamento(existentes, { ordem: 'asc' });
 
     if (historicoExistenteSanitizado.length > 0) {
+      console.info('[HIST] histórico encontrado', {
+        militar_id: militarIdNormalizado,
+        total: historicoExistenteSanitizado.length,
+      });
       console.info('[HIST] duplicidade evitada', {
         militar_id: militarIdNormalizado,
         motivo: 'implantacao_ja_existente',
@@ -94,7 +102,7 @@ export async function garantirImplantacaoHistoricoComportamento({
       dataVigenciaInicial = new Date().toISOString().slice(0, 10);
     }
 
-    let comportamentoInicial = militarPayload?.comportamento || comportamentoAtual;
+    let comportamentoInicial = militarPayload?.comportamento || origemPayload?.comportamentoAtual;
     if (!ehComportamentoValido(comportamentoInicial)) {
       comportamentoInicial = 'Bom';
     }
@@ -112,16 +120,29 @@ export async function garantirImplantacaoHistoricoComportamento({
       created_by: createdBy || '',
     });
 
-    console.info('[HIST] implantação criada', {
+    console.info('[HIST] implantação criada no banco', {
       militar_id: militarIdNormalizado,
       historico_id: marcoImplantacao?.id,
       comportamento: marcoImplantacao?.comportamento,
     });
 
+    const aposCreate = await historicoEntity.filter({ militar_id: militarIdNormalizado }, 'data_vigencia');
+    const historicoAposCreate = sanitizarHistoricoComportamento(aposCreate, { ordem: 'asc' });
+    if (historicoAposCreate.length > 0) {
+      console.info('[HIST] histórico encontrado', {
+        militar_id: militarIdNormalizado,
+        total: historicoAposCreate.length,
+      });
+    } else {
+      console.warn('[HIST] nenhum histórico após create', {
+        militar_id: militarIdNormalizado,
+      });
+    }
+
     return marcoImplantacao;
   } catch (error) {
     console.error('[HIST] erro implantação', {
-      militar_id: typeof militarId === 'object' ? militarId?.id : militarId,
+      militar_id: payload?.militarId?.id || payload?.militarId || payload?.id || null,
       erro: error?.message || error,
     });
     return null;
@@ -401,22 +422,10 @@ export async function recalcularComportamentoEMarcarPendencia(militarId) {
       status_pendencia: 'Pendente',
     };
 
-    let pendenciaCriada = false;
-    try {
-      await pendenciaEntity.create(payloadPendencia);
-      pendenciaCriada = true;
-    } catch (error) {
-      if (hasEntityMethod(pendenciaEntity, 'filter')) {
-        const existentes = await pendenciaEntity.filter({
-          militar_id: militar.id,
-          status_pendencia: 'Pendente',
-          comportamento_sugerido: resultado.comportamento,
-        });
-        pendenciaCriada = existentes.length > 0;
-      }
-      if (!pendenciaCriada) throw error;
+    const { criada: pendenciaCriada } = await criarPendenciaComportamentoSemDuplicidade(payloadPendencia);
+    if (pendenciaCriada) {
+      console.info('[JD] pendencia criada', { militar_id: militar.id, comportamento_sugerido: resultado.comportamento });
     }
-    console.info('[JD] pendencia criada', { militar_id: militar.id, comportamento_sugerido: resultado.comportamento });
 
     return {
       executado: true,
@@ -427,6 +436,43 @@ export async function recalcularComportamentoEMarcarPendencia(militarId) {
   }
 
   return { executado: true, pendenciaEsperada: false, pendenciaCriada: false };
+}
+
+export function criarChavePendenciaComportamento(pendencia = {}) {
+  return [
+    pendencia?.militar_id || '',
+    pendencia?.comportamento_atual || '',
+    pendencia?.comportamento_sugerido || '',
+    pendencia?.status_pendencia || '',
+  ].join('|');
+}
+
+export async function criarPendenciaComportamentoSemDuplicidade(payload = {}) {
+  const pendenciaEntity = getEntitySafe('PendenciaComportamento');
+  if (!hasEntityMethod(pendenciaEntity, 'create') || !hasEntityMethod(pendenciaEntity, 'filter')) {
+    return { criada: false, registro: null, motivo: 'entidade_indisponivel' };
+  }
+
+  const filtroDuplicidade = {
+    militar_id: payload.militar_id,
+    status_pendencia: 'Pendente',
+    comportamento_sugerido: payload.comportamento_sugerido,
+    comportamento_atual: payload.comportamento_atual,
+  };
+
+  const existentes = await pendenciaEntity.filter(filtroDuplicidade, '-created_date');
+  if (existentes.length > 0) {
+    console.info('[PEND] duplicidade evitada', {
+      militar_id: payload.militar_id,
+      comportamento_atual: payload.comportamento_atual,
+      comportamento_sugerido: payload.comportamento_sugerido,
+      pendencia_id: existentes[0]?.id,
+    });
+    return { criada: false, registro: existentes[0], motivo: 'duplicada' };
+  }
+
+  const registro = await pendenciaEntity.create(payload);
+  return { criada: true, registro, motivo: 'criada' };
 }
 
 export async function criarCardPunicaoNoQuadro(punicao) {
