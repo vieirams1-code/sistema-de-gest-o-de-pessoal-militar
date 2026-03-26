@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacao
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
-import { obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
+import { garantirImplantacaoHistoricoComportamento, obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
@@ -54,6 +54,7 @@ function formatDate(date) {
 }
 
 export default function VerMilitar() {
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
@@ -130,6 +131,31 @@ export default function VerMilitar() {
       dataInclusaoMilitar: militar.data_inclusao,
     });
   }, [militar, punicoes]);
+
+  React.useEffect(() => {
+    if (!militar?.id || !isAccessResolved || !canViewMilitar) return;
+
+    let ativo = true;
+    const implantar = async () => {
+      await garantirImplantacaoHistoricoComportamento(militar);
+      if (!ativo) return;
+      await queryClient.invalidateQueries({ queryKey: ['ver-historico-comportamento', id] });
+    };
+
+    implantar();
+    return () => {
+      ativo = false;
+    };
+  }, [militar, id, isAccessResolved, canViewMilitar, queryClient]);
+
+  const ultimaPunicaoPorMilitar = React.useMemo(() => {
+    const ultima = punicoes[0];
+    if (!ultima) return null;
+    return {
+      tipo: ultima.tipo_punicao || ultima.tipo || 'Punição disciplinar',
+      data: ultima.data_inicio_cumprimento || ultima.data_inicio || ultima.created_date || '',
+    };
+  }, [punicoes]);
 
 
   if (loadingUser || isLoading) {
@@ -359,10 +385,12 @@ export default function VerMilitar() {
                     {pendenciasComportamento.map((pendencia) => (
                       <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                         <p className="text-sm font-semibold text-amber-900">
-                          {pendencia.comportamento_atual || 'N/D'} → {pendencia.comportamento_calculado || 'N/D'}
+                          {(pendencia.comportamento_atual || militar.comportamento || 'Bom')} → {(pendencia.comportamento_sugerido || avaliacaoComportamento?.comportamento || militar.comportamento || 'Bom')}
                         </p>
                         <p className="text-xs text-amber-800 mt-1">
-                          Última punição: {formatDate(pendencia.data_ultima_punicao) || 'Não informada'}
+                          {ultimaPunicaoPorMilitar
+                            ? `Última punição: ${ultimaPunicaoPorMilitar.tipo} (${formatDate(ultimaPunicaoPorMilitar.data) || ultimaPunicaoPorMilitar.data})`
+                            : 'Sem punições registradas'}
                         </p>
                       </div>
                     ))}
