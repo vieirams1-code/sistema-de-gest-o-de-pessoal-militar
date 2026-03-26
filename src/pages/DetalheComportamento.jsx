@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Gavel } from 'lucide-react';
+import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
@@ -27,7 +28,7 @@ export default function DetalheComportamento() {
 
   const { data: historico = [] } = useQuery({
     queryKey: ['detalhe-comportamento-historico', id],
-    queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: id }, '-data_alteracao'),
+    queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: id }, '-data_evento'),
     enabled: !!id,
   });
 
@@ -99,18 +100,9 @@ export default function DetalheComportamento() {
 
         <div className="bg-white rounded-xl border p-4">
           <h3 className="font-semibold mb-3 inline-flex items-center gap-2"><Gavel className="w-4 h-4" />Histórico de comportamento</h3>
-          <div className="space-y-2">
-            {historico.map((h) => (
-              <div key={h.id} className="border rounded p-3 text-sm">
-                <p><strong>{h.data_alteracao}:</strong> {h.comportamento_anterior || 'N/D'} → {h.comportamento_novo}</p>
-                <p className="text-slate-600">Motivo: {h.motivo}</p>
-                <p className="text-slate-600">Fundamento: {h.fundamento_legal || h.observacoes || '—'}</p>
-              </div>
-            ))}
-          </div>
+          <ComportamentoTimeline eventos={historico} />
         </div>
       </div>
     </div>
   );
 }
-  const punicaoEntity = getPunicaoEntity();

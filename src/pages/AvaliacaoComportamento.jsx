@@ -7,7 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
-import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
+import { getPunicaoEntity, registrarEventoHistoricoComportamento } from '@/services/justicaDisciplinaService';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
@@ -60,13 +60,15 @@ export default function AvaliacaoComportamento() {
       comportamento: linha.calculado.comportamento,
     });
 
-    await base44.entities.HistoricoComportamento.create({
-      militar_id: linha.militar.id,
-      comportamento_anterior: linha.militar.comportamento || 'Bom',
-      comportamento_novo: linha.calculado.comportamento,
-      fundamento_legal: linha.calculado.fundamento,
-      motivo: 'Aplicação manual de sugestão de cálculo',
-      data_alteracao: new Date().toISOString().slice(0, 10),
+    await registrarEventoHistoricoComportamento({
+      militarId: linha.militar.id,
+      tipoEvento: 'Mudança',
+      comportamentoAnterior: linha.militar.comportamento || 'Bom',
+      comportamentoNovo: linha.calculado.comportamento,
+      fundamentoLegal: linha.calculado.fundamento,
+      origemTipo: 'PendenciaComportamento',
+      origemId: linha.pendenciaExistente?.id || '',
+      observacoes: 'Mudança aprovada manualmente na Avaliação de Comportamento.',
     });
     if (linha.pendenciaExistente?.id) {
       await base44.entities.PendenciaComportamento.update(linha.pendenciaExistente.id, {
@@ -198,4 +200,3 @@ export default function AvaliacaoComportamento() {
     </div>
   );
 }
-  const punicaoEntity = getPunicaoEntity();

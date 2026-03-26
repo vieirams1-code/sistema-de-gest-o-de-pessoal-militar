@@ -59,6 +59,38 @@ export async function diagnosticarFluxoPunicaoRuntime() {
   return diagnostico;
 }
 
+
+export async function registrarEventoHistoricoComportamento({
+  militarId,
+  dataEvento,
+  tipoEvento,
+  comportamentoAnterior,
+  comportamentoNovo,
+  fundamentoLegal,
+  origemTipo,
+  origemId,
+  observacoes,
+  createdBy,
+}) {
+  if (!militarId || !tipoEvento) return null;
+
+  const historicoEntity = getEntitySafe('HistoricoComportamento');
+  if (!hasEntityMethod(historicoEntity, 'create')) return null;
+
+  return historicoEntity.create({
+    militar_id: militarId,
+    data_evento: dataEvento || new Date().toISOString().slice(0, 10),
+    tipo_evento: tipoEvento,
+    comportamento_anterior: comportamentoAnterior || '',
+    comportamento_novo: comportamentoNovo || '',
+    fundamento_legal: fundamentoLegal || '',
+    origem_tipo: origemTipo || '',
+    origem_id: origemId || '',
+    observacoes: observacoes || '',
+    created_by: createdBy || '',
+  });
+}
+
 export function getPunicaoEntity() {
   const entity = base44.entities.PunicaoDisciplinar;
   if (!entity) {
@@ -153,18 +185,15 @@ export async function recalcularComportamentoEMarcarPendencia(militarId, motivo)
     }
     console.info('[JD] pendencia criada', { militar_id: militar.id, comportamento_sugerido: resultado.comportamento });
 
-    await militarEntity.update(militar.id, {
-      comportamento: resultado.comportamento,
-    });
-
     if (hasEntityMethod(historicoEntity, 'create')) {
-      await historicoEntity.create({
-        militar_id: militar.id,
-        comportamento_anterior: militar.comportamento || 'Bom',
-        comportamento_novo: resultado.comportamento,
-        fundamento_legal: resultado.fundamento,
-        motivo,
-        data_alteracao: new Date().toISOString().slice(0, 10),
+      await registrarEventoHistoricoComportamento({
+        militarId: militar.id,
+        tipoEvento: 'Recalculo',
+        comportamentoAnterior: militar.comportamento || 'Bom',
+        comportamentoNovo: resultado.comportamento,
+        fundamentoLegal: resultado.fundamento,
+        origemTipo: 'PendenciaComportamento',
+        observacoes: motivo,
       });
     }
 
