@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
+import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 function InfoItem({ label, value, icon: Icon }) {
@@ -92,6 +93,12 @@ export default function VerMilitar() {
   const { data: periodos = [] } = useQuery({
     queryKey: ['ver-periodos', id],
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+
+  const { data: historicoComportamento = [] } = useQuery({
+    queryKey: ['ver-historico-comportamento', id],
+    queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: id }, 'data_vigencia'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
@@ -215,31 +222,36 @@ export default function VerMilitar() {
 
           {/* Dados Pessoais */}
           <TabsContent value="dados">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Section title="Dados Funcionais" icon={Briefcase}>
-                <div className="grid grid-cols-2 gap-x-4">
-                  <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
-                  <InfoItem label="Matrícula" value={militar.matricula} />
-                  <InfoItem label="Posto/Graduação" value={militar.posto_graduacao} />
-                  <InfoItem label="Quadro" value={militar.quadro} />
-                  <InfoItem label="Situação" value={militar.situacao_militar} />
-                  <InfoItem label="Condição" value={militar.condicao} />
-                  <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
-                  {militar.destino && <InfoItem label="Destino/Cedência" value={militar.destino} />}
-                </div>
+            <div className="space-y-6">
+              <Section title="Linha do Tempo do Comportamento">
+                <ComportamentoTimeline eventos={historicoComportamento} />
               </Section>
-              <Section title="Dados Pessoais" icon={User}>
-                <div className="grid grid-cols-2 gap-x-4">
-                  <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
-                  <InfoItem label="Sexo" value={militar.sexo} />
-                  <InfoItem label="Estado Civil" value={militar.estado_civil} />
-                  <InfoItem label="Tipo Sanguíneo" value={militar.tipo_sanguineo} />
-                  <InfoItem label="Religião" value={militar.religiao} />
-                  <InfoItem label="Escolaridade" value={militar.escolaridade} />
-                  <InfoItem label="Naturalidade" value={militar.naturalidade} />
-                  <InfoItem label="UF Naturalidade" value={militar.naturalidade_uf} />
-                </div>
-              </Section>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Section title="Dados Funcionais" icon={Briefcase}>
+                  <div className="grid grid-cols-2 gap-x-4">
+                    <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
+                    <InfoItem label="Matrícula" value={militar.matricula} />
+                    <InfoItem label="Posto/Graduação" value={militar.posto_graduacao} />
+                    <InfoItem label="Quadro" value={militar.quadro} />
+                    <InfoItem label="Situação" value={militar.situacao_militar} />
+                    <InfoItem label="Condição" value={militar.condicao} />
+                    <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
+                    {militar.destino && <InfoItem label="Destino/Cedência" value={militar.destino} />}
+                  </div>
+                </Section>
+                <Section title="Dados Pessoais" icon={User}>
+                  <div className="grid grid-cols-2 gap-x-4">
+                    <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
+                    <InfoItem label="Sexo" value={militar.sexo} />
+                    <InfoItem label="Estado Civil" value={militar.estado_civil} />
+                    <InfoItem label="Tipo Sanguíneo" value={militar.tipo_sanguineo} />
+                    <InfoItem label="Religião" value={militar.religiao} />
+                    <InfoItem label="Escolaridade" value={militar.escolaridade} />
+                    <InfoItem label="Naturalidade" value={militar.naturalidade} />
+                    <InfoItem label="UF Naturalidade" value={militar.naturalidade_uf} />
+                  </div>
+                </Section>
               <Section title="Filiação" icon={Heart}>
                 <div className="grid grid-cols-2 gap-x-4">
                   <InfoItem label="Nome do Pai" value={militar.nome_pai} />
@@ -287,6 +299,7 @@ export default function VerMilitar() {
                   </div>
                 </Section>
               )}
+              </div>
             </div>
           </TabsContent>
 
