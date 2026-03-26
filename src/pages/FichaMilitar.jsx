@@ -22,8 +22,6 @@ import { montarCadeia, identificarDescendentes, executarExclusaoAdminCadeia } fr
 import { reverterAtestadosPorExclusaoPublicacao } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
-import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
-import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 
 const TIPOS = [
   { value: 'todos', label: 'Todos os Registros' },
@@ -286,16 +284,6 @@ export default function FichaMilitar() {
     enabled: !!militarId && isAccessResolved && canViewMilitar
   });
 
-  const historicoOrdenado = useMemo(
-    () => [...historico].sort((a, b) => {
-      if (!a?.data_vigencia && !b?.data_vigencia) return 0;
-      if (!a?.data_vigencia) return 1;
-      if (!b?.data_vigencia) return -1;
-      return new Date(a.data_vigencia) - new Date(b.data_vigencia);
-    }),
-    [historico]
-  );
-
   const refetchAll = () => {
     refetchPunicoes();
     refetchAtestados();
@@ -443,20 +431,6 @@ export default function FichaMilitar() {
       return true;
     });
   }, [eventos, tipoFiltro, searchTerm, dataInicio, dataFim]);
-
-  const avaliacaoComportamento = useMemo(() => {
-    if (!militar) return null;
-    return calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
-      dataInclusaoMilitar: militar.data_inclusao,
-    });
-  }, [militar, punicoes]);
-
-  const proximaMelhoria = useMemo(() => {
-    if (!militar) return null;
-    return calcularProximaMelhoria(punicoes, militar.posto_graduacao, new Date(), {
-      dataInclusaoMilitar: militar.data_inclusao,
-    });
-  }, [militar, punicoes]);
 
   const calcularDependencias = (event) => {
     const deps = [];
@@ -621,36 +595,6 @@ export default function FichaMilitar() {
             </Button>
           )}
         </div>
-
-        {militar && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
-            <h3 className="text-sm font-semibold text-slate-700 mb-2">Comportamento</h3>
-            <div className="grid md:grid-cols-3 gap-3 text-sm">
-              <div className="rounded-lg border p-3">
-                <p className="text-slate-500">Atual</p>
-                <p className="font-semibold">{militar.comportamento || 'Bom'}</p>
-              </div>
-              <div className="rounded-lg border p-3">
-                <p className="text-slate-500">Calculado</p>
-                <p className="font-semibold">{avaliacaoComportamento?.comportamento || '—'}</p>
-              </div>
-              <div className="rounded-lg border p-3">
-                <p className="text-slate-500">Próxima melhoria</p>
-                <p className="font-semibold">{proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—'}</p>
-              </div>
-            </div>
-            {avaliacaoComportamento?.fundamento && (
-              <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
-            )}
-          </div>
-        )}
-
-        {militar && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Linha do Tempo do Comportamento</h3>
-            <ComportamentoTimeline eventos={historicoOrdenado} />
-          </div>
-        )}
 
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6 space-y-3">
           <div className="flex items-center gap-2 text-slate-600 font-medium text-sm">
