@@ -60,29 +60,58 @@ export async function diagnosticarFluxoPunicaoRuntime() {
 }
 
 
+export async function garantirImplantacaoHistoricoComportamento({
+  militarId,
+  comportamentoAtual,
+  origemTipo = 'Militar',
+  origemId = '',
+  createdBy = '',
+}) {
+  if (!militarId) return null;
+  const historicoEntity = getEntitySafe('HistoricoComportamento');
+  if (!hasEntityMethod(historicoEntity, 'filter') || !hasEntityMethod(historicoEntity, 'create')) return null;
+
+  const existentes = await historicoEntity.filter({ militar_id: militarId }, 'data_vigencia');
+  if (existentes.length > 0) return existentes[0];
+
+  return historicoEntity.create({
+    militar_id: militarId,
+    data_vigencia: new Date().toISOString().slice(0, 10),
+    comportamento: comportamentoAtual || 'Bom',
+    comportamento_anterior: '',
+    motivo_mudanca: 'Implantação inicial do comportamento homologado.',
+    fundamento_legal: '',
+    origem_tipo: origemTipo,
+    origem_id: origemId,
+    observacoes: 'Registro inicial criado automaticamente para a linha do tempo disciplinar.',
+    created_by: createdBy || '',
+  });
+}
+
 export async function registrarEventoHistoricoComportamento({
   militarId,
-  dataEvento,
-  tipoEvento,
+  dataVigencia,
   comportamentoAnterior,
-  comportamentoNovo,
+  comportamento,
+  motivoMudanca,
   fundamentoLegal,
   origemTipo,
   origemId,
   observacoes,
   createdBy,
 }) {
-  if (!militarId || !tipoEvento) return null;
+  if (!militarId || !comportamento) return null;
+  if (comportamentoAnterior && comportamentoAnterior === comportamento) return null;
 
   const historicoEntity = getEntitySafe('HistoricoComportamento');
   if (!hasEntityMethod(historicoEntity, 'create')) return null;
 
   return historicoEntity.create({
     militar_id: militarId,
-    data_evento: dataEvento || new Date().toISOString().slice(0, 10),
-    tipo_evento: tipoEvento,
+    data_vigencia: dataVigencia || new Date().toISOString().slice(0, 10),
+    comportamento,
     comportamento_anterior: comportamentoAnterior || '',
-    comportamento_novo: comportamentoNovo || '',
+    motivo_mudanca: motivoMudanca || '',
     fundamento_legal: fundamentoLegal || '',
     origem_tipo: origemTipo || '',
     origem_id: origemId || '',
@@ -123,7 +152,7 @@ export function validarPunicaoDisciplinar(payload) {
   }
 }
 
-export async function recalcularComportamentoEMarcarPendencia(militarId, motivo) {
+export async function recalcularComportamentoEMarcarPendencia(militarId) {
   if (!militarId) return { executado: false, motivo: 'militar_id_ausente' };
 
   const militarEntity = getEntitySafe('Militar');
@@ -145,8 +174,6 @@ export async function recalcularComportamentoEMarcarPendencia(militarId, motivo)
 
   if (resultado.comportamento !== militar.comportamento) {
     const pendenciaEntity = getEntitySafe('PendenciaComportamento');
-    const historicoEntity = getEntitySafe('HistoricoComportamento');
-
     if (!hasEntityMethod(pendenciaEntity, 'create')) {
       console.warn('[JD] erro em etapa: entidade PendenciaComportamento indisponível');
       return {
@@ -184,18 +211,6 @@ export async function recalcularComportamentoEMarcarPendencia(militarId, motivo)
       if (!pendenciaCriada) throw error;
     }
     console.info('[JD] pendencia criada', { militar_id: militar.id, comportamento_sugerido: resultado.comportamento });
-
-    if (hasEntityMethod(historicoEntity, 'create')) {
-      await registrarEventoHistoricoComportamento({
-        militarId: militar.id,
-        tipoEvento: 'Recalculo',
-        comportamentoAnterior: militar.comportamento || 'Bom',
-        comportamentoNovo: resultado.comportamento,
-        fundamentoLegal: resultado.fundamento,
-        origemTipo: 'PendenciaComportamento',
-        observacoes: motivo,
-      });
-    }
 
     return {
       executado: true,

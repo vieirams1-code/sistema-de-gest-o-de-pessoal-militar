@@ -28,13 +28,12 @@ import {
   recalcularComportamentoEMarcarPendencia,
   criarCardPunicaoNoQuadro,
   diagnosticarFluxoPunicaoRuntime,
-  registrarEventoHistoricoComportamento,
 } from '@/services/justicaDisciplinaService';
 
 export default function CadastrarPunicao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved, user } = useCurrentUser();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMilitaresAccess = canAccessModule('militares');
 
   const [searchParams] = useSearchParams();
@@ -132,19 +131,6 @@ export default function CadastrarPunicao() {
       }
 
       if (!punicaoId) {
-        await registrarEventoHistoricoComportamento({
-          militarId: formData.militar_id,
-          tipoEvento: 'Punição',
-          comportamentoAnterior: '',
-          comportamentoNovo: '',
-          fundamentoLegal: '',
-          origemTipo: 'PunicaoDisciplinar',
-          origemId: punicaoSalva?.id,
-          observacoes: `${formData.tipo_punicao || 'Punição'}${formData.boletim_numero ? ` - BI ${formData.boletim_numero}` : ''}`,
-          createdBy: user?.email || '',
-          dataEvento: formData.data_inicio_cumprimento || new Date().toISOString().slice(0, 10),
-        });
-
         try {
           const card = await criarCardPunicaoNoQuadro(punicaoSalva);
           if (card?.id) {

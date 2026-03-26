@@ -28,7 +28,7 @@ export default function DetalheComportamento() {
 
   const { data: historico = [] } = useQuery({
     queryKey: ['detalhe-comportamento-historico', id],
-    queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: id }, '-data_evento'),
+    queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: id }, 'data_vigencia'),
     enabled: !!id,
   });
 
