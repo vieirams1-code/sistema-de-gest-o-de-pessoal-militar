@@ -19,7 +19,11 @@ import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacao
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
-import { garantirImplantacaoHistoricoComportamento, obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
+import {
+  criarChavePendenciaComportamento,
+  garantirImplantacaoHistoricoComportamento,
+  obterHistoricoComportamentoMilitar,
+} from '@/services/justicaDisciplinaService';
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
@@ -117,6 +121,18 @@ export default function VerMilitar() {
     queryFn: () => base44.entities.PendenciaComportamento.filter({ militar_id: id, status_pendencia: 'Pendente' }),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
+
+  const pendenciasComportamentoUnicas = React.useMemo(() => {
+    const unicas = [];
+    const chaves = new Set();
+    for (const pendencia of pendenciasComportamento) {
+      const chave = criarChavePendenciaComportamento(pendencia);
+      if (chaves.has(chave)) continue;
+      chaves.add(chave);
+      unicas.push(pendencia);
+    }
+    return unicas;
+  }, [pendenciasComportamento]);
 
   const avaliacaoComportamento = React.useMemo(() => {
     if (!militar) return null;
@@ -378,11 +394,11 @@ export default function VerMilitar() {
               </Section>
 
               <Section title="Pendências de Comportamento" icon={AlertTriangle}>
-                {pendenciasComportamento.length === 0 ? (
+                {pendenciasComportamentoUnicas.length === 0 ? (
                   <p className="text-sm text-slate-500">Sem pendências de comportamento no momento.</p>
                 ) : (
                   <div className="space-y-3">
-                    {pendenciasComportamento.map((pendencia) => (
+                    {pendenciasComportamentoUnicas.map((pendencia) => (
                       <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                         <p className="text-sm font-semibold text-amber-900">
                           {(pendencia.comportamento_atual || militar.comportamento || 'Bom')} → {(pendencia.comportamento_sugerido || avaliacaoComportamento?.comportamento || militar.comportamento || 'Bom')}

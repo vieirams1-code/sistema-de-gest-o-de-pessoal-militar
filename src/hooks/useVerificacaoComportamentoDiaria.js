@@ -5,7 +5,7 @@ import {
   calcularComportamento,
   compararComportamentos,
 } from '@/utils/calcularComportamento';
-import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
+import { criarPendenciaComportamentoSemDuplicidade, getPunicaoEntity } from '@/services/justicaDisciplinaService';
 
 const LAST_RUN_KEY = 'sgp_militar_comportamento_last_run';
 
@@ -57,14 +57,7 @@ export default function useVerificacaoComportamentoDiaria({ incluirReabilitadas 
 
             if (!mudouParaMelhor) return;
 
-            const pendencias = await base44.entities.PendenciaComportamento.filter({
-              militar_id: militar.id,
-              status_pendencia: 'Pendente',
-            });
-            const jaExiste = pendencias.some((p) => p.comportamento_sugerido === calculado.comportamento);
-            if (jaExiste) return;
-
-            await base44.entities.PendenciaComportamento.create({
+            await criarPendenciaComportamentoSemDuplicidade({
               militar_id: militar.id,
               militar_nome: militar.nome_completo,
               comportamento_atual: atual,
