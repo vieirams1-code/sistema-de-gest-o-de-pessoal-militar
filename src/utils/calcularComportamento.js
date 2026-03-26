@@ -142,8 +142,6 @@ function temRegraArt53(punicoesNormalizadas, postoGraduacao) {
 }
 
 function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
-  const atingiuPatamarInsuficienteAnual = j1.prisao_equivalente === 2;
-
   if (j1.prisao_equivalente > 2) {
     return {
       comportamento: 'Mau',
@@ -151,38 +149,24 @@ function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
     };
   }
 
-  if (atingiuPatamarInsuficienteAnual) {
+  if (j1.prisao_equivalente === 2) {
     return {
       comportamento: 'Insuficiente',
-      fundamento: 'Art. 52, alínea d: exatamente 2 prisões equivalentes no período de 1 ano (com precedência material sobre a janela de 2 anos).',
+      fundamento: 'Art. 52, alínea d: exatamente 2 prisões equivalentes no período de 1 ano.',
     };
   }
 
-  if (!elegibilidade.bom) {
-    return {
-      comportamento: 'Insuficiente',
-      fundamento: 'Art. 52, alíneas c-e c/c tempo mínimo: sem 2 anos completos de efetivo serviço, não há classificação em Bom ou superior.',
-    };
-  }
-
-  if (!atingiuPatamarInsuficienteAnual && j2.prisao_equivalente > 0 && j2.prisao_equivalente <= 2) {
-    return {
-      comportamento: 'Bom',
-      fundamento: 'Art. 52, alínea c: até 2 prisões equivalentes no período de 2 anos, sem enquadramento em Insuficiente na janela de 1 ano.',
-    };
-  }
-
-  if (elegibilidade.otimo && j4.quantidade > 0 && j4.detencao_equivalente <= 1) {
-    return {
-      comportamento: 'Ótimo',
-      fundamento: 'Art. 52, alínea b: até 1 detenção equivalente no período de 4 anos.',
-    };
-  }
-
-  if (elegibilidade.excepcional && j8.quantidade === 0) {
+  if (j8.quantidade === 0) {
     return {
       comportamento: 'Excepcional',
       fundamento: 'Art. 52, alínea a: sem punição válida no período de 8 anos.',
+    };
+  }
+
+  if (j4.quantidade > 0 && j4.detencao_equivalente <= 1) {
+    return {
+      comportamento: 'Ótimo',
+      fundamento: 'Art. 52, alínea b: até 1 detenção equivalente no período de 4 anos.',
     };
   }
 
