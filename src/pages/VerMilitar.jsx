@@ -19,6 +19,7 @@ import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacao
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
+import { obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
@@ -100,7 +101,7 @@ export default function VerMilitar() {
 
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
-    queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: id }, 'data_vigencia'),
+    queryFn: () => obterHistoricoComportamentoMilitar(id),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
@@ -369,7 +370,7 @@ export default function VerMilitar() {
                 )}
               </Section>
 
-              <Section title="Linha do Tempo / Histórico">
+              <Section title="Linha do Tempo do Comportamento">
                 <ComportamentoTimeline eventos={historicoComportamento} />
               </Section>
 

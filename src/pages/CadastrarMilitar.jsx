@@ -17,7 +17,7 @@ import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { garantirImplantacaoHistoricoComportamento, registrarEventoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
 
 const initialFormData = {
   nome_completo: '',
@@ -189,7 +189,7 @@ export default function CadastrarMilitar() {
         origemId: militarId,
         createdBy: user?.email || '',
       });
-      await registrarEventoHistoricoComportamento({
+      await registrarMarcoHistoricoComportamento({
         militarId,
         comportamentoAnterior: comportamentoOriginal || 'Bom',
         comportamento: formData.comportamento || 'Bom',
