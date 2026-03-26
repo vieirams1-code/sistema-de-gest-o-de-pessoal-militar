@@ -114,6 +114,36 @@ function normalizarDataVigencia(data) {
   return texto.length >= 10 ? texto.slice(0, 10) : texto;
 }
 
+function ehComportamentoValido(comportamento) {
+  if (!comportamento) return false;
+  const valor = String(comportamento).trim();
+  return Boolean(valor) && valor.toUpperCase() !== 'N/D';
+}
+
+function ehDataVigenciaValida(dataVigencia) {
+  if (!dataVigencia) return false;
+  const dataNormalizada = normalizarDataVigencia(dataVigencia);
+  if (!dataNormalizada) return false;
+  const data = new Date(`${dataNormalizada}T00:00:00`);
+  return !Number.isNaN(data.getTime());
+}
+
+function sanitizarHistoricoComportamento(registros = [], { ordem = 'asc' } = {}) {
+  const registrosValidos = (Array.isArray(registros) ? registros : [])
+    .filter((registro) => ehDataVigenciaValida(registro?.data_vigencia))
+    .filter((registro) => ehComportamentoValido(registro?.comportamento))
+    .sort((a, b) => new Date(`${normalizarDataVigencia(a.data_vigencia)}T00:00:00`) - new Date(`${normalizarDataVigencia(b.data_vigencia)}T00:00:00`));
+
+  const marcosReais = [];
+  for (const registro of registrosValidos) {
+    const ultimo = marcosReais[marcosReais.length - 1];
+    if (ultimo?.comportamento === registro.comportamento) continue;
+    marcosReais.push(registro);
+  }
+
+  return ordem === 'desc' ? [...marcosReais].reverse() : marcosReais;
+}
+
 export async function registrarMarcoHistoricoComportamento({
   militarId,
   dataVigencia,
@@ -126,7 +156,10 @@ export async function registrarMarcoHistoricoComportamento({
   observacoes,
   createdBy,
 }) {
-  if (!militarId || !comportamento) return null;
+  if (!militarId) return null;
+  if (!ehDataVigenciaValida(dataVigencia)) return null;
+  if (!ehComportamentoValido(comportamento)) return null;
+
   if (comportamentoAnterior && comportamentoAnterior === comportamento) {
     console.info('[HIST] sem mudança de comportamento', { militar_id: militarId, comportamento });
     return null;
@@ -136,7 +169,7 @@ export async function registrarMarcoHistoricoComportamento({
   if (!hasEntityMethod(historicoEntity, 'create') || !hasEntityMethod(historicoEntity, 'filter')) return null;
 
   const [ultimoMarco] = await historicoEntity.filter({ militar_id: militarId }, '-data_vigencia', 1);
-  const dataVigenciaNormalizada = normalizarDataVigencia(dataVigencia || new Date().toISOString().slice(0, 10));
+  const dataVigenciaNormalizada = normalizarDataVigencia(dataVigencia);
   const ultimaDataNormalizada = normalizarDataVigencia(ultimoMarco?.data_vigencia);
   const ultimoComportamento = ultimoMarco?.comportamento;
 
@@ -211,7 +244,7 @@ export async function obterHistoricoComportamentoMilitar(militarId, { ordem = 'a
 
   const sort = ordem === 'desc' ? '-data_vigencia' : 'data_vigencia';
   const registros = await historicoEntity.filter({ militar_id: militarId }, sort);
-  return Array.isArray(registros) ? registros : [];
+  return sanitizarHistoricoComportamento(registros, { ordem });
 }
 
 export async function criarMarcoHistoricoComportamento({
