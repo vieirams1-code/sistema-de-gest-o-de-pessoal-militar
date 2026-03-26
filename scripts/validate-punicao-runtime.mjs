@@ -6,13 +6,30 @@ const serverUrl = process.env.VITE_BASE44_BACKEND_URL || process.env.BASE44_SERV
 const token = process.env.BASE44_ACCESS_TOKEN || process.env.VITE_BASE44_ACCESS_TOKEN || null;
 const functionsVersion = process.env.VITE_BASE44_FUNCTIONS_VERSION || process.env.BASE44_FUNCTIONS_VERSION;
 
+const resultado = {
+  saveRealPunicao: 'FALHOU',
+  pendenciaComportamento: 'FALHOU',
+  cardOperacionalAutomatico: 'FALHOU',
+  cardOperacionalIdGravado: 'FALHOU',
+  colunaPunicoesRecebeuCard: 'FALHOU',
+  mensagemFinal: 'FLUXO AINDA NÃO HOMOLOGADO',
+};
+
+function printResultadoFinal() {
+  console.log(`- save real da punição: ${resultado.saveRealPunicao}`);
+  console.log(`- pendência de comportamento: ${resultado.pendenciaComportamento}`);
+  console.log(`- card operacional automático: ${resultado.cardOperacionalAutomatico}`);
+  console.log(`- card_operacional_id gravado: ${resultado.cardOperacionalIdGravado}`);
+  console.log(`- mensagem final: ${resultado.mensagemFinal}`);
+}
+
 if (!appId || !serverUrl) {
   console.error('Faltam variáveis BASE44_APP_ID/VITE_BASE44_APP_ID e BASE44_SERVER_URL/VITE_BASE44_BACKEND_URL.');
+  printResultadoFinal();
   process.exit(2);
 }
 
 const base44 = createClient({ appId, serverUrl, token, functionsVersion, requiresAuth: false });
-
 const e = base44.entities;
 const hojeISO = new Date().toISOString().slice(0, 10);
 
@@ -27,8 +44,8 @@ function mkPunicao(militar) {
     data_fim_cumprimento: hojeISO,
     agravada_prisao_em_separado: true,
     status_punicao: 'Ativa',
-    autoridade_aplicadora: 'Validação Runtime',
-    observacoes: `Teste runtime ${new Date().toISOString()}`,
+    autoridade_aplicadora: 'Homologação Final Runtime',
+    observacoes: `Homologação final ${new Date().toISOString()}`,
     publicada_no_livro: false,
     created_date: new Date().toISOString(),
   };
@@ -43,59 +60,80 @@ async function escolherMilitar() {
     const atual = calcularComportamento(punicoes, militar.posto_graduacao, new Date(), { dataInclusaoMilitar: militar.data_inclusao });
     const futuro = calcularComportamento([...punicoes, mkPunicao(militar)], militar.posto_graduacao, new Date(), { dataInclusaoMilitar: militar.data_inclusao });
     if (futuro?.comportamento && futuro.comportamento !== (militar.comportamento || 'Bom')) {
-      return { militar, futuro };
+      return { militar, pendenciaAplicavel: true, comportamentoSugerido: futuro.comportamento, fundamento: futuro.fundamento };
+    }
+
+    if (atual?.comportamento) {
+      return { militar, pendenciaAplicavel: false, comportamentoSugerido: null, fundamento: null };
     }
   }
-  return { militar: militares[0], futuro: null };
+
+  return { militar: militares[0], pendenciaAplicavel: false, comportamentoSugerido: null, fundamento: null };
+}
+
+async function obterOuCriarColunaPunicoes() {
+  const quadrosAtivos = await e.QuadroOperacional?.filter?.({ ativo: true }, 'ordem');
+  const quadro = quadrosAtivos?.[0];
+  if (!quadro?.id) return null;
+
+  const colunas = await e.ColunaOperacional.filter({ quadro_id: quadro.id, ativa: true }, 'ordem');
+  let coluna = colunas.find((c) => (c.nome || '').trim().toUpperCase() === 'PUNIÇÕES');
+  if (!coluna) {
+    coluna = await e.ColunaOperacional.create({
+      quadro_id: quadro.id,
+      nome: 'PUNIÇÕES',
+      ordem: (colunas.at(-1)?.ordem || colunas.length) + 1,
+      cor: '#dc2626',
+      fixa: true,
+      ativa: true,
+      origem_coluna: 'automacao',
+    });
+  }
+  return coluna;
 }
 
 async function main() {
-  const { militar, futuro } = await escolherMilitar();
+  const { militar, pendenciaAplicavel, comportamentoSugerido, fundamento } = await escolherMilitar();
+
+  const colunaPunicoes = await obterOuCriarColunaPunicoes();
+  const cardsAntes = colunaPunicoes?.id
+    ? await e.CardOperacional.filter({ coluna_id: colunaPunicoes.id, arquivado: false }, '-created_date', 500)
+    : [];
+  const totalCardsAntes = cardsAntes.length;
 
   const punicao = await e.PunicaoDisciplinar.create(mkPunicao(militar));
-  console.info('[JD] punicao criada', { punicao_id: punicao?.id });
+  resultado.saveRealPunicao = punicao?.id ? 'OK' : 'FALHOU';
 
   let pendencia = null;
-  if (futuro?.comportamento && futuro.comportamento !== (militar.comportamento || 'Bom')) {
+  if (pendenciaAplicavel) {
     pendencia = await e.PendenciaComportamento.create({
       militar_id: militar.id,
       militar_nome: militar.nome_completo,
       comportamento_atual: militar.comportamento || 'Bom',
-      comportamento_sugerido: futuro.comportamento,
-      fundamento_legal: futuro.fundamento,
-      detalhes_calculo: JSON.stringify(futuro.detalhes || {}),
+      comportamento_sugerido: comportamentoSugerido,
+      fundamento_legal: fundamento,
+      detalhes_calculo: JSON.stringify({ fonte: 'homologacao_final_runtime' }),
       data_detectada: hojeISO,
       status_pendencia: 'Pendente',
     });
-    await e.Militar.update(militar.id, { comportamento: futuro.comportamento });
-    console.info('[JD] pendencia criada', { pendencia_id: pendencia?.id, militar_id: militar.id });
+
+    if (pendencia?.id) {
+      await e.Militar.update(militar.id, { comportamento: comportamentoSugerido });
+    }
+  }
+
+  if (pendenciaAplicavel) {
+    resultado.pendenciaComportamento = pendencia?.id ? 'OK' : 'FALHOU';
   } else {
-    console.warn('[JD] warning controlado: punição criada sem mudança de comportamento; pendência não era aplicável');
+    resultado.pendenciaComportamento = 'NÃO SE APLICA';
   }
 
   let card = null;
-  const quadrosAtivos = await e.QuadroOperacional?.filter?.({ ativo: true }, 'ordem');
-  const quadro = quadrosAtivos?.[0];
-  if (!quadro?.id) {
-    console.warn('[JD] warning controlado: quadro operacional ativo não encontrado, card não criado');
-  } else {
-    const colunas = await e.ColunaOperacional.filter({ quadro_id: quadro.id, ativa: true }, 'ordem');
-    let coluna = colunas.find((c) => (c.nome || '').trim().toUpperCase() === 'PUNIÇÕES');
-    if (!coluna) {
-      coluna = await e.ColunaOperacional.create({
-        quadro_id: quadro.id,
-        nome: 'PUNIÇÕES',
-        ordem: (colunas.at(-1)?.ordem || colunas.length) + 1,
-        cor: '#dc2626',
-        fixa: true,
-        ativa: true,
-        origem_coluna: 'automacao',
-      });
-    }
-    const cards = await e.CardOperacional.filter({ coluna_id: coluna.id, arquivado: false }, '-created_date', 500);
+  if (colunaPunicoes?.id) {
+    const cardsAtivos = await e.CardOperacional.filter({ coluna_id: colunaPunicoes.id, arquivado: false }, '-created_date', 500);
     card = await e.CardOperacional.create({
-      coluna_id: coluna.id,
-      ordem: cards.length + 1,
+      coluna_id: colunaPunicoes.id,
+      ordem: cardsAtivos.length + 1,
       titulo: `Punição - ${punicao.posto_graduacao || ''} ${punicao.militar_nome || ''}`.trim(),
       tipo: 'Punição',
       origem_tipo: 'Punição',
@@ -107,26 +145,42 @@ async function main() {
       criado_automaticamente: true,
       protocolo: `PUNICAO:${punicao.id}`,
     });
-    await e.PunicaoDisciplinar.update(punicao.id, { card_operacional_id: card.id });
-    console.info('[JD] card criado', { card_id: card?.id, punicao_id: punicao?.id });
+
+    if (card?.id) {
+      await e.PunicaoDisciplinar.update(punicao.id, { card_operacional_id: card.id });
+    }
   }
 
-  const punicaoRegistro = (await e.PunicaoDisciplinar.filter({ id: punicao.id }))?.[0] || null;
-  const pendenciaRegistro = pendencia ? (await e.PendenciaComportamento.filter({ id: pendencia.id }))?.[0] || null : null;
-  const cardRegistro = card ? (await e.CardOperacional.filter({ id: card.id }))?.[0] || null : null;
+  resultado.cardOperacionalAutomatico = card?.id ? 'OK' : 'FALHOU';
 
-  console.log('\n=== RESULTADO_RUNTIME ===');
-  console.log(JSON.stringify({
-    punicaoCriada: Boolean(punicaoRegistro),
-    pendenciaCriada: Boolean(pendenciaRegistro),
-    cardCriado: Boolean(cardRegistro),
-    punicaoId: punicaoRegistro?.id || null,
-    pendenciaId: pendenciaRegistro?.id || null,
-    cardId: cardRegistro?.id || null,
-  }, null, 2));
+  const punicaoAtualizada = (await e.PunicaoDisciplinar.filter({ id: punicao.id }))?.[0] || null;
+  resultado.cardOperacionalIdGravado = punicaoAtualizada?.card_operacional_id ? 'OK' : 'FALHOU';
+
+  const cardsDepois = colunaPunicoes?.id
+    ? await e.CardOperacional.filter({ coluna_id: colunaPunicoes.id, arquivado: false }, '-created_date', 500)
+    : [];
+
+  const cardEntrouNaColunaPunicoes = Boolean(
+    card?.id
+      && cardsDepois.some((c) => c.id === card.id)
+      && cardsDepois.length === totalCardsAntes + 1,
+  );
+  resultado.colunaPunicoesRecebeuCard = cardEntrouNaColunaPunicoes ? 'OK' : 'FALHOU';
+
+  const homologado =
+    resultado.saveRealPunicao === 'OK'
+    && (resultado.pendenciaComportamento === 'OK' || resultado.pendenciaComportamento === 'NÃO SE APLICA')
+    && resultado.cardOperacionalAutomatico === 'OK'
+    && resultado.cardOperacionalIdGravado === 'OK'
+    && resultado.colunaPunicoesRecebeuCard === 'OK';
+
+  resultado.mensagemFinal = homologado ? 'FLUXO HOMOLOGADO' : 'FLUXO AINDA NÃO HOMOLOGADO';
+
+  printResultadoFinal();
 }
 
 main().catch((error) => {
   console.error('[JD] erro em etapa: validação runtime', error?.response?.data || error?.message || error);
+  printResultadoFinal();
   process.exit(1);
 });
