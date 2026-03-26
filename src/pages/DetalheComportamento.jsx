@@ -6,7 +6,7 @@ import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
-import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
+import { getPunicaoEntity, obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
 
 export default function DetalheComportamento() {
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ export default function DetalheComportamento() {
 
   const { data: historico = [] } = useQuery({
     queryKey: ['detalhe-comportamento-historico', id],
-    queryFn: () => base44.entities.HistoricoComportamento.filter({ militar_id: id }, 'data_vigencia'),
+    queryFn: () => obterHistoricoComportamentoMilitar(id),
     enabled: !!id,
   });
 

@@ -21,21 +21,22 @@ function formatarData(data) {
 }
 
 export default function ComportamentoTimeline({ eventos = [] }) {
-  if (!eventos.length) {
+  const eventosSanitizados = [...eventos]
+    .filter((evento) => Boolean(evento?.data_vigencia))
+    .filter((evento) => {
+      const comportamento = (evento?.comportamento || '').trim();
+      return comportamento && comportamento.toUpperCase() !== 'N/D';
+    })
+    .sort((a, b) => new Date(a.data_vigencia) - new Date(b.data_vigencia))
+    .filter((evento, index, lista) => index === 0 || lista[index - 1].comportamento !== evento.comportamento);
+
+  if (!eventosSanitizados.length) {
     return <p className="text-sm text-slate-500">Nenhum marco de comportamento registrado.</p>;
   }
-  const eventosOrdenados = [...eventos].sort((a, b) => {
-    const dataA = a.data_vigencia;
-    const dataB = b.data_vigencia;
-    if (!dataA && !dataB) return 0;
-    if (!dataA) return 1;
-    if (!dataB) return -1;
-    return new Date(dataA) - new Date(dataB);
-  });
 
   return (
     <div className="space-y-3">
-      {eventosOrdenados.map((evento) => (
+      {eventosSanitizados.map((evento) => (
         <div key={evento.id} className="border rounded p-3 text-sm">
           <div className="flex items-center justify-between gap-2 mb-2">
             <Badge className={comportamentoClasses[evento.comportamento] || 'bg-slate-100 text-slate-700'}>
