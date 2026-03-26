@@ -17,7 +17,6 @@ import {
   ScrollText,
   Medal,
   Sword,
-  FilePenLine,
   FolderKanban,
   CalendarClock,
   Wrench,
@@ -43,7 +42,6 @@ const menuGroups = [
     title: 'Pessoal',
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
-      { name: 'Alterações Militar', page: 'FichaMilitar', icon: FilePenLine, moduleKey: 'militares' },
     ],
   },
   {

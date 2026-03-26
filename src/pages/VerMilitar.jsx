@@ -56,6 +56,7 @@ export default function VerMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+  const selectedTab = searchParams.get('tab') || 'comportamento';
   const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
 
@@ -174,8 +175,8 @@ export default function VerMilitar() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">Ficha do Militar</h1>
-              <p className="text-slate-500 text-sm">Visualização completa dos dados</p>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">Perfil do Militar</h1>
+              <p className="text-slate-500 text-sm">Comportamento e dados completos do militar</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -238,14 +239,14 @@ export default function VerMilitar() {
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue="dados">
+        <Tabs defaultValue={selectedTab}>
           <TabsList className="w-full flex-wrap h-auto gap-1 mb-6">
+            <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
             <TabsTrigger value="dados"><User className="w-4 h-4 mr-1" />Dados Pessoais</TabsTrigger>
             <TabsTrigger value="ferias"><Calendar className="w-4 h-4 mr-1" />Férias</TabsTrigger>
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
             <TabsTrigger value="medalhas"><Award className="w-4 h-4 mr-1" />Medalhas</TabsTrigger>
             <TabsTrigger value="armamentos"><Shield className="w-4 h-4 mr-1" />Armamentos</TabsTrigger>
-            <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
           </TabsList>
 
           {/* Dados Pessoais */}
