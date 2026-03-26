@@ -68,52 +68,64 @@ export async function garantirImplantacaoHistoricoComportamento({
   origemId = '',
   createdBy = '',
 }) {
-  const militarPayload = (militarId && typeof militarId === 'object')
-    ? militarId
-    : { id: militarId, comportamento: comportamentoAtual };
-  const militarIdNormalizado = militarPayload?.id;
-  if (!militarIdNormalizado) return null;
+  try {
+    const militarPayload = (militarId && typeof militarId === 'object')
+      ? militarId
+      : { id: militarId, comportamento: comportamentoAtual };
+    const militarIdNormalizado = militarPayload?.id;
+    if (!militarIdNormalizado) return null;
 
-  const historicoEntity = getEntitySafe('HistoricoComportamento');
-  if (!hasEntityMethod(historicoEntity, 'filter') || !hasEntityMethod(historicoEntity, 'create')) return null;
+    const historicoEntity = getEntitySafe('HistoricoComportamento');
+    if (!hasEntityMethod(historicoEntity, 'filter') || !hasEntityMethod(historicoEntity, 'create')) return null;
 
-  const existentes = await historicoEntity.filter({ militar_id: militarIdNormalizado }, 'data_vigencia');
-  const historicoExistenteSanitizado = sanitizarHistoricoComportamento(existentes, { ordem: 'asc' });
+    const existentes = await historicoEntity.filter({ militar_id: militarIdNormalizado }, 'data_vigencia');
+    const historicoExistenteSanitizado = sanitizarHistoricoComportamento(existentes, { ordem: 'asc' });
 
-  if (historicoExistenteSanitizado.length > 0) {
-    console.info('[HIST] duplicidade evitada', {
+    if (historicoExistenteSanitizado.length > 0) {
+      console.info('[HIST] duplicidade evitada', {
+        militar_id: militarIdNormalizado,
+        motivo: 'implantacao_ja_existente',
+      });
+      return historicoExistenteSanitizado[0];
+    }
+
+    let dataVigenciaInicial = normalizarDataVigencia(dataVigencia || militarPayload?.data_inclusao || new Date().toISOString().slice(0, 10));
+    if (!ehDataVigenciaValida(dataVigenciaInicial)) {
+      dataVigenciaInicial = new Date().toISOString().slice(0, 10);
+    }
+
+    let comportamentoInicial = militarPayload?.comportamento || comportamentoAtual;
+    if (!ehComportamentoValido(comportamentoInicial)) {
+      comportamentoInicial = 'Bom';
+    }
+
+    const marcoImplantacao = await historicoEntity.create({
       militar_id: militarIdNormalizado,
-      motivo: 'implantacao_ja_existente',
+      data_vigencia: dataVigenciaInicial,
+      comportamento: comportamentoInicial,
+      comportamento_anterior: '',
+      motivo_mudanca: 'Implantação do sistema',
+      fundamento_legal: 'Registro inicial do comportamento no momento da implantação',
+      origem_tipo: origemTipo || 'Implantacao',
+      origem_id: origemId || militarIdNormalizado,
+      observacoes: 'Registro inicial criado automaticamente para a linha do tempo disciplinar.',
+      created_by: createdBy || '',
     });
-    return historicoExistenteSanitizado[0];
+
+    console.info('[HIST] implantação criada', {
+      militar_id: militarIdNormalizado,
+      historico_id: marcoImplantacao?.id,
+      comportamento: marcoImplantacao?.comportamento,
+    });
+
+    return marcoImplantacao;
+  } catch (error) {
+    console.error('[HIST] erro implantação', {
+      militar_id: typeof militarId === 'object' ? militarId?.id : militarId,
+      erro: error?.message || error,
+    });
+    return null;
   }
-
-  const dataVigenciaInicial = normalizarDataVigencia(dataVigencia || militarPayload?.data_inclusao || new Date().toISOString().slice(0, 10));
-  const comportamentoInicial = militarPayload?.comportamento || comportamentoAtual;
-
-  if (!ehDataVigenciaValida(dataVigenciaInicial)) return null;
-  if (!ehComportamentoValido(comportamentoInicial)) return null;
-
-  const marcoImplantacao = await historicoEntity.create({
-    militar_id: militarIdNormalizado,
-    data_vigencia: dataVigenciaInicial,
-    comportamento: comportamentoInicial,
-    comportamento_anterior: '',
-    motivo_mudanca: 'Implantação do sistema',
-    fundamento_legal: 'Registro inicial do comportamento no momento da implantação',
-    origem_tipo: origemTipo || 'Implantacao',
-    origem_id: origemId || militarIdNormalizado,
-    observacoes: 'Registro inicial criado automaticamente para a linha do tempo disciplinar.',
-    created_by: createdBy || '',
-  });
-
-  console.info('[HIST] implantação criada', {
-    militar_id: militarIdNormalizado,
-    historico_id: marcoImplantacao?.id,
-    comportamento: marcoImplantacao?.comportamento,
-  });
-
-  return marcoImplantacao;
 }
 
 function normalizarDataVigencia(data) {
