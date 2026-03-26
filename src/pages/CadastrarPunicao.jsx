@@ -27,6 +27,7 @@ import {
   validarPunicaoDisciplinar,
   recalcularComportamentoEMarcarPendencia,
   criarCardPunicaoNoQuadro,
+  diagnosticarFluxoPunicaoRuntime,
 } from '@/services/justicaDisciplinaService';
 
 export default function CadastrarPunicao() {
@@ -98,22 +99,39 @@ export default function CadastrarPunicao() {
       setErroValidacao('');
       validarPunicaoDisciplinar(formData);
 
+      try {
+        const diagnostico = await diagnosticarFluxoPunicaoRuntime();
+        console.info('[JD] diagnóstico de runtime', diagnostico);
+      } catch (error) {
+        console.warn('[JD] erro em etapa: diagnóstico de runtime', error);
+      }
+
       let punicaoSalva;
       if (punicaoId) {
         punicaoSalva = await entity.update(punicaoId, formData);
+        console.info('[JD] punicao criada', { punicao_id: punicaoId, modo: 'update' });
       } else {
         punicaoSalva = await entity.create({
           ...formData,
           created_date: new Date().toISOString(),
         });
+        console.info('[JD] punicao criada', { punicao_id: punicaoSalva?.id, modo: 'create' });
       }
 
-      await recalcularComportamentoEMarcarPendencia(formData.militar_id, punicaoId ? 'Punição disciplinar atualizada' : 'Punição disciplinar registrada');
+      try {
+        await recalcularComportamentoEMarcarPendencia(formData.militar_id, punicaoId ? 'Punição disciplinar atualizada' : 'Punição disciplinar registrada');
+      } catch (error) {
+        console.warn('[JD] erro em etapa: recálculo de comportamento', error);
+      }
 
       if (!punicaoId) {
-        const card = await criarCardPunicaoNoQuadro(punicaoSalva);
-        if (card?.id) {
-          await entity.update(punicaoSalva.id, { card_operacional_id: card.id });
+        try {
+          const card = await criarCardPunicaoNoQuadro(punicaoSalva);
+          if (card?.id) {
+            await entity.update(punicaoSalva.id, { card_operacional_id: card.id });
+          }
+        } catch (error) {
+          console.warn('[JD] erro em etapa: criação de card operacional', error);
         }
       }
 
@@ -125,6 +143,7 @@ export default function CadastrarPunicao() {
       navigate(createPageUrl('Punicoes'));
     },
     onError: (error) => {
+      console.warn('[JD] erro em etapa: salvar punição', error);
       setErroValidacao(error?.message || 'Não foi possível salvar a punição.');
     },
     onSettled: () => {
