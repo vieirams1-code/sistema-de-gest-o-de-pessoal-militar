@@ -119,7 +119,13 @@ export default function CadastrarPunicao() {
       }
 
       try {
-        await recalcularComportamentoEMarcarPendencia(formData.militar_id, punicaoId ? 'Punição disciplinar atualizada' : 'Punição disciplinar registrada');
+        const resultadoPendencia = await recalcularComportamentoEMarcarPendencia(
+          formData.militar_id,
+          punicaoId ? 'Punição disciplinar atualizada' : 'Punição disciplinar registrada'
+        );
+        if (resultadoPendencia?.pendenciaEsperada && !resultadoPendencia?.pendenciaCriada) {
+          console.warn('[JD] erro em etapa: pendência esperada não foi criada', resultadoPendencia);
+        }
       } catch (error) {
         console.warn('[JD] erro em etapa: recálculo de comportamento', error);
       }

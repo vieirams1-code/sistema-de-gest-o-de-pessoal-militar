@@ -92,16 +92,16 @@ export function validarPunicaoDisciplinar(payload) {
 }
 
 export async function recalcularComportamentoEMarcarPendencia(militarId, motivo) {
-  if (!militarId) return;
+  if (!militarId) return { executado: false, motivo: 'militar_id_ausente' };
 
   const militarEntity = getEntitySafe('Militar');
   if (!hasEntityMethod(militarEntity, 'filter')) {
     console.warn('[JD] erro em etapa: entidade Militar indisponível para recálculo');
-    return;
+    return { executado: false, motivo: 'entidade_militar_indisponivel' };
   }
 
   const [militar] = await militarEntity.filter({ id: militarId });
-  if (!militar) return;
+  if (!militar) return { executado: false, motivo: 'militar_nao_encontrado' };
 
   const entity = getPunicaoEntity();
   const punicoes = await entity.filter({ militar_id: militarId });
@@ -109,7 +109,7 @@ export async function recalcularComportamentoEMarcarPendencia(militarId, motivo)
     dataInclusaoMilitar: militar.data_inclusao,
   });
 
-  if (!resultado?.comportamento) return;
+  if (!resultado?.comportamento) return { executado: false, motivo: 'calculo_sem_resultado' };
 
   if (resultado.comportamento !== militar.comportamento) {
     const pendenciaEntity = getEntitySafe('PendenciaComportamento');
@@ -117,10 +117,15 @@ export async function recalcularComportamentoEMarcarPendencia(militarId, motivo)
 
     if (!hasEntityMethod(pendenciaEntity, 'create')) {
       console.warn('[JD] erro em etapa: entidade PendenciaComportamento indisponível');
-      return;
+      return {
+        executado: false,
+        pendenciaEsperada: true,
+        pendenciaCriada: false,
+        motivo: 'entidade_pendencia_indisponivel',
+      };
     }
 
-    await pendenciaEntity.create({
+    const payloadPendencia = {
       militar_id: militar.id,
       militar_nome: militar.nome_completo,
       comportamento_atual: militar.comportamento || 'Bom',
@@ -129,7 +134,23 @@ export async function recalcularComportamentoEMarcarPendencia(militarId, motivo)
       detalhes_calculo: JSON.stringify(resultado.detalhes || {}),
       data_detectada: new Date().toISOString().slice(0, 10),
       status_pendencia: 'Pendente',
-    });
+    };
+
+    let pendenciaCriada = false;
+    try {
+      await pendenciaEntity.create(payloadPendencia);
+      pendenciaCriada = true;
+    } catch (error) {
+      if (hasEntityMethod(pendenciaEntity, 'filter')) {
+        const existentes = await pendenciaEntity.filter({
+          militar_id: militar.id,
+          status_pendencia: 'Pendente',
+          comportamento_sugerido: resultado.comportamento,
+        });
+        pendenciaCriada = existentes.length > 0;
+      }
+      if (!pendenciaCriada) throw error;
+    }
     console.info('[JD] pendencia criada', { militar_id: militar.id, comportamento_sugerido: resultado.comportamento });
 
     await militarEntity.update(militar.id, {
@@ -146,7 +167,16 @@ export async function recalcularComportamentoEMarcarPendencia(militarId, motivo)
         data_alteracao: new Date().toISOString().slice(0, 10),
       });
     }
+
+    return {
+      executado: true,
+      pendenciaEsperada: true,
+      pendenciaCriada: true,
+      comportamentoSugerido: resultado.comportamento,
+    };
   }
+
+  return { executado: true, pendenciaEsperada: false, pendenciaCriada: false };
 }
 
 export async function criarCardPunicaoNoQuadro(punicao) {
