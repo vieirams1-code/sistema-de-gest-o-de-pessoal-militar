@@ -25,8 +25,8 @@ export default function ComportamentoTimeline({ eventos = [] }) {
     return <p className="text-sm text-slate-500">Nenhum marco de comportamento registrado.</p>;
   }
   const eventosOrdenados = [...eventos].sort((a, b) => {
-    const dataA = a.data_vigencia || a.data_evento || a.data_alteracao;
-    const dataB = b.data_vigencia || b.data_evento || b.data_alteracao;
+    const dataA = a.data_vigencia;
+    const dataB = b.data_vigencia;
     if (!dataA && !dataB) return 0;
     if (!dataA) return 1;
     if (!dataB) return -1;
@@ -41,7 +41,7 @@ export default function ComportamentoTimeline({ eventos = [] }) {
             <Badge className={comportamentoClasses[evento.comportamento] || 'bg-slate-100 text-slate-700'}>
               {evento.comportamento || 'N/D'}
             </Badge>
-            <span className="text-slate-500">{formatarData(evento.data_vigencia || evento.data_evento || evento.data_alteracao)}</span>
+            <span className="text-slate-500">{formatarData(evento.data_vigencia)}</span>
           </div>
 
           {evento.comportamento_anterior ? (
@@ -49,7 +49,7 @@ export default function ComportamentoTimeline({ eventos = [] }) {
           ) : (
             <p><strong>Comportamento vigente:</strong> {evento.comportamento || 'N/D'}</p>
           )}
-          {evento.motivo_mudanca && <p className="text-slate-700 mt-1"><strong>Motivo:</strong> {evento.motivo_mudanca}</p>}
+          <p className="text-slate-700 mt-1"><strong>Motivo:</strong> {evento.motivo_mudanca || '—'}</p>
           {evento.observacoes && <p className="text-slate-600 mt-1">{evento.observacoes}</p>}
         </div>
       ))}
