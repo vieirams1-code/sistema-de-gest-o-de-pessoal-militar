@@ -32,6 +32,24 @@ async function validarCamposEmAmostra(entity, campos, descricao) {
   };
 }
 
+async function listarHistoricoPorMilitar(historicoEntity, militarId, sort = 'data_vigencia') {
+  if (!hasEntityMethod(historicoEntity, 'filter') || !militarId) return [];
+
+  const [porMilitarId, porMilitarIdLegado] = await Promise.all([
+    historicoEntity.filter({ militar_id: militarId }, sort),
+    historicoEntity.filter({ militarId: militarId }, sort),
+  ]);
+
+  const agregados = [...(Array.isArray(porMilitarId) ? porMilitarId : []), ...(Array.isArray(porMilitarIdLegado) ? porMilitarIdLegado : [])];
+  const mapa = new Map();
+  for (const registro of agregados) {
+    const chave = registro?.id || `${registro?.militar_id || registro?.militarId || ''}-${registro?.data_vigencia || ''}-${registro?.comportamento || ''}`;
+    if (!mapa.has(chave)) mapa.set(chave, registro);
+  }
+
+  return Array.from(mapa.values());
+}
+
 export async function diagnosticarFluxoPunicaoRuntime() {
   const diagnostico = {
     entidades: {
@@ -82,7 +100,7 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
     const historicoEntity = getEntitySafe('HistoricoComportamento');
     if (!hasEntityMethod(historicoEntity, 'filter') || !hasEntityMethod(historicoEntity, 'create')) return null;
 
-    const existentes = await historicoEntity.filter({ militar_id: militarIdNormalizado }, 'data_vigencia');
+    const existentes = await listarHistoricoPorMilitar(historicoEntity, militarIdNormalizado, 'data_vigencia');
     const historicoExistenteSanitizado = sanitizarHistoricoComportamento(existentes, { ordem: 'asc' });
 
     if (historicoExistenteSanitizado.length > 0) {
@@ -107,7 +125,7 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
       comportamentoInicial = 'Bom';
     }
 
-    const marcoImplantacao = await historicoEntity.create({
+    const registroCriado = await historicoEntity.create({
       militar_id: militarIdNormalizado,
       data_vigencia: dataVigenciaInicial,
       comportamento: comportamentoInicial,
@@ -120,13 +138,19 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
       created_by: createdBy || '',
     });
 
+    if (registroCriado) {
+      console.log('[HIST] criado:', registroCriado);
+    } else {
+      console.error('[HIST] falha ao criar histórico');
+    }
+
     console.info('[HIST] implantação criada no banco', {
       militar_id: militarIdNormalizado,
-      historico_id: marcoImplantacao?.id,
-      comportamento: marcoImplantacao?.comportamento,
+      historico_id: registroCriado?.id,
+      comportamento: registroCriado?.comportamento,
     });
 
-    const aposCreate = await historicoEntity.filter({ militar_id: militarIdNormalizado }, 'data_vigencia');
+    const aposCreate = await listarHistoricoPorMilitar(historicoEntity, militarIdNormalizado, 'data_vigencia');
     const historicoAposCreate = sanitizarHistoricoComportamento(aposCreate, { ordem: 'asc' });
     if (historicoAposCreate.length > 0) {
       console.info('[HIST] histórico encontrado', {
@@ -139,7 +163,7 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
       });
     }
 
-    return marcoImplantacao;
+    return registroCriado;
   } catch (error) {
     console.error('[HIST] erro implantação', {
       militar_id: payload?.militarId?.id || payload?.militarId || payload?.id || null,
@@ -209,7 +233,7 @@ export async function registrarMarcoHistoricoComportamento({
   const historicoEntity = getEntitySafe('HistoricoComportamento');
   if (!hasEntityMethod(historicoEntity, 'create') || !hasEntityMethod(historicoEntity, 'filter')) return null;
 
-  const registrosExistentes = await historicoEntity.filter({ militar_id: militarId }, 'data_vigencia');
+  const registrosExistentes = await listarHistoricoPorMilitar(historicoEntity, militarId, 'data_vigencia');
   const historicoSanitizado = sanitizarHistoricoComportamento(registrosExistentes, { ordem: 'desc' });
   const ultimoMarco = historicoSanitizado[0];
 
@@ -287,7 +311,7 @@ export async function obterHistoricoComportamentoMilitar(militarId, { ordem = 'a
   if (!hasEntityMethod(historicoEntity, 'filter')) return [];
 
   const sort = ordem === 'desc' ? '-data_vigencia' : 'data_vigencia';
-  const registros = await historicoEntity.filter({ militar_id: militarId }, sort);
+  const registros = await listarHistoricoPorMilitar(historicoEntity, militarId, sort);
   return sanitizarHistoricoComportamento(registros, { ordem });
 }
 
