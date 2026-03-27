@@ -200,6 +200,8 @@ function normalizarRegistro(registro) {
     detalhes_contrato: origemTipo === 'livro' ? (registro?.detalhes || null) : registro.detalhes_contrato,
     vinculos_contrato: origemTipo === 'livro' ? (registro?.vinculos || null) : registro.vinculos_contrato,
     publicacao_contrato: origemTipo === 'livro' ? (registro?.publicacao || null) : registro.publicacao_contrato,
+    publicado_por: origemTipo === 'livro' ? (registro?.publicacao?.publicado_por || registro.publicado_por || '') : (registro.publicado_por || ''),
+    publicado_em: origemTipo === 'livro' ? (registro?.publicacao?.publicado_em || registro.publicado_em || '') : (registro.publicado_em || ''),
     inconsistencia_contrato: origemTipo === 'livro' ? (registro?.inconsistencia || null) : registro.inconsistencia_contrato,
     cadeia_eventos_contrato: origemTipo === 'livro' ? (registro?.cadeia_eventos || []) : (registro.cadeia_eventos_contrato || []),
   };
@@ -265,7 +267,7 @@ export default function Publicacoes() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
   const [loteDestinoId, setLoteDestinoId] = useState('');
-  const { isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { user, isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
@@ -1213,6 +1215,7 @@ export default function Publicacoes() {
                             isAdmin={isAdmin}
                             modoAdmin={modoAdmin}
                             canAccessAction={canAccessAction}
+                            currentUserEmail={user?.email || ''}
                           />
                         </div>
                       );

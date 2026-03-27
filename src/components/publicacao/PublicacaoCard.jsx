@@ -74,6 +74,9 @@ function detectarOrigemTipo(registro) {
 }
 
 function getTipoDisplay(tipo) {
+  if (tipo === 'ALTERACAO_COMPORTAMENTO_DISCIPLINAR') return 'Alteração de Comportamento Disciplinar';
+  if (tipo === 'MELHORIA_COMPORTAMENTO_DISCIPLINAR') return 'Melhoria de Comportamento Disciplinar';
+  if (tipo === 'MARCO_INICIAL_COMPORTAMENTO_DISCIPLINAR') return 'Marco Inicial de Comportamento Disciplinar';
   if (tipo === 'Saída Férias') return 'Início';
   if (tipo === 'Interrupção de Férias') return 'Interrupção';
   if (tipo === 'Nova Saída / Retomada') return 'Continuação';
@@ -172,7 +175,7 @@ function FieldBlock({ label, children, className = '' }) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, onDesagruparFilho, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false }) {
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, onDesagruparFilho, todosRegistros = [], isAdmin: _isAdmin = false, modoAdmin = false, canAccessAction = (_a) => false, currentUserEmail = '' }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isChildrenExpanded, setIsChildrenExpanded] = useState(false);
@@ -232,6 +235,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
   const podeMarcarPrioridade = !isPublicado && !isFilhoLoteCompilado;
   const podeEditar = !isPublicado && origemTipo !== 'livro' && origemTipo !== 'publicacao-compilada';
+  const podeInformarBg = !isPublicado && !isFilhoLoteCompilado && currentStatus === 'Aguardando Nota';
   const temPermissaoAdmin = canAccessAction('admin_mode');
   const podeExcluir = !isPublicado && temPermissaoAdmin && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && temPermissaoAdmin && !modoAdmin;
@@ -275,15 +279,30 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
       alert(mensagemRegistroFilho);
       return;
     }
+    if (!podeInformarBg) {
+      alert('Só é permitido informar BG para registros com status "Aguardando Nota".');
+      return;
+    }
+    if (!bgData.numero_bg?.trim()) {
+      alert('Informe o número do BG para concluir a publicação.');
+      return;
+    }
+    if (!bgData.data_bg) {
+      alert('Informe a data do BG para concluir a publicação.');
+      return;
+    }
 
-    const novoStatus = calcStatus(bgData.nota_para_bg, bgData.numero_bg, bgData.data_bg);
+    const novoStatus = 'Publicado';
+    const publicadoEm = new Date().toISOString();
+    const publicadoPor = currentUserEmail || 'usuario_nao_identificado';
 
     const updateData =
       origemTipo === 'atestado'
-        ? { ...bgData, status_publicacao: novoStatus }
-        : { ...bgData, status: novoStatus };
+        ? { ...bgData, status_publicacao: novoStatus, publicado_por: publicadoPor, publicado_em: publicadoEm }
+        : { ...bgData, status: novoStatus, publicado_por: publicadoPor, publicado_em: publicadoEm };
 
     onUpdate(registro.id, updateData, origemTipo);
+    alert('Publicação em BG confirmada com sucesso.');
     setIsEditingBg(false);
   };
 
@@ -539,7 +558,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   </Button>
                 </>
               )}
-              {!isEditingBg && (
+              {!isEditingBg && podeInformarBg && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -553,7 +572,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   }}
                   className="text-slate-500 hover:text-blue-600 text-xs gap-1"
                 >
-                  <FileText className="w-4 h-4" /><span className="hidden sm:inline">Nota/BG</span>
+                  <FileText className="w-4 h-4" /><span className="hidden sm:inline">Informar BG</span>
                 </Button>
               )}
               {podeEditar && (
@@ -627,7 +646,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           <CardContent className="p-5">
             {isEditingBg ? (
               <div className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Preencher Nota / BG</p>
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Publicar em BG</p>
                 <div>
                   <Label className="text-sm font-medium">Nota para BG</Label>
                   <Input value={bgData.nota_para_bg} onChange={(e) => setBgData((d) => ({ ...d, nota_para_bg: e.target.value }))} className="mt-1 bg-white" />
@@ -646,7 +665,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   <Badge className={`${statusColors[liveStatus]} text-xs`}>→ {liveStatus}</Badge>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handleSaveBg} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"><Save className="w-4 h-4 mr-1" />Salvar</Button>
+                  <Button size="sm" onClick={handleSaveBg} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"><Save className="w-4 h-4 mr-1" />Confirmar publicação</Button>
                   <Button size="sm" variant="outline" onClick={handleCancelBg}><X className="w-4 h-4 mr-1" />Cancelar</Button>
                 </div>
               </div>
@@ -702,6 +721,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 <div className="space-y-5">
                   <FieldBlock label="Nota para BG"><div className="font-semibold">{registro.nota_para_bg || '—'}</div></FieldBlock>
                   <FieldBlock label="Número do BG"><div className="font-semibold">{registro.numero_bg || '—'}</div></FieldBlock>
+                  <FieldBlock label="Publicado por"><div className="font-semibold">{registro.publicado_por || '—'}</div></FieldBlock>
                   <FieldBlock label="Rastreabilidade">
                     {cadeiaEventosContrato.length > 0 ? (
                       <div className="space-y-2">
@@ -718,6 +738,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                     ) : <div className="text-slate-500">Sem rastreabilidade detalhada.</div>}
                   </FieldBlock>
                   <FieldBlock label="Data do BG"><div className="font-semibold">{formatDate(registro.data_bg)}</div></FieldBlock>
+                  <FieldBlock label="Publicado em"><div className="font-semibold">{formatDate(registro.publicado_em)}</div></FieldBlock>
 
                   {(registro.data_inicio || registro.data_termino || registro.data_retorno || registro.dias || registro.periodo_aquisitivo) && (
                     <FieldBlock label="Datas e Período">

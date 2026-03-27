@@ -10,6 +10,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
 
 const STATUS_OPTIONS = [
   { value: 'todos', label: 'Todos os status' },
@@ -163,14 +164,16 @@ function normalizeRegistro(registro) {
   const statusCodigo = normalizeStatus(registro);
   const modulo = normalizeModulo(registro.modulo, registro);
   const militar = registro.militar || {};
+  const tipoOriginal = registro.tipo_label || registro.tipo_registro || registro.tipo || 'Registro RP';
+  const tipoAmigavel = getRPTipoLabel(tipoOriginal);
 
   return {
     ...registro,
     modulo_normalizado: modulo,
     status_codigo: statusCodigo,
     status_label: normalizeStatusLabel(registro, statusCodigo),
-    tipo_label: registro.tipo_label || registro.tipo_registro || registro.tipo || 'Registro RP',
-    data_display: registro.data_display || registro.data_registro || registro.data_inicio || registro.created_date || '-',
+    tipo_label: tipoAmigavel,
+    data_display: formatDateBR(registro.data_display || registro.data_registro || registro.data_inicio || registro.created_date || '-'),
     origem: registro.origem || registro.origem_tipo || modulo,
     militar: {
       id: militar.id || registro.militar_id,
@@ -181,12 +184,21 @@ function normalizeRegistro(registro) {
     publicacao: {
       nota_para_bg: registro.publicacao?.nota_para_bg || registro.nota_para_bg || '-',
       numero_bg: registro.publicacao?.numero_bg || registro.numero_bg || '',
-      data_bg: registro.publicacao?.data_bg || registro.data_bg || '-',
+      data_bg: formatDateBR(registro.publicacao?.data_bg || registro.data_bg || '-'),
+      publicado_por: registro.publicacao?.publicado_por || registro.publicado_por || '-',
+      publicado_em: formatDateBR(registro.publicacao?.publicado_em || registro.publicado_em || '-'),
     },
     detalhes: registro.detalhes || registro.detalhes_contrato || { observacoes: registro.observacoes || '' },
     inconsistencia: registro.inconsistencia || registro.inconsistencia_contrato || null,
     vinculos: registro.vinculos || registro.vinculos_contrato || null,
   };
+}
+
+function formatDateBR(valor) {
+  if (!valor || valor === '-') return '-';
+  const data = String(valor).includes('T') ? new Date(valor) : new Date(`${valor}T00:00:00`);
+  if (Number.isNaN(data.getTime())) return valor;
+  return data.toLocaleDateString('pt-BR');
 }
 
 function buildSearchText(registro) {
