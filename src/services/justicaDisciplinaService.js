@@ -152,6 +152,22 @@ function encontrarPendenciaCorrespondente(marco = {}, pendencias = []) {
   }) || null;
 }
 
+function inferirFundamentoPorCalculoNoMarco({ marco, militar, punicoes }) {
+  if (!marco || !militar || !Array.isArray(punicoes) || !punicoes.length) return '';
+  const referencia = normalizarDataVigencia(marco?.data_alteracao);
+  if (!referencia) return '';
+
+  const calculado = calcularComportamento(punicoes, militar.posto_graduacao, new Date(`${referencia}T00:00:00`), {
+    dataInclusaoMilitar: militar.data_inclusao,
+  });
+
+  const comportamentoCalculado = String(calculado?.comportamento || '').trim().toUpperCase();
+  const comportamentoMarco = String(marco?.comportamento_novo || '').trim().toUpperCase();
+  if (!comportamentoCalculado || !comportamentoMarco || comportamentoCalculado !== comportamentoMarco) return '';
+
+  return String(calculado?.fundamento || '').trim();
+}
+
 async function enriquecerHistoricoComportamentoDisciplinar(registros = [], militarId) {
   const historico = Array.isArray(registros) ? registros : [];
   const candidatos = historico.filter((registro) => precisaSaneamentoMarcoDisciplinar(registro));
@@ -181,18 +197,9 @@ async function enriquecerHistoricoComportamentoDisciplinar(registros = [], milit
     let motivoNovo = motivoAtual || (pendencia ? MOTIVO_MUDANCA_DISCIPLINAR_PADRAO : '');
     let fundamentoNovo = fundamentoAtual || String(pendencia?.fundamento_legal || '').trim();
 
-    if (!fundamentoNovo && militar && Array.isArray(punicoes) && punicoes.length > 0) {
-      const calculado = calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
-        dataInclusaoMilitar: militar.data_inclusao,
-      });
-      const comportamentoCalculado = String(calculado?.comportamento || '').trim().toUpperCase();
-      const comportamentoMarco = String(marco?.comportamento_novo || '').trim().toUpperCase();
-      if (comportamentoCalculado && comportamentoMarco && comportamentoCalculado === comportamentoMarco) {
-        fundamentoNovo = String(calculado?.fundamento || '').trim();
-        if (fundamentoNovo && !motivoNovo) {
-          motivoNovo = MOTIVO_MUDANCA_DISCIPLINAR_PADRAO;
-        }
-      }
+    if (!fundamentoNovo) {
+      fundamentoNovo = inferirFundamentoPorCalculoNoMarco({ marco, militar, punicoes });
+      if (fundamentoNovo && !motivoNovo) motivoNovo = MOTIVO_MUDANCA_DISCIPLINAR_PADRAO;
     }
 
     if (!motivoNovo && fundamentoNovo) {
@@ -205,12 +212,13 @@ async function enriquecerHistoricoComportamentoDisciplinar(registros = [], milit
         fundamento_legal: fundamentoNovo || fundamentoAtual || '',
       };
 
+      atualizados.set(marco.id, {
+        ...marco,
+        ...patch,
+      });
+
       try {
         await historicoEntity.update(marco.id, patch);
-        atualizados.set(marco.id, {
-          ...marco,
-          ...patch,
-        });
       } catch (error) {
         console.warn('[HIST] falha saneamento de marco disciplinar', {
           historico_id: marco?.id,
@@ -513,6 +521,18 @@ export async function registrarMarcoHistoricoComportamento({
     }
   }
   const mudancaDisciplinarPorCalculo = origemEhPendencia || Boolean(fundamentoLegalFinal);
+  if (!fundamentoLegalFinal && mudancaDisciplinarPorCalculo) {
+    const [militar] = await (getEntitySafe('Militar')?.filter?.({ id: militarIdNormalizado }) || []);
+    const punicoes = await (getEntitySafe('PunicaoDisciplinar')?.filter?.({ militar_id: militarIdNormalizado }) || []);
+    fundamentoLegalFinal = inferirFundamentoPorCalculoNoMarco({
+      marco: {
+        data_alteracao: dataVigencia,
+        comportamento_novo: comportamento,
+      },
+      militar,
+      punicoes,
+    });
+  }
   const motivoMudancaFinal = (motivoMudanca || motivo_mudanca || '').trim()
     || (mudancaDisciplinarPorCalculo ? MOTIVO_MUDANCA_DISCIPLINAR_PADRAO : '');
   const createdByFinal = createdBy || created_by || '';
