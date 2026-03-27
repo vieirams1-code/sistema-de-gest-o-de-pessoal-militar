@@ -212,22 +212,43 @@ export async function limparVinculoLoteDosFilhos({
 }
 
 export function isRegistroElegivelParaCompilacaoFerias(registro = {}) {
+  return getMotivoInelegibilidadeCompilacaoFerias(registro) === null;
+}
+
+export function getMotivoInelegibilidadeCompilacaoFerias(registro = {}) {
   const statusCodigo = getStatusCodigoNormalizado(registro);
   const publicacaoCompiladaId = hasPublicacaoCompiladaId(registro);
   const compiladoEmLote = isCompiladoEmLoteTrue(registro);
 
-  return (
-    detectarOrigemLivro(registro) &&
-    isFeriasOperacional(registro) &&
-    isTipoFeriasCompilavel(registro) &&
-    STATUS_COMPATIVEIS.has(statusCodigo) &&
-    !registro?.numero_bg &&
-    !registro?.data_bg &&
-    !isPublicado(registro) &&
-    !hasInconsistencia(registro) &&
-    !publicacaoCompiladaId &&
-    !compiladoEmLote
-  );
+  if (!detectarOrigemLivro(registro)) {
+    return 'Registro fora do módulo Livro.';
+  }
+
+  if (!isFeriasOperacional(registro)) {
+    return 'Registro sem vínculo operacional de férias.';
+  }
+
+  if (!isTipoFeriasCompilavel(registro)) {
+    return 'Tipo não elegível para compilação mínima de férias';
+  }
+
+  if (!STATUS_COMPATIVEIS.has(statusCodigo)) {
+    return 'Status não elegível para compilação mínima de férias.';
+  }
+
+  if (registro?.numero_bg || registro?.data_bg || isPublicado(registro)) {
+    return 'Registro já publicado em BG.';
+  }
+
+  if (hasInconsistencia(registro)) {
+    return 'Registro inconsistente e bloqueado para compilação.';
+  }
+
+  if (publicacaoCompiladaId || compiladoEmLote) {
+    return 'Registro já vinculado a lote compilado.';
+  }
+
+  return null;
 }
 
 export function validarCompatibilidadeLoteFerias(registros = []) {

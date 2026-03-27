@@ -24,6 +24,7 @@ import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeia
 import {
   buildPayloadPublicacaoCompilada,
   buildTextoCompiladoFerias,
+  getMotivoInelegibilidadeCompilacaoFerias,
   PUBLICACAO_COMPILADA_FERIAS_TIPO,
   limparVinculoLoteDosFilhos,
   isLoteCompiladoPublicado,
@@ -402,12 +403,20 @@ export default function Publicacoes() {
 
   const compilarMutation = useMutation({
     mutationFn: async (registrosSelecionados) => {
+      const registrosElegiveisSelecionados = (registrosSelecionados || []).filter((registro) => (
+        isRegistroElegivelParaCompilacaoFerias(registro)
+      ));
+
+      if (registrosElegiveisSelecionados.length !== (registrosSelecionados || []).length) {
+        throw new Error('A compilação mínima de férias aceita somente registros elegíveis de férias.');
+      }
+
       console.info('[CompilacaoFerias] Iniciando seleção para compilação.', {
-        totalSelecionados: registrosSelecionados?.length || 0,
-        registrosIds: (registrosSelecionados || []).map((registro) => registro?.id).filter(Boolean),
+        totalSelecionados: registrosElegiveisSelecionados.length,
+        registrosIds: registrosElegiveisSelecionados.map((registro) => registro?.id).filter(Boolean),
       });
 
-      const compatibilidade = validarCompatibilidadeLoteFerias(registrosSelecionados);
+      const compatibilidade = validarCompatibilidadeLoteFerias(registrosElegiveisSelecionados);
       if (!compatibilidade.compativel) {
         console.error('[CompilacaoFerias] Seleção inválida.', {
           motivo: compatibilidade.motivo,
@@ -417,7 +426,7 @@ export default function Publicacoes() {
       }
 
       // Verificar se algum registro já está compilado (usando dados locais — mais rápido e sem risco de leitura atrasada)
-      const registrosJaCompilados = registrosSelecionados.filter((registro) =>
+      const registrosJaCompilados = registrosElegiveisSelecionados.filter((registro) =>
         isRegistroEmLoteCompilado(registro) || !!registro?.publicacao_compilada_id
       );
 
@@ -429,7 +438,7 @@ export default function Publicacoes() {
       }
 
       // Garante em memória a ordem correta para construção sequencial do texto
-      const registrosComOrdem = registrosSelecionados.map((registro, index) => ({
+      const registrosComOrdem = registrosElegiveisSelecionados.map((registro, index) => ({
         ...registro,
         publicacao_compilada_ordem: index + 1
       }));
@@ -1176,7 +1185,7 @@ export default function Publicacoes() {
                   <span>Selecionar elegíveis visíveis</span>
                 </label>
                 <span className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
-                  {selectedRegistrosDetalhados.length} selecionado(s)
+                  {selectedRegistrosDetalhados.length} elegível(is) selecionado(s)
                 </span>
                 <Select value={loteDestinoId} onValueChange={setLoteDestinoId}>
                   <SelectTrigger className="w-[280px] bg-white">
@@ -1261,18 +1270,27 @@ export default function Publicacoes() {
                     {items.map((registro) => {
                       const elegivelCompilacao = elegiveisIds.has(registro.id);
                       const selecionado = selectedRegistros.includes(registro.id);
+                      const motivoInelegibilidade = elegivelCompilacao
+                        ? null
+                        : getMotivoInelegibilidadeCompilacaoFerias(registro);
 
                       return (
                         <div key={registro.id} className={`rounded-[24px] ${selecionado ? 'ring-2 ring-indigo-200' : ''}`}>
                           <div className="mb-2 flex flex-wrap items-center justify-between gap-3 px-1">
-                            <label className={`inline-flex items-center gap-2 text-sm font-medium ${elegivelCompilacao ? 'text-slate-700' : 'text-slate-400'}`}>
-                              <Checkbox
-                                checked={selecionado}
-                                disabled={!elegivelCompilacao}
-                                onCheckedChange={(checked) => toggleRegistroSelecionado(registro.id, Boolean(checked))}
-                              />
-                              <span>{elegivelCompilacao ? 'Selecionar para compilação' : (registro.compilado_em_lote ? 'Já vinculado a lote' : 'Não elegível para compilação')}</span>
-                            </label>
+                            {elegivelCompilacao ? (
+                              <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                                <Checkbox
+                                  checked={selecionado}
+                                  onCheckedChange={(checked) => toggleRegistroSelecionado(registro.id, Boolean(checked))}
+                                />
+                                <span>Selecionar para compilação</span>
+                              </label>
+                            ) : (
+                              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                <span>{motivoInelegibilidade || 'Tipo não elegível para compilação mínima de férias'}</span>
+                              </div>
+                            )}
 
                             {registro.compilado_em_lote && (
                               <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
