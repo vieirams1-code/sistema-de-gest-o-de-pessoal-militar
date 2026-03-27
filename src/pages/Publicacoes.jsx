@@ -23,17 +23,24 @@ import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import {
   buildPayloadPublicacaoCompilada,
+  buildPayloadPublicacaoCompiladaDisciplinar,
+  buildTextoCompiladoDisciplinar,
   buildTextoCompiladoFerias,
+  getMotivoInelegibilidadeCompilacaoDisciplinar,
   getMotivoInelegibilidadeCompilacaoFerias,
+  PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO,
   PUBLICACAO_COMPILADA_FERIAS_TIPO,
   limparVinculoLoteDosFilhos,
   isLoteCompiladoPublicado,
+  isRegistroElegivelParaCompilacaoDisciplinar,
   isRegistroElegivelParaCompilacaoFerias,
   isRegistroFilhoDePublicacaoCompilada,
   isRegistroEmLoteCompilado,
   podeDesfazerLoteCompilado,
+  validarCompatibilidadeLoteDisciplinar,
   validarCompatibilidadeLoteFerias,
 } from '@/components/publicacao/publicacaoCompiladaService';
+import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
 
 const TIPOS_FERIAS = [
   'Saída Férias',
@@ -80,14 +87,7 @@ function mapStatusContratoParaControle(statusCodigo) {
 }
 
 function mapTipoCodigoParaTipoRegistro(tipoCodigo, fallbackLabel = '') {
-  const mapa = {
-    saida_ferias: 'Saída Férias',
-    interrupcao_de_ferias: 'Interrupção de Férias',
-    nova_saida_retomada: 'Nova Saída / Retomada',
-    retorno_ferias: 'Retorno Férias',
-  };
-
-  return mapa[tipoCodigo] || fallbackLabel;
+  return RP_TIPO_LABELS[tipoCodigo] || RP_TIPO_LABELS[fallbackLabel] || fallbackLabel;
 }
 
 function getGrupoDisplay(registro) {
@@ -268,6 +268,7 @@ export default function Publicacoes() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const [selectedRegistros, setSelectedRegistros] = useState([]);
   const [loteDestinoId, setLoteDestinoId] = useState('');
+  const [modoCompilacao, setModoCompilacao] = useState('ferias');
   const { user, isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
 
@@ -402,13 +403,27 @@ export default function Publicacoes() {
   });
 
   const compilarMutation = useMutation({
-    mutationFn: async (registrosSelecionados) => {
-      const registrosElegiveisSelecionados = (registrosSelecionados || []).filter((registro) => (
-        isRegistroElegivelParaCompilacaoFerias(registro)
-      ));
+    mutationFn: async ({ registrosSelecionados, modo }) => {
+      const isModoDisciplinar = modo === 'disciplinar';
+      const isElegivel = isModoDisciplinar
+        ? isRegistroElegivelParaCompilacaoDisciplinar
+        : isRegistroElegivelParaCompilacaoFerias;
+      const validarCompatibilidade = isModoDisciplinar
+        ? validarCompatibilidadeLoteDisciplinar
+        : validarCompatibilidadeLoteFerias;
+      const montarTextoCompilado = isModoDisciplinar
+        ? buildTextoCompiladoDisciplinar
+        : buildTextoCompiladoFerias;
+      const montarPayloadLote = isModoDisciplinar
+        ? buildPayloadPublicacaoCompiladaDisciplinar
+        : buildPayloadPublicacaoCompilada;
+      const tipoLoteLabel = isModoDisciplinar ? 'disciplinar' : 'férias';
+      const tipoRegistroLote = isModoDisciplinar ? PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO : PUBLICACAO_COMPILADA_FERIAS_TIPO;
+
+      const registrosElegiveisSelecionados = (registrosSelecionados || []).filter((registro) => isElegivel(registro));
 
       if (registrosElegiveisSelecionados.length !== (registrosSelecionados || []).length) {
-        throw new Error('A compilação mínima de férias aceita somente registros elegíveis de férias.');
+        throw new Error(`A compilação ${tipoLoteLabel} aceita somente registros elegíveis para este modo.`);
       }
 
       console.info('[CompilacaoFerias] Iniciando seleção para compilação.', {
@@ -416,7 +431,7 @@ export default function Publicacoes() {
         registrosIds: registrosElegiveisSelecionados.map((registro) => registro?.id).filter(Boolean),
       });
 
-      const compatibilidade = validarCompatibilidadeLoteFerias(registrosElegiveisSelecionados);
+      const compatibilidade = validarCompatibilidade(registrosElegiveisSelecionados);
       if (!compatibilidade.compativel) {
         console.error('[CompilacaoFerias] Seleção inválida.', {
           motivo: compatibilidade.motivo,
@@ -443,15 +458,15 @@ export default function Publicacoes() {
         publicacao_compilada_ordem: index + 1
       }));
 
-      const textoCompilado = buildTextoCompiladoFerias(registrosComOrdem);
-      const payloadLote = buildPayloadPublicacaoCompilada(registrosComOrdem, {
+      const textoCompilado = montarTextoCompilado(registrosComOrdem);
+      const payloadLote = montarPayloadLote(registrosComOrdem, {
         texto_publicacao: textoCompilado,
         nota_para_bg: '',
         numero_bg: '',
         data_bg: '',
         criado_por: user?.email || user?.name || user?.id || '',
         data_criacao_lote: new Date().toISOString(),
-        titulo: `Lote Compilado Férias • ${new Date().toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`,
+        titulo: `Lote Compilado ${isModoDisciplinar ? 'Disciplinar' : 'Férias'} • ${new Date().toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`,
       });
 
       if (!payloadLote.ok) {
@@ -519,12 +534,13 @@ export default function Publicacoes() {
           nota_para_bg: loteCriado?.nota_para_bg || '',
         }));
 
-        const textoConsolidado = buildTextoCompiladoFerias(filhosAtualizados);
+        const textoConsolidado = montarTextoCompilado(filhosAtualizados);
 
         await base44.entities.PublicacaoCompilada.update(loteCriado.id, {
           texto_publicacao: textoConsolidado,
           quantidade_itens: filhosAtualizados.length,
           registros_ids: filhosAtualizados.map((item) => item.id),
+          tipo_registro: tipoRegistroLote,
         });
 
         console.info('[CompilacaoFerias] Texto consolidado e persistência final concluídos.', {
@@ -569,7 +585,7 @@ export default function Publicacoes() {
     onSuccess: async () => {
       setSelectedRegistros([]);
       await refrescarDadosPublicacoes();
-      alert('Lote compilado de férias criado com sucesso.');
+      alert(`Lote compilado ${modoCompilacao === 'disciplinar' ? 'disciplinar' : 'de férias'} criado com sucesso.`);
     },
     onError: (error) => {
       alert(error?.message || 'Erro ao compilar registros selecionados.');
@@ -697,8 +713,22 @@ export default function Publicacoes() {
         throw new Error('Só é permitido adicionar a um lote pai que ainda não foi publicado.');
       }
 
+      const tipoLote = lotePai?.tipo_lote || 'ferias';
+      if (tipoLote !== modoCompilacao) {
+        throw new Error('O lote selecionado não corresponde ao modo de compilação atual.');
+      }
+
+      const isModoDisciplinar = modoCompilacao === 'disciplinar';
+      const isElegivel = isModoDisciplinar
+        ? isRegistroElegivelParaCompilacaoDisciplinar
+        : isRegistroElegivelParaCompilacaoFerias;
+      const montarTextoCompilado = isModoDisciplinar
+        ? buildTextoCompiladoDisciplinar
+        : buildTextoCompiladoFerias;
+      const tipoRegistroLote = isModoDisciplinar ? PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO : PUBLICACAO_COMPILADA_FERIAS_TIPO;
+
       const registrosInvalidos = registrosSelecionados.filter((registro) => (
-        !isRegistroElegivelParaCompilacaoFerias(registro) ||
+        !isElegivel(registro) ||
         !!registro?.publicacao_compilada_id ||
         registro?.compilado_em_lote === true
       ));
@@ -732,8 +762,8 @@ export default function Publicacoes() {
 
       await base44.entities.PublicacaoCompilada.update(loteId, {
         quantidade_itens: filhosAtualizados.length,
-        tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
-        texto_publicacao: buildTextoCompiladoFerias(filhosAtualizados),
+        tipo_registro: tipoRegistroLote,
+        texto_publicacao: montarTextoCompilado(filhosAtualizados),
         registros_ids: filhosAtualizados.map((registro) => registro.id),
       });
 
@@ -857,8 +887,12 @@ export default function Publicacoes() {
   }, [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
   const registrosElegiveisParaCompilacao = useMemo(() => (
-    todosRegistros.filter((registro) => isRegistroElegivelParaCompilacaoFerias(registro))
-  ), [todosRegistros]);
+    todosRegistros.filter((registro) => (
+      modoCompilacao === 'disciplinar'
+        ? isRegistroElegivelParaCompilacaoDisciplinar(registro)
+        : isRegistroElegivelParaCompilacaoFerias(registro)
+    ))
+  ), [todosRegistros, modoCompilacao]);
 
   const elegiveisIds = useMemo(() => new Set(registrosElegiveisParaCompilacao.map((registro) => registro.id)), [registrosElegiveisParaCompilacao]);
 
@@ -874,9 +908,10 @@ export default function Publicacoes() {
   const lotesPaisNaoPublicados = useMemo(() => (
     todosRegistros.filter((registro) => (
       registro.origem_tipo === 'publicacao-compilada' &&
+      (registro.tipo_lote || 'ferias') === modoCompilacao &&
       !isLoteCompiladoPublicado(registro)
     ))
-  ), [todosRegistros]);
+  ), [todosRegistros, modoCompilacao]);
 
   useEffect(() => {
     setSelectedRegistros((atual) => atual.filter((id) => elegiveisIds.has(id)));
@@ -885,7 +920,9 @@ export default function Publicacoes() {
   const toggleRegistroSelecionado = (registroId, checked) => {
     setSelectedRegistros((atual) => {
       const registro = todosRegistros.find((item) => item.id === registroId);
-      const elegivelParaCompilacaoFerias = isRegistroElegivelParaCompilacaoFerias(registro);
+      const elegivelParaCompilacaoFerias = modoCompilacao === 'disciplinar'
+        ? isRegistroElegivelParaCompilacaoDisciplinar(registro)
+        : isRegistroElegivelParaCompilacaoFerias(registro);
 
       if (checked && !elegivelParaCompilacaoFerias) {
         return atual;
@@ -985,14 +1022,16 @@ export default function Publicacoes() {
   };
 
   const handleCompilarSelecionados = () => {
-    const compatibilidade = validarCompatibilidadeLoteFerias(selectedRegistrosDetalhados);
+    const compatibilidade = modoCompilacao === 'disciplinar'
+      ? validarCompatibilidadeLoteDisciplinar(selectedRegistrosDetalhados)
+      : validarCompatibilidadeLoteFerias(selectedRegistrosDetalhados);
 
     if (!compatibilidade.compativel) {
       alert(compatibilidade.motivo);
       return;
     }
 
-    compilarMutation.mutate(selectedRegistrosDetalhados);
+    compilarMutation.mutate({ registrosSelecionados: selectedRegistrosDetalhados, modo: modoCompilacao });
   };
 
   const handleAdicionarSelecionadosAoLote = () => {
@@ -1178,11 +1217,20 @@ export default function Publicacoes() {
           <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-semibold text-indigo-900">Compilação mínima de férias</p>
-                <p className="text-sm text-indigo-700">Selecione apenas registros elegíveis do Livro conforme os critérios operacionais da fase. Itens não elegíveis permanecem visíveis e fora da seleção.</p>
+                <p className="text-sm font-semibold text-indigo-900">Compilação de publicações</p>
+                <p className="text-sm text-indigo-700">Painel unificado com seleção operacional por modo. Itens não elegíveis permanecem visíveis e fora da seleção.</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
+                <Select value={modoCompilacao} onValueChange={(value) => { setModoCompilacao(value); setLoteDestinoId(''); }}>
+                  <SelectTrigger className="w-[180px] bg-white">
+                    <SelectValue placeholder="Modo de compilação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ferias">Férias</SelectItem>
+                    <SelectItem value="disciplinar">Disciplinar</SelectItem>
+                  </SelectContent>
+                </Select>
                 <label className="inline-flex items-center gap-2 text-sm text-indigo-900">
                   <Checkbox
                     checked={totalElegiveisVisiveis > 0 && totalElegiveisSelecionadosVisiveis === totalElegiveisVisiveis}
@@ -1227,7 +1275,9 @@ export default function Publicacoes() {
                   className="bg-indigo-700 hover:bg-indigo-800"
                 >
                   <Layers3 className="mr-2 h-4 w-4" />
-                  {compilarMutation.isPending ? 'Compilando...' : 'Compilar selecionados'}
+                  {compilarMutation.isPending
+                    ? 'Compilando...'
+                    : (modoCompilacao === 'disciplinar' ? 'Compilar disciplinar' : 'Compilar férias')}
                 </Button>
               </div>
             </div>
@@ -1275,11 +1325,15 @@ export default function Publicacoes() {
 
                   <div className="space-y-3">
                     {items.map((registro) => {
-                      const elegivelParaCompilacaoFerias = isRegistroElegivelParaCompilacaoFerias(registro);
+                      const elegivelParaCompilacaoFerias = modoCompilacao === 'disciplinar'
+                        ? isRegistroElegivelParaCompilacaoDisciplinar(registro)
+                        : isRegistroElegivelParaCompilacaoFerias(registro);
                       const selecionado = selectedRegistros.includes(registro.id);
                       const motivoInelegibilidadeFerias = elegivelParaCompilacaoFerias
                         ? null
-                        : getMotivoInelegibilidadeCompilacaoFerias(registro);
+                        : (modoCompilacao === 'disciplinar'
+                          ? getMotivoInelegibilidadeCompilacaoDisciplinar(registro)
+                          : getMotivoInelegibilidadeCompilacaoFerias(registro));
 
                       return (
                         <div key={registro.id} className={`rounded-[24px] ${selecionado ? 'ring-2 ring-indigo-200' : ''}`}>
@@ -1290,12 +1344,12 @@ export default function Publicacoes() {
                                   checked={selecionado}
                                   onCheckedChange={(checked) => toggleRegistroSelecionado(registro.id, Boolean(checked))}
                                 />
-                                <span>Selecionar para compilação</span>
+                                <span>Selecionar para compilação {modoCompilacao === 'disciplinar' ? 'disciplinar' : 'de férias'}</span>
                               </label>
                             ) : (
                               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
                                 <AlertCircle className="h-3.5 w-3.5" />
-                                <span>{motivoInelegibilidadeFerias || 'Tipo não elegível para compilação mínima de férias.'}</span>
+                                <span>{motivoInelegibilidadeFerias || `Tipo não elegível para compilação ${modoCompilacao === 'disciplinar' ? 'disciplinar' : 'mínima de férias'}.`}</span>
                               </div>
                             )}
 

@@ -1,7 +1,10 @@
 import { formatDateBR } from '@/components/utils/templateUtils';
+import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
 
 export const PUBLICACAO_COMPILADA_FERIAS_TIPO = 'Publicação Compilada - Férias';
 export const PUBLICACAO_COMPILADA_FERIAS_CODIGO = 'publicacao_compilada_ferias';
+export const PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO = 'Publicação Compilada - Disciplinar';
+export const PUBLICACAO_COMPILADA_DISCIPLINAR_CODIGO = 'publicacao_compilada_disciplinar';
 
 const TIPOS_FERIAS_COMPILAVEIS = new Set([
   'Saída Férias',
@@ -15,6 +18,20 @@ const TIPOS_CODIGO_COMPILAVEIS = new Set([
   'interrupcao_de_ferias',
   'nova_saida_retomada',
   'retorno_ferias',
+]);
+
+const TIPOS_DISCIPLINARES_COMPILAVEIS = new Set([
+  'ALTERACAO_COMPORTAMENTO_DISCIPLINAR',
+  'IMPLANTACAO_COMPORTAMENTO_DISCIPLINAR',
+  'MELHORIA_COMPORTAMENTO_DISCIPLINAR',
+  'MARCO_INICIAL_COMPORTAMENTO_DISCIPLINAR',
+]);
+
+const TIPOS_CODIGO_DISCIPLINAR_COMPILAVEIS = new Set([
+  'alteracao_comportamento_disciplinar',
+  'implantacao_comportamento_disciplinar',
+  'melhoria_comportamento_disciplinar',
+  'marco_inicial_comportamento_disciplinar',
 ]);
 
 const STATUS_COMPATIVEIS = new Set([
@@ -52,6 +69,20 @@ function isTipoFeriasCompilavel(registro = {}) {
   const tipoLabel = registro?.tipo_registro || registro?.tipo_label || registro?.tipo;
   const tipoCodigo = registro?.tipo_codigo || toCodigo(tipoLabel);
   return TIPOS_FERIAS_COMPILAVEIS.has(tipoLabel) || TIPOS_CODIGO_COMPILAVEIS.has(tipoCodigo);
+}
+
+function isTipoDisciplinarCompilavel(registro = {}) {
+  const tipoRaw = registro?.tipo_codigo || registro?.tipo_registro || registro?.tipo_label || registro?.tipo;
+  const tipoCodigo = toCodigo(tipoRaw);
+  const tipoCanonicoUpper = String(tipoRaw || '').trim().toUpperCase();
+  const tipoLabelAmigavel = RP_TIPO_LABELS[tipoRaw] || RP_TIPO_LABELS[tipoCanonicoUpper] || '';
+  const tipoLabelCodigo = toCodigo(tipoLabelAmigavel);
+
+  return (
+    TIPOS_DISCIPLINARES_COMPILAVEIS.has(tipoCanonicoUpper) ||
+    TIPOS_CODIGO_DISCIPLINAR_COMPILAVEIS.has(tipoCodigo) ||
+    TIPOS_CODIGO_DISCIPLINAR_COMPILAVEIS.has(tipoLabelCodigo)
+  );
 }
 
 function isPublicado(registro = {}) {
@@ -287,6 +318,78 @@ export function validarCompatibilidadeLoteFerias(registros = []) {
   };
 }
 
+export function isRegistroElegivelParaCompilacaoDisciplinar(registro = {}) {
+  return getMotivoInelegibilidadeCompilacaoDisciplinar(registro) === null;
+}
+
+export function getMotivoInelegibilidadeCompilacaoDisciplinar(registro = {}) {
+  const statusCodigo = getStatusCodigoNormalizado(registro);
+  const publicacaoCompiladaId = hasPublicacaoCompiladaId(registro);
+  const compiladoEmLote = isCompiladoEmLoteTrue(registro);
+
+  if (!detectarOrigemLivro(registro)) {
+    return 'Registro fora do fluxo de Publicações/RP.';
+  }
+
+  if (!isTipoDisciplinarCompilavel(registro)) {
+    return 'Tipo não elegível para compilação disciplinar.';
+  }
+
+  if (!STATUS_COMPATIVEIS.has(statusCodigo)) {
+    return 'Status não elegível para compilação disciplinar.';
+  }
+
+  if (registro?.numero_bg || registro?.data_bg || isPublicado(registro)) {
+    return 'Registro já publicado em BG.';
+  }
+
+  if (hasInconsistencia(registro)) {
+    return 'Registro inconsistente e bloqueado para compilação.';
+  }
+
+  if (publicacaoCompiladaId || compiladoEmLote) {
+    return 'Registro já vinculado a lote compilado.';
+  }
+
+  return null;
+}
+
+export function validarCompatibilidadeLoteDisciplinar(registros = []) {
+  const lista = registros.filter(Boolean);
+
+  if (lista.length < 2) {
+    return {
+      compativel: false,
+      motivo: 'Selecione pelo menos 2 registros elegíveis para montar o lote disciplinar.',
+    };
+  }
+
+  const inelegivel = lista.find((registro) => !isRegistroElegivelParaCompilacaoDisciplinar(registro));
+  if (inelegivel) {
+    return {
+      compativel: false,
+      motivo: 'Um ou mais registros não atendem às regras de compilação disciplinar.',
+      registro_id: inelegivel.id,
+    };
+  }
+
+  const origens = new Set(lista.map((registro) => registro?.origem_tipo || 'livro'));
+  if (origens.size > 1 || !origens.has('livro')) {
+    return {
+      compativel: false,
+      motivo: 'O lote compilado disciplinar aceita somente registros do módulo Livro.',
+    };
+  }
+
+  return {
+    compativel: true,
+    motivo: null,
+    quantidade_itens: lista.length,
+    escopo_inicial: 'disciplinar',
+    tipo_lote: 'disciplinar',
+  };
+}
+
 export function buildItensTextoCompiladoFerias(registros = []) {
   const lista = registros
     .filter(Boolean)
@@ -389,6 +492,26 @@ export function buildTextoCompiladoFerias(registros = []) {
   return renderPublicacaoCompiladaFerias({ registros });
 }
 
+export function renderPublicacaoCompiladaDisciplinar({ registros = [] } = {}) {
+  const lista = registros.filter(Boolean);
+  if (!lista.length) return '';
+
+  const vars = buildVarsPublicacaoCompiladaFerias(lista);
+
+  return [
+    'PUBLICAÇÃO COMPILADA DISCIPLINAR',
+    '',
+    `Quantidade de itens: ${vars.quantidade_itens}`,
+    `Data de geração: ${vars.data_geracao}`,
+    '',
+    ...vars.itens,
+  ].join('\n');
+}
+
+export function buildTextoCompiladoDisciplinar(registros = []) {
+  return renderPublicacaoCompiladaDisciplinar({ registros });
+}
+
 export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) {
   const compatibilidade = validarCompatibilidadeLoteFerias(registros);
 
@@ -434,9 +557,54 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
   };
 }
 
+export function buildPayloadPublicacaoCompiladaDisciplinar(registros = [], overrides = {}) {
+  const compatibilidade = validarCompatibilidadeLoteDisciplinar(registros);
+
+  if (!compatibilidade.compativel) {
+    return {
+      ok: false,
+      erro: compatibilidade.motivo,
+      detalhes: compatibilidade,
+      payload: null,
+    };
+  }
+
+  const textoPublicacao = overrides?.texto_publicacao ?? buildTextoCompiladoDisciplinar(registros);
+  const {
+    nota_para_bg: _notaParaBgIgnorada,
+    numero_bg: _numeroBgIgnorado,
+    data_bg: _dataBgIgnorada,
+    texto_publicacao: _textoPublicacaoOverride,
+    ...safeOverrides
+  } = overrides || {};
+
+  return {
+    ok: true,
+    erro: null,
+    detalhes: compatibilidade,
+    payload: {
+      tipo_lote: 'disciplinar',
+      status: 'Aguardando Nota',
+      nota_conciliada_boletim: '',
+      quantidade_itens: registros.length,
+      ativo: true,
+      escopo_inicial: 'disciplinar',
+      origem: 'livro',
+      registros_ids: registros.map((registro) => registro?.id).filter(Boolean),
+      tipo_registro: PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO,
+      tipo_codigo: PUBLICACAO_COMPILADA_DISCIPLINAR_CODIGO,
+      ...safeOverrides,
+      nota_para_bg: '',
+      numero_bg: '',
+      data_bg: '',
+      texto_publicacao: textoPublicacao,
+    },
+  };
+}
+
 export const isRegistroElegivelParaPublicacaoCompiladaFerias = isRegistroElegivelParaCompilacaoFerias;
 export const validarCompatibilidadeBasicaPublicacaoCompilada = validarCompatibilidadeLoteFerias;
 export const prepararPayloadPublicacaoCompilada = ({ registros = [], overrides = {} } = {}) => (
   buildPayloadPublicacaoCompilada(registros, overrides)
 );
-export { TIPOS_FERIAS_COMPILAVEIS, TIPOS_CODIGO_COMPILAVEIS };
+export { TIPOS_FERIAS_COMPILAVEIS, TIPOS_CODIGO_COMPILAVEIS, TIPOS_DISCIPLINARES_COMPILAVEIS, TIPOS_CODIGO_DISCIPLINAR_COMPILAVEIS };
