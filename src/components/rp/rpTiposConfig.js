@@ -212,6 +212,36 @@ export const RP_TIPOS_BASE = [
     palavrasChave: ['melhoria', 'comportamento', 'conceito'],
     destaque: false,
   },
+  {
+    value: 'ALTERACAO_COMPORTAMENTO_DISCIPLINAR',
+    label: 'Alteração de Comportamento Disciplinar',
+    grupo: 'Disciplinar',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Texto de RP para alteração disciplinar com base em marco do histórico.',
+    palavrasChave: ['alteracao', 'comportamento', 'disciplinar', 'historico'],
+    destaque: false,
+  },
+  {
+    value: 'IMPLANTACAO_COMPORTAMENTO_DISCIPLINAR',
+    label: 'Implantação de Comportamento Disciplinar',
+    grupo: 'Disciplinar',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Texto de RP para marco inicial de implantação disciplinar.',
+    palavrasChave: ['implantacao', 'comportamento', 'disciplinar', 'inicial'],
+    destaque: false,
+  },
+  {
+    value: 'MELHORIA_COMPORTAMENTO_DISCIPLINAR',
+    label: 'Melhoria de Comportamento Disciplinar',
+    grupo: 'Disciplinar',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Texto de RP para melhoria de comportamento disciplinar.',
+    palavrasChave: ['melhoria', 'comportamento', 'disciplinar'],
+    destaque: false,
+  },
 
   // RECONHECIMENTO
   {
