@@ -96,7 +96,10 @@ export default function ComportamentoTimeline({ eventos = [], selectedEventoId =
 
   return (
     <div className="space-y-3">
-      {eventosOrdenados.map((evento) => (
+      {eventosOrdenados.map((evento) => {
+        const motivo = evento?.motivo_mudanca || evento?.motivo_mudanca_resolvido || '';
+        const fundamento = evento?.fundamento_legal || evento?.fundamento_legal_resolvido || '';
+        return (
         <button
           type="button"
           key={evento.id}
@@ -119,13 +122,14 @@ export default function ComportamentoTimeline({ eventos = [], selectedEventoId =
           ) : (
             <p><strong>Comportamento vigente:</strong> {evento.comportamento_novo || 'N/D'}</p>
           )}
-          <p className="text-slate-700 mt-1"><strong>Motivo:</strong> {evento.motivo_mudanca || 'Não informado'}</p>
-          {evento.fundamento_legal && (
-            <p className="text-slate-700 mt-1"><strong>Fundamento:</strong> {evento.fundamento_legal}</p>
+          <p className="text-slate-700 mt-1"><strong>Motivo:</strong> {motivo || 'Não informado'}</p>
+          {fundamento && (
+            <p className="text-slate-700 mt-1"><strong>Fundamento:</strong> {fundamento}</p>
           )}
           {evento.observacoes && <p className="text-slate-600 mt-1">{evento.observacoes}</p>}
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }
