@@ -46,6 +46,7 @@ import {
   isRegistroFilhoDePublicacaoCompilada,
   podeDesfazerLoteCompilado,
 } from '@/components/publicacao/publicacaoCompiladaService';
+import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
 
 const statusColors = {
   'Aguardando Nota': 'bg-amber-100 text-amber-700 border-amber-200',
@@ -74,14 +75,11 @@ function detectarOrigemTipo(registro) {
 }
 
 function getTipoDisplay(tipo) {
-  if (tipo === 'ALTERACAO_COMPORTAMENTO_DISCIPLINAR') return 'Alteração de Comportamento Disciplinar';
-  if (tipo === 'MELHORIA_COMPORTAMENTO_DISCIPLINAR') return 'Melhoria de Comportamento Disciplinar';
-  if (tipo === 'MARCO_INICIAL_COMPORTAMENTO_DISCIPLINAR') return 'Marco Inicial de Comportamento Disciplinar';
   if (tipo === 'Saída Férias') return 'Início';
   if (tipo === 'Interrupção de Férias') return 'Interrupção';
   if (tipo === 'Nova Saída / Retomada') return 'Continuação';
   if (tipo === 'Retorno Férias') return 'Término';
-  return tipo;
+  return getRPTipoLabel(tipo);
 }
 
 function getGrupoDisplay(registro) {
@@ -124,11 +122,26 @@ function getEditUrl(registro) {
 function formatDate(d) {
   if (!d) return '-';
   try {
+    if (typeof d === 'number') {
+      return format(new Date(d), 'dd/MM/yyyy');
+    }
     if (String(d).includes('T')) return format(new Date(d), 'dd/MM/yyyy');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(d))) {
+      return format(new Date(`${d}T00:00:00`), 'dd/MM/yyyy');
+    }
     return format(new Date(`${d}T00:00:00`), 'dd/MM/yyyy');
   } catch {
     return d;
   }
+}
+
+function getFirstFilledValue(...values) {
+  return values.find((value) => {
+    if (value === null || value === undefined) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'string') return value.trim() !== '';
+    return true;
+  });
 }
 
 function gerarCodigo(id) {
@@ -235,7 +248,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeTornarSemEfeito = isPublicado && !foiTornadaSemEfeito && ((!isDerivado) || isApostila) && !isTSE;
   const podeMarcarPrioridade = !isPublicado && !isFilhoLoteCompilado;
   const podeEditar = !isPublicado && origemTipo !== 'livro' && origemTipo !== 'publicacao-compilada';
-  const podeInformarBg = !isPublicado && !isFilhoLoteCompilado && currentStatus === 'Aguardando Nota';
+  const podeInformarBg =
+    !isPublicado &&
+    !isFilhoLoteCompilado &&
+    (currentStatus === 'Aguardando Nota' || currentStatus === 'Aguardando Publicação');
   const temPermissaoAdmin = canAccessAction('admin_mode');
   const podeExcluir = !isPublicado && temPermissaoAdmin && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && temPermissaoAdmin && !modoAdmin;
@@ -280,7 +296,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
       return;
     }
     if (!podeInformarBg) {
-      alert('Só é permitido informar BG para registros com status "Aguardando Nota".');
+      alert('Só é permitido informar BG para registros com status "Aguardando Nota" ou "Aguardando Publicação".');
       return;
     }
     if (!bgData.numero_bg?.trim()) {
@@ -358,6 +374,27 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const origemLabel = contratoLivro
     ? (registro.origem || 'Automática')
     : (origemTipo === 'ex-officio' ? 'Ex Officio' : origemTipo === 'atestado' ? 'Atestado' : isLoteCompilado ? 'Lote compilado' : 'Manual');
+  const tipoRastreabilidade = getTipoDisplay(registro.tipo_registro || registro.tipo_label || registro.tipo || '—');
+  const templateUsado = getFirstFilledValue(
+    registro.template_nome,
+    registro.template_label,
+    registro.nome_template,
+    registro.tipo_template,
+    detalhesContrato?.template_nome,
+    detalhesContrato?.template_id,
+    registro.template_texto_id
+  ) || '—';
+  const historicoComportamentoId = getFirstFilledValue(registro.historico_comportamento_id, detalhesContrato?.historico_comportamento_id) || '—';
+  const origemRastreabilidade = getFirstFilledValue(registro.origem, registro.origem_tipo, origemLabel) || '—';
+  const numeroBgRastreabilidade = getFirstFilledValue(registro.numero_bg, publicacaoContrato?.numero_bg) || '—';
+  const dataBgRastreabilidade = formatDate(getFirstFilledValue(registro.data_bg, publicacaoContrato?.data_bg));
+  const publicadoPorRastreabilidade = getFirstFilledValue(registro.publicado_por, publicacaoContrato?.publicado_por) || '—';
+  const publicadoEmRastreabilidade = formatDate(getFirstFilledValue(registro.publicado_em, publicacaoContrato?.publicado_em));
+  const registrosIdsLote = Array.isArray(registro.registros_ids) && registro.registros_ids.length > 0
+    ? registro.registros_ids.join(', ')
+    : '—';
+  const criadoPorLote = getFirstFilledValue(registro.criado_por, detalhesContrato?.criado_por) || '—';
+  const dataCriacaoLote = formatDate(getFirstFilledValue(registro.data_criacao_lote, detalhesContrato?.data_criacao_lote));
 
   const renderFilhoAgrupado = (filho) => {
     const nomeFilho = filho.militar_nome_institucional || filho.militar_nome || 'Militar não identificado';
@@ -728,15 +765,29 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   <FieldBlock label="Número do BG"><div className="font-semibold">{registro.numero_bg || '—'}</div></FieldBlock>
                   <FieldBlock label="Publicado por"><div className="font-semibold">{registro.publicado_por || '—'}</div></FieldBlock>
                   <FieldBlock label="Rastreabilidade">
+                    <div className="space-y-1.5 mb-3">
+                      <p><span className="font-semibold">Origem:</span> {origemRastreabilidade}</p>
+                      <p><span className="font-semibold">Tipo:</span> {tipoRastreabilidade}</p>
+                      <p><span className="font-semibold">Militar:</span> {nomeInstitucional}</p>
+                      <p><span className="font-semibold">Template usado:</span> {templateUsado}</p>
+                      <p><span className="font-semibold">Histórico comportamento ID:</span> {historicoComportamentoId}</p>
+                      <p><span className="font-semibold">Número BG:</span> {numeroBgRastreabilidade}</p>
+                      <p><span className="font-semibold">Data BG:</span> {dataBgRastreabilidade}</p>
+                      <p><span className="font-semibold">Publicado por:</span> {publicadoPorRastreabilidade}</p>
+                      <p><span className="font-semibold">Publicado em:</span> {publicadoEmRastreabilidade}</p>
+                      <p><span className="font-semibold">Registros IDs:</span> {registrosIdsLote}</p>
+                      <p><span className="font-semibold">Criado por:</span> {criadoPorLote}</p>
+                      <p><span className="font-semibold">Data criação lote:</span> {dataCriacaoLote}</p>
+                    </div>
                     {cadeiaEventosContrato.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 border-t border-slate-200 pt-3">
                         {cadeiaEventosContrato.map((evento) => (
                           <div key={evento.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${evento.atual ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'}`}>
                             <div className="flex items-center gap-2">
                               <span className={`w-2.5 h-2.5 rounded-full ${evento.atual ? 'bg-amber-500' : 'bg-slate-300'}`}></span>
                               <span className="font-medium text-slate-800">{evento.tipo}</span>
                             </div>
-                            <span className="text-sm text-slate-500">{evento.data}</span>
+                            <span className="text-sm text-slate-500">{formatDate(evento.data)}</span>
                           </div>
                         ))}
                       </div>
