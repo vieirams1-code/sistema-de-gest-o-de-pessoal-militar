@@ -49,8 +49,8 @@ export default function HistoricoComportamentoModal({ militarId, open, onClose }
                     {h.comportamento_anterior || 'Não definido'}
                   </span>
                   <ArrowRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className={comportamentoColors[h.comportamento] || 'text-slate-700'}>
-                    {h.comportamento}
+                  <span className={comportamentoColors[h.comportamento_novo] || 'text-slate-700'}>
+                    {h.comportamento_novo}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
@@ -58,7 +58,7 @@ export default function HistoricoComportamentoModal({ militarId, open, onClose }
                     {h.motivo_mudanca || 'Marco disciplinar'}
                   </Badge>
                   <span className="text-xs text-slate-500">
-                    {h.data_vigencia ? format(new Date(h.data_vigencia + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
+                    {h.data_alteracao ? format(new Date(h.data_alteracao + 'T00:00:00'), 'dd/MM/yyyy') : '-'}
                   </span>
                 </div>
                 {h.observacoes && (

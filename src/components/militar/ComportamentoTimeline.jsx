@@ -40,14 +40,14 @@ function ehComportamentoValido(comportamento) {
 
 function limparEventos(eventos = []) {
   const ordenados = [...eventos]
-    .filter((evento) => ehDataValida(evento?.data_vigencia))
-    .filter((evento) => ehComportamentoValido(evento?.comportamento))
-    .sort((a, b) => new Date(`${normalizarDataVigencia(a.data_vigencia)}T00:00:00`) - new Date(`${normalizarDataVigencia(b.data_vigencia)}T00:00:00`));
+    .filter((evento) => ehDataValida(evento?.data_alteracao))
+    .filter((evento) => ehComportamentoValido(evento?.comportamento_novo))
+    .sort((a, b) => new Date(`${normalizarDataVigencia(a.data_alteracao)}T00:00:00`) - new Date(`${normalizarDataVigencia(b.data_alteracao)}T00:00:00`));
 
   const marcosReais = [];
   for (const evento of ordenados) {
     const ultimo = marcosReais[marcosReais.length - 1];
-    if (ultimo?.comportamento === evento.comportamento) continue;
+    if (ultimo?.comportamento_novo === evento.comportamento_novo) continue;
     marcosReais.push(evento);
   }
 
@@ -66,16 +66,16 @@ export default function ComportamentoTimeline({ eventos = [] }) {
       {eventosOrdenados.map((evento) => (
         <div key={evento.id} className="border rounded p-3 text-sm">
           <div className="flex items-center justify-between gap-2 mb-2">
-            <Badge className={comportamentoClasses[evento.comportamento] || 'bg-slate-100 text-slate-700'}>
-              {evento.comportamento || 'N/D'}
+            <Badge className={comportamentoClasses[evento.comportamento_novo] || 'bg-slate-100 text-slate-700'}>
+              {evento.comportamento_novo || 'N/D'}
             </Badge>
-            <span className="text-slate-500">{formatarData(evento.data_vigencia)}</span>
+            <span className="text-slate-500">{formatarData(evento.data_alteracao)}</span>
           </div>
 
           {evento.comportamento_anterior ? (
-            <p><strong>{evento.comportamento_anterior}</strong> → <strong>{evento.comportamento || 'N/D'}</strong></p>
+            <p><strong>{evento.comportamento_anterior}</strong> → <strong>{evento.comportamento_novo || 'N/D'}</strong></p>
           ) : (
-            <p><strong>Comportamento vigente:</strong> {evento.comportamento || 'N/D'}</p>
+            <p><strong>Comportamento vigente:</strong> {evento.comportamento_novo || 'N/D'}</p>
           )}
           <p className="text-slate-700 mt-1"><strong>Motivo:</strong> {evento.motivo_mudanca || '—'}</p>
           {evento.fundamento_legal && (
