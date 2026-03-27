@@ -348,6 +348,14 @@ export const RP_TIPO_LABELS = {
   'Retorno Férias': 'Término de Férias',
   'Interrupção de Férias': 'Interrupção de Férias',
   'Nova Saída / Retomada': 'Continuação de Férias',
+  'ALTERACAO_COMPORTAMENTO_DISCIPLINAR': 'Alteração de Comportamento Disciplinar',
+  'IMPLANTACAO_COMPORTAMENTO_DISCIPLINAR': 'Implantação de Comportamento Disciplinar',
+  'MELHORIA_COMPORTAMENTO_DISCIPLINAR': 'Melhoria de Comportamento Disciplinar',
+  'MARCO_INICIAL_COMPORTAMENTO_DISCIPLINAR': 'Marco Inicial de Comportamento Disciplinar',
+  'saida_ferias': 'Início de Férias',
+  'retorno_ferias': 'Término de Férias',
+  'interrupcao_de_ferias': 'Interrupção de Férias',
+  'nova_saida_retomada': 'Continuação de Férias',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -1179,7 +1179,7 @@ export default function Publicacoes() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-sm font-semibold text-indigo-900">Compilação mínima de férias</p>
-                <p className="text-sm text-indigo-700">Selecione apenas registros elegíveis do Livro em status aguardando publicação. Esta fase não altera o fluxo individual existente.</p>
+                <p className="text-sm text-indigo-700">Selecione apenas registros elegíveis do Livro conforme os critérios operacionais da fase. Itens não elegíveis permanecem visíveis e fora da seleção.</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
