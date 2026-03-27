@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import {
   criarChavePendenciaComportamento,
-  garantirImplantacaoHistoricoComportamento,
   obterHistoricoComportamentoMilitar,
 } from '@/services/justicaDisciplinaService';
 
@@ -58,12 +57,11 @@ function formatDate(date) {
 }
 
 export default function VerMilitar() {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const selectedTab = searchParams.get('tab') || 'comportamento';
-  const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
 
   const { data: militar, isLoading } = useQuery({
@@ -156,22 +154,6 @@ export default function VerMilitar() {
       dataInclusaoMilitar: militar.data_inclusao,
     });
   }, [militar, punicoes]);
-
-  React.useEffect(() => {
-    if (!militar?.id || !isAccessResolved || !canViewMilitar) return;
-
-    let ativo = true;
-    const implantar = async () => {
-      await garantirImplantacaoHistoricoComportamento(militar);
-      if (!ativo) return;
-      await queryClient.invalidateQueries({ queryKey: ['ver-historico-comportamento', id] });
-    };
-
-    implantar();
-    return () => {
-      ativo = false;
-    };
-  }, [militar, id, isAccessResolved, canViewMilitar, queryClient]);
 
   const ultimaPunicaoPorMilitar = React.useMemo(() => {
     const ultima = punicoes[0];

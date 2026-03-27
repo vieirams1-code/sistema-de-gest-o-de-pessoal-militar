@@ -38,14 +38,47 @@ function ehComportamentoValido(comportamento) {
   return String(comportamento).trim().toUpperCase() !== 'N/D';
 }
 
+function getMomentoRegistro(evento = {}) {
+  const candidatos = [
+    evento?.created_date,
+    evento?.updated_date,
+    evento?.createdDate,
+    evento?.updatedDate,
+  ].filter(Boolean);
+
+  for (const candidato of candidatos) {
+    const data = new Date(candidato);
+    if (!Number.isNaN(data.getTime())) return data.getTime();
+  }
+
+  return 0;
+}
+
+function ehRegistroAutomaticoIntermediario(evento = {}) {
+  const origem = String(evento?.origem_tipo || '').toUpperCase();
+  const motivo = String(evento?.motivo_mudanca || '').toUpperCase();
+  return origem.includes('AUTOMAT') || origem.includes('CALCUL') || motivo.includes('AUTOMÁTIC') || motivo.includes('AUTOMATIC');
+}
+
 function limparEventos(eventos = []) {
   const ordenados = [...eventos]
     .filter((evento) => ehDataValida(evento?.data_alteracao))
     .filter((evento) => ehComportamentoValido(evento?.comportamento_novo))
-    .sort((a, b) => new Date(`${normalizarDataVigencia(a.data_alteracao)}T00:00:00`) - new Date(`${normalizarDataVigencia(b.data_alteracao)}T00:00:00`));
+    .filter((evento) => !ehRegistroAutomaticoIntermediario(evento))
+    .sort((a, b) => {
+      const diffData = new Date(`${normalizarDataVigencia(a.data_alteracao)}T00:00:00`) - new Date(`${normalizarDataVigencia(b.data_alteracao)}T00:00:00`);
+      if (diffData !== 0) return diffData;
+      return getMomentoRegistro(a) - getMomentoRegistro(b);
+    });
+
+  const ultimoPorDia = new Map();
+  for (const evento of ordenados) {
+    ultimoPorDia.set(normalizarDataVigencia(evento.data_alteracao), evento);
+  }
+  const registrosPorDia = Array.from(ultimoPorDia.values());
 
   const marcosReais = [];
-  for (const evento of ordenados) {
+  for (const evento of registrosPorDia) {
     const ultimo = marcosReais[marcosReais.length - 1];
     if (ultimo?.comportamento_novo === evento.comportamento_novo) continue;
     marcosReais.push(evento);

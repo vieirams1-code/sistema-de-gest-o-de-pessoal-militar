@@ -217,14 +217,60 @@ function ehDataVigenciaValida(dataVigencia) {
   return !Number.isNaN(data.getTime());
 }
 
+function getMomentoRegistro(registro = {}) {
+  const candidatos = [
+    registro?.created_date,
+    registro?.updated_date,
+    registro?.createdDate,
+    registro?.updatedDate,
+  ].filter(Boolean);
+
+  for (const candidato of candidatos) {
+    const data = new Date(candidato);
+    if (!Number.isNaN(data.getTime())) return data.getTime();
+  }
+
+  return 0;
+}
+
+function ehOrigemAutomatica(origemTipo = '') {
+  const origemNormalizada = String(origemTipo || '').trim().toUpperCase();
+  if (!origemNormalizada) return false;
+  return (
+    origemNormalizada.includes('AUTOMAT') ||
+    origemNormalizada.includes('CALCUL') ||
+    origemNormalizada.includes('RECALCUL') ||
+    origemNormalizada.includes('VERIFICACAO_DIARIA') ||
+    origemNormalizada.includes('SISTEMA')
+  );
+}
+
+function ehRegistroAutomaticoIntermediario(registro = {}) {
+  if (ehOrigemAutomatica(registro?.origem_tipo)) return true;
+  const motivo = String(registro?.motivo_mudanca || '').toUpperCase();
+  return motivo.includes('AUTOMÁTIC') || motivo.includes('AUTOMATIC');
+}
+
 function sanitizarHistoricoComportamento(registros = [], { ordem = 'asc' } = {}) {
   const registrosValidos = (Array.isArray(registros) ? registros : [])
     .filter((registro) => ehDataVigenciaValida(registro?.data_alteracao))
     .filter((registro) => ehComportamentoValido(registro?.comportamento_novo))
-    .sort((a, b) => new Date(`${normalizarDataVigencia(a.data_alteracao)}T00:00:00`) - new Date(`${normalizarDataVigencia(b.data_alteracao)}T00:00:00`));
+    .filter((registro) => !ehRegistroAutomaticoIntermediario(registro))
+    .sort((a, b) => {
+      const diffData = new Date(`${normalizarDataVigencia(a.data_alteracao)}T00:00:00`) - new Date(`${normalizarDataVigencia(b.data_alteracao)}T00:00:00`);
+      if (diffData !== 0) return diffData;
+      return getMomentoRegistro(a) - getMomentoRegistro(b);
+    });
+
+  const ultimoPorDia = new Map();
+  for (const registro of registrosValidos) {
+    const dataChave = normalizarDataVigencia(registro.data_alteracao);
+    ultimoPorDia.set(dataChave, registro);
+  }
+  const registrosPorDia = Array.from(ultimoPorDia.values());
 
   const marcosReais = [];
-  for (const registro of registrosValidos) {
+  for (const registro of registrosPorDia) {
     const ultimo = marcosReais[marcosReais.length - 1];
     if (ultimo?.comportamento_novo === registro.comportamento_novo) continue;
     marcosReais.push(registro);
@@ -249,6 +295,13 @@ export async function registrarMarcoHistoricoComportamento({
   if (!militarIdNormalizado) return null;
   if (!ehDataVigenciaValida(dataVigencia)) return null;
   if (!ehComportamentoValido(comportamento)) return null;
+  if (ehOrigemAutomatica(origemTipo)) {
+    console.info('[HIST] registro bloqueado por origem automática', {
+      militar_id: militarIdNormalizado,
+      origem_tipo: origemTipo,
+    });
+    return null;
+  }
 
   if (comportamentoAnterior && comportamentoAnterior === comportamento) {
     console.info('[HIST] sem mudança de comportamento', { militar_id: militarIdNormalizado, comportamento });
