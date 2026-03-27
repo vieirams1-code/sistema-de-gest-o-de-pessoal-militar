@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowLeft, Pencil, User, Briefcase, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send, Activity, AlertTriangle
+  Shield, Award, Send, Activity, AlertTriangle, Copy
 } from 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
@@ -23,6 +24,13 @@ import {
   criarChavePendenciaComportamento,
   obterHistoricoComportamentoMilitar,
 } from '@/services/justicaDisciplinaService';
+import { MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import {
+  escolherTipoTemplateComportamento,
+  gerarTextoRPComportamento,
+  resolverMarcoComportamento,
+} from '@/utils/comportamentoTemplateUtils';
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
@@ -63,6 +71,8 @@ export default function VerMilitar() {
   const selectedTab = searchParams.get('tab') || 'comportamento';
   const { isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
+  const [marcoComportamentoSelecionadoId, setMarcoComportamentoSelecionadoId] = useState(null);
+  const [dialogTextoRP, setDialogTextoRP] = useState({ open: false, texto: '', tipoTemplate: '' });
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
@@ -129,6 +139,12 @@ export default function VerMilitar() {
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
+  const { data: templatesAtivos = [] } = useQuery({
+    queryKey: ['templates-ativos-comportamento-rp'],
+    queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
+    enabled: !!id && isAccessResolved && canViewMilitar,
+  });
+
   const pendenciasComportamentoUnicas = React.useMemo(() => {
     const unicas = [];
     const chaves = new Set();
@@ -163,6 +179,52 @@ export default function VerMilitar() {
       data: ultima.data_inicio_cumprimento || ultima.data_inicio || ultima.created_date || '',
     };
   }, [punicoes]);
+
+  const handleGerarTextoRP = React.useCallback(async () => {
+    const marcoSelecionado = resolverMarcoComportamento(historicoComportamento, marcoComportamentoSelecionadoId);
+
+    if (!marcoSelecionado) {
+      alert('Nenhum marco de comportamento disponível para geração de texto.');
+      return;
+    }
+
+    const tipoTemplate = escolherTipoTemplateComportamento(marcoSelecionado);
+    const templateAtivo = getTemplateAtivoPorTipo(tipoTemplate, MODULO_EX_OFFICIO, templatesAtivos);
+
+    if (!templateAtivo?.template) {
+      alert(`Template ativo não encontrado para '${tipoTemplate}'. Cadastre e ative um template para continuar.`);
+      return;
+    }
+
+    const resultado = gerarTextoRPComportamento({
+      template: templateAtivo.template,
+      militar,
+      marco: marcoSelecionado,
+      tipoTemplate,
+    });
+
+    if (!resultado.ok) {
+      alert(resultado.erro || 'Não foi possível gerar o texto para RP.');
+      return;
+    }
+
+    setDialogTextoRP({
+      open: true,
+      texto: resultado.texto,
+      tipoTemplate,
+    });
+  }, [historicoComportamento, marcoComportamentoSelecionadoId, templatesAtivos, militar]);
+
+  const handleCopiarTextoRP = React.useCallback(async () => {
+    if (!dialogTextoRP.texto) return;
+
+    try {
+      await navigator.clipboard.writeText(dialogTextoRP.texto);
+      alert('Texto copiado para a área de transferência.');
+    } catch {
+      alert('Não foi possível copiar automaticamente. Selecione e copie manualmente.');
+    }
+  }, [dialogTextoRP.texto]);
 
 
   if (loadingUser || isLoading) {
@@ -406,7 +468,19 @@ export default function VerMilitar() {
               </Section>
 
               <Section title="Linha do Tempo do Comportamento">
-                <ComportamentoTimeline eventos={historicoComportamento} />
+                <div className="flex flex-col gap-3">
+                  <div className="flex justify-end">
+                    <Button variant="outline" onClick={handleGerarTextoRP}>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Gerar texto para RP
+                    </Button>
+                  </div>
+                  <ComportamentoTimeline
+                    eventos={historicoComportamento}
+                    selectedEventoId={marcoComportamentoSelecionadoId}
+                    onSelectEvento={(evento) => setMarcoComportamentoSelecionadoId(evento?.id || null)}
+                  />
+                </div>
               </Section>
 
               <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
@@ -547,6 +621,33 @@ export default function VerMilitar() {
           onSaved={() => setShowSolicitacao(false)}
         />
       )}
+
+      <Dialog open={dialogTextoRP.open} onOpenChange={(open) => setDialogTextoRP((prev) => ({ ...prev, open }))}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#1e3a5f]">Pré-visualização do texto para RP</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Template utilizado: <strong>{dialogTextoRP.tipoTemplate || '—'}</strong>
+            </p>
+            <textarea
+              value={dialogTextoRP.texto}
+              readOnly
+              className="w-full min-h-[280px] rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={handleCopiarTextoRP}>
+                <Copy className="w-4 h-4 mr-2" />
+                Copiar texto
+              </Button>
+              <Button type="button" onClick={() => setDialogTextoRP({ open: false, texto: '', tipoTemplate: '' })}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

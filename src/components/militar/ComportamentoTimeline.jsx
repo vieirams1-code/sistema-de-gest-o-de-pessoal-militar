@@ -87,7 +87,7 @@ function limparEventos(eventos = []) {
   return marcosReais;
 }
 
-export default function ComportamentoTimeline({ eventos = [] }) {
+export default function ComportamentoTimeline({ eventos = [], selectedEventoId = null, onSelectEvento = null }) {
   const eventosOrdenados = limparEventos(eventos);
 
   if (!eventosOrdenados.length) {
@@ -97,7 +97,16 @@ export default function ComportamentoTimeline({ eventos = [] }) {
   return (
     <div className="space-y-3">
       {eventosOrdenados.map((evento) => (
-        <div key={evento.id} className="border rounded p-3 text-sm">
+        <button
+          type="button"
+          key={evento.id}
+          onClick={() => onSelectEvento?.(evento)}
+          className={`w-full text-left border rounded p-3 text-sm transition ${
+            selectedEventoId === evento.id
+              ? 'border-[#1e3a5f] bg-blue-50/60'
+              : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
           <div className="flex items-center justify-between gap-2 mb-2">
             <Badge className={comportamentoClasses[evento.comportamento_novo] || 'bg-slate-100 text-slate-700'}>
               {evento.comportamento_novo || 'N/D'}
@@ -115,7 +124,7 @@ export default function ComportamentoTimeline({ eventos = [] }) {
             <p className="text-slate-700 mt-1"><strong>Fundamento:</strong> {evento.fundamento_legal}</p>
           )}
           {evento.observacoes && <p className="text-slate-600 mt-1">{evento.observacoes}</p>}
-        </div>
+        </button>
       ))}
     </div>
   );

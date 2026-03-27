@@ -202,4 +202,13 @@ export const VARS_PREVIEW = {
   texto_errado: 'transferido para o 1º GBM',
   texto_novo: 'transferido para o 2º GBM',
   tipo_ref: 'Transferência',
+  militar_nome: 'João da Silva',
+  posto_graduacao: '3º Sargento',
+  quadro: 'QPBM',
+  unidade: '1º GBM',
+  comportamento_anterior: 'Bom',
+  comportamento_novo: 'Ótimo',
+  data_alteracao: '01/03/2026',
+  motivo_mudanca: 'cumprimento dos requisitos temporais para melhoria',
+  fundamento_legal: 'Art. 52 do regulamento disciplinar',
 };
