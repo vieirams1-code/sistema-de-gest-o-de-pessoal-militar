@@ -24,14 +24,12 @@ const TIPOS_DISCIPLINARES_COMPILAVEIS = new Set([
   'ALTERACAO_COMPORTAMENTO_DISCIPLINAR',
   'IMPLANTACAO_COMPORTAMENTO_DISCIPLINAR',
   'MELHORIA_COMPORTAMENTO_DISCIPLINAR',
-  'MARCO_INICIAL_COMPORTAMENTO_DISCIPLINAR',
 ]);
 
 const TIPOS_CODIGO_DISCIPLINAR_COMPILAVEIS = new Set([
   'alteracao_comportamento_disciplinar',
   'implantacao_comportamento_disciplinar',
   'melhoria_comportamento_disciplinar',
-  'marco_inicial_comportamento_disciplinar',
 ]);
 
 const STATUS_COMPATIVEIS = new Set([
@@ -327,10 +325,6 @@ export function getMotivoInelegibilidadeCompilacaoDisciplinar(registro = {}) {
   const publicacaoCompiladaId = hasPublicacaoCompiladaId(registro);
   const compiladoEmLote = isCompiladoEmLoteTrue(registro);
 
-  if (!detectarOrigemLivro(registro)) {
-    return 'Registro fora do fluxo de Publicações/RP.';
-  }
-
   if (!isTipoDisciplinarCompilavel(registro)) {
     return 'Tipo não elegível para compilação disciplinar.';
   }
@@ -373,11 +367,12 @@ export function validarCompatibilidadeLoteDisciplinar(registros = []) {
     };
   }
 
-  const origens = new Set(lista.map((registro) => registro?.origem_tipo || 'livro'));
-  if (origens.size > 1 || !origens.has('livro')) {
+  const origensPermitidas = new Set(['livro', 'ex-officio', 'historico_comportamento']);
+  const origemInvalida = lista.find((registro) => !origensPermitidas.has(registro?.origem_tipo || 'livro'));
+  if (origemInvalida) {
     return {
       compativel: false,
-      motivo: 'O lote compilado disciplinar aceita somente registros do módulo Livro.',
+      motivo: 'O lote compilado disciplinar aceita somente registros operacionais de Livro/RP.',
     };
   }
 

@@ -248,6 +248,13 @@ function isFeriasOperacional(registro) {
   );
 }
 
+function getEntidadeRegistroPorOrigem(origemTipo) {
+  if (origemTipo === 'ex-officio' || origemTipo === 'historico_comportamento') {
+    return base44.entities.PublicacaoExOfficio;
+  }
+  return base44.entities.RegistroLivro;
+}
+
 function isFilhoDeLoteNaListaPrincipal(registro) {
   return (
     detectarOrigemTipo(registro) === 'livro' &&
@@ -381,7 +388,7 @@ export default function Publicacoes() {
 
           await Promise.all(
             filhosNaoPublicados.map((filho) =>
-              base44.entities.RegistroLivro.update(filho.id, { nota_para_bg: data.nota_para_bg })
+              getEntidadeRegistroPorOrigem(filho?.origem_tipo).update(filho.id, { nota_para_bg: data.nota_para_bg })
             )
           );
         }
@@ -498,7 +505,7 @@ export default function Publicacoes() {
         });
 
         const resultadosVinculo = await Promise.allSettled(
-          registrosSelecionados.map((registro, index) => base44.entities.RegistroLivro.update(registro.id, {
+          registrosSelecionados.map((registro, index) => getEntidadeRegistroPorOrigem(registro?.origem_tipo).update(registro.id, {
               publicacao_compilada_id: loteCriado.id,
               compilado_em_lote: true,
               publicacao_compilada_ordem: index + 1,
@@ -559,7 +566,9 @@ export default function Publicacoes() {
         // Rollback: limpar vínculos dos filhos já atualizados
         await Promise.allSettled(
           filhosVinculados.map((registroId) =>
-            base44.entities.RegistroLivro.update(registroId, {
+            getEntidadeRegistroPorOrigem(
+              registrosSelecionados.find((registro) => registro.id === registroId)?.origem_tipo
+            ).update(registroId, {
               publicacao_compilada_id: null,
               compilado_em_lote: false,
               publicacao_compilada_ordem: null,
@@ -599,10 +608,22 @@ export default function Publicacoes() {
           throw new Error('Publicação compilada já publicada não pode ser removida.');
         }
 
-        await limparVinculoLoteDosFilhos({
-          entity: base44.entities.RegistroLivro,
-          loteId: id,
-        });
+        const filhosDoLote = todosRegistros.filter((item) => item?.publicacao_compilada_id === id);
+        const filhosLivro = filhosDoLote.filter((item) => getEntidadeRegistroPorOrigem(item?.origem_tipo) === base44.entities.RegistroLivro);
+        const filhosExOfficio = filhosDoLote.filter((item) => getEntidadeRegistroPorOrigem(item?.origem_tipo) === base44.entities.PublicacaoExOfficio);
+
+        await Promise.all([
+          limparVinculoLoteDosFilhos({
+            entity: base44.entities.RegistroLivro,
+            loteId: id,
+            filhos: filhosLivro,
+          }),
+          limparVinculoLoteDosFilhos({
+            entity: base44.entities.PublicacaoExOfficio,
+            loteId: id,
+            filhos: filhosExOfficio,
+          }),
+        ]);
 
         return base44.entities.PublicacaoCompilada.delete(id);
       }
@@ -743,7 +764,7 @@ export default function Publicacoes() {
 
       await Promise.all(
         registrosSelecionados.map((registro, index) =>
-          base44.entities.RegistroLivro.update(registro.id, {
+          getEntidadeRegistroPorOrigem(registro?.origem_tipo).update(registro.id, {
             publicacao_compilada_id: loteId,
             compilado_em_lote: true,
             publicacao_compilada_ordem: filhosAtuais.length + index + 1,
@@ -819,7 +840,7 @@ export default function Publicacoes() {
         publicacao_compilada_ordem: index + 1
       }));
 
-      await base44.entities.RegistroLivro.update(registroFilho.id, {
+      await getEntidadeRegistroPorOrigem(registroFilho?.origem_tipo).update(registroFilho.id, {
         publicacao_compilada_id: null,
         compilado_em_lote: false,
         publicacao_compilada_ordem: null,
@@ -830,16 +851,20 @@ export default function Publicacoes() {
 
       await Promise.all(
         filhosRestantesAtualizados.map((filho) =>
-          base44.entities.RegistroLivro.update(filho.id, {
+          getEntidadeRegistroPorOrigem(filho?.origem_tipo).update(filho.id, {
             publicacao_compilada_ordem: filho.publicacao_compilada_ordem,
           })
         )
       );
 
+      const loteDisciplinar = (lote?.tipo_lote || 'ferias') === 'disciplinar';
+
       await base44.entities.PublicacaoCompilada.update(loteId, {
         quantidade_itens: filhosRestantesAtualizados.length,
-        tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
-        texto_publicacao: buildTextoCompiladoFerias(filhosRestantesAtualizados),
+        tipo_registro: loteDisciplinar ? PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO : PUBLICACAO_COMPILADA_FERIAS_TIPO,
+        texto_publicacao: loteDisciplinar
+          ? buildTextoCompiladoDisciplinar(filhosRestantesAtualizados)
+          : buildTextoCompiladoFerias(filhosRestantesAtualizados),
         registros_ids: filhosRestantesAtualizados.map((registro) => registro.id),
       });
 
