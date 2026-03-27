@@ -29,7 +29,7 @@ import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import {
   escolherTipoTemplateComportamento,
   gerarTextoRPComportamento,
-  resolverMarcoComportamento,
+  resolverMarcoComportamentoValido,
 } from '@/utils/comportamentoTemplateUtils';
 
 function InfoItem({ label, value, icon: Icon }) {
@@ -181,7 +181,7 @@ export default function VerMilitar() {
   }, [punicoes]);
 
   const handleGerarTextoRP = React.useCallback(async () => {
-    const marcoSelecionado = resolverMarcoComportamento(historicoComportamento, marcoComportamentoSelecionadoId);
+    const marcoSelecionado = resolverMarcoComportamentoValido(historicoComportamento, marcoComportamentoSelecionadoId);
 
     if (!marcoSelecionado) {
       alert('Nenhum marco de comportamento disponível para geração de texto.');

@@ -119,7 +119,7 @@ export default function ComportamentoTimeline({ eventos = [], selectedEventoId =
           ) : (
             <p><strong>Comportamento vigente:</strong> {evento.comportamento_novo || 'N/D'}</p>
           )}
-          <p className="text-slate-700 mt-1"><strong>Motivo:</strong> {evento.motivo_mudanca || '—'}</p>
+          <p className="text-slate-700 mt-1"><strong>Motivo:</strong> {evento.motivo_mudanca || 'Não informado'}</p>
           {evento.fundamento_legal && (
             <p className="text-slate-700 mt-1"><strong>Fundamento:</strong> {evento.fundamento_legal}</p>
           )}
