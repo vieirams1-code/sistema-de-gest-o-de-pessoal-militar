@@ -7,6 +7,33 @@ export const TIPO_TEMPLATE_COMPORTAMENTO = {
   MELHORIA: 'MELHORIA_COMPORTAMENTO_DISCIPLINAR',
 };
 
+export const TEMPLATE_PADRAO_COMPORTAMENTO_POR_TIPO = {
+  [TIPO_TEMPLATE_COMPORTAMENTO.IMPLANTACAO]: `REGISTRO DE COMPORTAMENTO DISCIPLINAR
+
+Fica registrado o comportamento disciplinar do militar {{posto_graduacao}} {{militar_nome}}, matrícula nº {{matricula}}, do {{quadro}}, como {{comportamento_novo}}, a contar de {{data_alteracao}}, conforme {{motivo_mudanca}}.
+
+Campo Grande/MS, ____ de __________ de ______.
+
+__________________________________
+Comandante`,
+  [TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO]: `ALTERAÇÃO DE COMPORTAMENTO DISCIPLINAR
+
+Fica alterado o comportamento disciplinar do militar {{posto_graduacao}} {{militar_nome}}, matrícula nº {{matricula}}, do {{quadro}}, de {{comportamento_anterior}} para {{comportamento_novo}}, a contar de {{data_alteracao}}, em razão de {{motivo_mudanca}}, nos termos de {{fundamento_legal}}.
+
+Campo Grande/MS, ____ de __________ de ______.
+
+__________________________________
+Comandante`,
+  [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA]: `ALTERAÇÃO DE COMPORTAMENTO DISCIPLINAR
+
+Fica alterado o comportamento disciplinar do militar {{posto_graduacao}} {{militar_nome}}, matrícula nº {{matricula}}, do {{quadro}}, de {{comportamento_anterior}} para {{comportamento_novo}}, a contar de {{data_alteracao}}, em razão de {{motivo_mudanca}}, conforme {{fundamento_legal}}.
+
+Campo Grande/MS, ____ de __________ de ______.
+
+__________________________________
+Comandante`,
+};
+
 const CAMPOS_ESSENCIAIS_POR_TIPO = {
   [TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO]: [
     'militar_nome',
@@ -250,4 +277,8 @@ export function gerarTextoRPComportamento({ template, militar, marco, tipoTempla
     texto: aplicarTemplate(template, vars),
     vars,
   };
+}
+
+export function obterTemplatePadraoComportamento(tipoTemplate) {
+  return TEMPLATE_PADRAO_COMPORTAMENTO_POR_TIPO[tipoTemplate] || '';
 }

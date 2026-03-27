@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import {
   escolherTipoTemplateComportamento,
   gerarTextoRPComportamento,
+  obterTemplatePadraoComportamento,
   resolverMarcoComportamentoValido,
 } from '@/utils/comportamentoTemplateUtils';
 
@@ -66,13 +67,21 @@ function formatDate(date) {
 
 export default function VerMilitar() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const selectedTab = searchParams.get('tab') || 'comportamento';
-  const { isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [marcoComportamentoSelecionadoId, setMarcoComportamentoSelecionadoId] = useState(null);
-  const [dialogTextoRP, setDialogTextoRP] = useState({ open: false, texto: '', tipoTemplate: '' });
+  const [dialogTextoRP, setDialogTextoRP] = useState({
+    open: false,
+    texto: '',
+    tipoTemplate: '',
+    marcoId: '',
+    templateId: '',
+    geradoEm: '',
+  });
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
@@ -180,20 +189,68 @@ export default function VerMilitar() {
     };
   }, [punicoes]);
 
-  const handleGerarTextoRP = React.useCallback(async () => {
-    const marcoSelecionado = resolverMarcoComportamentoValido(historicoComportamento, marcoComportamentoSelecionadoId);
+  const registrarAuditoriaHistoricoComportamento = React.useCallback(async ({
+    marco,
+    tipoTemplate,
+    acao,
+    geradoEmISO,
+    publicacaoId = '',
+  }) => {
+    if (!marco?.id) return;
+    const observacaoAnterior = String(marco?.observacoes || '').trim();
+    const eventoAuditoria = {
+      acao,
+      historico_comportamento_id: marco.id,
+      tipo_template: tipoTemplate || '',
+      gerado_por: user?.email || 'usuário não identificado',
+      gerado_em: geradoEmISO || new Date().toISOString(),
+      publicacao_ex_officio_id: publicacaoId || '',
+    };
+    const linhaAuditoria = `[RP_AUDITORIA] ${JSON.stringify(eventoAuditoria)}`;
+    const observacoesAtualizadas = observacaoAnterior
+      ? `${observacaoAnterior}\n${linhaAuditoria}`
+      : linhaAuditoria;
 
+    await base44.entities.HistoricoComportamento.update(marco.id, {
+      observacoes: observacoesAtualizadas,
+    });
+  }, [user?.email]);
+
+  const montarPacoteGeracaoTextoRP = React.useCallback(async () => {
+    const marcoSelecionado = resolverMarcoComportamentoValido(historicoComportamento, marcoComportamentoSelecionadoId);
     if (!marcoSelecionado) {
-      alert('Nenhum marco de comportamento disponível para geração de texto.');
-      return;
+      return {
+        ok: false,
+        erro: 'Não há marco de comportamento válido para gerar texto de RP.',
+      };
     }
 
     const tipoTemplate = escolherTipoTemplateComportamento(marcoSelecionado);
-    const templateAtivo = getTemplateAtivoPorTipo(tipoTemplate, MODULO_EX_OFFICIO, templatesAtivos);
+    let templateAtivo = getTemplateAtivoPorTipo(tipoTemplate, MODULO_EX_OFFICIO, templatesAtivos);
+    if (!templateAtivo?.template) {
+      const templatePadrao = obterTemplatePadraoComportamento(tipoTemplate);
+      if (templatePadrao) {
+        try {
+          templateAtivo = await base44.entities.TemplateTexto.create({
+            modulo: MODULO_EX_OFFICIO,
+            tipo_registro: tipoTemplate,
+            nome: `Template padrão — ${tipoTemplate}`,
+            template: templatePadrao,
+            observacoes: 'Template padrão semeado automaticamente para comportamento disciplinar.',
+            ativo: true,
+          });
+          queryClient.invalidateQueries({ queryKey: ['templates-ativos-comportamento-rp'] });
+        } catch (error) {
+          console.warn('[RP] Falha ao semear template padrão de comportamento', error);
+        }
+      }
+    }
 
     if (!templateAtivo?.template) {
-      alert(`Template ativo não encontrado para '${tipoTemplate}'. Cadastre e ative um template para continuar.`);
-      return;
+      return {
+        ok: false,
+        erro: `Template ativo não encontrado para '${tipoTemplate}'. Cadastre e ative um template para continuar.`,
+      };
     }
 
     const resultado = gerarTextoRPComportamento({
@@ -203,17 +260,113 @@ export default function VerMilitar() {
       tipoTemplate,
     });
 
-    if (!resultado.ok) {
-      alert(resultado.erro || 'Não foi possível gerar o texto para RP.');
+    if (!resultado.ok) return resultado;
+
+    return {
+      ok: true,
+      resultado,
+      marcoSelecionado,
+      tipoTemplate,
+      templateAtivo,
+    };
+  }, [historicoComportamento, marcoComportamentoSelecionadoId, militar, templatesAtivos]);
+
+  const handleGerarTextoRP = React.useCallback(async () => {
+    const pacote = await montarPacoteGeracaoTextoRP();
+    if (!pacote.ok) {
+      alert(pacote.erro || 'Não foi possível gerar o texto para RP.');
       return;
     }
 
+    const geradoEm = new Date().toISOString();
+
     setDialogTextoRP({
       open: true,
-      texto: resultado.texto,
-      tipoTemplate,
+      texto: pacote.resultado.texto,
+      tipoTemplate: pacote.tipoTemplate,
+      marcoId: pacote.marcoSelecionado.id,
+      templateId: pacote.templateAtivo.id || '',
+      geradoEm,
     });
-  }, [historicoComportamento, marcoComportamentoSelecionadoId, templatesAtivos, militar]);
+
+    try {
+      await registrarAuditoriaHistoricoComportamento({
+        marco: pacote.marcoSelecionado,
+        tipoTemplate: pacote.tipoTemplate,
+        acao: 'GERACAO_PREVIEW_RP',
+        geradoEmISO: geradoEm,
+      });
+    } catch (error) {
+      console.warn('[RP] Falha ao registrar auditoria de geração de texto', error);
+    }
+  }, [montarPacoteGeracaoTextoRP, registrarAuditoriaHistoricoComportamento]);
+
+  const enviarParaRPMutation = useMutation({
+    mutationFn: async ({ texto, tipoTemplate, marcoId, templateId, geradoEm }) => {
+      const registro = await base44.entities.PublicacaoExOfficio.create({
+        militar_id: militar.id,
+        militar_nome: militar.nome_completo || militar.nome_guerra || '',
+        militar_posto: militar.posto_graduacao || '',
+        militar_matricula: militar.matricula || '',
+        tipo: tipoTemplate,
+        data_publicacao: new Date().toISOString().slice(0, 10),
+        status: 'Aguardando Nota',
+        texto_publicacao: texto,
+        origem_tipo: 'historico_comportamento',
+        origem_id: marcoId || '',
+        historico_comportamento_id: marcoId || '',
+        tipo_template: tipoTemplate,
+        template_texto_id: templateId || '',
+        texto_renderizado: texto,
+        gerado_por: user?.email || '',
+        gerado_em: geradoEm || new Date().toISOString(),
+      });
+
+      return registro;
+    },
+    onSuccess: async (registroCriado, variaveis) => {
+      queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['ver-historico-comportamento', id] });
+
+      const marcoParaAuditoria = historicoComportamento.find((item) => item.id === variaveis.marcoId);
+      try {
+        await registrarAuditoriaHistoricoComportamento({
+          marco: marcoParaAuditoria,
+          tipoTemplate: variaveis.tipoTemplate,
+          acao: 'ENVIO_DIRETO_RP',
+          geradoEmISO: variaveis.geradoEm,
+          publicacaoId: registroCriado?.id || '',
+        });
+      } catch (error) {
+        console.warn('[RP] Falha ao registrar auditoria de envio', error);
+      }
+
+      alert('Texto enviado para o módulo RP com sucesso.');
+    },
+  });
+
+  const handleEnviarParaRP = React.useCallback(async () => {
+    const pacote = await montarPacoteGeracaoTextoRP();
+    if (!pacote.ok) {
+      alert(pacote.erro || 'Não foi possível preparar o envio para RP.');
+      return;
+    }
+
+    const geradoEm = dialogTextoRP.geradoEm || new Date().toISOString();
+    const textoRenderizado = dialogTextoRP.texto || pacote.resultado.texto;
+    const tipoTemplate = dialogTextoRP.tipoTemplate || pacote.tipoTemplate;
+    const marcoId = dialogTextoRP.marcoId || pacote.marcoSelecionado.id;
+    const templateId = dialogTextoRP.templateId || pacote.templateAtivo.id || '';
+
+    enviarParaRPMutation.mutate({
+      texto: textoRenderizado,
+      tipoTemplate,
+      marcoId,
+      templateId,
+      geradoEm,
+    });
+  }, [dialogTextoRP, montarPacoteGeracaoTextoRP, enviarParaRPMutation]);
 
   const handleCopiarTextoRP = React.useCallback(async () => {
     if (!dialogTextoRP.texto) return;
@@ -470,10 +623,20 @@ export default function VerMilitar() {
               <Section title="Linha do Tempo do Comportamento">
                 <div className="flex flex-col gap-3">
                   <div className="flex justify-end">
-                    <Button variant="outline" onClick={handleGerarTextoRP}>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Gerar texto para RP
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={handleGerarTextoRP}>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Gerar texto para RP
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleEnviarParaRP}
+                        disabled={enviarParaRPMutation.isPending}
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Enviar para RP
+                      </Button>
+                    </div>
                   </div>
                   <ComportamentoTimeline
                     eventos={historicoComportamento}
@@ -641,7 +804,25 @@ export default function VerMilitar() {
                 <Copy className="w-4 h-4 mr-2" />
                 Copiar texto
               </Button>
-              <Button type="button" onClick={() => setDialogTextoRP({ open: false, texto: '', tipoTemplate: '' })}>
+              <Button
+                type="button"
+                onClick={handleEnviarParaRP}
+                disabled={enviarParaRPMutation.isPending}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Enviar para RP
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setDialogTextoRP({
+                  open: false,
+                  texto: '',
+                  tipoTemplate: '',
+                  marcoId: '',
+                  templateId: '',
+                  geradoEm: '',
+                })}
+              >
                 Fechar
               </Button>
             </div>
