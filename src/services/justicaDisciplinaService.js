@@ -537,18 +537,23 @@ export async function registrarMarcoHistoricoComportamento({
     || (mudancaDisciplinarPorCalculo ? MOTIVO_MUDANCA_DISCIPLINAR_PADRAO : '');
   const createdByFinal = createdBy || created_by || '';
 
+  // Mapear para o campo 'motivo' que a entidade requer (enum: "Manual", "Melhoria de Comportamento", "Punição")
+  let motivoEnum = 'Manual';
+  if (mudancaDisciplinarPorCalculo || origemEhPendencia) {
+    motivoEnum = 'Melhoria de Comportamento';
+  } else if (String(origemTipoFinal || '').toUpperCase().includes('PUNICAO') || String(origemTipoFinal || '').toUpperCase().includes('PUNIÇÃO')) {
+    motivoEnum = 'Punição';
+  }
+
   try {
     const marco = await historicoEntity.create({
       militar_id: militarIdNormalizado,
+      militar_nome: '',
       data_alteracao: dataVigenciaNormalizada,
       comportamento_anterior: comportamentoAnteriorFinal,
       comportamento_novo: comportamento,
-      motivo_mudanca: motivoMudancaFinal,
-      fundamento_legal: fundamentoLegalFinal,
-      origem_tipo: origemTipoFinal,
-      origem_id: origemIdFinal,
-      observacoes: observacoes || '',
-      created_by: createdByFinal,
+      motivo: motivoEnum,
+      observacoes: [motivoMudancaFinal, observacoes].filter(Boolean).join(' | ') || '',
     });
 
     console.info('[HIST] marco criado', {
