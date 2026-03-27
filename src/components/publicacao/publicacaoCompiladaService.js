@@ -401,6 +401,7 @@ export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) 
       ativo: true,
       escopo_inicial: 'ferias',
       origem: 'livro',
+      registros_ids: registros.map((registro) => registro?.id).filter(Boolean),
       tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
       tipo_codigo: PUBLICACAO_COMPILADA_FERIAS_CODIGO,
       ...safeOverrides,

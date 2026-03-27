@@ -61,6 +61,21 @@
       "type": "string",
       "default": "livro"
     },
+    "registros_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "criado_por": {
+      "type": "string",
+      "default": ""
+    },
+    "data_criacao_lote": {
+      "type": "string",
+      "default": ""
+    },
     "observacoes": {
       "type": "string",
       "default": ""
