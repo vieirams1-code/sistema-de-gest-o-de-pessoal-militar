@@ -28,6 +28,14 @@
       "type": "string",
       "default": ""
     },
+    "publicado_por": {
+      "type": "string",
+      "default": ""
+    },
+    "publicado_em": {
+      "type": "string",
+      "default": ""
+    },
     "nota_conciliada_boletim": {
       "type": "string",
       "default": ""
