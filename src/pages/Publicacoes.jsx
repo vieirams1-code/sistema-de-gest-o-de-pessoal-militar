@@ -884,6 +884,13 @@ export default function Publicacoes() {
 
   const toggleRegistroSelecionado = (registroId, checked) => {
     setSelectedRegistros((atual) => {
+      const registro = todosRegistros.find((item) => item.id === registroId);
+      const elegivelParaCompilacaoFerias = isRegistroElegivelParaCompilacaoFerias(registro);
+
+      if (checked && !elegivelParaCompilacaoFerias) {
+        return atual;
+      }
+
       if (checked) {
         return atual.includes(registroId) ? atual : [...atual, registroId];
       }
@@ -1268,16 +1275,16 @@ export default function Publicacoes() {
 
                   <div className="space-y-3">
                     {items.map((registro) => {
-                      const elegivelCompilacao = elegiveisIds.has(registro.id);
+                      const elegivelParaCompilacaoFerias = isRegistroElegivelParaCompilacaoFerias(registro);
                       const selecionado = selectedRegistros.includes(registro.id);
-                      const motivoInelegibilidade = elegivelCompilacao
+                      const motivoInelegibilidadeFerias = elegivelParaCompilacaoFerias
                         ? null
                         : getMotivoInelegibilidadeCompilacaoFerias(registro);
 
                       return (
                         <div key={registro.id} className={`rounded-[24px] ${selecionado ? 'ring-2 ring-indigo-200' : ''}`}>
                           <div className="mb-2 flex flex-wrap items-center justify-between gap-3 px-1">
-                            {elegivelCompilacao ? (
+                            {elegivelParaCompilacaoFerias ? (
                               <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
                                 <Checkbox
                                   checked={selecionado}
@@ -1288,7 +1295,7 @@ export default function Publicacoes() {
                             ) : (
                               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
                                 <AlertCircle className="h-3.5 w-3.5" />
-                                <span>{motivoInelegibilidade || 'Tipo não elegível para compilação mínima de férias'}</span>
+                                <span>{motivoInelegibilidadeFerias || 'Tipo não elegível para compilação mínima de férias.'}</span>
                               </div>
                             )}
 
