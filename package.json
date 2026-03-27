@@ -10,7 +10,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "publish:base44": "bash ./scripts/publish-github-base44.sh"
+    "publish:base44": "bash ./scripts/publish-github-base44.sh",
+    "validate:ferias-runtime": "node ./scripts/validate-ferias-compilacao-runtime.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.23",
