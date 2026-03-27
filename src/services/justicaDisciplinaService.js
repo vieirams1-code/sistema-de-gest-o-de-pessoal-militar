@@ -43,12 +43,27 @@ async function listarHistoricoPorMilitar(historicoEntity, militarId, sort = 'dat
   const militarIdNormalizado = normalizarMilitarId(militarId);
   if (!militarIdNormalizado) return [];
 
-  const [porMilitarId, porMilitarIdLegado] = await Promise.all([
+  const consultas = [
     historicoEntity.filter({ militar_id: militarIdNormalizado }, sort),
     historicoEntity.filter({ militarId: militarIdNormalizado }, sort),
-  ]);
+  ];
 
-  const agregados = [...(Array.isArray(porMilitarId) ? porMilitarId : []), ...(Array.isArray(porMilitarIdLegado) ? porMilitarIdLegado : [])];
+  if (hasEntityMethod(historicoEntity, 'list')) {
+    consultas.push(historicoEntity.list(sort, 200));
+  }
+
+  const [porMilitarId, porMilitarIdLegado, listagemGeral] = await Promise.all(consultas);
+
+  const porListagemGeral = (Array.isArray(listagemGeral) ? listagemGeral : []).filter((registro) => {
+    const registroMilitarId = normalizarMilitarId(registro?.militar_id || registro?.militarId);
+    return registroMilitarId === militarIdNormalizado;
+  });
+
+  const agregados = [
+    ...(Array.isArray(porMilitarId) ? porMilitarId : []),
+    ...(Array.isArray(porMilitarIdLegado) ? porMilitarIdLegado : []),
+    ...porListagemGeral,
+  ];
   const mapa = new Map();
   for (const registro of agregados) {
     const chave = registro?.id || `${registro?.militar_id || registro?.militarId || ''}-${registro?.data_vigencia || ''}-${registro?.comportamento || ''}`;
@@ -135,6 +150,7 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
 
     const registroCriado = await historicoEntity.create({
       militar_id: militarIdNormalizado,
+      militarId: militarIdNormalizado,
       data_vigencia: dataVigenciaInicial,
       comportamento: comportamentoInicial,
       comportamento_anterior: '',
@@ -150,6 +166,7 @@ export async function garantirImplantacaoHistoricoComportamento(payload = {}) {
       console.log('[HIST] criado:', registroCriado);
     } else {
       console.error('[HIST] falha ao criar histórico');
+      return null;
     }
 
     console.info('[HIST] implantação criada no banco', {
