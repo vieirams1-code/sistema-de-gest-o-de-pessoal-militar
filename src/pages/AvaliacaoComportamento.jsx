@@ -86,7 +86,7 @@ export default function AvaliacaoComportamento() {
     });
 
     if (marcoCriado?.id) {
-      await gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
+      const resultadoRPAutomatico = await gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
         militar: linha.militar,
         marco: {
           ...marcoCriado,
@@ -94,6 +94,14 @@ export default function AvaliacaoComportamento() {
           fundamento_legal: linha.calculado.fundamento,
         },
         geradoPor: '',
+      });
+      console.info('[RP_AUTO][aplicarSugestao] resultado da geração automática', {
+        militarId: linha.militar.id,
+        historicoId: marcoCriado.id,
+        ok: resultadoRPAutomatico?.ok,
+        etapa: resultadoRPAutomatico?.etapa || '',
+        motivo: resultadoRPAutomatico?.motivo || '',
+        publicado: resultadoRPAutomatico?.publicado,
       });
     }
     if (linha.pendenciaExistente?.id) {
