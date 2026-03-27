@@ -288,8 +288,13 @@ export async function registrarMarcoHistoricoComportamento({
   fundamentoLegal,
   origemTipo,
   origemId,
+  motivo_mudanca,
+  fundamento_legal,
+  origem_tipo,
+  origem_id,
   observacoes,
   createdBy,
+  created_by,
 }) {
   const militarIdNormalizado = normalizarMilitarId(militarId);
   if (!militarIdNormalizado) return null;
@@ -345,18 +350,26 @@ export async function registrarMarcoHistoricoComportamento({
     return null;
   }
 
+  const origemTipoFinal = origemTipo || origem_tipo || '';
+  const origemIdFinal = origemId || origem_id || '';
+  const fundamentoLegalFinal = fundamentoLegal || fundamento_legal || '';
+  const mudancaDisciplinarPorCalculo = origemTipoFinal === 'PendenciaComportamento' || Boolean(fundamentoLegalFinal);
+  const motivoMudancaFinal = (motivoMudanca || motivo_mudanca || '').trim()
+    || (mudancaDisciplinarPorCalculo ? 'Mudança de comportamento disciplinar por enquadramento legal' : '');
+  const createdByFinal = createdBy || created_by || '';
+
   try {
     const marco = await historicoEntity.create({
       militar_id: militarIdNormalizado,
       data_alteracao: dataVigenciaNormalizada,
       comportamento_anterior: comportamentoAnteriorFinal,
       comportamento_novo: comportamento,
-      motivo_mudanca: motivoMudanca || '',
-      fundamento_legal: fundamentoLegal || '',
-      origem_tipo: origemTipo || '',
-      origem_id: origemId || '',
+      motivo_mudanca: motivoMudancaFinal,
+      fundamento_legal: fundamentoLegalFinal,
+      origem_tipo: origemTipoFinal,
+      origem_id: origemIdFinal,
       observacoes: observacoes || '',
-      created_by: createdBy || '',
+      created_by: createdByFinal,
     });
 
     console.info('[HIST] marco criado', {

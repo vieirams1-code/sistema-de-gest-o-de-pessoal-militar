@@ -112,7 +112,7 @@ export default function ComportamentoTimeline({ eventos = [] }) {
           )}
           <p className="text-slate-700 mt-1"><strong>Motivo:</strong> {evento.motivo_mudanca || '—'}</p>
           {evento.fundamento_legal && (
-            <p className="text-slate-700 mt-1"><strong>Fundamento legal:</strong> {evento.fundamento_legal}</p>
+            <p className="text-slate-700 mt-1"><strong>Fundamento:</strong> {evento.fundamento_legal}</p>
           )}
           {evento.observacoes && <p className="text-slate-600 mt-1">{evento.observacoes}</p>}
         </div>
