@@ -152,6 +152,45 @@ export function resolverMarcoComportamento(eventos = [], marcoSelecionadoId = nu
   return marcos[marcos.length - 1];
 }
 
+function campoPreenchido(valor) {
+  return !(valor === undefined || valor === null || String(valor).trim() === '' || String(valor).trim().toLowerCase() === 'não informado');
+}
+
+export function marcoEhValidoParaGeracaoRP(marco = null, tipoTemplate = TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO) {
+  if (!marco) return false;
+  if (!campoPreenchido(marco?.comportamento_novo)) return false;
+  if (!ehDataValida(marco?.data_alteracao)) return false;
+
+  if (!campoPreenchido(marco?.motivo_mudanca)) return false;
+
+  if (tipoTemplate === TIPO_TEMPLATE_COMPORTAMENTO.IMPLANTACAO) {
+    return true;
+  }
+
+  return campoPreenchido(marco?.fundamento_legal);
+}
+
+export function resolverMarcoComportamentoValido(eventos = [], marcoSelecionadoId = null) {
+  const marcos = sanitizarHistoricoComportamentoParaTemplate(eventos);
+  if (!marcos.length) return null;
+
+  if (marcoSelecionadoId) {
+    const selecionado = marcos.find((marco) => marco.id === marcoSelecionadoId);
+    if (selecionado) {
+      const tipoSelecionado = escolherTipoTemplateComportamento(selecionado);
+      if (marcoEhValidoParaGeracaoRP(selecionado, tipoSelecionado)) return selecionado;
+    }
+  }
+
+  for (let index = marcos.length - 1; index >= 0; index -= 1) {
+    const candidato = marcos[index];
+    const tipoCandidato = escolherTipoTemplateComportamento(candidato);
+    if (marcoEhValidoParaGeracaoRP(candidato, tipoCandidato)) return candidato;
+  }
+
+  return marcos[marcos.length - 1];
+}
+
 export function escolherTipoTemplateComportamento(marco = {}) {
   if (!marco) return TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO;
 

@@ -2,6 +2,7 @@ import { base44 } from '@/api/base44Client';
 import { calcularComportamento } from '@/utils/calcularComportamento';
 
 const TIPOS_COM_DIAS_OBRIGATORIO = new Set(['Detenção', 'Prisão', 'Prisão em Separado']);
+const MOTIVO_MUDANCA_DISCIPLINAR_PADRAO = 'Mudança de comportamento disciplinar por enquadramento legal';
 
 function getEntitySafe(nome) {
   const entity = base44.entities?.[nome];
@@ -71,6 +72,156 @@ async function listarHistoricoPorMilitar(historicoEntity, militarId, sort = 'dat
   }
 
   return Array.from(mapa.values());
+}
+
+async function listarPendenciasPorMilitar(pendenciaEntity, militarId) {
+  if (!hasEntityMethod(pendenciaEntity, 'filter')) return [];
+  const militarIdNormalizado = normalizarMilitarId(militarId);
+  if (!militarIdNormalizado) return [];
+
+  const consultas = [
+    pendenciaEntity.filter({ militar_id: militarIdNormalizado }, '-created_date'),
+  ];
+
+  if (hasEntityMethod(pendenciaEntity, 'list')) {
+    consultas.push(pendenciaEntity.list('-created_date', 200));
+  }
+
+  const [porMilitarId, listagemGeral] = await Promise.all(consultas);
+  const porListagemGeral = (Array.isArray(listagemGeral) ? listagemGeral : []).filter((registro) => {
+    const registroMilitarId = normalizarMilitarId(registro?.militar_id || registro?.militarId);
+    return registroMilitarId === militarIdNormalizado;
+  });
+
+  const agregados = [
+    ...(Array.isArray(porMilitarId) ? porMilitarId : []),
+    ...porListagemGeral,
+  ];
+
+  const mapa = new Map();
+  for (const registro of agregados) {
+    const chave = registro?.id || `${registro?.militar_id || ''}-${registro?.created_date || ''}-${registro?.comportamento_sugerido || ''}`;
+    if (!mapa.has(chave)) mapa.set(chave, registro);
+  }
+
+  return Array.from(mapa.values());
+}
+
+function ehMarcoImplantacao(registro = {}) {
+  const origem = String(registro?.origem_tipo || '').toUpperCase();
+  const motivo = String(registro?.motivo_mudanca || '').toUpperCase();
+  return origem.includes('IMPLANT') || motivo.includes('IMPLANT') || motivo.includes('REGISTRO INICIAL');
+}
+
+function ehMarcoMudancaDisciplinar(registro = {}) {
+  if (!registro) return false;
+  if (ehMarcoImplantacao(registro)) return false;
+  const origem = String(registro?.origem_tipo || '').toUpperCase();
+  if (origem.includes('PENDENCIA')) return true;
+  if (String(registro?.fundamento_legal || '').trim()) return true;
+  return Boolean(registro?.comportamento_anterior && registro?.comportamento_novo);
+}
+
+function precisaSaneamentoMarcoDisciplinar(registro = {}) {
+  if (!ehMarcoMudancaDisciplinar(registro)) return false;
+  const motivo = String(registro?.motivo_mudanca || '').trim();
+  const fundamento = String(registro?.fundamento_legal || '').trim();
+  return !motivo || !fundamento;
+}
+
+function encontrarPendenciaCorrespondente(marco = {}, pendencias = []) {
+  if (!Array.isArray(pendencias) || !pendencias.length) return null;
+
+  const origemId = String(marco?.origem_id || '').trim();
+  if (origemId) {
+    const porOrigem = pendencias.find((pendencia) => String(pendencia?.id || '').trim() === origemId);
+    if (porOrigem) return porOrigem;
+  }
+
+  const comportamentoNovo = String(marco?.comportamento_novo || '').trim().toUpperCase();
+  const comportamentoAnterior = String(marco?.comportamento_anterior || '').trim().toUpperCase();
+  const dataMarco = normalizarDataVigencia(marco?.data_alteracao);
+
+  return pendencias.find((pendencia) => {
+    const sugerido = String(pendencia?.comportamento_sugerido || '').trim().toUpperCase();
+    const atual = String(pendencia?.comportamento_atual || '').trim().toUpperCase();
+    if (!sugerido || sugerido !== comportamentoNovo) return false;
+    if (comportamentoAnterior && atual && atual !== comportamentoAnterior) return false;
+    const dataPendencia = normalizarDataVigencia(pendencia?.data_confirmacao || pendencia?.data_detectada);
+    return !dataMarco || !dataPendencia || dataPendencia <= dataMarco;
+  }) || null;
+}
+
+async function enriquecerHistoricoComportamentoDisciplinar(registros = [], militarId) {
+  const historico = Array.isArray(registros) ? registros : [];
+  const candidatos = historico.filter((registro) => precisaSaneamentoMarcoDisciplinar(registro));
+  if (!candidatos.length) return historico;
+
+  const historicoEntity = getEntitySafe('HistoricoComportamento');
+  if (!hasEntityMethod(historicoEntity, 'update')) return historico;
+
+  const pendenciaEntity = getEntitySafe('PendenciaComportamento');
+  const punicaoEntity = getEntitySafe('PunicaoDisciplinar');
+  const militarEntity = getEntitySafe('Militar');
+
+  const [pendencias, punicoes, militarLista] = await Promise.all([
+    listarPendenciasPorMilitar(pendenciaEntity, militarId),
+    hasEntityMethod(punicaoEntity, 'filter') ? punicaoEntity.filter({ militar_id: militarId }) : [],
+    hasEntityMethod(militarEntity, 'filter') ? militarEntity.filter({ id: militarId }) : [],
+  ]);
+  const militar = Array.isArray(militarLista) ? militarLista[0] : null;
+
+  const atualizados = new Map();
+
+  for (const marco of candidatos) {
+    const pendencia = encontrarPendenciaCorrespondente(marco, pendencias);
+    const motivoAtual = String(marco?.motivo_mudanca || '').trim();
+    const fundamentoAtual = String(marco?.fundamento_legal || '').trim();
+
+    let motivoNovo = motivoAtual || (pendencia ? MOTIVO_MUDANCA_DISCIPLINAR_PADRAO : '');
+    let fundamentoNovo = fundamentoAtual || String(pendencia?.fundamento_legal || '').trim();
+
+    if (!fundamentoNovo && militar && Array.isArray(punicoes) && punicoes.length > 0) {
+      const calculado = calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
+        dataInclusaoMilitar: militar.data_inclusao,
+      });
+      const comportamentoCalculado = String(calculado?.comportamento || '').trim().toUpperCase();
+      const comportamentoMarco = String(marco?.comportamento_novo || '').trim().toUpperCase();
+      if (comportamentoCalculado && comportamentoMarco && comportamentoCalculado === comportamentoMarco) {
+        fundamentoNovo = String(calculado?.fundamento || '').trim();
+        if (fundamentoNovo && !motivoNovo) {
+          motivoNovo = MOTIVO_MUDANCA_DISCIPLINAR_PADRAO;
+        }
+      }
+    }
+
+    if (!motivoNovo && fundamentoNovo) {
+      motivoNovo = MOTIVO_MUDANCA_DISCIPLINAR_PADRAO;
+    }
+
+    if ((!motivoAtual && motivoNovo) || (!fundamentoAtual && fundamentoNovo)) {
+      const patch = {
+        motivo_mudanca: motivoNovo || motivoAtual || '',
+        fundamento_legal: fundamentoNovo || fundamentoAtual || '',
+      };
+
+      try {
+        await historicoEntity.update(marco.id, patch);
+        atualizados.set(marco.id, {
+          ...marco,
+          ...patch,
+        });
+      } catch (error) {
+        console.warn('[HIST] falha saneamento de marco disciplinar', {
+          historico_id: marco?.id,
+          erro: error?.message || error,
+        });
+      }
+    }
+  }
+
+  if (!atualizados.size) return historico;
+  return historico.map((registro) => atualizados.get(registro.id) || registro);
 }
 
 export async function diagnosticarFluxoPunicaoRuntime() {
@@ -352,10 +503,18 @@ export async function registrarMarcoHistoricoComportamento({
 
   const origemTipoFinal = origemTipo || origem_tipo || '';
   const origemIdFinal = origemId || origem_id || '';
-  const fundamentoLegalFinal = fundamentoLegal || fundamento_legal || '';
-  const mudancaDisciplinarPorCalculo = origemTipoFinal === 'PendenciaComportamento' || Boolean(fundamentoLegalFinal);
+  let fundamentoLegalFinal = fundamentoLegal || fundamento_legal || '';
+  const origemEhPendencia = String(origemTipoFinal || '').toUpperCase().includes('PENDENCIACOMPORTAMENTO');
+  if (!fundamentoLegalFinal && origemEhPendencia && origemIdFinal) {
+    const pendenciaEntity = getEntitySafe('PendenciaComportamento');
+    if (hasEntityMethod(pendenciaEntity, 'filter')) {
+      const [pendenciaOrigem] = await pendenciaEntity.filter({ id: origemIdFinal });
+      fundamentoLegalFinal = String(pendenciaOrigem?.fundamento_legal || '').trim();
+    }
+  }
+  const mudancaDisciplinarPorCalculo = origemEhPendencia || Boolean(fundamentoLegalFinal);
   const motivoMudancaFinal = (motivoMudanca || motivo_mudanca || '').trim()
-    || (mudancaDisciplinarPorCalculo ? 'Mudança de comportamento disciplinar por enquadramento legal' : '');
+    || (mudancaDisciplinarPorCalculo ? MOTIVO_MUDANCA_DISCIPLINAR_PADRAO : '');
   const createdByFinal = createdBy || created_by || '';
 
   try {
@@ -404,7 +563,8 @@ export async function obterHistoricoComportamentoMilitar(militarId, { ordem = 'a
 
   const sort = ordem === 'desc' ? '-data_alteracao' : 'data_alteracao';
   const registros = await listarHistoricoPorMilitar(historicoEntity, militarIdNormalizado, sort);
-  return sanitizarHistoricoComportamento(registros, { ordem });
+  const registrosEnriquecidos = await enriquecerHistoricoComportamentoDisciplinar(registros, militarIdNormalizado);
+  return sanitizarHistoricoComportamento(registrosEnriquecidos, { ordem });
 }
 
 export async function criarMarcoHistoricoComportamento({
