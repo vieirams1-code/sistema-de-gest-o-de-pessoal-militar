@@ -26,6 +26,7 @@ import {
   buildPayloadPublicacaoCompiladaDisciplinar,
   buildTextoCompiladoDisciplinar,
   buildTextoCompiladoFerias,
+  gerarTextoConsolidadoDisciplinarDoLote,
   getMotivoInelegibilidadeCompilacaoDisciplinar,
   getMotivoInelegibilidadeCompilacaoFerias,
   PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO,
@@ -253,35 +254,6 @@ function getEntidadeRegistroPorOrigem(origemTipo) {
     return base44.entities.PublicacaoExOfficio;
   }
   return base44.entities.RegistroLivro;
-}
-
-function normalizeText(value = '') {
-  return String(value || '').trim().toLowerCase();
-}
-
-async function gerarTextoConsolidadoDisciplinarDoLote({ loteId, registrosFallback = [] } = {}) {
-  if (!loteId) {
-    return buildTextoCompiladoDisciplinar(registrosFallback);
-  }
-
-  const [filhosLivro, filhosExOfficio, templatesAtivos] = await Promise.all([
-    base44.entities.RegistroLivro.filter({ publicacao_compilada_id: loteId }),
-    base44.entities.PublicacaoExOfficio.filter({ publicacao_compilada_id: loteId }),
-    base44.entities.TemplateTexto.filter({ ativo: true }),
-  ]);
-
-  const filhos = [...(filhosLivro || []), ...(filhosExOfficio || [])]
-    .filter(Boolean)
-    .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
-
-  const templateDisciplinar = (templatesAtivos || []).find((template) => (
-    normalizeText(template?.tipo_registro) === normalizeText(PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO)
-  ));
-
-  return buildTextoCompiladoDisciplinar(filhos, {
-    templateLote: templateDisciplinar?.template || '',
-    templateItem: templateDisciplinar?.item_template || '',
-  });
 }
 
 function isFilhoDeLoteNaListaPrincipal(registro) {
@@ -574,6 +546,14 @@ export default function Publicacoes() {
           ? await gerarTextoConsolidadoDisciplinarDoLote({
               loteId: loteCriado.id,
               registrosFallback: filhosAtualizados,
+              carregarFilhosPorLoteId: async (idLote) => {
+                const [filhosLivro, filhosExOfficio] = await Promise.all([
+                  base44.entities.RegistroLivro.filter({ publicacao_compilada_id: idLote }),
+                  base44.entities.PublicacaoExOfficio.filter({ publicacao_compilada_id: idLote }),
+                ]);
+                return [...(filhosLivro || []), ...(filhosExOfficio || [])];
+              },
+              carregarTemplatesAtivos: () => base44.entities.TemplateTexto.filter({ ativo: true }),
             })
           : montarTextoCompilado(filhosAtualizados);
 
@@ -819,6 +799,14 @@ export default function Publicacoes() {
         ? await gerarTextoConsolidadoDisciplinarDoLote({
             loteId,
             registrosFallback: filhosAtualizados,
+            carregarFilhosPorLoteId: async (idLote) => {
+              const [filhosLivro, filhosExOfficio] = await Promise.all([
+                base44.entities.RegistroLivro.filter({ publicacao_compilada_id: idLote }),
+                base44.entities.PublicacaoExOfficio.filter({ publicacao_compilada_id: idLote }),
+              ]);
+              return [...(filhosLivro || []), ...(filhosExOfficio || [])];
+            },
+            carregarTemplatesAtivos: () => base44.entities.TemplateTexto.filter({ ativo: true }),
           })
         : montarTextoCompilado(filhosAtualizados);
 
@@ -904,6 +892,14 @@ export default function Publicacoes() {
         ? await gerarTextoConsolidadoDisciplinarDoLote({
             loteId,
             registrosFallback: filhosRestantesAtualizados,
+            carregarFilhosPorLoteId: async (idLote) => {
+              const [filhosLivro, filhosExOfficio] = await Promise.all([
+                base44.entities.RegistroLivro.filter({ publicacao_compilada_id: idLote }),
+                base44.entities.PublicacaoExOfficio.filter({ publicacao_compilada_id: idLote }),
+              ]);
+              return [...(filhosLivro || []), ...(filhosExOfficio || [])];
+            },
+            carregarTemplatesAtivos: () => base44.entities.TemplateTexto.filter({ ativo: true }),
           })
         : buildTextoCompiladoFerias(filhosRestantesAtualizados);
 

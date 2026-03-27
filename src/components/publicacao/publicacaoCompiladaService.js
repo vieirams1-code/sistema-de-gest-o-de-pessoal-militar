@@ -1,5 +1,6 @@
 import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils';
-import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
+import { MODULO_EX_OFFICIO, MODULO_LIVRO, RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 
 export const PUBLICACAO_COMPILADA_FERIAS_TIPO = 'Publicação Compilada - Férias';
 export const PUBLICACAO_COMPILADA_FERIAS_CODIGO = 'publicacao_compilada_ferias';
@@ -555,6 +556,71 @@ export function buildTextoCompiladoDisciplinar(registros = [], options = {}) {
   }
 
   return renderPublicacaoCompiladaDisciplinar({ registros: lista });
+}
+
+export async function gerarTextoConsolidadoDisciplinarDoLote({
+  loteId,
+  registrosFallback = [],
+  carregarFilhosPorLoteId,
+  carregarTemplatesAtivos,
+  logger = console,
+} = {}) {
+  const logPrefix = '[CompilacaoDisciplinar][TextoConsolidado]';
+  const logError = typeof logger?.error === 'function' ? logger.error.bind(logger) : console.error.bind(console);
+  const logInfo = typeof logger?.info === 'function' ? logger.info.bind(logger) : console.info.bind(console);
+
+  let filhosOrdenados = registrosFallback
+    .filter(Boolean)
+    .slice()
+    .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
+
+  if (loteId && typeof carregarFilhosPorLoteId === 'function') {
+    const filhosCarregados = await carregarFilhosPorLoteId(loteId);
+    const filhosNormalizados = Array.isArray(filhosCarregados) ? filhosCarregados.filter(Boolean) : [];
+    if (filhosNormalizados.length) {
+      filhosOrdenados = filhosNormalizados
+        .slice()
+        .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
+    }
+  }
+
+  const templatesAtivos = typeof carregarTemplatesAtivos === 'function'
+    ? await carregarTemplatesAtivos()
+    : [];
+
+  const templateDisciplinar =
+    getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO, MODULO_EX_OFFICIO, templatesAtivos)
+    || getTemplateAtivoPorTipo(PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO, MODULO_LIVRO, templatesAtivos);
+
+  if (!templateDisciplinar?.template) {
+    logError(`${logPrefix} Template disciplinar ativo não encontrado para o lote.`, {
+      loteId: loteId || null,
+      tipoRegistro: PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO,
+      modulosTentados: [MODULO_EX_OFFICIO, MODULO_LIVRO],
+    });
+  }
+
+  const textoConsolidado = buildTextoCompiladoDisciplinar(filhosOrdenados, {
+    templateLote: templateDisciplinar?.template || '',
+    templateItem: templateDisciplinar?.item_template || '',
+  }).trim();
+
+  if (!textoConsolidado) {
+    logError(`${logPrefix} Geração de texto disciplinar retornou vazio.`, {
+      loteId: loteId || null,
+      quantidadeFilhos: filhosOrdenados.length,
+      templateId: templateDisciplinar?.id || null,
+    });
+  } else {
+    logInfo(`${logPrefix} Texto disciplinar consolidado gerado com sucesso.`, {
+      loteId: loteId || null,
+      quantidadeFilhos: filhosOrdenados.length,
+      templateId: templateDisciplinar?.id || null,
+      tamanhoTexto: textoConsolidado.length,
+    });
+  }
+
+  return textoConsolidado;
 }
 
 export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) {
