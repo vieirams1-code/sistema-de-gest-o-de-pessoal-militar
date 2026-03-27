@@ -23,12 +23,28 @@ const TIPO_CONFIG = {
   'Unidade': { icone: MapPin, cor: 'text-emerald-600', bgIcone: 'bg-emerald-50', bgCard: 'bg-slate-50/50', label: 'Unidade (Nível 3)' }
 };
 
-// Aliases para fallback caso ainda existam dados com 'Grupamento' ou 'Subgrupamento'
-const normalizeTipo = (tipo) => {
-  if (tipo === 'Grupamento') return 'Setor';
-  if (tipo === 'Subgrupamento') return 'Subsetor';
+const TIPO_UI_TO_DB = {
+  Setor: 'Grupamento',
+  Subsetor: 'Subgrupamento',
+  Unidade: 'Unidade',
+};
+
+const getParentId = (item = {}) => item.grupamento_id || item.setor_pai_id || item.parent_id || '';
+
+// Aliases para fallback entre nomenclatura antiga (Grupamento/Subgrupamento)
+// e nova (Setor/Subsetor). Também considera nível hierárquico quando houver.
+const normalizeTipo = (itemOrTipo) => {
+  const tipo = typeof itemOrTipo === 'string' ? itemOrTipo : itemOrTipo?.tipo;
+  const nivel = typeof itemOrTipo === 'object' ? itemOrTipo?.nivel_hierarquico : undefined;
+
+  if (tipo === 'Setor' || tipo === 'Grupamento') return 'Setor';
+  if (tipo === 'Subsetor' || tipo === 'Subgrupamento') return 'Subsetor';
   if (tipo === 'Unidade') return 'Unidade';
-  return 'Subsetor'; // default
+  if (nivel === 1) return 'Setor';
+  if (nivel === 2) return 'Subsetor';
+  if (nivel === 3) return 'Unidade';
+
+  return getParentId(itemOrTipo) ? 'Subsetor' : 'Setor';
 };
 
 export default function EstruturaOrganizacional() {
@@ -49,7 +65,7 @@ export default function EstruturaOrganizacional() {
   });
 
   const estrutura = useMemo(() => {
-    return todos.map(item => ({ ...item, tipoNormalizado: normalizeTipo(item.tipo) }));
+    return todos.map(item => ({ ...item, parentId: getParentId(item), tipoNormalizado: normalizeTipo(item) }));
   }, [todos]);
 
   if (loadingUser || !isAccessResolved) return null;
@@ -89,7 +105,7 @@ export default function EstruturaOrganizacional() {
 
   const startEdit = (s) => {
     setEditingId(s.id);
-    setEditData({ nome: s.nome, sigla: s.sigla || '', descricao: s.descricao || '', tipo: normalizeTipo(s.tipo), grupamento_id: s.grupamento_id || '' });
+    setEditData({ nome: s.nome, sigla: s.sigla || '', descricao: s.descricao || '', tipo: normalizeTipo(s), grupamento_id: s.parentId || '' });
   };
 
   const saveEdit = (id) => {
@@ -98,6 +114,11 @@ export default function EstruturaOrganizacional() {
       id,
       data: {
         ...editData,
+        tipo: TIPO_UI_TO_DB[editData.tipo] || editData.tipo,
+        nivel_hierarquico: editData.tipo === 'Setor' ? 1 : editData.tipo === 'Subsetor' ? 2 : 3,
+        grupamento_id: editData.tipo === 'Setor' ? '' : (editData.grupamento_id || ''),
+        setor_pai_id: editData.tipo === 'Setor' ? '' : (editData.grupamento_id || ''),
+        parent_id: editData.tipo === 'Setor' ? '' : (editData.grupamento_id || ''),
         grupamento_nome: parent?.nome || '', // Mapeando parent para manter retrocompatibilidade
       }
     });
@@ -107,6 +128,11 @@ export default function EstruturaOrganizacional() {
     const parent = estrutura.find(g => g.id === newData.grupamento_id);
     createMutation.mutate({
       ...newData,
+      tipo: TIPO_UI_TO_DB[newData.tipo] || newData.tipo,
+      nivel_hierarquico: newData.tipo === 'Setor' ? 1 : newData.tipo === 'Subsetor' ? 2 : 3,
+      grupamento_id: newData.tipo === 'Setor' ? '' : (newData.grupamento_id || ''),
+      setor_pai_id: newData.tipo === 'Setor' ? '' : (newData.grupamento_id || ''),
+      parent_id: newData.tipo === 'Setor' ? '' : (newData.grupamento_id || ''),
       ativo: true,
       grupamento_nome: parent?.nome || '',
     });
@@ -121,7 +147,7 @@ export default function EstruturaOrganizacional() {
   };
 
   const getFilhos = (parentId, nivelTarget) => 
-    estrutura.filter(s => s.grupamento_id === parentId && s.tipoNormalizado === nivelTarget);
+    estrutura.filter(s => s.parentId === parentId && s.tipoNormalizado === nivelTarget);
 
   const getParentOptions = (tipoFilho) => {
     if (tipoFilho === 'Subsetor') return setores; // Subsetor -> Pai é Setor
@@ -380,11 +406,11 @@ export default function EstruturaOrganizacional() {
             })}
 
             {/* Órfãos / Mal formatados (Caso o banco venha sujo) */}
-            {estrutura.filter(e => e.tipoNormalizado === 'Subsetor' && !e.grupamento_id).length > 0 && (
+            {estrutura.filter(e => e.tipoNormalizado === 'Subsetor' && !e.parentId).length > 0 && (
               <div className="mt-8 pt-4 border-t-2 border-dashed border-red-200">
                 <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-3">⚠️ Subsetores Órfãos (Sem Setor Pai)</p>
                 <div className="space-y-2">
-                  {estrutura.filter(e => e.tipoNormalizado === 'Subsetor' && !e.grupamento_id).map(sub => (
+                  {estrutura.filter(e => e.tipoNormalizado === 'Subsetor' && !e.parentId).map(sub => (
                     <div key={sub.id} className="bg-red-50 border border-red-100 p-3 rounded-lg flex items-center justify-between">
                        {editingId === sub.id ? (
                         <div className="w-full">{renderEditForm(editData, setEditData, getParentOptions('Subsetor'), () => saveEdit(sub.id), () => setEditingId(null))}</div>
