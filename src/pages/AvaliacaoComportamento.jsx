@@ -13,6 +13,7 @@ import {
   getPunicaoEntity,
   registrarMarcoHistoricoComportamento,
 } from '@/services/justicaDisciplinaService';
+import { gerarPublicacaoRPAutomaticaPorHistoricoComportamento } from '@/services/comportamentoRPService';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
@@ -72,7 +73,7 @@ export default function AvaliacaoComportamento() {
       origemId: linha.militar.id,
     });
 
-    await registrarMarcoHistoricoComportamento({
+    const marcoCriado = await registrarMarcoHistoricoComportamento({
       militarId: linha.militar.id,
       dataVigencia: new Date().toISOString().slice(0, 10),
       comportamentoAnterior: linha.militar.comportamento || 'Bom',
@@ -83,6 +84,18 @@ export default function AvaliacaoComportamento() {
       origemId: linha.pendenciaExistente?.id || '',
       observacoes: 'Mudança aprovada manualmente na Avaliação de Comportamento.',
     });
+
+    if (marcoCriado?.id) {
+      await gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
+        militar: linha.militar,
+        marco: {
+          ...marcoCriado,
+          motivo_mudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
+          fundamento_legal: linha.calculado.fundamento,
+        },
+        geradoPor: '',
+      });
+    }
     if (linha.pendenciaExistente?.id) {
       await base44.entities.PendenciaComportamento.update(linha.pendenciaExistente.id, {
         status_pendencia: 'Aplicada',
