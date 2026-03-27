@@ -402,8 +402,17 @@ export default function Publicacoes() {
 
   const compilarMutation = useMutation({
     mutationFn: async (registrosSelecionados) => {
+      console.info('[CompilacaoFerias] Iniciando seleção para compilação.', {
+        totalSelecionados: registrosSelecionados?.length || 0,
+        registrosIds: (registrosSelecionados || []).map((registro) => registro?.id).filter(Boolean),
+      });
+
       const compatibilidade = validarCompatibilidadeLoteFerias(registrosSelecionados);
       if (!compatibilidade.compativel) {
+        console.error('[CompilacaoFerias] Seleção inválida.', {
+          motivo: compatibilidade.motivo,
+          registro_id: compatibilidade.registro_id || null,
+        });
         throw new Error(compatibilidade.motivo);
       }
 
@@ -413,6 +422,9 @@ export default function Publicacoes() {
       );
 
       if (registrosJaCompilados.length > 0) {
+        console.error('[CompilacaoFerias] Seleção contém registros já vinculados a lote.', {
+          registrosIds: registrosJaCompilados.map((registro) => registro.id),
+        });
         throw new Error('Não é possível compilar novamente: há registros selecionados já vinculados a um lote compilado.');
       }
 
@@ -428,38 +440,97 @@ export default function Publicacoes() {
         nota_para_bg: '',
         numero_bg: '',
         data_bg: '',
+        criado_por: user?.email || user?.name || user?.id || '',
+        data_criacao_lote: new Date().toISOString(),
+        titulo: `Lote Compilado Férias • ${new Date().toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`,
       });
 
       if (!payloadLote.ok) {
+        console.error('[CompilacaoFerias] Falha ao montar payload do lote.', {
+          erro: payloadLote.erro,
+          detalhes: payloadLote.detalhes,
+        });
         throw new Error(payloadLote.erro || 'Não foi possível montar o lote compilado.');
       }
 
       let loteCriado = null;
-      const filhosVinculados = [];
+      let filhosVinculados = [];
 
       try {
+        console.info('[CompilacaoFerias] Criando lote pai.', {
+          quantidade_itens: payloadLote?.payload?.quantidade_itens,
+          tipo_lote: payloadLote?.payload?.tipo_lote,
+          origem: payloadLote?.payload?.origem,
+        });
         loteCriado = await base44.entities.PublicacaoCompilada.create(payloadLote.payload);
 
         if (!loteCriado?.id) {
+          console.error('[CompilacaoFerias] Lote criado sem ID retornado.');
           throw new Error('Falha ao criar o lote compilado: ID não retornado pelo servidor.');
         }
 
-        // Vincular todos os filhos em paralelo — sem get() posterior para evitar atraso de leitura
-        await Promise.all(
-          registrosSelecionados.map((registro, index) =>
-            base44.entities.RegistroLivro.update(registro.id, {
+        console.info('[CompilacaoFerias] Lote pai criado.', {
+          loteId: loteCriado.id,
+        });
+
+        const resultadosVinculo = await Promise.allSettled(
+          registrosSelecionados.map((registro, index) => base44.entities.RegistroLivro.update(registro.id, {
               publicacao_compilada_id: loteCriado.id,
               compilado_em_lote: true,
               publicacao_compilada_ordem: index + 1,
               nota_para_bg: loteCriado?.nota_para_bg || '',
-            }).then(() => {
-              filhosVinculados.push(registro.id);
-            })
-          )
+            }))
         );
+
+        filhosVinculados = resultadosVinculo
+          .map((resultado, index) => (resultado.status === 'fulfilled' ? registrosSelecionados[index]?.id : null))
+          .filter(Boolean);
+
+        const falhasVinculo = resultadosVinculo
+          .map((resultado, index) => ({ resultado, registroId: registrosSelecionados[index]?.id }))
+          .filter((item) => item.resultado.status === 'rejected');
+
+        if (falhasVinculo.length > 0) {
+          console.error('[CompilacaoFerias] Falha ao vincular filhos ao lote.', {
+            loteId: loteCriado.id,
+            filhosVinculados,
+            falhas: falhasVinculo.map((item) => ({
+              registroId: item.registroId,
+              motivo: item.resultado.reason?.message || String(item.resultado.reason || 'Erro de vínculo'),
+            })),
+          });
+          throw new Error('Falha ao vincular todos os registros filhos ao lote compilado.');
+        }
+
+        const filhosAtualizados = registrosSelecionados.map((registro, index) => ({
+          ...registro,
+          publicacao_compilada_id: loteCriado.id,
+          compilado_em_lote: true,
+          publicacao_compilada_ordem: index + 1,
+          nota_para_bg: loteCriado?.nota_para_bg || '',
+        }));
+
+        const textoConsolidado = buildTextoCompiladoFerias(filhosAtualizados);
+
+        await base44.entities.PublicacaoCompilada.update(loteCriado.id, {
+          texto_publicacao: textoConsolidado,
+          quantidade_itens: filhosAtualizados.length,
+          registros_ids: filhosAtualizados.map((item) => item.id),
+        });
+
+        console.info('[CompilacaoFerias] Texto consolidado e persistência final concluídos.', {
+          loteId: loteCriado.id,
+          quantidade_itens: filhosAtualizados.length,
+        });
 
         return loteCriado;
       } catch (error) {
+        console.error('[CompilacaoFerias] Erro durante compilação. Iniciando rollback.', {
+          loteId: loteCriado?.id || null,
+          filhosVinculados,
+          erro: error?.message || String(error),
+        });
+
         // Rollback: limpar vínculos dos filhos já atualizados
         await Promise.allSettled(
           filhosVinculados.map((registroId) =>
@@ -477,6 +548,9 @@ export default function Publicacoes() {
             await base44.entities.PublicacaoCompilada.delete(loteCriado.id);
           } catch (_deleteError) {
             // ignora erro de delete no rollback — lote órfão pode ser limpo manualmente
+            console.error('[CompilacaoFerias] Falha ao excluir lote no rollback.', {
+              loteId: loteCriado.id,
+            });
           }
         }
 
@@ -651,6 +725,7 @@ export default function Publicacoes() {
         quantidade_itens: filhosAtualizados.length,
         tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
         texto_publicacao: buildTextoCompiladoFerias(filhosAtualizados),
+        registros_ids: filhosAtualizados.map((registro) => registro.id),
       });
 
       return true;
@@ -726,6 +801,7 @@ export default function Publicacoes() {
         quantidade_itens: filhosRestantesAtualizados.length,
         tipo_registro: PUBLICACAO_COMPILADA_FERIAS_TIPO,
         texto_publicacao: buildTextoCompiladoFerias(filhosRestantesAtualizados),
+        registros_ids: filhosRestantesAtualizados.map((registro) => registro.id),
       });
 
       return true;

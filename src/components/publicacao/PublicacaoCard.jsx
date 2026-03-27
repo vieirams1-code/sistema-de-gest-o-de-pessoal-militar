@@ -696,6 +696,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                       <p><span className="font-semibold">Lote compilado:</span> {registro.publicacao_compilada_id ? `Sim (${registro.publicacao_compilada_id})` : 'Não'}</p>
                       <p><span className="font-semibold">Ordem no lote:</span> {registro.publicacao_compilada_ordem ?? '—'}</p>
                       {isLoteCompilado && <p><span className="font-semibold">Itens controlados:</span> {registro.quantidade_itens || 0}</p>}
+                      {isLoteCompilado && <p><span className="font-semibold">Tipo do lote:</span> {registro.tipo_lote || '—'}</p>}
+                      {isLoteCompilado && <p><span className="font-semibold">Origem do lote:</span> {registro.origem || '—'}</p>}
+                      {isLoteCompilado && <p><span className="font-semibold">Criado por:</span> {registro.criado_por || '—'}</p>}
+                      {isLoteCompilado && <p><span className="font-semibold">Data criação (lote):</span> {formatDate(registro.data_criacao_lote) || '—'}</p>}
+                      {isLoteCompilado && <p><span className="font-semibold">Filhos vinculados (ids):</span> {Array.isArray(registro.registros_ids) && registro.registros_ids.length > 0 ? registro.registros_ids.join(', ') : '—'}</p>}
                       <p><span className="font-semibold">Período:</span> {vinculosContrato?.periodo?.label || registro.periodo_aquisitivo || '—'}</p>
                       <p><span className="font-semibold">Cadeia:</span> {vinculosContrato?.cadeia?.existe ? `${vinculosContrato.cadeia.total_eventos} evento(s)` : (cadeiaEventosContrato.length ? `${cadeiaEventosContrato.length} evento(s)` : 'Sem cadeia')}</p>
                       {registro.publicacao_referencia_id && <p><span className="font-semibold">Código principal:</span> {gerarCodigo(registro.publicacao_referencia_id)}</p>}
