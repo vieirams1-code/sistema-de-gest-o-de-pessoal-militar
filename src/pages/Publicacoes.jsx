@@ -255,6 +255,35 @@ function getEntidadeRegistroPorOrigem(origemTipo) {
   return base44.entities.RegistroLivro;
 }
 
+function normalizeText(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+async function gerarTextoConsolidadoDisciplinarDoLote({ loteId, registrosFallback = [] } = {}) {
+  if (!loteId) {
+    return buildTextoCompiladoDisciplinar(registrosFallback);
+  }
+
+  const [filhosLivro, filhosExOfficio, templatesAtivos] = await Promise.all([
+    base44.entities.RegistroLivro.filter({ publicacao_compilada_id: loteId }),
+    base44.entities.PublicacaoExOfficio.filter({ publicacao_compilada_id: loteId }),
+    base44.entities.TemplateTexto.filter({ ativo: true }),
+  ]);
+
+  const filhos = [...(filhosLivro || []), ...(filhosExOfficio || [])]
+    .filter(Boolean)
+    .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
+
+  const templateDisciplinar = (templatesAtivos || []).find((template) => (
+    normalizeText(template?.tipo_registro) === normalizeText(PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO)
+  ));
+
+  return buildTextoCompiladoDisciplinar(filhos, {
+    templateLote: templateDisciplinar?.template || '',
+    templateItem: templateDisciplinar?.item_template || '',
+  });
+}
+
 function isFilhoDeLoteNaListaPrincipal(registro) {
   return (
     detectarOrigemTipo(registro) === 'livro' &&
@@ -541,7 +570,12 @@ export default function Publicacoes() {
           nota_para_bg: loteCriado?.nota_para_bg || '',
         }));
 
-        const textoConsolidado = montarTextoCompilado(filhosAtualizados);
+        const textoConsolidado = isModoDisciplinar
+          ? await gerarTextoConsolidadoDisciplinarDoLote({
+              loteId: loteCriado.id,
+              registrosFallback: filhosAtualizados,
+            })
+          : montarTextoCompilado(filhosAtualizados);
 
         await base44.entities.PublicacaoCompilada.update(loteCriado.id, {
           texto_publicacao: textoConsolidado,
@@ -781,10 +815,17 @@ export default function Publicacoes() {
         nota_para_bg: lotePai?.nota_para_bg || '',
       }));
 
+      const textoConsolidado = isModoDisciplinar
+        ? await gerarTextoConsolidadoDisciplinarDoLote({
+            loteId,
+            registrosFallback: filhosAtualizados,
+          })
+        : montarTextoCompilado(filhosAtualizados);
+
       await base44.entities.PublicacaoCompilada.update(loteId, {
         quantidade_itens: filhosAtualizados.length,
         tipo_registro: tipoRegistroLote,
-        texto_publicacao: montarTextoCompilado(filhosAtualizados),
+        texto_publicacao: textoConsolidado,
         registros_ids: filhosAtualizados.map((registro) => registro.id),
       });
 
@@ -859,12 +900,17 @@ export default function Publicacoes() {
 
       const loteDisciplinar = (lote?.tipo_lote || 'ferias') === 'disciplinar';
 
+      const textoConsolidado = loteDisciplinar
+        ? await gerarTextoConsolidadoDisciplinarDoLote({
+            loteId,
+            registrosFallback: filhosRestantesAtualizados,
+          })
+        : buildTextoCompiladoFerias(filhosRestantesAtualizados);
+
       await base44.entities.PublicacaoCompilada.update(loteId, {
         quantidade_itens: filhosRestantesAtualizados.length,
         tipo_registro: loteDisciplinar ? PUBLICACAO_COMPILADA_DISCIPLINAR_TIPO : PUBLICACAO_COMPILADA_FERIAS_TIPO,
-        texto_publicacao: loteDisciplinar
-          ? buildTextoCompiladoDisciplinar(filhosRestantesAtualizados)
-          : buildTextoCompiladoFerias(filhosRestantesAtualizados),
+        texto_publicacao: textoConsolidado,
         registros_ids: filhosRestantesAtualizados.map((registro) => registro.id),
       });
 

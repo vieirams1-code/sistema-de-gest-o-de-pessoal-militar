@@ -1,4 +1,4 @@
-import { formatDateBR } from '@/components/utils/templateUtils';
+import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils';
 import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
 
 export const PUBLICACAO_COMPILADA_FERIAS_TIPO = 'Publicação Compilada - Férias';
@@ -503,8 +503,58 @@ export function renderPublicacaoCompiladaDisciplinar({ registros = [] } = {}) {
   ].join('\n');
 }
 
-export function buildTextoCompiladoDisciplinar(registros = []) {
-  return renderPublicacaoCompiladaDisciplinar({ registros });
+function buildTextoItemCompiladoDisciplinar(registro = {}, index = 0, templateItem = '') {
+  const ordem = registro?.publicacao_compilada_ordem ?? (index + 1);
+  const tipo = getFirstFilled(
+    RP_TIPO_LABELS[registro?.tipo_registro],
+    RP_TIPO_LABELS[registro?.tipo_codigo],
+    registro?.tipo_registro,
+    registro?.tipo_label,
+    registro?.tipo,
+    'Registro disciplinar'
+  );
+  const nome = getFirstFilled(registro?.militar_nome, registro?.nome, registro?.militar_nome_institucional, 'Militar não identificado');
+  const postoGraduacao = getFirstFilled(registro?.militar_posto_graduacao, registro?.posto_graduacao, registro?.posto, '');
+  const matricula = getFirstFilled(registro?.militar_matricula, registro?.matricula, '—');
+  const textoBase = getFirstFilled(registro?.texto_publicacao, registro?.texto, registro?.descricao, 'Sem texto do registro.');
+
+  if (templateItem) {
+    return aplicarTemplate(templateItem, {
+      ordem: String(ordem),
+      tipo_registro: tipo,
+      militar_nome: nome,
+      posto_graduacao: postoGraduacao,
+      matricula,
+      texto_publicacao: textoBase,
+      texto_item: textoBase,
+      data_registro: formatDate(registro?.data_registro) || '',
+    });
+  }
+
+  return `${ordem}. ${tipo} — ${postoGraduacao ? `${postoGraduacao} ` : ''}${nome} (Mat: ${matricula})\n${textoBase}`;
+}
+
+export function buildTextoCompiladoDisciplinar(registros = [], options = {}) {
+  const lista = registros
+    .filter(Boolean)
+    .slice()
+    .sort((a, b) => (a?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER) - (b?.publicacao_compilada_ordem ?? Number.MAX_SAFE_INTEGER));
+  if (!lista.length) return '';
+
+  const templateLote = options?.templateLote || '';
+  const templateItem = options?.templateItem || '';
+  const itens = lista.map((registro, index) => buildTextoItemCompiladoDisciplinar(registro, index, templateItem));
+
+  if (templateLote) {
+    return aplicarTemplate(templateLote, {
+      quantidade_itens: String(lista.length),
+      data_geracao: formatDateBR(new Date().toISOString().slice(0, 10)),
+      itens: itens.join('\n'),
+      itens_texto: itens.join('\n'),
+    });
+  }
+
+  return renderPublicacaoCompiladaDisciplinar({ registros: lista });
 }
 
 export function buildPayloadPublicacaoCompilada(registros = [], overrides = {}) {
