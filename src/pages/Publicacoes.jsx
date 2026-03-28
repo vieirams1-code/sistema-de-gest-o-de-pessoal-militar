@@ -71,6 +71,17 @@ function mapStatusContratoParaControle(statusCodigo) {
   return 'Aguardando Nota';
 }
 
+function obterStatusCanonicoPublicacao(registro = {}) {
+  return (
+    normalizarStatusPublicacao(
+      registro.status_canonico ||
+      registro.status_calculado ||
+      registro.status_publicacao ||
+      registro.status
+    ) || calcularStatusPublicacaoRegistro(registro)
+  );
+}
+
 function getGrupoDisplay(registro) {
   const tipoBase = registro.tipo_registro || registro.tipo || '';
   if (TIPOS_FERIAS.includes(tipoBase)) return 'Férias';
@@ -143,10 +154,16 @@ function normalizarRegistro(registro) {
   const tipoDisplay = getTipoDisplay(tipoBase);
   const grupoDisplay = getGrupoDisplay({ ...registro, tipo_registro: tipoBase });
 
+  const statusOrigem =
+    registro.status_calculado ||
+    (origemTipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcularStatusPublicacaoRegistro(registro));
+  const statusCanonico = obterStatusCanonicoPublicacao({ ...registro, status_calculado: statusOrigem });
+
   return {
     ...registro,
     origem_tipo: origemTipo,
-    status_calculado: registro.status_calculado || (origemTipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcularStatusPublicacaoRegistro(registro)),
+    status_calculado: statusOrigem,
+    status_canonico: statusCanonico,
     tipo_display: tipoDisplay,
     grupo_display: grupoDisplay,
     tipo_composto_display: grupoDisplay ? `${grupoDisplay} • ${tipoDisplay}` : tipoDisplay,
@@ -393,7 +410,8 @@ export default function Publicacoes() {
 
   const registrosDaAbaAtiva = useMemo(() => (abaOrigemAtiva === 'all' ? todosRegistros : todosRegistros.filter((registro) => registro.origem_tipo === abaOrigemAtiva)), [todosRegistros, abaOrigemAtiva]);
   const filteredRegistros = useMemo(() => registrosDaAbaAtiva.filter((r) => {
-    const matchesStatus = statusFilter === 'all' || r.status_calculado === statusFilter;
+    const statusReferencia = statusFilter === 'Inconsistente' ? r.status_calculado : obterStatusCanonicoPublicacao(r);
+    const matchesStatus = statusFilter === 'all' || statusReferencia === statusFilter;
     const termo = searchTerm.toLowerCase().trim();
     const matchesSearch =
       containsTerm(r.militar_nome, termo) ||
@@ -409,17 +427,17 @@ export default function Publicacoes() {
 
   const statsOrigem = useMemo(() => ({
     total: registrosDaAbaAtiva.length,
-    aguardandoNota: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length,
-    aguardandoPublicacao: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length,
-    publicados: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.PUBLICADO).length,
+    aguardandoNota: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length,
+    aguardandoPublicacao: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length,
+    publicados: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.PUBLICADO).length,
     inconsistentes: registrosDaAbaAtiva.filter((r) => r.status_calculado === 'Inconsistente').length,
   }), [registrosDaAbaAtiva]);
 
   const statsFiltro = useMemo(() => {
     const total = filteredRegistros.length;
-    const aguardandoNota = filteredRegistros.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length;
-    const aguardandoPublicacao = filteredRegistros.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length;
-    const publicados = filteredRegistros.filter((r) => r.status_calculado === STATUS_PUBLICACAO.PUBLICADO).length;
+    const aguardandoNota = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length;
+    const aguardandoPublicacao = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length;
+    const publicados = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.PUBLICADO).length;
     const inconsistentes = filteredRegistros.filter((r) => r.status_calculado === 'Inconsistente').length;
     const comBloqueioOperacional = filteredRegistros.filter((r) =>
       (Array.isArray(r?.historico_publicacao) ? r.historico_publicacao : []).some(
@@ -557,7 +575,11 @@ export default function Publicacoes() {
             {grupos
               .filter((grupo) => STATUS_CANONICOS_PUBLICACAO.includes(grupo.key) || grupo.key === 'Inconsistente')
               .map((grupo) => {
-              const items = filteredRegistros.filter((r) => r.status_calculado === grupo.key);
+              const items = filteredRegistros.filter((r) =>
+                grupo.key === 'Inconsistente'
+                  ? r.status_calculado === 'Inconsistente'
+                  : obterStatusCanonicoPublicacao(r) === grupo.key
+              );
               if (!items.length) return null;
               return (
                 <section key={grupo.key} className="space-y-3">
