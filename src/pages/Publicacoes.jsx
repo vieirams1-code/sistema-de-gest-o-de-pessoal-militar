@@ -189,6 +189,7 @@ export default function Publicacoes() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const { user, isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
+  const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
@@ -376,7 +377,12 @@ export default function Publicacoes() {
                     <ShieldAlert className="mr-2 h-4 w-4" /> {modoAdmin ? 'Modo admin ativo' : 'Modo admin'}
                   </Button>
                 )}
-                <Button asChild variant="outline">
+                <Button
+                  asChild
+                  variant="outline"
+                  disabled={!canGerirPublicacoes}
+                  title={!canGerirPublicacoes ? 'Ação negada: você não tem permissão para criar publicação.' : ''}
+                >
                   <button onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}><Plus className="mr-2 h-4 w-4" />Nova publicação</button>
                 </Button>
               </div>

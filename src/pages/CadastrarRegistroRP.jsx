@@ -47,8 +47,10 @@ export default function CadastrarRegistroRP() {
   const registroId = searchParams.get('id');
   const isEditing = !!registroId;
 
-  const { canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasAccess = canAccessModule('livro') || canAccessModule('publicacoes');
+  const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
+  const canPublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
 
   const [step, setStep] = useState(1);
   const [tipoSearch, setTipoSearch] = useState('');
@@ -379,6 +381,20 @@ export default function CadastrarRegistroRP() {
 
     if (templateObrigatorioAusenteNoSubmit) return;
     if (conflitoTemplateNoSubmit.temConflito) return;
+    if (!canGerirPublicacoes) {
+      alert('Ação negada: você não tem permissão para criar/editar publicações.');
+      return;
+    }
+
+    const informouBg =
+      String(formData.nota_para_bg || '').trim() ||
+      String(formData.numero_bg || '').trim() ||
+      String(formData.data_bg || '').trim();
+
+    if (informouBg && !canPublicarBg) {
+      alert('Ação negada: você não tem permissão para informar dados de BG.');
+      return;
+    }
 
     const payload = {
       ...formData,
@@ -394,6 +410,10 @@ export default function CadastrarRegistroRP() {
 
   if (!loadingUser && isAccessResolved && !hasAccess) {
     return <AccessDenied modulo="RP — Registro de Publicações" />;
+  }
+
+  if (!loadingUser && isAccessResolved && !canGerirPublicacoes) {
+    return <AccessDenied modulo="Cadastro/Edição de Publicações" />;
   }
 
   if (loadingUser || (isEditing && loadingRegistro)) {
