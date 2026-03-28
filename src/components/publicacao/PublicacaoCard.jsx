@@ -19,6 +19,10 @@ import { ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, Edit2, FileTex
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
+import {
+  calcularStatusPublicacaoRegistro,
+  STATUS_PUBLICACAO,
+} from '@/components/publicacao/publicacaoStateMachine';
 
 const statusColors = {
   'Aguardando Nota': 'bg-amber-100 text-amber-700 border-amber-200',
@@ -26,12 +30,6 @@ const statusColors = {
   'Publicado': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'Inconsistente': 'bg-red-100 text-red-700 border-red-200',
 };
-
-function calcStatus(nota, numeroBg, dataBg) {
-  if (numeroBg && dataBg) return 'Publicado';
-  if (nota) return 'Aguardando Publicação';
-  return 'Aguardando Nota';
-}
 
 function detectarOrigemTipo(registro) {
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) return 'ex-officio';
@@ -94,13 +92,16 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   });
 
   const origemTipo = detectarOrigemTipo(registro);
-  const currentStatus = calcStatus(registro.nota_para_bg, registro.numero_bg, registro.data_bg);
+  const currentStatus = registro.status_calculado || calcularStatusPublicacaoRegistro(registro);
   const tipoVisual = getTipoVisual(registro.tipo_registro || registro.tipo || '');
   const TipoIcon = tipoVisual.icon;
-  const isPublicado = currentStatus === 'Publicado';
+  const isPublicado = currentStatus === STATUS_PUBLICACAO.PUBLICADO;
   const podeGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
   const podePublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
-  const podeInformarBg = !isPublicado && (currentStatus === 'Aguardando Nota' || currentStatus === 'Aguardando Publicação');
+  const podeInformarBg = !isPublicado && (
+    currentStatus === STATUS_PUBLICACAO.AGUARDANDO_NOTA ||
+    currentStatus === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO
+  );
   const podeEditar = !isPublicado && origemTipo !== 'livro' && podeGerirPublicacoes;
   const podeExcluir = !isPublicado && canAccessAction('admin_mode') && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && canAccessAction('admin_mode') && !modoAdmin;

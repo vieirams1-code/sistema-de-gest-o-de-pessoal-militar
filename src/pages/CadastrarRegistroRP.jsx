@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Save, BookOpenText, Search } from 'lucide-react';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
@@ -29,8 +28,10 @@ import {
   getTemplateAtivoPorTipo,
   tipoExigeTemplate,
 } from '@/components/rp/templateValidation';
-
-const STATUS_OPTIONS = ['Aguardando Nota', 'Aguardando Publicação', 'Publicado'];
+import {
+  calcularStatusPublicacaoRegistro,
+  validarPayloadPublicacao,
+} from '@/components/publicacao/publicacaoStateMachine';
 const TEMPLATE_CONFLITO_MENSAGEM =
   'Conflito de template detectado para este tipo. Verifique os templates cadastrados.';
 
@@ -264,6 +265,17 @@ export default function CadastrarRegistroRP() {
   }, [formData.tipo_registro, templatesAtivos]);
 
   const hasTemplateConflict = conflitoTemplateSelecionado.temConflito;
+  const statusCalculadoFormulario = useMemo(
+    () => calcularStatusPublicacaoRegistro(formData),
+    [formData.nota_para_bg, formData.numero_bg, formData.data_bg]
+  );
+
+  useEffect(() => {
+    setFormData((prev) => {
+      if (prev.status === statusCalculadoFormulario) return prev;
+      return { ...prev, status: statusCalculadoFormulario };
+    });
+  }, [statusCalculadoFormulario]);
 
   // Populate form when editing
   useEffect(() => {
@@ -275,7 +287,7 @@ export default function CadastrarRegistroRP() {
       ...prev,
       ...d,
       tipo_registro: tipoVal,
-      status: d.status || d.status_publicacao || 'Aguardando Nota',
+      status: calcularStatusPublicacaoRegistro(d),
     }));
     const tipo = tiposFiltrados.find(t => t.value === tipoVal);
     if (tipo) setSelectedTipo(tipo);
@@ -396,8 +408,22 @@ export default function CadastrarRegistroRP() {
       return;
     }
 
+    const registroAtual = registroEdicao
+      ? {
+        ...registroEdicao,
+        status: registroEdicao.status || registroEdicao.status_publicacao || statusCalculadoFormulario,
+      }
+      : null;
+    const registroDestino = { ...formData, status: statusCalculadoFormulario };
+    const validacaoTransicao = validarPayloadPublicacao({ registroAtual, registroDestino });
+    if (!validacaoTransicao.valido) {
+      alert(validacaoTransicao.motivo || 'Transição inválida de status para publicação.');
+      return;
+    }
+
     const payload = {
       ...formData,
+      status: statusCalculadoFormulario,
       ...(Object.keys(camposCustom).length > 0 ? { campos_custom: camposCustom } : {}),
     };
     isSubmittingRef.current = true;
@@ -676,16 +702,12 @@ export default function CadastrarRegistroRP() {
                   />
                   <div>
                     <Label className="text-sm font-medium text-slate-700">Status</Label>
-                    <Select value={formData.status} onValueChange={v => handleChange('status', v)}>
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map(s => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                      {statusCalculadoFormulario}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      O status é calculado automaticamente pela máquina de estados (Nota/BG).
+                    </p>
                   </div>
                 </div>
               </div>
