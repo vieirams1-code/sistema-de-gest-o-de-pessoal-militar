@@ -72,16 +72,48 @@ function montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao }) {
   return [postoGraduacao, quadro, nomeExibicao].filter(Boolean).join(' ').trim();
 }
 
+function pickPrimeiroValor(...valores) {
+  for (const valor of valores) {
+    if (valor === null || valor === undefined) continue;
+    const texto = String(valor).trim();
+    if (texto) return texto;
+  }
+  return '';
+}
+
 function normalizarRegistro(registro) {
   const origemTipo = detectarOrigemTipo(registro);
   const militarContrato = registro?.militar || {};
   const militarNomeCompleto = origemTipo === 'livro'
-    ? (militarContrato?.nome_completo || militarContrato?.nome || registro?.militar_nome || registro?.nome || '')
-    : (registro?.militar_nome_completo || registro?.militar_nome || registro?.nome || '');
+    ? pickPrimeiroValor(
+      militarContrato?.nome_completo,
+      registro?.militar_nome_completo,
+      registro?.militar_nome_institucional,
+      registro?.militar_nome,
+      militarContrato?.nome,
+      registro?.nome,
+    )
+    : pickPrimeiroValor(
+      registro?.militar_nome_completo,
+      registro?.militar_nome_institucional,
+      registro?.militar_nome,
+      registro?.nome,
+    );
 
   const militarNomeGuerra = origemTipo === 'livro'
-    ? (militarContrato?.nome_guerra || registro?.nome_guerra || militarContrato?.nome || '')
-    : (registro?.militar_nome_guerra || registro?.nome_guerra || registro?.militar_nome || '');
+    ? pickPrimeiroValor(
+      militarContrato?.nome_guerra,
+      registro?.militar_nome_guerra,
+      registro?.nome_guerra,
+      registro?.militar?.nome_guerra,
+      registro?.militar_nome,
+      militarContrato?.nome,
+    )
+    : pickPrimeiroValor(
+      registro?.militar_nome_guerra,
+      registro?.nome_guerra,
+      registro?.militar_nome,
+    );
 
   const postoGraduacao = abreviarPostoGraduacao(
     origemTipo === 'livro'
@@ -89,7 +121,11 @@ function normalizarRegistro(registro) {
       : (registro?.militar_posto_graduacao || registro?.posto_graduacao || registro?.posto || registro?.graduacao || '')
   );
 
-  const quadro = (origemTipo === 'livro' ? (militarContrato?.quadro || '') : (registro?.militar_quadro || registro?.quadro || '')).toUpperCase();
+  const quadro = pickPrimeiroValor(
+    origemTipo === 'livro' ? militarContrato?.quadro : registro?.militar_quadro,
+    registro?.militar_quadro,
+    registro?.quadro,
+  );
   const tipoRegistroLivro = mapTipoCodigoParaTipoRegistro(registro.tipo_codigo, registro.tipo_label);
   const tipoBase = origemTipo === 'livro' ? (tipoRegistroLivro || registro.tipo_label || registro.tipo || '') : (registro.tipo_registro || registro.tipo || '');
   const tipoDisplay = getTipoDisplay(tipoBase);
