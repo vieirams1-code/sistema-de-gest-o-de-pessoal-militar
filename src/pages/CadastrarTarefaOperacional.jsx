@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { TarefaOperacional, TarefaOperacionalDestinatario, TarefaOperacionalHistorico } from '@/api/entities';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
@@ -81,7 +82,11 @@ export default function CadastrarTarefaOperacional() {
         total_destinatarios: selectedMilitarIds.length,
       };
 
-      const tarefaCriada = await base44.entities.TarefaOperacional.create(payload);
+      if (!TarefaOperacional) throw new Error('Entidade TarefaOperacional não encontrada no schema do app.');
+      if (!TarefaOperacionalDestinatario) throw new Error('Entidade TarefaOperacionalDestinatario não encontrada no schema do app.');
+      if (!TarefaOperacionalHistorico) throw new Error('Entidade TarefaOperacionalHistorico não encontrada no schema do app.');
+
+      const tarefaCriada = await TarefaOperacional.create(payload);
 
       const destinatarioPayloads = selectedMilitarIds
         .map((militarId) => militares.find((item) => item.id === militarId))
@@ -94,9 +99,9 @@ export default function CadastrarTarefaOperacional() {
           status_individual: 'Pendente',
         }));
 
-      await Promise.all(destinatarioPayloads.map((item) => base44.entities.TarefaOperacionalDestinatario.create(item)));
+      await Promise.all(destinatarioPayloads.map((item) => TarefaOperacionalDestinatario.create(item)));
 
-      await base44.entities.TarefaOperacionalHistorico.create({
+      await TarefaOperacionalHistorico.create({
         tarefa_id: tarefaCriada.id,
         evento: 'TAREFA_CRIADA',
         descricao: `Tarefa criada e distribuída para ${destinatarioPayloads.length} destinatário(s).`,
