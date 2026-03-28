@@ -98,8 +98,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const tipoVisual = getTipoVisual(registro.tipo_registro || registro.tipo || '');
   const TipoIcon = tipoVisual.icon;
   const isPublicado = currentStatus === 'Publicado';
+  const podeGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
+  const podePublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
   const podeInformarBg = !isPublicado && (currentStatus === 'Aguardando Nota' || currentStatus === 'Aguardando Publicação');
-  const podeEditar = !isPublicado && origemTipo !== 'livro';
+  const podeEditar = !isPublicado && origemTipo !== 'livro' && podeGerirPublicacoes;
   const podeExcluir = !isPublicado && canAccessAction('admin_mode') && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && canAccessAction('admin_mode') && !modoAdmin;
 
@@ -163,7 +165,13 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
         <div className="flex flex-wrap gap-2">
           {podeInformarBg && !isEditingBg && (
-            <Button variant="outline" size="sm" onClick={() => setIsEditingBg(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditingBg(true)}
+              disabled={!podePublicarBg}
+              title={!podePublicarBg ? 'Ação negada: você não tem permissão para informar BG.' : ''}
+            >
               <Calendar className="mr-2 h-4 w-4" /> Informar BG
             </Button>
           )}
