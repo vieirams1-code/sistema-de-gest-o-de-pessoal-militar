@@ -242,6 +242,36 @@ export const RP_TIPOS_BASE = [
     palavrasChave: ['melhoria', 'comportamento', 'disciplinar'],
     destaque: false,
   },
+  {
+    value: 'COMPILACAO_DISCIPLINAR_CABECALHO',
+    label: 'Compilação Disciplinar — Cabeçalho',
+    grupo: 'Disciplinar',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Template de abertura da compilação disciplinar por lote.',
+    palavrasChave: ['compilacao', 'disciplinar', 'cabecalho', 'lote'],
+    destaque: false,
+  },
+  {
+    value: 'COMPILACAO_DISCIPLINAR_ITEM',
+    label: 'Compilação Disciplinar — Item',
+    grupo: 'Disciplinar',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Template do bloco numerado de cada item do lote disciplinar.',
+    palavrasChave: ['compilacao', 'disciplinar', 'item', 'lote'],
+    destaque: false,
+  },
+  {
+    value: 'COMPILACAO_DISCIPLINAR_RODAPE',
+    label: 'Compilação Disciplinar — Rodapé',
+    grupo: 'Disciplinar',
+    modulo: MODULO_EX_OFFICIO,
+    sexo: null,
+    descricao: 'Template de encerramento opcional da compilação disciplinar.',
+    palavrasChave: ['compilacao', 'disciplinar', 'rodape', 'lote'],
+    destaque: false,
+  },
 
   // RECONHECIMENTO
   {

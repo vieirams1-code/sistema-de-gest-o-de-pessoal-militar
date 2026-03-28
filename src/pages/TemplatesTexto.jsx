@@ -457,6 +457,36 @@ const VARS_POR_TIPO = {
       { v: '{{fundamento_legal}}', desc: 'Fundamento legal da melhoria' },
     ],
   },
+  'COMPILACAO_DISCIPLINAR_CABECALHO': {
+    grupo: 'Compilação Disciplinar — Cabeçalho',
+    cor: 'red',
+    variaveis: [
+      { v: '{{data_geracao}}', desc: 'Data de geração do lote' },
+      { v: '{{quantidade_itens}}', desc: 'Quantidade de itens compilados' },
+    ],
+  },
+  'COMPILACAO_DISCIPLINAR_ITEM': {
+    grupo: 'Compilação Disciplinar — Item',
+    cor: 'red',
+    variaveis: [
+      { v: '{{indice}}', desc: 'Numeração do item no lote' },
+      { v: '{{posto_graduacao}}', desc: 'Posto/graduação do militar' },
+      { v: '{{militar_nome}}', desc: 'Nome do militar' },
+      { v: '{{matricula}}', desc: 'Matrícula funcional' },
+      { v: '{{comportamento_anterior}}', desc: 'Comportamento anterior' },
+      { v: '{{comportamento_novo}}', desc: 'Comportamento novo' },
+      { v: '{{data_alteracao}}', desc: 'Data da alteração disciplinar' },
+      { v: '{{motivo_mudanca}}', desc: 'Motivo da alteração' },
+      { v: '{{fundamento_legal}}', desc: 'Fundamento legal' },
+    ],
+  },
+  'COMPILACAO_DISCIPLINAR_RODAPE': {
+    grupo: 'Compilação Disciplinar — Rodapé',
+    cor: 'red',
+    variaveis: [
+      { v: '{{data_geracao}}', desc: 'Data de geração do lote' },
+    ],
+  },
   'Ata JISO': {
     grupo: 'Ata JISO',
     cor: 'purple',
