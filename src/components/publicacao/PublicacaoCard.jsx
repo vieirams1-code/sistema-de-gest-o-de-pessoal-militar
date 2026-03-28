@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Calendar, Edit2, ExternalLink, FileText, Save, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, Edit2, ExternalLink, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
@@ -47,6 +47,24 @@ function getTipoDisplay(tipo) {
   return getRPTipoLabel(tipo);
 }
 
+function getTipoVisual(tipo) {
+  const tipoBase = String(tipo || '').toLowerCase();
+
+  if (tipoBase.includes('saída férias') || tipoBase.includes('inicio de férias') || tipoBase.includes('início de férias')) {
+    return { icon: ArrowRight, label: 'Início de Férias', className: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+  }
+  if (tipoBase.includes('retorno férias') || tipoBase.includes('término de férias') || tipoBase.includes('termino de férias')) {
+    return { icon: ArrowLeft, label: 'Término de Férias', className: 'text-amber-700 bg-amber-50 border-amber-200' };
+  }
+  if (tipoBase.includes('interrupção de férias') || tipoBase.includes('interrupcao de férias')) {
+    return { icon: Pause, label: 'Interrupção de Férias', className: 'text-orange-700 bg-orange-50 border-orange-200' };
+  }
+  if (tipoBase.includes('nova saída') || tipoBase.includes('retomada') || tipoBase.includes('continuação')) {
+    return { icon: ArrowRight, label: 'Continuação de Férias', className: 'text-sky-700 bg-sky-50 border-sky-200' };
+  }
+  return { icon: Shield, label: getTipoDisplay(tipo), className: 'text-slate-700 bg-slate-50 border-slate-200' };
+}
+
 function getEditUrl(registro) {
   const tipo = detectarOrigemTipo(registro);
   if (tipo === 'ex-officio') return `${createPageUrl('CadastrarPublicacao')}?id=${registro.id}`;
@@ -76,6 +94,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
   const origemTipo = detectarOrigemTipo(registro);
   const currentStatus = calcStatus(registro.nota_para_bg, registro.numero_bg, registro.data_bg);
+  const tipoVisual = getTipoVisual(registro.tipo_registro || registro.tipo || '');
+  const TipoIcon = tipoVisual.icon;
   const isPublicado = currentStatus === 'Publicado';
   const podeInformarBg = !isPublicado && (currentStatus === 'Aguardando Nota' || currentStatus === 'Aguardando Publicação');
   const podeEditar = !isPublicado && origemTipo !== 'livro';
@@ -91,9 +111,13 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
     <Card className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-slate-900">{registro.militar_nome || 'Sem militar'}</h3>
-            <p className="text-sm text-slate-500">{getTipoDisplay(registro.tipo_registro || registro.tipo || 'Publicação')}</p>
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-slate-900">{registro.militar_nome_institucional || registro.militar_nome || 'Sem militar'}</h3>
+            <p className="text-sm text-slate-500">{registro.militar_nome_guerra || 'Sem nome de guerra'}</p>
+            <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${tipoVisual.className}`}>
+              <TipoIcon className="h-3.5 w-3.5" />
+              <span>{tipoVisual.label}</span>
+            </div>
           </div>
           <Badge className={statusColors[registro.status_calculado || currentStatus] || statusColors[currentStatus]}>
             {registro.status_calculado || currentStatus}

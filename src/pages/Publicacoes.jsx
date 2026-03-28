@@ -64,7 +64,7 @@ function getGrupoDisplay(registro) {
 }
 
 function abreviarPostoGraduacao(valor) {
-  const mapa = { Coronel: 'Cel', 'Tenente Coronel': 'TC', Major: 'Maj', Capitão: 'Cap', '1º Tenente': '1º Ten', '2º Tenente': '2º Ten', Aspirante: 'Asp', Subtenente: 'ST', '1º Sargento': '1º Sgt', '2º Sargento': '2º Sgt', '3º Sargento': '3º Sgt', Cabo: 'Cb', Soldado: 'Sd' };
+  const mapa = { Coronel: 'CEL', 'Tenente Coronel': 'TC', Major: 'MAJ', Capitão: 'CAP', '1º Tenente': '1º TEN', '2º Tenente': '2º TEN', Aspirante: 'ASP', Subtenente: 'ST', '1º Sargento': '1º SGT', '2º Sargento': '2º SGT', '3º Sargento': '3º SGT', Cabo: 'CB', Soldado: 'SD' };
   return mapa[valor] || valor || '';
 }
 
@@ -75,9 +75,13 @@ function montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao }) {
 function normalizarRegistro(registro) {
   const origemTipo = detectarOrigemTipo(registro);
   const militarContrato = registro?.militar || {};
-  const militarNome = origemTipo === 'livro'
-    ? (militarContrato?.nome_guerra || militarContrato?.nome || registro?.militar_nome || '')
-    : (registro?.militar_nome || registro?.nome_guerra || registro?.nome || '');
+  const militarNomeCompleto = origemTipo === 'livro'
+    ? (militarContrato?.nome_completo || militarContrato?.nome || registro?.militar_nome || registro?.nome || '')
+    : (registro?.militar_nome_completo || registro?.militar_nome || registro?.nome || '');
+
+  const militarNomeGuerra = origemTipo === 'livro'
+    ? (militarContrato?.nome_guerra || registro?.nome_guerra || militarContrato?.nome || '')
+    : (registro?.militar_nome_guerra || registro?.nome_guerra || registro?.militar_nome || '');
 
   const postoGraduacao = abreviarPostoGraduacao(
     origemTipo === 'livro'
@@ -85,7 +89,7 @@ function normalizarRegistro(registro) {
       : (registro?.militar_posto_graduacao || registro?.posto_graduacao || registro?.posto || registro?.graduacao || '')
   );
 
-  const quadro = origemTipo === 'livro' ? (militarContrato?.quadro || '') : (registro?.militar_quadro || registro?.quadro || '');
+  const quadro = (origemTipo === 'livro' ? (militarContrato?.quadro || '') : (registro?.militar_quadro || registro?.quadro || '')).toUpperCase();
   const tipoRegistroLivro = mapTipoCodigoParaTipoRegistro(registro.tipo_codigo, registro.tipo_label);
   const tipoBase = origemTipo === 'livro' ? (tipoRegistroLivro || registro.tipo_label || registro.tipo || '') : (registro.tipo_registro || registro.tipo || '');
   const tipoDisplay = getTipoDisplay(tipoBase);
@@ -100,10 +104,12 @@ function normalizarRegistro(registro) {
     tipo_composto_display: grupoDisplay ? `${grupoDisplay} • ${tipoDisplay}` : tipoDisplay,
     tipo: origemTipo === 'livro' ? (registro.tipo_label || registro.tipo) : registro.tipo,
     tipo_registro: origemTipo === 'livro' ? tipoBase : registro.tipo_registro,
-    militar_nome: militarNome,
+    militar_nome: militarNomeCompleto,
+    militar_nome_completo: militarNomeCompleto,
+    militar_nome_guerra: militarNomeGuerra,
     militar_posto_graduacao: postoGraduacao,
     militar_quadro: quadro,
-    militar_nome_institucional: montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao: militarNome }),
+    militar_nome_institucional: montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao: militarNomeCompleto }),
     militar_matricula: origemTipo === 'livro' ? (registro?.militar?.matricula || registro?.militar_matricula) : registro.militar_matricula,
     militar_id: origemTipo === 'livro' ? (registro?.militar?.id || registro?.militar_id) : registro.militar_id,
     created_date: origemTipo === 'livro' ? (registro?.detalhes?.criado_em_iso || registro.created_date) : registro.created_date,
