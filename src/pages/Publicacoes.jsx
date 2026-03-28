@@ -106,13 +106,10 @@ function normalizarRegistro(registro) {
       registro?.militar_nome_guerra,
       registro?.nome_guerra,
       registro?.militar?.nome_guerra,
-      registro?.militar_nome,
-      militarContrato?.nome,
     )
     : pickPrimeiroValor(
       registro?.militar_nome_guerra,
       registro?.nome_guerra,
-      registro?.militar_nome,
     );
 
   const postoGraduacao = abreviarPostoGraduacao(
