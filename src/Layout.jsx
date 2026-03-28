@@ -18,6 +18,7 @@ import {
   Sword,
   FolderKanban,
   CalendarClock,
+  CheckSquare,
   Wrench,
   ArrowLeftRight,
   Building2,
@@ -67,6 +68,7 @@ const menuGroups = [
     items: [
       { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban, moduleKey: 'quadro_operacional' },
       { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock, moduleKey: 'quadro_operacional' },
+      { name: 'Tarefas Operacionais', page: 'TarefasOperacionais', icon: CheckSquare, moduleKey: 'tarefas_operacionais' },
     ],
   },
   {
