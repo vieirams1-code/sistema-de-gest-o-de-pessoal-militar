@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, ArrowRight, Calendar, Edit2, ExternalLink, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, Edit2, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
@@ -86,6 +86,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const navigate = useNavigate();
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTextoPublicacao, setShowTextoPublicacao] = useState(false);
   const [bgData, setBgData] = useState({
     nota_para_bg: registro.nota_para_bg || '',
     numero_bg: registro.numero_bg || '',
@@ -176,8 +177,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               <FileText className="mr-2 h-4 w-4" /> Família
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => navigate(getEditUrl(registro))}>
-            <ExternalLink className="mr-2 h-4 w-4" /> Abrir origem
+          <Button variant="outline" size="sm" onClick={() => setShowTextoPublicacao((prev) => !prev)}>
+            {showTextoPublicacao ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+            {showTextoPublicacao ? 'Recolher texto' : 'Expandir texto'}
           </Button>
           {podeExcluir && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
@@ -190,6 +192,15 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             </Button>
           )}
         </div>
+
+        {showTextoPublicacao && (
+          <div className="rounded-lg border bg-slate-50 p-3">
+            <p className="text-xs font-semibold text-slate-500">Texto para publicação</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+              {registro.texto_publicacao || 'Nenhum texto de publicação gerado para este registro.'}
+            </p>
+          </div>
+        )}
       </CardContent>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
