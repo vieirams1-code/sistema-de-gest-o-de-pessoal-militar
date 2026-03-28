@@ -909,7 +909,7 @@ export default function ConciliacaoBoletim() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
-  const isCarregandoDados = isLoadingLivro || isLoadingExOfficio || isLoadingPublicacoesCompiladas || isLoadingAtestados;
+  const isCarregandoDados = isLoadingLivro || isLoadingExOfficio || isLoadingAtestados;
 
   if (isCarregandoDados) {
     return (
