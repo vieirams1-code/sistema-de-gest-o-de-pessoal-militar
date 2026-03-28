@@ -4,6 +4,15 @@ export const STATUS_PUBLICACAO = {
   PUBLICADO: 'Publicado',
 };
 
+export const EVENTO_AUDITORIA_PUBLICACAO = {
+  CRIACAO: 'criacao_publicacao',
+  EDICAO: 'edicao_publicacao',
+  MUDANCA_STATUS: 'mudanca_status',
+  INFORMAR_BG: 'informar_bg',
+  EXCLUSAO: 'exclusao_publicacao',
+  BLOQUEIO: 'bloqueio_operacional',
+};
+
 const STATUS_VALIDOS = new Set(Object.values(STATUS_PUBLICACAO));
 
 const TRANSICOES_VALIDAS = {
@@ -22,6 +31,10 @@ const TRANSICOES_VALIDAS = {
 
 function toText(value) {
   return String(value || '').trim();
+}
+
+function limparObjeto(obj = {}) {
+  return Object.fromEntries(Object.entries(obj).filter(([, valor]) => valor !== undefined));
 }
 
 export function temNotaParaBg(registro = {}) {
@@ -84,4 +97,55 @@ export function validarPayloadPublicacao({ registroAtual = {}, registroDestino =
 
   const statusDestino = calcularStatusPublicacaoRegistro(registroDestino);
   return validarTransicaoPublicacao({ statusAtual, statusDestino, registroDestino });
+}
+
+export function extrairSnapshotPublicacao(registro = {}) {
+  return limparObjeto({
+    nota_para_bg: toText(registro.nota_para_bg),
+    numero_bg: toText(registro.numero_bg),
+    data_bg: toText(registro.data_bg),
+    status_calculado: normalizarStatusPublicacao(registro.status_calculado) || calcularStatusPublicacaoRegistro(registro),
+  });
+}
+
+export function criarEventoAuditoriaPublicacao({
+  registro = {},
+  evento,
+  usuario,
+  resumo,
+  estadoAnterior = null,
+  estadoNovo = null,
+  antes = null,
+  depois = null,
+  metadata = {},
+}) {
+  return limparObjeto({
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    evento,
+    acao: evento,
+    timestamp: new Date().toISOString(),
+    publicacao: limparObjeto({
+      id: registro.id || registro.publicacao_id || null,
+      origem_tipo: registro.origem_tipo || null,
+      militar_id: registro.militar_id || null,
+      tipo: registro.tipo_registro || registro.tipo || null,
+    }),
+    usuario: limparObjeto({
+      id: usuario?.id || null,
+      email: toText(usuario?.email),
+      nome: toText(usuario?.full_name || usuario?.name || usuario?.nome),
+    }),
+    estado_anterior: estadoAnterior,
+    estado_novo: estadoNovo,
+    resumo: toText(resumo),
+    antes: antes ? limparObjeto(antes) : null,
+    depois: depois ? limparObjeto(depois) : null,
+    metadata: limparObjeto(metadata),
+  });
+}
+
+export function anexarEventoAuditoriaPublicacao(registro = {}, evento = null) {
+  const historicoAtual = Array.isArray(registro.historico_publicacao) ? registro.historico_publicacao : [];
+  if (!evento) return historicoAtual;
+  return [...historicoAtual, evento];
 }

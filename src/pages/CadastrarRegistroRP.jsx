@@ -29,9 +29,27 @@ import {
   tipoExigeTemplate,
 } from '@/components/rp/templateValidation';
 import {
+  anexarEventoAuditoriaPublicacao,
   calcularStatusPublicacaoRegistro,
+  criarEventoAuditoriaPublicacao,
+  EVENTO_AUDITORIA_PUBLICACAO,
+  extrairSnapshotPublicacao,
+  normalizarStatusPublicacao,
   validarPayloadPublicacao,
 } from '@/components/publicacao/publicacaoStateMachine';
+
+
+function mapearEntityPublicacaoPorModulo(modulo) {
+  return modulo === MODULO_LIVRO ? base44.entities.RegistroLivro : base44.entities.PublicacaoExOfficio;
+}
+
+function montarResumoEdicaoCamposPublicacao(antes = {}, depois = {}) {
+  const campos = ['nota_para_bg', 'numero_bg', 'data_bg'];
+  const alterados = campos.filter((campo) => String(antes[campo] || '') !== String(depois[campo] || ''));
+  if (!alterados.length) return 'Edição de publicação sem alteração de campos de BG.';
+  return `Edição de publicação com alteração em: ${alterados.join(', ')}.`;
+}
+
 const TEMPLATE_CONFLITO_MENSAGEM =
   'Conflito de template detectado para este tipo. Verifique os templates cadastrados.';
 
@@ -349,18 +367,71 @@ export default function CadastrarRegistroRP() {
       };
 
       if (isEditing) {
-        if (moduloOrigemEdicao === 'Livro') {
-          return base44.entities.RegistroLivro.update(registroId, payloadLivro);
-        }
+        const moduloPersistencia = moduloOrigemEdicao === 'Livro' ? MODULO_LIVRO : MODULO_EX_OFFICIO;
+        const entity = mapearEntityPublicacaoPorModulo(moduloPersistencia);
+        const registroAtual = registroEdicao || {};
+        const payloadAtualizacaoBase = moduloPersistencia === MODULO_LIVRO ? payloadLivro : payloadExOfficio;
+        const registroDestino = { ...registroAtual, ...payloadAtualizacaoBase };
+        const statusAntes = normalizarStatusPublicacao(registroAtual.status_calculado || registroAtual.status_publicacao || registroAtual.status) || calcularStatusPublicacaoRegistro(registroAtual);
+        const statusDepois = normalizarStatusPublicacao(registroDestino.status_calculado || registroDestino.status_publicacao || registroDestino.status) || calcularStatusPublicacaoRegistro(registroDestino);
+        const houveMudancaStatus = statusAntes !== statusDepois;
 
-        return base44.entities.PublicacaoExOfficio.update(registroId, payloadExOfficio);
+        const eventoEdicao = criarEventoAuditoriaPublicacao({
+          registro: {
+            ...registroAtual,
+            id: registroId,
+            origem_tipo: moduloPersistencia === MODULO_LIVRO ? 'livro' : 'ex-officio',
+          },
+          evento: houveMudancaStatus ? EVENTO_AUDITORIA_PUBLICACAO.MUDANCA_STATUS : EVENTO_AUDITORIA_PUBLICACAO.EDICAO,
+          usuario: user,
+          resumo: houveMudancaStatus
+            ? `Mudança de status na edição: ${statusAntes} → ${statusDepois}.`
+            : montarResumoEdicaoCamposPublicacao(registroAtual, registroDestino),
+          estadoAnterior: statusAntes,
+          estadoNovo: statusDepois,
+          antes: extrairSnapshotPublicacao(registroAtual),
+          depois: extrairSnapshotPublicacao(registroDestino),
+        });
+
+        return entity.update(registroId, {
+          ...payloadAtualizacaoBase,
+          historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual, eventoEdicao),
+        });
       }
 
       if (isLivro) {
-        return base44.entities.RegistroLivro.create(payloadLivro);
+        const criado = await base44.entities.RegistroLivro.create(payloadLivro);
+        const eventoCriacao = criarEventoAuditoriaPublicacao({
+          registro: { ...criado, origem_tipo: 'livro' },
+          evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
+          usuario: user,
+          resumo: 'Criação de publicação no módulo Livro.',
+          estadoAnterior: null,
+          estadoNovo: normalizarStatusPublicacao(criado.status_calculado || criado.status_publicacao || criado.status) || calcularStatusPublicacaoRegistro(criado),
+          antes: null,
+          depois: extrairSnapshotPublicacao(criado),
+        });
+        await base44.entities.RegistroLivro.update(criado.id, {
+          historico_publicacao: anexarEventoAuditoriaPublicacao(criado, eventoCriacao),
+        });
+        return criado;
       }
 
-      return base44.entities.PublicacaoExOfficio.create(payloadExOfficio);
+      const criado = await base44.entities.PublicacaoExOfficio.create(payloadExOfficio);
+      const eventoCriacao = criarEventoAuditoriaPublicacao({
+        registro: { ...criado, origem_tipo: 'ex-officio' },
+        evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
+        usuario: user,
+        resumo: 'Criação de publicação no módulo Ex Officio.',
+        estadoAnterior: null,
+        estadoNovo: normalizarStatusPublicacao(criado.status_calculado || criado.status_publicacao || criado.status) || calcularStatusPublicacaoRegistro(criado),
+        antes: null,
+        depois: extrairSnapshotPublicacao(criado),
+      });
+      await base44.entities.PublicacaoExOfficio.update(criado.id, {
+        historico_publicacao: anexarEventoAuditoriaPublicacao(criado, eventoCriacao),
+      });
+      return criado;
     },
     onSuccess: async (resultado, payload) => {
       queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] });
@@ -417,6 +488,28 @@ export default function CadastrarRegistroRP() {
     const registroDestino = { ...formData, status: statusCalculadoFormulario };
     const validacaoTransicao = validarPayloadPublicacao({ registroAtual, registroDestino });
     if (!validacaoTransicao.valido) {
+      if (registroEdicao?.id) {
+        const moduloPersistencia = moduloOrigemEdicao === 'Livro' ? MODULO_LIVRO : MODULO_EX_OFFICIO;
+        const entity = mapearEntityPublicacaoPorModulo(moduloPersistencia);
+        const eventoBloqueio = criarEventoAuditoriaPublicacao({
+          registro: {
+            ...registroEdicao,
+            id: registroEdicao.id,
+            origem_tipo: moduloPersistencia === MODULO_LIVRO ? 'livro' : 'ex-officio',
+          },
+          evento: EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO,
+          usuario: user,
+          resumo: validacaoTransicao.motivo || 'Transição inválida de status para publicação.',
+          estadoAnterior: normalizarStatusPublicacao(registroAtual?.status_calculado || registroAtual?.status_publicacao || registroAtual?.status) || calcularStatusPublicacaoRegistro(registroAtual || {}),
+          estadoNovo: normalizarStatusPublicacao(registroDestino?.status_calculado || registroDestino?.status_publicacao || registroDestino?.status) || calcularStatusPublicacaoRegistro(registroDestino || {}),
+          antes: extrairSnapshotPublicacao(registroAtual || {}),
+          depois: extrairSnapshotPublicacao(registroDestino || {}),
+          metadata: { bloqueio_tipo: 'transicao_invalida' },
+        });
+        entity.update(registroEdicao.id, {
+          historico_publicacao: anexarEventoAuditoriaPublicacao(registroEdicao, eventoBloqueio),
+        }).catch(() => {});
+      }
       alert(validacaoTransicao.motivo || 'Transição inválida de status para publicação.');
       return;
     }

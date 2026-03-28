@@ -21,7 +21,12 @@ import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
 import {
+  anexarEventoAuditoriaPublicacao,
   calcularStatusPublicacaoRegistro,
+  criarEventoAuditoriaPublicacao,
+  EVENTO_AUDITORIA_PUBLICACAO,
+  extrairSnapshotPublicacao,
+  normalizarStatusPublicacao,
   STATUS_PUBLICACAO,
   validarPayloadPublicacao,
 } from '@/components/publicacao/publicacaoStateMachine';
@@ -183,6 +188,24 @@ function isFeriasOperacional(registro) {
   );
 }
 
+
+
+function normalizarOrigemTipoRegistro(tipo) {
+  if (tipo === 'atestado') return 'atestado';
+  if (tipo === 'livro') return 'livro';
+  return 'ex-officio';
+}
+
+function mapearEntityPublicacao(tipo) {
+  if (tipo === 'atestado') return base44.entities.Atestado;
+  if (tipo === 'livro') return base44.entities.RegistroLivro;
+  return base44.entities.PublicacaoExOfficio;
+}
+
+function campoStatusPorTipo(tipo) {
+  return tipo === 'atestado' ? 'status_publicacao' : 'status';
+}
+
 function containsTerm(valor, termo) {
   if (!termo) return true;
   if (valor === null || valor === undefined) return false;
@@ -260,11 +283,39 @@ export default function Publicacoes() {
     mutationFn: async ({ id, data, tipo }) => {
       const registroAtual = todosRegistros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
-      if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
-      if (tipo === 'atestado') return base44.entities.Atestado.update(id, payloadFinal);
-      await base44.entities.RegistroLivro.update(id, payloadFinal);
-      if (isFeriasOperacional(registroAtual)) await reconciliarCadeiaFerias({ feriasId: registroAtual.ferias_id });
-      return null;
+      const origemTipo = normalizarOrigemTipoRegistro(tipo);
+      const entity = mapearEntityPublicacao(origemTipo);
+      const campoStatus = campoStatusPorTipo(origemTipo);
+      const statusAntes = normalizarStatusPublicacao(registroAtual?.status_calculado || registroAtual?.status_publicacao || registroAtual?.status) || calcularStatusPublicacaoRegistro(registroAtual || {});
+      const registroDestino = { ...(registroAtual || {}), ...payloadFinal };
+      const statusDepois = normalizarStatusPublicacao(registroDestino.status_calculado || registroDestino.status_publicacao || registroDestino.status) || calcularStatusPublicacaoRegistro(registroDestino);
+
+      const eventoAuditoria = criarEventoAuditoriaPublicacao({
+        registro: { ...(registroAtual || {}), id, origem_tipo: origemTipo },
+        evento: EVENTO_AUDITORIA_PUBLICACAO.INFORMAR_BG,
+        usuario: user,
+        resumo: statusAntes !== statusDepois
+          ? `BG informado/atualizado com mudança de status: ${statusAntes} → ${statusDepois}.`
+          : 'BG informado/atualizado sem mudança de status.',
+        estadoAnterior: statusAntes,
+        estadoNovo: statusDepois,
+        antes: extrairSnapshotPublicacao(registroAtual || {}),
+        depois: extrairSnapshotPublicacao(registroDestino),
+      });
+
+      const payloadComAuditoria = {
+        ...payloadFinal,
+        [campoStatus]: statusDepois,
+        historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual || {}, eventoAuditoria),
+      };
+
+      if (origemTipo === 'livro') {
+        await entity.update(id, payloadComAuditoria);
+        if (isFeriasOperacional(registroAtual)) await reconciliarCadeiaFerias({ feriasId: registroAtual.ferias_id });
+        return null;
+      }
+
+      return entity.update(id, payloadComAuditoria);
     },
     onSuccess: refrescarDadosPublicacoes,
     onError: (error) => {
@@ -275,6 +326,25 @@ export default function Publicacoes() {
   const deleteMutation = useMutation({
     mutationFn: async ({ id, tipo, registro }) => {
       if (tipo === 'atestado') return;
+
+      const origemTipo = normalizarOrigemTipoRegistro(tipo);
+      const entity = mapearEntityPublicacao(origemTipo);
+      const statusAtual = normalizarStatusPublicacao(registro?.status_calculado || registro?.status_publicacao || registro?.status) || calcularStatusPublicacaoRegistro(registro || {});
+      const eventoExclusao = criarEventoAuditoriaPublicacao({
+        registro: { ...(registro || {}), id, origem_tipo: origemTipo },
+        evento: EVENTO_AUDITORIA_PUBLICACAO.EXCLUSAO,
+        usuario: user,
+        resumo: 'Publicação excluída do fluxo operacional.',
+        estadoAnterior: statusAtual,
+        estadoNovo: null,
+        antes: extrairSnapshotPublicacao(registro || {}),
+        depois: null,
+      });
+
+      await entity.update(id, {
+        historico_publicacao: anexarEventoAuditoriaPublicacao(registro || {}, eventoExclusao),
+      });
+
       if (tipo === 'ex-officio') {
         const isApostila = registro.tipo === 'Apostila';
         const isTSE = registro.tipo === 'Tornar sem Efeito';
@@ -302,12 +372,12 @@ export default function Publicacoes() {
         }
 
         await reverterAtestadosPorExclusaoPublicacao(registro, base44.entities.Atestado, base44.entities.PublicacaoExOfficio);
-        return base44.entities.PublicacaoExOfficio.delete(id);
+        return entity.delete(id);
       }
 
       if (tipo === 'livro') {
         if (isFeriasOperacional(registro)) throw new Error('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
-        return base44.entities.RegistroLivro.delete(id);
+        return entity.delete(id);
       }
     },
     onSuccess: async () => {
@@ -345,7 +415,23 @@ export default function Publicacoes() {
     const registroAtual = todosRegistros.find((item) => item.id === id);
     const registroDestino = { ...(registroAtual || {}), ...(data || {}) };
     const validacao = validarPayloadPublicacao({ registroAtual, registroDestino });
-    if (!validacao.valido) return alert(validacao.motivo || 'Transição inválida de status para publicação.');
+    if (!validacao.valido) {
+      const origemTipo = normalizarOrigemTipoRegistro(tipo);
+      const entity = mapearEntityPublicacao(origemTipo);
+      const eventoBloqueio = criarEventoAuditoriaPublicacao({
+        registro: { ...(registroAtual || {}), id, origem_tipo: origemTipo },
+        evento: EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO,
+        usuario: user,
+        resumo: validacao.motivo || 'Transição inválida de status para publicação.',
+        estadoAnterior: normalizarStatusPublicacao(registroAtual?.status_calculado || registroAtual?.status_publicacao || registroAtual?.status) || calcularStatusPublicacaoRegistro(registroAtual || {}),
+        estadoNovo: normalizarStatusPublicacao(registroDestino?.status_calculado || registroDestino?.status_publicacao || registroDestino?.status) || calcularStatusPublicacaoRegistro(registroDestino || {}),
+        antes: extrairSnapshotPublicacao(registroAtual || {}),
+        depois: extrairSnapshotPublicacao(registroDestino || {}),
+        metadata: { bloqueio_tipo: 'transicao_invalida' },
+      });
+      entity.update(id, { historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual || {}, eventoBloqueio) }).catch(() => {});
+      return alert(validacao.motivo || 'Transição inválida de status para publicação.');
+    }
     updateMutation.mutate({ id, data, tipo });
   };
 
