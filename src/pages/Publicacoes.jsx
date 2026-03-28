@@ -20,6 +20,11 @@ import {
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
+import {
+  calcularStatusPublicacaoRegistro,
+  STATUS_PUBLICACAO,
+  validarPayloadPublicacao,
+} from '@/components/publicacao/publicacaoStateMachine';
 
 const TIPOS_FERIAS = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'];
 const ABAS_ORIGEM = [
@@ -131,7 +136,7 @@ function normalizarRegistro(registro) {
   return {
     ...registro,
     origem_tipo: origemTipo,
-    status_calculado: registro.status_calculado || (origemTipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcStatusPublicacao(registro)),
+    status_calculado: registro.status_calculado || (origemTipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcularStatusPublicacaoRegistro(registro)),
     tipo_display: tipoDisplay,
     grupo_display: grupoDisplay,
     tipo_composto_display: grupoDisplay ? `${grupoDisplay} • ${tipoDisplay}` : tipoDisplay,
@@ -162,7 +167,12 @@ function normalizarRegistro(registro) {
 function montarPayloadAtualizacao(registroAtual, dataParcial, tipo) {
   const houveAlteracaoCamposPublicacao = ['nota_para_bg', 'numero_bg', 'data_bg'].some((campo) => Object.prototype.hasOwnProperty.call(dataParcial || {}, campo));
   if (!houveAlteracaoCamposPublicacao) return dataParcial || {};
-  const statusCalculado = calcStatusPublicacao({ ...(registroAtual || {}), ...(dataParcial || {}) });
+  const registroDestino = { ...(registroAtual || {}), ...(dataParcial || {}) };
+  const statusCalculado = calcularStatusPublicacaoRegistro(registroDestino);
+  const validacao = validarPayloadPublicacao({ registroAtual, registroDestino });
+  if (!validacao.valido) {
+    throw new Error(validacao.motivo || 'Transição de status inválida para publicação.');
+  }
   if (tipo === 'atestado') return { ...(dataParcial || {}), status_publicacao: statusCalculado };
   return { ...(dataParcial || {}), status: statusCalculado };
 }
@@ -257,6 +267,9 @@ export default function Publicacoes() {
       return null;
     },
     onSuccess: refrescarDadosPublicacoes,
+    onError: (error) => {
+      alert(error?.message || 'Falha ao atualizar publicação.');
+    },
   });
 
   const deleteMutation = useMutation({
@@ -321,14 +334,18 @@ export default function Publicacoes() {
 
   const stats = useMemo(() => ({
     total: registrosDaAbaAtiva.length,
-    aguardandoNota: registrosDaAbaAtiva.filter((r) => r.status_calculado === 'Aguardando Nota').length,
-    aguardandoPublicacao: registrosDaAbaAtiva.filter((r) => r.status_calculado === 'Aguardando Publicação').length,
-    publicados: registrosDaAbaAtiva.filter((r) => r.status_calculado === 'Publicado').length,
+    aguardandoNota: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length,
+    aguardandoPublicacao: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length,
+    publicados: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.PUBLICADO).length,
     inconsistentes: registrosDaAbaAtiva.filter((r) => r.status_calculado === 'Inconsistente').length,
   }), [registrosDaAbaAtiva]);
 
   const handleUpdate = (id, data, tipo) => {
     if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
+    const registroAtual = todosRegistros.find((item) => item.id === id);
+    const registroDestino = { ...(registroAtual || {}), ...(data || {}) };
+    const validacao = validarPayloadPublicacao({ registroAtual, registroDestino });
+    if (!validacao.valido) return alert(validacao.motivo || 'Transição inválida de status para publicação.');
     updateMutation.mutate({ id, data, tipo });
   };
 
@@ -338,15 +355,15 @@ export default function Publicacoes() {
     if (!registro) return;
     if (tipo === 'atestado') return alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
     if (tipo === 'livro' && isFeriasOperacional(registro)) return alert('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
-    if (registro.status_calculado === 'Publicado' && registro.tipo !== 'Apostila' && registro.tipo !== 'Tornar sem Efeito') return alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
+    if (registro.status_calculado === STATUS_PUBLICACAO.PUBLICADO && registro.tipo !== 'Apostila' && registro.tipo !== 'Tornar sem Efeito') return alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
     if (registro.tipo === 'Tornar sem Efeito') return alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
     deleteMutation.mutate({ id, tipo, registro });
   };
 
   const grupos = [
-    { key: 'Aguardando Nota', label: 'Aguardando Nota', color: 'text-amber-700', border: 'border-amber-300', bg: 'bg-amber-50' },
-    { key: 'Aguardando Publicação', label: 'Aguardando Publicação', color: 'text-blue-700', border: 'border-blue-300', bg: 'bg-blue-50' },
-    { key: 'Publicado', label: 'Publicado', color: 'text-emerald-700', border: 'border-emerald-300', bg: 'bg-emerald-50' },
+    { key: STATUS_PUBLICACAO.AGUARDANDO_NOTA, label: STATUS_PUBLICACAO.AGUARDANDO_NOTA, color: 'text-amber-700', border: 'border-amber-300', bg: 'bg-amber-50' },
+    { key: STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO, label: STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO, color: 'text-blue-700', border: 'border-blue-300', bg: 'bg-blue-50' },
+    { key: STATUS_PUBLICACAO.PUBLICADO, label: STATUS_PUBLICACAO.PUBLICADO, color: 'text-emerald-700', border: 'border-emerald-300', bg: 'bg-emerald-50' },
     { key: 'Inconsistente', label: 'Inconsistente', color: 'text-red-700', border: 'border-red-300', bg: 'bg-red-50' },
   ];
 
