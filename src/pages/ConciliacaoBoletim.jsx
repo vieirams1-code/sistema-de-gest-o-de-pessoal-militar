@@ -33,7 +33,6 @@ function calcStatus(registro) {
 }
 
 function detectarOrigemTipo(registro) {
-  if (registro?.tipo_lote || registro?.quantidade_itens) return 'publicacao-compilada';
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) return 'ex-officio';
   if (registro.medico || registro.cid_10) return 'atestado';
   return 'livro';
@@ -535,27 +534,6 @@ export default function ConciliacaoBoletim() {
     enabled: isAccessResolved && hasAccess
   });
 
-  const publicacaoCompiladaIds = useMemo(() => (
-    [...new Set(
-      registrosLivro
-        .map((registro) => registro?.publicacao_compilada_id)
-        .filter(Boolean)
-    )]
-  ), [registrosLivro]);
-
-  const { data: publicacoesCompiladas = [], isLoading: isLoadingPublicacoesCompiladas } = useQuery({
-    queryKey: ['conciliacao-publicacoes-compiladas', publicacaoCompiladaIds],
-    queryFn: async () => {
-      if (!publicacaoCompiladaIds.length) return [];
-      const arrays = await Promise.all(
-        publicacaoCompiladaIds.map((id) => base44.entities.PublicacaoCompilada.filter({ id }, '-created_date'))
-      );
-      const mapa = new Map();
-      arrays.flat().forEach((item) => mapa.set(item.id, item));
-      return Array.from(mapa.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-    },
-    enabled: isAccessResolved && hasAccess && publicacaoCompiladaIds.length > 0,
-  });
 
   const { data: atestados = [], isLoading: isLoadingAtestados } = useQuery({
     queryKey: ['conciliacao-atestados-publicacao'],
@@ -581,9 +559,7 @@ export default function ConciliacaoBoletim() {
   });
 
   const pendentes = useMemo(() => {
-    const registrosLivroIndividuais = registrosLivro.filter((registro) => !registro?.publicacao_compilada_id);
-
-    return [...registrosLivroIndividuais, ...publicacoesCompiladas, ...publicacoesExOfficio, ...atestados]
+    return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
       .map((registro) => ({
         ...registro,
         origem_tipo: detectarOrigemTipo(registro),
@@ -593,7 +569,7 @@ export default function ConciliacaoBoletim() {
       }))
       .filter((registro) => registro.status_calculado === 'Aguardando Publicação' && registro.nota_para_bg)
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-  }, [registrosLivro, publicacoesCompiladas, publicacoesExOfficio, atestados]);
+  }, [registrosLivro, publicacoesExOfficio, atestados]);
 
   const ocorrenciasNotasPendentes = useMemo(() => contarOcorrenciasNotasPendentes(pendentes), [pendentes]);
 
@@ -715,15 +691,6 @@ export default function ConciliacaoBoletim() {
           nota_conciliada_boletim: nota?.nota_normalizada || '',
         };
 
-        if (pub.origem_tipo === 'publicacao-compilada') {
-          const filhosDoLote = registrosLivro.filter((registro) => registro?.publicacao_compilada_id === pub.id);
-          return [
-            base44.entities.PublicacaoCompilada.update(pub.id, { ...payloadBase, status: 'Publicado' }),
-            ...filhosDoLote.map((filho) => (
-              base44.entities.RegistroLivro.update(filho.id, { ...payloadBase, status: 'Publicado' })
-            )),
-          ];
-        }
 
         if (pub.origem_tipo === 'atestado') {
           return [base44.entities.Atestado.update(pub.id, { ...payloadBase, status_publicacao: 'Publicado' })];
@@ -741,7 +708,6 @@ export default function ConciliacaoBoletim() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
@@ -777,10 +743,6 @@ export default function ConciliacaoBoletim() {
       return;
     }
 
-    if (pub.origem_tipo === 'publicacao-compilada') {
-      await base44.entities.PublicacaoCompilada.update(pub.id, payload);
-      return;
-    }
 
     await base44.entities.RegistroLivro.update(pub.id, payload);
   };
@@ -863,7 +825,6 @@ export default function ConciliacaoBoletim() {
       await atualizarPersistenciaVinculo(pub, notaSelecionada.nota_normalizada);
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
@@ -894,7 +855,6 @@ export default function ConciliacaoBoletim() {
 
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
@@ -934,7 +894,6 @@ export default function ConciliacaoBoletim() {
       await atualizarPersistenciaVinculo(pub, '');
       queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-compiladas'] });
       queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });

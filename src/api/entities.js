@@ -1,11 +1,7 @@
 import { base44 } from './base44Client';
 
-
 export const Query = base44.entities.Query;
-export const PublicacaoCompilada = base44.entities.PublicacaoCompilada;
 export const PunicaoDisciplinar = base44.entities.PunicaoDisciplinar;
-
-
 
 // auth sdk:
 export const User = base44.auth;
