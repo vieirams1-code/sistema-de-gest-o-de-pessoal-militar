@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ChevronDown,
   LogOut,
-  Settings,
   HeartPulse,
   CalendarDays,
   ClipboardList,
@@ -55,14 +54,24 @@ const menuGroups = [
     title: 'Saúde',
     items: [
       { name: 'Atestados', page: 'DashboardAtestados', icon: HeartPulse, moduleKey: 'atestados' },
+    ],
+  },
+  {
+    title: 'Férias',
+    items: [
       { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias' },
     ],
   },
   {
-    title: 'Gestão',
+    title: 'Operações',
     items: [
       { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban, moduleKey: 'quadro_operacional' },
       { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock, moduleKey: 'quadro_operacional' },
+    ],
+  },
+  {
+    title: 'Publicações e RP',
+    items: [
       { name: 'RP', page: 'RP', icon: BookMarked, moduleKey: 'livro' },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, moduleKey: 'publicacoes' },
       { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, moduleKey: 'publicacoes' },
@@ -74,20 +83,14 @@ const menuGroups = [
       { name: 'Armamentos', page: 'Armamentos', icon: Sword, moduleKey: 'armamentos' },
       { name: 'Medalhas', page: 'Medalhas', icon: Medal, moduleKey: 'medalhas' },
     ],
-  },
-  {
-    title: 'Administração',
-    items: [
-      { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
-      { name: 'Configurações', page: 'Configuracoes', icon: Settings, moduleKey: 'configuracoes' },
-    ],
-  },
+  }
 ];
 
 
 const adminMenuGroup = {
   title: 'ADMIN',
   items: [
+    { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
     { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes', actionKey: 'gerir_configuracoes' },
     { name: 'Permissões de Usuários', page: 'PermissoesUsuarios', icon: Users, actionKey: 'gerir_permissoes' },
     { name: 'Perfis de Permissão', page: 'PerfisPermissao', icon: Shield, actionKey: 'gerir_permissoes' },
