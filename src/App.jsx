@@ -34,6 +34,8 @@ const moduleGuardByPage = {
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   CadastrarPublicacao: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
+  TarefasOperacionais: { moduleKey: 'tarefas_operacionais', moduleName: 'Tarefas Operacionais' },
+  CadastrarTarefaOperacional: { moduleKey: 'tarefas_operacionais', moduleName: 'Tarefas Operacionais' },
   LotacaoMilitares: { moduleKey: 'militares', moduleName: 'Efetivo' },
   EstruturaOrganizacional: { moduleKey: 'militares', moduleName: 'Efetivo' },
   CadastrarArmamento: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
