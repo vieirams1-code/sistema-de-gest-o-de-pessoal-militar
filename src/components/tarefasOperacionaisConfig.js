@@ -1,16 +1,17 @@
 export const STATUS_TAREFA = ['Aberta', 'Em andamento', 'Concluída', 'Encerrada'];
 
+export const STATUS_DESTINATARIO = ['Pendente', 'Em andamento', 'Concluído', 'Com pendência'];
+
 export const STATUS_OPTIONS = [
   { value: 'all', label: 'Todos os status' },
   ...STATUS_TAREFA.map((status) => ({ value: status, label: status })),
 ];
 
 export const TIPO_TAREFA_OPTIONS = [
-  'Administrativa',
-  'Operacional',
-  'Documental',
-  'Logística',
-  'Treinamento',
+  'Envio de documento',
+  'Ciência',
+  'Preenchimento de informação',
+  'Missão/ordem simples',
 ];
 
 export const PRIORIDADE_OPTIONS = ['Baixa', 'Média', 'Alta', 'Crítica'];
