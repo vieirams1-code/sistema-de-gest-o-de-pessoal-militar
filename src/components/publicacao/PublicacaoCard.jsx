@@ -15,12 +15,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, Edit2, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, Edit2, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
 import {
   calcularStatusPublicacaoRegistro,
+  EVENTO_AUDITORIA_PUBLICACAO,
   STATUS_PUBLICACAO,
 } from '@/components/publicacao/publicacaoStateMachine';
 
@@ -95,6 +96,12 @@ function getHistoricoPublicacao(registro) {
   return [...historico].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
 }
 
+function getBloqueiosOperacionais(registro) {
+  return getHistoricoPublicacao(registro).filter(
+    (evento) => (evento?.evento || evento?.acao) === EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO
+  );
+}
+
 export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, modoAdmin = false }) {
   const navigate = useNavigate();
   const [isEditingBg, setIsEditingBg] = useState(false);
@@ -122,6 +129,8 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeExcluir = !isPublicado && canAccessAction('admin_mode') && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && canAccessAction('admin_mode') && !modoAdmin;
   const historicoPublicacao = getHistoricoPublicacao(registro);
+  const bloqueiosOperacionais = getBloqueiosOperacionais(registro);
+  const ultimoBloqueio = bloqueiosOperacionais[0] || null;
 
   const handleSaveBg = () => {
     onUpdate(registro.id, bgData, origemTipo);
@@ -159,6 +168,22 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             <p className="text-sm text-slate-800">{formatDate(registro.data_bg)}</p>
           </div>
         </div>
+
+        {bloqueiosOperacionais.length > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-700" />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  Bloqueio operacional registrado ({bloqueiosOperacionais.length})
+                </p>
+                <p className="mt-1 text-sm text-amber-900">
+                  {ultimoBloqueio?.resumo || 'Há tentativa bloqueada no fluxo. Consulte o histórico para detalhes.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isEditingBg && (
           <div className="grid gap-3 rounded-lg border bg-slate-50 p-4 md:grid-cols-3">
