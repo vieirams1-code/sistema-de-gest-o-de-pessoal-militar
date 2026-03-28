@@ -16,6 +16,6 @@
     "setor_origem": { "type": "string", "default": "" },
     "publico_resumo": { "type": "string", "default": "" },
     "data_criacao": { "type": "datetime", "default": "" },
-    "total_destinatarios": { "type": "number", "default": 0 }
+    "total_destinatarios": { "type": "integer", "default": 0 }
   }
 }
