@@ -176,6 +176,12 @@ function isFeriasOperacional(registro) {
   );
 }
 
+function containsTerm(valor, termo) {
+  if (!termo) return true;
+  if (valor === null || valor === undefined) return false;
+  return String(valor).toLowerCase().includes(termo);
+}
+
 export default function Publicacoes() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -303,7 +309,15 @@ export default function Publicacoes() {
   const filteredRegistros = useMemo(() => registrosDaAbaAtiva.filter((r) => {
     const matchesStatus = statusFilter === 'all' || r.status_calculado === statusFilter;
     const termo = searchTerm.toLowerCase().trim();
-    const matchesSearch = !termo || r.militar_nome?.toLowerCase().includes(termo) || r.militar_matricula?.toLowerCase().includes(termo) || r.numero_bg?.toLowerCase().includes(termo) || r.nota_para_bg?.toLowerCase().includes(termo) || r.tipo?.toLowerCase().includes(termo) || r.tipo_registro?.toLowerCase().includes(termo) || r.tipo_display?.toLowerCase().includes(termo) || r.grupo_display?.toLowerCase().includes(termo);
+    const matchesSearch =
+      containsTerm(r.militar_nome, termo) ||
+      containsTerm(r.militar_matricula, termo) ||
+      containsTerm(r.numero_bg, termo) ||
+      containsTerm(r.nota_para_bg, termo) ||
+      containsTerm(r.tipo, termo) ||
+      containsTerm(r.tipo_registro, termo) ||
+      containsTerm(r.tipo_display, termo) ||
+      containsTerm(r.grupo_display, termo);
     return matchesStatus && matchesSearch;
   }), [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
