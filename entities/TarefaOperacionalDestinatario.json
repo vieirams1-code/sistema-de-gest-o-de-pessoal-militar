@@ -2,10 +2,12 @@
   "name": "TarefaOperacionalDestinatario",
   "type": "object",
   "title": "Tarefa Operacional - Destinatário",
-  "description": "Vincula tarefa operacional a militar destinatário com status individual e retorno.",
+  "description": "Vínculo entre tarefa operacional e destinatário com status individual e retorno.",
   "properties": {
     "tarefa_id": { "type": "string", "default": "" },
     "militar_id": { "type": "string", "default": "" },
+    "militar_nome": { "type": "string", "default": "" },
+    "militar_email": { "type": "string", "default": "" },
     "status_individual": { "type": "string", "default": "Pendente" },
     "resposta_texto": { "type": "string", "default": "" },
     "anexo_url": { "type": "string", "default": "" },

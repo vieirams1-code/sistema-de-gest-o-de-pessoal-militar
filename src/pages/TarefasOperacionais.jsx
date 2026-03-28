@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardCheck, Clock3, Filter, Plus, Search } from 'lucide-react';
+import { ClipboardCheck, Clock3, Filter, Plus, Search, Users } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import {
   STATUS_OPTIONS,
@@ -73,7 +73,7 @@ export default function TarefasOperacionais() {
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Tarefas Operacionais</h1>
-          <p className="text-sm text-slate-500 mt-1">Painel inicial para gestão e conferência de tarefas administrativas e operacionais.</p>
+          <p className="text-sm text-slate-500 mt-1">Painel inicial para gestão e conferência de tarefas operacionais distribuídas ao efetivo.</p>
         </div>
 
         {canCreate && (
@@ -167,6 +167,7 @@ export default function TarefasOperacionais() {
                     <div className="flex items-center gap-2"><Clock3 className="w-3.5 h-3.5" /> Prazo: {formatDateBR(tarefa.prazo)}</div>
                     <div className="flex items-center gap-2"><Filter className="w-3.5 h-3.5" /> Setor: {tarefa.setor_origem || 'Não informado'}</div>
                     <div className="flex items-center gap-2"><ClipboardCheck className="w-3.5 h-3.5" /> Criado por: {tarefa.criado_por || 'N/I'}</div>
+                    <div className="flex items-center gap-2"><Users className="w-3.5 h-3.5" /> Destinatários: {tarefa.total_destinatarios || 0}</div>
                   </div>
                 </div>
               </CardContent>

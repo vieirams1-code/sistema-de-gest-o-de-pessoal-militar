@@ -2,7 +2,7 @@
   "name": "TarefaOperacionalHistorico",
   "type": "object",
   "title": "Tarefa Operacional - Histórico",
-  "description": "Auditoria mínima de eventos da tarefa operacional.",
+  "description": "Trilha mínima de auditoria para eventos da tarefa operacional.",
   "properties": {
     "tarefa_id": { "type": "string", "default": "" },
     "evento": { "type": "string", "default": "" },
