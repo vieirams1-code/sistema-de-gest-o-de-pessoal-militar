@@ -80,11 +80,27 @@ function formatDate(value) {
   }
 }
 
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  try {
+    return format(new Date(value), 'dd/MM/yyyy HH:mm');
+  } catch {
+    return String(value);
+  }
+}
+
+function getHistoricoPublicacao(registro) {
+  const historico = Array.isArray(registro?.historico_publicacao) ? registro.historico_publicacao : [];
+  return [...historico].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+}
+
 export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, modoAdmin = false }) {
   const navigate = useNavigate();
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTextoPublicacao, setShowTextoPublicacao] = useState(false);
+  const [showHistorico, setShowHistorico] = useState(false);
   const [bgData, setBgData] = useState({
     nota_para_bg: registro.nota_para_bg || '',
     numero_bg: registro.numero_bg || '',
@@ -105,6 +121,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const podeEditar = !isPublicado && origemTipo !== 'livro' && podeGerirPublicacoes;
   const podeExcluir = !isPublicado && canAccessAction('admin_mode') && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && canAccessAction('admin_mode') && !modoAdmin;
+  const historicoPublicacao = getHistoricoPublicacao(registro);
 
   const handleSaveBg = () => {
     onUpdate(registro.id, bgData, origemTipo);
@@ -190,6 +207,10 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             {showTextoPublicacao ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
             {showTextoPublicacao ? 'Recolher texto' : 'Expandir texto'}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowHistorico((prev) => !prev)}>
+            {showHistorico ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+            {showHistorico ? 'Ocultar histórico' : 'Histórico'}
+          </Button>
           {podeExcluir && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 className="mr-2 h-4 w-4" /> Excluir
@@ -208,6 +229,31 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
               {registro.texto_publicacao || 'Nenhum texto de publicação gerado para este registro.'}
             </p>
+          </div>
+        )}
+
+        {showHistorico && (
+          <div className="rounded-lg border bg-slate-50 p-3">
+            <p className="text-xs font-semibold text-slate-500">Trilha de auditoria</p>
+            {historicoPublicacao.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">Sem eventos auditados para esta publicação.</p>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {historicoPublicacao.slice(0, 8).map((evento) => (
+                  <div key={evento.id || `${evento.timestamp}-${evento.evento}`} className="rounded-md border bg-white p-2 text-xs text-slate-700">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-800">{evento.evento || evento.acao || 'evento'}</span>
+                      <span className="text-slate-500">{formatDateTime(evento.timestamp)}</span>
+                    </div>
+                    {(evento.estado_anterior || evento.estado_novo) && (
+                      <p className="mt-1 text-slate-600">{evento.estado_anterior || '—'} → {evento.estado_novo || '—'}</p>
+                    )}
+                    <p className="mt-1 text-slate-600">{evento.resumo || 'Sem resumo.'}</p>
+                    <p className="mt-1 text-slate-400">{evento.usuario?.nome || evento.usuario?.email || 'Usuário não identificado'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
