@@ -38,6 +38,11 @@ const ABAS_ORIGEM = [
   { key: 'livro', label: 'Livro' },
   { key: 'atestado', label: 'Atestados' },
 ];
+const STATUS_CANONICOS_PUBLICACAO = [
+  STATUS_PUBLICACAO.AGUARDANDO_NOTA,
+  STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO,
+  STATUS_PUBLICACAO.PUBLICADO,
+];
 
 function detectarOrigemTipo(registro) {
   if (registro.origem_tipo) return registro.origem_tipo;
@@ -402,13 +407,27 @@ export default function Publicacoes() {
     return matchesStatus && matchesSearch;
   }), [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
-  const stats = useMemo(() => ({
+  const statsOrigem = useMemo(() => ({
     total: registrosDaAbaAtiva.length,
     aguardandoNota: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length,
     aguardandoPublicacao: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length,
     publicados: registrosDaAbaAtiva.filter((r) => r.status_calculado === STATUS_PUBLICACAO.PUBLICADO).length,
     inconsistentes: registrosDaAbaAtiva.filter((r) => r.status_calculado === 'Inconsistente').length,
   }), [registrosDaAbaAtiva]);
+
+  const statsFiltro = useMemo(() => {
+    const total = filteredRegistros.length;
+    const aguardandoNota = filteredRegistros.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length;
+    const aguardandoPublicacao = filteredRegistros.filter((r) => r.status_calculado === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length;
+    const publicados = filteredRegistros.filter((r) => r.status_calculado === STATUS_PUBLICACAO.PUBLICADO).length;
+    const inconsistentes = filteredRegistros.filter((r) => r.status_calculado === 'Inconsistente').length;
+    const comBloqueioOperacional = filteredRegistros.filter((r) =>
+      (Array.isArray(r?.historico_publicacao) ? r.historico_publicacao : []).some(
+        (evento) => (evento?.evento || evento?.acao) === EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO
+      )
+    ).length;
+    return { total, aguardandoNota, aguardandoPublicacao, publicados, inconsistentes, comBloqueioOperacional };
+  }, [filteredRegistros]);
 
   const handleUpdate = (id, data, tipo) => {
     if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
@@ -468,10 +487,14 @@ export default function Publicacoes() {
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Publicações</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Consolide Livro, Ex Officio e Atestados no mesmo fluxo operacional.</p>
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  No filtro atual: {statsFiltro.aguardandoNota} em {STATUS_PUBLICACAO.AGUARDANDO_NOTA.toLowerCase()}, {statsFiltro.aguardandoPublicacao} em {STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO.toLowerCase()} e {statsFiltro.publicados} {STATUS_PUBLICACAO.PUBLICADO.toLowerCase()}.
+                </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <InfoPill icon={LayoutGrid} label={`${stats.total} registros na origem selecionada`} />
-                  <InfoPill icon={Sparkles} label={`${filteredRegistros.length} itens compatíveis com os filtros`} />
-                  {stats.inconsistentes > 0 && <InfoPill icon={ShieldAlert} label={`${stats.inconsistentes} inconsistência(s) para conferência`} tone="danger" />}
+                  <InfoPill icon={LayoutGrid} label={`${statsOrigem.total} registros na origem selecionada`} />
+                  <InfoPill icon={Sparkles} label={`${statsFiltro.total} itens compatíveis com os filtros`} />
+                  {statsFiltro.comBloqueioOperacional > 0 && <InfoPill icon={ShieldAlert} label={`${statsFiltro.comBloqueioOperacional} registro(s) com bloqueio operacional`} tone="warning" />}
+                  {statsOrigem.inconsistentes > 0 && <InfoPill icon={ShieldAlert} label={`${statsOrigem.inconsistentes} inconsistência(s) para conferência`} tone="danger" />}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -492,11 +515,11 @@ export default function Publicacoes() {
             </div>
           </div>
           <div className="grid gap-4 border-t border-slate-100 bg-slate-50/70 px-6 py-5 md:grid-cols-2 xl:grid-cols-5 lg:px-8">
-            <MetricCard icon={FileText} label="Total" value={stats.total} helper="Todos os registros visíveis" />
-            <MetricCard icon={Clock} label="Aguardando nota" value={stats.aguardandoNota} helper="Dependem de nota para BG" tone="amber" />
-            <MetricCard icon={AlertCircle} label="Aguardando publicação" value={stats.aguardandoPublicacao} helper="Prontos para boletim" tone="blue" />
-            <MetricCard icon={CheckCircle} label="Publicados" value={stats.publicados} helper="Já lançados em BG" tone="emerald" />
-            <MetricCard icon={ShieldAlert} label="Inconsistências" value={stats.inconsistentes} helper="Requer conferência" tone="red" />
+            <MetricCard icon={FileText} label="Total no filtro" value={statsFiltro.total} helper="Registros visíveis após filtros" />
+            <MetricCard icon={Clock} label={STATUS_PUBLICACAO.AGUARDANDO_NOTA} value={statsFiltro.aguardandoNota} helper="Dependem de nota para BG" tone="amber" />
+            <MetricCard icon={AlertCircle} label={STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO} value={statsFiltro.aguardandoPublicacao} helper="Prontos para boletim" tone="blue" />
+            <MetricCard icon={CheckCircle} label={STATUS_PUBLICACAO.PUBLICADO} value={statsFiltro.publicados} helper="Já lançados em BG" tone="emerald" />
+            <MetricCard icon={ShieldAlert} label="Bloqueios operacionais" value={statsFiltro.comBloqueioOperacional} helper="Com tentativa bloqueada auditada" tone="red" />
           </div>
         </section>
 
@@ -531,7 +554,9 @@ export default function Publicacoes() {
           </section>
         ) : (
           <div className="space-y-8">
-            {grupos.map((grupo) => {
+            {grupos
+              .filter((grupo) => STATUS_CANONICOS_PUBLICACAO.includes(grupo.key) || grupo.key === 'Inconsistente')
+              .map((grupo) => {
               const items = filteredRegistros.filter((r) => r.status_calculado === grupo.key);
               if (!items.length) return null;
               return (
@@ -569,7 +594,11 @@ export default function Publicacoes() {
 }
 
 function InfoPill({ icon: Icon, label, tone = 'default' }) {
-  const toneClasses = { default: 'border-slate-200 bg-white text-slate-600', danger: 'border-red-200 bg-red-50 text-red-700' };
+  const toneClasses = {
+    default: 'border-slate-200 bg-white text-slate-600',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700',
+    danger: 'border-red-200 bg-red-50 text-red-700',
+  };
   return <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm ${toneClasses[tone] || toneClasses.default}`}><Icon className="h-3.5 w-3.5" /><span>{label}</span></div>;
 }
 
