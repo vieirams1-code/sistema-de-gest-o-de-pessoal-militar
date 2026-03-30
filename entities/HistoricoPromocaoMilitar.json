@@ -1,0 +1,18 @@
+{
+  "name": "HistoricoPromocaoMilitar",
+  "type": "object",
+  "title": "Histórico de Promoção Militar",
+  "description": "Histórico cronológico de promoções para preservar rastreabilidade de antiguidade.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "posto_graduacao": { "type": "string", "default": "" },
+    "quadro": { "type": "string", "default": "" },
+    "data_promocao": { "type": "date", "default": "" },
+    "antiguidade_herdada_ordem": { "type": "number", "default": 0 },
+    "referencia_promocao_anterior_id": { "type": "string", "default": "" },
+    "tipo_evento": { "type": "string", "default": "PROMOCAO" },
+    "ato_promocao": { "type": "string", "default": "" },
+    "observacoes": { "type": "string", "default": "" },
+    "created_by": { "type": "string", "default": "" }
+  }
+}

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from "@/components/ui/use-toast";
+import { ordenarMilitaresPorAntiguidade } from '@/utils/antiguidadeMilitar';
 
 const normalizeTipo = (tipo) => {
   if (tipo === 'Grupamento') return 'Setor';
@@ -55,13 +56,14 @@ export default function LotacaoMilitares() {
 
   // Filtragem de militares
   const militaresFiltrados = useMemo(() => {
-    return militares
+    const filtrados = militares
       .filter(m => {
         if (!searchMilitar) return true;
         const q = searchMilitar.toLowerCase();
         return (m.nome_completo?.toLowerCase().includes(q) || m.matricula?.includes(q) || m.posto_graduacao?.toLowerCase().includes(q));
-      })
-      .sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
+      });
+
+    return ordenarMilitaresPorAntiguidade(filtrados);
   }, [militares, searchMilitar]);
 
   const toggleExpand = (id, e) => {
