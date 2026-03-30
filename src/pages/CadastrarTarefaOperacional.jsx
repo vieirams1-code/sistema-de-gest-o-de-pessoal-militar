@@ -67,6 +67,12 @@ function uniqById(items = []) {
   });
 }
 
+function normalizeDateToIso(dateValue) {
+  if (!dateValue) return '';
+  if (dateValue.includes('T')) return new Date(dateValue).toISOString();
+  return new Date(`${dateValue}T00:00:00.000Z`).toISOString();
+}
+
 export default function CadastrarTarefaOperacional() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -277,9 +283,15 @@ export default function CadastrarTarefaOperacional() {
       const setorOrigem = modoAcesso === 'setor' ? subgrupamentoId : '';
 
       const payload = {
-        ...formData,
         titulo,
         descricao: formData.descricao.trim(),
+        tipo_tarefa: formData.tipo_tarefa,
+        prazo: normalizeDateToIso(formData.prazo),
+        prioridade: formData.prioridade,
+        status_tarefa: formData.status_tarefa,
+        exige_documento: Boolean(formData.exige_documento),
+        permite_mensagem: Boolean(formData.permite_mensagem),
+        forma_destinacao: formData.forma_destinacao,
         setor_origem: formData.setor_origem.trim() || setorOrigem,
         subsetor_origem: subsetorOrigem,
         unidade_origem: unidadeOrigem,
