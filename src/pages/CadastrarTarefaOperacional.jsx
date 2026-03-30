@@ -263,6 +263,7 @@ export default function CadastrarTarefaOperacional() {
     mutationFn: async () => {
       const titulo = formData.titulo.trim();
       if (!titulo) throw new Error('Informe o título da tarefa.');
+      if (!formData.prazo) throw new Error('Informe o prazo da tarefa.');
       if (semEscopo) throw new Error('Seu usuário não possui escopo organizacional válido para criar tarefas.');
       if (destinoAmploBloqueado) throw new Error('No modo próprio é permitido somente destinar tarefa para militar específico.');
       if (militaresElegiveis.length === 0) throw new Error('Nenhum destinatário elegível encontrado para a forma de destinação selecionada.');
@@ -296,6 +297,12 @@ export default function CadastrarTarefaOperacional() {
         militar_nome: militar.nome_completo || militar.nome_guerra || 'Militar',
         militar_email: militar.email_funcional || militar.email_particular || militar.email || '',
         status_individual: 'Pendente',
+        resposta_texto: '',
+        anexo_url: '',
+        data_resposta: '',
+        concluido_em: '',
+        problema_reportado: false,
+        detalhe_problema: '',
       }));
 
       await Promise.all(destinatarioPayloads.map((item) => TarefaOperacionalDestinatario.create(item)));
