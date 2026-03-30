@@ -33,6 +33,11 @@ const initialState = {
 
 const DESTINACAO_OPTIONS = ['Militar', 'Setor', 'Subsetor', 'Unidade'];
 
+const isSchemaNotFoundError = (error) => {
+  const message = String(error?.message || error?.response?.data?.message || '').toLowerCase();
+  return message.includes('entity schema') && message.includes('not found');
+};
+
 const normalizeTipo = (item = {}) => {
   const tipo = String(item.tipo || '').trim();
   if (tipo === 'Setor' || tipo === 'Grupamento') return 'Setor';
@@ -244,6 +249,16 @@ export default function CadastrarTarefaOperacional() {
   const semEscopo = !isAdmin && modoAcesso !== 'proprio' && !subgrupamentoId;
   const destinoAmploBloqueado = modoAcesso === 'proprio' && formData.forma_destinacao !== 'Militar';
 
+  const registrarHistoricoSemBloqueio = async (payloadHistorico) => {
+    if (!TarefaOperacionalHistorico) return;
+    try {
+      await TarefaOperacionalHistorico.create(payloadHistorico);
+    } catch (error) {
+      if (isSchemaNotFoundError(error)) return;
+      throw error;
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const titulo = formData.titulo.trim();
@@ -285,15 +300,13 @@ export default function CadastrarTarefaOperacional() {
 
       await Promise.all(destinatarioPayloads.map((item) => TarefaOperacionalDestinatario.create(item)));
 
-      if (TarefaOperacionalHistorico) {
-        await TarefaOperacionalHistorico.create({
-          tarefa_id: tarefaCriada.id,
-          evento: 'TAREFA_CRIADA',
-          descricao: `Tarefa criada via ${formData.forma_destinacao} para ${destinatarioPayloads.length} destinatário(s).`,
-          usuario: user?.email || 'sistema',
-          timestamp: nowIso,
-        });
-      }
+      await registrarHistoricoSemBloqueio({
+        tarefa_id: tarefaCriada.id,
+        evento: 'TAREFA_CRIADA',
+        descricao: `Tarefa criada via ${formData.forma_destinacao} para ${destinatarioPayloads.length} destinatário(s).`,
+        usuario: user?.email || 'sistema',
+        timestamp: nowIso,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tarefas-operacionais'] });
