@@ -154,6 +154,12 @@ export default function CadastrarMilitar() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (formData.posto_graduacao && !formData.data_promocao_atual) {
+      alert('Informe a data de promoção no posto atual para militares com posto/graduação.');
+      return;
+    }
+
     setLoading(true);
 
     const dataToSave = {
@@ -471,6 +477,35 @@ export default function CadastrarMilitar() {
                 </div>
               )}
               </div>
+            </div>
+          </FormSection>
+
+          {/* Antiguidade Militar */}
+          <FormSection title="Antiguidade Militar" icon={GraduationCap}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <FormField
+                label="Data de promoção no posto atual"
+                name="data_promocao_atual"
+                value={formData.data_promocao_atual}
+                onChange={handleChange}
+                type="date"
+                required={!!formData.posto_graduacao}
+                hint={formData.posto_graduacao ? 'Obrigatória quando houver posto/graduação informado.' : ''}
+              />
+              <FormField
+                label="Ordem de antiguidade herdada"
+                name="antiguidade_referencia_ordem"
+                value={formData.antiguidade_referencia_ordem}
+                onChange={handleChange}
+                placeholder="Ex: 15"
+              />
+              <FormField
+                label="Referência de antiguidade (opcional)"
+                name="antiguidade_referencia_id"
+                value={formData.antiguidade_referencia_id}
+                onChange={handleChange}
+                placeholder="ID da referência (opcional)"
+              />
             </div>
           </FormSection>
 
