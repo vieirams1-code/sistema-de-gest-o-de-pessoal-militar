@@ -3,6 +3,13 @@
   "type": "object",
   "title": "Tarefa Operacional - Histórico",
   "description": "Trilha mínima de auditoria para eventos da tarefa operacional.",
+  "required": [
+    "tarefa_id",
+    "evento",
+    "descricao",
+    "usuario",
+    "timestamp"
+  ],
   "properties": {
     "tarefa_id": { "type": "string", "default": "" },
     "evento": { "type": "string", "default": "" },

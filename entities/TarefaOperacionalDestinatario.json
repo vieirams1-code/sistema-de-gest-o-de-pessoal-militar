@@ -3,6 +3,19 @@
   "type": "object",
   "title": "Tarefa Operacional - Destinatário",
   "description": "Vínculo entre tarefa operacional e destinatário com status individual e retorno.",
+  "required": [
+    "tarefa_id",
+    "militar_id",
+    "militar_nome",
+    "militar_email",
+    "status_individual",
+    "resposta_texto",
+    "anexo_url",
+    "data_resposta",
+    "concluido_em",
+    "problema_reportado",
+    "detalhe_problema"
+  ],
   "properties": {
     "tarefa_id": { "type": "string", "default": "" },
     "militar_id": { "type": "string", "default": "" },
