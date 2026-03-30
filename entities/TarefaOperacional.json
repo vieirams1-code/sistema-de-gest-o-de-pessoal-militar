@@ -22,21 +22,21 @@
     "total_destinatarios"
   ],
   "properties": {
-    "titulo": { "type": "string", "default": "" },
-    "descricao": { "type": "string", "default": "" },
-    "tipo_tarefa": { "type": "string", "default": "Envio de documento" },
-    "prazo": { "type": "date", "default": "" },
-    "prioridade": { "type": "string", "default": "Média" },
-    "status_tarefa": { "type": "string", "default": "Aberta" },
+    "titulo": { "type": "text", "default": "" },
+    "descricao": { "type": "text", "default": "" },
+    "tipo_tarefa": { "type": "text", "default": "Envio de documento" },
+    "prazo": { "type": "datetime", "default": "" },
+    "prioridade": { "type": "text", "default": "Média" },
+    "status_tarefa": { "type": "text", "default": "Aberta" },
     "exige_documento": { "type": "boolean", "default": false },
     "permite_mensagem": { "type": "boolean", "default": true },
-    "criado_por": { "type": "string", "default": "" },
-    "setor_origem": { "type": "string", "default": "" },
-    "subsetor_origem": { "type": "string", "default": "" },
-    "unidade_origem": { "type": "string", "default": "" },
-    "publico_resumo": { "type": "string", "default": "" },
+    "criado_por": { "type": "text", "default": "" },
+    "setor_origem": { "type": "text", "default": "" },
+    "subsetor_origem": { "type": "text", "default": "" },
+    "unidade_origem": { "type": "text", "default": "" },
+    "publico_resumo": { "type": "text", "default": "" },
     "data_criacao": { "type": "datetime", "default": "" },
-    "forma_destinacao": { "type": "string", "default": "Militar" },
-    "total_destinatarios": { "type": "integer", "default": 0 }
+    "forma_destinacao": { "type": "text", "default": "Militar" },
+    "total_destinatarios": { "type": "number", "default": 0 }
   }
 }
