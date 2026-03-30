@@ -78,7 +78,6 @@ import Punicoes from './pages/Punicoes';
 import QuadroOperacional from './pages/QuadroOperacional';
 import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
 import TemplatesTexto from './pages/TemplatesTexto';
-import TarefasOperacionais from './pages/TarefasOperacionais';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
@@ -89,7 +88,6 @@ import PerfisPermissao from './pages/PerfisPermissao';
 import PermissoesUsuarios from './pages/PermissoesUsuarios';
 import RP from './pages/RP';
 import CadastrarRegistroRP from './pages/CadastrarRegistroRP';
-import CadastrarTarefaOperacional from './pages/CadastrarTarefaOperacional';
 import __Layout from './Layout.jsx';
 
 
@@ -125,7 +123,6 @@ export const PAGES = {
     "QuadroOperacional": QuadroOperacional,
     "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
     "TemplatesTexto": TemplatesTexto,
-    "TarefasOperacionais": TarefasOperacionais,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
@@ -136,7 +133,6 @@ export const PAGES = {
     "PermissoesUsuarios": PermissoesUsuarios,
     "RP": RP,
     "CadastrarRegistroRP": CadastrarRegistroRP,
-    "CadastrarTarefaOperacional": CadastrarTarefaOperacional,
 }
 
 export const pagesConfig = {
