@@ -380,7 +380,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                   <FileText className="w-4 h-4" /><span className="hidden sm:inline">Nota/BG</span>
                 </Button>
               )}
-              {podeEditar && (
+              {podeEditar && origemTipo !== 'livro' && (
                 <Button variant="ghost" size="sm" onClick={() => navigate(getEditUrl(registro))} className="text-slate-500 hover:text-[#1e3a5f] text-xs gap-1">
                   <Edit2 className="w-4 h-4" /><span className="hidden sm:inline">Editar</span>
                 </Button>

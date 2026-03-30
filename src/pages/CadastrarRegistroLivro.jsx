@@ -150,13 +150,13 @@ export default function CadastrarRegistroLivro() {
   const [camposCustom, setCamposCustom] = useState({});
 
   const { data: registroEdicao } = useQuery({
-    queryKey: ['registro-livro-edicao', id],
+    queryKey: ['registro-livro-edicao', editId],
     queryFn: async () => {
-      if (!id) return null;
-      const list = await base44.entities.RegistroLivro.filter({ id });
+      if (!editId) return null;
+      const list = await base44.entities.RegistroLivro.filter({ id: editId });
       return list[0] || null;
     },
-    enabled: !!id,
+    enabled: isEditing,
   });
 
   const { data: feriasEdicao } = useQuery({
@@ -190,7 +190,16 @@ export default function CadastrarRegistroLivro() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasLivroAccess) return <AccessDenied modulo="Livro de Registros" />;
 
-  const tipoRegistroEfetivo = formData.tipo_registro === 'Saída Férias'
+  // Evita qualquer estado transitório com tipo default em edição antes da carga do registro real
+  if (isEditing && !registroEdicao) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const tipoRegistroEfetivo = isEditing ? registroEdicao?.tipo_registro : formData.tipo_registro === 'Saída Férias'
     ? (selectedFerias ? operacaoFeriasSelecionada : 'Saída Férias')
     : formData.tipo_registro;
 
@@ -225,7 +234,7 @@ export default function CadastrarRegistroLivro() {
       militar_sexo: militarSexo,
       ferias_id: '',
       dias: 0,
-      data_inicio: '',
+      data_inicio: isEditing ? prev.data_inicio : '',
       data_termino: '',
       data_retorno: '',
       periodo_aquisitivo: '',
@@ -241,7 +250,7 @@ export default function CadastrarRegistroLivro() {
     let dataRegistro = formData.data_registro || hoje;
 
     if (operacao === 'Saída Férias') {
-      dataRegistro = ferias.data_inicio || formData.data_registro || hoje;
+      dataRegistro = isEditing ? formData.data_registro : (ferias.data_inicio || formData.data_registro || hoje);
     } else if (operacao === 'Retorno Férias') {
       dataRegistro = ferias.data_retorno || formData.data_registro || hoje;
     }
@@ -262,7 +271,7 @@ export default function CadastrarRegistroLivro() {
     let dataRegistro = formData.data_registro || hoje;
 
     if (operacao === 'Saída Férias') {
-      dataRegistro = selectedFerias.data_inicio || formData.data_registro || hoje;
+      dataRegistro = isEditing ? formData.data_registro : (selectedFerias.data_inicio || formData.data_registro || hoje);
     } else if (operacao === 'Retorno Férias') {
       dataRegistro = selectedFerias.data_retorno || formData.data_registro || hoje;
     } else {
@@ -612,7 +621,7 @@ export default function CadastrarRegistroLivro() {
     queryClient.invalidateQueries({ queryKey: ['publicacoes'] });
     
     setLoading(false);
-    
+
     if (redirectTarget === 'publicacoes') navigate(createPageUrl('Publicacoes'));
     else navigate(-1);
   };
@@ -621,14 +630,21 @@ export default function CadastrarRegistroLivro() {
     if (formData.tipo_registro === 'Saída Férias') {
       return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Férias</h3>
+          <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Vínculo com Férias</h3>
 
-          <FeriasSelector
-            militarId={formData.militar_id}
-            value={formData.ferias_id}
-            onChange={handleFeriasSelect}
-            tipoRegistro={formData.tipo_registro}
-          />
+          {isEditing ? (
+            <ReadOnlyDisplay
+              label="Férias Vinculada"
+              value={selectedFerias?.periodo_aquisitivo_ref || 'Nenhuma'}
+            />
+          ) : (
+            <FeriasSelector
+              militarId={formData.militar_id}
+              value={formData.ferias_id}
+              onChange={handleFeriasSelect}
+              tipoRegistro={formData.tipo_registro}
+            />
+          )}
 
           {selectedFerias && (
             <div className="mt-4 space-y-3">
@@ -638,7 +654,7 @@ export default function CadastrarRegistroLivro() {
               {selectedFerias.status === 'Em Curso' && (
                 <div className="p-4 bg-white rounded-lg border border-slate-200">
                   <Label className="text-sm font-medium text-slate-700">Ação para férias em curso</Label>
-                  <Select value={operacaoFeriasSelecionada} onValueChange={handleOperacaoFeriasChange}>
+                  <Select value={operacaoFeriasSelecionada} onValueChange={handleOperacaoFeriasChange} disabled={isEditing}>
                     <SelectTrigger className="mt-1.5">
                       <SelectValue />
                     </SelectTrigger>
@@ -741,6 +757,19 @@ export default function CadastrarRegistroLivro() {
         );
 
       case 'Luto':
+      if (isEditing) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Luto</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyDisplay label="Falecido(a)" value={formData.falecido_nome} />
+              <ReadOnlyDisplay label="Certidão de Óbito" value={formData.falecido_certidao} />
+              <ReadOnlyDisplay label="Grau de Parentesco" value={formData.grau_parentesco} />
+              <ReadOnlyDisplay label="Data de Início" value={formatarDataExtenso(formData.data_inicio)} />
+            </div>
+          </div>
+        );
+      }
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Luto</h3>
@@ -787,6 +816,19 @@ export default function CadastrarRegistroLivro() {
         );
 
       case 'Cedência':
+      if (isEditing) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cedência</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyDisplay label="Origem" value={formData.origem} />
+              <ReadOnlyDisplay label="Destino" value={formData.destino} />
+              <ReadOnlyDisplay label="Data da Cedência" value={formatarDataExtenso(formData.data_cedencia)} />
+            </div>
+            <ReadOnlyDisplay label="Observações" value={formData.obs_cedencia} />
+          </div>
+        );
+      }
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cedência</h3>
@@ -831,6 +873,19 @@ export default function CadastrarRegistroLivro() {
         );
 
       case 'Transferência para RR':
+      if (isEditing) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência para Reserva Remunerada</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyDisplay label="Origem" value={formData.origem} />
+              <ReadOnlyDisplay label="Destino" value={formData.destino} />
+              <ReadOnlyDisplay label="Data de Transferência" value={formatarDataExtenso(formData.data_transferencia)} />
+              <ReadOnlyDisplay label="Publicação da Transferência" value={formData.publicacao_transferencia} />
+            </div>
+          </div>
+        );
+      }
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Transferência para Reserva Remunerada</h3>
@@ -857,6 +912,18 @@ export default function CadastrarRegistroLivro() {
         );
 
       case 'Trânsito':
+      if (isEditing) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Trânsito</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyDisplay label="Origem" value={formData.origem} />
+              <ReadOnlyDisplay label="Destino" value={formData.destino} />
+              <ReadOnlyDisplay label="Data de Início" value={formatarDataExtenso(formData.data_inicio)} />
+            </div>
+          </div>
+        );
+      }
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Trânsito</h3>
@@ -871,6 +938,18 @@ export default function CadastrarRegistroLivro() {
         );
 
       case 'Instalação':
+      if (isEditing) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Instalação</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyDisplay label="Origem" value={formData.origem} />
+              <ReadOnlyDisplay label="Destino" value={formData.destino} />
+              <ReadOnlyDisplay label="Data de Início" value={formatarDataExtenso(formData.data_inicio)} />
+            </div>
+          </div>
+        );
+      }
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Instalação</h3>
@@ -885,6 +964,20 @@ export default function CadastrarRegistroLivro() {
         );
 
       case 'Dispensa Recompensa':
+      if (isEditing) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa como Recompensa</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyDisplay label="Dias" value={formData.dias} />
+              <ReadOnlyDisplay label="Data de Início" value={formatarDataExtenso(formData.data_inicio)} />
+            </div>
+            <div className="mt-4">
+              <ReadOnlyDisplay label="Motivo" value={formData.motivo_dispensa} />
+            </div>
+          </div>
+        );
+      }
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Dispensa como Recompensa</h3>
@@ -921,6 +1014,19 @@ export default function CadastrarRegistroLivro() {
         );
 
       case 'Curso/Estágio':
+      if (isEditing) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cursos / Estágios / Capacitações</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <ReadOnlyDisplay label="Data de Início" value={formatarDataExtenso(formData.data_inicio)} />
+              <ReadOnlyDisplay label="Edição ou Ano" value={formData.edicao_ano} />
+              <ReadOnlyDisplay label="Cursos" value={formData.curso_nome} />
+              <ReadOnlyDisplay label="Localidade de Realização" value={formData.curso_local} />
+            </div>
+          </div>
+        );
+      }
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Cursos / Estágios / Capacitações</h3>
@@ -941,6 +1047,22 @@ export default function CadastrarRegistroLivro() {
 
       default:
         // Verifica se é um tipo customizado
+      if (isEditing && tipoAtualCustom) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mt-6">
+            <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">{tipoAtualCustom.nome}</h3>
+            <div className="space-y-4">
+              {(tipoAtualCustom.campos || []).map((campo) => (
+                <ReadOnlyDisplay
+                  key={campo.chave}
+                  label={campo.label}
+                  value={formData.campos_customizados?.[campo.chave] || '—'}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      }
         if (tipoAtualCustom) {
           return (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -1004,13 +1126,32 @@ export default function CadastrarRegistroLivro() {
   }, [tipoAtualCustom, formData, camposCustom]);
 
   const canGoNext = () => {
+    if (isEditing && !registroEdicao) return false;
     if (currentStep === 1) return !!formData.tipo_registro;
     if (currentStep === 2) return !!formData.militar_id && !!formData.data_registro && !(isFeriasEfetivo && !formData.ferias_id);
     if (currentStep === 3) return !templateError;
     return false;
   };
 
-  const tiposDisponiveis = getTiposLivroFiltrados({ sexo: formData.militar_sexo, tiposCustom });
+  const tiposDisponiveis = (() => {
+    const base = getTiposLivroFiltrados({ sexo: formData.militar_sexo, tiposCustom });
+    const map = new Map(base.map(t => [t.value, t]));
+
+    // Adicionar tipos originados de templates (derivação de lógicas anteriores)
+    templates.filter(t => t.modulo === 'Livro' && t.ativo !== false).forEach(t => {
+      if (t.tipo_registro && !map.has(t.tipo_registro)) {
+        map.set(t.tipo_registro, { value: t.tipo_registro, label: t.tipo_registro, grupo: 'Outros' });
+      }
+    });
+
+    // Adicionar o tipo atual em edição (caso não esteja mapeado, ex: foi deletado do config)
+    if (isEditing && registroEdicao?.tipo_registro && !map.has(registroEdicao.tipo_registro)) {
+      map.set(registroEdicao.tipo_registro, { value: registroEdicao.tipo_registro, label: registroEdicao.tipo_registro, grupo: 'Registro Original' });
+    }
+
+    return Array.from(map.values());
+  })();
+
   const gruposDeTipos = groupTiposLivro(tiposDisponiveis);
 
   return (
@@ -1065,6 +1206,16 @@ export default function CadastrarRegistroLivro() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8 w-full flex-1 pb-32">
+        {isEditing && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6 flex items-start gap-3 text-sm">
+            <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold">Edição restrita</p>
+              <p>Este modo permite apenas ajustes administrativos e de publicação. O tipo de registro, militar e datas principais não podem ser alterados.</p>
+            </div>
+          </div>
+        )}
+
         {/* Stepper */}
         <div className="flex items-center justify-between mb-8 max-w-3xl mx-auto relative">
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 rounded-full z-0" />
@@ -1100,6 +1251,7 @@ export default function CadastrarRegistroLivro() {
                   className="pl-10 h-12 text-lg"
                   value={buscaTipo}
                   onChange={e => setBuscaTipo(e.target.value)}
+                  disabled={isEditing}
                 />
               </div>
               
@@ -1112,7 +1264,8 @@ export default function CadastrarRegistroLivro() {
                       return (
                         <button
                           key={t.value}
-                          onClick={() => { handleChange('tipo_registro', t.value); setCurrentStep(2); }}
+                          onClick={!isEditing ? () => { handleChange('tipo_registro', t.value); setCurrentStep(2); } : undefined}
+                          disabled={isEditing}
                           className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'}`}
                         >
                           {t.label}
@@ -1136,9 +1289,9 @@ export default function CadastrarRegistroLivro() {
                           const isSelected = formData.tipo_registro === t.value;
                           return (
                             <div 
-                              key={t.value} 
-                              onClick={() => { handleChange('tipo_registro', t.value); setCurrentStep(2); }}
-                              className={`p-4 rounded-lg border cursor-pointer transition-all ${isSelected ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'}`}
+                              key={t.value}
+                              onClick={!isEditing ? () => { handleChange('tipo_registro', t.value); } : undefined}
+                              className={`p-4 rounded-lg border transition-all ${isSelected ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200 bg-white'} ${isEditing ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:border-blue-300 hover:shadow-sm'}`}
                             >
                               <div className="flex items-center justify-between mb-1">
                                 <span className={`font-medium ${isSelected ? 'text-blue-800' : 'text-slate-700'}`}>{t.label}</span>
@@ -1163,21 +1316,28 @@ export default function CadastrarRegistroLivro() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-lg font-semibold text-[#1e3a5f] mb-4">Militar e Data Base</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <MilitarSelector
-                  value={formData.militar_id}
-                  onChange={(name, value) => handleChange(name, value)}
-                  onMilitarSelect={handleMilitarSelect}
-                />
-              </div>
-              <FormField
-                label="Data"
-                name="data_registro"
-                value={formData.data_registro}
-                onChange={handleChange}
-                type="date"
-                required
-              />
+              {isEditing ? (
+                <>
+                  <div className="md:col-span-2">
+                    <ReadOnlyDisplay label="Militar" value={`${formData.militar_posto || ''} ${formData.militar_nome || ''}`} />
+                  </div>
+                  <ReadOnlyDisplay label="Data do Registro" value={formatarDataExtenso(formData.data_registro)} />
+                </>
+              ) : (
+                <>
+                  <div className="md:col-span-2">
+                    <MilitarSelector
+                      value={formData.militar_id}
+                      onChange={(name, value) => handleChange(name, value)}
+                      onMilitarSelect={handleMilitarSelect}
+                    />
+                  </div>
+                  <div>
+                    <Label>Data do Registro</Label>
+                    <Input type="date" value={formData.data_registro} onChange={(e) => handleChange('data_registro', e.target.value)} required className="mt-1.5" />
+                  </div>
+                </>
+              )}
             </div>
           </div>
             {formData.militar_id && renderSpecificFields()}
