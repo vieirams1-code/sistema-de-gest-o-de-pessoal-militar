@@ -52,7 +52,7 @@ const menuGroups = [
     ],
   },
   {
-    title: 'Saúde',
+    title: 'Atestados',
     items: [
       { name: 'Atestados', page: 'DashboardAtestados', icon: HeartPulse, moduleKey: 'atestados' },
     ],
