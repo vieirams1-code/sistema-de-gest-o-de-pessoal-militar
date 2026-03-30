@@ -17,16 +17,16 @@
     "detalhe_problema"
   ],
   "properties": {
-    "tarefa_id": { "type": "string", "default": "" },
-    "militar_id": { "type": "string", "default": "" },
-    "militar_nome": { "type": "string", "default": "" },
-    "militar_email": { "type": "string", "default": "" },
-    "status_individual": { "type": "string", "default": "Pendente" },
-    "resposta_texto": { "type": "string", "default": "" },
-    "anexo_url": { "type": "string", "default": "" },
+    "tarefa_id": { "type": "text", "default": "" },
+    "militar_id": { "type": "text", "default": "" },
+    "militar_nome": { "type": "text", "default": "" },
+    "militar_email": { "type": "text", "default": "" },
+    "status_individual": { "type": "text", "default": "Pendente" },
+    "resposta_texto": { "type": "text", "default": "" },
+    "anexo_url": { "type": "text", "default": "" },
     "data_resposta": { "type": "datetime", "default": "" },
     "concluido_em": { "type": "datetime", "default": "" },
     "problema_reportado": { "type": "boolean", "default": false },
-    "detalhe_problema": { "type": "string", "default": "" }
+    "detalhe_problema": { "type": "text", "default": "" }
   }
 }

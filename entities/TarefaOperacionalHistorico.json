@@ -11,10 +11,10 @@
     "timestamp"
   ],
   "properties": {
-    "tarefa_id": { "type": "string", "default": "" },
-    "evento": { "type": "string", "default": "" },
-    "descricao": { "type": "string", "default": "" },
-    "usuario": { "type": "string", "default": "" },
+    "tarefa_id": { "type": "text", "default": "" },
+    "evento": { "type": "text", "default": "" },
+    "descricao": { "type": "text", "default": "" },
+    "usuario": { "type": "text", "default": "" },
     "timestamp": { "type": "datetime", "default": "" }
   }
 }
