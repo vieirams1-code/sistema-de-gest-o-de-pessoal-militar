@@ -40,8 +40,6 @@ const moduleGuardByPage = {
   Publicacoes: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
   QuadroOperacional: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
-  TarefasOperacionais: { moduleKey: 'tarefas_operacionais', moduleName: 'Tarefas Operacionais' },
-  CadastrarTarefaOperacional: { moduleKey: 'tarefas_operacionais', moduleName: 'Tarefas Operacionais' },
   LotacaoMilitares: { moduleKey: 'militares', moduleName: 'Efetivo' },
   EstruturaOrganizacional: { moduleKey: 'militares', moduleName: 'Efetivo' },
   CadastrarArmamento: { moduleKey: 'armamentos', moduleName: 'Armamentos' },

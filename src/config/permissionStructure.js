@@ -55,15 +55,6 @@ export const permissionStructure = [
           { key: 'perm_gerir_acoes_operacionais', label: 'Gerir Ações Op.', sensitive: true },
           { key: 'perm_excluir_acao_operacional', label: 'Excluir Ação Op.', sensitive: true }
         ]
-      },
-      {
-        key: 'acesso_tarefas_operacionais',
-        label: 'Tarefas Operacionais',
-        actions: [
-          { key: 'perm_criar_tarefa_operacional', label: 'Criar Tarefa Operacional', sensitive: true },
-          { key: 'perm_gerenciar_tarefa_operacional', label: 'Gerenciar Tarefa Operacional', sensitive: true },
-          { key: 'perm_responder_tarefa_operacional', label: 'Responder Tarefa Operacional', sensitive: true }
-        ]
       }
     ]
   },
