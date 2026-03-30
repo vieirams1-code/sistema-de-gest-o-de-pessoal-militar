@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { TarefaOperacional } from '@/api/entities';
+import { getTarefaOperacionalEntity } from '@/services/tarefaOperacionalEntityResolver';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
@@ -37,9 +37,9 @@ export default function TarefasOperacionais() {
 
   const { data: tarefas = [], isLoading: loadingTarefas } = useQuery({
     queryKey: ['tarefas-operacionais'],
-    queryFn: () => {
-      if (!TarefaOperacional) throw new Error('Entidade TarefaOperacional não encontrada no schema do app.');
-      return TarefaOperacional.list('-created_date');
+    queryFn: async () => {
+      const entity = await getTarefaOperacionalEntity();
+      return entity.list('-created_date');
     },
     enabled: isAccessResolved && hasAccess,
   });
