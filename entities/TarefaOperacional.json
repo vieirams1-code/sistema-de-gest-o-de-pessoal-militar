@@ -1,0 +1,21 @@
+{
+  "name": "TarefaOperacional",
+  "type": "object",
+  "title": "Tarefa Operacional",
+  "description": "Tarefa operacional com distribuição para militares e acompanhamento pelo gestor.",
+  "properties": {
+    "titulo": { "type": "string", "default": "" },
+    "descricao": { "type": "string", "default": "" },
+    "tipo_tarefa": { "type": "string", "default": "Envio de documento" },
+    "prazo": { "type": "date", "default": "" },
+    "prioridade": { "type": "string", "default": "Média" },
+    "status_tarefa": { "type": "string", "default": "Aberta" },
+    "exige_documento": { "type": "boolean", "default": false },
+    "permite_mensagem": { "type": "boolean", "default": true },
+    "criado_por": { "type": "string", "default": "" },
+    "setor_origem": { "type": "string", "default": "" },
+    "publico_resumo": { "type": "string", "default": "" },
+    "data_criacao": { "type": "datetime", "default": "" },
+    "total_destinatarios": { "type": "integer", "default": 0 }
+  }
+}

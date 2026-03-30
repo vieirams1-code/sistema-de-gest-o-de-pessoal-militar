@@ -1,22 +1,37 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowLeft, Pencil, User, Briefcase, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send
+  Shield, Award, Send, Activity, AlertTriangle, Copy
 } from 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
+import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
+import {
+  criarChavePendenciaComportamento,
+  obterHistoricoComportamentoMilitar,
+} from '@/services/justicaDisciplinaService';
+import { MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import {
+  escolherTipoTemplateComportamento,
+  gerarTextoRPComportamento,
+  obterTemplatePadraoComportamento,
+  resolverMarcoComportamentoValido,
+} from '@/utils/comportamentoTemplateUtils';
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
@@ -52,10 +67,21 @@ function formatDate(date) {
 
 export default function VerMilitar() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
+  const selectedTab = searchParams.get('tab') || 'comportamento';
   const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
+  const [marcoComportamentoSelecionadoId, setMarcoComportamentoSelecionadoId] = useState(null);
+  const [dialogTextoRP, setDialogTextoRP] = useState({
+    open: false,
+    texto: '',
+    tipoTemplate: '',
+    marcoId: '',
+    templateId: '',
+    geradoEm: '',
+  });
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
@@ -94,6 +120,264 @@ export default function VerMilitar() {
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
+
+  const { data: historicoComportamento = [] } = useQuery({
+    queryKey: ['ver-historico-comportamento', id],
+    queryFn: async () => {
+      const militarIdHistorico = militar?.id || id;
+      const historico = await obterHistoricoComportamentoMilitar(militarIdHistorico);
+      console.log('[HIST] resultado query:', {
+        militar_id: militarIdHistorico,
+        quantidade: Array.isArray(historico) ? historico.length : 0,
+        registros: historico,
+      });
+      return historico;
+    },
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+
+  const { data: punicoes = [] } = useQuery({
+    queryKey: ['ver-punicoes-comportamento', id],
+    queryFn: () => base44.entities.PunicaoDisciplinar.filter({ militar_id: id }, '-data_inicio_cumprimento'),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+
+  const { data: pendenciasComportamento = [] } = useQuery({
+    queryKey: ['ver-pendencias-comportamento', id],
+    queryFn: () => base44.entities.PendenciaComportamento.filter({ militar_id: id, status_pendencia: 'Pendente' }),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+
+  const { data: templatesAtivos = [] } = useQuery({
+    queryKey: ['templates-ativos-comportamento-rp'],
+    queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
+    enabled: !!id && isAccessResolved && canViewMilitar,
+  });
+
+  const pendenciasComportamentoUnicas = React.useMemo(() => {
+    const unicas = [];
+    const chaves = new Set();
+    for (const pendencia of pendenciasComportamento) {
+      const chave = criarChavePendenciaComportamento(pendencia);
+      if (chaves.has(chave)) continue;
+      chaves.add(chave);
+      unicas.push(pendencia);
+    }
+    return unicas;
+  }, [pendenciasComportamento]);
+
+  const avaliacaoComportamento = React.useMemo(() => {
+    if (!militar) return null;
+    return calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
+      dataInclusaoMilitar: militar.data_inclusao,
+    });
+  }, [militar, punicoes]);
+
+  const proximaMelhoria = React.useMemo(() => {
+    if (!militar) return null;
+    return calcularProximaMelhoria(punicoes, militar.posto_graduacao, new Date(), {
+      dataInclusaoMilitar: militar.data_inclusao,
+    });
+  }, [militar, punicoes]);
+
+  const ultimaPunicaoPorMilitar = React.useMemo(() => {
+    const ultima = punicoes[0];
+    if (!ultima) return null;
+    return {
+      tipo: ultima.tipo_punicao || ultima.tipo || 'Punição disciplinar',
+      data: ultima.data_inicio_cumprimento || ultima.data_inicio || ultima.created_date || '',
+    };
+  }, [punicoes]);
+
+  const registrarAuditoriaHistoricoComportamento = React.useCallback(async ({
+    marco,
+    tipoTemplate,
+    acao,
+    geradoEmISO,
+    publicacaoId = '',
+  }) => {
+    if (!marco?.id) return;
+    const observacaoAnterior = String(marco?.observacoes || '').trim();
+    const eventoAuditoria = {
+      acao,
+      historico_comportamento_id: marco.id,
+      tipo_template: tipoTemplate || '',
+      gerado_por: user?.email || 'usuário não identificado',
+      gerado_em: geradoEmISO || new Date().toISOString(),
+      publicacao_ex_officio_id: publicacaoId || '',
+    };
+    const linhaAuditoria = `[RP_AUDITORIA] ${JSON.stringify(eventoAuditoria)}`;
+    const observacoesAtualizadas = observacaoAnterior
+      ? `${observacaoAnterior}\n${linhaAuditoria}`
+      : linhaAuditoria;
+
+    await base44.entities.HistoricoComportamento.update(marco.id, {
+      observacoes: observacoesAtualizadas,
+    });
+  }, [user?.email]);
+
+  const montarPacoteGeracaoTextoRP = React.useCallback(async () => {
+    const marcoSelecionado = resolverMarcoComportamentoValido(historicoComportamento, marcoComportamentoSelecionadoId);
+    if (!marcoSelecionado) {
+      return {
+        ok: false,
+        erro: 'Não há marco de comportamento válido para gerar texto de RP.',
+      };
+    }
+
+    const tipoTemplate = escolherTipoTemplateComportamento(marcoSelecionado);
+    let templateAtivo = getTemplateAtivoPorTipo(tipoTemplate, MODULO_EX_OFFICIO, templatesAtivos);
+    if (!templateAtivo?.template) {
+      const templatePadrao = obterTemplatePadraoComportamento(tipoTemplate);
+      if (templatePadrao) {
+        try {
+          templateAtivo = await base44.entities.TemplateTexto.create({
+            modulo: MODULO_EX_OFFICIO,
+            tipo_registro: tipoTemplate,
+            nome: `Template padrão — ${tipoTemplate}`,
+            template: templatePadrao,
+            observacoes: 'Template padrão semeado automaticamente para comportamento disciplinar.',
+            ativo: true,
+          });
+          queryClient.invalidateQueries({ queryKey: ['templates-ativos-comportamento-rp'] });
+        } catch (error) {
+          console.warn('[RP] Falha ao semear template padrão de comportamento', error);
+        }
+      }
+    }
+
+    if (!templateAtivo?.template) {
+      return {
+        ok: false,
+        erro: `Template ativo não encontrado para '${tipoTemplate}'. Cadastre e ative um template para continuar.`,
+      };
+    }
+
+    const resultado = gerarTextoRPComportamento({
+      template: templateAtivo.template,
+      militar,
+      marco: marcoSelecionado,
+      tipoTemplate,
+    });
+
+    if (!resultado.ok) return resultado;
+
+    return {
+      ok: true,
+      resultado,
+      marcoSelecionado,
+      tipoTemplate,
+      templateAtivo,
+    };
+  }, [historicoComportamento, marcoComportamentoSelecionadoId, militar, templatesAtivos]);
+
+  const handleGerarTextoRP = React.useCallback(async () => {
+    const pacote = await montarPacoteGeracaoTextoRP();
+    if (!pacote.ok) {
+      alert(pacote.erro || 'Não foi possível gerar o texto para RP.');
+      return;
+    }
+
+    const geradoEm = new Date().toISOString();
+
+    setDialogTextoRP({
+      open: true,
+      texto: pacote.resultado.texto,
+      tipoTemplate: pacote.tipoTemplate,
+      marcoId: pacote.marcoSelecionado.id,
+      templateId: pacote.templateAtivo.id || '',
+      geradoEm,
+    });
+
+    try {
+      await registrarAuditoriaHistoricoComportamento({
+        marco: pacote.marcoSelecionado,
+        tipoTemplate: pacote.tipoTemplate,
+        acao: 'GERACAO_PREVIEW_RP',
+        geradoEmISO: geradoEm,
+      });
+    } catch (error) {
+      console.warn('[RP] Falha ao registrar auditoria de geração de texto', error);
+    }
+  }, [montarPacoteGeracaoTextoRP, registrarAuditoriaHistoricoComportamento]);
+
+  const enviarParaRPMutation = useMutation({
+    mutationFn: async ({ texto, tipoTemplate, marcoId, templateId, geradoEm }) => {
+      const registro = await base44.entities.PublicacaoExOfficio.create({
+        militar_id: militar.id,
+        militar_nome: militar.nome_completo || militar.nome_guerra || '',
+        militar_posto: militar.posto_graduacao || '',
+        militar_matricula: militar.matricula || '',
+        tipo: tipoTemplate,
+        data_publicacao: new Date().toISOString().slice(0, 10),
+        status: 'Aguardando Nota',
+        texto_publicacao: texto,
+        origem_tipo: 'historico_comportamento',
+        origem_id: marcoId || '',
+        historico_comportamento_id: marcoId || '',
+        tipo_template: tipoTemplate,
+        template_texto_id: templateId || '',
+        texto_renderizado: texto,
+        gerado_por: user?.email || '',
+        gerado_em: geradoEm || new Date().toISOString(),
+      });
+
+      return registro;
+    },
+    onSuccess: async (registroCriado, variaveis) => {
+      queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] });
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+      queryClient.invalidateQueries({ queryKey: ['ver-historico-comportamento', id] });
+
+      const marcoParaAuditoria = historicoComportamento.find((item) => item.id === variaveis.marcoId);
+      try {
+        await registrarAuditoriaHistoricoComportamento({
+          marco: marcoParaAuditoria,
+          tipoTemplate: variaveis.tipoTemplate,
+          acao: 'ENVIO_DIRETO_RP',
+          geradoEmISO: variaveis.geradoEm,
+          publicacaoId: registroCriado?.id || '',
+        });
+      } catch (error) {
+        console.warn('[RP] Falha ao registrar auditoria de envio', error);
+      }
+
+      alert('Texto enviado para o módulo RP com sucesso.');
+    },
+  });
+
+  const handleEnviarParaRP = React.useCallback(async () => {
+    const pacote = await montarPacoteGeracaoTextoRP();
+    if (!pacote.ok) {
+      alert(pacote.erro || 'Não foi possível preparar o envio para RP.');
+      return;
+    }
+
+    const geradoEm = dialogTextoRP.geradoEm || new Date().toISOString();
+    const textoRenderizado = dialogTextoRP.texto || pacote.resultado.texto;
+    const tipoTemplate = dialogTextoRP.tipoTemplate || pacote.tipoTemplate;
+    const marcoId = dialogTextoRP.marcoId || pacote.marcoSelecionado.id;
+    const templateId = dialogTextoRP.templateId || pacote.templateAtivo.id || '';
+
+    enviarParaRPMutation.mutate({
+      texto: textoRenderizado,
+      tipoTemplate,
+      marcoId,
+      templateId,
+      geradoEm,
+    });
+  }, [dialogTextoRP, montarPacoteGeracaoTextoRP, enviarParaRPMutation]);
+
+  const handleCopiarTextoRP = React.useCallback(async () => {
+    if (!dialogTextoRP.texto) return;
+
+    try {
+      await navigator.clipboard.writeText(dialogTextoRP.texto);
+      alert('Texto copiado para a área de transferência.');
+    } catch {
+      alert('Não foi possível copiar automaticamente. Selecione e copie manualmente.');
+    }
+  }, [dialogTextoRP.texto]);
 
 
   if (loadingUser || isLoading) {
@@ -140,8 +424,8 @@ export default function VerMilitar() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">Ficha do Militar</h1>
-              <p className="text-slate-500 text-sm">Visualização completa dos dados</p>
+              <h1 className="text-2xl font-bold text-[#1e3a5f]">Perfil do Militar</h1>
+              <p className="text-slate-500 text-sm">Comportamento e dados completos do militar</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -204,8 +488,9 @@ export default function VerMilitar() {
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue="dados">
+        <Tabs defaultValue={selectedTab}>
           <TabsList className="w-full flex-wrap h-auto gap-1 mb-6">
+            <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
             <TabsTrigger value="dados"><User className="w-4 h-4 mr-1" />Dados Pessoais</TabsTrigger>
             <TabsTrigger value="ferias"><Calendar className="w-4 h-4 mr-1" />Férias</TabsTrigger>
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
@@ -215,31 +500,32 @@ export default function VerMilitar() {
 
           {/* Dados Pessoais */}
           <TabsContent value="dados">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Section title="Dados Funcionais" icon={Briefcase}>
-                <div className="grid grid-cols-2 gap-x-4">
-                  <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
-                  <InfoItem label="Matrícula" value={militar.matricula} />
-                  <InfoItem label="Posto/Graduação" value={militar.posto_graduacao} />
-                  <InfoItem label="Quadro" value={militar.quadro} />
-                  <InfoItem label="Situação" value={militar.situacao_militar} />
-                  <InfoItem label="Condição" value={militar.condicao} />
-                  <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
-                  {militar.destino && <InfoItem label="Destino/Cedência" value={militar.destino} />}
-                </div>
-              </Section>
-              <Section title="Dados Pessoais" icon={User}>
-                <div className="grid grid-cols-2 gap-x-4">
-                  <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
-                  <InfoItem label="Sexo" value={militar.sexo} />
-                  <InfoItem label="Estado Civil" value={militar.estado_civil} />
-                  <InfoItem label="Tipo Sanguíneo" value={militar.tipo_sanguineo} />
-                  <InfoItem label="Religião" value={militar.religiao} />
-                  <InfoItem label="Escolaridade" value={militar.escolaridade} />
-                  <InfoItem label="Naturalidade" value={militar.naturalidade} />
-                  <InfoItem label="UF Naturalidade" value={militar.naturalidade_uf} />
-                </div>
-              </Section>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Section title="Dados Funcionais" icon={Briefcase}>
+                  <div className="grid grid-cols-2 gap-x-4">
+                    <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
+                    <InfoItem label="Matrícula" value={militar.matricula} />
+                    <InfoItem label="Posto/Graduação" value={militar.posto_graduacao} />
+                    <InfoItem label="Quadro" value={militar.quadro} />
+                    <InfoItem label="Situação" value={militar.situacao_militar} />
+                    <InfoItem label="Condição" value={militar.condicao} />
+                    <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
+                    {militar.destino && <InfoItem label="Destino/Cedência" value={militar.destino} />}
+                  </div>
+                </Section>
+                <Section title="Dados Pessoais" icon={User}>
+                  <div className="grid grid-cols-2 gap-x-4">
+                    <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
+                    <InfoItem label="Sexo" value={militar.sexo} />
+                    <InfoItem label="Estado Civil" value={militar.estado_civil} />
+                    <InfoItem label="Tipo Sanguíneo" value={militar.tipo_sanguineo} />
+                    <InfoItem label="Religião" value={militar.religiao} />
+                    <InfoItem label="Escolaridade" value={militar.escolaridade} />
+                    <InfoItem label="Naturalidade" value={militar.naturalidade} />
+                    <InfoItem label="UF Naturalidade" value={militar.naturalidade_uf} />
+                  </div>
+                </Section>
               <Section title="Filiação" icon={Heart}>
                 <div className="grid grid-cols-2 gap-x-4">
                   <InfoItem label="Nome do Pai" value={militar.nome_pai} />
@@ -287,6 +573,96 @@ export default function VerMilitar() {
                   </div>
                 </Section>
               )}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="comportamento">
+            <div className="space-y-6">
+              <Section title="Situação Atual do Comportamento" icon={Activity}>
+                <div className="grid md:grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-slate-500">Atual</p>
+                    <p className="font-semibold">{militar.comportamento || 'Bom'}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-slate-500">Calculado</p>
+                    <p className="font-semibold">{avaliacaoComportamento?.comportamento || '—'}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-slate-500">Próxima melhoria</p>
+                    <p className="font-semibold">{proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—'}</p>
+                  </div>
+                </div>
+                {avaliacaoComportamento?.fundamento && (
+                  <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
+                )}
+              </Section>
+
+              <Section title="Pendências de Comportamento" icon={AlertTriangle}>
+                {pendenciasComportamentoUnicas.length === 0 ? (
+                  <p className="text-sm text-slate-500">Sem pendências de comportamento no momento.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {pendenciasComportamentoUnicas.map((pendencia) => (
+                      <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-sm font-semibold text-amber-900">
+                          {(pendencia.comportamento_atual || militar.comportamento || 'Bom')} → {(pendencia.comportamento_sugerido || avaliacaoComportamento?.comportamento || militar.comportamento || 'Bom')}
+                        </p>
+                        <p className="text-xs text-amber-800 mt-1">
+                          {ultimaPunicaoPorMilitar
+                            ? `Última punição: ${ultimaPunicaoPorMilitar.tipo} (${formatDate(ultimaPunicaoPorMilitar.data) || ultimaPunicaoPorMilitar.data})`
+                            : 'Sem punições registradas'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              <Section title="Linha do Tempo do Comportamento">
+                <div className="flex flex-col gap-3">
+                  <div className="flex justify-end">
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={handleGerarTextoRP}>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Gerar texto para RP
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleEnviarParaRP}
+                        disabled={enviarParaRPMutation.isPending}
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Enviar para RP
+                      </Button>
+                    </div>
+                  </div>
+                  <ComportamentoTimeline
+                    eventos={historicoComportamento}
+                    selectedEventoId={marcoComportamentoSelecionadoId}
+                    onSelectEvento={(evento) => setMarcoComportamentoSelecionadoId(evento?.id || null)}
+                  />
+                </div>
+              </Section>
+
+              <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
+                {punicoes.length === 0 ? (
+                  <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {punicoes.slice(0, 5).map((punicao) => (
+                      <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
+                        <p className="text-sm font-medium text-slate-800">{punicao.tipo_punicao || punicao.tipo || 'Punição'}</p>
+                        <p className="text-xs text-slate-500">
+                          Início: {formatDate(punicao.data_inicio_cumprimento || punicao.data_inicio)} ·
+                          Término: {formatDate(punicao.data_fim_cumprimento || punicao.data_termino)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
             </div>
           </TabsContent>
 
@@ -408,6 +784,51 @@ export default function VerMilitar() {
           onSaved={() => setShowSolicitacao(false)}
         />
       )}
+
+      <Dialog open={dialogTextoRP.open} onOpenChange={(open) => setDialogTextoRP((prev) => ({ ...prev, open }))}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-[#1e3a5f]">Pré-visualização do texto para RP</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Template utilizado: <strong>{dialogTextoRP.tipoTemplate || '—'}</strong>
+            </p>
+            <textarea
+              value={dialogTextoRP.texto}
+              readOnly
+              className="w-full min-h-[280px] rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={handleCopiarTextoRP}>
+                <Copy className="w-4 h-4 mr-2" />
+                Copiar texto
+              </Button>
+              <Button
+                type="button"
+                onClick={handleEnviarParaRP}
+                disabled={enviarParaRPMutation.isPending}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Enviar para RP
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setDialogTextoRP({
+                  open: false,
+                  texto: '',
+                  tipoTemplate: '',
+                  marcoId: '',
+                  templateId: '',
+                  geradoEm: '',
+                })}
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

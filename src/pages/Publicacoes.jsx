@@ -4,15 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert } from 'lucide-react';
+import { FileText, Search, Plus, Clock, CheckCircle, AlertCircle, ShieldAlert, BookOpenText , Sparkles, LayoutGrid, Inbox } from 'lucide-react';
 import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-
 import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
@@ -21,32 +19,40 @@ import {
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
+import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
+import {
+  anexarEventoAuditoriaPublicacao,
+  calcularStatusPublicacaoRegistro,
+  criarEventoAuditoriaPublicacao,
+  EVENTO_AUDITORIA_PUBLICACAO,
+  extrairSnapshotPublicacao,
+  normalizarStatusPublicacao,
+  STATUS_PUBLICACAO,
+  validarPayloadPublicacao,
+} from '@/components/publicacao/publicacaoStateMachine';
 
-const TIPOS_FERIAS = [
-  'Saída Férias',
-  'Interrupção de Férias',
-  'Nova Saída / Retomada',
-  'Retorno Férias',
-];
-
+const TIPOS_FERIAS = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'];
 const ABAS_ORIGEM = [
   { key: 'all', label: 'Todos' },
   { key: 'ex-officio', label: 'Ex Officio' },
   { key: 'livro', label: 'Livro' },
   { key: 'atestado', label: 'Atestados' },
 ];
-
+const STATUS_CANONICOS_PUBLICACAO = [
+  STATUS_PUBLICACAO.AGUARDANDO_NOTA,
+  STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO,
+  STATUS_PUBLICACAO.PUBLICADO,
+];
 
 function detectarOrigemTipo(registro) {
   if (registro.origem_tipo) return registro.origem_tipo;
-  if (registro.tipo_label || registro.status_codigo || registro.origem) return 'livro';
-  if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
-    return 'ex-officio';
-  }
-  if (registro.medico || registro.cid_10) {
-    return 'atestado';
-  }
+  if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) return 'ex-officio';
+  if (registro.medico || registro.cid_10) return 'atestado';
   return 'livro';
+}
+
+function mapTipoCodigoParaTipoRegistro(tipoCodigo, fallbackLabel = '') {
+  return RP_TIPO_LABELS[tipoCodigo] || RP_TIPO_LABELS[fallbackLabel] || fallbackLabel;
 }
 
 function getTipoDisplay(tipo) {
@@ -65,47 +71,26 @@ function mapStatusContratoParaControle(statusCodigo) {
   return 'Aguardando Nota';
 }
 
-function mapTipoCodigoParaTipoRegistro(tipoCodigo, fallbackLabel = '') {
-  const mapa = {
-    saida_ferias: 'Saída Férias',
-    interrupcao_de_ferias: 'Interrupção de Férias',
-    nova_saida_retomada: 'Nova Saída / Retomada',
-    retorno_ferias: 'Retorno Férias',
-  };
-
-  return mapa[tipoCodigo] || fallbackLabel;
+function obterStatusCanonicoPublicacao(registro = {}) {
+  return (
+    normalizarStatusPublicacao(
+      registro.status_canonico ||
+      registro.status_calculado ||
+      registro.status_publicacao ||
+      registro.status
+    ) || calcularStatusPublicacaoRegistro(registro)
+  );
 }
 
 function getGrupoDisplay(registro) {
   const tipoBase = registro.tipo_registro || registro.tipo || '';
-
-  if (TIPOS_FERIAS.includes(tipoBase)) {
-    return 'Férias';
-  }
-
-  if (registro.medico || registro.cid_10) {
-    return 'Atestado';
-  }
-
+  if (TIPOS_FERIAS.includes(tipoBase)) return 'Férias';
+  if (registro.medico || registro.cid_10) return 'Atestado';
   return '';
 }
 
 function abreviarPostoGraduacao(valor) {
-  const mapa = {
-    'Coronel': 'Cel',
-    'Tenente Coronel': 'TC',
-    'Major': 'Maj',
-    'Capitão': 'Cap',
-    '1º Tenente': '1º Ten',
-    '2º Tenente': '2º Ten',
-    'Aspirante': 'Asp',
-    'Subtenente': 'ST',
-    '1º Sargento': '1º Sgt',
-    '2º Sargento': '2º Sgt',
-    '3º Sargento': '3º Sgt',
-    'Cabo': 'Cb',
-    'Soldado': 'Sd',
-  };
+  const mapa = { Coronel: 'CEL', 'Tenente Coronel': 'TC', Major: 'MAJ', Capitão: 'CAP', '1º Tenente': '1º TEN', '2º Tenente': '2º TEN', Aspirante: 'ASP', Subtenente: 'ST', '1º Sargento': '1º SGT', '2º Sargento': '2º SGT', '3º Sargento': '3º SGT', Cabo: 'CB', Soldado: 'SD' };
   return mapa[valor] || valor || '';
 }
 
@@ -113,51 +98,83 @@ function montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao }) {
   return [postoGraduacao, quadro, nomeExibicao].filter(Boolean).join(' ').trim();
 }
 
+function pickPrimeiroValor(...valores) {
+  for (const valor of valores) {
+    if (valor === null || valor === undefined) continue;
+    const texto = String(valor).trim();
+    if (texto) return texto;
+  }
+  return '';
+}
+
 function normalizarRegistro(registro) {
   const origemTipo = detectarOrigemTipo(registro);
   const militarContrato = registro?.militar || {};
-  const militarNome = origemTipo === 'livro'
-    ? (militarContrato?.nome_guerra || militarContrato?.nome || registro?.militar_nome || '')
-    : (registro?.militar_nome || registro?.nome_guerra || registro?.nome || '');
+  const militarNomeCompleto = origemTipo === 'livro'
+    ? pickPrimeiroValor(
+      militarContrato?.nome_completo,
+      registro?.militar_nome_completo,
+      registro?.militar_nome_institucional,
+      registro?.militar_nome,
+      militarContrato?.nome,
+      registro?.nome,
+    )
+    : pickPrimeiroValor(
+      registro?.militar_nome_completo,
+      registro?.militar_nome_institucional,
+      registro?.militar_nome,
+      registro?.nome,
+    );
 
-  const postoGraduacaoBruto = origemTipo === 'livro'
-    ? (militarContrato?.posto_graduacao || militarContrato?.posto || militarContrato?.graduacao || '')
-    : (registro?.militar_posto_graduacao || registro?.posto_graduacao || registro?.posto || registro?.graduacao || '');
+  const militarNomeGuerra = origemTipo === 'livro'
+    ? pickPrimeiroValor(
+      militarContrato?.nome_guerra,
+      registro?.militar_nome_guerra,
+      registro?.nome_guerra,
+      registro?.militar?.nome_guerra,
+    )
+    : pickPrimeiroValor(
+      registro?.militar_nome_guerra,
+      registro?.nome_guerra,
+    );
 
-  const quadro = origemTipo === 'livro'
-    ? (militarContrato?.quadro || '')
-    : (registro?.militar_quadro || registro?.quadro || '');
+  const postoGraduacao = abreviarPostoGraduacao(
+    origemTipo === 'livro'
+      ? (militarContrato?.posto_graduacao || militarContrato?.posto || militarContrato?.graduacao || '')
+      : (registro?.militar_posto_graduacao || registro?.posto_graduacao || registro?.posto || registro?.graduacao || '')
+  );
 
-  const postoGraduacao = abreviarPostoGraduacao(postoGraduacaoBruto);
+  const quadro = pickPrimeiroValor(
+    origemTipo === 'livro' ? militarContrato?.quadro : registro?.militar_quadro,
+    registro?.militar_quadro,
+    registro?.quadro,
+  );
   const tipoRegistroLivro = mapTipoCodigoParaTipoRegistro(registro.tipo_codigo, registro.tipo_label);
-  const tipoBase = origemTipo === 'livro'
-    ? (tipoRegistroLivro || registro.tipo_label || registro.tipo || '')
-    : (registro.tipo_registro || registro.tipo || '');
+  const tipoBase = origemTipo === 'livro' ? (tipoRegistroLivro || registro.tipo_label || registro.tipo || '') : (registro.tipo_registro || registro.tipo || '');
   const tipoDisplay = getTipoDisplay(tipoBase);
   const grupoDisplay = getGrupoDisplay({ ...registro, tipo_registro: tipoBase });
-  const tipoCompostoDisplay = grupoDisplay
-    ? `${grupoDisplay} • ${tipoDisplay}`
-    : tipoDisplay;
+
+  const statusOrigem =
+    registro.status_calculado ||
+    (origemTipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcularStatusPublicacaoRegistro(registro));
+  const statusCanonico = obterStatusCanonicoPublicacao({ ...registro, status_calculado: statusOrigem });
 
   return {
     ...registro,
     origem_tipo: origemTipo,
-    status_calculado: registro.status_calculado || (origemTipo === 'livro'
-      ? mapStatusContratoParaControle(registro.status_codigo)
-      : calcStatusPublicacao(registro)),
+    status_calculado: statusOrigem,
+    status_canonico: statusCanonico,
     tipo_display: tipoDisplay,
     grupo_display: grupoDisplay,
-    tipo_composto_display: tipoCompostoDisplay,
+    tipo_composto_display: grupoDisplay ? `${grupoDisplay} • ${tipoDisplay}` : tipoDisplay,
     tipo: origemTipo === 'livro' ? (registro.tipo_label || registro.tipo) : registro.tipo,
     tipo_registro: origemTipo === 'livro' ? tipoBase : registro.tipo_registro,
-    militar_nome: militarNome,
+    militar_nome: militarNomeCompleto,
+    militar_nome_completo: militarNomeCompleto,
+    militar_nome_guerra: militarNomeGuerra,
     militar_posto_graduacao: postoGraduacao,
     militar_quadro: quadro,
-    militar_nome_institucional: montarNomeInstitucional({
-      postoGraduacao,
-      quadro,
-      nomeExibicao: militarNome,
-    }),
+    militar_nome_institucional: montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao: militarNomeCompleto }),
     militar_matricula: origemTipo === 'livro' ? (registro?.militar?.matricula || registro?.militar_matricula) : registro.militar_matricula,
     militar_id: origemTipo === 'livro' ? (registro?.militar?.id || registro?.militar_id) : registro.militar_id,
     created_date: origemTipo === 'livro' ? (registro?.detalhes?.criado_em_iso || registro.created_date) : registro.created_date,
@@ -175,47 +192,46 @@ function normalizarRegistro(registro) {
 }
 
 function montarPayloadAtualizacao(registroAtual, dataParcial, tipo) {
-  const registroBase = registroAtual || {};
-  const payloadParcial = dataParcial || {};
-  const registroMesclado = { ...registroBase, ...payloadParcial };
-
-  const houveAlteracaoCamposPublicacao =
-    Object.prototype.hasOwnProperty.call(payloadParcial, 'nota_para_bg') ||
-    Object.prototype.hasOwnProperty.call(payloadParcial, 'numero_bg') ||
-    Object.prototype.hasOwnProperty.call(payloadParcial, 'data_bg');
-
-  if (!houveAlteracaoCamposPublicacao) {
-    return payloadParcial;
+  const houveAlteracaoCamposPublicacao = ['nota_para_bg', 'numero_bg', 'data_bg'].some((campo) => Object.prototype.hasOwnProperty.call(dataParcial || {}, campo));
+  if (!houveAlteracaoCamposPublicacao) return dataParcial || {};
+  const registroDestino = { ...(registroAtual || {}), ...(dataParcial || {}) };
+  const statusCalculado = calcularStatusPublicacaoRegistro(registroDestino);
+  const validacao = validarPayloadPublicacao({ registroAtual, registroDestino });
+  if (!validacao.valido) {
+    throw new Error(validacao.motivo || 'Transição de status inválida para publicação.');
   }
-
-  const statusCalculado = calcStatusPublicacao(registroMesclado);
-
-  if (tipo === 'atestado') {
-    return {
-      ...payloadParcial,
-      status_publicacao: statusCalculado,
-    };
-  }
-
-  return {
-    ...payloadParcial,
-    status: statusCalculado,
-  };
-}
-
-function getEventDate(registro) {
-  return registro?.data_registro || registro?.data_inicio || registro?.data_inicio_iso || null;
+  if (tipo === 'atestado') return { ...(dataParcial || {}), status_publicacao: statusCalculado };
+  return { ...(dataParcial || {}), status: statusCalculado };
 }
 
 function isFeriasOperacional(registro) {
-  return (
-    detectarOrigemTipo(registro) === 'livro' &&
-    !!(registro.ferias_id || registro?.vinculos?.ferias?.id) &&
-    (
-      TIPOS_FERIAS.includes(registro.tipo_registro) ||
-      ['saida_ferias', 'interrupcao_de_ferias', 'nova_saida_retomada', 'retorno_ferias'].includes(registro.tipo_codigo)
-    )
+  return detectarOrigemTipo(registro) === 'livro' && !!(registro.ferias_id || registro?.vinculos?.ferias?.id) && (
+    TIPOS_FERIAS.includes(registro.tipo_registro) || ['saida_ferias', 'interrupcao_de_ferias', 'nova_saida_retomada', 'retorno_ferias'].includes(registro.tipo_codigo)
   );
+}
+
+
+
+function normalizarOrigemTipoRegistro(tipo) {
+  if (tipo === 'atestado') return 'atestado';
+  if (tipo === 'livro') return 'livro';
+  return 'ex-officio';
+}
+
+function mapearEntityPublicacao(tipo) {
+  if (tipo === 'atestado') return base44.entities.Atestado;
+  if (tipo === 'livro') return base44.entities.RegistroLivro;
+  return base44.entities.PublicacaoExOfficio;
+}
+
+function campoStatusPorTipo(tipo) {
+  return tipo === 'atestado' ? 'status_publicacao' : 'status';
+}
+
+function containsTerm(valor, termo) {
+  if (!termo) return true;
+  if (valor === null || valor === undefined) return false;
+  return String(valor).toLowerCase().includes(termo);
 }
 
 export default function Publicacoes() {
@@ -226,13 +242,13 @@ export default function Publicacoes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
-  const { isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { user, isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
+  const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
     queryFn: () => getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
-    // Só dispara após resolução de acesso e confirmação de permissão
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
@@ -240,19 +256,15 @@ export default function Publicacoes() {
     queryKey: ['publicacoes-ex-officio', isAdmin],
     queryFn: async () => {
       if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
-      
       const scopeFilters = getMilitarScopeFilters();
       if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
-      const militaresAcess = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
+      const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
+      const militarIds = [...new Set(militarQueries.flat().map((m) => m.id).filter(Boolean))];
       if (!militarIds.length) return [];
-      
-      const queryPromises = militarIds.map(id => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date'));
-      const arrays = await Promise.all(queryPromises);
+      const arrays = await Promise.all(militarIds.map((id) => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date')));
       const m = new Map();
-      arrays.flat().forEach(item => m.set(item.id, item));
-      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
+      arrays.flat().forEach((item) => m.set(item.id, item));
+      return Array.from(m.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
     },
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
@@ -260,492 +272,372 @@ export default function Publicacoes() {
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
     queryKey: ['atestados-publicacao', isAdmin],
     queryFn: async () => {
-      if (isAdmin) {
-        const all = await base44.entities.Atestado.list('-created_date');
-        return all.filter(a => a.nota_para_bg || a.numero_bg);
-      }
-      
+      if (isAdmin) return (await base44.entities.Atestado.list('-created_date')).filter((a) => a.nota_para_bg || a.numero_bg);
       const scopeFilters = getMilitarScopeFilters();
       if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
-      const militaresAcess = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
+      const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
+      const militarIds = [...new Set(militarQueries.flat().map((m) => m.id).filter(Boolean))];
       if (!militarIds.length) return [];
-      
-      const queryPromises = militarIds.map(id => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
-      const arrays = await Promise.all(queryPromises);
+      const arrays = await Promise.all(militarIds.map((id) => base44.entities.Atestado.filter({ militar_id: id }, '-created_date')));
       const m = new Map();
-      arrays.flat().forEach(item => { if (item.nota_para_bg || item.numero_bg) m.set(item.id, item); });
-      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
+      arrays.flat().forEach((item) => { if (item.nota_para_bg || item.numero_bg) m.set(item.id, item); });
+      return Array.from(m.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
     },
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
-
   const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
+  const todosRegistros = useMemo(() => [...registrosLivro, ...publicacoesExOfficio, ...atestados].map(normalizarRegistro).sort((a, b) => new Date(b.created_date) - new Date(a.created_date)), [registrosLivro, publicacoesExOfficio, atestados]);
 
-  const registros = useMemo(() => {
-    return [...registrosLivro, ...publicacoesExOfficio, ...atestados]
-      .map(normalizarRegistro)
-      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-  }, [registrosLivro, publicacoesExOfficio, atestados]);
+  const refrescarDadosPublicacoes = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
+      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] }),
+      queryClient.invalidateQueries({ queryKey: ['atestados'] }),
+      queryClient.invalidateQueries({ queryKey: ['ferias'] }),
+      queryClient.invalidateQueries({ queryKey: ['cards'] }),
+    ]);
+  };
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data, tipo }) => {
-      const registroAtual = registros.find((item) => item.id === id);
+      const registroAtual = todosRegistros.find((item) => item.id === id);
       const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
+      const origemTipo = normalizarOrigemTipoRegistro(tipo);
+      const entity = mapearEntityPublicacao(origemTipo);
+      const campoStatus = campoStatusPorTipo(origemTipo);
+      const statusAntes = normalizarStatusPublicacao(registroAtual?.status_calculado || registroAtual?.status_publicacao || registroAtual?.status) || calcularStatusPublicacaoRegistro(registroAtual || {});
+      const registroDestino = { ...(registroAtual || {}), ...payloadFinal };
+      const statusDepois = normalizarStatusPublicacao(registroDestino.status_calculado || registroDestino.status_publicacao || registroDestino.status) || calcularStatusPublicacaoRegistro(registroDestino);
 
-      if (tipo === 'ex-officio') return base44.entities.PublicacaoExOfficio.update(id, payloadFinal);
-      if (tipo === 'atestado') return base44.entities.Atestado.update(id, payloadFinal);
+      const eventoAuditoria = criarEventoAuditoriaPublicacao({
+        registro: { ...(registroAtual || {}), id, origem_tipo: origemTipo },
+        evento: EVENTO_AUDITORIA_PUBLICACAO.INFORMAR_BG,
+        usuario: user,
+        resumo: statusAntes !== statusDepois
+          ? `BG informado/atualizado com mudança de status: ${statusAntes} → ${statusDepois}.`
+          : 'BG informado/atualizado sem mudança de status.',
+        estadoAnterior: statusAntes,
+        estadoNovo: statusDepois,
+        antes: extrairSnapshotPublicacao(registroAtual || {}),
+        depois: extrairSnapshotPublicacao(registroDestino),
+      });
 
-      await base44.entities.RegistroLivro.update(id, payloadFinal);
-      if (isFeriasOperacional(registroAtual)) {
-        await reconciliarCadeiaFerias({ feriasId: registroAtual.ferias_id });
+      const payloadComAuditoria = {
+        ...payloadFinal,
+        [campoStatus]: statusDepois,
+        historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual || {}, eventoAuditoria),
+      };
+
+      if (origemTipo === 'livro') {
+        await entity.update(id, payloadComAuditoria);
+        if (isFeriasOperacional(registroAtual)) await reconciliarCadeiaFerias({ feriasId: registroAtual.ferias_id });
+        return null;
       }
-      return null;
+
+      return entity.update(id, payloadComAuditoria);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['conciliacao-atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
-    }
+    onSuccess: refrescarDadosPublicacoes,
+    onError: (error) => {
+      alert(error?.message || 'Falha ao atualizar publicação.');
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, tipo, registro }) => {
       if (tipo === 'atestado') return;
 
-      const detectarTipo = (refId) => {
-        const found = [...registrosLivro, ...publicacoesExOfficio, ...atestados].find(r => r.id === refId);
-        if (!found) return 'ex-officio';
-        return detectarOrigemTipo(found);
-      };
+      const origemTipo = normalizarOrigemTipoRegistro(tipo);
+      const entity = mapearEntityPublicacao(origemTipo);
+      const statusAtual = normalizarStatusPublicacao(registro?.status_calculado || registro?.status_publicacao || registro?.status) || calcularStatusPublicacaoRegistro(registro || {});
+      const eventoExclusao = criarEventoAuditoriaPublicacao({
+        registro: { ...(registro || {}), id, origem_tipo: origemTipo },
+        evento: EVENTO_AUDITORIA_PUBLICACAO.EXCLUSAO,
+        usuario: user,
+        resumo: 'Publicação excluída do fluxo operacional.',
+        estadoAnterior: statusAtual,
+        estadoNovo: null,
+        antes: extrairSnapshotPublicacao(registro || {}),
+        depois: null,
+      });
 
-      const reverterVinculo = async (isApostila, isTSE, refId, origemTipoHint) => {
-        if (!refId) return;
-        const origemTipo = origemTipoHint || detectarTipo(refId);
-        const entityOriginal =
-          origemTipo === 'atestado' ? base44.entities.Atestado :
-          origemTipo === 'livro' ? base44.entities.RegistroLivro :
-          base44.entities.PublicacaoExOfficio;
-
-        const originais = await entityOriginal.filter({ id: refId });
-        const original = originais[0];
-        if (!original) return;
-
-        const payload = { ...(origemTipo === 'atestado' ? {} : { status: calcStatusPublicacao(original) }) };
-
-        if (isApostila) {
-          payload.apostilada_por_id = null;
-          payload.foi_apostilada = false;
-        }
-        if (isTSE) {
-          payload.tornada_sem_efeito_por_id = null;
-          payload.foi_tornada_sem_efeito = false;
-        }
-
-        if (origemTipo === 'atestado') {
-          payload.status_publicacao = calcStatusPublicacao(original);
-        }
-
-        await entityOriginal.update(refId, payload);
-      };
+      await entity.update(id, {
+        historico_publicacao: anexarEventoAuditoriaPublicacao(registro || {}, eventoExclusao),
+      });
 
       if (tipo === 'ex-officio') {
         const isApostila = registro.tipo === 'Apostila';
         const isTSE = registro.tipo === 'Tornar sem Efeito';
-
         if (isApostila || isTSE) {
           const refId = registro.publicacao_referencia_id;
           const origemTipoHint = registro.publicacao_referencia_origem_tipo || null;
-          await reverterVinculo(isApostila, isTSE, refId, origemTipoHint);
+          if (refId) {
+            const entityOriginal = origemTipoHint === 'atestado' ? base44.entities.Atestado : origemTipoHint === 'livro' ? base44.entities.RegistroLivro : base44.entities.PublicacaoExOfficio;
+            const [original] = await entityOriginal.filter({ id: refId });
+            if (original) {
+              const payload = { ...(origemTipoHint === 'atestado' ? {} : { status: calcStatusPublicacao(original) }) };
+              if (isApostila) { payload.apostilada_por_id = null; payload.foi_apostilada = false; }
+              if (isTSE) { payload.tornada_sem_efeito_por_id = null; payload.foi_tornada_sem_efeito = false; }
+              if (origemTipoHint === 'atestado') payload.status_publicacao = calcStatusPublicacao(original);
+              await entityOriginal.update(refId, payload);
+            }
+          }
 
           if (isTSE && refId && (!origemTipoHint || origemTipoHint === 'ex-officio')) {
             const [publicacaoReferencia] = await base44.entities.PublicacaoExOfficio.filter({ id: refId });
-            const atestadoIdsVinculados = getAtestadoIdsVinculados(publicacaoReferencia);
-            for (const atestadoId of atestadoIdsVinculados) {
-              await atualizarEstadoAtestadoPelasPublicacoes(
-                atestadoId,
-                base44.entities.Atestado,
-                base44.entities.PublicacaoExOfficio
-              );
+            for (const atestadoId of getAtestadoIdsVinculados(publicacaoReferencia)) {
+              await atualizarEstadoAtestadoPelasPublicacoes(atestadoId, base44.entities.Atestado, base44.entities.PublicacaoExOfficio);
             }
           }
         }
 
-        await reverterAtestadosPorExclusaoPublicacao(
-          registro,
-          base44.entities.Atestado,
-          base44.entities.PublicacaoExOfficio
-        );
-
-
-        return base44.entities.PublicacaoExOfficio.delete(id);
+        await reverterAtestadosPorExclusaoPublicacao(registro, base44.entities.Atestado, base44.entities.PublicacaoExOfficio);
+        return entity.delete(id);
       }
 
       if (tipo === 'livro') {
-        if (isFeriasOperacional(registro)) {
-          throw new Error('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
-        }
-
-        return base44.entities.RegistroLivro.delete(id);
+        if (isFeriasOperacional(registro)) throw new Error('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
+        return entity.delete(id);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] });
-      queryClient.invalidateQueries({ queryKey: ['atestados'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-atestado'] });
-      queryClient.invalidateQueries({ queryKey: ['cards'] });
+    onSuccess: async () => {
+      await Promise.all([refrescarDadosPublicacoes(), queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] })]);
     },
-    onError: (error) => {
-      alert(error?.message || 'Erro ao excluir registro.');
-    }
+    onError: (error) => alert(error?.message || 'Erro ao excluir registro.'),
   });
 
-  const registrosDaAbaAtiva = useMemo(() => {
-    if (abaOrigemAtiva === 'all') return registros;
-    return registros.filter((registro) => registro.origem_tipo === abaOrigemAtiva);
-  }, [registros, abaOrigemAtiva]);
+  const registrosDaAbaAtiva = useMemo(() => (abaOrigemAtiva === 'all' ? todosRegistros : todosRegistros.filter((registro) => registro.origem_tipo === abaOrigemAtiva)), [todosRegistros, abaOrigemAtiva]);
+  const filteredRegistros = useMemo(() => registrosDaAbaAtiva.filter((r) => {
+    const statusReferencia = statusFilter === 'Inconsistente' ? r.status_calculado : obterStatusCanonicoPublicacao(r);
+    const matchesStatus = statusFilter === 'all' || statusReferencia === statusFilter;
+    const termo = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      containsTerm(r.militar_nome, termo) ||
+      containsTerm(r.militar_matricula, termo) ||
+      containsTerm(r.numero_bg, termo) ||
+      containsTerm(r.nota_para_bg, termo) ||
+      containsTerm(r.tipo, termo) ||
+      containsTerm(r.tipo_registro, termo) ||
+      containsTerm(r.tipo_display, termo) ||
+      containsTerm(r.grupo_display, termo);
+    return matchesStatus && matchesSearch;
+  }), [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
-  const filteredRegistros = useMemo(() => {
-    return registrosDaAbaAtiva.filter((r) => {
-      const matchesStatus =
-        statusFilter === 'all' || r.status_calculado === statusFilter;
+  const statsOrigem = useMemo(() => ({
+    total: registrosDaAbaAtiva.length,
+    aguardandoNota: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length,
+    aguardandoPublicacao: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length,
+    publicados: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.PUBLICADO).length,
+    inconsistentes: registrosDaAbaAtiva.filter((r) => r.status_calculado === 'Inconsistente').length,
+  }), [registrosDaAbaAtiva]);
 
-      const termo = searchTerm.toLowerCase().trim();
-      const matchesSearch =
-        !termo ||
-        r.militar_nome?.toLowerCase().includes(termo) ||
-        r.militar_matricula?.toLowerCase().includes(termo) ||
-        r.numero_bg?.toLowerCase().includes(termo) ||
-        r.nota_para_bg?.toLowerCase().includes(termo) ||
-        r.tipo?.toLowerCase().includes(termo) ||
-        r.tipo_registro?.toLowerCase().includes(termo) ||
-        r.tipo_display?.toLowerCase().includes(termo) ||
-        r.grupo_display?.toLowerCase().includes(termo) ||
-        r.tipo_composto_display?.toLowerCase().includes(termo);
-
-      return matchesStatus && matchesSearch;
-    });
-  }, [registrosDaAbaAtiva, statusFilter, searchTerm]);
-
-  const stats = useMemo(() => {
-    return {
-      total: registrosDaAbaAtiva.length,
-      aguardandoNota: registrosDaAbaAtiva.filter(r => r.status_calculado === 'Aguardando Nota').length,
-      aguardandoPublicacao: registrosDaAbaAtiva.filter(r => r.status_calculado === 'Aguardando Publicação').length,
-      publicados: registrosDaAbaAtiva.filter(r => r.status_calculado === 'Publicado').length,
-      inconsistentes: registrosDaAbaAtiva.filter(r => r.status_calculado === 'Inconsistente').length
-    };
-  }, [registrosDaAbaAtiva]);
+  const statsFiltro = useMemo(() => {
+    const total = filteredRegistros.length;
+    const aguardandoNota = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length;
+    const aguardandoPublicacao = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length;
+    const publicados = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.PUBLICADO).length;
+    const inconsistentes = filteredRegistros.filter((r) => r.status_calculado === 'Inconsistente').length;
+    const comBloqueioOperacional = filteredRegistros.filter((r) =>
+      (Array.isArray(r?.historico_publicacao) ? r.historico_publicacao : []).some(
+        (evento) => (evento?.evento || evento?.acao) === EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO
+      )
+    ).length;
+    return { total, aguardandoNota, aguardandoPublicacao, publicados, inconsistentes, comBloqueioOperacional };
+  }, [filteredRegistros]);
 
   const handleUpdate = (id, data, tipo) => {
-    // Verificação explícita: atualizar BG/nota exige permissão de publicar
-    if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) {
-      alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
-      return;
+    if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
+    const registroAtual = todosRegistros.find((item) => item.id === id);
+    const registroDestino = { ...(registroAtual || {}), ...(data || {}) };
+    const validacao = validarPayloadPublicacao({ registroAtual, registroDestino });
+    if (!validacao.valido) {
+      const origemTipo = normalizarOrigemTipoRegistro(tipo);
+      const entity = mapearEntityPublicacao(origemTipo);
+      const eventoBloqueio = criarEventoAuditoriaPublicacao({
+        registro: { ...(registroAtual || {}), id, origem_tipo: origemTipo },
+        evento: EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO,
+        usuario: user,
+        resumo: validacao.motivo || 'Transição inválida de status para publicação.',
+        estadoAnterior: normalizarStatusPublicacao(registroAtual?.status_calculado || registroAtual?.status_publicacao || registroAtual?.status) || calcularStatusPublicacaoRegistro(registroAtual || {}),
+        estadoNovo: normalizarStatusPublicacao(registroDestino?.status_calculado || registroDestino?.status_publicacao || registroDestino?.status) || calcularStatusPublicacaoRegistro(registroDestino || {}),
+        antes: extrairSnapshotPublicacao(registroAtual || {}),
+        depois: extrairSnapshotPublicacao(registroDestino || {}),
+        metadata: { bloqueio_tipo: 'transicao_invalida' },
+      });
+      entity.update(id, { historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual || {}, eventoBloqueio) }).catch(() => {});
+      return alert(validacao.motivo || 'Transição inválida de status para publicação.');
     }
     updateMutation.mutate({ id, data, tipo });
   };
 
   const handleDelete = (id, tipo) => {
-    if (!canAccessAction('admin_mode') || !modoAdmin) {
-      alert('Ação restrita. Exige permissão de administração e modo admin ativo.');
-      return;
-    }
-
-    const registro = registros.find(r => r.id === id);
+    if (!canAccessAction('admin_mode') || !modoAdmin) return alert('Ação restrita. Exige permissão de administração e modo admin ativo.');
+    const registro = todosRegistros.find((r) => r.id === id);
     if (!registro) return;
-
-    if (tipo === 'atestado') {
-      alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
-      return;
-    }
-
-    if (tipo === 'livro' && isFeriasOperacional(registro)) {
-      alert('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
-      return;
-    }
-
-    if (registro.status_calculado === 'Publicado') {
-      if (registro.tipo !== 'Apostila' && registro.tipo !== 'Tornar sem Efeito') {
-        alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
-        return;
-      }
-      if (registro.tipo === 'Tornar sem Efeito') {
-        alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
-        return;
-      }
-    }
-
+    if (tipo === 'atestado') return alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
+    if (tipo === 'livro' && isFeriasOperacional(registro)) return alert('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
+    if (registro.status_calculado === STATUS_PUBLICACAO.PUBLICADO && registro.tipo !== 'Apostila' && registro.tipo !== 'Tornar sem Efeito') return alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
+    if (registro.tipo === 'Tornar sem Efeito') return alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');
     deleteMutation.mutate({ id, tipo, registro });
   };
 
   const grupos = [
-    {
-      key: 'Aguardando Nota',
-      label: 'Aguardando Nota',
-      color: 'text-amber-700',
-      border: 'border-amber-300',
-      bg: 'bg-amber-50'
-    },
-    {
-      key: 'Aguardando Publicação',
-      label: 'Aguardando Publicação',
-      color: 'text-blue-700',
-      border: 'border-blue-300',
-      bg: 'bg-blue-50'
-    },
-    {
-      key: 'Publicado',
-      label: 'Publicado',
-      color: 'text-emerald-700',
-      border: 'border-emerald-300',
-      bg: 'bg-emerald-50'
-    },
-    {
-      key: 'Inconsistente',
-      label: 'Inconsistente',
-      color: 'text-red-700',
-      border: 'border-red-300',
-      bg: 'bg-red-50'
-    },
+    { key: STATUS_PUBLICACAO.AGUARDANDO_NOTA, label: STATUS_PUBLICACAO.AGUARDANDO_NOTA, color: 'text-amber-700', border: 'border-amber-300', bg: 'bg-amber-50' },
+    { key: STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO, label: STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO, color: 'text-blue-700', border: 'border-blue-300', bg: 'bg-blue-50' },
+    { key: STATUS_PUBLICACAO.PUBLICADO, label: STATUS_PUBLICACAO.PUBLICADO, color: 'text-emerald-700', border: 'border-emerald-300', bg: 'bg-emerald-50' },
+    { key: 'Inconsistente', label: 'Inconsistente', color: 'text-red-700', border: 'border-red-300', bg: 'bg-red-50' },
   ];
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasPublicacoesAccess) return <AccessDenied modulo="Controle de Publicações" />;
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="px-4 py-6 lg:px-8">
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <Input
-                  placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-11 pl-11 border-slate-300 bg-white rounded-xl shadow-sm"
-                />
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        <section className="mb-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(30,58,95,0.12),_transparent_45%),linear-gradient(135deg,_#ffffff_0%,_#f8fafc_55%,_#eef2ff_100%)] px-6 py-6 lg:px-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#1e3a5f]/15 bg-white px-3 py-1 text-xs font-medium text-[#1e3a5f] shadow-sm">
+                  <BookOpenText className="h-3.5 w-3.5" /> Controle de Publicações
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Publicações</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Consolide Livro, Ex Officio e Atestados no mesmo fluxo operacional.</p>
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  No filtro atual: {statsFiltro.aguardandoNota} em {STATUS_PUBLICACAO.AGUARDANDO_NOTA.toLowerCase()}, {statsFiltro.aguardandoPublicacao} em {STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO.toLowerCase()} e {statsFiltro.publicados} {STATUS_PUBLICACAO.PUBLICADO.toLowerCase()}.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <InfoPill icon={LayoutGrid} label={`${statsOrigem.total} registros na origem selecionada`} />
+                  <InfoPill icon={Sparkles} label={`${statsFiltro.total} itens compatíveis com os filtros`} />
+                  {statsFiltro.comBloqueioOperacional > 0 && <InfoPill icon={ShieldAlert} label={`${statsFiltro.comBloqueioOperacional} registro(s) com bloqueio operacional`} tone="warning" />}
+                  {statsOrigem.inconsistentes > 0 && <InfoPill icon={ShieldAlert} label={`${statsOrigem.inconsistentes} inconsistência(s) para conferência`} tone="danger" />}
+                </div>
               </div>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {canAccessAction('admin_mode') && (
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                {canAccessAction('admin_mode') && (
+                  <Button variant="outline" onClick={() => setModoAdmin((v) => !v)} className={modoAdmin ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' : 'border-red-200 text-red-700 hover:bg-red-50'}>
+                    <ShieldAlert className="mr-2 h-4 w-4" /> {modoAdmin ? 'Modo admin ativo' : 'Modo admin'}
+                  </Button>
+                )}
                 <Button
-                  variant={modoAdmin ? 'default' : 'outline'}
-                  onClick={() => setModoAdmin((v) => !v)}
-                  className={modoAdmin
-                    ? 'h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white animate-pulse'
-                    : 'h-11 rounded-xl border-red-300 text-red-600 hover:bg-red-50'}
-                  title={modoAdmin ? 'Desativar modo admin' : 'Ativar modo admin para ações sensíveis'}
+                  asChild
+                  variant="outline"
+                  disabled={!canGerirPublicacoes}
+                  title={!canGerirPublicacoes ? 'Ação negada: você não tem permissão para criar publicação.' : ''}
                 >
-                  <ShieldAlert className="w-4 h-4 mr-2" />
-                  {modoAdmin ? 'Admin Ativo' : 'Modo Admin'}
+                  <button onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}><Plus className="mr-2 h-4 w-4" />Nova publicação</button>
                 </Button>
-              )}
-
-              <div className="min-w-[170px]">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-white shadow-sm">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Status</SelectItem>
-                    <SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem>
-                    <SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem>
-                    <SelectItem value="Publicado">Publicado</SelectItem>
-                    <SelectItem value="Inconsistente">Inconsistente</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-
-              <Button
-                className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Publicação
-              </Button>
             </div>
           </div>
+          <div className="grid gap-4 border-t border-slate-100 bg-slate-50/70 px-6 py-5 md:grid-cols-2 xl:grid-cols-5 lg:px-8">
+            <MetricCard icon={FileText} label="Total no filtro" value={statsFiltro.total} helper="Registros visíveis após filtros" />
+            <MetricCard icon={Clock} label={STATUS_PUBLICACAO.AGUARDANDO_NOTA} value={statsFiltro.aguardandoNota} helper="Dependem de nota para BG" tone="amber" />
+            <MetricCard icon={AlertCircle} label={STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO} value={statsFiltro.aguardandoPublicacao} helper="Prontos para boletim" tone="blue" />
+            <MetricCard icon={CheckCircle} label={STATUS_PUBLICACAO.PUBLICADO} value={statsFiltro.publicados} helper="Já lançados em BG" tone="emerald" />
+            <MetricCard icon={ShieldAlert} label="Bloqueios operacionais" value={statsFiltro.comBloqueioOperacional} helper="Com tentativa bloqueada auditada" tone="red" />
+          </div>
+        </section>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {ABAS_ORIGEM.map((aba) => {
-                const totalAba = aba.key === 'all'
-                  ? registros.length
-                  : registros.filter((registro) => registro.origem_tipo === aba.key).length;
-                const ativa = abaOrigemAtiva === aba.key;
-
-                return (
-                  <button
-                    key={aba.key}
-                    type="button"
-                    onClick={() => setAbaOrigemAtiva(aba.key)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${ativa
-                      ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                      : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900'}`}
-                  >
-                    <span>{aba.label}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${ativa ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                      {totalAba}
-                    </span>
-                  </button>
-                );
-              })}
+        <section className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
+          <div className="grid gap-4 lg:grid-cols-[1.25fr,0.75fr,1fr]">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Busca</label>
+              <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 rounded-xl border-slate-200 pl-9" /></div>
             </div>
-
-            <div className="text-sm font-medium text-slate-500">
-              {filteredRegistros.length} registro(s) encontrado(s)
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-11 rounded-xl border-slate-200"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos Status</SelectItem><SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem><SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem><SelectItem value="Publicado">Publicado</SelectItem><SelectItem value="Inconsistente">Inconsistente</SelectItem></SelectContent></Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Origem</label>
+              <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                {ABAS_ORIGEM.map((aba) => {
+                  const totalAba = aba.key === 'all' ? todosRegistros.length : todosRegistros.filter((registro) => registro.origem_tipo === aba.key).length;
+                  const ativa = abaOrigemAtiva === aba.key;
+                  return <button key={aba.key} type="button" onClick={() => setAbaOrigemAtiva(aba.key)} className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${ativa ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-900'}`}><span>{aba.label}</span><span className={`rounded-full px-2 py-0.5 text-xs ${ativa ? 'bg-white/15 text-white' : 'border border-slate-200 bg-slate-50 text-slate-500'}`}>{totalAba}</span></button>;
+                })}
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#e8eef5] flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-[#1e3a5f]" />
+        {isLoading ? <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">Carregando registros...</div> : filteredRegistros.length === 0 ? (
+          <section className="rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><Inbox className="h-8 w-8" /></div>
+            <h3 className="mt-5 text-lg font-semibold text-slate-800">Nenhum registro encontrado</h3>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">{searchTerm || statusFilter !== 'all' ? 'Ajuste os filtros para localizar publicações compatíveis com a busca atual.' : 'Os registros de publicação aparecerão aqui conforme forem disponibilizados pelas origens integradas do painel.'}</p>
+          </section>
+        ) : (
+          <div className="space-y-8">
+            {grupos
+              .filter((grupo) => STATUS_CANONICOS_PUBLICACAO.includes(grupo.key) || grupo.key === 'Inconsistente')
+              .map((grupo) => {
+              const items = filteredRegistros.filter((r) =>
+                grupo.key === 'Inconsistente'
+                  ? r.status_calculado === 'Inconsistente'
+                  : obterStatusCanonicoPublicacao(r) === grupo.key
+              );
+              if (!items.length) return null;
+              return (
+                <section key={grupo.key} className="space-y-3">
+                  <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${grupo.border} ${grupo.bg}`}><span className={`text-sm font-bold ${grupo.color}`}>{grupo.label}</span><span className={`text-xs ${grupo.color} opacity-70`}>{items.length} registro(s)</span></div>
+                  <div className="space-y-3">
+                    {items.map((registro) => (
+                      <PublicacaoCard
+                        key={registro.id}
+                        registro={registro}
+                        onUpdate={handleUpdate}
+                        onDelete={handleDelete}
+                        onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
+                        canAccessAction={canAccessAction}
+                        modoAdmin={modoAdmin}
+                        currentUserEmail={user?.email || ''}
+                      />
+                    ))}
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold text-[#1e3a5f]">{stats.total}</p>
-                    <p className="text-xs text-slate-500">Total</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-amber-600">{stats.aguardandoNota}</p>
-                    <p className="text-xs text-slate-500">Aguardando Nota</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <AlertCircle className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-blue-600">{stats.aguardandoPublicacao}</p>
-                    <p className="text-xs text-slate-500">Aguardando Publ.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-emerald-600">{stats.publicados}</p>
-                    <p className="text-xs text-slate-500">Publicados</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </section>
+              );
+            })}
           </div>
-
-          {stats.inconsistentes > 0 && (
-            <div className="text-sm text-red-600 font-medium">
-              {stats.inconsistentes} registro(s) inconsistente(s) na aba selecionada
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : filteredRegistros.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
-              <FileText className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                Nenhum registro encontrado
-              </h3>
-              <p className="text-slate-500">
-                {searchTerm || statusFilter !== 'all'
-                  ? 'Tente ajustar os filtros de busca'
-                  : 'Os registros de publicação aparecerão aqui'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {grupos.map((grupo) => {
-                const items = filteredRegistros.filter(r => r.status_calculado === grupo.key);
-                if (items.length === 0) return null;
-
-                return (
-                  <div key={grupo.key} className="space-y-3">
-                    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${grupo.border} ${grupo.bg}`}>
-                      <span className={`font-bold text-sm ${grupo.color}`}>{grupo.label}</span>
-                      <span className={`text-xs ${grupo.color} opacity-70`}>
-                        {items.length} registro(s)
-                      </span>
-                    </div>
-
-                    <div className="space-y-3">
-                      {items.map((registro) => (
-                        <PublicacaoCard
-                          key={registro.id}
-                          registro={registro}
-                          onUpdate={handleUpdate}
-                          onDelete={handleDelete}
-                          onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
-                          todosRegistros={registros}
-                          isAdmin={isAdmin}
-                          modoAdmin={modoAdmin}
-                          canAccessAction={canAccessAction}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {familiaPanel.open && (
         <>
-          <div
-            className="fixed inset-0 bg-black/30 z-40"
-            onClick={() => setFamiliaPanel({ open: false, registro: null })}
-          />
-          <FamiliaPublicacaoPanel
-            registro={familiaPanel.registro}
-            todosRegistros={registros}
-            onClose={() => setFamiliaPanel({ open: false, registro: null })}
-          />
+          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setFamiliaPanel({ open: false, registro: null })} />
+          <FamiliaPublicacaoPanel registro={familiaPanel.registro} todosRegistros={todosRegistros} onClose={() => setFamiliaPanel({ open: false, registro: null })} />
         </>
       )}
+    </div>
+  );
+}
+
+function InfoPill({ icon: Icon, label, tone = 'default' }) {
+  const toneClasses = {
+    default: 'border-slate-200 bg-white text-slate-600',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700',
+    danger: 'border-red-200 bg-red-50 text-red-700',
+  };
+  return <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm ${toneClasses[tone] || toneClasses.default}`}><Icon className="h-3.5 w-3.5" /><span>{label}</span></div>;
+}
+
+function MetricCard({ icon: Icon, label, value, helper, tone = 'slate' }) {
+  const toneClasses = {
+    slate: { icon: 'bg-[#1e3a5f]/10 text-[#1e3a5f]', value: 'text-[#1e3a5f]', ring: 'border-slate-200 bg-white' },
+    amber: { icon: 'bg-amber-100 text-amber-700', value: 'text-amber-700', ring: 'border-amber-200 bg-white' },
+    blue: { icon: 'bg-blue-100 text-blue-700', value: 'text-blue-700', ring: 'border-blue-200 bg-white' },
+    emerald: { icon: 'bg-emerald-100 text-emerald-700', value: 'text-emerald-700', ring: 'border-emerald-200 bg-white' },
+    red: { icon: 'bg-red-100 text-red-700', value: 'text-red-700', ring: 'border-red-200 bg-white' },
+  };
+  const classes = toneClasses[tone] || toneClasses.slate;
+  return (
+    <div className={`rounded-2xl border p-4 ${classes.ring}`}>
+      <div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500">{label}</span><div className={`rounded-lg p-2 ${classes.icon}`}><Icon className="h-4 w-4" /></div></div>
+      <p className={`mt-3 text-2xl font-bold ${classes.value}`}>{value}</p>
+      <p className="mt-1 text-xs text-slate-500">{helper}</p>
     </div>
   );
 }

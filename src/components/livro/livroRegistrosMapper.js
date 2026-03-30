@@ -171,8 +171,26 @@ function mapVinculos({ registro, ferias, periodo, cadeiaInfo }) {
 function mapMilitar(registro, militar) {
   return {
     id: registro?.militar_id || militar?.id || null,
-    nome_guerra: registro?.militar_nome || militar?.nome_guerra || militar?.militar_nome_guerra || null,
+    nome_completo:
+      registro?.militar_nome_completo ||
+      militar?.nome_completo ||
+      militar?.nome ||
+      registro?.militar_nome ||
+      null,
+    nome:
+      militar?.nome ||
+      militar?.nome_completo ||
+      registro?.militar_nome_completo ||
+      registro?.militar_nome ||
+      null,
+    nome_guerra:
+      registro?.militar_nome_guerra ||
+      militar?.nome_guerra ||
+      militar?.militar_nome_guerra ||
+      registro?.nome_guerra ||
+      null,
     posto_graduacao: registro?.militar_posto || militar?.posto_graduacao || militar?.militar_posto || null,
+    quadro: registro?.militar_quadro || militar?.quadro || null,
     matricula: registro?.militar_matricula || militar?.matricula || militar?.militar_matricula || null,
   };
 }

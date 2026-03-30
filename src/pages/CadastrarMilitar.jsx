@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, History, GitBranch } from 'lucide-react';
+import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, GitBranch } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 
 import FormSection from '@/components/militar/FormSection';
@@ -13,11 +13,11 @@ import PhotoUpload from '@/components/militar/PhotoUpload';
 import TagInput from '@/components/militar/TagInput';
 import LotacaoSelector from '@/components/militar/LotacaoSelector';
 import FuncaoSelector from '@/components/militar/FuncaoSelector';
-import HistoricoComportamentoModal from '@/components/militar/HistoricoComportamentoModal';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
 
 const initialFormData = {
   nome_completo: '',
@@ -111,7 +111,6 @@ export default function CadastrarMilitar() {
   const [formData, setFormData] = useState(initialFormData);
 
   const [loading, setLoading] = useState(false);
-  const [historicoOpen, setHistoricoOpen] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
 
   const { data: subgrupamentosAll = [] } = useQuery({
@@ -174,20 +173,32 @@ export default function CadastrarMilitar() {
       militarId = criado.id;
     }
 
-    // Registrar alteração manual de comportamento
-    const comportamentoMudou = editId
-      ? formData.comportamento !== comportamentoOriginal
-      : formData.comportamento; // novo cadastro com comportamento definido
-
-    if (comportamentoMudou && militarId) {
-      await base44.entities.HistoricoComportamento.create({
-        militar_id: militarId,
-        militar_nome: formData.nome_completo,
-        comportamento_anterior: comportamentoOriginal || null,
-        comportamento_novo: formData.comportamento,
-        motivo: 'Manual',
-        data_alteracao: new Date().toISOString().split('T')[0],
-        observacoes: editId ? (motivoComportamento || 'Alteração manual no cadastro') : 'Definição inicial no cadastro'
+    if (!editId && militarId) {
+      await garantirImplantacaoHistoricoComportamento({
+        militarId,
+        comportamentoAtual: formData.comportamento || 'Bom',
+        origemTipo: 'Militar',
+        origemId: militarId,
+        createdBy: user?.email || '',
+      });
+    } else if (editId && formData.comportamento !== comportamentoOriginal && militarId) {
+      await garantirImplantacaoHistoricoComportamento({
+        militarId,
+        comportamentoAtual: comportamentoOriginal || 'Bom',
+        origemTipo: 'Militar',
+        origemId: militarId,
+        createdBy: user?.email || '',
+      });
+      await registrarMarcoHistoricoComportamento({
+        militarId,
+        dataVigencia: new Date().toISOString().slice(0, 10),
+        comportamentoAnterior: comportamentoOriginal || 'Bom',
+        comportamento: formData.comportamento || 'Bom',
+        motivoMudanca: motivoComportamento || 'Revisão manual de comportamento no cadastro do militar.',
+        origemTipo: 'Militar',
+        origemId: militarId,
+        observacoes: motivoComportamento || '',
+        createdBy: user?.email || '',
       });
     }
     
@@ -442,18 +453,6 @@ export default function CadastrarMilitar() {
                       options={['Excepcional', 'Ótimo', 'Bom', 'Insuficiente', 'MAU']}
                     />
                   </div>
-                  {editId && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setHistoricoOpen(true)}
-                      className="flex-shrink-0 self-end h-10 w-10"
-                      title="Ver histórico de comportamento"
-                    >
-                      <History className="w-4 h-4" />
-                    </Button>
-                  )}
                 </div>
               )}
               {!isOficial(formData.posto_graduacao) && formData.comportamento !== comportamentoOriginal && comportamentoOriginal !== null && (
@@ -803,13 +802,6 @@ export default function CadastrarMilitar() {
               />
             </div>
           </FormSection>
-
-          {/* Histórico de Comportamento */}
-          <HistoricoComportamentoModal
-            militarId={editId}
-            open={historicoOpen}
-            onClose={() => setHistoricoOpen(false)}
-          />
 
           {/* Submit Button Mobile */}
           <div className="md:hidden">

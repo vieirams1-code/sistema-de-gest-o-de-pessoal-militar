@@ -49,6 +49,7 @@
  */
 import AgendaAcoesOperacionais from './pages/AgendaAcoesOperacionais';
 import AgendarJISO from './pages/AgendarJISO';
+import AvaliacaoComportamento from './pages/AvaliacaoComportamento';
 import Armamentos from './pages/Armamentos';
 import Atestados from './pages/Atestados';
 import CadastrarArmamento from './pages/CadastrarArmamento';
@@ -62,6 +63,7 @@ import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import Configuracoes from './pages/Configuracoes';
 import DashboardAtestados from './pages/DashboardAtestados';
+import DetalheComportamento from './pages/DetalheComportamento';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
 import FichaMilitar from './pages/FichaMilitar';
@@ -76,6 +78,7 @@ import Punicoes from './pages/Punicoes';
 import QuadroOperacional from './pages/QuadroOperacional';
 import SolicitacoesAtualizacao from './pages/SolicitacoesAtualizacao';
 import TemplatesTexto from './pages/TemplatesTexto';
+import TarefasOperacionais from './pages/TarefasOperacionais';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
@@ -84,12 +87,16 @@ import LotacaoMilitares from './pages/LotacaoMilitares';
 import Livro from './pages/Livro';
 import PerfisPermissao from './pages/PerfisPermissao';
 import PermissoesUsuarios from './pages/PermissoesUsuarios';
+import RP from './pages/RP';
+import CadastrarRegistroRP from './pages/CadastrarRegistroRP';
+import CadastrarTarefaOperacional from './pages/CadastrarTarefaOperacional';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AgendaAcoesOperacionais": AgendaAcoesOperacionais,
     "AgendarJISO": AgendarJISO,
+    "AvaliacaoComportamento": AvaliacaoComportamento,
     "Armamentos": Armamentos,
     "Atestados": Atestados,
     "CadastrarArmamento": CadastrarArmamento,
@@ -103,6 +110,7 @@ export const PAGES = {
     "ConciliacaoBoletim": ConciliacaoBoletim,
     "Configuracoes": Configuracoes,
     "DashboardAtestados": DashboardAtestados,
+    "DetalheComportamento": DetalheComportamento,
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
     "FichaMilitar": FichaMilitar,
@@ -117,6 +125,7 @@ export const PAGES = {
     "QuadroOperacional": QuadroOperacional,
     "SolicitacoesAtualizacao": SolicitacoesAtualizacao,
     "TemplatesTexto": TemplatesTexto,
+    "TarefasOperacionais": TarefasOperacionais,
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
@@ -125,6 +134,9 @@ export const PAGES = {
     "Livro": Livro,
     "PerfisPermissao": PerfisPermissao,
     "PermissoesUsuarios": PermissoesUsuarios,
+    "RP": RP,
+    "CadastrarRegistroRP": CadastrarRegistroRP,
+    "CadastrarTarefaOperacional": CadastrarTarefaOperacional,
 }
 
 export const pagesConfig = {

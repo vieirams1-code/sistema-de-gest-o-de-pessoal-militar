@@ -12,9 +12,8 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 
-const { Pages, Layout, mainPage } = pagesConfig;
-const mainPageKey = mainPage ?? Object.keys(Pages)[0];
-const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
+const { Pages, Layout } = pagesConfig;
+const homeRoute = '/VerMilitar';
 
 const adminOnlyPages = new Set([
   // Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação
@@ -35,6 +34,8 @@ const moduleGuardByPage = {
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   CadastrarPublicacao: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
+  TarefasOperacionais: { moduleKey: 'tarefas_operacionais', moduleName: 'Tarefas Operacionais' },
+  CadastrarTarefaOperacional: { moduleKey: 'tarefas_operacionais', moduleName: 'Tarefas Operacionais' },
   LotacaoMilitares: { moduleKey: 'militares', moduleName: 'Efetivo' },
   EstruturaOrganizacional: { moduleKey: 'militares', moduleName: 'Efetivo' },
   CadastrarArmamento: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
@@ -44,6 +45,10 @@ const moduleGuardByPage = {
   PeriodosAquisitivos: { moduleKey: 'ferias', moduleName: 'Férias' },
   CadastrarRegistroLivro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   Livro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
+  RP: { moduleKey: 'livro', moduleName: 'Registro de Publicações' },
+  CadastrarRegistroRP: { moduleKey: 'livro', moduleName: 'Registro de Publicações' },
+  AvaliacaoComportamento: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  DetalheComportamento: { moduleKey: 'militares', moduleName: 'Efetivo' },
   CadastrarMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   CadastrarPunicao: { moduleKey: 'militares', moduleName: 'Efetivo' },
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
@@ -89,9 +94,7 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route path="/" element={
-        <LayoutWrapper currentPageName={mainPageKey}>
-          <MainPage />
-        </LayoutWrapper>
+        <Navigate to={homeRoute} replace />
       } />
       {Object.entries(Pages).map(([path, Page]) => {
         let pageContent = <Page />;

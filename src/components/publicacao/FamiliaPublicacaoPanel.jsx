@@ -76,17 +76,6 @@ function formatDate(d) {
   }
 }
 
-function detectarOrigem(registro) {
-  if (!registro) return null;
-  if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
-    return 'ex-officio';
-  }
-  if (registro.medico || registro.cid_10) {
-    return 'atestado';
-  }
-  return 'livro';
-}
-
 // Gerar código funcional legível ex: PUB-XXXX
 function gerarCodigo(id) {
   if (!id) return '—';
@@ -103,14 +92,14 @@ function gerarCodigoTSE(baseId, idx) {
 }
 
 function getEditUrl(registro) {
-  if (!registro) return '#';
+  if (!registro) return null;
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) {
     return `${createPageUrl('CadastrarPublicacao')}?id=${registro.id}`;
   }
   if (registro.medico || registro.cid_10) {
     return `${createPageUrl('CadastrarAtestado')}?id=${registro.id}`;
   }
-  return `${createPageUrl('CadastrarRegistroLivro')}?id=${registro.id}`;
+  return null;
 }
 
 // Card de um item da família
@@ -259,7 +248,6 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
   const raizTipoLabel = getTipoLabel(raiz);
   const raizGrupoLabel = getGrupoDisplay(raiz);
   const raizCodigo = gerarCodigo(raiz.id);
-  const raizOrigem = detectarOrigem(raiz);
 
   // Item selecionado para detalhes
   const itemSelecionado = todosRegistros.find(r => r.id === selectedId) || raiz;
@@ -394,20 +382,16 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
               status={raizStatus}
               isSelected={selectedId === raiz.id}
               onClick={() => setSelectedId(raiz.id)}
-              onNavigate={raizOrigem !== 'livro'
-                ? () => {
-                  navigate(getEditUrl(raiz));
-                  onClose();
-                }
-                : undefined}
+              onNavigate={getEditUrl(raiz) ? () => {
+                navigate(getEditUrl(raiz));
+                onClose();
+              } : null}
               variant="original"
             />
 
             {/* Apostilas + TSE de cada Apostila */}
-            {tsesPorApostila.map(({ apostila: ap, tse: tseAp }, idx) => {
-              const apOrigem = detectarOrigem(ap);
-              const tseApOrigem = detectarOrigem(tseAp);
-              return (<React.Fragment key={ap.id}>
+            {tsesPorApostila.map(({ apostila: ap, tse: tseAp }, idx) => (
+              <React.Fragment key={ap.id}>
                 <FamiliaItem
                   label="APOSTILA"
                   codigo={gerarCodigoApostila(raiz.id, idx + 1)}
@@ -416,11 +400,10 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                   status={calcStatus(ap)}
                   isSelected={selectedId === ap.id}
                   onClick={() => setSelectedId(ap.id)}
-                  onNavigate={apOrigem !== 'livro'
-                    ? () => {
-                      navigate(getEditUrl(ap));
-                      onClose();
-                    } : undefined}
+                  onNavigate={getEditUrl(ap) ? () => {
+                    navigate(getEditUrl(ap));
+                    onClose();
+                  } : null}
                   indent
                   variant="apostila"
                 />
@@ -434,22 +417,19 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                     status={calcStatus(tseAp)}
                     isSelected={selectedId === tseAp.id}
                     onClick={() => setSelectedId(tseAp.id)}
-                    onNavigate={tseApOrigem !== 'livro'
-                      ? () => {
-                        navigate(getEditUrl(tseAp));
-                        onClose();
-                      } : undefined}
+                    onNavigate={getEditUrl(tseAp) ? () => {
+                      navigate(getEditUrl(tseAp));
+                      onClose();
+                    } : null}
                     indent
                     variant="tse"
                   />
                 )}
-              </React.Fragment>);
-            })}
+              </React.Fragment>
+            ))}
 
             {/* TSE direto da raiz */}
-            {tseRaiz && (() => {
-              const tseRaizOrigem = detectarOrigem(tseRaiz);
-              return (
+            {tseRaiz && (
               <FamiliaItem
                 label="TORNAR S/ EFEITO"
                 codigo={gerarCodigoTSE(raiz.id, 1)}
@@ -458,16 +438,14 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                 status={calcStatus(tseRaiz)}
                 isSelected={selectedId === tseRaiz.id}
                 onClick={() => setSelectedId(tseRaiz.id)}
-                onNavigate={tseRaizOrigem !== 'livro'
-                  ? () => {
-                    navigate(getEditUrl(tseRaiz));
-                    onClose();
-                  } : undefined}
+                onNavigate={getEditUrl(tseRaiz) ? () => {
+                  navigate(getEditUrl(tseRaiz));
+                  onClose();
+                } : null}
                 indent
                 variant="tse"
               />
-            );
-            })()}
+            )}
 
             {!temFamilia && (
               <p className="text-sm text-slate-400 text-center py-3 italic">
