@@ -311,8 +311,6 @@ export default function CadastrarTarefaOperacional() {
         status_individual: 'Pendente',
         resposta_texto: '',
         anexo_url: '',
-        data_resposta: '',
-        concluido_em: '',
         problema_reportado: false,
         detalhe_problema: '',
       }));
