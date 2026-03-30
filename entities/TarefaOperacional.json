@@ -2,7 +2,7 @@
   "name": "TarefaOperacional",
   "type": "object",
   "title": "Tarefa Operacional",
-  "description": "Tarefa operacional com distribuição para militares e acompanhamento pelo gestor.",
+  "description": "Tarefa operacional com distribuição por escopo organizacional e acompanhamento do cumprimento.",
   "properties": {
     "titulo": { "type": "string", "default": "" },
     "descricao": { "type": "string", "default": "" },
@@ -14,8 +14,11 @@
     "permite_mensagem": { "type": "boolean", "default": true },
     "criado_por": { "type": "string", "default": "" },
     "setor_origem": { "type": "string", "default": "" },
+    "subsetor_origem": { "type": "string", "default": "" },
+    "unidade_origem": { "type": "string", "default": "" },
     "publico_resumo": { "type": "string", "default": "" },
     "data_criacao": { "type": "datetime", "default": "" },
+    "forma_destinacao": { "type": "string", "default": "Militar" },
     "total_destinatarios": { "type": "integer", "default": 0 }
   }
 }

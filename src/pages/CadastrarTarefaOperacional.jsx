@@ -28,6 +28,23 @@ const initialState = {
   permite_mensagem: true,
   setor_origem: '',
   publico_resumo: '',
+  forma_destinacao: 'Militar',
+};
+
+const DESTINACAO_OPTIONS = ['Militar', 'Setor', 'Subsetor', 'Unidade'];
+
+const normalizeTipo = (item = {}) => {
+  const tipo = String(item.tipo || '').trim();
+  if (tipo === 'Setor' || tipo === 'Grupamento') return 'Setor';
+  if (tipo === 'Subsetor' || tipo === 'Subgrupamento') return 'Subsetor';
+  if (tipo === 'Unidade') return 'Unidade';
+
+  const nivel = Number(item.nivel_hierarquico);
+  if (nivel === 1) return 'Setor';
+  if (nivel === 2) return 'Subsetor';
+  if (nivel === 3) return 'Unidade';
+
+  return item.grupamento_id ? 'Subsetor' : 'Setor';
 };
 
 function containsTerm(value, term) {
@@ -36,81 +53,251 @@ function containsTerm(value, term) {
   return String(value).toLowerCase().includes(term);
 }
 
+function uniqById(items = []) {
+  const ids = new Set();
+  return items.filter((item) => {
+    if (!item?.id || ids.has(item.id)) return false;
+    ids.add(item.id);
+    return true;
+  });
+}
+
 export default function CadastrarTarefaOperacional() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const {
+    user,
+    canAccessModule,
+    canAccessAction,
+    isLoading: loadingUser,
+    isAccessResolved,
+    isAdmin,
+    modoAcesso,
+    subgrupamentoId,
+    userEmail,
+    linkedMilitarId,
+    linkedMilitarEmail,
+  } = useCurrentUser();
 
   const [formData, setFormData] = useState(initialState);
   const [searchMilitarTerm, setSearchMilitarTerm] = useState('');
   const [selectedMilitarIds, setSelectedMilitarIds] = useState([]);
+  const [selectedScopeId, setSelectedScopeId] = useState('');
 
   const hasModuleAccess = canAccessModule('tarefas_operacionais');
   const canCreateTask = canAccessAction('criar_tarefa_operacional') || canAccessAction('admin_mode');
 
-  const { data: militares = [], isLoading: loadingMilitares } = useQuery({
-    queryKey: ['militares-destinatarios-tarefa-operacional'],
-    queryFn: () => base44.entities.Militar.list('nome_completo'),
+  const { data: estruturaRaw = [], isLoading: loadingEstrutura } = useQuery({
+    queryKey: ['estrutura-organizacional-tarefas-operacionais'],
+    queryFn: () => base44.entities.Subgrupamento.list('-created_date'),
     enabled: isAccessResolved && hasModuleAccess && canCreateTask,
   });
 
+  const { data: militaresRaw = [], isLoading: loadingMilitares } = useQuery({
+    queryKey: ['militares-tarefas-operacionais'],
+    queryFn: () => base44.entities.Militar.list('-nome_completo'),
+    enabled: isAccessResolved && hasModuleAccess && canCreateTask,
+  });
+
+  const estrutura = useMemo(() => estruturaRaw.map((item) => ({ ...item, tipoNormalizado: normalizeTipo(item) })), [estruturaRaw]);
+
+  const allowedOrgIds = useMemo(() => {
+    if (isAdmin) {
+      return {
+        setores: new Set(estrutura.filter((item) => item.tipoNormalizado === 'Setor').map((item) => item.id)),
+        subsetores: new Set(estrutura.filter((item) => item.tipoNormalizado === 'Subsetor').map((item) => item.id)),
+        unidades: new Set(estrutura.filter((item) => item.tipoNormalizado === 'Unidade').map((item) => item.id)),
+      };
+    }
+
+    if (!subgrupamentoId) return { setores: new Set(), subsetores: new Set(), unidades: new Set() };
+
+    if (modoAcesso === 'setor') {
+      const subsetores = estrutura.filter((item) => item.tipoNormalizado === 'Subsetor' && item.grupamento_id === subgrupamentoId);
+      const subsetorIds = new Set(subsetores.map((item) => item.id));
+      const unidades = estrutura.filter((item) => item.tipoNormalizado === 'Unidade' && subsetorIds.has(item.grupamento_id));
+      return {
+        setores: new Set([subgrupamentoId]),
+        subsetores: subsetorIds,
+        unidades: new Set(unidades.map((item) => item.id)),
+      };
+    }
+
+    if (modoAcesso === 'subsetor') {
+      const unidades = estrutura.filter((item) => item.tipoNormalizado === 'Unidade' && item.grupamento_id === subgrupamentoId);
+      return {
+        setores: new Set(),
+        subsetores: new Set([subgrupamentoId]),
+        unidades: new Set(unidades.map((item) => item.id)),
+      };
+    }
+
+    if (modoAcesso === 'unidade') {
+      return {
+        setores: new Set(),
+        subsetores: new Set(),
+        unidades: new Set([subgrupamentoId]),
+      };
+    }
+
+    return { setores: new Set(), subsetores: new Set(), unidades: new Set() };
+  }, [isAdmin, modoAcesso, estrutura, subgrupamentoId]);
+
+  const militaresNoEscopo = useMemo(() => {
+    const ativos = militaresRaw.filter((militar) => militar.status_cadastro !== 'Inativo');
+
+    if (isAdmin) return ativos;
+
+    if (modoAcesso === 'proprio') {
+      const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
+      return ativos.filter((militar) => {
+        if (linkedMilitarId && militar.id === linkedMilitarId) return true;
+        return knownEmails.some((email) => (
+          militar.email === email
+          || militar.email_particular === email
+          || militar.email_funcional === email
+          || militar.created_by === email
+          || militar.militar_email === email
+        ));
+      });
+    }
+
+    return ativos.filter((militar) => {
+      const isBySetor = militar.grupamento_id && allowedOrgIds.setores.has(militar.grupamento_id);
+      const isBySubsetorOuUnidade = militar.subgrupamento_id
+        && (allowedOrgIds.subsetores.has(militar.subgrupamento_id) || allowedOrgIds.unidades.has(militar.subgrupamento_id));
+      return isBySetor || isBySubsetorOuUnidade;
+    });
+  }, [allowedOrgIds, isAdmin, linkedMilitarEmail, linkedMilitarId, militaresRaw, modoAcesso, userEmail]);
+
+  const setoresDisponiveis = useMemo(
+    () => estrutura.filter((item) => item.tipoNormalizado === 'Setor' && allowedOrgIds.setores.has(item.id)),
+    [estrutura, allowedOrgIds.setores],
+  );
+
+  const subsetoresDisponiveis = useMemo(
+    () => estrutura.filter((item) => item.tipoNormalizado === 'Subsetor' && allowedOrgIds.subsetores.has(item.id)),
+    [estrutura, allowedOrgIds.subsetores],
+  );
+
+  const unidadesDisponiveis = useMemo(
+    () => estrutura.filter((item) => item.tipoNormalizado === 'Unidade' && allowedOrgIds.unidades.has(item.id)),
+    [estrutura, allowedOrgIds.unidades],
+  );
+
   const militaresFiltrados = useMemo(() => {
     const term = searchMilitarTerm.trim().toLowerCase();
-    return militares.filter((militar) => (
-      containsTerm(militar.nome_completo, term) ||
-      containsTerm(militar.nome_guerra, term) ||
-      containsTerm(militar.matricula, term) ||
-      containsTerm(militar.funcao, term)
+    return militaresNoEscopo.filter((militar) => (
+      containsTerm(militar.nome_completo, term)
+      || containsTerm(militar.nome_guerra, term)
+      || containsTerm(militar.matricula, term)
+      || containsTerm(militar.funcao, term)
     ));
-  }, [militares, searchMilitarTerm]);
+  }, [militaresNoEscopo, searchMilitarTerm]);
+
+  const militaresElegiveis = useMemo(() => {
+    if (formData.forma_destinacao === 'Militar') {
+      return uniqById(selectedMilitarIds.map((id) => militaresNoEscopo.find((militar) => militar.id === id)).filter(Boolean));
+    }
+
+    if (!selectedScopeId) return [];
+
+    if (formData.forma_destinacao === 'Unidade') {
+      return uniqById(militaresNoEscopo.filter((militar) => militar.subgrupamento_id === selectedScopeId));
+    }
+
+    if (formData.forma_destinacao === 'Subsetor') {
+      const unidadeIds = new Set(
+        estrutura
+          .filter((item) => item.tipoNormalizado === 'Unidade' && item.grupamento_id === selectedScopeId)
+          .map((item) => item.id),
+      );
+
+      return uniqById(militaresNoEscopo.filter((militar) => (
+        militar.subgrupamento_id === selectedScopeId
+        || unidadeIds.has(militar.subgrupamento_id)
+      )));
+    }
+
+    if (formData.forma_destinacao === 'Setor') {
+      const subsetorIds = new Set(
+        estrutura
+          .filter((item) => item.tipoNormalizado === 'Subsetor' && item.grupamento_id === selectedScopeId)
+          .map((item) => item.id),
+      );
+      const unidadeIds = new Set(
+        estrutura
+          .filter((item) => item.tipoNormalizado === 'Unidade' && subsetorIds.has(item.grupamento_id))
+          .map((item) => item.id),
+      );
+
+      return uniqById(militaresNoEscopo.filter((militar) => (
+        militar.grupamento_id === selectedScopeId
+        || subsetorIds.has(militar.subgrupamento_id)
+        || unidadeIds.has(militar.subgrupamento_id)
+      )));
+    }
+
+    return [];
+  }, [formData.forma_destinacao, militaresNoEscopo, selectedMilitarIds, selectedScopeId, estrutura]);
+
+  const semEscopo = !isAdmin && modoAcesso !== 'proprio' && !subgrupamentoId;
+  const destinoAmploBloqueado = modoAcesso === 'proprio' && formData.forma_destinacao !== 'Militar';
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const titulo = formData.titulo.trim();
       if (!titulo) throw new Error('Informe o título da tarefa.');
-      if (selectedMilitarIds.length === 0) throw new Error('Selecione ao menos um destinatário.');
+      if (semEscopo) throw new Error('Seu usuário não possui escopo organizacional válido para criar tarefas.');
+      if (destinoAmploBloqueado) throw new Error('No modo próprio é permitido somente destinar tarefa para militar específico.');
+      if (militaresElegiveis.length === 0) throw new Error('Nenhum destinatário elegível encontrado para a forma de destinação selecionada.');
+
+      if (!TarefaOperacional) throw new Error('Entidade TarefaOperacional não encontrada no schema do app.');
+      if (!TarefaOperacionalDestinatario) throw new Error('Entidade TarefaOperacionalDestinatario não encontrada no schema do app.');
 
       const nowIso = new Date().toISOString();
+      const subsetorOrigem = modoAcesso === 'subsetor' ? subgrupamentoId : '';
+      const unidadeOrigem = modoAcesso === 'unidade' ? subgrupamentoId : '';
+      const setorOrigem = modoAcesso === 'setor' ? subgrupamentoId : '';
+
       const payload = {
         ...formData,
         titulo,
         descricao: formData.descricao.trim(),
-        setor_origem: formData.setor_origem.trim(),
+        setor_origem: formData.setor_origem.trim() || setorOrigem,
+        subsetor_origem: subsetorOrigem,
+        unidade_origem: unidadeOrigem,
         publico_resumo: formData.publico_resumo.trim(),
         criado_por: user?.email || 'sistema',
         data_criacao: nowIso,
-        total_destinatarios: selectedMilitarIds.length,
+        total_destinatarios: militaresElegiveis.length,
       };
-
-      if (!TarefaOperacional) throw new Error('Entidade TarefaOperacional não encontrada no schema do app.');
-      if (!TarefaOperacionalDestinatario) throw new Error('Entidade TarefaOperacionalDestinatario não encontrada no schema do app.');
-      if (!TarefaOperacionalHistorico) throw new Error('Entidade TarefaOperacionalHistorico não encontrada no schema do app.');
 
       const tarefaCriada = await TarefaOperacional.create(payload);
 
-      const destinatarioPayloads = selectedMilitarIds
-        .map((militarId) => militares.find((item) => item.id === militarId))
-        .filter(Boolean)
-        .map((militar) => ({
-          tarefa_id: tarefaCriada.id,
-          militar_id: militar.id,
-          militar_nome: militar.nome_completo || militar.nome_guerra || 'Militar',
-          militar_email: militar.email_funcional || militar.email_particular || '',
-          status_individual: 'Pendente',
-        }));
+      const destinatarioPayloads = uniqById(militaresElegiveis).map((militar) => ({
+        tarefa_id: tarefaCriada.id,
+        militar_id: militar.id,
+        militar_nome: militar.nome_completo || militar.nome_guerra || 'Militar',
+        militar_email: militar.email_funcional || militar.email_particular || militar.email || '',
+        status_individual: 'Pendente',
+      }));
 
       await Promise.all(destinatarioPayloads.map((item) => TarefaOperacionalDestinatario.create(item)));
 
-      await TarefaOperacionalHistorico.create({
-        tarefa_id: tarefaCriada.id,
-        evento: 'TAREFA_CRIADA',
-        descricao: `Tarefa criada e distribuída para ${destinatarioPayloads.length} destinatário(s).`,
-        usuario: user?.email || 'sistema',
-        timestamp: nowIso,
-      });
+      if (TarefaOperacionalHistorico) {
+        await TarefaOperacionalHistorico.create({
+          tarefa_id: tarefaCriada.id,
+          evento: 'TAREFA_CRIADA',
+          descricao: `Tarefa criada via ${formData.forma_destinacao} para ${destinatarioPayloads.length} destinatário(s).`,
+          usuario: user?.email || 'sistema',
+          timestamp: nowIso,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tarefas-operacionais'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-tarefas-operacionais'] });
       toast({
         title: 'Tarefa criada',
         description: 'A tarefa operacional foi criada e distribuída com sucesso.',
@@ -128,6 +315,12 @@ export default function CadastrarTarefaOperacional() {
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFormaDestinacao = (value) => {
+    setFormData((prev) => ({ ...prev, forma_destinacao: value }));
+    setSelectedScopeId('');
+    setSelectedMilitarIds([]);
   };
 
   const toggleMilitarSelection = (militarId, checked) => {
@@ -150,7 +343,7 @@ export default function CadastrarTarefaOperacional() {
         <header className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Cadastrar Tarefa Operacional</h1>
-            <p className="text-sm text-slate-500 mt-1">LOTE 1 - cadastro inicial com definição de tipo, prazo e destinatários.</p>
+            <p className="text-sm text-slate-500 mt-1">Cadastro com destinação por escopo (militar, setor, subsetor ou unidade).</p>
           </div>
 
           <Button variant="outline" onClick={() => navigate(createPageUrl('TarefasOperacionais'))}>
@@ -158,6 +351,14 @@ export default function CadastrarTarefaOperacional() {
             Voltar
           </Button>
         </header>
+
+        {semEscopo && (
+          <Card className="border-amber-300 bg-amber-50">
+            <CardContent className="p-4 text-sm text-amber-800">
+              Seu usuário não possui escopo organizacional definido para criar tarefas operacionais.
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -251,50 +452,107 @@ export default function CadastrarTarefaOperacional() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-4 h-4" />
-              Destinatários
+              Destinação e destinatários
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar militar por nome, nome de guerra, matrícula ou função"
-                value={searchMilitarTerm}
-                onChange={(e) => setSearchMilitarTerm(e.target.value)}
-              />
-            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Forma de destinação</Label>
+                <Select value={formData.forma_destinacao} onValueChange={handleFormaDestinacao}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DESTINACAO_OPTIONS.map((tipo) => (
+                      <SelectItem
+                        key={tipo}
+                        value={tipo}
+                        disabled={modoAcesso === 'proprio' && tipo !== 'Militar'}
+                      >
+                        {tipo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="rounded-lg border border-slate-200">
-              {loadingMilitares ? (
-                <p className="p-4 text-sm text-slate-500">Carregando efetivo...</p>
-              ) : militaresFiltrados.length === 0 ? (
-                <p className="p-4 text-sm text-slate-500">Nenhum militar encontrado com o filtro informado.</p>
-              ) : (
-                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
-                  {militaresFiltrados.map((militar) => (
-                    <label key={militar.id} className="flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-50">
-                      <Checkbox
-                        checked={selectedMilitarIds.includes(militar.id)}
-                        onCheckedChange={(value) => toggleMilitarSelection(militar.id, Boolean(value))}
-                      />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{militar.nome_completo || militar.nome_guerra || 'Militar sem nome'}</p>
-                        <p className="text-xs text-slate-500">
-                          {militar.nome_guerra ? `${militar.nome_guerra} • ` : ''}
-                          {militar.matricula ? `Mat: ${militar.matricula}` : 'Sem matrícula'}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
+              {formData.forma_destinacao !== 'Militar' && (
+                <div className="space-y-2">
+                  <Label>{formData.forma_destinacao} de destino</Label>
+                  <Select value={selectedScopeId} onValueChange={setSelectedScopeId}>
+                    <SelectTrigger><SelectValue placeholder={`Selecione ${formData.forma_destinacao.toLowerCase()}...`} /></SelectTrigger>
+                    <SelectContent>
+                      {(formData.forma_destinacao === 'Setor' ? setoresDisponiveis :
+                        formData.forma_destinacao === 'Subsetor' ? subsetoresDisponiveis :
+                          unidadesDisponiveis).map((item) => (
+                            <SelectItem key={item.id} value={item.id}>{item.nome}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-2 flex-wrap pt-2">
-              <p className="text-sm text-slate-600">Selecionados: <span className="font-semibold text-slate-800">{selectedMilitarIds.length}</span></p>
+            {formData.forma_destinacao === 'Militar' && (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Buscar militar por nome, nome de guerra, matrícula ou função"
+                    value={searchMilitarTerm}
+                    onChange={(e) => setSearchMilitarTerm(e.target.value)}
+                  />
+                </div>
 
-              <Button className="bg-[#173764] hover:bg-[#10294c]" onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
+                <div className="rounded-lg border border-slate-200">
+                  {loadingMilitares || loadingEstrutura ? (
+                    <p className="p-4 text-sm text-slate-500">Carregando efetivo...</p>
+                  ) : militaresFiltrados.length === 0 ? (
+                    <p className="p-4 text-sm text-slate-500">Nenhum militar elegível encontrado para o seu escopo.</p>
+                  ) : (
+                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                      {militaresFiltrados.map((militar) => (
+                        <label key={militar.id} className="flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-50">
+                          <Checkbox
+                            checked={selectedMilitarIds.includes(militar.id)}
+                            onCheckedChange={(value) => toggleMilitarSelection(militar.id, Boolean(value))}
+                          />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">{militar.nome_completo || militar.nome_guerra || 'Militar sem nome'}</p>
+                            <p className="text-xs text-slate-500">
+                              {militar.nome_guerra ? `${militar.nome_guerra} • ` : ''}
+                              {militar.matricula ? `Mat: ${militar.matricula}` : 'Sem matrícula'}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {destinoAmploBloqueado && (
+              <p className="text-sm text-amber-700 rounded-lg bg-amber-50 border border-amber-200 p-3">
+                No modo próprio você só pode criar tarefa para militar específico dentro do seu vínculo.
+              </p>
+            )}
+
+            <div className="flex items-center justify-between gap-2 flex-wrap pt-2">
+              <p className="text-sm text-slate-600">
+                Destinatários elegíveis: <span className="font-semibold text-slate-800">{militaresElegiveis.length}</span>
+              </p>
+
+              <Button
+                className="bg-[#173764] hover:bg-[#10294c]"
+                onClick={() => createMutation.mutate()}
+                disabled={
+                  createMutation.isPending
+                  || militaresElegiveis.length === 0
+                  || semEscopo
+                  || destinoAmploBloqueado
+                }
+              >
                 <Save className="w-4 h-4 mr-2" />
                 {createMutation.isPending ? 'Salvando...' : 'Criar tarefa'}
               </Button>
