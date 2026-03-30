@@ -2,6 +2,7 @@ import { base44 } from '@/api/base44Client';
 import { calcularComportamento } from '@/utils/calcularComportamento';
 
 const TIPOS_COM_DIAS_OBRIGATORIO = new Set(['Detenção', 'Prisão', 'Prisão em Separado']);
+const HISTORICO_COMPORTAMENTO_FETCH_LIMIT = 500;
 
 function getEntitySafe(nome) {
   const entity = base44.entities?.[nome];
@@ -77,7 +78,11 @@ export async function garantirImplantacaoHistoricoComportamento({
   const historicoEntity = getEntitySafe('HistoricoComportamento');
   if (!hasEntityMethod(historicoEntity, 'filter') || !hasEntityMethod(historicoEntity, 'create')) return null;
 
-  const existentes = await historicoEntity.filter({ militar_id: militarIdNormalizado }, 'data_vigencia');
+  const existentes = await historicoEntity.filter(
+    { militar_id: militarIdNormalizado },
+    '-data_vigencia',
+    HISTORICO_COMPORTAMENTO_FETCH_LIMIT,
+  );
   const historicoExistenteSanitizado = sanitizarHistoricoComportamento(existentes, { ordem: 'asc' });
 
   if (historicoExistenteSanitizado.length > 0) {
@@ -176,7 +181,11 @@ export async function registrarMarcoHistoricoComportamento({
   const historicoEntity = getEntitySafe('HistoricoComportamento');
   if (!hasEntityMethod(historicoEntity, 'create') || !hasEntityMethod(historicoEntity, 'filter')) return null;
 
-  const registrosExistentes = await historicoEntity.filter({ militar_id: militarId }, 'data_vigencia');
+  const registrosExistentes = await historicoEntity.filter(
+    { militar_id: militarId },
+    '-data_vigencia',
+    HISTORICO_COMPORTAMENTO_FETCH_LIMIT,
+  );
   const historicoSanitizado = sanitizarHistoricoComportamento(registrosExistentes, { ordem: 'desc' });
   const ultimoMarco = historicoSanitizado[0];
 
