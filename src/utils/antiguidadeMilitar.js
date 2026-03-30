@@ -17,12 +17,16 @@ const POSTO_GRADUACAO_PRIORIDADE = {
 
 // Ordem padrão pode ser sobrescrita por configuração de cada corporação.
 const QUADRO_PRIORIDADE_PADRAO = {
-  QOEM: 1,
-  QOBM: 2,
-  QOCBM: 3,
-  QOABM: 4,
-  QPEBM: 5,
-  QPBM: 6,
+  // Oficiais
+  QOBM: 1,
+  QAOBM: 2,
+  QOEBM: 3,
+  QOSAU: 4,
+  // Praças
+  'QBMP-1.a': 5,
+  'QBMP-1.b': 6,
+  'QBMP-2': 7,
+  QBMPT: 8,
 };
 
 function toPriority(value, prioridades, fallback = Number.MAX_SAFE_INTEGER) {
