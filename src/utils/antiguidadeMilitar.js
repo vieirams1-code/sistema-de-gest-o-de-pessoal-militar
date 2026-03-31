@@ -51,12 +51,29 @@ function toInheritedAntiguidadeValue(militar = {}) {
     militar.antiguidade_anterior,
   ];
 
-  for (const valor of candidatos) {
+  for (let i = 0; i < candidatos.length; i += 1) {
+    const valor = candidatos[i];
     const numero = Number(valor);
-    if (Number.isFinite(numero)) return numero;
+    if (!Number.isInteger(numero) || numero <= 0) continue;
+    return numero;
   }
 
   return Number.MAX_SAFE_INTEGER;
+}
+
+export function getMissingAntiguidadeFields(militar = {}) {
+  const missing = [];
+  if (!militar.posto_graduacao) missing.push('posto_graduacao');
+  if (!militar.quadro) missing.push('quadro');
+  if (!militar.data_promocao_atual) missing.push('data_promocao_atual');
+  if (toInheritedAntiguidadeValue(militar) === Number.MAX_SAFE_INTEGER) {
+    missing.push('antiguidade_referencia_ordem');
+  }
+  return missing;
+}
+
+export function hasConfiavelAntiguidadeData(militar = {}) {
+  return getMissingAntiguidadeFields(militar).length === 0;
 }
 
 /**
@@ -65,6 +82,7 @@ function toInheritedAntiguidadeValue(militar = {}) {
  * 2) Quadro
  * 3) Data de promoção atual
  * 4) Antiguidade herdada do posto/graduação anterior
+ * 5) Desempate final estável por ID (fallback para nome quando ID ausente)
  */
 export function compareAntiguidadeMilitar(a = {}, b = {}, options = {}) {
   const quadroPrioridade = options.quadroPrioridade || QUADRO_PRIORIDADE_PADRAO;
@@ -84,6 +102,13 @@ export function compareAntiguidadeMilitar(a = {}, b = {}, options = {}) {
   const herdadaA = toInheritedAntiguidadeValue(a);
   const herdadaB = toInheritedAntiguidadeValue(b);
   if (herdadaA !== herdadaB) return herdadaA - herdadaB;
+
+  // Desempate explícito e determinístico para não depender de ordenação implícita do motor JS.
+  const idA = String(a.id || '');
+  const idB = String(b.id || '');
+  if (idA && idB && idA !== idB) {
+    return idA.localeCompare(idB, 'pt-BR');
+  }
 
   return (a.nome_completo || '').localeCompare(b.nome_completo || '', 'pt-BR');
 }

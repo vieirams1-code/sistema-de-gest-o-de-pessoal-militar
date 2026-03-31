@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from "@/components/ui/use-toast";
-import { ordenarMilitaresPorAntiguidade } from '@/utils/antiguidadeMilitar';
+import { getMissingAntiguidadeFields, ordenarMilitaresPorAntiguidade } from '@/utils/antiguidadeMilitar';
 
 const normalizeTipo = (tipo) => {
   if (tipo === 'Grupamento') return 'Setor';
@@ -37,15 +37,6 @@ export default function LotacaoMilitares() {
     queryKey: ['estruturaOrganizacional'],
     queryFn: () => base44.entities.Subgrupamento.list('nome'),
   });
-
-  if (loadingUser || !isAccessResolved) return null;
-  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
-
-  // Acesso à página: gerir_estrutura (ação correta para mover lotação) ou gerir_permissoes (acesso legado)
-  const canAccess = canAccessAction('gerir_estrutura') || canAccessAction('gerir_permissoes');
-  if (!canAccess) {
-    return <AccessDenied modulo="Lotação de Militares" />;
-  }
 
   const estrutura = useMemo(() => {
     return estruturaRaw.map(item => ({ ...item, tipoNormalizado: normalizeTipo(item.tipo) }));
@@ -156,6 +147,15 @@ export default function LotacaoMilitares() {
     }
     moveMutation.mutate({ militaresIds: selectedMilitares, targetNode: selectedNode });
   };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
+
+  // Acesso à página: gerir_estrutura (ação correta para mover lotação) ou gerir_permissoes (acesso legado)
+  const canAccess = canAccessAction('gerir_estrutura') || canAccessAction('gerir_permissoes');
+  if (!canAccess) {
+    return <AccessDenied modulo="Lotação de Militares" />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -288,6 +288,8 @@ export default function LotacaoMilitares() {
                     const isSelected = selectedMilitares.includes(m.id);
                     // Computa lotacao formatada
                     const lotacaoText = m.subgrupamento_nome ? `${m.subgrupamento_nome}${m.grupamento_nome && m.grupamento_nome !== m.subgrupamento_nome ? ` (${m.grupamento_nome})` : ''}` : m.grupamento_nome || 'Sem lotação';
+                    const missingAntiguidade = getMissingAntiguidadeFields(m);
+                    const hasAntiguidadeWarning = missingAntiguidade.length > 0;
                     
                     return (
                       <div 
@@ -302,7 +304,18 @@ export default function LotacaoMilitares() {
                               <span className="text-blue-700/80 mr-1">{m.posto_graduacao}</span>
                               {m.nome_completo}
                             </p>
-                            <p className="text-xs text-slate-500 font-medium truncate mt-0.5">Mat. {m.matricula}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-xs text-slate-500 font-medium truncate">Mat. {m.matricula}</p>
+                              {hasAntiguidadeWarning && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] h-5 border-amber-300 text-amber-700 bg-amber-50"
+                                  title={`Dados incompletos para antiguidade confiável: ${missingAntiguidade.join(', ')}`}
+                                >
+                                  Antiguidade incompleta
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="shrink-0 max-w-[40%] text-right bg-slate-50 px-2.5 py-1 rounded border border-slate-100">
