@@ -8,6 +8,8 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +22,23 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Search, Users, Grid3X3, List } from 'lucide-react';
 import MilitarCard from '@/components/militar/MilitarCard';
+import { promoverMilitaresEmLote } from '@/services/promocaoMilitarService';
+
+const POSTOS_GRADUACOES = [
+  'Coronel',
+  'Tenente-Coronel',
+  'Major',
+  'Capitão',
+  '1º Tenente',
+  '2º Tenente',
+  'Aspirante',
+  'Subtenente',
+  '1º Sargento',
+  '2º Sargento',
+  '3º Sargento',
+  'Cabo',
+  'Soldado',
+];
 
 export default function Militares() {
   const navigate = useNavigate();
@@ -46,6 +65,12 @@ export default function Militares() {
   const [viewMode, setViewMode] = useState('grid');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
+  const [showPromocaoLoteDialog, setShowPromocaoLoteDialog] = useState(false);
+  const [promocaoLoteForm, setPromocaoLoteForm] = useState({
+    posto_graduacao: '',
+    data_promocao_atual: '',
+  });
+  const [selectedLoteIds, setSelectedLoteIds] = useState([]);
 
   const { data: militares = [], isLoading } = useQuery({
     queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
@@ -90,8 +115,6 @@ export default function Militares() {
     enabled: isAccessResolved,
   });
 
-  if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
-
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Militar.delete(id),
     onSuccess: () => {
@@ -99,6 +122,29 @@ export default function Militares() {
       setDeleteDialogOpen(false);
       setMilitarToDelete(null);
     }
+  });
+
+  const promocaoLoteMutation = useMutation({
+    mutationFn: async () => {
+      const selecionados = militares.filter((militar) => selectedLoteIds.includes(militar.id));
+      return promoverMilitaresEmLote({
+        militaresSelecionados: selecionados,
+        postoGraduacao: promocaoLoteForm.posto_graduacao,
+        dataPromocaoAtual: promocaoLoteForm.data_promocao_atual,
+        userEmail: userEmail || '',
+      });
+    },
+    onSuccess: (resultado) => {
+      queryClient.invalidateQueries({ queryKey: ['militares'] });
+      setShowPromocaoLoteDialog(false);
+      setSelectedLoteIds([]);
+      const promovidos = resultado?.promovidos || 0;
+      const semAlteracao = resultado?.semAlteracao || 0;
+      alert(`Promoção em lote finalizada. Promovidos: ${promovidos}. Sem alteração: ${semAlteracao}.`);
+    },
+    onError: (error) => {
+      alert(error?.message || 'Falha ao registrar promoção em lote.');
+    },
   });
 
   const filteredMilitares = militares.filter(m => {
@@ -146,7 +192,32 @@ export default function Militares() {
     }
   };
 
+  const toggleMilitarLote = (militarId, checked) => {
+    setSelectedLoteIds((prev) => {
+      if (checked) {
+        if (prev.includes(militarId)) return prev;
+        return [...prev, militarId];
+      }
+      return prev.filter((id) => id !== militarId);
+    });
+  };
+
+  const abrirPromocaoLote = () => {
+    setPromocaoLoteForm({
+      posto_graduacao: '',
+      data_promocao_atual: '',
+    });
+    setSelectedLoteIds([]);
+    setShowPromocaoLoteDialog(true);
+  };
+
+  const selecionarFiltrados = () => {
+    setSelectedLoteIds(filteredMilitares.map((militar) => militar.id));
+  };
+
   const militaresAtivos = militares.filter(m => m.status_cadastro !== 'Inativo');
+
+  if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
   
   const stats = {
     total: militaresAtivos.length,
@@ -166,6 +237,14 @@ export default function Militares() {
             <p className="text-slate-500">Gerenciamento de pessoal da unidade</p>
           </div>
           <div className="flex gap-3">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                onClick={abrirPromocaoLote}
+              >
+                Promoção em lote
+              </Button>
+            )}
             <Button
               onClick={() => navigate(createPageUrl('CadastrarMilitar'))}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
@@ -384,6 +463,92 @@ export default function Militares() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showPromocaoLoteDialog} onOpenChange={setShowPromocaoLoteDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[#1e3a5f]">Promoção em lote por turma/data</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Novo posto/graduação</label>
+                <select
+                  className="w-full border rounded-md h-10 px-3 bg-white"
+                  value={promocaoLoteForm.posto_graduacao}
+                  onChange={(e) => setPromocaoLoteForm((prev) => ({ ...prev, posto_graduacao: e.target.value }))}
+                >
+                  <option value="">Selecione</option>
+                  {POSTOS_GRADUACOES.map((posto) => (
+                    <option key={posto} value={posto}>{posto}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Data da promoção do lote</label>
+                <Input
+                  type="date"
+                  value={promocaoLoteForm.data_promocao_atual}
+                  onChange={(e) => setPromocaoLoteForm((prev) => ({ ...prev, data_promocao_atual: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-slate-500">
+                Selecione apenas os militares que devem ser promovidos nesta data (promoção parcial permitida).
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={selecionarFiltrados}>
+                Selecionar filtrados ({filteredMilitares.length})
+              </Button>
+            </div>
+
+            <div className="border rounded-lg p-3 max-h-80 overflow-y-auto space-y-2">
+              {filteredMilitares.length === 0 ? (
+                <p className="text-sm text-slate-500">Nenhum militar disponível com os filtros atuais.</p>
+              ) : (
+                filteredMilitares.map((militar) => {
+                  const checked = selectedLoteIds.includes(militar.id);
+                  return (
+                    <label
+                      key={militar.id}
+                      className="flex items-center justify-between gap-3 border rounded-md px-3 py-2 cursor-pointer hover:bg-slate-50"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(valor) => toggleMilitarLote(militar.id, Boolean(valor))}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-800 truncate">{militar.nome_completo}</p>
+                          <p className="text-xs text-slate-500 truncate">
+                            {militar.posto_graduacao || 'Sem posto'} · {militar.matricula || 'Sem matrícula'}
+                          </p>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowPromocaoLoteDialog(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => promocaoLoteMutation.mutate()}
+                disabled={promocaoLoteMutation.isPending}
+              >
+                {promocaoLoteMutation.isPending ? 'Processando...' : `Promover selecionados (${selectedLoteIds.length})`}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
