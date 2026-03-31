@@ -71,6 +71,7 @@ function existeRegistroEquivalente(historico = [], snapshot = {}) {
 
 function resolverCriterioPromocao({ militarAntes, militarDepois, contexto }) {
   if (contexto === 'cadastro_inicial') return 'Cadastro inicial';
+  if (contexto === 'promocao_manual') return 'Promoção manual';
 
   const postoMudou = normalizarTexto(militarAntes?.posto_graduacao) !== normalizarTexto(militarDepois?.posto_graduacao);
   const dataMudou = normalizarDataISO(militarAntes?.data_promocao_atual) !== normalizarDataISO(militarDepois?.data_promocao_atual);
