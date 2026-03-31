@@ -3,6 +3,7 @@ import { registrarHistoricoPromocaoMilitarSeNecessario } from '@/services/histor
 import { ordenarMilitaresPorAntiguidade } from '@/utils/antiguidadeMilitar';
 
 const POSITIVE_INTEGER_REGEX = /^[1-9]\d*$/;
+const MAX_TENTATIVAS_COLISAO = 3;
 
 function normalizarTexto(valor) {
   return String(valor || '').trim();
@@ -104,6 +105,44 @@ function proximaAntiguidadeDisponivel(inicio, ocupadas) {
   return candidata;
 }
 
+async function listarMilitaresMesmoPostoData(postoGraduacao, dataPromocaoAtual) {
+  const militares = await base44.entities.Militar.filter({
+    posto_graduacao: postoGraduacao,
+    data_promocao_atual: dataPromocaoAtual,
+  }, '-created_date');
+
+  return Array.isArray(militares) ? militares : [];
+}
+
+function mapearOrdensOcupadas(militares, militarIdIgnorado = '') {
+  const ignorado = normalizarTexto(militarIdIgnorado);
+  return new Set(
+    (Array.isArray(militares) ? militares : [])
+      .filter((item) => normalizarTexto(item?.id) !== ignorado)
+      .map((item) => normalizarAntiguidadeNullable(item?.antiguidade_referencia_ordem))
+      .filter((numero) => Number.isInteger(numero) && numero > 0),
+  );
+}
+
+function mapearDuplicidadesDeAntiguidade(militares) {
+  const mapaOrdens = new Map();
+  for (const militar of militares) {
+    const ordem = normalizarAntiguidadeNullable(militar?.antiguidade_referencia_ordem);
+    if (!Number.isInteger(ordem) || ordem <= 0) continue;
+    const ids = mapaOrdens.get(ordem) || [];
+    ids.push(normalizarTexto(militar?.id));
+    mapaOrdens.set(ordem, ids);
+  }
+
+  return Array.from(mapaOrdens.entries())
+    .filter(([, ids]) => ids.length > 1)
+    .map(([ordem, ids]) => ({
+      ordem,
+      militares: ids,
+      quantidade: ids.length,
+    }));
+}
+
 export async function promoverMilitaresEmLote({
   militaresSelecionados,
   postoGraduacao,
@@ -124,9 +163,14 @@ export async function promoverMilitaresEmLote({
 
   const militaresUnicos = [];
   const ids = new Set();
+  let descartadosSemIdValido = 0;
   for (const militar of militares) {
     const militarId = normalizarTexto(militar?.id);
-    if (!militarId || ids.has(militarId)) continue;
+    if (!militarId) {
+      descartadosSemIdValido += 1;
+      continue;
+    }
+    if (ids.has(militarId)) continue;
     ids.add(militarId);
     militaresUnicos.push(militar);
   }
@@ -135,47 +179,95 @@ export async function promoverMilitaresEmLote({
     throw new Error('Não foi possível identificar militares válidos para o lote.');
   }
 
-  const militaresMesmoPostoData = await base44.entities.Militar.filter({
-    posto_graduacao: novoPosto,
-    data_promocao_atual: novaDataPromocao,
-  }, '-created_date');
-
-  const ordensOcupadas = new Set(
-    (Array.isArray(militaresMesmoPostoData) ? militaresMesmoPostoData : [])
-      .map((item) => normalizarAntiguidadeNullable(item?.antiguidade_referencia_ordem))
-      .filter((numero) => Number.isInteger(numero) && numero > 0),
-  );
-
   const militaresOrdenados = ordenarMilitaresPorAntiguidade(militaresUnicos);
 
   const resultados = [];
-  let ordemAtual = proximaAntiguidadeDisponivel(1, ordensOcupadas);
+  let ordemAtual = 1;
   for (const militar of militaresOrdenados) {
-    const ordemAtribuida = ordemAtual;
-    ordensOcupadas.add(ordemAtribuida);
-    ordemAtual = proximaAntiguidadeDisponivel(ordemAtribuida + 1, ordensOcupadas);
+    const militarId = normalizarTexto(militar?.id);
+    let ordemCandidata = ordemAtual;
+    let processado = false;
+    let ultimaMensagemErro = null;
 
-    const resultado = await promoverMilitarSimples({
-      militarAtual: militar,
-      postoGraduacao: novoPosto,
-      dataPromocaoAtual: novaDataPromocao,
-      antiguidadeReferenciaOrdem: ordemAtribuida,
-      userEmail,
-    });
+    for (let tentativa = 1; tentativa <= MAX_TENTATIVAS_COLISAO; tentativa += 1) {
+      const militaresMesmoPostoData = await listarMilitaresMesmoPostoData(novoPosto, novaDataPromocao);
+      const ordensOcupadas = mapearOrdensOcupadas(militaresMesmoPostoData, militarId);
+      const ordemDisponivel = proximaAntiguidadeDisponivel(ordemCandidata, ordensOcupadas);
 
-    resultados.push({
-      militar_id: normalizarTexto(militar?.id),
-      atualizou: Boolean(resultado?.atualizou),
-      motivo: resultado?.motivo || null,
-      antiguidade_referencia_ordem: ordemAtribuida,
-    });
+      if (ordemDisponivel !== ordemCandidata) {
+        ultimaMensagemErro = `Colisão detectada para ordem ${ordemCandidata}; recalculada para ${ordemDisponivel}.`;
+        ordemCandidata = ordemDisponivel;
+        if (tentativa < MAX_TENTATIVAS_COLISAO) {
+          continue;
+        }
+      }
+
+      try {
+        const resultado = await promoverMilitarSimples({
+          militarAtual: militar,
+          postoGraduacao: novoPosto,
+          dataPromocaoAtual: novaDataPromocao,
+          antiguidadeReferenciaOrdem: ordemCandidata,
+          userEmail,
+        });
+
+        const status = resultado?.atualizou ? 'promovido' : 'sem_alteracao';
+        resultados.push({
+          militar_id: militarId,
+          status,
+          mensagem: status === 'promovido' ? null : (resultado?.motivo || 'sem_alteracao'),
+          antiguidade_referencia_ordem: ordemCandidata,
+          tentativas: tentativa,
+        });
+
+        ordemAtual = ordemCandidata + 1;
+        processado = true;
+        break;
+      } catch (error) {
+        ultimaMensagemErro = normalizarTexto(error?.message) || 'Falha ao promover militar no lote.';
+        if (tentativa === MAX_TENTATIVAS_COLISAO) {
+          resultados.push({
+            militar_id: militarId,
+            status: 'falha',
+            mensagem: ultimaMensagemErro,
+            antiguidade_referencia_ordem: null,
+            tentativas: tentativa,
+          });
+        }
+      }
+    }
+
+    if (!processado && resultados[resultados.length - 1]?.militar_id !== militarId) {
+      resultados.push({
+        militar_id: militarId,
+        status: 'falha',
+        mensagem: ultimaMensagemErro || 'Falha na promoção após tentativas de reprocessamento.',
+        antiguidade_referencia_ordem: null,
+        tentativas: MAX_TENTATIVAS_COLISAO,
+      });
+    }
   }
 
-  const promovidos = resultados.filter((item) => item.atualizou).length;
+  const promovidos = resultados.filter((item) => item.status === 'promovido').length;
+  const semAlteracao = resultados.filter((item) => item.status === 'sem_alteracao').length;
+  const falhas = resultados.filter((item) => item.status === 'falha').length;
+
+  const snapshotFinalMesmoPostoData = await listarMilitaresMesmoPostoData(novoPosto, novaDataPromocao);
+  const duplicidadesAntiguidade = mapearDuplicidadesDeAntiguidade(snapshotFinalMesmoPostoData);
+
   return {
     totalSelecionados: militaresUnicos.length,
     promovidos,
-    semAlteracao: resultados.length - promovidos,
+    semAlteracao,
+    falhas,
+    descartadosSemIdValido,
+    alertaIntegridade: duplicidadesAntiguidade.length
+      ? {
+        tipo: 'duplicidade_antiguidade_referencia_ordem',
+        mensagem: 'Foram encontradas ordens de antiguidade duplicadas no checkpoint pós-lote.',
+        duplicidades: duplicidadesAntiguidade,
+      }
+      : null,
     resultados,
   };
 }
