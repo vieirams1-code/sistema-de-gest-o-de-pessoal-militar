@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, GitBranch } from 'lucide-react';
 import { createPageUrl } from '@/utils';
@@ -102,6 +103,7 @@ const POSTOS_GRADUACOES = [
 
 const POSTOS_OFICIAIS = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'];
 const isOficial = (posto) => POSTOS_OFICIAIS.includes(posto);
+const POSITIVE_INTEGER_REGEX = /^[1-9]\d*$/;
 
 export default function CadastrarMilitar() {
   const navigate = useNavigate();
@@ -149,6 +151,11 @@ export default function CadastrarMilitar() {
   const [motivoComportamento, setMotivoComportamento] = useState('');
 
   const handleChange = (name, value) => {
+    if (name === 'antiguidade_referencia_ordem') {
+      const onlyDigits = String(value || '').replace(/\D/g, '');
+      setFormData(prev => ({ ...prev, [name]: onlyDigits }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -160,10 +167,17 @@ export default function CadastrarMilitar() {
       return;
     }
 
+    const antiguidadeOrdemRaw = String(formData.antiguidade_referencia_ordem || '').trim();
+    if (antiguidadeOrdemRaw && !POSITIVE_INTEGER_REGEX.test(antiguidadeOrdemRaw)) {
+      alert('A ordem de antiguidade herdada deve ser um inteiro positivo.');
+      return;
+    }
+
     setLoading(true);
 
     const dataToSave = {
       ...formData,
+      antiguidade_referencia_ordem: antiguidadeOrdemRaw ? Number(antiguidadeOrdemRaw) : null,
       altura: formData.altura ? parseFloat(formData.altura) : null,
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
@@ -492,13 +506,24 @@ export default function CadastrarMilitar() {
                 required={!!formData.posto_graduacao}
                 hint={formData.posto_graduacao ? 'Obrigatória quando houver posto/graduação informado.' : ''}
               />
-              <FormField
-                label="Ordem de antiguidade herdada"
-                name="antiguidade_referencia_ordem"
-                value={formData.antiguidade_referencia_ordem}
-                onChange={handleChange}
-                placeholder="Ex: 15"
-              />
+              <div className="space-y-1.5">
+                <label htmlFor="antiguidade_referencia_ordem" className="text-sm font-medium text-slate-700">
+                  Ordem de antiguidade herdada
+                </label>
+                <Input
+                  id="antiguidade_referencia_ordem"
+                  name="antiguidade_referencia_ordem"
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={formData.antiguidade_referencia_ordem || ''}
+                  onChange={(e) => handleChange('antiguidade_referencia_ordem', e.target.value)}
+                  placeholder="Ex: 15"
+                  className="h-10 border-slate-200 focus:border-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+                />
+                <p className="text-xs text-blue-600 mt-0.5">Use apenas número inteiro positivo.</p>
+              </div>
               <FormField
                 label="Referência de antiguidade (opcional)"
                 name="antiguidade_referencia_id"
