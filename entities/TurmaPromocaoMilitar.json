@@ -1,0 +1,15 @@
+{
+  "name": "TurmaPromocaoMilitar",
+  "type": "object",
+  "title": "Turma de Promoção Militar",
+  "description": "Agrupa militares para execução de promoção em turma reutilizando o fluxo de promoção em lote existente.",
+  "properties": {
+    "nome": { "type": "string", "default": "" },
+    "identificacao": { "type": "string", "default": "" },
+    "posto_graduacao_alvo": { "type": "string", "default": "" },
+    "data_promocao": { "type": "date", "default": "" },
+    "status": { "type": "string", "default": "Rascunho" },
+    "observacoes": { "type": "string", "default": "" },
+    "created_by": { "type": "string", "default": "" }
+  }
+}

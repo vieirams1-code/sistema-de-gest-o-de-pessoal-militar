@@ -1,0 +1,11 @@
+{
+  "name": "TurmaPromocaoMilitarMembro",
+  "type": "object",
+  "title": "Membro de Turma de Promoção",
+  "description": "Vínculo mínimo entre militar e turma de promoção para permitir processamento em lote.",
+  "properties": {
+    "turma_promocao_id": { "type": "string", "default": "" },
+    "militar_id": { "type": "string", "default": "" },
+    "created_by": { "type": "string", "default": "" }
+  }
+}
