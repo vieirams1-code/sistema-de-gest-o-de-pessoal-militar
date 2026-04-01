@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
 import {
@@ -40,6 +41,7 @@ export default function CadastrarPunicao() {
   const punicaoId = searchParams.get('id');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [autoCalcularDataFim, setAutoCalcularDataFim] = useState(!punicaoId);
   const [erroValidacao, setErroValidacao] = useState('');
   const [formData, setFormData] = useState({
     militar_id: '',
@@ -82,7 +84,44 @@ export default function CadastrarPunicao() {
     }
   }, [punicaoExistente]);
 
+  const calcularDataFimCumprimento = (dataInicio, diasPunicao) => {
+    const dias = Number(diasPunicao);
+    if (!dataInicio || !Number.isFinite(dias) || dias <= 0) return null;
+
+    const [ano, mes, dia] = String(dataInicio).split('-').map(Number);
+    if (!ano || !mes || !dia) return null;
+
+    // Convenção adotada (contagem inclusiva): 01/04 com 1 dia termina em 01/04.
+    const dataBaseUtc = new Date(Date.UTC(ano, mes - 1, dia));
+    dataBaseUtc.setUTCDate(dataBaseUtc.getUTCDate() + (dias - 1));
+    return dataBaseUtc.toISOString().slice(0, 10);
+  };
+
+  useEffect(() => {
+    if (!autoCalcularDataFim) return;
+
+    const dataFimCalculada = calcularDataFimCumprimento(
+      formData.data_inicio_cumprimento,
+      formData.dias_punicao,
+    );
+
+    if (!dataFimCalculada || dataFimCalculada === formData.data_fim_cumprimento) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      data_fim_cumprimento: dataFimCalculada,
+    }));
+  }, [
+    autoCalcularDataFim,
+    formData.data_inicio_cumprimento,
+    formData.dias_punicao,
+    formData.data_fim_cumprimento,
+  ]);
+
   const handleChange = (name, value) => {
+    if (name === 'data_inicio_cumprimento' || name === 'dias_punicao') {
+      setAutoCalcularDataFim(true);
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -270,7 +309,20 @@ export default function CadastrarPunicao() {
                 </Select>
               </div>
               <FormField label="Data Início Cumprimento" name="data_inicio_cumprimento" value={formData.data_inicio_cumprimento} onChange={handleChange} type="date" required />
-              <FormField label="Data Fim Cumprimento" name="data_fim_cumprimento" value={formData.data_fim_cumprimento} onChange={handleChange} type="date" />
+              <div className="space-y-1.5">
+                <Label htmlFor="data_fim_cumprimento" className="text-sm font-medium text-slate-700">Data Fim Cumprimento</Label>
+                <Input
+                  id="data_fim_cumprimento"
+                  name="data_fim_cumprimento"
+                  type="date"
+                  value={formData.data_fim_cumprimento || ''}
+                  readOnly
+                  className="h-10 border-slate-200 bg-slate-50 focus:border-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+                />
+                <p className="text-xs text-blue-600 mt-0.5">
+                  Calculada automaticamente por contagem inclusiva (ex.: início 01/04 com 1 dia =&gt; fim 01/04).
+                </p>
+              </div>
               <FormField label="Dias de Punição" name="dias_punicao" value={formData.dias_punicao} onChange={handleChange} type="number" required={necessitaDias} />
               <div>
                 <Label>Status</Label>
