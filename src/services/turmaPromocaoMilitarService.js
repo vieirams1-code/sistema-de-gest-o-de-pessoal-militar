@@ -1,6 +1,9 @@
 import { base44 } from '@/api/base44Client';
 import { promoverMilitaresEmLote } from '@/services/promocaoMilitarService';
 
+const TURMA_ENTITY_CANDIDATES = ['TurmaPromocaoMilitar', 'TurmaPromocao'];
+const TURMA_MEMBRO_ENTITY_CANDIDATES = ['TurmaPromocaoMilitarMembro', 'TurmaPromocaoMembro'];
+
 const STATUS_TURMA = Object.freeze({
   RASCUNHO: 'Rascunho',
   PRONTA: 'Pronta para processamento',
@@ -25,13 +28,41 @@ function dataValida(dataISO) {
   return Number.isFinite(timestamp);
 }
 
+function resolverEntidade(candidatas) {
+  for (const nome of candidatas) {
+    const entidade = base44.entities?.[nome];
+    if (entidade) return { nome, entidade };
+  }
+  return { nome: '', entidade: null };
+}
+
+function erroEntidadeNaoProvisionada(candidatas) {
+  const nomes = candidatas.join(' ou ');
+  return new Error(
+    `Nenhuma entidade de turma está disponível no app (${nomes}). ` +
+    'Publique/sincronize o schema no Base44 e confirme o nome real da entidade.',
+  );
+}
+
+export function getEntidadeTurmaPromocao() {
+  const resolvida = resolverEntidade(TURMA_ENTITY_CANDIDATES);
+  if (!resolvida.entidade) throw erroEntidadeNaoProvisionada(TURMA_ENTITY_CANDIDATES);
+  return resolvida;
+}
+
+export function getEntidadeTurmaPromocaoMembro() {
+  const resolvida = resolverEntidade(TURMA_MEMBRO_ENTITY_CANDIDATES);
+  if (!resolvida.entidade) throw erroEntidadeNaoProvisionada(TURMA_MEMBRO_ENTITY_CANDIDATES);
+  return resolvida;
+}
+
 async function buscarTurmaPorId(turmaId) {
   const turmaIdNormalizado = normalizarTexto(turmaId);
   if (!turmaIdNormalizado) throw new Error('Turma de promoção inválida.');
 
-  const entidadeTurma = base44.entities?.TurmaPromocaoMilitar;
+  const { entidade: entidadeTurma } = getEntidadeTurmaPromocao();
   if (!entidadeTurma || typeof entidadeTurma.filter !== 'function') {
-    throw new Error('Entidade TurmaPromocaoMilitar indisponível.');
+    throw new Error('Entidade de turma de promoção indisponível para consulta.');
   }
 
   const turmas = await entidadeTurma.filter({ id: turmaIdNormalizado });
@@ -39,8 +70,9 @@ async function buscarTurmaPorId(turmaId) {
 }
 
 async function atualizarTurmaSePossivel(turmaId, payload) {
-  if (!base44.entities?.TurmaPromocaoMilitar?.update) return;
-  await base44.entities.TurmaPromocaoMilitar.update(turmaId, payload);
+  const { entidade: entidadeTurma } = getEntidadeTurmaPromocao();
+  if (!entidadeTurma?.update) return;
+  await entidadeTurma.update(turmaId, payload);
 }
 
 export async function criarTurmaPromocaoMilitar({
@@ -51,9 +83,9 @@ export async function criarTurmaPromocaoMilitar({
   observacoes,
   userEmail,
 }) {
-  const entidadeTurma = base44.entities?.TurmaPromocaoMilitar;
+  const { entidade: entidadeTurma } = getEntidadeTurmaPromocao();
   if (!entidadeTurma || typeof entidadeTurma.create !== 'function') {
-    throw new Error('Entidade TurmaPromocaoMilitar indisponível.');
+    throw new Error('Entidade de turma de promoção indisponível para criação.');
   }
 
   const nomeNormalizado = normalizarTexto(nome);
@@ -102,9 +134,9 @@ export async function associarMilitaresATurmaPromocao({
   const turma = await buscarTurmaPorId(turmaId);
   if (!turma) throw new Error('Turma de promoção não encontrada.');
 
-  const entidadeMembro = base44.entities?.TurmaPromocaoMilitarMembro;
+  const { entidade: entidadeMembro } = getEntidadeTurmaPromocaoMembro();
   if (!entidadeMembro || typeof entidadeMembro.filter !== 'function' || typeof entidadeMembro.create !== 'function') {
-    throw new Error('Entidade TurmaPromocaoMilitarMembro indisponível.');
+    throw new Error('Entidade de membros da turma indisponível.');
   }
 
   const militares = Array.isArray(militaresSelecionados) ? militaresSelecionados : [];
@@ -171,9 +203,9 @@ export async function executarPromocaoDaTurma({ turmaId, userEmail }) {
     throw new Error('A turma já está em processamento. Aguarde a finalização para nova execução.');
   }
 
-  const entidadeMembro = base44.entities?.TurmaPromocaoMilitarMembro;
+  const { entidade: entidadeMembro } = getEntidadeTurmaPromocaoMembro();
   if (!entidadeMembro || typeof entidadeMembro.filter !== 'function') {
-    throw new Error('Entidade TurmaPromocaoMilitarMembro indisponível.');
+    throw new Error('Entidade de membros da turma indisponível.');
   }
 
   const vinculos = await entidadeMembro.filter({ turma_promocao_id: turma.id });
