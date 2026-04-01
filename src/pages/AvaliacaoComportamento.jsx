@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Scale, Wand2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Scale, Wand2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,7 @@ export default function AvaliacaoComportamento() {
       });
   }, [militares, punicoes, filtro, pendencias]);
 
-  const aplicarSugestao = async (linha) => {
+  const aplicarSugestao = async (linha, { gerarPublicacao = false } = {}) => {
     if (!linha.calculado?.comportamento) return;
 
     await base44.entities.Militar.update(linha.militar.id, {
@@ -85,7 +85,7 @@ export default function AvaliacaoComportamento() {
       observacoes: 'Mudança aprovada manualmente na Avaliação de Comportamento.',
     });
 
-    if (marcoCriado?.id) {
+    if (gerarPublicacao && marcoCriado?.id) {
       const resultadoRPAutomatico = await gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
         militar: linha.militar,
         marco: {
@@ -140,14 +140,6 @@ export default function AvaliacaoComportamento() {
     await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
   };
 
-  const aplicarTodos = async () => {
-    for (const linha of avaliacao.filter((a) => a.divergente)) {
-      // eslint-disable-next-line no-await-in-loop
-      await aplicarSugestao(linha);
-    }
-    await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -163,10 +155,6 @@ export default function AvaliacaoComportamento() {
             <Button variant="outline" onClick={gerarPendencias}>
               <Wand2 className="w-4 h-4 mr-2" />
               Gerar pendências
-            </Button>
-            <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={aplicarTodos}>
-              <Wand2 className="w-4 h-4 mr-2" />
-              Aplicar Todos
             </Button>
           </div>
         </div>
@@ -212,12 +200,13 @@ export default function AvaliacaoComportamento() {
                       </Button>
                       {linha.divergente ? (
                         <>
-                          <Button variant="outline" size="sm" onClick={() => gerarPendencia(linha)}>
-                            {linha.pendenciaExistente ? 'Pendência criada' : 'Gerar pendência'}
-                          </Button>
                           <Button size="sm" onClick={() => aplicarSugestao(linha)}>
                             <CheckCircle2 className="w-4 h-4 mr-1" />
-                            Aplicar Sugestão
+                            Aplicar
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => aplicarSugestao(linha, { gerarPublicacao: true })}>
+                            <FileText className="w-4 h-4 mr-1" />
+                            Aplicar e gerar publicação
                           </Button>
                         </>
                       ) : (
