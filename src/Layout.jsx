@@ -21,7 +21,6 @@ import {
   Wrench,
   ArrowLeftRight,
   Building2,
-  GitBranch,
   BookMarked,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -41,7 +40,6 @@ const menuGroups = [
     title: 'Pessoal',
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
-      { name: 'Turmas de Promoção', page: 'TurmasPromocaoMilitar', icon: GitBranch, moduleKey: 'militares' },
     ],
   },
   {

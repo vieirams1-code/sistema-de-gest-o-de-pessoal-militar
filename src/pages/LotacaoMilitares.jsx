@@ -3,12 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Users, Search, CheckSquare, Square, Building2, GitMerge, MapPin, ChevronRight, ChevronDown, CheckCircle2 } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
+import { Users, Search, CheckSquare, Square, Building2, GitMerge, MapPin, ChevronRight, ChevronDown } from 'lucide-react';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from "@/components/ui/use-toast";
-import { getMissingAntiguidadeFields, ordenarMilitaresPorAntiguidade } from '@/utils/antiguidadeMilitar';
+import { Badge } from "@/components/ui/badge";
 
 const normalizeTipo = (tipo) => {
   if (tipo === 'Grupamento') return 'Setor';
@@ -54,7 +53,7 @@ export default function LotacaoMilitares() {
         return (m.nome_completo?.toLowerCase().includes(q) || m.matricula?.includes(q) || m.posto_graduacao?.toLowerCase().includes(q));
       });
 
-    return ordenarMilitaresPorAntiguidade(filtrados);
+    return filtrados;
   }, [militares, searchMilitar]);
 
   const toggleExpand = (id, e) => {
@@ -286,15 +285,14 @@ export default function LotacaoMilitares() {
                 <div className="divide-y divide-slate-100">
                   {militaresFiltrados.map(m => {
                     const isSelected = selectedMilitares.includes(m.id);
-                    // Computa lotacao formatada
-                    const lotacaoText = m.subgrupamento_nome ? `${m.subgrupamento_nome}${m.grupamento_nome && m.grupamento_nome !== m.subgrupamento_nome ? ` (${m.grupamento_nome})` : ''}` : m.grupamento_nome || 'Sem lotação';
-                    const missingAntiguidade = getMissingAntiguidadeFields(m);
-                    const hasAntiguidadeWarning = missingAntiguidade.length > 0;
-                    
+                    const lotacaoText = m.subgrupamento_nome
+                      ? `${m.subgrupamento_nome}${m.grupamento_nome && m.grupamento_nome !== m.subgrupamento_nome ? ` (${m.grupamento_nome})` : ''}`
+                      : m.grupamento_nome || m.lotacao || 'Não lotado';
+
                     return (
-                      <div 
-                        key={m.id} 
-                        onClick={() => toggleMilitar(m.id)} 
+                      <div
+                        key={m.id}
+                        onClick={() => toggleMilitar(m.id)}
                         className={`flex justify-between items-center p-3 sm:px-4 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50'}`}
                       >
                         <div className="flex items-center gap-3 min-w-0 pr-4">
@@ -306,15 +304,6 @@ export default function LotacaoMilitares() {
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <p className="text-xs text-slate-500 font-medium truncate">Mat. {m.matricula}</p>
-                              {hasAntiguidadeWarning && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] h-5 border-amber-300 text-amber-700 bg-amber-50"
-                                  title={`Dados incompletos para antiguidade confiável: ${missingAntiguidade.join(', ')}`}
-                                >
-                                  Antiguidade incompleta
-                                </Badge>
-                              )}
                             </div>
                           </div>
                         </div>

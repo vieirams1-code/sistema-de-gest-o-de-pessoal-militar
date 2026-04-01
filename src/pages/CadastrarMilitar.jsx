@@ -3,9 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, GitBranch } from 'lucide-react';
+import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GitBranch } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 
 import FormSection from '@/components/militar/FormSection';
@@ -19,7 +18,6 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
-import { registrarHistoricoPromocaoMilitarSeNecessario } from '@/services/historicoPromocaoMilitarService';
 
 const initialFormData = {
   nome_completo: '',
@@ -36,9 +34,6 @@ const initialFormData = {
   subgrupamento_nome: '',
   posto_graduacao: '',
   quadro: '',
-  data_promocao_atual: '',
-  antiguidade_referencia_ordem: '',
-  antiguidade_referencia_id: '',
   data_inclusao: '',
   comportamento: 'Bom',
   data_nascimento: '',
@@ -104,14 +99,13 @@ const POSTOS_GRADUACOES = [
 
 const POSTOS_OFICIAIS = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'];
 const isOficial = (posto) => POSTOS_OFICIAIS.includes(posto);
-const POSITIVE_INTEGER_REGEX = /^[1-9]\d*$/;
 
 export default function CadastrarMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
-  const { isAdmin, subgrupamentoId, subgrupamentoTipo, user, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, subgrupamentoId, user, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMilitaresAccess = canAccessModule('militares');
 
   const [formData, setFormData] = useState(initialFormData);
@@ -152,33 +146,17 @@ export default function CadastrarMilitar() {
   const [motivoComportamento, setMotivoComportamento] = useState('');
 
   const handleChange = (name, value) => {
-    if (name === 'antiguidade_referencia_ordem') {
-      const onlyDigits = String(value || '').replace(/\D/g, '');
-      setFormData(prev => ({ ...prev, [name]: onlyDigits }));
-      return;
-    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (formData.posto_graduacao && !formData.data_promocao_atual) {
-      alert('Informe a data de promoção no posto atual para militares com posto/graduação.');
-      return;
-    }
-
-    const antiguidadeOrdemRaw = String(formData.antiguidade_referencia_ordem || '').trim();
-    if (antiguidadeOrdemRaw && !POSITIVE_INTEGER_REGEX.test(antiguidadeOrdemRaw)) {
-      alert('A ordem de antiguidade herdada deve ser um inteiro positivo.');
-      return;
-    }
 
     setLoading(true);
 
     const dataToSave = {
       ...formData,
-      antiguidade_referencia_ordem: antiguidadeOrdemRaw ? Number(antiguidadeOrdemRaw) : null,
       altura: formData.altura ? parseFloat(formData.altura) : null,
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
@@ -226,16 +204,6 @@ export default function CadastrarMilitar() {
       });
     }
 
-    if (militarId) {
-      const militarAntesPromocao = editId ? (editingMilitar || {}) : {};
-      await registrarHistoricoPromocaoMilitarSeNecessario({
-        militarAntes: militarAntesPromocao,
-        militarDepois: { ...dataToSave, id: militarId },
-        userEmail: user?.email || '',
-        contexto: editId ? 'edicao_cadastro' : 'cadastro_inicial',
-      });
-    }
-    
     queryClient.invalidateQueries({ queryKey: ['militares'] });
     setLoading(false);
     navigate(createPageUrl('Militares'));
@@ -505,45 +473,7 @@ export default function CadastrarMilitar() {
             </div>
           </FormSection>
 
-          {/* Antiguidade Militar */}
-          <FormSection title="Antiguidade Militar" icon={GraduationCap}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <FormField
-                label="Data de promoção no posto atual"
-                name="data_promocao_atual"
-                value={formData.data_promocao_atual}
-                onChange={handleChange}
-                type="date"
-                required={!!formData.posto_graduacao}
-                hint={formData.posto_graduacao ? 'Obrigatória quando houver posto/graduação informado.' : ''}
-              />
-              <div className="space-y-1.5">
-                <label htmlFor="antiguidade_referencia_ordem" className="text-sm font-medium text-slate-700">
-                  Ordem de antiguidade herdada
-                </label>
-                <Input
-                  id="antiguidade_referencia_ordem"
-                  name="antiguidade_referencia_ordem"
-                  type="number"
-                  min={1}
-                  step={1}
-                  inputMode="numeric"
-                  value={formData.antiguidade_referencia_ordem || ''}
-                  onChange={(e) => handleChange('antiguidade_referencia_ordem', e.target.value)}
-                  placeholder="Ex: 15"
-                  className="h-10 border-slate-200 focus:border-[#1e3a5f] focus:ring-[#1e3a5f]/20"
-                />
-                <p className="text-xs text-blue-600 mt-0.5">Use apenas número inteiro positivo.</p>
-              </div>
-              <FormField
-                label="Referência de antiguidade (opcional)"
-                name="antiguidade_referencia_id"
-                value={formData.antiguidade_referencia_id}
-                onChange={handleChange}
-                placeholder="ID da referência (opcional)"
-              />
-            </div>
-          </FormSection>
+
 
           {/* Dados Pessoais */}
           <FormSection title="Dados Pessoais" icon={User}>
