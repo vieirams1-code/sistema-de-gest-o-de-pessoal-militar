@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 
 const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_REMOVE_DELAY = 300;
+const TOAST_DEFAULT_DURATION = 4000;
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -19,6 +20,7 @@ function genId() {
 }
 
 const toastTimeouts = new Map();
+const toastDismissTimeouts = new Map();
 
 const addToRemoveQueue = (toastId) => {
   if (toastTimeouts.has(toastId)) {
@@ -44,15 +46,37 @@ const _clearFromRemoveQueue = (toastId) => {
   }
 };
 
+const scheduleAutoDismiss = (toastId, duration) => {
+  const existingTimeout = toastDismissTimeouts.get(toastId);
+  if (existingTimeout) {
+    clearTimeout(existingTimeout);
+    toastDismissTimeouts.delete(toastId);
+  }
+
+  if (duration === Infinity || duration === null || duration === undefined) return;
+
+  const normalizedDuration = Number.isFinite(duration) ? Math.max(0, duration) : TOAST_DEFAULT_DURATION;
+  const timeout = setTimeout(() => {
+    toastDismissTimeouts.delete(toastId);
+    dispatch({ type: actionTypes.DISMISS_TOAST, toastId });
+  }, normalizedDuration);
+
+  toastDismissTimeouts.set(toastId, timeout);
+};
+
 export const reducer = (state, action) => {
   switch (action.type) {
     case actionTypes.ADD_TOAST:
+      scheduleAutoDismiss(action.toast.id, action.toast.duration ?? TOAST_DEFAULT_DURATION);
       return {
         ...state,
         toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
       };
 
     case actionTypes.UPDATE_TOAST:
+      if (action.toast?.id) {
+        scheduleAutoDismiss(action.toast.id, action.toast.duration ?? TOAST_DEFAULT_DURATION);
+      }
       return {
         ...state,
         toasts: state.toasts.map((t) =>
@@ -86,6 +110,16 @@ export const reducer = (state, action) => {
       };
     }
     case actionTypes.REMOVE_TOAST:
+      if (action.toastId !== undefined) {
+        const dismissTimeout = toastDismissTimeouts.get(action.toastId);
+        if (dismissTimeout) {
+          clearTimeout(dismissTimeout);
+          toastDismissTimeouts.delete(action.toastId);
+        }
+      } else {
+        toastDismissTimeouts.forEach((timeout) => clearTimeout(timeout));
+        toastDismissTimeouts.clear();
+      }
       if (action.toastId === undefined) {
         return {
           ...state,

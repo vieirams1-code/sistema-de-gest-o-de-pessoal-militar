@@ -35,6 +35,9 @@ import {
 } from '@/utils/comportamentoTemplateUtils';
 import { promoverMilitarSimples } from '@/services/promocaoMilitarService';
 
+const POSTOS_OFICIAIS = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'];
+const isOficial = (postoGraduacao) => POSTOS_OFICIAIS.includes(String(postoGraduacao || '').trim());
+
 const POSTOS_GRADUACOES = [
   'Coronel',
   'Tenente Coronel',
@@ -114,6 +117,10 @@ export default function VerMilitar() {
   });
 
   const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
+  const comportamentoElegivel = militar ? !isOficial(militar.posto_graduacao) : false;
+  const tabInicial = comportamentoElegivel
+    ? selectedTab
+    : (selectedTab === 'comportamento' ? 'dados' : selectedTab);
 
   const { data: ferias = [] } = useQuery({
     queryKey: ['ver-ferias', id],
@@ -539,7 +546,7 @@ export default function VerMilitar() {
                   {militar.lotacao && <span>Lotação: {militar.lotacao}</span>}
                   {militar.funcao && <span>Função: {militar.funcao}</span>}
                 </div>
-                {militar.comportamento && !['Coronel','Tenente Coronel','Major','Capitão','1º Tenente','2º Tenente','Aspirante'].includes(militar.posto_graduacao) && (
+                {militar.comportamento && comportamentoElegivel && (
                   <div className="mt-2">
                     <Badge className="bg-white/20 text-white border border-white/30">Comportamento: {militar.comportamento}</Badge>
                   </div>
@@ -550,9 +557,11 @@ export default function VerMilitar() {
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue={selectedTab}>
+        <Tabs defaultValue={tabInicial}>
           <TabsList className="w-full flex-wrap h-auto gap-1 mb-6">
-            <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
+            {comportamentoElegivel && (
+              <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
+            )}
             <TabsTrigger value="dados"><User className="w-4 h-4 mr-1" />Dados Pessoais</TabsTrigger>
             <TabsTrigger value="ferias"><Calendar className="w-4 h-4 mr-1" />Férias</TabsTrigger>
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
@@ -639,94 +648,96 @@ export default function VerMilitar() {
             </div>
           </TabsContent>
 
-          <TabsContent value="comportamento">
-            <div className="space-y-6">
-              <Section title="Situação Atual do Comportamento" icon={Activity}>
-                <div className="grid md:grid-cols-3 gap-3 text-sm">
-                  <div className="rounded-lg border p-3">
-                    <p className="text-slate-500">Atual</p>
-                    <p className="font-semibold">{militar.comportamento || 'Bom'}</p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-slate-500">Calculado</p>
-                    <p className="font-semibold">{avaliacaoComportamento?.comportamento || '—'}</p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-slate-500">Próxima melhoria</p>
-                    <p className="font-semibold">{proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—'}</p>
-                  </div>
-                </div>
-                {avaliacaoComportamento?.fundamento && (
-                  <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
-                )}
-              </Section>
-
-              <Section title="Pendências de Comportamento" icon={AlertTriangle}>
-                {pendenciasComportamentoUnicas.length === 0 ? (
-                  <p className="text-sm text-slate-500">Sem pendências de comportamento no momento.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {pendenciasComportamentoUnicas.map((pendencia) => (
-                      <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                        <p className="text-sm font-semibold text-amber-900">
-                          {(pendencia.comportamento_atual || militar.comportamento || 'Bom')} → {(pendencia.comportamento_sugerido || avaliacaoComportamento?.comportamento || militar.comportamento || 'Bom')}
-                        </p>
-                        <p className="text-xs text-amber-800 mt-1">
-                          {ultimaPunicaoPorMilitar
-                            ? `Última punição: ${ultimaPunicaoPorMilitar.tipo} (${formatDate(ultimaPunicaoPorMilitar.data) || ultimaPunicaoPorMilitar.data})`
-                            : 'Sem punições registradas'}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Section>
-
-              <Section title="Linha do Tempo do Comportamento">
-                <div className="flex flex-col gap-3">
-                  <div className="flex justify-end">
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={handleGerarTextoRP}>
-                        <FileText className="w-4 h-4 mr-2" />
-                        Gerar texto para RP
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleEnviarParaRP}
-                        disabled={enviarParaRPMutation.isPending}
-                      >
-                        <Send className="w-4 h-4 mr-2" />
-                        Enviar para RP
-                      </Button>
+          {comportamentoElegivel && (
+            <TabsContent value="comportamento">
+              <div className="space-y-6">
+                <Section title="Situação Atual do Comportamento" icon={Activity}>
+                  <div className="grid md:grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-lg border p-3">
+                      <p className="text-slate-500">Atual</p>
+                      <p className="font-semibold">{militar.comportamento || '—'}</p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <p className="text-slate-500">Calculado</p>
+                      <p className="font-semibold">{avaliacaoComportamento?.comportamento || '—'}</p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <p className="text-slate-500">Próxima melhoria</p>
+                      <p className="font-semibold">{proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—'}</p>
                     </div>
                   </div>
-                  <ComportamentoTimeline
-                    eventos={historicoComportamento}
-                    selectedEventoId={marcoComportamentoSelecionadoId}
-                    onSelectEvento={(evento) => setMarcoComportamentoSelecionadoId(evento?.id || null)}
-                  />
-                </div>
-              </Section>
+                  {avaliacaoComportamento?.fundamento && (
+                    <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
+                  )}
+                </Section>
 
-              <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
-                {punicoes.length === 0 ? (
-                  <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {punicoes.slice(0, 5).map((punicao) => (
-                      <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
-                        <p className="text-sm font-medium text-slate-800">{punicao.tipo_punicao || punicao.tipo || 'Punição'}</p>
-                        <p className="text-xs text-slate-500">
-                          Início: {formatDate(punicao.data_inicio_cumprimento || punicao.data_inicio)} ·
-                          Término: {formatDate(punicao.data_fim_cumprimento || punicao.data_termino)}
-                        </p>
+                <Section title="Pendências de Comportamento" icon={AlertTriangle}>
+                  {pendenciasComportamentoUnicas.length === 0 ? (
+                    <p className="text-sm text-slate-500">Sem pendências de comportamento no momento.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {pendenciasComportamentoUnicas.map((pendencia) => (
+                        <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-sm font-semibold text-amber-900">
+                            {(pendencia.comportamento_atual || militar.comportamento || '—')} → {(pendencia.comportamento_sugerido || avaliacaoComportamento?.comportamento || militar.comportamento || '—')}
+                          </p>
+                          <p className="text-xs text-amber-800 mt-1">
+                            {ultimaPunicaoPorMilitar
+                              ? `Última punição: ${ultimaPunicaoPorMilitar.tipo} (${formatDate(ultimaPunicaoPorMilitar.data) || ultimaPunicaoPorMilitar.data})`
+                              : 'Sem punições registradas'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Section>
+
+                <Section title="Linha do Tempo do Comportamento">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex justify-end">
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleGerarTextoRP}>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Gerar texto para RP
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleEnviarParaRP}
+                          disabled={enviarParaRPMutation.isPending}
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Enviar para RP
+                        </Button>
                       </div>
-                    ))}
+                    </div>
+                    <ComportamentoTimeline
+                      eventos={historicoComportamento}
+                      selectedEventoId={marcoComportamentoSelecionadoId}
+                      onSelectEvento={(evento) => setMarcoComportamentoSelecionadoId(evento?.id || null)}
+                    />
                   </div>
-                )}
-              </Section>
-            </div>
-          </TabsContent>
+                </Section>
+
+                <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
+                  {punicoes.length === 0 ? (
+                    <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {punicoes.slice(0, 5).map((punicao) => (
+                        <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
+                          <p className="text-sm font-medium text-slate-800">{punicao.tipo_punicao || punicao.tipo || 'Punição'}</p>
+                          <p className="text-xs text-slate-500">
+                            Início: {formatDate(punicao.data_inicio_cumprimento || punicao.data_inicio)} ·
+                            Término: {formatDate(punicao.data_fim_cumprimento || punicao.data_termino)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Section>
+              </div>
+            </TabsContent>
+          )}
 
           {/* Férias */}
           <TabsContent value="ferias">
