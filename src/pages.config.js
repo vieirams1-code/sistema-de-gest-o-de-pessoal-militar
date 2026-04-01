@@ -70,6 +70,7 @@ import FichaMilitar from './pages/FichaMilitar';
 import Home from './pages/Home';
 import Medalhas from './pages/Medalhas';
 import Militares from './pages/Militares';
+import TurmasPromocaoMilitar from './pages/TurmasPromocaoMilitar';
 import PeriodosAquisitivos from './pages/PeriodosAquisitivos';
 import PlanoAnualFerias from './pages/PlanoAnualFerias';
 import Processos from './pages/Processos';
@@ -115,6 +116,7 @@ export const PAGES = {
     "Home": Home,
     "Medalhas": Medalhas,
     "Militares": Militares,
+    "TurmasPromocaoMilitar": TurmasPromocaoMilitar,
     "PeriodosAquisitivos": PeriodosAquisitivos,
     "PlanoAnualFerias": PlanoAnualFerias,
     "Processos": Processos,
