@@ -12,6 +12,8 @@ import {
   associarMilitaresATurmaPromocao,
   criarTurmaPromocaoMilitar,
   executarPromocaoDaTurma,
+  getEntidadeTurmaPromocao,
+  getEntidadeTurmaPromocaoMembro,
 } from '@/services/turmaPromocaoMilitarService';
 
 const POSTOS_GRADUACOES = [
@@ -64,7 +66,8 @@ export default function TurmasPromocaoMilitar() {
   const { data: turmas = [], isLoading: loadingTurmas } = useQuery({
     queryKey: ['turmas-promocao-militar'],
     queryFn: async () => {
-      const lista = await base44.entities.TurmaPromocaoMilitar.list('-created_date');
+      const { entidade } = getEntidadeTurmaPromocao();
+      const lista = await entidade.list('-created_date');
       return Array.isArray(lista) ? lista : [];
     },
   });
@@ -78,7 +81,8 @@ export default function TurmasPromocaoMilitar() {
     queryKey: ['turma-promocao-militar-membros', selectedTurmaId],
     queryFn: async () => {
       if (!selectedTurmaId) return [];
-      const lista = await base44.entities.TurmaPromocaoMilitarMembro.filter({ turma_promocao_id: selectedTurmaId }, '-created_date');
+      const { entidade } = getEntidadeTurmaPromocaoMembro();
+      const lista = await entidade.filter({ turma_promocao_id: selectedTurmaId }, '-created_date');
       return Array.isArray(lista) ? lista : [];
     },
     enabled: Boolean(selectedTurmaId),
@@ -151,7 +155,10 @@ export default function TurmasPromocaoMilitar() {
   });
 
   const removeMembroMutation = useMutation({
-    mutationFn: (membroId) => base44.entities.TurmaPromocaoMilitarMembro.delete(membroId),
+    mutationFn: async (membroId) => {
+      const { entidade } = getEntidadeTurmaPromocaoMembro();
+      return entidade.delete(membroId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['turma-promocao-militar-membros', selectedTurmaId] });
       queryClient.invalidateQueries({ queryKey: ['turmas-promocao-militar'] });
