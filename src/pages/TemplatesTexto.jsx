@@ -111,6 +111,11 @@ function isLivroFeriasTipo(tipo) {
   return FERIAS_CANONICAL_TYPES.includes(tipo);
 }
 
+function isTipoOcultoNoFrontend(tipo) {
+  const valor = String(tipo || '').trim();
+  return valor.endsWith('_COMPORTAMENTO_DISCIPLINAR') && valor !== 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR';
+}
+
 const VARS_POR_TIPO = {
   'Saída Férias': {
     grupo: 'Início',
@@ -407,8 +412,8 @@ const VARS_POR_TIPO = {
       { v: '{{data_inclusao}}', desc: 'Data de inclusão do militar' },
     ]
   },
-  'ALTERACAO_COMPORTAMENTO_DISCIPLINAR': {
-    grupo: 'Alteração de Comportamento Disciplinar',
+  'ELEVACAO_COMPORTAMENTO_DISCIPLINAR': {
+    grupo: 'Elevação de Comportamento Disciplinar',
     cor: 'red',
     variaveis: [
       { v: '{{militar_nome}}', desc: 'Nome completo do militar' },
@@ -419,42 +424,9 @@ const VARS_POR_TIPO = {
       { v: '{{comportamento_anterior}}', desc: 'Comportamento anterior no marco' },
       { v: '{{comportamento_novo}}', desc: 'Comportamento novo no marco' },
       { v: '{{comportamento_atual}}', desc: 'Comportamento atual do militar' },
-      { v: '{{data_alteracao}}', desc: 'Data do marco de alteração' },
-      { v: '{{motivo_mudanca}}', desc: 'Motivo da mudança' },
-      { v: '{{fundamento_legal}}', desc: 'Fundamento legal da mudança' },
-    ],
-  },
-  'IMPLANTACAO_COMPORTAMENTO_DISCIPLINAR': {
-    grupo: 'Implantação de Comportamento Disciplinar',
-    cor: 'red',
-    variaveis: [
-      { v: '{{militar_nome}}', desc: 'Nome completo do militar' },
-      { v: '{{posto_graduacao}}', desc: 'Posto/graduação do militar' },
-      { v: '{{matricula}}', desc: 'Matrícula funcional' },
-      { v: '{{quadro}}', desc: 'Quadro do militar' },
-      { v: '{{unidade}}', desc: 'Unidade/Lotação principal' },
-      { v: '{{comportamento_novo}}', desc: 'Comportamento implantado' },
-      { v: '{{comportamento_atual}}', desc: 'Comportamento atual do militar' },
-      { v: '{{data_alteracao}}', desc: 'Data do marco de implantação' },
-      { v: '{{motivo_mudanca}}', desc: 'Motivo do registro inicial' },
-      { v: '{{fundamento_legal}}', desc: 'Fundamento legal do marco' },
-    ],
-  },
-  'MELHORIA_COMPORTAMENTO_DISCIPLINAR': {
-    grupo: 'Melhoria de Comportamento Disciplinar',
-    cor: 'red',
-    variaveis: [
-      { v: '{{militar_nome}}', desc: 'Nome completo do militar' },
-      { v: '{{posto_graduacao}}', desc: 'Posto/graduação do militar' },
-      { v: '{{matricula}}', desc: 'Matrícula funcional' },
-      { v: '{{quadro}}', desc: 'Quadro do militar' },
-      { v: '{{unidade}}', desc: 'Unidade/Lotação principal' },
-      { v: '{{comportamento_anterior}}', desc: 'Comportamento anterior no marco' },
-      { v: '{{comportamento_novo}}', desc: 'Comportamento novo no marco' },
-      { v: '{{comportamento_atual}}', desc: 'Comportamento atual do militar' },
-      { v: '{{data_alteracao}}', desc: 'Data da melhoria' },
-      { v: '{{motivo_mudanca}}', desc: 'Motivo da melhoria' },
-      { v: '{{fundamento_legal}}', desc: 'Fundamento legal da melhoria' },
+      { v: '{{data_alteracao}}', desc: 'Data da elevação' },
+      { v: '{{motivo_mudanca}}', desc: 'Motivo da elevação' },
+      { v: '{{fundamento_legal}}', desc: 'Fundamento legal da elevação' },
     ],
   },
   'Ata JISO': {
@@ -632,6 +604,7 @@ export default function TemplatesTexto() {
   }, [templates]);
 
   const filtered = templates.filter(t => {
+    if (isTipoOcultoNoFrontend(t?.tipo_registro)) return false;
     const matchesModulo = moduloFiltro === 'all' || normalizeTemplateModulo(t.modulo) === moduloFiltro;
     const tipoBusca = getTipoDisplay(t.tipo_registro || '');
     const matchesSearch = !searchTerm || 

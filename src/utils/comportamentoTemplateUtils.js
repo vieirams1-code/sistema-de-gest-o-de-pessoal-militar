@@ -1,30 +1,11 @@
 import { aplicarTemplate, formatDateBR } from '@/components/utils/templateUtils';
-import { compararComportamentos } from '@/utils/calcularComportamento';
 
 export const TIPO_TEMPLATE_COMPORTAMENTO = {
-  ALTERACAO: 'ALTERACAO_COMPORTAMENTO_DISCIPLINAR',
-  IMPLANTACAO: 'IMPLANTACAO_COMPORTAMENTO_DISCIPLINAR',
-  MELHORIA: 'MELHORIA_COMPORTAMENTO_DISCIPLINAR',
+  ELEVACAO: 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR',
 };
 
 export const TEMPLATE_PADRAO_COMPORTAMENTO_POR_TIPO = {
-  [TIPO_TEMPLATE_COMPORTAMENTO.IMPLANTACAO]: `REGISTRO DE COMPORTAMENTO DISCIPLINAR
-
-Fica registrado o comportamento disciplinar do militar {{posto_graduacao}} {{militar_nome}}, matrícula nº {{matricula}}, do {{quadro}}, como {{comportamento_novo}}, a contar de {{data_alteracao}}, conforme {{motivo_mudanca}}.
-
-Campo Grande/MS, ____ de __________ de ______.
-
-__________________________________
-Comandante`,
-  [TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO]: `ALTERAÇÃO DE COMPORTAMENTO DISCIPLINAR
-
-Fica alterado o comportamento disciplinar do militar {{posto_graduacao}} {{militar_nome}}, matrícula nº {{matricula}}, do {{quadro}}, de {{comportamento_anterior}} para {{comportamento_novo}}, a contar de {{data_alteracao}}, em razão de {{motivo_mudanca}}, nos termos de {{fundamento_legal}}.
-
-Campo Grande/MS, ____ de __________ de ______.
-
-__________________________________
-Comandante`,
-  [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA]: `ALTERAÇÃO DE COMPORTAMENTO DISCIPLINAR
+  [TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO]: `ELEVAÇÃO DE COMPORTAMENTO DISCIPLINAR
 
 Fica alterado o comportamento disciplinar do militar {{posto_graduacao}} {{militar_nome}}, matrícula nº {{matricula}}, do {{quadro}}, de {{comportamento_anterior}} para {{comportamento_novo}}, a contar de {{data_alteracao}}, em razão de {{motivo_mudanca}}, conforme {{fundamento_legal}}.
 
@@ -35,7 +16,7 @@ Comandante`,
 };
 
 const CAMPOS_ESSENCIAIS_POR_TIPO = {
-  [TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO]: [
+  [TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO]: [
     'militar_nome',
     'posto_graduacao',
     'matricula',
@@ -44,24 +25,6 @@ const CAMPOS_ESSENCIAIS_POR_TIPO = {
     'data_alteracao',
     'motivo_mudanca',
     'fundamento_legal',
-  ],
-  [TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA]: [
-    'militar_nome',
-    'posto_graduacao',
-    'matricula',
-    'comportamento_anterior',
-    'comportamento_novo',
-    'data_alteracao',
-    'motivo_mudanca',
-    'fundamento_legal',
-  ],
-  [TIPO_TEMPLATE_COMPORTAMENTO.IMPLANTACAO]: [
-    'militar_nome',
-    'posto_graduacao',
-    'matricula',
-    'comportamento_novo',
-    'data_alteracao',
-    'motivo_mudanca',
   ],
 };
 
@@ -76,13 +39,6 @@ const LABELS_CAMPOS = {
   motivo_mudanca: 'Motivo da mudança',
   fundamento_legal: 'Fundamento legal',
 };
-
-const INDICADORES_IMPLANTACAO = [
-  'IMPLANT',
-  'REGISTRO INICIAL',
-  'IMPLANTAÇÃO DO SISTEMA',
-  'INICIAL',
-];
 
 function normalizarDataVigencia(data) {
   if (!data) return '';
@@ -131,12 +87,6 @@ function ehRegistroAutomaticoIntermediario(evento = {}) {
   );
 }
 
-function contemIndicadorImplantacao(value) {
-  const texto = String(value || '').toUpperCase();
-  if (!texto) return false;
-  return INDICADORES_IMPLANTACAO.some((indicador) => texto.includes(indicador));
-}
-
 export function sanitizarHistoricoComportamentoParaTemplate(eventos = []) {
   const ordenados = [...(Array.isArray(eventos) ? eventos : [])]
     .filter((evento) => ehDataValida(evento?.data_alteracao))
@@ -180,17 +130,13 @@ function campoPreenchido(valor) {
   return !(valor === undefined || valor === null || String(valor).trim() === '' || String(valor).trim().toLowerCase() === 'não informado');
 }
 
-export function marcoEhValidoParaGeracaoRP(marco = null, tipoTemplate = TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO) {
+export function marcoEhValidoParaGeracaoRP(marco = null, tipoTemplate = TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO) {
   if (!marco) return false;
   if (!campoPreenchido(marco?.comportamento_novo)) return false;
   if (!ehDataValida(marco?.data_alteracao)) return false;
 
   if (!campoPreenchido(marco?.motivo_mudanca)) return false;
-
-  if (tipoTemplate === TIPO_TEMPLATE_COMPORTAMENTO.IMPLANTACAO) {
-    return true;
-  }
-
+  if (!tipoTemplate) return false;
   return campoPreenchido(marco?.fundamento_legal);
 }
 
@@ -216,18 +162,8 @@ export function resolverMarcoComportamentoValido(eventos = [], marcoSelecionadoI
 }
 
 export function escolherTipoTemplateComportamento(marco = {}) {
-  if (!marco) return TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO;
-
-  if (contemIndicadorImplantacao(marco?.origem_tipo) || contemIndicadorImplantacao(marco?.motivo_mudanca)) {
-    return TIPO_TEMPLATE_COMPORTAMENTO.IMPLANTACAO;
-  }
-
-  const comparacao = compararComportamentos(marco?.comportamento_anterior, marco?.comportamento_novo);
-  if (comparacao > 0) {
-    return TIPO_TEMPLATE_COMPORTAMENTO.MELHORIA;
-  }
-
-  return TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO;
+  if (!marco) return TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO;
+  return TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO;
 }
 
 export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}) {
@@ -249,7 +185,7 @@ export function montarVariaveisComportamentoTemplate(militar = {}, marco = {}) {
 }
 
 export function validarCamposEssenciaisComportamento(tipoTemplate, vars) {
-  const camposObrigatorios = CAMPOS_ESSENCIAIS_POR_TIPO[tipoTemplate] || CAMPOS_ESSENCIAIS_POR_TIPO[TIPO_TEMPLATE_COMPORTAMENTO.ALTERACAO];
+  const camposObrigatorios = CAMPOS_ESSENCIAIS_POR_TIPO[tipoTemplate] || CAMPOS_ESSENCIAIS_POR_TIPO[TIPO_TEMPLATE_COMPORTAMENTO.ELEVACAO];
   const faltantes = camposObrigatorios.filter((campo) => {
     const valor = vars?.[campo];
     return valor === undefined || valor === null || String(valor).trim() === '' || String(valor).trim().toLowerCase() === 'não informado';
