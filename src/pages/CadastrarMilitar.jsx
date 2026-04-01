@@ -5,14 +5,13 @@ import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap, GitBranch } from 'lucide-react';
+import { Save, ArrowLeft, User, Briefcase, FileText, Building, Phone, Heart, MapPin, GraduationCap } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 
 import FormSection from '@/components/militar/FormSection';
 import FormField from '@/components/militar/FormField';
 import PhotoUpload from '@/components/militar/PhotoUpload';
 import TagInput from '@/components/militar/TagInput';
-import LotacaoSelector from '@/components/militar/LotacaoSelector';
 import FuncaoSelector from '@/components/militar/FuncaoSelector';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
@@ -119,13 +118,6 @@ export default function CadastrarMilitar() {
   const [loading, setLoading] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
 
-  const { data: subgrupamentosAll = [] } = useQuery({
-    queryKey: ['subgrupamentos'],
-    queryFn: () => base44.entities.Subgrupamento.list('nome'),
-  });
-  // Nomenclatura: Grupamento = Setor, Subgrupamento = Subsetor/Seção
-  const grupamentos = subgrupamentosAll.filter(s => s.tipo === 'Grupamento');
-  const subgrupamentosLista = subgrupamentosAll.filter(s => s.tipo === 'Subgrupamento');
 
   const { data: editingMilitar, isLoading: loadingEdit } = useQuery({
     queryKey: ['militar', editId],
@@ -320,11 +312,6 @@ export default function CadastrarMilitar() {
                   options={['Ativa', 'Reserva Remunerada', 'Reformado', 'Designado', 'Convocado']}
                   hint={['Designado', 'Convocado'].includes(formData.situacao_militar) ? 'Situação vinculada a vínculo temporário.' : ''}
                 />
-                <LotacaoSelector
-                  value={formData.lotacao}
-                  onChange={handleChange}
-                  name="lotacao"
-                />
                 <FuncaoSelector
                   value={formData.funcao}
                   onChange={handleChange}
@@ -364,65 +351,6 @@ export default function CadastrarMilitar() {
           {/* Dados Funcionais */}
           <FormSection title="Dados Funcionais" icon={Briefcase} defaultOpen={true}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Grupamento / Subgrupamento */}
-              <div className="col-span-full">
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                     <GitBranch className="w-4 h-4 text-[#1e3a5f]" />
-                     <span className="text-sm font-semibold text-slate-700">Vinculação Organizacional</span>
-                     {!isAdmin && <span className="text-xs text-slate-400">(definido automaticamente)</span>}
-                   </div>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                     <div className="space-y-1">
-                       <label className="text-xs font-medium text-slate-600">Setor</label>
-                      <select
-                        disabled={!isAdmin}
-                        className={`w-full border border-slate-200 rounded-md px-3 py-2 text-sm ${!isAdmin ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`}
-                        value={formData.grupamento_id || ''}
-                        onChange={e => {
-                          const gp = grupamentos.find(g => g.id === e.target.value);
-                          setFormData(prev => ({
-                            ...prev,
-                            grupamento_id: e.target.value,
-                            grupamento_nome: gp?.nome || '',
-                            subgrupamento_id: '',
-                            subgrupamento_nome: ''
-                          }));
-                        }}
-                      >
-                        <option value="">Nenhum / Selecione...</option>
-                        {grupamentos.map(g => (
-                          <option key={g.id} value={g.id}>{g.nome} {g.sigla && `(${g.sigla})`}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-600">Subsetor / Seção</label>
-                      <select
-                        disabled={!isAdmin}
-                        className={`w-full border border-slate-200 rounded-md px-3 py-2 text-sm ${!isAdmin ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`}
-                        value={formData.subgrupamento_id || ''}
-                        onChange={e => {
-                          const sg = subgrupamentosLista.find(s => s.id === e.target.value);
-                          setFormData(prev => ({
-                            ...prev,
-                            subgrupamento_id: e.target.value,
-                            subgrupamento_nome: sg?.nome || ''
-                          }));
-                        }}
-                      >
-                        <option value="">Nenhum / Selecione...</option>
-                        {(formData.grupamento_id
-                          ? subgrupamentosLista.filter(s => s.grupamento_id === formData.grupamento_id)
-                          : subgrupamentosLista
-                        ).map(s => (
-                          <option key={s.id} value={s.id}>{s.nome} {s.sigla && `(${s.sigla})`}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
               <FormField
                 label="Nome de Guerra"
                 name="nome_guerra"
