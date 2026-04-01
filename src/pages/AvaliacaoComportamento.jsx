@@ -6,11 +6,13 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/use-toast';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import {
   criarPendenciaComportamentoSemDuplicidade,
   garantirImplantacaoHistoricoComportamento,
   getPunicaoEntity,
+  obterHistoricoComportamentoMilitar,
   registrarMarcoHistoricoComportamento,
 } from '@/services/justicaDisciplinaService';
 import { gerarPublicacaoRPAutomaticaPorHistoricoComportamento } from '@/services/comportamentoRPService';
@@ -18,6 +20,7 @@ import { gerarPublicacaoRPAutomaticaPorHistoricoComportamento } from '@/services
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [filtro, setFiltro] = useState('');
   const punicaoEntity = getPunicaoEntity();
 
@@ -62,58 +65,99 @@ export default function AvaliacaoComportamento() {
   const aplicarSugestao = async (linha, { gerarPublicacao = false } = {}) => {
     if (!linha.calculado?.comportamento) return;
 
-    await base44.entities.Militar.update(linha.militar.id, {
-      comportamento: linha.calculado.comportamento,
-    });
-
-    await garantirImplantacaoHistoricoComportamento({
-      militarId: linha.militar.id,
-      comportamentoAtual: linha.militar.comportamento || 'Bom',
-      origemTipo: 'Militar',
-      origemId: linha.militar.id,
-    });
-
-    const marcoCriado = await registrarMarcoHistoricoComportamento({
-      militarId: linha.militar.id,
-      dataVigencia: new Date().toISOString().slice(0, 10),
-      comportamentoAnterior: linha.militar.comportamento || 'Bom',
-      comportamento: linha.calculado.comportamento,
-      motivoMudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
-      fundamentoLegal: linha.calculado.fundamento,
-      origemTipo: 'PendenciaComportamento',
-      origemId: linha.pendenciaExistente?.id || '',
-      observacoes: 'Mudança aprovada manualmente na Avaliação de Comportamento.',
-    });
-
-    if (gerarPublicacao && marcoCriado?.id) {
-      const resultadoRPAutomatico = await gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
-        militar: linha.militar,
-        marco: {
-          ...marcoCriado,
-          motivo_mudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
-          fundamento_legal: linha.calculado.fundamento,
-        },
-        geradoPor: '',
+    try {
+      await base44.entities.Militar.update(linha.militar.id, {
+        comportamento: linha.calculado.comportamento,
       });
-      console.info('[RP_AUTO][aplicarSugestao] resultado da geração automática', {
+
+      await garantirImplantacaoHistoricoComportamento({
         militarId: linha.militar.id,
-        historicoId: marcoCriado.id,
-        ok: resultadoRPAutomatico?.ok,
-        etapa: resultadoRPAutomatico?.etapa || '',
-        motivo: resultadoRPAutomatico?.motivo || '',
-        publicado: resultadoRPAutomatico?.publicado,
+        comportamentoAtual: linha.militar.comportamento || 'Bom',
+        origemTipo: 'Militar',
+        origemId: linha.militar.id,
       });
-    }
-    if (linha.pendenciaExistente?.id) {
-      await base44.entities.PendenciaComportamento.update(linha.pendenciaExistente.id, {
-        status_pendencia: 'Aplicada',
-        data_confirmacao: new Date().toISOString().slice(0, 10),
-      });
-    }
 
-    await queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] });
-    await queryClient.invalidateQueries({ queryKey: ['militares'] });
-    await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
+      const marcoCriado = await registrarMarcoHistoricoComportamento({
+        militarId: linha.militar.id,
+        dataVigencia: new Date().toISOString().slice(0, 10),
+        comportamentoAnterior: linha.militar.comportamento || 'Bom',
+        comportamento: linha.calculado.comportamento,
+        motivoMudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
+        fundamentoLegal: linha.calculado.fundamento,
+        origemTipo: 'PendenciaComportamento',
+        origemId: linha.pendenciaExistente?.id || '',
+        observacoes: 'Mudança aprovada manualmente na Avaliação de Comportamento.',
+      });
+
+      let resultadoRPAutomatico = null;
+      if (gerarPublicacao) {
+        let marcoParaPublicacao = marcoCriado;
+
+        if (!marcoParaPublicacao?.id) {
+          const historicoMilitar = await obterHistoricoComportamentoMilitar(linha.militar.id, { ordem: 'desc' });
+          marcoParaPublicacao = historicoMilitar.find((marco) => marco?.comportamento_novo === linha.calculado.comportamento) || null;
+        }
+
+        if (!marcoParaPublicacao?.id) {
+          throw new Error('Não foi possível localizar o marco histórico para vincular a publicação.');
+        }
+
+        resultadoRPAutomatico = await gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
+          militar: linha.militar,
+          marco: {
+            ...marcoParaPublicacao,
+            motivo_mudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
+            fundamento_legal: linha.calculado.fundamento,
+          },
+          geradoPor: '',
+        });
+
+        console.info('[RP_AUTO][aplicarSugestao] resultado da geração automática', {
+          militarId: linha.militar.id,
+          historicoId: marcoParaPublicacao.id,
+          ok: resultadoRPAutomatico?.ok,
+          etapa: resultadoRPAutomatico?.etapa || '',
+          motivo: resultadoRPAutomatico?.motivo || '',
+          publicado: resultadoRPAutomatico?.publicado,
+        });
+
+        const houveFalhaPublicacao = !resultadoRPAutomatico?.ok
+          && resultadoRPAutomatico?.motivo !== 'publicacao_ja_existente';
+        if (houveFalhaPublicacao) {
+          throw new Error(resultadoRPAutomatico?.motivo || 'Falha ao gerar publicação automática.');
+        }
+      }
+
+      if (linha.pendenciaExistente?.id) {
+        await base44.entities.PendenciaComportamento.update(linha.pendenciaExistente.id, {
+          status_pendencia: 'Aplicada',
+          data_confirmacao: new Date().toISOString().slice(0, 10),
+        });
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] });
+      await queryClient.invalidateQueries({ queryKey: ['militares'] });
+      await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
+      await queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
+
+      const descricaoPublicacao = !gerarPublicacao
+        ? 'Comportamento aplicado com sucesso.'
+        : resultadoRPAutomatico?.motivo === 'publicacao_ja_existente'
+          ? 'Comportamento aplicado e publicação já existente foi reaproveitada (sem duplicidade).'
+          : 'Comportamento aplicado e publicação gerada com sucesso.';
+
+      toast({
+        title: 'Operação concluída',
+        description: descricaoPublicacao,
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Falha ao aplicar alteração',
+        description: error?.message || 'Não foi possível concluir a operação.',
+      });
+      throw error;
+    }
   };
 
   const gerarPendencia = async (linha) => {
