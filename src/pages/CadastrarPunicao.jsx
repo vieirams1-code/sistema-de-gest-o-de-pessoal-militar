@@ -31,6 +31,8 @@ import {
   diagnosticarFluxoPunicaoRuntime,
 } from '@/services/justicaDisciplinaService';
 
+const TIPOS_COM_CUMPRIMENTO = new Set(['Detenção', 'Prisão', 'Prisão em Separado']);
+
 export default function CadastrarPunicao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -48,6 +50,7 @@ export default function CadastrarPunicao() {
     militar_nome: '',
     posto_graduacao: '',
     tipo_punicao: 'Advertência',
+    data_punicao: new Date().toISOString().split('T')[0],
     dias_punicao: 0,
     data_inicio_cumprimento: new Date().toISOString().split('T')[0],
     data_fim_cumprimento: '',
@@ -80,7 +83,11 @@ export default function CadastrarPunicao() {
 
   useEffect(() => {
     if (punicaoExistente) {
-      setFormData((prev) => ({ ...prev, ...punicaoExistente }));
+      setFormData((prev) => ({
+        ...prev,
+        ...punicaoExistente,
+        data_punicao: punicaoExistente?.data_punicao || punicaoExistente?.data_inicio_cumprimento || prev.data_punicao,
+      }));
     }
   }, [punicaoExistente]);
 
@@ -125,6 +132,49 @@ export default function CadastrarPunicao() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  useEffect(() => {
+    const exigeCumprimento = TIPOS_COM_CUMPRIMENTO.has(formData.tipo_punicao);
+
+    setFormData((prev) => {
+      if (exigeCumprimento) {
+        const inicio = prev.data_inicio_cumprimento || prev.data_punicao || new Date().toISOString().split('T')[0];
+        const dias = Number(prev.dias_punicao || 0);
+        const fimCalculada = calcularDataFimCumprimento(inicio, dias) || '';
+        if (
+          prev.data_inicio_cumprimento === inicio &&
+          prev.data_fim_cumprimento === fimCalculada &&
+          prev.data_punicao === ''
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          data_inicio_cumprimento: inicio,
+          data_fim_cumprimento: fimCalculada,
+          data_punicao: '',
+        };
+      }
+
+      const dataBase = prev.data_punicao || prev.data_inicio_cumprimento || new Date().toISOString().split('T')[0];
+      if (
+        prev.data_punicao === dataBase &&
+        prev.data_inicio_cumprimento === '' &&
+        Number(prev.dias_punicao || 0) === 0 &&
+        prev.data_fim_cumprimento === ''
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        data_punicao: dataBase,
+        data_inicio_cumprimento: '',
+        dias_punicao: 0,
+        data_fim_cumprimento: '',
+      };
+    });
+  }, [formData.tipo_punicao]);
+
   const deleteMutation = useMutation({
     mutationFn: (id) => entity.delete(id),
     onSuccess: () => {
@@ -136,7 +186,19 @@ export default function CadastrarPunicao() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       setErroValidacao('');
-      validarPunicaoDisciplinar(formData);
+      const payloadNormalizado = TIPOS_COM_CUMPRIMENTO.has(formData.tipo_punicao)
+        ? {
+            ...formData,
+            data_punicao: '',
+          }
+        : {
+            ...formData,
+            data_inicio_cumprimento: '',
+            dias_punicao: 0,
+            data_fim_cumprimento: '',
+          };
+
+      validarPunicaoDisciplinar(payloadNormalizado);
 
       try {
         const diagnostico = await diagnosticarFluxoPunicaoRuntime();
@@ -147,11 +209,11 @@ export default function CadastrarPunicao() {
 
       let punicaoSalva;
       if (punicaoId) {
-        punicaoSalva = await entity.update(punicaoId, formData);
+        punicaoSalva = await entity.update(punicaoId, payloadNormalizado);
         console.info('[JD] punicao criada', { punicao_id: punicaoId, modo: 'update' });
       } else {
         punicaoSalva = await entity.create({
-          ...formData,
+          ...payloadNormalizado,
           created_date: new Date().toISOString(),
         });
         console.info('[JD] punicao criada', { punicao_id: punicaoSalva?.id, modo: 'create' });
@@ -203,7 +265,7 @@ export default function CadastrarPunicao() {
     saveMutation.mutate();
   };
 
-  const necessitaDias = ['Detenção', 'Prisão', 'Prisão em Separado'].includes(formData.tipo_punicao);
+  const necessitaDias = TIPOS_COM_CUMPRIMENTO.has(formData.tipo_punicao);
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMilitaresAccess) return <AccessDenied modulo="Justiça e Disciplina" />;
@@ -308,22 +370,50 @@ export default function CadastrarPunicao() {
                   </SelectContent>
                 </Select>
               </div>
-              <FormField label="Data Início Cumprimento" name="data_inicio_cumprimento" value={formData.data_inicio_cumprimento} onChange={handleChange} type="date" required />
-              <div className="space-y-1.5">
-                <Label htmlFor="data_fim_cumprimento" className="text-sm font-medium text-slate-700">Data Fim Cumprimento</Label>
-                <Input
-                  id="data_fim_cumprimento"
-                  name="data_fim_cumprimento"
+              {!necessitaDias && (
+                <FormField
+                  label="Data da Punição"
+                  name="data_punicao"
+                  value={formData.data_punicao}
+                  onChange={handleChange}
                   type="date"
-                  value={formData.data_fim_cumprimento || ''}
-                  readOnly
-                  className="h-10 border-slate-200 bg-slate-50 focus:border-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+                  required
                 />
-                <p className="text-xs text-blue-600 mt-0.5">
-                  Calculada automaticamente por contagem inclusiva (ex.: início 01/04 com 1 dia =&gt; fim 01/04).
-                </p>
-              </div>
-              <FormField label="Dias de Punição" name="dias_punicao" value={formData.dias_punicao} onChange={handleChange} type="number" required={necessitaDias} />
+              )}
+              {necessitaDias && (
+                <>
+                  <FormField
+                    label="Data Início Cumprimento"
+                    name="data_inicio_cumprimento"
+                    value={formData.data_inicio_cumprimento}
+                    onChange={handleChange}
+                    type="date"
+                    required
+                  />
+                  <FormField
+                    label="Dias de Punição"
+                    name="dias_punicao"
+                    value={formData.dias_punicao}
+                    onChange={handleChange}
+                    type="number"
+                    required={necessitaDias}
+                  />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="data_fim_cumprimento" className="text-sm font-medium text-slate-700">Data Fim Cumprimento</Label>
+                    <Input
+                      id="data_fim_cumprimento"
+                      name="data_fim_cumprimento"
+                      type="date"
+                      value={formData.data_fim_cumprimento || ''}
+                      readOnly
+                      className="h-10 border-slate-200 bg-slate-50 focus:border-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+                    />
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      Calculada automaticamente por contagem inclusiva (ex.: início 01/04 com 1 dia =&gt; fim 01/04).
+                    </p>
+                  </div>
+                </>
+              )}
               <div>
                 <Label>Status</Label>
                 <Select value={formData.status_punicao || 'Ativa'} onValueChange={(v) => handleChange('status_punicao', v)}>

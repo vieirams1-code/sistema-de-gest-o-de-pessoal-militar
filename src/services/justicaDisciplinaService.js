@@ -659,15 +659,25 @@ export function getPunicaoEntity() {
 export function validarPunicaoDisciplinar(payload) {
   const tipo = payload?.tipo_punicao;
   const dias = Number(payload?.dias_punicao || 0);
+  const dataPunicao = payload?.data_punicao || null;
   const inicio = payload?.data_inicio_cumprimento || null;
   const fim = payload?.data_fim_cumprimento || null;
   const agravada = Boolean(payload?.agravada_prisao_em_separado);
+  const exigeCumprimento = TIPOS_COM_DIAS_OBRIGATORIO.has(tipo);
 
-  if (TIPOS_COM_DIAS_OBRIGATORIO.has(tipo) && dias <= 0) {
+  if (exigeCumprimento && !inicio) {
+    throw new Error(`${tipo} exige data de início de cumprimento.`);
+  }
+
+  if (exigeCumprimento && dias <= 0) {
     throw new Error(`${tipo} exige quantidade de dias de punição.`);
   }
 
-  if (!TIPOS_COM_DIAS_OBRIGATORIO.has(tipo) && payload?.dias_punicao && dias < 0) {
+  if (!exigeCumprimento && !dataPunicao) {
+    throw new Error(`${tipo} exige data da punição.`);
+  }
+
+  if (!exigeCumprimento && payload?.dias_punicao && dias < 0) {
     throw new Error('Dias de punição não pode ser negativo.');
   }
 

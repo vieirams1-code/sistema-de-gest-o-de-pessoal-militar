@@ -8,6 +8,7 @@
     "militar_nome": { "type": "string", "default": "" },
     "posto_graduacao": { "type": "string", "default": "" },
     "tipo_punicao": { "type": "string", "default": "" },
+    "data_punicao": { "type": "date", "default": "" },
     "dias_punicao": { "type": "integer", "default": 0 },
     "data_inicio_cumprimento": { "type": "date", "default": "" },
     "data_fim_cumprimento": { "type": "date", "default": "" },
