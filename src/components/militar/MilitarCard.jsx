@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, MapPin, MoreVertical, Pencil, Trash2, Eye, ClipboardList, ExternalLink, FileText } from 'lucide-react';
+import { User, MapPin, MoreVertical, Pencil, Trash2, Eye, ExternalLink, FileText } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,10 +90,6 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
                  <DropdownMenuItem onClick={() => onView(militar)}>
                   <Eye className="w-4 h-4 mr-2" />
                   Visualizar
-                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}&tab=comportamento`)}>
-                  <ClipboardList className="w-4 h-4 mr-2" />
-                  Comportamento Militar
                  </DropdownMenuItem>
                  <DropdownMenuItem onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}&tab=comportamento`)}>
                   <FileText className="w-4 h-4 mr-2" />
