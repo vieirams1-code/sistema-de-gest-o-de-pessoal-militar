@@ -1,6 +1,15 @@
 import { base44 } from '@/api/base44Client';
 import { promoverMilitaresEmLote } from '@/services/promocaoMilitarService';
 
+const STATUS_TURMA = Object.freeze({
+  RASCUNHO: 'Rascunho',
+  PRONTA: 'Pronta para processamento',
+  EM_PROCESSAMENTO: 'Em processamento',
+  PROCESSADA: 'Processada',
+  PROCESSADA_COM_PENDENCIAS: 'Processada com pendências',
+  FALHA_EXECUCAO: 'Falha na execução',
+});
+
 function normalizarTexto(valor) {
   return String(valor || '').trim();
 }
@@ -29,6 +38,11 @@ async function buscarTurmaPorId(turmaId) {
   return Array.isArray(turmas) ? (turmas[0] || null) : null;
 }
 
+async function atualizarTurmaSePossivel(turmaId, payload) {
+  if (!base44.entities?.TurmaPromocaoMilitar?.update) return;
+  await base44.entities.TurmaPromocaoMilitar.update(turmaId, payload);
+}
+
 export async function criarTurmaPromocaoMilitar({
   nome,
   identificacao,
@@ -54,12 +68,27 @@ export async function criarTurmaPromocaoMilitar({
   if (!dataPromocaoISO) throw new Error('Informe a data de promoção da turma.');
   if (!dataValida(dataPromocaoISO)) throw new Error('Data de promoção da turma inválida.');
 
+  if (identificacaoNormalizada && typeof entidadeTurma.filter === 'function') {
+    const turmasMesmoIdentificador = await entidadeTurma.filter({ identificacao: identificacaoNormalizada });
+    const existeDuplicada = (Array.isArray(turmasMesmoIdentificador) ? turmasMesmoIdentificador : [])
+      .some((item) => normalizarDataISO(item?.data_promocao) === dataPromocaoISO);
+    if (existeDuplicada) {
+      throw new Error('Já existe turma com a mesma identificação e data de promoção.');
+    }
+  }
+
   return entidadeTurma.create({
     nome: nomeNormalizado,
     identificacao: identificacaoNormalizada,
     posto_graduacao_alvo: postoAlvo,
     data_promocao: dataPromocaoISO,
-    status: 'Rascunho',
+    status: STATUS_TURMA.RASCUNHO,
+    mensagem_status: '',
+    total_membros: 0,
+    total_processados: 0,
+    total_promovidos: 0,
+    total_sem_alteracao: 0,
+    total_falhas: 0,
     observacoes: normalizarTexto(observacoes),
     created_by: normalizarTexto(userEmail),
   });
@@ -112,9 +141,19 @@ export async function associarMilitaresATurmaPromocao({
     await entidadeMembro.create({
       turma_promocao_id: turma.id,
       militar_id: militarId,
+      status_processamento: 'Pendente',
+      ultima_mensagem_processamento: '',
       created_by: normalizarTexto(userEmail),
     });
     criados += 1;
+  }
+
+  if (criados > 0) {
+    await atualizarTurmaSePossivel(turma.id, {
+      status: STATUS_TURMA.PRONTA,
+      total_membros: idsJaVinculados.size + criados,
+      mensagem_status: '',
+    });
   }
 
   return {
@@ -128,6 +167,9 @@ export async function associarMilitaresATurmaPromocao({
 export async function executarPromocaoDaTurma({ turmaId, userEmail }) {
   const turma = await buscarTurmaPorId(turmaId);
   if (!turma) throw new Error('Turma de promoção não encontrada.');
+  if (normalizarTexto(turma.status) === STATUS_TURMA.EM_PROCESSAMENTO) {
+    throw new Error('A turma já está em processamento. Aguarde a finalização para nova execução.');
+  }
 
   const entidadeMembro = base44.entities?.TurmaPromocaoMilitarMembro;
   if (!entidadeMembro || typeof entidadeMembro.filter !== 'function') {
@@ -154,18 +196,45 @@ export async function executarPromocaoDaTurma({ turmaId, userEmail }) {
     throw new Error('Não foi possível carregar os militares vinculados à turma.');
   }
 
-  const resultadoLote = await promoverMilitaresEmLote({
-    militaresSelecionados,
-    postoGraduacao: turma.posto_graduacao_alvo,
-    dataPromocaoAtual: turma.data_promocao,
-    userEmail,
+  await atualizarTurmaSePossivel(turma.id, {
+    status: STATUS_TURMA.EM_PROCESSAMENTO,
+    mensagem_status: '',
   });
 
-  if (base44.entities?.TurmaPromocaoMilitar?.update) {
-    await base44.entities.TurmaPromocaoMilitar.update(turma.id, {
-      status: resultadoLote.falhas > 0 ? 'Processada com pendências' : 'Processada',
+  let resultadoLote;
+  try {
+    resultadoLote = await promoverMilitaresEmLote({
+      militaresSelecionados,
+      postoGraduacao: turma.posto_graduacao_alvo,
+      dataPromocaoAtual: turma.data_promocao,
+      userEmail,
     });
+  } catch (error) {
+    await atualizarTurmaSePossivel(turma.id, {
+      status: STATUS_TURMA.FALHA_EXECUCAO,
+      mensagem_status: normalizarTexto(error?.message) || 'Falha inesperada na execução da turma.',
+      ultima_execucao_em: new Date().toISOString(),
+      ultima_execucao_por: normalizarTexto(userEmail),
+      total_membros: militarIds.length,
+      total_processados: 0,
+      total_promovidos: 0,
+      total_sem_alteracao: 0,
+      total_falhas: militarIds.length,
+    });
+    throw error;
   }
+
+  await atualizarTurmaSePossivel(turma.id, {
+    status: resultadoLote.falhas > 0 ? STATUS_TURMA.PROCESSADA_COM_PENDENCIAS : STATUS_TURMA.PROCESSADA,
+    mensagem_status: '',
+    ultima_execucao_em: new Date().toISOString(),
+    ultima_execucao_por: normalizarTexto(userEmail),
+    total_membros: militarIds.length,
+    total_processados: resultadoLote.totalSelecionados || 0,
+    total_promovidos: resultadoLote.promovidos || 0,
+    total_sem_alteracao: resultadoLote.semAlteracao || 0,
+    total_falhas: resultadoLote.falhas || 0,
+  });
 
   return {
     turma_id: turma.id,

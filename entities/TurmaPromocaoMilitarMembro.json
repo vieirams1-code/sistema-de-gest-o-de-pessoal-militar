@@ -6,6 +6,8 @@
   "properties": {
     "turma_promocao_id": { "type": "string", "default": "" },
     "militar_id": { "type": "string", "default": "" },
+    "status_processamento": { "type": "string", "default": "Pendente" },
+    "ultima_mensagem_processamento": { "type": "string", "default": "" },
     "created_by": { "type": "string", "default": "" }
   }
 }

@@ -9,6 +9,14 @@
     "posto_graduacao_alvo": { "type": "string", "default": "" },
     "data_promocao": { "type": "date", "default": "" },
     "status": { "type": "string", "default": "Rascunho" },
+    "mensagem_status": { "type": "string", "default": "" },
+    "ultima_execucao_em": { "type": "datetime", "default": "" },
+    "ultima_execucao_por": { "type": "string", "default": "" },
+    "total_membros": { "type": "number", "default": 0 },
+    "total_processados": { "type": "number", "default": 0 },
+    "total_promovidos": { "type": "number", "default": 0 },
+    "total_sem_alteracao": { "type": "number", "default": 0 },
+    "total_falhas": { "type": "number", "default": 0 },
     "observacoes": { "type": "string", "default": "" },
     "created_by": { "type": "string", "default": "" }
   }
