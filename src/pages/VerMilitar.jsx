@@ -35,8 +35,18 @@ import {
 } from '@/utils/comportamentoTemplateUtils';
 import { promoverMilitarSimples } from '@/services/promocaoMilitarService';
 
-const POSTOS_OFICIAIS = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'];
-const isOficial = (postoGraduacao) => POSTOS_OFICIAIS.includes(String(postoGraduacao || '').trim());
+const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
+
+const normalizarPosto = (valor) => String(valor || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[º°]/g, '')
+  .replace(/[-_]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .toLowerCase();
+
+const isOficial = (postoGraduacao) => POSTOS_OFICIAIS.has(normalizarPosto(postoGraduacao));
 
 const POSTOS_GRADUACOES = [
   'Coronel',
@@ -164,25 +174,25 @@ export default function VerMilitar() {
       });
       return historico;
     },
-    enabled: !!id && isAccessResolved && canViewMilitar
+    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
   });
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['ver-punicoes-comportamento', id],
     queryFn: () => base44.entities.PunicaoDisciplinar.filter({ militar_id: id }, '-data_inicio_cumprimento'),
-    enabled: !!id && isAccessResolved && canViewMilitar
+    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
   });
 
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['ver-pendencias-comportamento', id],
     queryFn: () => base44.entities.PendenciaComportamento.filter({ militar_id: id, status_pendencia: 'Pendente' }),
-    enabled: !!id && isAccessResolved && canViewMilitar
+    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
   });
 
   const { data: templatesAtivos = [] } = useQuery({
     queryKey: ['templates-ativos-comportamento-rp'],
     queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
-    enabled: !!id && isAccessResolved && canViewMilitar,
+    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel,
   });
 
   const pendenciasComportamentoUnicas = React.useMemo(() => {
