@@ -1,5 +1,4 @@
 import { base44 } from '@/api/base44Client';
-import { registrarHistoricoPromocaoMilitarSeNecessario } from '@/services/historicoPromocaoMilitarService';
 import { ordenarMilitaresPorAntiguidade } from '@/utils/antiguidadeMilitar';
 
 const POSITIVE_INTEGER_REGEX = /^[1-9]\d*$/;
@@ -84,16 +83,8 @@ export async function promoverMilitarSimples({
     id: militarId,
   };
 
-  const historico = await registrarHistoricoPromocaoMilitarSeNecessario({
-    militarAntes: militarAtual || {},
-    militarDepois,
-    userEmail: normalizarTexto(userEmail),
-    contexto: 'promocao_manual',
-  });
-
   return {
     atualizou: true,
-    historico,
   };
 }
 

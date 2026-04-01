@@ -18,7 +18,6 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
-import { registrarHistoricoPromocaoMilitarSeNecessario } from '@/services/historicoPromocaoMilitarService';
 
 const initialFormData = {
   nome_completo: '',
@@ -218,16 +217,6 @@ export default function CadastrarMilitar() {
       });
     }
 
-    if (militarId) {
-      const militarAntesPromocao = editId ? (editingMilitar || {}) : {};
-      await registrarHistoricoPromocaoMilitarSeNecessario({
-        militarAntes: militarAntesPromocao,
-        militarDepois: { ...dataToSave, id: militarId },
-        userEmail: user?.email || '',
-        contexto: editId ? 'edicao_cadastro' : 'cadastro_inicial',
-      });
-    }
-    
     queryClient.invalidateQueries({ queryKey: ['militares'] });
     setLoading(false);
     navigate(createPageUrl('Militares'));
