@@ -139,6 +139,10 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const handleOpenAtaJiso = () => {
+    if (statusDocumentalAtaJiso.bloqueiaNovaPublicacao) {
+      alert('Ação bloqueada: já existe Ata JISO ativa/consolidada para este atestado.');
+      return;
+    }
     const texto = gerarTextoAtaJiso(ataJisoForm);
     if (texto === null) {
       alert("Template obrigatório não encontrado para 'Ata JISO'. Entre em contato com o administrador.");
@@ -430,6 +434,15 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                       >
                         <FileText className="w-4 h-4 mr-2 text-slate-400" />
                         <span className="truncate">Homologação vinculada — edição bloqueada neste card</span>
+                      </DropdownMenuItem>
+                    ) : p.tipo === 'Ata JISO' && calcStatusPublicacao(p) === 'Publicado' ? (
+                      <DropdownMenuItem
+                        key={p.id}
+                        disabled
+                        title="Ata JISO consolidada/publicada: edição bloqueada neste card."
+                      >
+                        <FileText className="w-4 h-4 mr-2 text-slate-400" />
+                        <span className="truncate">{statusDocumentalAtaJiso.texto} — edição bloqueada neste card</span>
                       </DropdownMenuItem>
                     ) : (
                       <DropdownMenuItem key={p.id} onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?id=${p.id}`, '_blank')}>

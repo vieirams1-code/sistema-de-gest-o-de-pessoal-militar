@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import JisoHistoricoModal from '@/components/atestado/JisoHistoricoModal';
 import {
+  calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
   getStatusDocumentalAtaJiso,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
@@ -717,6 +718,7 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
   const podeRegistrarDecisaoJiso = fluxoJiso.isCardJisoElegivel;
   const decisaoJisoRegistrada = fluxoJiso.decisaoJisoRegistrada;
   const statusDocumentalAtaJiso = getStatusDocumentalAtaJiso(atestadoVinculado || {}, publicacoesAtestado);
+  const ataJisoConsolidada = calcStatusPublicacao(statusDocumentalAtaJiso.publicacao || {}) === 'Publicado';
   const ataJisoAtiva = existePublicacaoAtivaParaAtestado(
     publicacoesAtestado,
     vinculoAtestado?.referencia_id,
@@ -1152,9 +1154,11 @@ export default function CardDetalheModal({ card, colunaNome, onClose, onCardUpda
                     type="button"
                     variant="outline"
                     className="h-8 text-xs"
+                    disabled={ataJisoConsolidada}
+                    title={ataJisoConsolidada ? 'Ata JISO consolidada/publicada: edição bloqueada neste card.' : ''}
                     onClick={() => window.open(`${createPageUrl('CadastrarPublicacao')}?id=${statusDocumentalAtaJiso.publicacao.id}`, '_blank')}
                   >
-                    Ver publicação
+                    {ataJisoConsolidada ? 'Ata publicada — edição bloqueada no card' : 'Ver publicação'}
                   </Button>
                 ) : null}
                 <Button

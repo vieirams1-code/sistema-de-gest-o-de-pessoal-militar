@@ -1,5 +1,5 @@
 export function calcStatusPublicacao(registro = {}) {
-  if (registro.numero_bg && registro.data_bg) return 'Publicado';
+  if (registro.numero_bg || registro.data_bg) return 'Publicado';
   if (registro.nota_para_bg) return 'Aguardando Publicação';
   return 'Aguardando Nota';
 }
@@ -73,14 +73,23 @@ export function getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas = [])
 
   if (ataAtivaMaisRecente) {
     const statusPublicacao = calcStatusPublicacao(ataAtivaMaisRecente);
-    if (statusPublicacao === 'Publicado' && ataAtivaMaisRecente.numero_bg && ataAtivaMaisRecente.data_bg) {
-      const dataBg = new Date(`${ataAtivaMaisRecente.data_bg}T00:00:00`);
-      const dataFormatada = Number.isNaN(dataBg.getTime())
-        ? ataAtivaMaisRecente.data_bg
-        : dataBg.toLocaleDateString('pt-BR');
+    if (statusPublicacao === 'Publicado') {
+      const temNumeroBg = !!ataAtivaMaisRecente.numero_bg;
+      const temDataBg = !!ataAtivaMaisRecente.data_bg;
+      const dataBg = temDataBg ? new Date(`${ataAtivaMaisRecente.data_bg}T00:00:00`) : null;
+      const dataFormatada = dataBg && !Number.isNaN(dataBg.getTime())
+        ? dataBg.toLocaleDateString('pt-BR')
+        : ataAtivaMaisRecente.data_bg;
+      const sufixoBg = temNumeroBg && dataFormatada
+        ? `BG ${ataAtivaMaisRecente.numero_bg} de ${dataFormatada}`
+        : temNumeroBg
+          ? `BG ${ataAtivaMaisRecente.numero_bg}`
+          : dataFormatada
+            ? `publicada em ${dataFormatada}`
+            : 'Publicada';
       return {
         codigo: 'publicada',
-        texto: `Ata JISO — BG ${ataAtivaMaisRecente.numero_bg} de ${dataFormatada}`,
+        texto: `Ata JISO — ${sufixoBg}`,
         publicacao: ataAtivaMaisRecente,
         bloqueiaNovaPublicacao: true,
       };
