@@ -12,6 +12,7 @@ import {
   ChevronRight, Clock, CheckCircle, Stethoscope
 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
+import AfastamentosVigentesPanel from '@/components/dashboard/AfastamentosVigentesPanel';
 import { ptBR } from 'date-fns/locale';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
@@ -208,6 +209,10 @@ export default function Home() {
             color="bg-slate-100 text-slate-600"
             onClick={() => navigate(createPageUrl('Armamentos'))}
           />
+        </div>
+
+        <div className="mb-8">
+          <AfastamentosVigentesPanel />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
