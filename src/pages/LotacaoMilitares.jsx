@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from "@/components/ui/use-toast";
-import { getMissingAntiguidadeFields, ordenarMilitaresPorAntiguidade } from '@/utils/antiguidadeMilitar';
 
 const normalizeTipo = (tipo) => {
   if (tipo === 'Grupamento') return 'Setor';
@@ -47,14 +46,13 @@ export default function LotacaoMilitares() {
 
   // Filtragem de militares
   const militaresFiltrados = useMemo(() => {
-    const filtrados = militares
+    return militares
       .filter(m => {
         if (!searchMilitar) return true;
         const q = searchMilitar.toLowerCase();
         return (m.nome_completo?.toLowerCase().includes(q) || m.matricula?.includes(q) || m.posto_graduacao?.toLowerCase().includes(q));
-      });
-
-    return ordenarMilitaresPorAntiguidade(filtrados);
+      })
+      .sort((a, b) => String(a?.nome_completo || '').localeCompare(String(b?.nome_completo || ''), 'pt-BR'));
   }, [militares, searchMilitar]);
 
   const toggleExpand = (id, e) => {
@@ -288,8 +286,6 @@ export default function LotacaoMilitares() {
                     const isSelected = selectedMilitares.includes(m.id);
                     // Computa lotacao formatada
                     const lotacaoText = m.subgrupamento_nome ? `${m.subgrupamento_nome}${m.grupamento_nome && m.grupamento_nome !== m.subgrupamento_nome ? ` (${m.grupamento_nome})` : ''}` : m.grupamento_nome || 'Sem lotação';
-                    const missingAntiguidade = getMissingAntiguidadeFields(m);
-                    const hasAntiguidadeWarning = missingAntiguidade.length > 0;
                     
                     return (
                       <div 
@@ -306,15 +302,6 @@ export default function LotacaoMilitares() {
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <p className="text-xs text-slate-500 font-medium truncate">Mat. {m.matricula}</p>
-                              {hasAntiguidadeWarning && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] h-5 border-amber-300 text-amber-700 bg-amber-50"
-                                  title={`Dados incompletos para antiguidade confiável: ${missingAntiguidade.join(', ')}`}
-                                >
-                                  Antiguidade incompleta
-                                </Badge>
-                              )}
                             </div>
                           </div>
                         </div>

@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowLeft, Pencil, User, Briefcase, FileText,
-  Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard, ChevronUp,
+  Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
   Shield, Award, Send, Activity, AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -26,7 +24,6 @@ import {
   criarChavePendenciaComportamento,
   obterHistoricoComportamentoMilitar,
 } from '@/services/justicaDisciplinaService';
-import { promoverMilitarSimples } from '@/services/promocaoMilitarService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -48,22 +45,6 @@ const normalizarPosto = (valor) => String(valor || '')
   .toLowerCase();
 
 const isOficial = (postoGraduacao) => POSTOS_OFICIAIS.has(normalizarPosto(postoGraduacao));
-
-const POSTOS_GRADUACOES = [
-  'Coronel',
-  'Tenente Coronel',
-  'Major',
-  'Capitão',
-  '1º Tenente',
-  '2º Tenente',
-  'Aspirante',
-  'Subtenente',
-  '1º Sargento',
-  '2º Sargento',
-  '3º Sargento',
-  'Cabo',
-  'Soldado',
-];
 
 const toChartLevel = (comportamento) => {
   if (!comportamento) return 3;
@@ -104,18 +85,11 @@ function formatDate(date) {
 
 export default function VerMilitar() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const selectedTab = searchParams.get('tab') || 'comportamento';
-  const { user, isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
-  const [showPromocaoDialog, setShowPromocaoDialog] = useState(false);
-  const [promocaoForm, setPromocaoForm] = useState({
-    posto_graduacao: '',
-    data_promocao_atual: '',
-    antiguidade_referencia_ordem: '',
-  });
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
@@ -232,39 +206,6 @@ export default function VerMilitar() {
     };
   }).filter((item) => Number.isFinite(item.year)), [historicoComportamento]);
 
-  const promocaoMutation = useMutation({
-    mutationFn: async () => promoverMilitarSimples({
-      militarAtual: militar,
-      postoGraduacao: promocaoForm.posto_graduacao,
-      dataPromocaoAtual: promocaoForm.data_promocao_atual,
-      antiguidadeReferenciaOrdem: promocaoForm.antiguidade_referencia_ordem,
-      userEmail: user?.email || '',
-    }),
-    onSuccess: (resultado) => {
-      if (!resultado?.atualizou) {
-        alert('Nenhuma alteração detectada para registrar promoção.');
-        return;
-      }
-      queryClient.invalidateQueries({ queryKey: ['militar', id] });
-      queryClient.invalidateQueries({ queryKey: ['militares'] });
-      setShowPromocaoDialog(false);
-      alert('Promoção registrada com sucesso.');
-    },
-    onError: (error) => {
-      alert(error?.message || 'Falha ao registrar promoção.');
-    },
-  });
-
-  const abrirDialogPromocao = React.useCallback(() => {
-    setPromocaoForm({
-      posto_graduacao: militar?.posto_graduacao || '',
-      data_promocao_atual: militar?.data_promocao_atual || '',
-      antiguidade_referencia_ordem: militar?.antiguidade_referencia_ordem ?? '',
-    });
-    setShowPromocaoDialog(true);
-  }, [militar]);
-
-
   if (loadingUser || isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -319,10 +260,6 @@ export default function VerMilitar() {
             </Button>
             {isAdmin && (
               <>
-                <Button variant="outline" onClick={abrirDialogPromocao}>
-                  <ChevronUp className="w-4 h-4 mr-2" />
-                  Promover
-                </Button>
                 <Button onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                   <Pencil className="w-4 h-4 mr-2" />Editar
                 </Button>
@@ -664,57 +601,6 @@ export default function VerMilitar() {
           onSaved={() => setShowSolicitacao(false)}
         />
       )}
-
-      <Dialog open={showPromocaoDialog} onOpenChange={setShowPromocaoDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-[#1e3a5f]">Registrar promoção</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Posto/Graduação</label>
-              <select
-                className="w-full border rounded-md h-10 px-3 bg-white"
-                value={promocaoForm.posto_graduacao}
-                onChange={(e) => setPromocaoForm((prev) => ({ ...prev, posto_graduacao: e.target.value }))}
-              >
-                <option value="">Selecione</option>
-                {POSTOS_GRADUACOES.map((posto) => (
-                  <option key={posto} value={posto}>{posto}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Data da promoção</label>
-              <Input
-                type="date"
-                value={promocaoForm.data_promocao_atual}
-                onChange={(e) => setPromocaoForm((prev) => ({ ...prev, data_promocao_atual: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Antiguidade de referência (opcional)</label>
-              <Input
-                type="number"
-                min={1}
-                step={1}
-                value={promocaoForm.antiguidade_referencia_ordem}
-                onChange={(e) => setPromocaoForm((prev) => ({ ...prev, antiguidade_referencia_ordem: e.target.value }))}
-                placeholder="Ex.: 12"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowPromocaoDialog(false)}>
-                Cancelar
-              </Button>
-              <Button type="button" onClick={() => promocaoMutation.mutate()} disabled={promocaoMutation.isPending}>
-                {promocaoMutation.isPending ? 'Salvando...' : 'Confirmar promoção'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
