@@ -594,7 +594,7 @@ export default function Publicacoes() {
                         onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
                         canAccessAction={canAccessAction}
                         modoAdmin={modoAdmin}
-                        currentUserEmail={user?.email || ''}
+                        isAdmin={isAdmin}
                       />
                     ))}
                   </div>
