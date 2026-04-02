@@ -126,6 +126,10 @@ export default function Home() {
     queryKey: ['dashboard-pendencias-comportamento'],
     queryFn: () => base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' }),
   });
+  const { data: jisos = [] } = useQuery({
+    queryKey: ['dashboard-jisos'],
+    queryFn: () => base44.entities.JISO.list('-data_jiso'),
+  });
 
   // Alertas de férias por nível
   const periodosAlerta = periodos.filter(p => {
@@ -143,6 +147,24 @@ export default function Home() {
   const punicoesAtivas = punicoes.filter(p => p.status_punicao === 'Ativa' || p.status_punicao === 'Em Curso');
   const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamento.length;
   const registrosRecentes = registrosLivro.slice(0, 5);
+  const jisosAgendadas = jisos
+    .filter((jiso) => {
+      if (!jiso?.data_jiso) return false;
+      const dataJiso = new Date(`${jiso.data_jiso}T00:00:00`);
+      const status = (jiso.status || '').trim();
+      const statusFinalizada = status === 'Realizada' || status === 'Cancelada';
+      return dataJiso >= hoje && !statusFinalizada;
+    })
+    .sort((a, b) => new Date(`${a.data_jiso}T00:00:00`) - new Date(`${b.data_jiso}T00:00:00`));
+
+  const formatarHoraJiso = (jiso) => {
+    const horaRaw = jiso.horario_jiso || jiso.horario || jiso.hora_jiso;
+    if (!horaRaw) return null;
+    if (/^\d{2}:\d{2}/.test(horaRaw)) return horaRaw.slice(0, 5);
+    const parsed = new Date(horaRaw);
+    if (Number.isNaN(parsed.getTime())) return horaRaw;
+    return parsed.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -271,6 +293,47 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* Próximas datas de JISO */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-500" />
+                  <h2 className="font-semibold text-slate-800">Próximas datas de JISO</h2>
+                  <Badge className="bg-blue-100 text-blue-700">{jisosAgendadas.length}</Badge>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => navigate(createPageUrl('AgendarJISO'))}>
+                  Ver agenda <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+              {jisosAgendadas.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-6">Nenhuma JISO agendada</p>
+              ) : (
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {jisosAgendadas.map((jiso) => {
+                    const horaJiso = formatarHoraJiso(jiso);
+                    return (
+                      <div key={jiso.id} className="flex items-center justify-between p-3 rounded-lg border border-blue-100 bg-blue-50/50">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">
+                            {jiso.militar_posto ? `${jiso.militar_posto} ` : ''}{jiso.militar_nome || 'Militar não informado'}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Data: {format(new Date(`${jiso.data_jiso}T00:00:00`), 'dd/MM/yyyy')}
+                            {horaJiso ? ` • ${horaJiso}` : ''}
+                          </p>
+                        </div>
+                        {jiso.status && (
+                          <Badge variant="outline" className="text-slate-600 border-slate-300">
+                            {jiso.status}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Estado limpo */}
             {totalAlertas === 0 && (
