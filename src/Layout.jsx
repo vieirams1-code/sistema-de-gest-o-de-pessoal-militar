@@ -53,7 +53,7 @@ const menuGroups = [
   {
     title: 'Atestados',
     items: [
-      { name: 'Atestados', page: 'DashboardAtestados', icon: HeartPulse, moduleKey: 'atestados' },
+      { name: 'Atestados', page: 'Atestados', icon: HeartPulse, moduleKey: 'atestados' },
     ],
   },
   {
