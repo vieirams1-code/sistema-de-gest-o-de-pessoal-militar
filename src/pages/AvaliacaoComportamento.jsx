@@ -6,6 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import {
@@ -22,6 +23,10 @@ export default function AvaliacaoComportamento() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [filtro, setFiltro] = useState('');
+  const [aprovacaoModal, setAprovacaoModal] = useState({
+    open: false,
+    linha: null,
+  });
   const punicaoEntity = getPunicaoEntity();
 
   const { data: militares = [], isLoading } = useQuery({
@@ -184,6 +189,26 @@ export default function AvaliacaoComportamento() {
     await queryClient.invalidateQueries({ queryKey: ['pendencias-comportamento'] });
   };
 
+  const abrirModalAprovacao = (linha) => {
+    setAprovacaoModal({
+      open: true,
+      linha,
+    });
+  };
+
+  const fecharModalAprovacao = () => {
+    setAprovacaoModal({
+      open: false,
+      linha: null,
+    });
+  };
+
+  const confirmarAprovacao = async ({ gerarPublicacao = false } = {}) => {
+    if (!aprovacaoModal.linha) return;
+    await aplicarSugestao(aprovacaoModal.linha, { gerarPublicacao });
+    fecharModalAprovacao();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -244,13 +269,9 @@ export default function AvaliacaoComportamento() {
                       </Button>
                       {linha.divergente ? (
                         <>
-                          <Button size="sm" onClick={() => aplicarSugestao(linha)}>
+                          <Button size="sm" onClick={() => abrirModalAprovacao(linha)}>
                             <CheckCircle2 className="w-4 h-4 mr-1" />
-                            Aplicar
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => aplicarSugestao(linha, { gerarPublicacao: true })}>
-                            <FileText className="w-4 h-4 mr-1" />
-                            Aplicar e gerar publicação
+                            Aprovar mudança
                           </Button>
                         </>
                       ) : (
@@ -264,6 +285,35 @@ export default function AvaliacaoComportamento() {
           </table>
         </div>
       </div>
+
+      <Dialog open={aprovacaoModal.open} onOpenChange={(open) => (!open ? fecharModalAprovacao() : null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Aprovar mudança de comportamento</DialogTitle>
+            <DialogDescription>
+              Escolha como deseja concluir a aprovação para {aprovacaoModal.linha?.militar?.nome_completo || 'o militar selecionado'}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border bg-slate-50 p-3 text-sm text-slate-700">
+            <strong>Mudança:</strong>{' '}
+            {aprovacaoModal.linha
+              ? `${aprovacaoModal.linha.militar.comportamento || 'Bom'} → ${aprovacaoModal.linha.calculado?.comportamento || '—'}`
+              : '—'}
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => confirmarAprovacao({ gerarPublicacao: false })}>
+              <CheckCircle2 className="w-4 h-4 mr-1" />
+              Aprovar sem publicação
+            </Button>
+            <Button onClick={() => confirmarAprovacao({ gerarPublicacao: true })}>
+              <FileText className="w-4 h-4 mr-1" />
+              Aprovar e gerar publicação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
