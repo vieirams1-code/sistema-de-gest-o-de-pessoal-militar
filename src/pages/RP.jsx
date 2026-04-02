@@ -1,6 +1,6 @@
-import React, { Fragment, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, FileText, Filter, CalendarRange, ShieldAlert, UserRound, ExternalLink, BookOpenText } from 'lucide-react';
+import { Plus, FileText, Filter, CalendarRange, ShieldAlert, BookOpenText } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
@@ -8,24 +8,6 @@ import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
-
-const STATUS_OPTIONS = [
-  { value: 'todos', label: 'Todos os status' },
-  { value: 'ativo', label: 'Ativos' },
-  { value: 'aguardando_nota', label: 'Aguardando nota' },
-  { value: 'aguardando_publicacao', label: 'Aguardando publicação' },
-  { value: 'gerada', label: 'Publicados' },
-  { value: 'inconsistente', label: 'Inconsistentes' },
-];
-
-const MODULO_OPTIONS = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'Livro', label: 'Livro' },
-  { value: 'Ex Officio', label: 'Ex Officio' },
-];
 
 const STATUS_PRIORITY = {
   inconsistente: 0,
@@ -34,83 +16,6 @@ const STATUS_PRIORITY = {
   gerada: 3,
 };
 
-const STATUS_GROUP_CONFIG = {
-  inconsistente: {
-    title: 'INCONSISTENTES',
-    cardClasses: 'border-red-300 bg-red-50/40',
-    actionLabel: 'AÇÃO NECESSÁRIA',
-    actionClasses: 'border border-red-200 bg-red-100 text-red-700',
-    sectionClasses: 'text-red-700 border-red-200 bg-red-50',
-  },
-  aguardando_publicacao: {
-    title: 'AGUARDANDO PUBLICAÇÃO',
-    cardClasses: 'border-amber-300 bg-amber-50/40',
-    actionLabel: 'PRONTO PARA PUBLICAR',
-    actionClasses: 'border border-amber-200 bg-amber-100 text-amber-800',
-    sectionClasses: 'text-amber-700 border-amber-200 bg-amber-50',
-  },
-  aguardando_nota: {
-    title: 'AGUARDANDO NOTA',
-    cardClasses: 'border-blue-300 bg-blue-50/40',
-    actionLabel: 'AGUARDANDO DOCUMENTO',
-    actionClasses: 'border border-blue-200 bg-blue-100 text-blue-700',
-    sectionClasses: 'text-blue-700 border-blue-200 bg-blue-50',
-  },
-  gerada: {
-    title: 'PUBLICADOS',
-    cardClasses: 'border-slate-200 bg-white',
-    actionLabel: '',
-    actionClasses: '',
-    sectionClasses: 'text-emerald-700 border-emerald-200 bg-emerald-50',
-  },
-  default: {
-    title: 'OUTROS',
-    cardClasses: 'border-slate-200 bg-white',
-    actionLabel: '',
-    actionClasses: '',
-    sectionClasses: 'text-slate-700 border-slate-200 bg-slate-50',
-  },
-};
-
-function getStatusClasses(statusCodigo) {
-  switch (statusCodigo) {
-    case 'gerada':
-      return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    case 'aguardando_publicacao':
-      return 'bg-blue-100 text-blue-700 border-blue-200';
-    case 'aguardando_nota':
-      return 'bg-amber-100 text-amber-700 border-amber-200';
-    case 'inconsistente':
-      return 'bg-red-100 text-red-700 border-red-200';
-    default:
-      return 'bg-slate-100 text-slate-700 border-slate-200';
-  }
-}
-
-function getTipoGrupo(tipoLabel = '') {
-  const tipo = tipoLabel.toLowerCase();
-
-  if (tipo.includes('férias')) return 'Férias';
-  if (tipo.includes('licença') || tipo.includes('luto') || tipo.includes('núpcias')) return 'Afastamentos';
-  if (tipo.includes('transfer') || tipo.includes('trânsito') || tipo.includes('instalação') || tipo.includes('cedência')) return 'Movimentação';
-  if (tipo.includes('missão') || tipo.includes('dispensa')) return 'Operacional';
-  return 'Outros';
-}
-
-function getTipoGrupoClasses(grupo) {
-  switch (grupo) {
-    case 'Férias':
-      return 'bg-cyan-50 text-cyan-700 border-cyan-200';
-    case 'Afastamentos':
-      return 'bg-violet-50 text-violet-700 border-violet-200';
-    case 'Movimentação':
-      return 'bg-orange-50 text-orange-700 border-orange-200';
-    case 'Operacional':
-      return 'bg-indigo-50 text-indigo-700 border-indigo-200';
-    default:
-      return 'bg-slate-50 text-slate-700 border-slate-200';
-  }
-}
 
 function normalizeModulo(modulo = '', registro = {}) {
   const valor = String(modulo || registro?.modulo || registro?.origem_tipo || '').trim().toLowerCase();
@@ -124,12 +29,6 @@ function normalizeModulo(modulo = '', registro = {}) {
   if (registro?.origem_tipo === 'ex-officio' || registro?.tipo || registro?._origem === 'ex-officio') return 'Ex Officio';
 
   return modulo || 'Livro';
-}
-
-function getModuloBadgeClasses(modulo) {
-  return modulo === 'Livro'
-    ? 'border-blue-200 bg-blue-100 text-blue-700'
-    : 'border-violet-200 bg-violet-100 text-violet-700';
 }
 
 function normalizeStatus(registro) {
@@ -163,62 +62,13 @@ function normalizeStatusLabel(registro, statusCodigo) {
 function normalizeRegistro(registro) {
   const statusCodigo = normalizeStatus(registro);
   const modulo = normalizeModulo(registro.modulo, registro);
-  const militar = registro.militar || {};
-  const tipoOriginal = registro.tipo_label || registro.tipo_registro || registro.tipo || 'Registro RP';
-  const tipoAmigavel = getRPTipoLabel(tipoOriginal);
 
   return {
     ...registro,
     modulo_normalizado: modulo,
     status_codigo: statusCodigo,
     status_label: normalizeStatusLabel(registro, statusCodigo),
-    tipo_label: tipoAmigavel,
-    data_display: formatDateBR(registro.data_display || registro.data_registro || registro.data_inicio || registro.created_date || '-'),
-    origem: registro.origem || registro.origem_tipo || modulo,
-    militar: {
-      id: militar.id || registro.militar_id,
-      nome_guerra: militar.nome_guerra || registro.militar_nome || registro.nome_guerra || registro.nome || 'Não informado',
-      posto_graduacao: militar.posto_graduacao || registro.militar_posto_graduacao || registro.posto_graduacao || registro.posto || 'Posto não informado',
-      matricula: militar.matricula || registro.militar_matricula || '-',
-    },
-    publicacao: {
-      nota_para_bg: registro.publicacao?.nota_para_bg || registro.nota_para_bg || '-',
-      numero_bg: registro.publicacao?.numero_bg || registro.numero_bg || '',
-      data_bg: formatDateBR(registro.publicacao?.data_bg || registro.data_bg || '-'),
-      publicado_por: registro.publicacao?.publicado_por || registro.publicado_por || '-',
-      publicado_em: formatDateBR(registro.publicacao?.publicado_em || registro.publicado_em || '-'),
-    },
-    detalhes: registro.detalhes || registro.detalhes_contrato || { observacoes: registro.observacoes || '' },
-    inconsistencia: registro.inconsistencia || registro.inconsistencia_contrato || null,
-    vinculos: registro.vinculos || registro.vinculos_contrato || null,
   };
-}
-
-function formatDateBR(valor) {
-  if (!valor || valor === '-') return '-';
-  const data = String(valor).includes('T') ? new Date(valor) : new Date(`${valor}T00:00:00`);
-  if (Number.isNaN(data.getTime())) return valor;
-  return data.toLocaleDateString('pt-BR');
-}
-
-function buildSearchText(registro) {
-  return [
-    registro.tipo_label,
-    registro.modulo_normalizado,
-    registro.militar?.nome_guerra,
-    registro.militar?.posto_graduacao,
-    registro.militar?.matricula,
-    registro.status_label,
-    registro.origem,
-    registro.publicacao?.nota_para_bg,
-    registro.publicacao?.numero_bg,
-    registro.vinculos?.periodo?.label,
-    registro.detalhes?.observacoes,
-    registro.inconsistencia?.motivo_curto,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
 }
 
 function sortRegistrosDesc(registros = []) {
@@ -242,10 +92,6 @@ function sortRegistrosByOperationalPriority(registros = []) {
     const dataB = new Date(b.data_registro || b.data_inicio || b.created_date || 0).getTime();
     return dataB - dataA;
   });
-}
-
-function getStatusGroupConfig(statusCodigo = '') {
-  return STATUS_GROUP_CONFIG[statusCodigo] || STATUS_GROUP_CONFIG.default;
 }
 
 function formatOperationalSummary({ inconsistentes = 0, aguardando_publicacao = 0 } = {}) {
@@ -284,10 +130,6 @@ async function getPublicacoesExOfficioRP({ isAdmin, getMilitarScopeFilters }) {
 
 export default function RP() {
   const { canAccessModule, isAccessResolved, isLoading: loadingUser, isAdmin, getMilitarScopeFilters } = useCurrentUser();
-  const [busca, setBusca] = useState('');
-  const [statusFilter, setStatusFilter] = useState('todos');
-  const [tipoFilter, setTipoFilter] = useState('todos');
-  const [moduloFilter, setModuloFilter] = useState('todos');
 
   const hasAccess = canAccessModule('livro') || canAccessModule('publicacoes');
 
@@ -318,44 +160,6 @@ export default function RP() {
   });
 
   const registros = useMemo(() => registrosBrutos.map(normalizeRegistro), [registrosBrutos]);
-
-  const tiposDisponiveis = useMemo(() => {
-    const tipos = [...new Set(registros.map((registro) => registro.tipo_label).filter(Boolean))];
-    return tipos.sort((a, b) => a.localeCompare(b));
-  }, [registros]);
-
-  const registrosFiltrados = useMemo(() => {
-    const buscaNormalizada = busca.trim().toLowerCase();
-
-    const filtrados = registros.filter((registro) => {
-      if (statusFilter !== 'todos' && registro.status_codigo !== statusFilter) return false;
-      if (tipoFilter !== 'todos' && registro.tipo_label !== tipoFilter) return false;
-      if (moduloFilter !== 'todos' && registro.modulo_normalizado !== moduloFilter) return false;
-      if (buscaNormalizada && !buildSearchText(registro).includes(buscaNormalizada)) return false;
-      return true;
-    });
-
-    return sortRegistrosByOperationalPriority(filtrados);
-  }, [registros, busca, statusFilter, tipoFilter, moduloFilter]);
-
-  const registrosAgrupados = useMemo(() => {
-    const grupos = [];
-    let grupoAtual = null;
-
-    registrosFiltrados.forEach((registro) => {
-      if (!grupoAtual || grupoAtual.statusCodigo !== registro.status_codigo) {
-        grupoAtual = {
-          statusCodigo: registro.status_codigo,
-          registros: [],
-        };
-        grupos.push(grupoAtual);
-      }
-
-      grupoAtual.registros.push(registro);
-    });
-
-    return grupos;
-  }, [registrosFiltrados]);
 
   const metricas = useMemo(() => {
     const totais = {
@@ -422,171 +226,11 @@ export default function RP() {
           <MetricCard icon={ShieldAlert} label="Inconsistências" value={metricas.inconsistentes} helper="Requer conferência" />
         </div>
 
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 lg:grid-cols-[1.4fr,0.8fr,0.8fr,0.8fr]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar por militar, matrícula, tipo, nota ou observação"
-                className="pl-9"
-              />
-            </div>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={moduloFilter} onValueChange={setModuloFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Módulo" />
-              </SelectTrigger>
-              <SelectContent>
-                {MODULO_OPTIONS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={tipoFilter} onValueChange={setTipoFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tipo de registro" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os tipos</SelectItem>
-                {tiposDisponiveis.map((tipo) => (
-                  <SelectItem key={tipo} value={tipo}>
-                    {tipo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {isLoading && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
+            Carregando registros...
           </div>
-        </div>
-
-        <div className="space-y-4">
-          {isLoading ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
-              Carregando registros...
-            </div>
-          ) : registrosFiltrados.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
-              <FileText className="mx-auto mb-3 h-8 w-8 text-slate-400" />
-              <h3 className="text-base font-semibold text-slate-700">Nenhum registro encontrado</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                Ajuste os filtros ou cadastre um novo registro para iniciar o fluxo.
-              </p>
-            </div>
-          ) : (
-            registrosAgrupados.map((grupoStatus) => {
-              const statusConfig = getStatusGroupConfig(grupoStatus.statusCodigo);
-
-              return (
-                <div key={grupoStatus.statusCodigo} className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h2 className={`text-sm font-bold uppercase tracking-[0.18em] ${statusConfig.sectionClasses.split(' ')[0]}`}>
-                      {statusConfig.title}
-                    </h2>
-                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusConfig.sectionClasses}`}>
-                      {grupoStatus.registros.length} registro{grupoStatus.registros.length > 1 ? 's' : ''}
-                    </span>
-                  </div>
-
-                  {grupoStatus.registros.map((registro) => {
-                    const grupo = getTipoGrupo(registro.tipo_label);
-                    const cardStatusConfig = getStatusGroupConfig(registro.status_codigo);
-
-                    return (
-                      <Fragment key={`${registro.modulo_normalizado}-${registro.id}`}>
-                        <div className={`rounded-2xl border p-5 shadow-sm ${cardStatusConfig.cardClasses}`}>
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="min-w-0 flex-1">
-                              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getModuloBadgeClasses(registro.modulo_normalizado)}`}>
-                                    {registro.modulo_normalizado}
-                                  </span>
-                                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getTipoGrupoClasses(grupo)}`}>
-                                    {grupo}
-                                  </span>
-                                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(registro.status_codigo)}`}>
-                                    {registro.status_label}
-                                  </span>
-                                </div>
-
-                                {cardStatusConfig.actionLabel ? (
-                                  <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${cardStatusConfig.actionClasses}`}>
-                                    {cardStatusConfig.actionLabel}
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="truncate text-lg font-semibold text-[#1e3a5f]">{registro.tipo_label}</h3>
-                              </div>
-
-                              <div className="mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
-                                <InfoLine icon={UserRound} label="Militar" value={registro.militar?.nome_guerra} />
-                                <InfoLine label="Posto/Graduação" value={registro.militar?.posto_graduacao} />
-                                <InfoLine label="Matrícula" value={registro.militar?.matricula} />
-                                <InfoLine label="Data" value={registro.data_display} />
-                                <InfoLine label="Nota p/ BG" value={registro.publicacao?.nota_para_bg || '-'} />
-                                <InfoLine label="Nº BG" value={registro.publicacao?.numero_bg || '-'} />
-                                <InfoLine label="Data BG" value={registro.publicacao?.data_bg || '-'} />
-                                <InfoLine label="Origem" value={registro.origem || '-'} />
-                              </div>
-
-                              {(registro.detalhes?.observacoes || registro.inconsistencia?.motivo_curto || registro.vinculos?.periodo?.label) && (
-                                <div className="mt-4 space-y-2 rounded-xl bg-white/70 p-4">
-                                  {registro.vinculos?.periodo?.label && (
-                                    <p className="text-sm text-slate-600">
-                                      <span className="font-medium text-slate-700">Período vinculado:</span> {registro.vinculos.periodo.label}
-                                    </p>
-                                  )}
-                                  {registro.detalhes?.observacoes && (
-                                    <p className="text-sm text-slate-600">
-                                      <span className="font-medium text-slate-700">Observações:</span> {registro.detalhes.observacoes}
-                                    </p>
-                                  )}
-                                  {registro.inconsistencia?.motivo_curto && (
-                                    <p className="text-sm text-red-700">
-                                      <span className="font-medium">Inconsistência:</span> {registro.inconsistencia.motivo_curto}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex shrink-0 justify-start lg:justify-end">
-                              <Button asChild variant="ghost">
-                                <a href={createPageUrl('Publicacoes')}>
-                                  <ExternalLink className="mr-2 h-4 w-4" />
-                                  Publicações
-                                </a>
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </Fragment>
-                    );
-                  })}
-                </div>
-              );
-            })
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
@@ -603,18 +247,6 @@ function MetricCard({ icon: Icon, label, value, helper }) {
       </div>
       <p className="text-sm font-medium text-slate-700">{label}</p>
       <p className="mt-1 text-xs text-slate-500">{helper}</p>
-    </div>
-  );
-}
-
-function InfoLine({ icon: Icon, label, value }) {
-  return (
-    <div className="min-w-0">
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <div className="flex items-center gap-2">
-        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : null}
-        <p className="truncate text-sm font-medium text-slate-700">{value || '-'}</p>
-      </div>
     </div>
   );
 }
