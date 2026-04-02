@@ -17,14 +17,12 @@ import {
   Save,
   ChevronRight,
   Download,
-  AlertTriangle,
   RefreshCw
 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -561,13 +559,15 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
             ? 'Homologado'
             : 'Em análise'}
         </div>
-        <button
-          onClick={() => setShowJisoModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 shadow-sm transition-all active:scale-95 text-sm"
-        >
-          Registrar Decisão
-          <ChevronRight size={16} />
-        </button>
+        {isFluxoJiso && (
+          <button
+            onClick={() => setShowJisoModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 shadow-sm transition-all active:scale-95 text-sm"
+          >
+            Registrar Decisão
+            <ChevronRight size={16} />
+          </button>
+        )}
       </div>
 
       {/* Modal Homologação pelo Comandante */}
