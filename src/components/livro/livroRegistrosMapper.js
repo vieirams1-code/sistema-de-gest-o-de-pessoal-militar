@@ -1,5 +1,8 @@
 import { format } from 'date-fns';
 import { getTipoRegistroLabel } from '@/components/livro/livroTipoRegistroConfig';
+import { aplicarTemplate, buildVarsLivro } from '@/components/utils/templateUtils';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { getTipoFeriasOperacional, resolverTipoFeriasCanonico } from '@/components/ferias/feriasTipoResolver';
 
 const STATUS_LABELS = {
   ativo: 'Ativo',
@@ -146,6 +149,69 @@ function mapPublicacao(registro) {
   };
 }
 
+function getTextoPublicacaoRegistro({
+  registro,
+  ferias,
+  periodo,
+  militar,
+  templatesAtivosLivro,
+}) {
+  if (registro?.texto_publicacao) return registro.texto_publicacao;
+
+  const tipoCanonicoFerias = resolverTipoFeriasCanonico(registro?.tipo_registro);
+  if (!tipoCanonicoFerias) return registro?.documento_texto || '';
+
+  const tipoOperacionalFerias = getTipoFeriasOperacional(tipoCanonicoFerias);
+  const templateAtivo = getTemplateAtivoPorTipo(tipoCanonicoFerias, 'Livro', templatesAtivosLivro);
+
+  if (!templateAtivo?.template) {
+    const templatesCompativeis = templatesAtivosLivro
+      .filter((template) => resolverTipoFeriasCanonico(template?.tipo_registro) === tipoCanonicoFerias)
+      .map((template) => ({
+        id: template.id,
+        nome: template.nome || '',
+        tipo_registro: template.tipo_registro,
+        ativo: template.ativo !== false,
+        modulo: template.modulo,
+      }));
+    console.warn('[Publicacoes][Ferias][TemplateNaoEncontrado]', {
+      registro_id: registro?.id,
+      tipo_real_registro: registro?.tipo_registro || '',
+      tipo_normalizado: tipoCanonicoFerias,
+      tipo_operacional: tipoOperacionalFerias,
+      modulo_buscado: 'Livro',
+      templates_ativos_ferias: templatesCompativeis,
+    });
+    return registro?.documento_texto || '';
+  }
+
+  const vars = buildVarsLivro({
+    ferias: {
+      ...(ferias || {}),
+      dias: registro?.dias ?? ferias?.dias,
+      data_inicio: registro?.data_inicio || ferias?.data_inicio || registro?.data_registro,
+      data_retorno: registro?.data_retorno || ferias?.data_retorno,
+      data_interrupcao: registro?.data_registro || registro?.data_inicio || null,
+      militar_nome: registro?.militar_nome || militar?.nome_completo || militar?.nome,
+      militar_posto: registro?.militar_posto || militar?.posto_graduacao,
+      militar_matricula: registro?.militar_matricula || militar?.matricula,
+      periodo_aquisitivo_ref: registro?.periodo_aquisitivo || ferias?.periodo_aquisitivo_ref || '',
+      saldo_remanescente: registro?.saldo_remanescente ?? ferias?.saldo_remanescente,
+      dias_gozados_interrupcao: registro?.dias_gozados ?? ferias?.dias_gozados_interrupcao,
+    },
+    dataRegistro: registro?.data_registro || registro?.data_inicio || '',
+    periodo,
+    interrupcaoInfo: {
+      diasNoMomento: registro?.dias_no_momento ?? registro?.dias,
+      diasGozados: registro?.dias_gozados,
+      saldoRemanescente: registro?.saldo_remanescente,
+      dataInterrupcao: registro?.data_registro || registro?.data_inicio || '',
+    },
+  });
+
+  return aplicarTemplate(templateAtivo.template, vars);
+}
+
 function mapVinculos({ registro, ferias, periodo, cadeiaInfo }) {
   return {
     ferias: ferias
@@ -195,7 +261,7 @@ function mapMilitar(registro, militar) {
   };
 }
 
-export function mapLivroRegistrosPresenter({ registros = [], militares = [], ferias = [], periodos = [] } = {}) {
+export function mapLivroRegistrosPresenter({ registros = [], militares = [], ferias = [], periodos = [], templates = [] } = {}) {
   const militarById = new Map(militares.map((item) => [item.id, item]));
   const feriasById = new Map(ferias.map((item) => [item.id, item]));
   const periodoById = new Map(periodos.map((item) => [item.id, item]));
@@ -206,6 +272,8 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
     acc[item.ferias_id].push(item);
     return acc;
   }, {});
+
+  const templatesAtivosLivro = templates.filter((template) => template?.ativo !== false);
 
   const registrosLivro = registros.map((registro) => {
     const militar = militarById.get(registro?.militar_id);
@@ -219,6 +287,13 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
     const statusCodigo = getStatusCodigo(registro, inconsistencia);
     const cadeiaRaw = registro?.ferias_id ? registrosPorFerias[registro.ferias_id] || [] : [];
     const { cadeia, cadeia_eventos } = mapCadeiaEventos(registro, cadeiaRaw);
+    const textoPublicacao = getTextoPublicacaoRegistro({
+      registro,
+      ferias: feriasRegistro,
+      periodo: periodoRegistro,
+      militar,
+      templatesAtivosLivro,
+    });
 
     return {
       id: registro.id,
@@ -244,6 +319,7 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
         cadeiaInfo: cadeia,
       }),
       publicacao: mapPublicacao(registro),
+      texto_publicacao: textoPublicacao,
       inconsistencia,
       cadeia_eventos,
     };

@@ -1,11 +1,13 @@
+import { resolverTipoFeriasCanonico } from '@/components/ferias/feriasTipoResolver';
+
 export const TEMPLATE_BLOQUEIO_MENSAGEM =
   'Template obrigatório não encontrado para este tipo de registro. Cadastre um template antes de continuar.';
 
 export const TIPO_REGISTRO_TEMPLATE_INTERNO = {
-  SAIDA_FERIAS: 'SAIDA_FERIAS',
-  INTERRUPCAO_FERIAS: 'INTERRUPCAO_FERIAS',
-  CONTINUACAO_FERIAS: 'CONTINUACAO_FERIAS',
-  TERMINO_FERIAS: 'TERMINO_FERIAS',
+  SAIDA_FERIAS: 'Saída Férias',
+  INTERRUPCAO_FERIAS: 'Interrupção de Férias',
+  CONTINUACAO_FERIAS: 'Continuação de Férias',
+  TERMINO_FERIAS: 'Retorno Férias',
 };
 
 export function normalizarModulo(modulo = '') {
@@ -32,49 +34,11 @@ function normalizeTipoRegistroKey(value = '') {
     .trim();
 }
 
-const TIPO_REGISTRO_TEMPLATE_ALIASES = {
-  [TIPO_REGISTRO_TEMPLATE_INTERNO.SAIDA_FERIAS]: [
-    'SAIDA_FERIAS',
-    'saida_ferias',
-    'Início de Férias',
-    'Saída Férias',
-  ],
-  [TIPO_REGISTRO_TEMPLATE_INTERNO.INTERRUPCAO_FERIAS]: [
-    'INTERRUPCAO_FERIAS',
-    'interrupcao_ferias',
-    'Interrupção de Férias',
-  ],
-  [TIPO_REGISTRO_TEMPLATE_INTERNO.CONTINUACAO_FERIAS]: [
-    'CONTINUACAO_FERIAS',
-    'continuacao_ferias',
-    'Continuação',
-    'Nova Saída',
-    'Nova Saída / Retomada',
-    'Retomada',
-  ],
-  [TIPO_REGISTRO_TEMPLATE_INTERNO.TERMINO_FERIAS]: [
-    'TERMINO_FERIAS',
-    'termino_ferias',
-    'Término',
-    'Retorno de Férias',
-    'Retorno Férias',
-  ],
-};
-
-const MAPA_ALIAS_TIPO_REGISTRO_TEMPLATE = Object.entries(TIPO_REGISTRO_TEMPLATE_ALIASES).reduce(
-  (acc, [tipoInterno, aliases]) => {
-    aliases.forEach((alias) => {
-      acc.set(normalizeTipoRegistroKey(alias), tipoInterno);
-    });
-    return acc;
-  },
-  new Map()
-);
-
 export function resolveTipoRegistroTemplate(tipoRegistro = '') {
   if (!tipoRegistro) return '';
-  const tipoNormalizado = normalizeTipoRegistroKey(tipoRegistro);
-  return MAPA_ALIAS_TIPO_REGISTRO_TEMPLATE.get(tipoNormalizado) || String(tipoRegistro).trim();
+  const feriasCanonico = resolverTipoFeriasCanonico(tipoRegistro);
+  if (feriasCanonico) return feriasCanonico;
+  return normalizeTipoRegistroKey(tipoRegistro);
 }
 
 function getModuloCanonico(modulo = '') {
