@@ -3,10 +3,26 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Gavel } from 'lucide-react';
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
+import HistoricoComportamentoChart from '@/components/militar/HistoricoComportamentoChart';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import { getPunicaoEntity, obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
+
+
+const COMPORTAMENTO_LEVEL = {
+  MAU: 1,
+  INSUFICIENTE: 2,
+  BOM: 3,
+  ÓTIMO: 4,
+  OTIMO: 4,
+  EXCEPCIONAL: 5,
+};
+
+function toChartLevel(comportamento) {
+  if (!comportamento) return 3;
+  return COMPORTAMENTO_LEVEL[String(comportamento).trim().toUpperCase()] || 3;
+}
 
 export default function DetalheComportamento() {
   const navigate = useNavigate();
@@ -38,6 +54,17 @@ export default function DetalheComportamento() {
       dataInclusaoMilitar: militar.data_inclusao,
     });
   }, [militar, punicoes]);
+
+  const historicoChartData = useMemo(() => historico.map((evento) => {
+    const dataAlteracao = String(evento?.data_alteracao || '').slice(0, 10);
+    const year = Number(dataAlteracao.slice(0, 4));
+
+    return {
+      year,
+      level: toChartLevel(evento?.comportamento_novo),
+      desc: evento?.motivo_mudanca || evento?.motivo_mudanca_resolvido || evento?.observacoes || 'Alteração de comportamento registrada.',
+    };
+  }).filter((item) => Number.isFinite(item.year)), [historico]);
 
   const proximaMelhoria = useMemo(() => {
     if (!militar) return null;
@@ -100,7 +127,14 @@ export default function DetalheComportamento() {
 
         <div className="bg-white rounded-xl border p-4">
           <h3 className="font-semibold mb-3 inline-flex items-center gap-2"><Gavel className="w-4 h-4" />Histórico de comportamento</h3>
-          <ComportamentoTimeline eventos={historico} />
+          <HistoricoComportamentoChart
+            data={historicoChartData}
+            title="Evolução anual do comportamento"
+            height={220}
+          />
+          <div className="mt-4">
+            <ComportamentoTimeline eventos={historico} />
+          </div>
         </div>
       </div>
     </div>
