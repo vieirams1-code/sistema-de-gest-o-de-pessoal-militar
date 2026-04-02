@@ -42,6 +42,7 @@ import { aplicarTemplate } from '@/components/utils/templateUtils';
 import {
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
+  getAtestadoIdsVinculados,
   getStatusDocumentalAtaJiso,
   isPublicacaoAtestadoAtiva,
 } from './atestadoPublicacaoHelpers';
@@ -268,6 +269,13 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     atestado.id,
     'Homologação de Atestado'
   );
+  const hasHomologacaoGerada = publicacoesVinculadas.some(
+    (publicacao) =>
+      publicacao.tipo === 'Homologação de Atestado' &&
+      getAtestadoIdsVinculados(publicacao).includes(atestado.id)
+  );
+  const podePublicarHomologacao = atestado.fluxo_homologacao === 'comandante' && !hasHomologacaoGerada;
+  const hasPublicacaoVinculada = publicacoesVinculadas.some(isPublicacaoAtestadoAtiva);
 
 
   const statusDocumentalAtaJiso = getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas);
@@ -380,7 +388,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               <DropdownMenuSeparator />
               {/* Fluxo exclusivo: mostrar apenas o botão do fluxo definido */}
               {/* dias <= 15 e fluxo = comandante (ou não definido e dias <= 15): mostrar homologação */}
-              {atestado.fluxo_homologacao === 'comandante' && (
+              {podePublicarHomologacao && (
                 <DropdownMenuItem onClick={handleOpenHomologacao} disabled={hasHomologacaoAtiva}>
                   <CheckCircle className="w-4 h-4 mr-2 text-emerald-600" />
                   {hasHomologacaoAtiva ? 'Homologação já gerada' : 'Publicar Homologação'}
@@ -403,10 +411,21 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 <>
                   <DropdownMenuSeparator />
                   {publicacoesVinculadas.filter(isPublicacaoAtestadoAtiva).map(p => (
-                    <DropdownMenuItem key={p.id} onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?id=${p.id}`, '_blank')}>
-                      <FileText className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="truncate">{p.tipo} — {p.status}</span>
-                    </DropdownMenuItem>
+                    p.tipo === 'Homologação de Atestado' ? (
+                      <DropdownMenuItem
+                        key={p.id}
+                        disabled
+                        title="A edição da homologação vinculada deve ser feita no módulo de publicações."
+                      >
+                        <FileText className="w-4 h-4 mr-2 text-slate-400" />
+                        <span className="truncate">Homologação vinculada — edição bloqueada neste card</span>
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem key={p.id} onClick={() => window.open(createPageUrl('CadastrarPublicacao') + `?id=${p.id}`, '_blank')}>
+                        <FileText className="w-4 h-4 mr-2 text-blue-500" />
+                        <span className="truncate">{p.tipo} — {p.status}</span>
+                      </DropdownMenuItem>
+                    )
                   ))}
                 </>
               )}
@@ -419,9 +438,20 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                   </DropdownMenuItem>
                 </>
               )}
-              <DropdownMenuItem onClick={() => onDelete(atestado)} className="text-red-600 focus:text-red-600">
+              <DropdownMenuItem
+                onClick={() => {
+                  if (hasPublicacaoVinculada) {
+                    alert('Exclusão não permitida: este atestado possui publicação/nota vinculada.');
+                    return;
+                  }
+                  onDelete(atestado);
+                }}
+                disabled={hasPublicacaoVinculada}
+                title={hasPublicacaoVinculada ? 'Exclusão bloqueada: há publicação/nota vinculada.' : ''}
+                className="text-red-600 focus:text-red-600"
+              >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Excluir
+                {hasPublicacaoVinculada ? 'Excluir (bloqueado por publicação vinculada)' : 'Excluir'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
