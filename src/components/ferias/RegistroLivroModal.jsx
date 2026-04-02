@@ -30,6 +30,7 @@ import {
   validarInicioNoPeriodoConcessivo,
 } from '@/components/ferias/feriasRules';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 
 const NOMES_OPERACIONAIS = {
   'Saída Férias': 'Início',
@@ -444,7 +445,7 @@ export default function RegistroLivroModal({
       return;
     }
 
-    const tmpl = templates.find(t => t.modulo === 'Livro' && t.tipo_registro === tipoRegistro && t.ativo !== false);
+    const tmpl = getTemplateAtivoPorTipo(tipoRegistro, 'Livro', templates);
 
     if (!tmpl?.template) {
       setTextoPublicacao('');
