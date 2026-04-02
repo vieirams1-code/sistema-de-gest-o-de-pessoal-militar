@@ -24,6 +24,35 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { getAtestadoIdsVinculados, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
 
+const STATUS_FLUXO_FINALIZADO = new Set([
+  'Homologado pela JISO',
+  'Homologado pelo Comandante',
+]);
+
+const parseDateOnly = (dateValue) => {
+  if (!dateValue) return null;
+  const parsed = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+};
+
+const getDataFimAfastamento = (atestado) => atestado.data_retorno || atestado.data_termino || null;
+
+const isFluxoFinalizado = (atestado) => {
+  if (!atestado) return false;
+  if (atestado.status === 'Encerrado' || atestado.status === 'Cancelado') return true;
+  if (atestado.homologado_comandante) return true;
+  return STATUS_FLUXO_FINALIZADO.has(atestado.status_jiso);
+};
+
+const isAtestadoVigente = (atestado, hoje) => {
+  if (!atestado || atestado.status === 'Cancelado') return false;
+  const dataFim = parseDateOnly(getDataFimAfastamento(atestado));
+  if (!dataFim) return atestado.status === 'Ativo';
+  return hoje <= dataFim;
+};
+
 export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -103,8 +132,11 @@ export default function Atestados() {
     return matchesSearch && matchesTipoAfastamento && matchesJiso && matchesPublicacao;
   });
 
-  const vigentes = applyFilters(atestados.filter(a => a.status === 'Ativo'));
-  const finalizados = applyFilters(atestados.filter(a => a.status !== 'Ativo'));
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const vigentes = applyFilters(atestados.filter((atestado) => isAtestadoVigente(atestado, hoje)));
+  const finalizados = applyFilters(atestados.filter((atestado) => !isAtestadoVigente(atestado, hoje)));
 
   const handleEdit = async (atestado) => {
     const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
@@ -139,19 +171,18 @@ export default function Atestados() {
     deleteMutation.mutate(atestadoToDelete);
   };
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
   const stats = {
     total: atestados.length,
-    ativos: atestados.filter(a => a.status === 'Ativo').length,
+    ativos: atestados.filter((atestado) => isAtestadoVigente(atestado, hoje)).length,
     retornoProximo: atestados.filter(a => {
-      if (a.status !== 'Ativo' || !a.data_retorno) return false;
+      if (!isAtestadoVigente(a, hoje) || !a.data_retorno) return false;
       const diff = differenceInDays(new Date(a.data_retorno + 'T00:00:00'), hoje);
       return diff >= 0 && diff <= 7;
     }).length,
     atrasados: atestados.filter(a => {
-      if (a.status !== 'Ativo' || !a.data_retorno) return false;
-      return differenceInDays(new Date(a.data_retorno + 'T00:00:00'), hoje) < 0;
+      const dataFim = parseDateOnly(getDataFimAfastamento(a));
+      if (!dataFim || isAtestadoVigente(a, hoje)) return false;
+      return !isFluxoFinalizado(a);
     }).length
   };
 
