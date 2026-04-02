@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,9 +14,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, Edit2, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { createPageUrl } from '@/utils';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
 import {
   calcularStatusPublicacaoRegistro,
@@ -64,13 +62,6 @@ function getTipoVisual(tipo) {
   return { icon: Shield, label: getTipoDisplay(tipo), className: 'text-slate-700 bg-slate-50 border-slate-200' };
 }
 
-function getEditUrl(registro) {
-  const tipo = detectarOrigemTipo(registro);
-  if (tipo === 'ex-officio') return `${createPageUrl('CadastrarPublicacao')}?id=${registro.id}`;
-  if (tipo === 'atestado') return `${createPageUrl('CadastrarAtestado')}?id=${registro.id}`;
-  return `${createPageUrl('CadastrarRegistroLivro')}?id=${registro.id}`;
-}
-
 function formatDate(value) {
   if (!value) return '-';
   try {
@@ -102,8 +93,7 @@ function getBloqueiosOperacionais(registro) {
   );
 }
 
-export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, modoAdmin = false }) {
-  const navigate = useNavigate();
+export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, modoAdmin = false, isAdmin = false }) {
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTextoPublicacao, setShowTextoPublicacao] = useState(false);
@@ -119,13 +109,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const tipoVisual = getTipoVisual(registro.tipo_registro || registro.tipo || '');
   const TipoIcon = tipoVisual.icon;
   const isPublicado = currentStatus === STATUS_PUBLICACAO.PUBLICADO;
-  const podeGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
   const podePublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
   const podeInformarBg = !isPublicado && (
     currentStatus === STATUS_PUBLICACAO.AGUARDANDO_NOTA ||
     currentStatus === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO
   );
-  const podeEditar = !isPublicado && origemTipo !== 'livro' && podeGerirPublicacoes;
   const podeExcluir = !isPublicado && canAccessAction('admin_mode') && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && canAccessAction('admin_mode') && !modoAdmin;
   const historicoPublicacao = getHistoricoPublicacao(registro);
@@ -218,11 +206,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               <Calendar className="mr-2 h-4 w-4" /> Informar BG
             </Button>
           )}
-          {podeEditar && (
-            <Button variant="outline" size="sm" onClick={() => navigate(getEditUrl(registro))}>
-              <Edit2 className="mr-2 h-4 w-4" /> Editar
-            </Button>
-          )}
           {onVerFamilia && (
             <Button variant="outline" size="sm" onClick={onVerFamilia}>
               <FileText className="mr-2 h-4 w-4" /> Família
@@ -232,10 +215,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             {showTextoPublicacao ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
             {showTextoPublicacao ? 'Recolher texto' : 'Expandir texto'}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowHistorico((prev) => !prev)}>
-            {showHistorico ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
-            {showHistorico ? 'Ocultar histórico' : 'Histórico'}
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => setShowHistorico((prev) => !prev)}>
+              {showHistorico ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+              {showHistorico ? 'Ocultar histórico' : 'Histórico'}
+            </Button>
+          )}
           {podeExcluir && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 className="mr-2 h-4 w-4" /> Excluir
@@ -257,11 +242,11 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           </div>
         )}
 
-        {showHistorico && (
+        {isAdmin && showHistorico && (
           <div className="rounded-lg border bg-slate-50 p-3">
             <p className="text-xs font-semibold text-slate-500">Trilha de auditoria</p>
             {historicoPublicacao.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">Sem eventos auditados para esta publicação.</p>
+              <p className="mt-2 text-sm text-slate-500">Nenhum evento registrado até o momento.</p>
             ) : (
               <div className="mt-2 space-y-2">
                 {historicoPublicacao.slice(0, 8).map((evento) => (
@@ -274,6 +259,22 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                       <p className="mt-1 text-slate-600">{evento.estado_anterior || '—'} → {evento.estado_novo || '—'}</p>
                     )}
                     <p className="mt-1 text-slate-600">{evento.resumo || 'Sem resumo.'}</p>
+                    {(evento.antes || evento.depois) && (
+                      <div className="mt-1 rounded border border-slate-100 bg-slate-50 p-2 text-[11px] text-slate-600">
+                        {Object.entries({
+                          'Nota BG': [evento?.antes?.nota_para_bg, evento?.depois?.nota_para_bg],
+                          'Número BG': [evento?.antes?.numero_bg, evento?.depois?.numero_bg],
+                          'Data BG': [evento?.antes?.data_bg, evento?.depois?.data_bg],
+                          Status: [evento?.antes?.status_calculado, evento?.depois?.status_calculado],
+                        })
+                          .filter(([, [antes, depois]]) => String(antes || '') !== String(depois || ''))
+                          .map(([label, [antes, depois]]) => (
+                            <p key={`${evento.id || evento.timestamp}-${label}`}>
+                              <span className="font-semibold">{label}:</span> {antes || '—'} → {depois || '—'}
+                            </p>
+                          ))}
+                      </div>
+                    )}
                     <p className="mt-1 text-slate-400">{evento.usuario?.nome || evento.usuario?.email || 'Usuário não identificado'}</p>
                   </div>
                 ))}
