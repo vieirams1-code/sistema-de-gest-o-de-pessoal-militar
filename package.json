@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint . --quiet",
+    "build": "npm run check:banned-terms && vite build",
+    "lint": "npm run check:banned-terms && eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "publish:base44": "bash ./scripts/publish-github-base44.sh"
+    "publish:base44": "bash ./scripts/publish-github-base44.sh",
+    "check:banned-terms": "node ./scripts/check-banned-terms.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.24",
