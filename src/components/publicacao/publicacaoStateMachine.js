@@ -62,7 +62,12 @@ export function normalizarStatusPublicacao(status) {
   return null;
 }
 
-export function validarTransicaoPublicacao({ statusAtual, statusDestino, registroDestino }) {
+export function validarTransicaoPublicacao({
+  statusAtual,
+  statusDestino,
+  registroDestino,
+  permitirReversaoPublicado = false,
+}) {
   const atualNormalizado = normalizarStatusPublicacao(statusAtual);
   const destinoNormalizado = normalizarStatusPublicacao(statusDestino);
 
@@ -79,7 +84,12 @@ export function validarTransicaoPublicacao({ statusAtual, statusDestino, registr
   }
 
   const permitidos = TRANSICOES_VALIDAS[atualNormalizado] || new Set([atualNormalizado]);
-  if (!permitidos.has(destinoNormalizado)) {
+  const reversaoPublicadoPermitida =
+    permitirReversaoPublicado &&
+    atualNormalizado === STATUS_PUBLICACAO.PUBLICADO &&
+    (destinoNormalizado === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO || destinoNormalizado === STATUS_PUBLICACAO.AGUARDANDO_NOTA);
+
+  if (!permitidos.has(destinoNormalizado) && !reversaoPublicadoPermitida) {
     return {
       valido: false,
       motivo: `Transição inválida: ${atualNormalizado} → ${destinoNormalizado}.`,
@@ -89,14 +99,23 @@ export function validarTransicaoPublicacao({ statusAtual, statusDestino, registr
   return { valido: true, statusAtual: atualNormalizado, statusDestino: destinoNormalizado };
 }
 
-export function validarPayloadPublicacao({ registroAtual = {}, registroDestino = {} }) {
+export function validarPayloadPublicacao({
+  registroAtual = {},
+  registroDestino = {},
+  permitirReversaoPublicado = false,
+}) {
   const statusAtual =
     normalizarStatusPublicacao(registroAtual.status_calculado) ||
     normalizarStatusPublicacao(registroAtual.status_publicacao) ||
     normalizarStatusPublicacao(registroAtual.status);
 
   const statusDestino = calcularStatusPublicacaoRegistro(registroDestino);
-  return validarTransicaoPublicacao({ statusAtual, statusDestino, registroDestino });
+  return validarTransicaoPublicacao({
+    statusAtual,
+    statusDestino,
+    registroDestino,
+    permitirReversaoPublicado,
+  });
 }
 
 export function extrairSnapshotPublicacao(registro = {}) {

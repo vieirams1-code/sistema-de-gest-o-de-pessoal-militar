@@ -192,12 +192,16 @@ function normalizarRegistro(registro) {
   };
 }
 
-function montarPayloadAtualizacao(registroAtual, dataParcial, tipo) {
+function montarPayloadAtualizacao(registroAtual, dataParcial, tipo, opcoes = {}) {
   const houveAlteracaoCamposPublicacao = ['nota_para_bg', 'numero_bg', 'data_bg'].some((campo) => Object.prototype.hasOwnProperty.call(dataParcial || {}, campo));
   if (!houveAlteracaoCamposPublicacao) return dataParcial || {};
   const registroDestino = { ...(registroAtual || {}), ...(dataParcial || {}) };
   const statusCalculado = calcularStatusPublicacaoRegistro(registroDestino);
-  const validacao = validarPayloadPublicacao({ registroAtual, registroDestino });
+  const validacao = validarPayloadPublicacao({
+    registroAtual,
+    registroDestino,
+    permitirReversaoPublicado: !!opcoes?.permitirReversaoPublicado,
+  });
   if (!validacao.valido) {
     throw new Error(validacao.motivo || 'Transição de status inválida para publicação.');
   }
@@ -281,9 +285,9 @@ export default function Publicacoes() {
   };
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data, tipo }) => {
+    mutationFn: async ({ id, data, tipo, permitirReversaoPublicado = false }) => {
       const registroAtual = todosRegistros.find((item) => item.id === id);
-      const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo);
+      const payloadFinal = montarPayloadAtualizacao(registroAtual, data, tipo, { permitirReversaoPublicado });
       const origemTipo = normalizarOrigemTipoRegistro(tipo);
       const entity = mapearEntityPublicacao(origemTipo);
       const campoStatus = campoStatusPorTipo(origemTipo);
@@ -302,6 +306,10 @@ export default function Publicacoes() {
         estadoNovo: statusDepois,
         antes: extrairSnapshotPublicacao(registroAtual || {}),
         depois: extrairSnapshotPublicacao(registroDestino),
+        metadata: {
+          edicao_manual_bg: true,
+          permitir_reversao_publicado: !!permitirReversaoPublicado,
+        },
       });
 
       const payloadComAuditoria = {
@@ -426,9 +434,14 @@ export default function Publicacoes() {
 
   const handleUpdate = (id, data, tipo) => {
     if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
+    const permitirReversaoPublicado = !!(isAdmin && canAccessAction('admin_mode') && modoAdmin);
     const registroAtual = todosRegistros.find((item) => item.id === id);
     const registroDestino = { ...(registroAtual || {}), ...(data || {}) };
-    const validacao = validarPayloadPublicacao({ registroAtual, registroDestino });
+    const validacao = validarPayloadPublicacao({
+      registroAtual,
+      registroDestino,
+      permitirReversaoPublicado,
+    });
     if (!validacao.valido) {
       const origemTipo = normalizarOrigemTipoRegistro(tipo);
       const entity = mapearEntityPublicacao(origemTipo);
@@ -441,12 +454,12 @@ export default function Publicacoes() {
         estadoNovo: normalizarStatusPublicacao(registroDestino?.status_calculado || registroDestino?.status_publicacao || registroDestino?.status) || calcularStatusPublicacaoRegistro(registroDestino || {}),
         antes: extrairSnapshotPublicacao(registroAtual || {}),
         depois: extrairSnapshotPublicacao(registroDestino || {}),
-        metadata: { bloqueio_tipo: 'transicao_invalida' },
+        metadata: { bloqueio_tipo: 'transicao_invalida', permitir_reversao_publicado: permitirReversaoPublicado },
       });
       entity.update(id, { historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual || {}, eventoBloqueio) }).catch(() => {});
       return alert(validacao.motivo || 'Transição inválida de status para publicação.');
     }
-    updateMutation.mutate({ id, data, tipo });
+    updateMutation.mutate({ id, data, tipo, permitirReversaoPublicado });
   };
 
   const handleDelete = (id, tipo) => {
