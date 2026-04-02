@@ -12,30 +12,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   ArrowLeft, Pencil, User, Briefcase, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard, ChevronUp,
-  Shield, Award, Send, Activity, AlertTriangle, Copy
+  Shield, Award, Send, Activity, AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
+import HistoricoComportamentoChart from '@/components/militar/HistoricoComportamentoChart';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import {
   criarChavePendenciaComportamento,
   obterHistoricoComportamentoMilitar,
 } from '@/services/justicaDisciplinaService';
-import { MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
-import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
-import {
-  escolherTipoTemplateComportamento,
-  gerarTextoRPComportamento,
-  obterTemplatePadraoComportamento,
-  resolverMarcoComportamentoValido,
-} from '@/utils/comportamentoTemplateUtils';
 import { promoverMilitarSimples } from '@/services/promocaoMilitarService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
+const COMPORTAMENTO_LEVEL = {
+  MAU: 1,
+  INSUFICIENTE: 2,
+  BOM: 3,
+  ÓTIMO: 4,
+  OTIMO: 4,
+  EXCEPCIONAL: 5,
+};
 
 const normalizarPosto = (valor) => String(valor || '')
   .normalize('NFD')
@@ -63,6 +64,11 @@ const POSTOS_GRADUACOES = [
   'Cabo',
   'Soldado',
 ];
+
+const toChartLevel = (comportamento) => {
+  if (!comportamento) return 3;
+  return COMPORTAMENTO_LEVEL[String(comportamento).trim().toUpperCase()] || 3;
+};
 
 function InfoItem({ label, value, icon: Icon }) {
   if (!value) return null;
@@ -109,15 +115,6 @@ export default function VerMilitar() {
     posto_graduacao: '',
     data_promocao_atual: '',
     antiguidade_referencia_ordem: '',
-  });
-  const [marcoComportamentoSelecionadoId, setMarcoComportamentoSelecionadoId] = useState(null);
-  const [dialogTextoRP, setDialogTextoRP] = useState({
-    open: false,
-    texto: '',
-    tipoTemplate: '',
-    marcoId: '',
-    templateId: '',
-    geradoEm: '',
   });
 
   const { data: militar, isLoading } = useQuery({
@@ -189,12 +186,6 @@ export default function VerMilitar() {
     enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
   });
 
-  const { data: templatesAtivos = [] } = useQuery({
-    queryKey: ['templates-ativos-comportamento-rp'],
-    queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
-    enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel,
-  });
-
   const pendenciasComportamentoUnicas = React.useMemo(() => {
     const unicas = [];
     const chaves = new Set();
@@ -230,195 +221,16 @@ export default function VerMilitar() {
     };
   }, [punicoes]);
 
-  const registrarAuditoriaHistoricoComportamento = React.useCallback(async ({
-    marco,
-    tipoTemplate,
-    acao,
-    geradoEmISO,
-    publicacaoId = '',
-  }) => {
-    if (!marco?.id) return;
-    const observacaoAnterior = String(marco?.observacoes || '').trim();
-    const eventoAuditoria = {
-      acao,
-      historico_comportamento_id: marco.id,
-      tipo_template: tipoTemplate || '',
-      gerado_por: user?.email || 'usuário não identificado',
-      gerado_em: geradoEmISO || new Date().toISOString(),
-      publicacao_ex_officio_id: publicacaoId || '',
-    };
-    const linhaAuditoria = `[RP_AUDITORIA] ${JSON.stringify(eventoAuditoria)}`;
-    const observacoesAtualizadas = observacaoAnterior
-      ? `${observacaoAnterior}\n${linhaAuditoria}`
-      : linhaAuditoria;
-
-    await base44.entities.HistoricoComportamento.update(marco.id, {
-      observacoes: observacoesAtualizadas,
-    });
-  }, [user?.email]);
-
-  const montarPacoteGeracaoTextoRP = React.useCallback(async () => {
-    const marcoSelecionado = resolverMarcoComportamentoValido(historicoComportamento, marcoComportamentoSelecionadoId);
-    if (!marcoSelecionado) {
-      return {
-        ok: false,
-        erro: 'Não há marco de comportamento válido para gerar texto de RP.',
-      };
-    }
-
-    const tipoTemplate = escolherTipoTemplateComportamento(marcoSelecionado);
-    let templateAtivo = getTemplateAtivoPorTipo(tipoTemplate, MODULO_EX_OFFICIO, templatesAtivos);
-    if (!templateAtivo?.template) {
-      const templatePadrao = obterTemplatePadraoComportamento(tipoTemplate);
-      if (templatePadrao) {
-        try {
-          templateAtivo = await base44.entities.TemplateTexto.create({
-            modulo: MODULO_EX_OFFICIO,
-            tipo_registro: tipoTemplate,
-            nome: `Template padrão — ${tipoTemplate}`,
-            template: templatePadrao,
-            observacoes: 'Template padrão semeado automaticamente para comportamento disciplinar.',
-            ativo: true,
-          });
-          queryClient.invalidateQueries({ queryKey: ['templates-ativos-comportamento-rp'] });
-        } catch (error) {
-          console.warn('[RP] Falha ao semear template padrão de comportamento', error);
-        }
-      }
-    }
-
-    if (!templateAtivo?.template) {
-      return {
-        ok: false,
-        erro: `Template ativo não encontrado para '${tipoTemplate}'. Cadastre e ative um template para continuar.`,
-      };
-    }
-
-    const resultado = gerarTextoRPComportamento({
-      template: templateAtivo.template,
-      militar,
-      marco: marcoSelecionado,
-      tipoTemplate,
-    });
-
-    if (!resultado.ok) return resultado;
+  const historicoChartData = React.useMemo(() => historicoComportamento.map((evento) => {
+    const dataAlteracao = String(evento?.data_alteracao || '').slice(0, 10);
+    const year = Number(dataAlteracao.slice(0, 4));
 
     return {
-      ok: true,
-      resultado,
-      marcoSelecionado,
-      tipoTemplate,
-      templateAtivo,
+      year,
+      level: toChartLevel(evento?.comportamento_novo),
+      desc: evento?.motivo_mudanca || evento?.motivo_mudanca_resolvido || evento?.observacoes || 'Alteração de comportamento registrada.',
     };
-  }, [historicoComportamento, marcoComportamentoSelecionadoId, militar, templatesAtivos]);
-
-  const handleGerarTextoRP = React.useCallback(async () => {
-    const pacote = await montarPacoteGeracaoTextoRP();
-    if (!pacote.ok) {
-      alert(pacote.erro || 'Não foi possível gerar o texto para RP.');
-      return;
-    }
-
-    const geradoEm = new Date().toISOString();
-
-    setDialogTextoRP({
-      open: true,
-      texto: pacote.resultado.texto,
-      tipoTemplate: pacote.tipoTemplate,
-      marcoId: pacote.marcoSelecionado.id,
-      templateId: pacote.templateAtivo.id || '',
-      geradoEm,
-    });
-
-    try {
-      await registrarAuditoriaHistoricoComportamento({
-        marco: pacote.marcoSelecionado,
-        tipoTemplate: pacote.tipoTemplate,
-        acao: 'GERACAO_PREVIEW_RP',
-        geradoEmISO: geradoEm,
-      });
-    } catch (error) {
-      console.warn('[RP] Falha ao registrar auditoria de geração de texto', error);
-    }
-  }, [montarPacoteGeracaoTextoRP, registrarAuditoriaHistoricoComportamento]);
-
-  const enviarParaRPMutation = useMutation({
-    mutationFn: async ({ texto, tipoTemplate, marcoId, templateId, geradoEm }) => {
-      const registro = await base44.entities.PublicacaoExOfficio.create({
-        militar_id: militar.id,
-        militar_nome: militar.nome_completo || militar.nome_guerra || '',
-        militar_posto: militar.posto_graduacao || '',
-        militar_matricula: militar.matricula || '',
-        tipo: tipoTemplate,
-        data_publicacao: new Date().toISOString().slice(0, 10),
-        status: 'Aguardando Nota',
-        texto_publicacao: texto,
-        origem_tipo: 'historico_comportamento',
-        origem_id: marcoId || '',
-        historico_comportamento_id: marcoId || '',
-        tipo_template: tipoTemplate,
-        template_texto_id: templateId || '',
-        texto_renderizado: texto,
-        gerado_por: user?.email || '',
-        gerado_em: geradoEm || new Date().toISOString(),
-      });
-
-      return registro;
-    },
-    onSuccess: async (registroCriado, variaveis) => {
-      queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['ver-historico-comportamento', id] });
-
-      const marcoParaAuditoria = historicoComportamento.find((item) => item.id === variaveis.marcoId);
-      try {
-        await registrarAuditoriaHistoricoComportamento({
-          marco: marcoParaAuditoria,
-          tipoTemplate: variaveis.tipoTemplate,
-          acao: 'ENVIO_DIRETO_RP',
-          geradoEmISO: variaveis.geradoEm,
-          publicacaoId: registroCriado?.id || '',
-        });
-      } catch (error) {
-        console.warn('[RP] Falha ao registrar auditoria de envio', error);
-      }
-
-      alert('Texto enviado para o módulo RP com sucesso.');
-    },
-  });
-
-  const handleEnviarParaRP = React.useCallback(async () => {
-    const pacote = await montarPacoteGeracaoTextoRP();
-    if (!pacote.ok) {
-      alert(pacote.erro || 'Não foi possível preparar o envio para RP.');
-      return;
-    }
-
-    const geradoEm = dialogTextoRP.geradoEm || new Date().toISOString();
-    const textoRenderizado = dialogTextoRP.texto || pacote.resultado.texto;
-    const tipoTemplate = dialogTextoRP.tipoTemplate || pacote.tipoTemplate;
-    const marcoId = dialogTextoRP.marcoId || pacote.marcoSelecionado.id;
-    const templateId = dialogTextoRP.templateId || pacote.templateAtivo.id || '';
-
-    enviarParaRPMutation.mutate({
-      texto: textoRenderizado,
-      tipoTemplate,
-      marcoId,
-      templateId,
-      geradoEm,
-    });
-  }, [dialogTextoRP, montarPacoteGeracaoTextoRP, enviarParaRPMutation]);
-
-  const handleCopiarTextoRP = React.useCallback(async () => {
-    if (!dialogTextoRP.texto) return;
-
-    try {
-      await navigator.clipboard.writeText(dialogTextoRP.texto);
-      alert('Texto copiado para a área de transferência.');
-    } catch {
-      alert('Não foi possível copiar automaticamente. Selecione e copie manualmente.');
-    }
-  }, [dialogTextoRP.texto]);
+  }).filter((item) => Number.isFinite(item.year)), [historicoComportamento]);
 
   const promocaoMutation = useMutation({
     mutationFn: async () => promoverMilitarSimples({
@@ -703,28 +515,13 @@ export default function VerMilitar() {
                 </Section>
 
                 <Section title="Linha do Tempo do Comportamento">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex justify-end">
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleGerarTextoRP}>
-                          <FileText className="w-4 h-4 mr-2" />
-                          Gerar texto para RP
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={handleEnviarParaRP}
-                          disabled={enviarParaRPMutation.isPending}
-                        >
-                          <Send className="w-4 h-4 mr-2" />
-                          Enviar para RP
-                        </Button>
-                      </div>
-                    </div>
-                    <ComportamentoTimeline
-                      eventos={historicoComportamento}
-                      selectedEventoId={marcoComportamentoSelecionadoId}
-                      onSelectEvento={(evento) => setMarcoComportamentoSelecionadoId(evento?.id || null)}
+                  <div className="flex flex-col gap-4">
+                    <HistoricoComportamentoChart
+                      data={historicoChartData}
+                      title="Evolução anual do comportamento"
+                      height={220}
                     />
+                    <ComportamentoTimeline eventos={historicoComportamento} />
                   </div>
                 </Section>
 
@@ -867,51 +664,6 @@ export default function VerMilitar() {
           onSaved={() => setShowSolicitacao(false)}
         />
       )}
-
-      <Dialog open={dialogTextoRP.open} onOpenChange={(open) => setDialogTextoRP((prev) => ({ ...prev, open }))}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-[#1e3a5f]">Pré-visualização do texto para RP</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-xs text-slate-500">
-              Template utilizado: <strong>{dialogTextoRP.tipoTemplate || '—'}</strong>
-            </p>
-            <textarea
-              value={dialogTextoRP.texto}
-              readOnly
-              className="w-full min-h-[280px] rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
-            />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={handleCopiarTextoRP}>
-                <Copy className="w-4 h-4 mr-2" />
-                Copiar texto
-              </Button>
-              <Button
-                type="button"
-                onClick={handleEnviarParaRP}
-                disabled={enviarParaRPMutation.isPending}
-              >
-                <Send className="w-4 h-4 mr-2" />
-                Enviar para RP
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setDialogTextoRP({
-                  open: false,
-                  texto: '',
-                  tipoTemplate: '',
-                  marcoId: '',
-                  templateId: '',
-                  geradoEm: '',
-                })}
-              >
-                Fechar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showPromocaoDialog} onOpenChange={setShowPromocaoDialog}>
         <DialogContent className="max-w-lg">
