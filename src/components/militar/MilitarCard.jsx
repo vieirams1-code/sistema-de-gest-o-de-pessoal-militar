@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, MapPin, MoreVertical, Pencil, Trash2, Eye, ExternalLink, FileText } from 'lucide-react';
+import { User, MapPin, MoreVertical, Pencil, Trash2, Eye, ExternalLink } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,12 +34,9 @@ const postoAbreviado = {
   'Coronel': 'Cel'
 };
 
-import { createPageUrl } from '@/utils';
-import { useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
-  const navigate = useNavigate();
   const { hasAccess, hasSelfAccess } = useCurrentUser();
   const canAccess = hasAccess(militar) || hasSelfAccess(militar);
   return (
@@ -90,10 +87,6 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
                  <DropdownMenuItem onClick={() => onView(militar)}>
                   <Eye className="w-4 h-4 mr-2" />
                   Visualizar
-                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}&tab=comportamento`)}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Extrato de Elogios e Punições
                  </DropdownMenuItem>
                  {militar.link_alteracoes_anteriores && (
                    <DropdownMenuItem onClick={() => window.open(militar.link_alteracoes_anteriores, '_blank')}>
