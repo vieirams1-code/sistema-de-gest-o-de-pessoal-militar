@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, Check, ChevronDown, ChevronUp, Copy, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
 import {
@@ -76,6 +76,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTextoPublicacao, setShowTextoPublicacao] = useState(false);
+  const [isTextoCopiado, setIsTextoCopiado] = useState(false);
   const [bgData, setBgData] = useState({
     nota_para_bg: registro.nota_para_bg || '',
     numero_bg: registro.numero_bg || '',
@@ -100,6 +101,28 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const handleSaveBg = () => {
     onUpdate(registro.id, bgData, origemTipo);
     setIsEditingBg(false);
+  };
+
+  const handleCopyTextoPublicacao = async () => {
+    const texto = registro.texto_publicacao || 'Nenhum texto de publicação gerado para este registro.';
+
+    try {
+      await navigator.clipboard.writeText(texto);
+      setIsTextoCopiado(true);
+      setTimeout(() => setIsTextoCopiado(false), 1800);
+    } catch {
+      const fallbackTextArea = document.createElement('textarea');
+      fallbackTextArea.value = texto;
+      fallbackTextArea.setAttribute('readonly', '');
+      fallbackTextArea.style.position = 'absolute';
+      fallbackTextArea.style.left = '-9999px';
+      document.body.appendChild(fallbackTextArea);
+      fallbackTextArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(fallbackTextArea);
+      setIsTextoCopiado(true);
+      setTimeout(() => setIsTextoCopiado(false), 1800);
+    }
   };
 
   return (
@@ -190,7 +213,28 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
 
         {showTextoPublicacao && (
           <div className="rounded-lg border bg-slate-50 p-3">
-            <p className="text-xs font-semibold text-slate-500">Texto para publicação</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-slate-500">Texto para publicação</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-slate-600 hover:text-slate-900"
+                onClick={handleCopyTextoPublicacao}
+              >
+                {isTextoCopiado ? (
+                  <>
+                    <Check className="mr-1 h-3.5 w-3.5" />
+                    Texto copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-1 h-3.5 w-3.5" />
+                    Copiar
+                  </>
+                )}
+              </Button>
+            </div>
             <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
               {registro.texto_publicacao || 'Nenhum texto de publicação gerado para este registro.'}
             </p>
