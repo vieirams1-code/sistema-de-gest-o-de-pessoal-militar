@@ -22,6 +22,7 @@ import AtestadoCard from '@/components/atestado/AtestadoCard';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { getAtestadoIdsVinculados, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
 
 export default function Atestados() {
   const navigate = useNavigate();
@@ -61,6 +62,13 @@ export default function Atestados() {
 
   const deleteMutation = useMutation({
     mutationFn: async (atestado) => {
+      const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+      const possuiPublicacaoVinculada = publicacoesMilitar.some(
+        (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
+      );
+      if (possuiPublicacaoVinculada) {
+        throw new Error('Exclusão não permitida: este atestado possui publicação/nota vinculada.');
+      }
       await excluirAtestadoComReflexoNoQuadro(atestado);
       return atestado;
     },
@@ -69,6 +77,9 @@ export default function Atestados() {
       queryClient.invalidateQueries({ queryKey: ['cards'] });
       setDeleteDialogOpen(false);
       setAtestadoToDelete(null);
+    },
+    onError: (error) => {
+      alert(error?.message || 'Não foi possível excluir o atestado.');
     }
   });
 
@@ -98,11 +109,21 @@ export default function Atestados() {
   const handleEdit = (atestado) => navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
   const handleDelete = (atestado) => { setAtestadoToDelete(atestado); setDeleteDialogOpen(true); };
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!atestadoToDelete) return;
     if (!canAccessAction('excluir_atestado')) {
       alert('Ação negada: você não tem permissão para excluir atestados.');
       setDeleteDialogOpen(false);
+      return;
+    }
+    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoToDelete.militar_id });
+    const possuiPublicacaoVinculada = publicacoesMilitar.some(
+      (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestadoToDelete.id)
+    );
+    if (possuiPublicacaoVinculada) {
+      alert('Exclusão não permitida: este atestado possui publicação/nota vinculada.');
+      setDeleteDialogOpen(false);
+      setAtestadoToDelete(null);
       return;
     }
     deleteMutation.mutate(atestadoToDelete);
