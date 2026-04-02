@@ -106,7 +106,17 @@ export default function Atestados() {
   const vigentes = applyFilters(atestados.filter(a => a.status === 'Ativo'));
   const finalizados = applyFilters(atestados.filter(a => a.status !== 'Ativo'));
 
-  const handleEdit = (atestado) => navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
+  const handleEdit = async (atestado) => {
+    const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
+    const possuiPublicacaoVinculada = publicacoesMilitar.some(
+      (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
+    );
+    if (possuiPublicacaoVinculada) {
+      alert('Edição não permitida: este atestado possui publicação/nota vinculada.');
+      return;
+    }
+    navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
+  };
   const handleDelete = (atestado) => { setAtestadoToDelete(atestado); setDeleteDialogOpen(true); };
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
   const confirmDelete = async () => {
