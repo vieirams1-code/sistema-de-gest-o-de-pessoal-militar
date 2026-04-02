@@ -1,21 +1,35 @@
 const PRACAS = new Set(['Subtenente', '1º Sargento', '2º Sargento', '3º Sargento', 'Cabo', 'Soldado']);
 
-const STATUS_EXCLUIDOS = new Set(['Anulada']);
-const STATUS_REABILITADA = 'Reabilitada';
+const STATUS_EXCLUIDOS = new Set(['ANULADA']);
+const STATUS_REABILITADA = 'REABILITADA';
+
+const TIPOS_PUNICAO_VALIDOS = new Set([
+  'ADVERTENCIA',
+  'ADVERTENCIA VERBAL',
+  'REPREENSAO',
+  'DETENCAO',
+  'PRISAO',
+  'PRISAO EM SEPARADO',
+]);
 
 const COMPORTAMENTO_ORDEM = ['Mau', 'Insuficiente', 'Bom', 'Ótimo', 'Excepcional'];
 
 const TIPO_PESO_PRISAO = {
-  'Prisão': 1,
-  'Prisao': 1,
-  'Detenção': 0.5,
-  'Detencao': 0.5,
-  'Repreensão': 0.25,
-  'Repreensao': 0.25,
-  'Advertência': 0,
-  'Advertencia': 0,
-  'Advertência Verbal': 0,
+  'PRISAO': 1,
+  'PRISAO EM SEPARADO': 1,
+  'DETENCAO': 0.5,
+  'REPREENSAO': 0.25,
+  'ADVERTENCIA': 0,
+  'ADVERTENCIA VERBAL': 0,
 };
+
+function normalizeText(texto = '') {
+  return String(texto)
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
 
 function toDate(dateLike) {
   if (!dateLike) return null;
@@ -46,11 +60,11 @@ function addDays(baseDate, days) {
 }
 
 function getStatusPunicao(punicao = {}) {
-  return punicao.status_punicao || punicao.status || 'Ativa';
+  return String(punicao.status_punicao || punicao.status || 'Ativa').trim();
 }
 
 function getTipoPunicao(punicao = {}) {
-  return punicao.tipo_punicao || punicao.tipo || '';
+  return String(punicao.tipo_punicao || punicao.tipo || '').trim();
 }
 
 function getDataBasePunicao(punicao = {}) {
@@ -65,12 +79,14 @@ function getDataBasePunicao(punicao = {}) {
 
 function normalizePunicao(punicao = {}) {
   const tipo = getTipoPunicao(punicao);
-  const pesoPrisao = TIPO_PESO_PRISAO[tipo] ?? 0;
+  const tipoNormalizado = normalizeText(tipo);
+  const pesoPrisao = TIPO_PESO_PRISAO[tipoNormalizado] ?? 0;
   const dataBase = toDate(getDataBasePunicao(punicao));
   return {
     ...punicao,
     status_resolvido: getStatusPunicao(punicao),
     tipo_resolvido: tipo,
+    tipo_normalizado: tipoNormalizado,
     data_base: dataBase,
     data_base_iso: formatDateISO(dataBase),
     prisao_equivalente: pesoPrisao,
@@ -83,9 +99,11 @@ function isPraca(postoGraduacao) {
 }
 
 function isPunicaoValida(punicao, { incluirReabilitadas = false } = {}) {
-  const status = getStatusPunicao(punicao);
+  const status = normalizeText(getStatusPunicao(punicao));
+  const tipo = normalizeText(getTipoPunicao(punicao));
+  if (!TIPOS_PUNICAO_VALIDOS.has(tipo)) return false;
   if (STATUS_EXCLUIDOS.has(status)) return false;
-  if (!incluirReabilitadas && status === STATUS_REABILITADA) return false;
+  if (!incluirReabilitadas && status === normalizeText(STATUS_REABILITADA)) return false;
   return true;
 }
 
@@ -115,7 +133,7 @@ function summarizeWindowWithStart(punicoesNormalizadas, inicio, fim, anos) {
       prisao_equivalente: p.prisao_equivalente,
       detencao_equivalente: p.detencao_equivalente,
       dias: Number(p.dias || p.dias_punicao || 0),
-      em_separado: Boolean(p.prisao_em_separado || p.em_separado),
+      em_separado: Boolean(p.prisao_em_separado || p.em_separado || p.agravada_prisao_em_separado),
     })),
   };
 }
@@ -134,10 +152,10 @@ function temRegraArt53(punicoesNormalizadas, postoGraduacao) {
   if (postoGraduacao !== 'Soldado') return null;
 
   return punicoesNormalizadas.find((p) => {
-    const tipo = p.tipo_resolvido;
+    const tipo = p.tipo_normalizado;
     const dias = Number(p.dias || p.dias_punicao || 0);
-    const separado = Boolean(p.prisao_em_separado || p.em_separado);
-    return (tipo === 'Prisão' || tipo === 'Prisao') && separado && dias > 20;
+    const separado = Boolean(p.prisao_em_separado || p.em_separado || p.agravada_prisao_em_separado);
+    return (tipo === 'PRISAO' || tipo === 'PRISAO EM SEPARADO') && separado && dias > 20;
   }) || null;
 }
 
