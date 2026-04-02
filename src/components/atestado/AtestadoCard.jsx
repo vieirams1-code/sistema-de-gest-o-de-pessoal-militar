@@ -276,6 +276,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   );
   const podePublicarHomologacao = atestado.fluxo_homologacao === 'comandante' && !hasHomologacaoGerada;
   const hasPublicacaoVinculada = publicacoesVinculadas.some(isPublicacaoAtestadoAtiva);
+  const mensagemBloqueioPublicacao = 'Ação não permitida: este atestado possui publicação/nota vinculada.';
 
 
   const statusDocumentalAtaJiso = getStatusDocumentalAtaJiso(atestado, publicacoesVinculadas);
@@ -375,9 +376,19 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 <Eye className="w-4 h-4 mr-2" />
                 Visualizar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(atestado)}>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (hasPublicacaoVinculada) {
+                    alert(mensagemBloqueioPublicacao);
+                    return;
+                  }
+                  onEdit(atestado);
+                }}
+                disabled={hasPublicacaoVinculada}
+                title={hasPublicacaoVinculada ? 'Edição bloqueada: há publicação/nota vinculada.' : ''}
+              >
                 <Pencil className="w-4 h-4 mr-2" />
-                Editar
+                {hasPublicacaoVinculada ? 'Editar (bloqueado por publicação vinculada)' : 'Editar'}
               </DropdownMenuItem>
               {atestado.arquivo_atestado && (
                 <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
@@ -441,7 +452,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
               <DropdownMenuItem
                 onClick={() => {
                   if (hasPublicacaoVinculada) {
-                    alert('Exclusão não permitida: este atestado possui publicação/nota vinculada.');
+                    alert(mensagemBloqueioPublicacao);
                     return;
                   }
                   onDelete(atestado);
