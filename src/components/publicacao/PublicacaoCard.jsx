@@ -14,12 +14,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, ChevronDown, ChevronUp, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
 import {
   calcularStatusPublicacaoRegistro,
-  EVENTO_AUDITORIA_PUBLICACAO,
   STATUS_PUBLICACAO,
 } from '@/components/publicacao/publicacaoStateMachine';
 
@@ -73,31 +72,10 @@ function formatDate(value) {
 }
 
 
-function formatDateTime(value) {
-  if (!value) return '-';
-  try {
-    return format(new Date(value), 'dd/MM/yyyy HH:mm');
-  } catch {
-    return String(value);
-  }
-}
-
-function getHistoricoPublicacao(registro) {
-  const historico = Array.isArray(registro?.historico_publicacao) ? registro.historico_publicacao : [];
-  return [...historico].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-}
-
-function getBloqueiosOperacionais(registro) {
-  return getHistoricoPublicacao(registro).filter(
-    (evento) => (evento?.evento || evento?.acao) === EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO
-  );
-}
-
 export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFamilia, canAccessAction = () => false, modoAdmin = false, isAdmin = false }) {
   const [isEditingBg, setIsEditingBg] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTextoPublicacao, setShowTextoPublicacao] = useState(false);
-  const [showHistorico, setShowHistorico] = useState(false);
   const [bgData, setBgData] = useState({
     nota_para_bg: registro.nota_para_bg || '',
     numero_bg: registro.numero_bg || '',
@@ -118,9 +96,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   );
   const podeExcluir = !isPublicado && canAccessAction('admin_mode') && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && canAccessAction('admin_mode') && !modoAdmin;
-  const historicoPublicacao = getHistoricoPublicacao(registro);
-  const bloqueiosOperacionais = getBloqueiosOperacionais(registro);
-  const ultimoBloqueio = bloqueiosOperacionais[0] || null;
 
   const handleSaveBg = () => {
     onUpdate(registro.id, bgData, origemTipo);
@@ -158,22 +133,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             <p className="text-sm text-slate-800">{formatDate(registro.data_bg)}</p>
           </div>
         </div>
-
-        {bloqueiosOperacionais.length > 0 && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-700" />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                  Bloqueio operacional registrado ({bloqueiosOperacionais.length})
-                </p>
-                <p className="mt-1 text-sm text-amber-900">
-                  {ultimoBloqueio?.resumo || 'Há tentativa bloqueada no fluxo. Consulte o histórico para detalhes.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {isEditingBg && (
           <div className="grid gap-3 rounded-lg border bg-slate-50 p-4 md:grid-cols-3">
@@ -217,12 +176,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             {showTextoPublicacao ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
             {showTextoPublicacao ? 'Recolher texto' : 'Expandir texto'}
           </Button>
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => setShowHistorico((prev) => !prev)}>
-              {showHistorico ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
-              {showHistorico ? 'Ocultar histórico' : 'Histórico'}
-            </Button>
-          )}
           {podeExcluir && (
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 className="mr-2 h-4 w-4" /> Excluir
@@ -244,46 +197,6 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
           </div>
         )}
 
-        {isAdmin && showHistorico && (
-          <div className="rounded-lg border bg-slate-50 p-3">
-            <p className="text-xs font-semibold text-slate-500">Trilha de auditoria</p>
-            {historicoPublicacao.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">Nenhum evento registrado até o momento.</p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {historicoPublicacao.slice(0, 8).map((evento) => (
-                  <div key={evento.id || `${evento.timestamp}-${evento.evento}`} className="rounded-md border bg-white p-2 text-xs text-slate-700">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-semibold text-slate-800">{evento.evento || evento.acao || 'evento'}</span>
-                      <span className="text-slate-500">{formatDateTime(evento.timestamp)}</span>
-                    </div>
-                    {(evento.estado_anterior || evento.estado_novo) && (
-                      <p className="mt-1 text-slate-600">{evento.estado_anterior || '—'} → {evento.estado_novo || '—'}</p>
-                    )}
-                    <p className="mt-1 text-slate-600">{evento.resumo || 'Sem resumo.'}</p>
-                    {(evento.antes || evento.depois) && (
-                      <div className="mt-1 rounded border border-slate-100 bg-slate-50 p-2 text-[11px] text-slate-600">
-                        {Object.entries({
-                          'Nota BG': [evento?.antes?.nota_para_bg, evento?.depois?.nota_para_bg],
-                          'Número BG': [evento?.antes?.numero_bg, evento?.depois?.numero_bg],
-                          'Data BG': [evento?.antes?.data_bg, evento?.depois?.data_bg],
-                          Status: [evento?.antes?.status_calculado, evento?.depois?.status_calculado],
-                        })
-                          .filter(([, [antes, depois]]) => String(antes || '') !== String(depois || ''))
-                          .map(([label, [antes, depois]]) => (
-                            <p key={`${evento.id || evento.timestamp}-${label}`}>
-                              <span className="font-semibold">{label}:</span> {antes || '—'} → {depois || '—'}
-                            </p>
-                          ))}
-                      </div>
-                    )}
-                    <p className="mt-1 text-slate-400">{evento.usuario?.nome || evento.usuario?.email || 'Usuário não identificado'}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </CardContent>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
