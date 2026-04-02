@@ -16,20 +16,13 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
 import { getConflitoTemplatePorTipo } from '@/components/rp/templateValidation';
+import {
+  FERIAS_TIPO_CANONICO,
+  getLabelTipoFerias,
+  resolverTipoFeriasCanonico,
+} from '@/components/ferias/feriasTipoResolver';
 
-const FERIAS_CANONICAL_TYPES = [
-  'Saída Férias',
-  'Interrupção de Férias',
-  'Nova Saída / Retomada',
-  'Retorno Férias',
-];
-
-const FERIAS_LABELS = {
-  'Saída Férias': 'Início',
-  'Interrupção de Férias': 'Interrupção',
-  'Nova Saída / Retomada': 'Continuação',
-  'Retorno Férias': 'Término',
-};
+const FERIAS_CANONICAL_TYPES = Object.values(FERIAS_TIPO_CANONICO);
 
 const MODULO_LABELS = {
   [MODULO_LIVRO]: 'Livro',
@@ -94,18 +87,22 @@ async function updateTemplate(id, payload) {
 }
 
 function getTipoDisplay(tipo) {
-  return FERIAS_LABELS[tipo] || tipo;
+  const tipoCanonicoFerias = resolverTipoFeriasCanonico(tipo);
+  if (tipoCanonicoFerias) return getLabelTipoFerias(tipoCanonicoFerias);
+  return tipo;
 }
 
 function getTipoSelectLabel(modulo, tipo) {
-  if (normalizeTemplateModulo(modulo) === MODULO_LIVRO && FERIAS_LABELS[tipo]) {
-    return `${getTipoDisplay(tipo)} (${tipo})`;
+  const tipoCanonicoFerias = resolverTipoFeriasCanonico(tipo);
+  if (normalizeTemplateModulo(modulo) === MODULO_LIVRO && tipoCanonicoFerias) {
+    return `${getLabelTipoFerias(tipoCanonicoFerias)} (${tipoCanonicoFerias})`;
   }
   return getTipoDisplay(tipo);
 }
 
 function isLivroFeriasTipo(tipo) {
-  return FERIAS_CANONICAL_TYPES.includes(tipo);
+  const tipoCanonicoFerias = resolverTipoFeriasCanonico(tipo);
+  return Boolean(tipoCanonicoFerias && FERIAS_CANONICAL_TYPES.includes(tipoCanonicoFerias));
 }
 
 function isTipoOcultoNoFrontend(tipo) {
@@ -143,6 +140,21 @@ const VARS_POR_TIPO = {
       { v: '{{dias_gozados}}', desc: 'Dias efetivamente gozados até a interrupção' },
       { v: '{{dias_gozados_interrupcao}}', desc: 'Dias efetivamente gozados até a interrupção' },
       { v: '{{saldo_remanescente}}', desc: 'Saldo remanescente após a interrupção' },
+      { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
+    ]
+  },
+  'Continuação de Férias': {
+    grupo: 'Continuação',
+    cor: 'teal',
+    variaveis: [
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{nome_completo}}', desc: 'Nome completo' },
+      { v: '{{matricula}}', desc: 'Matrícula' },
+      { v: '{{data_registro}}', desc: 'Data do registro / continuação' },
+      { v: '{{data_inicio}}', desc: 'Nova data de início da continuação' },
+      { v: '{{data_retorno}}', desc: 'Nova data de retorno' },
+      { v: '{{dias}}', desc: 'Dias retomados / saldo retomado' },
+      { v: '{{saldo_remanescente}}', desc: 'Saldo remanescente da interrupção anterior' },
       { v: '{{periodo_aquisitivo}}', desc: 'Período aquisitivo' },
     ]
   },
