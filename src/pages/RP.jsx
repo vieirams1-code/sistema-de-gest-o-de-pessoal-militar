@@ -2,130 +2,43 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, FileText, Filter, CalendarRange, ShieldAlert, BookOpenText } from 'lucide-react';
 
-import { base44 } from '@/api/base44Client';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
+import { calcularMetricasPublicacao, listarAtestadosPublicacaoEscopo, listarPublicacoesExOfficioEscopo } from '@/services/publicacoesPainelService';
+import { calcularStatusPublicacaoRegistro, normalizarStatusPublicacao, STATUS_PUBLICACAO } from '@/components/publicacao/publicacaoStateMachine';
 
-const STATUS_PRIORITY = {
-  inconsistente: 0,
-  aguardando_publicacao: 1,
-  aguardando_nota: 2,
-  gerada: 3,
-};
-
-
-function normalizeModulo(modulo = '', registro = {}) {
-  const valor = String(modulo || registro?.modulo || registro?.origem_tipo || '').trim().toLowerCase();
-
-  if (valor === 'livro') return 'Livro';
-  if (valor === 'ex officio' || valor === 'exofficio' || valor === 'ex-officio' || valor === 'publicação ex officio' || valor === 'publicacao ex officio') {
-    return 'Ex Officio';
-  }
-
-  if (registro?.origem_tipo === 'livro' || registro?.tipo_label || registro?.status_codigo || registro?.vinculos) return 'Livro';
-  if (registro?.origem_tipo === 'ex-officio' || registro?.tipo || registro?._origem === 'ex-officio') return 'Ex Officio';
-
-  return modulo || 'Livro';
+function mapStatusContratoParaControle(statusCodigo) {
+  if (statusCodigo === 'gerada') return STATUS_PUBLICACAO.PUBLICADO;
+  if (statusCodigo === 'aguardando_publicacao') return STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO;
+  if (statusCodigo === 'aguardando_nota') return STATUS_PUBLICACAO.AGUARDANDO_NOTA;
+  if (statusCodigo === 'inconsistente') return 'Inconsistente';
+  return STATUS_PUBLICACAO.AGUARDANDO_NOTA;
 }
 
-function normalizeStatus(registro) {
-  const statusBase = registro.status_codigo || registro.status || registro.status_publicacao || '';
-  const valor = String(statusBase).trim().toLowerCase();
+function getStatusCanonicoRP(registro = {}) {
+  const statusBase =
+    registro.status_canonico ||
+    registro.status_calculado ||
+    registro.status_publicacao ||
+    registro.status ||
+    (registro.origem_tipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcularStatusPublicacaoRegistro(registro));
 
-  if (valor === 'publicado' || valor === 'gerada') return 'gerada';
-  if (valor === 'aguardando publicação' || valor === 'aguardando_publicacao') return 'aguardando_publicacao';
-  if (valor === 'aguardando nota' || valor === 'aguardando_nota') return 'aguardando_nota';
-  if (valor === 'inconsistente') return 'inconsistente';
-  return valor || 'ativo';
+  return normalizarStatusPublicacao(statusBase) || calcularStatusPublicacaoRegistro(registro);
 }
 
-function normalizeStatusLabel(registro, statusCodigo) {
-  if (registro.status_label) return registro.status_label;
-
-  switch (statusCodigo) {
-    case 'gerada':
-      return 'Publicado';
-    case 'aguardando_publicacao':
-      return 'Aguardando publicação';
-    case 'aguardando_nota':
-      return 'Aguardando nota';
-    case 'inconsistente':
-      return 'Inconsistente';
-    default:
-      return registro.status || registro.status_publicacao || 'Ativo';
-  }
-}
-
-function normalizeRegistro(registro) {
-  const statusCodigo = normalizeStatus(registro);
-  const modulo = normalizeModulo(registro.modulo, registro);
-
-  return {
-    ...registro,
-    modulo_normalizado: modulo,
-    status_codigo: statusCodigo,
-    status_label: normalizeStatusLabel(registro, statusCodigo),
-  };
-}
-
-function sortRegistrosDesc(registros = []) {
-  return [...registros].sort((a, b) => {
-    const dataA = new Date(a.data_registro || a.data_inicio || a.created_date || 0).getTime();
-    const dataB = new Date(b.data_registro || b.data_inicio || b.created_date || 0).getTime();
-    return dataB - dataA;
-  });
-}
-
-function getStatusPriority(statusCodigo = '') {
-  return STATUS_PRIORITY[statusCodigo] ?? 99;
-}
-
-function sortRegistrosByOperationalPriority(registros = []) {
-  return [...registros].sort((a, b) => {
-    const priorityDiff = getStatusPriority(a.status_codigo) - getStatusPriority(b.status_codigo);
-    if (priorityDiff !== 0) return priorityDiff;
-
-    const dataA = new Date(a.data_registro || a.data_inicio || a.created_date || 0).getTime();
-    const dataB = new Date(b.data_registro || b.data_inicio || b.created_date || 0).getTime();
-    return dataB - dataA;
-  });
-}
-
-function formatOperationalSummary({ inconsistentes = 0, aguardando_publicacao = 0 } = {}) {
-  if (!inconsistentes && !aguardando_publicacao) {
+function formatOperationalSummary({ inconsistentes = 0, aguardandoPublicacao = 0 } = {}) {
+  if (!inconsistentes && !aguardandoPublicacao) {
     return 'Nenhum registro crítico no momento. Revise os demais status conforme necessário.';
   }
 
   const partes = [];
   if (inconsistentes) partes.push(`${inconsistentes} registro${inconsistentes > 1 ? 's' : ''} inconsistente${inconsistentes > 1 ? 's' : ''}`);
-  if (aguardando_publicacao) partes.push(`${aguardando_publicacao} pronto${aguardando_publicacao > 1 ? 's' : ''} para publicação`);
+  if (aguardandoPublicacao) partes.push(`${aguardandoPublicacao} pronto${aguardandoPublicacao > 1 ? 's' : ''} para publicação`);
 
   return `Você possui ${partes.join(' e ')}.`;
-}
-
-async function getPublicacoesExOfficioRP({ isAdmin, getMilitarScopeFilters }) {
-  if (isAdmin) {
-    return base44.entities.PublicacaoExOfficio.list('-created_date');
-  }
-
-  const scopeFilters = getMilitarScopeFilters();
-  if (!scopeFilters.length) return [];
-
-  const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
-  const militaresAcesso = militarQueries.flat();
-  const militarIds = [...new Set(militaresAcesso.map((m) => m.id).filter(Boolean))];
-  if (!militarIds.length) return [];
-
-  const arrays = await Promise.all(
-    militarIds.map((id) => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date'))
-  );
-
-  const map = new Map();
-  arrays.flat().forEach((item) => map.set(item.id, item));
-  return Array.from(map.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
 }
 
 export default function RP() {
@@ -136,49 +49,38 @@ export default function RP() {
   const { data: registrosBrutos = [], isLoading } = useQuery({
     queryKey: ['registro-rp-lista', isAdmin],
     queryFn: async () => {
-      const [contratoLivro, publicacoesExOfficio] = await Promise.all([
+      const [contratoLivro, publicacoesExOfficio, atestados] = await Promise.all([
         getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
-        getPublicacoesExOfficioRP({ isAdmin, getMilitarScopeFilters }),
+        listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
+        listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
       ]);
 
       const registrosLivro = (contratoLivro?.registros_livro || []).map((registro) => ({
         ...registro,
-        modulo: 'Livro',
         origem_tipo: 'livro',
+        status_calculado: mapStatusContratoParaControle(registro.status_codigo),
       }));
 
       const registrosExOfficio = publicacoesExOfficio.map((registro) => ({
         ...registro,
-        modulo: 'Ex Officio',
         origem_tipo: 'ex-officio',
       }));
 
-      return sortRegistrosDesc([...registrosLivro, ...registrosExOfficio]);
+      const registrosAtestados = atestados.map((registro) => ({
+        ...registro,
+        origem_tipo: 'atestado',
+      }));
+
+      return [...registrosLivro, ...registrosExOfficio, ...registrosAtestados];
     },
     enabled: isAccessResolved && hasAccess,
     staleTime: 30000,
   });
 
-  const registros = useMemo(() => registrosBrutos.map(normalizeRegistro), [registrosBrutos]);
-
-  const metricas = useMemo(() => {
-    const totais = {
-      total: registros.length,
-      aguardando_publicacao: 0,
-      aguardando_nota: 0,
-      gerada: 0,
-      inconsistentes: 0,
-    };
-
-    registros.forEach((registro) => {
-      if (registro.status_codigo === 'aguardando_publicacao') totais.aguardando_publicacao += 1;
-      if (registro.status_codigo === 'aguardando_nota') totais.aguardando_nota += 1;
-      if (registro.status_codigo === 'gerada') totais.gerada += 1;
-      if (registro.status_codigo === 'inconsistente') totais.inconsistentes += 1;
-    });
-
-    return totais;
-  }, [registros]);
+  const metricas = useMemo(() => calcularMetricasPublicacao(registrosBrutos, {
+    getStatusCanonico: getStatusCanonicoRP,
+    isInconsistente: (registro) => registro.status_calculado === 'Inconsistente',
+  }), [registrosBrutos]);
 
   const resumoOperacional = useMemo(
     () => formatOperationalSummary(metricas),
@@ -200,7 +102,7 @@ export default function RP() {
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Registros</h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Gestão unificada dos registros do Livro e das publicações Ex Officio, com foco em ação rápida e conferência operacional.
+              Resumo espelho do módulo Controle de Publicações, usando a mesma fonte e mesma regra de contagem.
             </p>
           </div>
 
@@ -220,9 +122,9 @@ export default function RP() {
 
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <MetricCard icon={FileText} label="Total" value={metricas.total} helper="Todos os registros visíveis" />
-          <MetricCard icon={Filter} label="Aguardando publicação" value={metricas.aguardando_publicacao} helper="Prontos para boletim" />
-          <MetricCard icon={CalendarRange} label="Aguardando nota" value={metricas.aguardando_nota} helper="Dependem de nota para BG" />
-          <MetricCard icon={BookOpenText} label="Publicados" value={metricas.gerada} helper="Já lançados em BG" />
+          <MetricCard icon={Filter} label="Aguardando publicação" value={metricas.aguardandoPublicacao} helper="Prontos para boletim" />
+          <MetricCard icon={CalendarRange} label="Aguardando nota" value={metricas.aguardandoNota} helper="Dependem de nota para BG" />
+          <MetricCard icon={BookOpenText} label="Publicados" value={metricas.publicados} helper="Já lançados em BG" />
           <MetricCard icon={ShieldAlert} label="Inconsistências" value={metricas.inconsistentes} helper="Requer conferência" />
         </div>
 

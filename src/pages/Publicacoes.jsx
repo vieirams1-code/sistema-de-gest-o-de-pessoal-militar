@@ -18,6 +18,7 @@ import {
   reverterAtestadosPorExclusaoPublicacao,
 } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
+import { calcularMetricasPublicacao, listarAtestadosPublicacaoEscopo, listarPublicacoesExOfficioEscopo } from '@/services/publicacoesPainelService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
 import {
@@ -254,35 +255,13 @@ export default function Publicacoes() {
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
     queryKey: ['publicacoes-ex-officio', isAdmin],
-    queryFn: async () => {
-      if (isAdmin) return base44.entities.PublicacaoExOfficio.list('-created_date');
-      const scopeFilters = getMilitarScopeFilters();
-      if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
-      const militarIds = [...new Set(militarQueries.flat().map((m) => m.id).filter(Boolean))];
-      if (!militarIds.length) return [];
-      const arrays = await Promise.all(militarIds.map((id) => base44.entities.PublicacaoExOfficio.filter({ militar_id: id }, '-created_date')));
-      const m = new Map();
-      arrays.flat().forEach((item) => m.set(item.id, item));
-      return Array.from(m.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-    },
+    queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
     queryKey: ['atestados-publicacao', isAdmin],
-    queryFn: async () => {
-      if (isAdmin) return (await base44.entities.Atestado.list('-created_date')).filter((a) => a.nota_para_bg || a.numero_bg);
-      const scopeFilters = getMilitarScopeFilters();
-      if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
-      const militarIds = [...new Set(militarQueries.flat().map((m) => m.id).filter(Boolean))];
-      if (!militarIds.length) return [];
-      const arrays = await Promise.all(militarIds.map((id) => base44.entities.Atestado.filter({ militar_id: id }, '-created_date')));
-      const m = new Map();
-      arrays.flat().forEach((item) => { if (item.nota_para_bg || item.numero_bg) m.set(item.id, item); });
-      return Array.from(m.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-    },
+    queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
@@ -425,26 +404,24 @@ export default function Publicacoes() {
     return matchesStatus && matchesSearch;
   }), [registrosDaAbaAtiva, statusFilter, searchTerm]);
 
-  const statsOrigem = useMemo(() => ({
-    total: registrosDaAbaAtiva.length,
-    aguardandoNota: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length,
-    aguardandoPublicacao: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length,
-    publicados: registrosDaAbaAtiva.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.PUBLICADO).length,
-    inconsistentes: registrosDaAbaAtiva.filter((r) => r.status_calculado === 'Inconsistente').length,
+  const statsOrigem = useMemo(() => calcularMetricasPublicacao(registrosDaAbaAtiva, {
+    getStatusCanonico: obterStatusCanonicoPublicacao,
+    isInconsistente: (r) => r.status_calculado === 'Inconsistente',
   }), [registrosDaAbaAtiva]);
 
   const statsFiltro = useMemo(() => {
-    const total = filteredRegistros.length;
-    const aguardandoNota = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_NOTA).length;
-    const aguardandoPublicacao = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO).length;
-    const publicados = filteredRegistros.filter((r) => obterStatusCanonicoPublicacao(r) === STATUS_PUBLICACAO.PUBLICADO).length;
-    const inconsistentes = filteredRegistros.filter((r) => r.status_calculado === 'Inconsistente').length;
+    const metricaBase = calcularMetricasPublicacao(filteredRegistros, {
+      getStatusCanonico: obterStatusCanonicoPublicacao,
+      isInconsistente: (r) => r.status_calculado === 'Inconsistente',
+    });
+
     const comBloqueioOperacional = filteredRegistros.filter((r) =>
       (Array.isArray(r?.historico_publicacao) ? r.historico_publicacao : []).some(
         (evento) => (evento?.evento || evento?.acao) === EVENTO_AUDITORIA_PUBLICACAO.BLOQUEIO
       )
     ).length;
-    return { total, aguardandoNota, aguardandoPublicacao, publicados, inconsistentes, comBloqueioOperacional };
+
+    return { ...metricaBase, comBloqueioOperacional };
   }, [filteredRegistros]);
 
   const handleUpdate = (id, data, tipo) => {
