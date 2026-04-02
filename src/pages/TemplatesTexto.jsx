@@ -54,7 +54,6 @@ function createEmptyTemplateForm() {
     tipo_registro: '',
     nome: '',
     template: '',
-    observacoes: '',
     ativo: true,
   };
 }
@@ -71,7 +70,6 @@ function normalizeTemplateForForm(template) {
     ...template,
     modulo: normalizeTemplateModulo(template.modulo),
     template: getFormTextValue(template.template),
-    observacoes: getFormTextValue(template.observacoes),
     ativo: template.ativo ?? true,
   };
 }
@@ -83,7 +81,6 @@ function buildTemplatePayload(data) {
     tipo_registro: data.tipo_registro || '',
     nome: getFormTextValue(data.nome),
     template: getFormTextValue(data.template),
-    observacoes: getFormTextValue(data.observacoes),
     ativo: data.ativo ?? true,
   };
 }
@@ -817,7 +814,6 @@ export default function TemplatesTexto() {
                       {!t.ativo && <Badge className="bg-red-100 text-red-600">Inativo</Badge>}
                     </div>
                     <p className="text-sm text-slate-500 line-clamp-2 mt-1">{t.template}</p>
-                    {t.observacoes && <p className="text-xs text-slate-400 mt-1 italic">{t.observacoes}</p>}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-[#1e3a5f]" onClick={() => handleEdit(t)}>
@@ -1000,11 +996,6 @@ export default function TemplatesTexto() {
                   </div>
                 );
               })()}
-
-              <div>
-                <Label className="text-sm font-medium text-slate-700">Observações / Referência Legal</Label>
-                <Textarea value={editingTemplate.observacoes || ''} onChange={e => setEditingTemplate(p => ({ ...p, observacoes: e.target.value }))} rows={2} className="mt-1.5" placeholder="Ex: Art. 49, II, do Decreto nº 5.698/1990" />
-              </div>
 
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="ativo" checked={editingTemplate.ativo !== false} onChange={e => setEditingTemplate(p => ({ ...p, ativo: e.target.checked }))} className="w-4 h-4" />
