@@ -110,7 +110,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   const TipoIcon = tipoVisual.icon;
   const isPublicado = currentStatus === STATUS_PUBLICACAO.PUBLICADO;
   const podePublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
-  const adminPodeEditarBgPublicado = isAdmin && canAccessAction('admin_mode');
+  const adminPodeEditarBgPublicado = isAdmin && canAccessAction('admin_mode') && modoAdmin;
   const podeInformarBg = (adminPodeEditarBgPublicado || !isPublicado) && (
     currentStatus === STATUS_PUBLICACAO.AGUARDANDO_NOTA ||
     currentStatus === STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO ||
