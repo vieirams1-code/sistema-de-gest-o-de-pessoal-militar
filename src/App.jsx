@@ -29,7 +29,6 @@ const moduleGuardByPage = {
   EditarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
   EditarJiso: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   Atestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
-  DashboardAtestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
   CadastrarAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   Ferias: { moduleKey: 'ferias', moduleName: 'Férias' },

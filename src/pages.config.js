@@ -62,7 +62,6 @@ import CadastrarPunicao from './pages/CadastrarPunicao';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import Configuracoes from './pages/Configuracoes';
-import DashboardAtestados from './pages/DashboardAtestados';
 import DetalheComportamento from './pages/DetalheComportamento';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
@@ -107,7 +106,6 @@ export const PAGES = {
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "ConciliacaoBoletim": ConciliacaoBoletim,
     "Configuracoes": Configuracoes,
-    "DashboardAtestados": DashboardAtestados,
     "DetalheComportamento": DetalheComportamento,
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
