@@ -5,7 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,6 +37,48 @@ const MODULO_LABELS = {
   [MODULO_LIVRO]: 'Livro',
   [MODULO_EX_OFFICIO]: 'Ex Offício',
 };
+
+const TIPO_LABEL_OVERRIDES = {
+  ELEVACAO_COMPORTAMENTO_DISCIPLINAR: 'Elevação de Comportamento Disciplinar',
+};
+
+const TIPO_REGISTRO_CATEGORIAS = [
+  {
+    key: 'ferias',
+    label: 'Férias',
+    tipos: ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'],
+  },
+  {
+    key: 'atestados_saude',
+    label: 'Atestados / Saúde',
+    tipos: ['Homologação de Atestado', 'Ata JISO'],
+  },
+  {
+    key: 'comportamento',
+    label: 'Comportamento',
+    tipos: ['Melhoria de Comportamento', 'ELEVACAO_COMPORTAMENTO_DISCIPLINAR', 'Punição'],
+  },
+  {
+    key: 'livro_administrativo',
+    label: 'Livro / Atos Administrativos',
+    tipos: [
+      'Apostila',
+      'Cedência',
+      'Curso/Estágio',
+      'Designação de Função',
+      'Deslocamento Missão',
+      'Dispensa de Função',
+      'Dispensa Recompensa',
+      'Elogio Individual',
+      'Licença Maternidade',
+      'Prorrogação de Licença Maternidade',
+      'Licença Paternidade',
+      'Transcrição de Documentos',
+      'Tornar sem Efeito',
+      'Geral',
+    ],
+  },
+];
 
 function normalizeTemplateModulo(modulo) {
   return modulo === 'Publicação Ex Officio' ? MODULO_EX_OFFICIO : modulo || '';
@@ -89,7 +140,7 @@ async function updateTemplate(id, payload) {
 function getTipoDisplay(tipo) {
   const tipoCanonicoFerias = resolverTipoFeriasCanonico(tipo);
   if (tipoCanonicoFerias) return getLabelTipoFerias(tipoCanonicoFerias);
-  return tipo;
+  return TIPO_LABEL_OVERRIDES[tipo] || tipo;
 }
 
 function getTipoSelectLabel(modulo, tipo) {
@@ -644,6 +695,30 @@ export default function TemplatesTexto() {
       .sort((a, b) => getTipoDisplay(a.value).localeCompare(getTipoDisplay(b.value), 'pt-BR'))
   ), []);
 
+  const tiposRegistroAgrupados = useMemo(() => {
+    const optionsByValue = new Map(tiposRegistroOptions.map((tipo) => [tipo.value, tipo]));
+    const grouped = [];
+    const usedValues = new Set();
+
+    TIPO_REGISTRO_CATEGORIAS.forEach((categoria) => {
+      const options = categoria.tipos
+        .map((tipo) => optionsByValue.get(tipo))
+        .filter(Boolean);
+
+      if (!options.length) return;
+
+      options.forEach((option) => usedValues.add(option.value));
+      grouped.push({ key: categoria.key, label: categoria.label, options });
+    });
+
+    const restantes = tiposRegistroOptions.filter((tipo) => !usedValues.has(tipo.value));
+    if (restantes.length) {
+      grouped.push({ key: 'outros', label: 'Outros', options: restantes });
+    }
+
+    return grouped;
+  }, [tiposRegistroOptions]);
+
   const getModuloByTipoOption = (tipo) => {
     const option = tiposRegistroOptions.find((item) => item.value === tipo);
     return option?.modulo || '';
@@ -924,8 +999,18 @@ export default function TemplatesTexto() {
                   >
                     <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      {tiposRegistroOptions.map(tipo => (
-                        <SelectItem key={tipo.value} value={tipo.value}>{getTipoSelectLabel(tipo.modulo, tipo.value)}</SelectItem>
+                      {tiposRegistroAgrupados.map((grupo, groupIndex) => (
+                        <React.Fragment key={grupo.key}>
+                          {groupIndex > 0 && <SelectSeparator />}
+                          <SelectGroup>
+                            <SelectLabel>{grupo.label}</SelectLabel>
+                            {grupo.options.map((tipo) => (
+                              <SelectItem key={tipo.value} value={tipo.value}>
+                                {getTipoSelectLabel(tipo.modulo, tipo.value)}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </React.Fragment>
                       ))}
                     </SelectContent>
                   </Select>
