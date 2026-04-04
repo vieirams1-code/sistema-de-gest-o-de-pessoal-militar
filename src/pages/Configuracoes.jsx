@@ -11,6 +11,14 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { CATEGORIA_QUADRO_OFICIAL, CATEGORIA_QUADRO_PRACA } from '@/utils/postoGraduacaoClassificacao';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -32,6 +40,11 @@ export default function Configuracoes() {
   const [novoQuadro, setNovoQuadro] = useState({ nome: '', sigla: '', categoria: CATEGORIA_QUADRO_OFICIAL, ativo: true });
   const [quadroEmEdicao, setQuadroEmEdicao] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
+  const [addQuadroDialogOpen, setAddQuadroDialogOpen] = useState(false);
+  const [editConfirmStep, setEditConfirmStep] = useState(0);
+  const [editImpactCount, setEditImpactCount] = useState(0);
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
+  const [deleteImpactData, setDeleteImpactData] = useState({ id: null, nome: '', quantidade: 0 });
 
   const selectedTab = searchParams.get('tab') || 'adicoes';
 
@@ -46,6 +59,7 @@ export default function Configuracoes() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quadros-militares'] });
       setNovoQuadro({ nome: '', sigla: '', categoria: CATEGORIA_QUADRO_OFICIAL, ativo: true });
+      setAddQuadroDialogOpen(false);
     }
   });
   const updateQuadroMutation = useMutation({
@@ -85,7 +99,20 @@ export default function Configuracoes() {
     if (!canAccessAction('gerir_configuracoes')) return;
     if (deleteDialog.type === 'lotacao') deleteLotacaoMutation.mutate(deleteDialog.id);
     else if (deleteDialog.type === 'funcao') deleteFuncaoMutation.mutate(deleteDialog.id);
-    else deleteQuadroMutation.mutate(deleteDialog.id);
+    else {
+      deleteQuadroMutation.mutate(deleteDialog.id);
+      setDeleteConfirmStep(0);
+      setDeleteImpactData({ id: null, nome: '', quantidade: 0 });
+    }
+  };
+
+  const countMilitaresVinculadosAoQuadro = async (quadro) => {
+    if (!quadro?.id) return 0;
+
+    const militaresPorId = await base44.entities.Militar.filter({ quadro_id: quadro.id });
+    const militaresPorNome = quadro?.nome ? await base44.entities.Militar.filter({ quadro: quadro.nome }) : [];
+    const militaresVinculados = [...new Map([...militaresPorId, ...militaresPorNome].map((m) => [m.id, m])).values()];
+    return militaresVinculados.length;
   };
 
   const handleCreateLotacao = () => {
@@ -111,9 +138,16 @@ export default function Configuracoes() {
     });
   };
 
-  const handleUpdateQuadro = () => {
+  const handleUpdateQuadro = async () => {
     if (!canAccessAction('gerir_configuracoes') || !quadroEmEdicao?.id) return;
     if (!quadroEmEdicao.nome?.trim()) return;
+    const militaresImpactados = await countMilitaresVinculadosAoQuadro(quadroEmEdicao);
+    setEditImpactCount(militaresImpactados);
+    setEditConfirmStep(1);
+  };
+
+  const confirmUpdateQuadro = () => {
+    if (!canAccessAction('gerir_configuracoes') || !quadroEmEdicao?.id) return;
     updateQuadroMutation.mutate({
       id: quadroEmEdicao.id,
       payload: {
@@ -123,6 +157,19 @@ export default function Configuracoes() {
         ativo: quadroEmEdicao.ativo,
       }
     });
+    setEditConfirmStep(0);
+    setEditImpactCount(0);
+  };
+
+  const abrirExclusaoQuadroComConfirmacao = async (quadro) => {
+    const quantidade = await countMilitaresVinculadosAoQuadro(quadro);
+    setDeleteImpactData({ id: quadro.id, nome: quadro.nome, quantidade });
+    setDeleteConfirmStep(1);
+  };
+
+  const iniciarConfirmacaoFinalExclusao = () => {
+    setDeleteDialog({ open: true, type: 'quadro', id: deleteImpactData.id });
+    setDeleteConfirmStep(2);
   };
 
   if (loadingUser || !isAccessResolved) return null;
@@ -200,33 +247,9 @@ export default function Configuracoes() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Quadros</h2>
             <p className="text-sm text-slate-500 mb-4">Cadastre quadros com categoria obrigatória (Oficial/Praça) para uso no cadastro de militar.</p>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-6">
-              <Input
-                value={novoQuadro.nome}
-                onChange={(e) => setNovoQuadro((prev) => ({ ...prev, nome: e.target.value }))}
-                placeholder="Nome do quadro"
-                disabled={!canAccessAction('gerir_configuracoes')}
-                className="md:col-span-2"
-              />
-              <Input
-                value={novoQuadro.sigla}
-                onChange={(e) => setNovoQuadro((prev) => ({ ...prev, sigla: e.target.value }))}
-                placeholder="Sigla (opcional)"
-                disabled={!canAccessAction('gerir_configuracoes')}
-              />
-              <Select
-                value={novoQuadro.categoria}
-                onValueChange={(value) => setNovoQuadro((prev) => ({ ...prev, categoria: value }))}
-                disabled={!canAccessAction('gerir_configuracoes')}
-              >
-                <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={CATEGORIA_QUADRO_OFICIAL}>{CATEGORIA_QUADRO_OFICIAL}</SelectItem>
-                  <SelectItem value={CATEGORIA_QUADRO_PRACA}>{CATEGORIA_QUADRO_PRACA}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={handleCreateQuadro} disabled={!novoQuadro.nome.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-                <Plus className="w-4 h-4 mr-2" /> Adicionar
+            <div className="mb-6">
+              <Button onClick={() => setAddQuadroDialogOpen(true)} disabled={!canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                <Plus className="w-4 h-4 mr-2" /> Adicionar Quadro
               </Button>
             </div>
 
@@ -267,7 +290,7 @@ export default function Configuracoes() {
                         {canAccessAction('gerir_configuracoes') && (
                           <div className="flex gap-2">
                             <Button variant="outline" size="sm" onClick={() => setQuadroEmEdicao({ ...quadro })}>Editar</Button>
-                            <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, type: 'quadro', id: quadro.id })} className="text-red-600 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => abrirExclusaoQuadroComConfirmacao(quadro)} className="text-red-600 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
                           </div>
                         )}
                       </div>
@@ -282,7 +305,100 @@ export default function Configuracoes() {
           <TiposPublicacaoManager />
         </div>
 
-        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+        <Dialog open={addQuadroDialogOpen} onOpenChange={setAddQuadroDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Novo quadro</DialogTitle>
+              <DialogDescription>Preencha os dados para cadastrar um novo quadro.</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-3">
+              <Input
+                value={novoQuadro.nome}
+                onChange={(e) => setNovoQuadro((prev) => ({ ...prev, nome: e.target.value }))}
+                placeholder="Nome do quadro"
+                disabled={!canAccessAction('gerir_configuracoes')}
+              />
+              <Input
+                value={novoQuadro.sigla}
+                onChange={(e) => setNovoQuadro((prev) => ({ ...prev, sigla: e.target.value }))}
+                placeholder="Sigla (opcional)"
+                disabled={!canAccessAction('gerir_configuracoes')}
+              />
+              <Select
+                value={novoQuadro.categoria}
+                onValueChange={(value) => setNovoQuadro((prev) => ({ ...prev, categoria: value }))}
+                disabled={!canAccessAction('gerir_configuracoes')}
+              >
+                <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CATEGORIA_QUADRO_OFICIAL}>{CATEGORIA_QUADRO_OFICIAL}</SelectItem>
+                  <SelectItem value={CATEGORIA_QUADRO_PRACA}>{CATEGORIA_QUADRO_PRACA}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddQuadroDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleCreateQuadro} disabled={!novoQuadro.nome.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={editConfirmStep === 1} onOpenChange={(open) => { if (!open) setEditConfirmStep(0); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Impacto da edição de quadro</AlertDialogTitle>
+              <AlertDialogDescription>
+                Alterar este quadro pode impactar militares já vinculados a ele. Revise com atenção antes de continuar.
+                {editImpactCount > 0 && ` Há ${editImpactCount} militar(es) potencialmente impactado(s).`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setEditConfirmStep(0)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => setEditConfirmStep(2)} className="bg-amber-600 hover:bg-amber-700 text-white">Continuar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={editConfirmStep === 2} onOpenChange={(open) => { if (!open) setEditConfirmStep(0); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmação final da edição</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta é a segunda confirmação obrigatória. Confirme apenas se tiver certeza de que deseja salvar as alterações deste quadro.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setEditConfirmStep(0)}>Voltar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmUpdateQuadro} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">Confirmar e salvar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteConfirmStep === 1} onOpenChange={(open) => { if (!open) setDeleteConfirmStep(0); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Impacto da exclusão de quadro</AlertDialogTitle>
+              <AlertDialogDescription>
+                Excluir este quadro pode deixar militares com quadro desatualizado ou sem vínculo válido. Confirme apenas se tiver certeza.
+                {deleteImpactData.quantidade > 0 && ` Há ${deleteImpactData.quantidade} militar(es) vinculado(s) no momento.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteConfirmStep(0)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={iniciarConfirmacaoFinalExclusao} className="bg-amber-600 hover:bg-amber-700 text-white">Continuar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => {
+          setDeleteDialog({ ...deleteDialog, open });
+          if (!open && deleteDialog.type === 'quadro') {
+            setDeleteConfirmStep(0);
+            setDeleteImpactData({ id: null, nome: '', quantidade: 0 });
+          }
+        }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
