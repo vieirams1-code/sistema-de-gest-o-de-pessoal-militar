@@ -17,6 +17,11 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import {
+  CATEGORIA_QUADRO_OFICIAL,
+  classificarPostoGraduacao,
+  validarCompatibilidadePostoQuadro,
+} from '@/utils/postoGraduacaoClassificacao';
 
 const initialFormData = {
   nome_completo: '',
@@ -32,6 +37,7 @@ const initialFormData = {
   subgrupamento_id: '',
   subgrupamento_nome: '',
   posto_graduacao: '',
+  quadro_id: '',
   quadro: '',
   data_inclusao: '',
   comportamento: 'Bom',
@@ -96,8 +102,7 @@ const POSTOS_GRADUACOES = [
   { value: 'Soldado', label: 'Soldado (SD)', grupo: 'Praças' },
 ];
 
-const POSTOS_OFICIAIS = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'];
-const isOficial = (posto) => POSTOS_OFICIAIS.includes(posto);
+const isOficial = (posto) => classificarPostoGraduacao(posto) === CATEGORIA_QUADRO_OFICIAL;
 
 export default function CadastrarMilitar() {
   const navigate = useNavigate();
@@ -111,6 +116,7 @@ export default function CadastrarMilitar() {
 
   const [loading, setLoading] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
+  const [mensagemCompatibilidadeQuadro, setMensagemCompatibilidadeQuadro] = useState('');
 
 
   const { data: editingMilitar, isLoading: loadingEdit } = useQuery({
@@ -128,16 +134,65 @@ export default function CadastrarMilitar() {
     }
   });
 
+  const { data: quadrosMilitares = [] } = useQuery({
+    queryKey: ['quadros-militares', 'ativo'],
+    queryFn: () => base44.entities.QuadroMilitar.filter({ ativo: true }, 'nome'),
+    enabled: isAccessResolved && hasMilitaresAccess,
+  });
+
   React.useEffect(() => {
     if (editingMilitar) {
-      setFormData({ ...initialFormData, ...editingMilitar });
+      setFormData((prev) => ({ ...prev, ...initialFormData, ...editingMilitar }));
       setComportamentoOriginal(editingMilitar.comportamento || null);
     }
   }, [editingMilitar]);
 
+  React.useEffect(() => {
+    if (!formData.quadro_id && formData.quadro && quadrosMilitares.length > 0) {
+      const quadroCorrespondente = quadrosMilitares.find((item) => item.nome === formData.quadro);
+      if (quadroCorrespondente) {
+        setFormData((prev) => ({ ...prev, quadro_id: quadroCorrespondente.id, quadro: quadroCorrespondente.nome }));
+      }
+    }
+  }, [formData.quadro, formData.quadro_id, quadrosMilitares]);
+
   const [motivoComportamento, setMotivoComportamento] = useState('');
 
+  const categoriaPosto = classificarPostoGraduacao(formData.posto_graduacao);
+  const quadrosCompativeis = quadrosMilitares.filter((quadro) => quadro.categoria === categoriaPosto);
+  const quadroSelecionado = quadrosMilitares.find((quadro) => quadro.id === formData.quadro_id);
+
   const handleChange = (name, value) => {
+    if (name === 'posto_graduacao') {
+      const novaCategoria = classificarPostoGraduacao(value);
+      if (formData.quadro_id) {
+        const quadroAtual = quadrosMilitares.find((q) => q.id === formData.quadro_id);
+        if (quadroAtual && quadroAtual.categoria !== novaCategoria) {
+          setFormData((prev) => ({ ...prev, posto_graduacao: value, quadro_id: '', quadro: '' }));
+          setMensagemCompatibilidadeQuadro('Quadro removido automaticamente porque o novo Posto/Graduação pertence a outra categoria.');
+          return;
+        }
+      }
+      setMensagemCompatibilidadeQuadro('');
+    }
+
+    if (name === 'quadro_id') {
+      const quadro = quadrosMilitares.find((item) => item.id === value);
+      if (!quadro) {
+        setFormData((prev) => ({ ...prev, quadro_id: '', quadro: '' }));
+        return;
+      }
+
+      if (!validarCompatibilidadePostoQuadro(formData.posto_graduacao, quadro.categoria)) {
+        setMensagemCompatibilidadeQuadro('Quadro incompatível com o Posto/Graduação selecionado.');
+        return;
+      }
+
+      setMensagemCompatibilidadeQuadro('');
+      setFormData((prev) => ({ ...prev, quadro_id: quadro.id, quadro: quadro.nome }));
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -151,6 +206,21 @@ export default function CadastrarMilitar() {
       altura: formData.altura ? parseFloat(formData.altura) : null,
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
+
+    const categoriaPostoAtual = classificarPostoGraduacao(formData.posto_graduacao);
+    const quadroAtual = quadrosMilitares.find((q) => q.id === formData.quadro_id);
+
+    if (formData.posto_graduacao && !categoriaPostoAtual) {
+      alert('Posto/Graduação não classificado. Revise o cadastro antes de salvar.');
+      setLoading(false);
+      return;
+    }
+
+    if (quadroAtual && !validarCompatibilidadePostoQuadro(formData.posto_graduacao, quadroAtual.categoria)) {
+      alert('Não é possível salvar: Quadro incompatível com o Posto/Graduação informado.');
+      setLoading(false);
+      return;
+    }
 
     // Preencher subgrupamento automaticamente para usuários não-admin
     if (!editId && !isAdmin && subgrupamentoId) {
@@ -349,14 +419,34 @@ export default function CadastrarMilitar() {
                   </SelectContent>
                 </Select>
               </div>
-              <FormField
-                label="Quadro"
-                name="quadro"
-                value={formData.quadro}
-                onChange={handleChange}
-                type="select"
-                options={['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QBMPT']}
-              />
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Quadro</label>
+                <Select
+                  value={formData.quadro_id || ''}
+                  onValueChange={(v) => handleChange('quadro_id', v)}
+                  disabled={!categoriaPosto}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={categoriaPosto ? 'Selecione um quadro compatível...' : 'Selecione o Posto/Graduação primeiro'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quadrosCompativeis.map((quadro) => (
+                      <SelectItem key={quadro.id} value={quadro.id}>
+                        {quadro.nome}{quadro.sigla ? ` (${quadro.sigla})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {categoriaPosto && quadrosCompativeis.length === 0 && (
+                  <p className="text-xs text-amber-700">Nenhum quadro ativo compatível com a categoria selecionada.</p>
+                )}
+                {mensagemCompatibilidadeQuadro && (
+                  <p className="text-xs text-red-600">{mensagemCompatibilidadeQuadro}</p>
+                )}
+                {!mensagemCompatibilidadeQuadro && quadroSelecionado && (
+                  <p className="text-xs text-slate-500">Categoria do quadro: {quadroSelecionado.categoria}</p>
+                )}
+              </div>
               <FormField
                 label="Data de Inclusão"
                 name="data_inclusao"
