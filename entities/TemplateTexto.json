@@ -28,6 +28,22 @@
       "type": "string",
       "default": ""
     },
+    "escopo": {
+      "type": "string",
+      "default": "GLOBAL"
+    },
+    "setor_id": {
+      "type": "string",
+      "default": ""
+    },
+    "subsetor_id": {
+      "type": "string",
+      "default": ""
+    },
+    "unidade_id": {
+      "type": "string",
+      "default": ""
+    },
     "ativo": {
       "type": "boolean",
       "default": true

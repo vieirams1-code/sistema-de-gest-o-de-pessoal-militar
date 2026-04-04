@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { addDays, format as formatDate } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 
 export default function EditarJISO() {
   const navigate = useNavigate();
@@ -83,7 +84,11 @@ export default function EditarJISO() {
 
   const gerarTextoPublicacao = () => {
     if (!atestado || !formData.ata_jiso) return '';
-    const tmpl = templatesExOfficio.find(t => t.tipo_registro === 'Ata JISO' && t.ativo !== false);
+    const tmpl = getTemplateAtivoPorTipo('Ata JISO', 'ExOfficio', templatesExOfficio, {
+      grupamento_id: atestado?.grupamento_id,
+      subgrupamento_id: atestado?.subgrupamento_id,
+      subgrupamento_tipo: atestado?.subgrupamento_tipo,
+    });
     if (!tmpl?.template) return null;
     
     const formatarData = (dataStr) => {

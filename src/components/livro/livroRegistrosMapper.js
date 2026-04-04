@@ -163,8 +163,19 @@ function getTextoPublicacaoRegistro({
 
   const tipoOperacionalFerias = getTipoFeriasOperacional(tipoCanonicoFerias);
   const templateAtivo = getTemplateAtivoPorTipo(tipoCanonicoFerias, 'Livro', templatesAtivosLivro);
+  const templateComEscopo = getTemplateAtivoPorTipo(
+    tipoCanonicoFerias,
+    'Livro',
+    templatesAtivosLivro,
+    {
+      grupamento_id: militar?.grupamento_id,
+      subgrupamento_id: militar?.subgrupamento_id,
+      subgrupamento_tipo: militar?.subgrupamento_tipo,
+    }
+  );
+  const templateResolvido = templateComEscopo || templateAtivo;
 
-  if (!templateAtivo?.template) {
+  if (!templateResolvido?.template) {
     const templatesCompativeis = templatesAtivosLivro
       .filter((template) => resolverTipoFeriasCanonico(template?.tipo_registro) === tipoCanonicoFerias)
       .map((template) => ({
@@ -209,7 +220,7 @@ function getTextoPublicacaoRegistro({
     },
   });
 
-  return aplicarTemplate(templateAtivo.template, vars);
+  return aplicarTemplate(templateResolvido.template, vars);
 }
 
 function mapVinculos({ registro, ferias, periodo, cadeiaInfo }) {
