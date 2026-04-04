@@ -19,15 +19,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle, Copy } from 'lucide-react';
 import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
 import {
   ESCOPO_TEMPLATE,
-  getChaveUnicidadeTemplate,
   getConflitoTemplatePorTipo,
+  getConflitoUnicidadeTemplate,
+  getMensagemConflitoUnicidadeTemplate,
   normalizarEscopoTemplate,
   validarEscopoTemplate,
 } from '@/components/rp/templateValidation';
@@ -137,6 +138,15 @@ function normalizeTemplateForForm(template) {
     template: getFormTextValue(template.template),
     ativo: template.ativo ?? true,
   });
+}
+
+function createDuplicatedTemplateForm(template) {
+  const base = normalizeTemplateForForm(template);
+  return {
+    ...base,
+    id: undefined,
+    nome: base.nome ? `${base.nome} (cópia)` : '',
+  };
 }
 
 function buildTemplatePayload(data) {
@@ -621,6 +631,7 @@ export default function TemplatesTexto() {
   const [moduloFiltro, setModuloFiltro] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [formMode, setFormMode] = useState('new');
   const [showForm, setShowForm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const textareaRef = useRef(null);
@@ -643,23 +654,12 @@ export default function TemplatesTexto() {
       const erroEscopo = validarEscopoTemplate(dadosNormalizados);
       if (erroEscopo) throw new Error(erroEscopo);
 
-      const templatesParaValidacao = [
-        ...templates.filter((template) => template.id !== dadosNormalizados.id),
-        { ...dadosNormalizados, modulo: serializeTemplateModulo(dadosNormalizados.modulo) },
-      ];
-      const conflitoTemplate = getConflitoTemplatePorTipo(data.tipo_registro, templatesParaValidacao);
-
-      if (conflitoTemplate.temConflito) {
-        throw new Error('Já existe template ativo para este tipo em outro módulo. Resolva o conflito antes de salvar.');
-      }
-
-      const chaveAtual = getChaveUnicidadeTemplate(dadosNormalizados);
-      const duplicadoEscopo = templates.find((template) => (
-        template.id !== dadosNormalizados.id &&
-        getChaveUnicidadeTemplate(template) === chaveAtual
-      ));
+      const duplicadoEscopo = getConflitoUnicidadeTemplate(dadosNormalizados, templates, {
+        ignoreId: dadosNormalizados.id,
+        considerarApenasAtivos: true,
+      });
       if (duplicadoEscopo) {
-        throw new Error('Já existe template ativo para esta combinação de módulo, tipo e escopo organizacional.');
+        throw new Error(getMensagemConflitoUnicidadeTemplate(dadosNormalizados, duplicadoEscopo, true));
       }
 
       const payload = buildTemplatePayload(dadosNormalizados);
@@ -673,6 +673,7 @@ export default function TemplatesTexto() {
       queryClient.invalidateQueries({ queryKey: ['templates-texto'] });
       setShowForm(false);
       setEditingTemplate(null);
+      setFormMode('new');
     },
     onError: (error) => {
       alert(error?.message || 'Falha ao salvar o template. Tente novamente.');
@@ -716,11 +717,19 @@ export default function TemplatesTexto() {
 
   const handleEdit = (t) => {
     setEditingTemplate(normalizeTemplateForForm(t));
+    setFormMode('edit');
     setShowForm(true);
   };
 
   const handleNew = () => {
     setEditingTemplate(createEmptyTemplateForm());
+    setFormMode('new');
+    setShowForm(true);
+  };
+
+  const handleDuplicate = (template) => {
+    setEditingTemplate(createDuplicatedTemplateForm(template));
+    setFormMode('duplicate');
     setShowForm(true);
   };
 
@@ -799,34 +808,12 @@ export default function TemplatesTexto() {
     const erroEscopo = validarEscopoTemplate(editingTemplate);
     if (erroEscopo) return erroEscopo;
 
-    const sameModuleConflict = templates.find(t =>
-      normalizeTemplateModulo(t.modulo) === normalizeTemplateModulo(editingTemplate.modulo) &&
-      t.tipo_registro === editingTemplate.tipo_registro &&
-      t.ativo !== false &&
-      t.id !== editingTemplate.id
-    );
-
-    if (sameModuleConflict) {
-      return `Já existe um template ativo para '${getTipoDisplay(editingTemplate.tipo_registro)}' no módulo '${getModuloDisplay(editingTemplate.modulo)}'. Desative ou edite o template existente antes de ativar este.`;
-    }
-
-    const templatesParaValidacao = [
-      ...templates.filter(t => t.id !== editingTemplate.id),
-      { ...editingTemplate, modulo: serializeTemplateModulo(editingTemplate.modulo) },
-    ];
-    const conflitoGlobal = getConflitoTemplatePorTipo(editingTemplate.tipo_registro, templatesParaValidacao);
-
-    if (conflitoGlobal.temConflito) {
-      return 'Já existe template ativo para este tipo em outro módulo. Resolva o conflito antes de salvar.';
-    }
-
-    const chaveAtual = getChaveUnicidadeTemplate(editingTemplate);
-    const conflitoEscopo = templates.find((t) =>
-      t.id !== editingTemplate.id &&
-      getChaveUnicidadeTemplate(t) === chaveAtual
-    );
+    const conflitoEscopo = getConflitoUnicidadeTemplate(editingTemplate, templates, {
+      ignoreId: editingTemplate.id,
+      considerarApenasAtivos: true,
+    });
     if (conflitoEscopo) {
-      return 'Já existe template ativo para esta combinação de módulo, tipo e escopo.';
+      return getMensagemConflitoUnicidadeTemplate(editingTemplate, conflitoEscopo, true);
     }
 
     return null;
@@ -991,6 +978,15 @@ export default function TemplatesTexto() {
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-[#1e3a5f]" onClick={() => handleEdit(t)}>
                       <Pencil className="w-4 h-4" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-slate-500 hover:text-indigo-700"
+                      onClick={() => handleDuplicate(t)}
+                    >
+                      <Copy className="w-4 h-4 mr-1" />
+                      Duplicar
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => setConfirmDeleteId(t.id)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -1024,11 +1020,11 @@ export default function TemplatesTexto() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingTemplate(null); } }}>
+      <Dialog open={showForm} onOpenChange={(v) => { if (!v) { setShowForm(false); setEditingTemplate(null); setFormMode('new'); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#1e3a5f]">
-              {editingTemplate?.id ? 'Editar Template' : 'Novo Template'}
+              {formMode === 'edit' ? 'Editar Template' : formMode === 'duplicate' ? 'Duplicar Template' : 'Novo Template'}
             </DialogTitle>
           </DialogHeader>
 
@@ -1262,7 +1258,7 @@ export default function TemplatesTexto() {
               )}
 
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
-            <Button variant="outline" onClick={() => { setShowForm(false); setEditingTemplate(null); }} disabled={saveMutation.isPending}>
+            <Button variant="outline" onClick={() => { setShowForm(false); setEditingTemplate(null); setFormMode('new'); }} disabled={saveMutation.isPending}>
               Cancelar
             </Button>
                 <Button

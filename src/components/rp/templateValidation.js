@@ -213,6 +213,62 @@ export function getChaveUnicidadeTemplate(template = {}) {
   ].join('::');
 }
 
+function getDescricaoEscopoTemplate(template = {}) {
+  const escopo = normalizeScope(template.escopo);
+  const setorId = normalizeId(template.setor_id);
+  const subsetorId = normalizeId(template.subsetor_id);
+  const unidadeId = normalizeId(template.unidade_id);
+
+  if (escopo === ESCOPO_TEMPLATE.SETOR) {
+    return `escopo Setor (${setorId || 'não informado'})`;
+  }
+
+  if (escopo === ESCOPO_TEMPLATE.SUBSETOR) {
+    return `escopo Subsetor (${setorId || 'não informado'} / ${subsetorId || 'não informado'})`;
+  }
+
+  if (escopo === ESCOPO_TEMPLATE.UNIDADE) {
+    return `escopo Unidade (${setorId || 'não informado'} / ${subsetorId || 'não informado'} / ${unidadeId || 'não informado'})`;
+  }
+
+  return 'escopo Global';
+}
+
+export function getConflitoUnicidadeTemplate(template = {}, templates = [], { ignoreId = null, considerarApenasAtivos = true } = {}) {
+  if (!template?.modulo || !template?.tipo_registro) return null;
+
+  const templateNormalizado = normalizarEscopoTemplate(template);
+  const chaveComparacao = getChaveUnicidadeTemplate({
+    ...templateNormalizado,
+    ativo: considerarApenasAtivos ? true : templateNormalizado.ativo,
+  });
+
+  return (
+    templates.find((item) => {
+      if (!item || item.id === ignoreId) return false;
+      if (considerarApenasAtivos && (templateNormalizado.ativo === false || item.ativo === false)) return false;
+
+      const chaveItem = getChaveUnicidadeTemplate({
+        ...item,
+        ativo: considerarApenasAtivos ? true : item.ativo,
+      });
+
+      return chaveItem === chaveComparacao;
+    }) || null
+  );
+}
+
+export function getMensagemConflitoUnicidadeTemplate(template = {}, conflito = null, considerarApenasAtivos = true) {
+  if (!conflito) return null;
+
+  const escopoDescricao = getDescricaoEscopoTemplate(template);
+  const sufixoAtivo = considerarApenasAtivos
+    ? 'A regra de unicidade bloqueia concorrência entre templates ativos.'
+    : 'A regra de unicidade bloqueia qualquer duplicidade, inclusive inativos.';
+
+  return `Já existe template para este módulo, tipo e ${escopoDescricao}. ${sufixoAtivo}`;
+}
+
 export function validarEscopoTemplate(template = {}) {
   const escopo = normalizeScope(template.escopo);
   const setorId = normalizeId(template.setor_id);
