@@ -42,6 +42,10 @@ async function obterOuSemearTemplateAtivo(tipoTemplate) {
         nome: `Template padrão — ${tipoTemplate}`,
         template: templatePadrao,
         observacoes: 'Template padrão semeado automaticamente para comportamento disciplinar.',
+        escopo: 'GLOBAL',
+        setor_id: '',
+        subsetor_id: '',
+        unidade_id: '',
         ativo: true,
       });
     }

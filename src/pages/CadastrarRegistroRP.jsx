@@ -264,10 +264,16 @@ export default function CadastrarRegistroRP() {
     return getModuloByTipo(formData.tipo_registro, tiposCustom);
   }, [formData.tipo_registro, tiposCustom]);
 
+  const contextoTemplate = useMemo(() => ({
+    grupamento_id: militarSelecionado?.grupamento_id,
+    subgrupamento_id: militarSelecionado?.subgrupamento_id,
+    subgrupamento_tipo: militarSelecionado?.subgrupamento_tipo,
+  }), [militarSelecionado?.grupamento_id, militarSelecionado?.subgrupamento_id, militarSelecionado?.subgrupamento_tipo]);
+
   const templateAtivoSelecionado = useMemo(() => {
     if (!formData.tipo_registro || !moduloAtual) return null;
-    return getTemplateAtivoPorTipo(formData.tipo_registro, moduloAtual, templatesAtivos);
-  }, [formData.tipo_registro, moduloAtual, templatesAtivos]);
+    return getTemplateAtivoPorTipo(formData.tipo_registro, moduloAtual, templatesAtivos, contextoTemplate);
+  }, [formData.tipo_registro, moduloAtual, templatesAtivos, contextoTemplate]);
 
   const templateObrigatorioAusente = useMemo(() => {
     if (isEditing || !formData.tipo_registro) return false;
@@ -456,6 +462,7 @@ export default function CadastrarRegistroRP() {
       formData.tipo_registro,
       moduloValidacao,
       templatesAtivos,
+      contextoTemplate,
     );
     const templateObrigatorioAusenteNoSubmit =
       !isEditing && tipoExigeTemplate(formData.tipo_registro) && !templateAtivoNoSubmit;

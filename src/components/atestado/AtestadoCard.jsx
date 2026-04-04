@@ -46,6 +46,7 @@ import {
   getStatusDocumentalAtaJiso,
   isPublicacaoAtestadoAtiva,
 } from './atestadoPublicacaoHelpers';
+import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -93,11 +94,25 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     queryFn: () => base44.entities.TemplateTexto.list(),
     staleTime: 30000,
   });
+  const { data: militarAtestado = null } = useQuery({
+    queryKey: ['militar-atestado-template', atestado?.militar_id],
+    queryFn: async () => {
+      if (!atestado?.militar_id) return null;
+      const rows = await base44.entities.Militar.filter({ id: atestado.militar_id });
+      return rows?.[0] || null;
+    },
+    enabled: !!atestado?.militar_id,
+    staleTime: 30000,
+  });
 
   const diasExtensoMap = { 1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze' };
 
   const gerarTextoHomologacao = (form) => {
-    const tmpl = templates.find(t => t.modulo === 'Publicação Ex Officio' && t.tipo_registro === 'Homologação de Atestado' && t.ativo !== false);
+    const tmpl = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templates, {
+      grupamento_id: militarAtestado?.grupamento_id,
+      subgrupamento_id: militarAtestado?.subgrupamento_id,
+      subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
+    });
     if (!tmpl?.template) return null;
     const posto = `${atestado.militar_posto || ''} QOBM`;
     return aplicarTemplate(tmpl.template, {
@@ -113,7 +128,11 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   };
 
   const gerarTextoAtaJiso = (form) => {
-    const tmpl = templates.find(t => t.modulo === 'Publicação Ex Officio' && t.tipo_registro === 'Ata JISO' && t.ativo !== false);
+    const tmpl = getTemplateAtivoPorTipo('Ata JISO', 'ExOfficio', templates, {
+      grupamento_id: militarAtestado?.grupamento_id,
+      subgrupamento_id: militarAtestado?.subgrupamento_id,
+      subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
+    });
     if (!tmpl?.template) return null;
     const posto = `${atestado.militar_posto || ''} QOBM`;
     return aplicarTemplate(tmpl.template, {

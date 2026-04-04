@@ -445,7 +445,11 @@ export default function RegistroLivroModal({
       return;
     }
 
-    const tmpl = getTemplateAtivoPorTipo(tipoRegistro, 'Livro', templates);
+    const tmpl = getTemplateAtivoPorTipo(tipoRegistro, 'Livro', templates, {
+      grupamento_id: ferias?.grupamento_id,
+      subgrupamento_id: ferias?.subgrupamento_id,
+      subgrupamento_tipo: ferias?.subgrupamento_tipo,
+    });
 
     if (!tmpl?.template) {
       setTextoPublicacao('');

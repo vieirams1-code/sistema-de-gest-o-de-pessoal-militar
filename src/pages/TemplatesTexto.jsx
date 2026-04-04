@@ -24,7 +24,13 @@ import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/com
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
-import { getConflitoTemplatePorTipo } from '@/components/rp/templateValidation';
+import {
+  ESCOPO_TEMPLATE,
+  getChaveUnicidadeTemplate,
+  getConflitoTemplatePorTipo,
+  normalizarEscopoTemplate,
+  validarEscopoTemplate,
+} from '@/components/rp/templateValidation';
 import {
   FERIAS_TIPO_CANONICO,
   getLabelTipoFerias,
@@ -37,6 +43,17 @@ const MODULO_LABELS = {
   [MODULO_LIVRO]: 'Livro',
   [MODULO_EX_OFFICIO]: 'Ex Offício',
 };
+
+const ESCOPO_OPTIONS = [
+  { value: ESCOPO_TEMPLATE.GLOBAL, label: 'Global' },
+  { value: ESCOPO_TEMPLATE.SETOR, label: 'Setor' },
+  { value: ESCOPO_TEMPLATE.SUBSETOR, label: 'Subsetor' },
+  { value: ESCOPO_TEMPLATE.UNIDADE, label: 'Unidade' },
+];
+
+function getEscopoLabel(escopo) {
+  return ESCOPO_OPTIONS.find((item) => item.value === escopo)?.label || 'Global';
+}
 
 const TIPO_LABEL_OVERRIDES = {
   ELEVACAO_COMPORTAMENTO_DISCIPLINAR: 'Elevação de Comportamento Disciplinar',
@@ -98,6 +115,10 @@ function createEmptyTemplateForm() {
     tipo_registro: '',
     nome: '',
     template: '',
+    escopo: ESCOPO_TEMPLATE.GLOBAL,
+    setor_id: '',
+    subsetor_id: '',
+    unidade_id: '',
     ativo: true,
   };
 }
@@ -109,23 +130,24 @@ function getFormTextValue(value) {
 function normalizeTemplateForForm(template) {
   if (!template) return createEmptyTemplateForm();
 
-  return {
+  return normalizarEscopoTemplate({
     ...createEmptyTemplateForm(),
     ...template,
     modulo: normalizeTemplateModulo(template.modulo),
     template: getFormTextValue(template.template),
     ativo: template.ativo ?? true,
-  };
+  });
 }
 
 function buildTemplatePayload(data) {
+  const normalizado = normalizarEscopoTemplate(data);
   return {
-    ...data,
-    modulo: serializeTemplateModulo(data.modulo),
-    tipo_registro: data.tipo_registro || '',
-    nome: getFormTextValue(data.nome),
-    template: getFormTextValue(data.template),
-    ativo: data.ativo ?? true,
+    ...normalizado,
+    modulo: serializeTemplateModulo(normalizado.modulo),
+    tipo_registro: normalizado.tipo_registro || '',
+    nome: getFormTextValue(normalizado.nome),
+    template: getFormTextValue(normalizado.template),
+    ativo: normalizado.ativo ?? true,
   };
 }
 
@@ -608,13 +630,22 @@ export default function TemplatesTexto() {
     queryFn: () => base44.entities.TemplateTexto.list('-created_date'),
     enabled: isAccessResolved && canGerirTemplates,
   });
+  const { data: estrutura = [] } = useQuery({
+    queryKey: ['estrutura-organizacional-template'],
+    queryFn: () => base44.entities.Subgrupamento.list(),
+    enabled: isAccessResolved && canGerirTemplates,
+  });
 
   const saveMutation = useMutation({
     mutationFn: (data) => {
       if (!canGerirTemplates) throw new Error('Ação negada: sem permissão para gerir templates.');
+      const dadosNormalizados = normalizarEscopoTemplate(data);
+      const erroEscopo = validarEscopoTemplate(dadosNormalizados);
+      if (erroEscopo) throw new Error(erroEscopo);
+
       const templatesParaValidacao = [
-        ...templates.filter((template) => template.id !== data.id),
-        { ...data, modulo: serializeTemplateModulo(data.modulo) },
+        ...templates.filter((template) => template.id !== dadosNormalizados.id),
+        { ...dadosNormalizados, modulo: serializeTemplateModulo(dadosNormalizados.modulo) },
       ];
       const conflitoTemplate = getConflitoTemplatePorTipo(data.tipo_registro, templatesParaValidacao);
 
@@ -622,7 +653,16 @@ export default function TemplatesTexto() {
         throw new Error('Já existe template ativo para este tipo em outro módulo. Resolva o conflito antes de salvar.');
       }
 
-      const payload = buildTemplatePayload(data);
+      const chaveAtual = getChaveUnicidadeTemplate(dadosNormalizados);
+      const duplicadoEscopo = templates.find((template) => (
+        template.id !== dadosNormalizados.id &&
+        getChaveUnicidadeTemplate(template) === chaveAtual
+      ));
+      if (duplicadoEscopo) {
+        throw new Error('Já existe template ativo para esta combinação de módulo, tipo e escopo organizacional.');
+      }
+
+      const payload = buildTemplatePayload(dadosNormalizados);
       if (data.id) {
         return updateTemplate(data.id, payload);
       }
@@ -724,12 +764,40 @@ export default function TemplatesTexto() {
     return option?.modulo || '';
   };
 
+  const setoresOptions = useMemo(
+    () => estrutura.filter((item) => item?.tipo === 'Grupamento' || item?.nivel_hierarquico === 1),
+    [estrutura]
+  );
+
+  const subsetoresOptions = useMemo(() => {
+    if (!editingTemplate?.setor_id) return [];
+    return estrutura.filter((item) =>
+      (item?.tipo === 'Subgrupamento' || item?.nivel_hierarquico === 2) &&
+      item?.grupamento_id === editingTemplate.setor_id
+    );
+  }, [estrutura, editingTemplate?.setor_id]);
+
+  const unidadesOptions = useMemo(() => {
+    if (!editingTemplate?.subsetor_id) return [];
+    return estrutura.filter((item) =>
+      item?.tipo === 'Unidade' &&
+      item?.grupamento_id === editingTemplate.subsetor_id
+    );
+  }, [estrutura, editingTemplate?.subsetor_id]);
+
   const selectedTipoVars = editingTemplate?.tipo_registro && VARS_POR_TIPO[editingTemplate.tipo_registro];
+  const estruturaById = useMemo(
+    () => new Map((estrutura || []).map((item) => [item.id, item])),
+    [estrutura]
+  );
 
   const templateConflictError = useMemo(() => {
     if (!editingTemplate || editingTemplate.ativo === false || !editingTemplate.modulo || !editingTemplate.tipo_registro) {
       return null;
     }
+
+    const erroEscopo = validarEscopoTemplate(editingTemplate);
+    if (erroEscopo) return erroEscopo;
 
     const sameModuleConflict = templates.find(t =>
       normalizeTemplateModulo(t.modulo) === normalizeTemplateModulo(editingTemplate.modulo) &&
@@ -750,6 +818,15 @@ export default function TemplatesTexto() {
 
     if (conflitoGlobal.temConflito) {
       return 'Já existe template ativo para este tipo em outro módulo. Resolva o conflito antes de salvar.';
+    }
+
+    const chaveAtual = getChaveUnicidadeTemplate(editingTemplate);
+    const conflitoEscopo = templates.find((t) =>
+      t.id !== editingTemplate.id &&
+      getChaveUnicidadeTemplate(t) === chaveAtual
+    );
+    if (conflitoEscopo) {
+      return 'Já existe template ativo para esta combinação de módulo, tipo e escopo.';
     }
 
     return null;
@@ -891,6 +968,7 @@ export default function TemplatesTexto() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-semibold text-slate-800">{t.nome}</span>
                       <Badge className={moduloColor[normalizeTemplateModulo(t.modulo)] || 'bg-slate-100 text-slate-700'}>{getModuloDisplay(t.modulo)}</Badge>
+                      <Badge variant="secondary" className="text-xs">{getEscopoLabel(t.escopo)}</Badge>
                       <Badge variant="outline" className="text-xs">{getTipoDisplay(t.tipo_registro)}</Badge>
                       {isLivroFeriasTipo(t.tipo_registro) && (
                         <Badge className="bg-slate-100 text-slate-600 text-[10px]">{t.tipo_registro}</Badge>
@@ -900,6 +978,13 @@ export default function TemplatesTexto() {
                       )}
                       {!t.ativo && <Badge className="bg-red-100 text-red-600">Inativo</Badge>}
                     </div>
+                    {t.escopo !== ESCOPO_TEMPLATE.GLOBAL && (
+                      <p className="text-xs text-slate-500">
+                        {t.escopo === ESCOPO_TEMPLATE.SETOR && `Setor: ${estruturaById.get(t.setor_id)?.nome || 'Não informado'}`}
+                        {t.escopo === ESCOPO_TEMPLATE.SUBSETOR && `Setor: ${estruturaById.get(t.setor_id)?.nome || 'Não informado'} · Subsetor: ${estruturaById.get(t.subsetor_id)?.nome || 'Não informado'}`}
+                        {t.escopo === ESCOPO_TEMPLATE.UNIDADE && `Setor: ${estruturaById.get(t.setor_id)?.nome || 'Não informado'} · Subsetor: ${estruturaById.get(t.subsetor_id)?.nome || 'Não informado'} · Unidade: ${estruturaById.get(t.unidade_id)?.nome || 'Não informado'}`}
+                      </p>
+                    )}
                     <p className="text-sm text-slate-500 line-clamp-2 mt-1">{t.template}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1016,6 +1101,76 @@ export default function TemplatesTexto() {
                   </Select>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Escopo <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={editingTemplate.escopo || ESCOPO_TEMPLATE.GLOBAL}
+                    onValueChange={(v) => setEditingTemplate((p) => normalizarEscopoTemplate({ ...p, escopo: v }))}
+                  >
+                    <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ESCOPO_OPTIONS.map((op) => (
+                        <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {(editingTemplate.escopo === ESCOPO_TEMPLATE.SETOR || editingTemplate.escopo === ESCOPO_TEMPLATE.SUBSETOR || editingTemplate.escopo === ESCOPO_TEMPLATE.UNIDADE) && (
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Setor <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={editingTemplate.setor_id || ''}
+                    onValueChange={(v) => setEditingTemplate((p) => normalizarEscopoTemplate({ ...p, setor_id: v, subsetor_id: '', unidade_id: '' }))}
+                  >
+                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione o setor..." /></SelectTrigger>
+                    <SelectContent>
+                      {setoresOptions.map((setor) => (
+                        <SelectItem key={setor.id} value={setor.id}>{setor.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {(editingTemplate.escopo === ESCOPO_TEMPLATE.SUBSETOR || editingTemplate.escopo === ESCOPO_TEMPLATE.UNIDADE) && (
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Subsetor <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={editingTemplate.subsetor_id || ''}
+                    onValueChange={(v) => setEditingTemplate((p) => normalizarEscopoTemplate({ ...p, subsetor_id: v, unidade_id: '' }))}
+                    disabled={!editingTemplate.setor_id}
+                  >
+                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione o subsetor..." /></SelectTrigger>
+                    <SelectContent>
+                      {subsetoresOptions.map((subsetor) => (
+                        <SelectItem key={subsetor.id} value={subsetor.id}>{subsetor.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {editingTemplate.escopo === ESCOPO_TEMPLATE.UNIDADE && (
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Unidade <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={editingTemplate.unidade_id || ''}
+                    onValueChange={(v) => setEditingTemplate((p) => ({ ...p, unidade_id: v }))}
+                    disabled={!editingTemplate.subsetor_id}
+                  >
+                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="Selecione a unidade..." /></SelectTrigger>
+                    <SelectContent>
+                      {unidadesOptions.map((unidade) => (
+                        <SelectItem key={unidade.id} value={unidade.id}>{unidade.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {normalizeTemplateModulo(editingTemplate.modulo) === MODULO_LIVRO && isLivroFeriasTipo(editingTemplate.tipo_registro) && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
