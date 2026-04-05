@@ -9,11 +9,97 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileSpreadsheet, Printer } from 'lucide-react';
 
+const MESES = [
+  'JANEIRO',
+  'FEVEREIRO',
+  'MARÇO',
+  'ABRIL',
+  'MAIO',
+  'JUNHO',
+  'JULHO',
+  'AGOSTO',
+  'SETEMBRO',
+  'OUTUBRO',
+  'NOVEMBRO',
+  'DEZEMBRO',
+];
+
 function formatarData(isoDate) {
   if (!isoDate) return '-';
   const [ano, mes, dia] = String(isoDate).split('-');
   if (!ano || !mes || !dia) return isoDate;
   return `${dia}/${mes}/${ano}`;
+}
+
+function normalizarDataISO(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+    return null;
+  }
+
+  const dateObj = new Date(value);
+  if (Number.isNaN(dateObj.getTime())) return null;
+  const ano = dateObj.getFullYear();
+  const mes = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const dia = String(dateObj.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+function listarMesesNoPeriodo(dataInicial, dataFinal) {
+  if (!dataInicial || !dataFinal || dataInicial > dataFinal) return [];
+
+  const [anoInicio, mesInicio] = dataInicial.split('-').map(Number);
+  const [anoFim, mesFim] = dataFinal.split('-').map(Number);
+
+  const itens = [];
+  let anoAtual = anoInicio;
+  let mesAtual = mesInicio;
+
+  while (anoAtual < anoFim || (anoAtual === anoFim && mesAtual <= mesFim)) {
+    itens.push({
+      ano: anoAtual,
+      mes: mesAtual,
+      chave: `${anoAtual}-${String(mesAtual).padStart(2, '0')}`,
+      titulo: `MÊS DE ${MESES[mesAtual - 1]}/${anoAtual}`,
+    });
+
+    mesAtual += 1;
+    if (mesAtual > 12) {
+      mesAtual = 1;
+      anoAtual += 1;
+    }
+  }
+
+  return itens;
+}
+
+function agruparHistoricoPorAnoMes(eventos, dataInicial, dataFinal) {
+  const meses = listarMesesNoPeriodo(dataInicial, dataFinal);
+  const agrupadoPorAno = new Map();
+
+  meses.forEach((mesInfo) => {
+    if (!agrupadoPorAno.has(mesInfo.ano)) {
+      agrupadoPorAno.set(mesInfo.ano, []);
+    }
+
+    const eventosDoMes = eventos
+      .filter((evento) => {
+        if (!evento?.data) return false;
+        return evento.data.startsWith(mesInfo.chave);
+      })
+      .sort((a, b) => a.data.localeCompare(b.data));
+
+    agrupadoPorAno.get(mesInfo.ano).push({
+      ...mesInfo,
+      eventos: eventosDoMes,
+    });
+  });
+
+  return Array.from(agrupadoPorAno.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([ano, mesesDoAno]) => ({ ano, meses: mesesDoAno }));
 }
 
 export default function FolhaAlteracoes() {
@@ -100,6 +186,104 @@ export default function FolhaAlteracoes() {
   );
 
   const periodoValido = Boolean(dataInicial && dataFinal && dataInicial <= dataFinal);
+
+  const { data: historicoAlteracoes = [], isLoading: loadingHistorico } = useQuery({
+    queryKey: ['folha-alteracoes-historico', previa?.militar?.id, previa?.periodo?.dataInicial, previa?.periodo?.dataFinal],
+    queryFn: async () => {
+      if (!previa?.militar?.id || !previa?.periodo?.dataInicial || !previa?.periodo?.dataFinal) return [];
+
+      const militarId = previa.militar.id;
+      const inicioPeriodo = previa.periodo.dataInicial;
+      const fimPeriodo = previa.periodo.dataFinal;
+
+      const [ferias, atestados, publicacoes, punicoes] = await Promise.all([
+        base44.entities.Ferias.filter({ militar_id: militarId }, '-data_inicio').catch(() => []),
+        base44.entities.Atestado.filter({ militar_id: militarId }, '-data_inicio').catch(() => []),
+        base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }, '-data_publicacao').catch(() => []),
+        base44.entities.PunicaoDisciplinar?.filter({ militar_id: militarId }, '-data_punicao').catch(() => []) || Promise.resolve([]),
+      ]);
+
+      const filtrarPorPeriodo = (data) => Boolean(data && data >= inicioPeriodo && data <= fimPeriodo);
+
+      const eventosFerias = ferias
+        .map((item) => {
+          const dataEvento = normalizarDataISO(item.data_inicio || item.created_date);
+          if (!filtrarPorPeriodo(dataEvento)) return null;
+
+          const periodoRef = item.periodo_aquisitivo_ref ? ` (${item.periodo_aquisitivo_ref})` : '';
+          const fracao = item.fracionamento ? ` - ${item.fracionamento}` : '';
+
+          return {
+            data: dataEvento,
+            tipo: 'Férias',
+            descricao: `${item.dias || 0} dia(s) de férias${periodoRef}${fracao}`,
+            origem: 'Ferias',
+          };
+        })
+        .filter(Boolean);
+
+      const eventosAtestados = atestados
+        .map((item) => {
+          const dataEvento = normalizarDataISO(item.data_inicio || item.created_date);
+          if (!filtrarPorPeriodo(dataEvento)) return null;
+
+          const tipoAfastamento = item.tipo_afastamento || 'Afastamento médico';
+          const dias = item.dias ? ` (${item.dias} dia(s))` : '';
+          const cid = item.cid_10 ? ` - CID ${item.cid_10}` : '';
+
+          return {
+            data: dataEvento,
+            tipo: 'Atestado',
+            descricao: `${tipoAfastamento}${dias}${cid}`,
+            origem: 'Atestado',
+          };
+        })
+        .filter(Boolean);
+
+      const eventosPublicacoes = publicacoes
+        .map((item) => {
+          const dataEvento = normalizarDataISO(item.data_publicacao || item.data_registro || item.data_bg || item.created_date);
+          if (!filtrarPorPeriodo(dataEvento)) return null;
+
+          const tipoPublicacao = item.tipo_registro || item.tipo || 'Publicação';
+          const numeroBg = item.numero_bg ? ` - BG ${item.numero_bg}` : '';
+
+          return {
+            data: dataEvento,
+            tipo: 'Publicação',
+            descricao: `${tipoPublicacao}${numeroBg}`,
+            origem: 'PublicacaoExOfficio',
+          };
+        })
+        .filter(Boolean);
+
+      const eventosPunicoes = (punicoes || [])
+        .map((item) => {
+          const dataEvento = normalizarDataISO(item.data_punicao || item.data_inicio_cumprimento || item.boletim_data || item.created_date);
+          if (!filtrarPorPeriodo(dataEvento)) return null;
+
+          const tipoPunicao = item.tipo_punicao || 'Punição disciplinar';
+          const dias = item.dias_punicao ? ` - ${item.dias_punicao} dia(s)` : '';
+          const status = item.status_punicao ? ` (${item.status_punicao})` : '';
+
+          return {
+            data: dataEvento,
+            tipo: 'Punição',
+            descricao: `${tipoPunicao}${dias}${status}`,
+            origem: 'PunicaoDisciplinar',
+          };
+        })
+        .filter(Boolean);
+
+      return [...eventosFerias, ...eventosAtestados, ...eventosPublicacoes, ...eventosPunicoes].sort((a, b) => a.data.localeCompare(b.data));
+    },
+    enabled: !!previa,
+  });
+
+  const historicoPorAnoMes = useMemo(() => {
+    if (!previa?.periodo?.dataInicial || !previa?.periodo?.dataFinal) return [];
+    return agruparHistoricoPorAnoMes(historicoAlteracoes, previa.periodo.dataInicial, previa.periodo.dataFinal);
+  }, [historicoAlteracoes, previa]);
 
   const handleGerarPrevia = () => {
     if (!militarSelecionado || !periodoValido) return;
@@ -221,13 +405,61 @@ export default function FolhaAlteracoes() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-700 mb-2">Histórico por ano/mês (área reservada)</p>
-                <div className="space-y-2 text-sm text-slate-600">
-                  <p>• AAAA/MM — Registro de alteração 1 (placeholder)</p>
-                  <p>• AAAA/MM — Registro de alteração 2 (placeholder)</p>
-                  <p>• AAAA/MM — Registro de alteração 3 (placeholder)</p>
-                </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+                <p className="text-base font-semibold text-slate-800">Histórico de Alterações</p>
+
+                {loadingHistorico && (
+                  <p className="text-sm text-slate-500">Carregando histórico do período...</p>
+                )}
+
+                {!loadingHistorico && historicoPorAnoMes.length === 0 && (
+                  <p className="text-sm text-slate-500">Não foi possível montar o histórico para o período selecionado.</p>
+                )}
+
+                {!loadingHistorico && historicoPorAnoMes.length > 0 && (
+                  <div className="space-y-4">
+                    {historicoPorAnoMes.map((ano) => (
+                      <div key={ano.ano} className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+                        <h3 className="text-sm md:text-base font-bold text-[#1e3a5f]">ANO {ano.ano}</h3>
+
+                        <div className="space-y-3">
+                          {ano.meses.map((mes) => (
+                            <div key={mes.chave} className="rounded-md border border-slate-100 p-3 bg-slate-50/70">
+                              <p className="text-xs md:text-sm font-semibold text-slate-700 mb-2">{mes.titulo}</p>
+
+                              {mes.eventos.length === 0 ? (
+                                <p className="text-sm text-slate-500 italic">Sem alteração</p>
+                              ) : (
+                                <ul className="space-y-2">
+                                  {mes.eventos.map((evento, index) => (
+                                    <li key={`${evento.origem}-${evento.data}-${index}`} className="rounded border border-slate-200 bg-white px-3 py-2">
+                                      <p className="text-sm text-slate-800">
+                                        <span className="font-semibold">{formatarData(evento.data)}</span>
+                                        {' • '}
+                                        <span className="font-medium">{evento.tipo}</span>
+                                      </p>
+                                      <p className="text-sm text-slate-600">{evento.descricao}</p>
+                                      <p className="text-xs text-slate-500">Origem: {evento.origem}</p>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs text-amber-800">
+                  Fontes desta fase: Férias, Atestados, Publicações Ex Officio e Punições Disciplinares (quando disponíveis com data no cadastro).
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  Estrutura preparada para ampliar outras fontes sem alterar o layout do histórico.
+                </p>
               </div>
             </CardContent>
           </Card>
