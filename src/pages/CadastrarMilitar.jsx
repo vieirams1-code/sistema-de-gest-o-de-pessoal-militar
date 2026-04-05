@@ -17,12 +17,6 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
-import { filterQuadrosMilitares } from '@/services/quadroMilitarEntityService';
-import {
-  CATEGORIA_QUADRO_OFICIAL,
-  classificarPostoGraduacao,
-  validarCompatibilidadePostoQuadro,
-} from '@/utils/postoGraduacaoClassificacao';
 
 const initialFormData = {
   nome_completo: '',
@@ -38,7 +32,6 @@ const initialFormData = {
   subgrupamento_id: '',
   subgrupamento_nome: '',
   posto_graduacao: '',
-  quadro_id: '',
   quadro: '',
   data_inclusao: '',
   comportamento: 'Bom',
@@ -103,7 +96,8 @@ const POSTOS_GRADUACOES = [
   { value: 'Soldado', label: 'Soldado (SD)', grupo: 'Praças' },
 ];
 
-const isOficial = (posto) => classificarPostoGraduacao(posto) === CATEGORIA_QUADRO_OFICIAL;
+const POSTOS_OFICIAIS = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'];
+const isOficial = (posto) => POSTOS_OFICIAIS.includes(posto);
 
 export default function CadastrarMilitar() {
   const navigate = useNavigate();
@@ -117,7 +111,6 @@ export default function CadastrarMilitar() {
 
   const [loading, setLoading] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
-  const [mensagemCompatibilidadeQuadro, setMensagemCompatibilidadeQuadro] = useState('');
 
 
   const { data: editingMilitar, isLoading: loadingEdit } = useQuery({
@@ -135,65 +128,16 @@ export default function CadastrarMilitar() {
     }
   });
 
-  const { data: quadrosMilitares = [] } = useQuery({
-    queryKey: ['quadros-militares', 'ativo'],
-    queryFn: () => filterQuadrosMilitares({ ativo: true }, 'nome'),
-    enabled: isAccessResolved && hasMilitaresAccess,
-  });
-
   React.useEffect(() => {
     if (editingMilitar) {
-      setFormData((prev) => ({ ...prev, ...initialFormData, ...editingMilitar }));
+      setFormData({ ...initialFormData, ...editingMilitar });
       setComportamentoOriginal(editingMilitar.comportamento || null);
     }
   }, [editingMilitar]);
 
-  React.useEffect(() => {
-    if (!formData.quadro_id && formData.quadro && quadrosMilitares.length > 0) {
-      const quadroCorrespondente = quadrosMilitares.find((item) => item.nome === formData.quadro);
-      if (quadroCorrespondente) {
-        setFormData((prev) => ({ ...prev, quadro_id: quadroCorrespondente.id, quadro: quadroCorrespondente.nome }));
-      }
-    }
-  }, [formData.quadro, formData.quadro_id, quadrosMilitares]);
-
   const [motivoComportamento, setMotivoComportamento] = useState('');
 
-  const categoriaPosto = classificarPostoGraduacao(formData.posto_graduacao);
-  const quadrosCompativeis = quadrosMilitares.filter((quadro) => quadro.categoria === categoriaPosto);
-  const quadroSelecionado = quadrosMilitares.find((quadro) => quadro.id === formData.quadro_id);
-
   const handleChange = (name, value) => {
-    if (name === 'posto_graduacao') {
-      const novaCategoria = classificarPostoGraduacao(value);
-      if (formData.quadro_id) {
-        const quadroAtual = quadrosMilitares.find((q) => q.id === formData.quadro_id);
-        if (quadroAtual && quadroAtual.categoria !== novaCategoria) {
-          setFormData((prev) => ({ ...prev, posto_graduacao: value, quadro_id: '', quadro: '' }));
-          setMensagemCompatibilidadeQuadro('Quadro removido automaticamente porque o novo Posto/Graduação pertence a outra categoria.');
-          return;
-        }
-      }
-      setMensagemCompatibilidadeQuadro('');
-    }
-
-    if (name === 'quadro_id') {
-      const quadro = quadrosMilitares.find((item) => item.id === value);
-      if (!quadro) {
-        setFormData((prev) => ({ ...prev, quadro_id: '', quadro: '' }));
-        return;
-      }
-
-      if (!validarCompatibilidadePostoQuadro(formData.posto_graduacao, quadro.categoria)) {
-        setMensagemCompatibilidadeQuadro('Quadro incompatível com o Posto/Graduação selecionado.');
-        return;
-      }
-
-      setMensagemCompatibilidadeQuadro('');
-      setFormData((prev) => ({ ...prev, quadro_id: quadro.id, quadro: quadro.nome }));
-      return;
-    }
-
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -207,21 +151,6 @@ export default function CadastrarMilitar() {
       altura: formData.altura ? parseFloat(formData.altura) : null,
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
-
-    const categoriaPostoAtual = classificarPostoGraduacao(formData.posto_graduacao);
-    const quadroAtual = quadrosMilitares.find((q) => q.id === formData.quadro_id);
-
-    if (formData.posto_graduacao && !categoriaPostoAtual) {
-      alert('Posto/Graduação não classificado. Revise o cadastro antes de salvar.');
-      setLoading(false);
-      return;
-    }
-
-    if (quadroAtual && !validarCompatibilidadePostoQuadro(formData.posto_graduacao, quadroAtual.categoria)) {
-      alert('Não é possível salvar: Quadro incompatível com o Posto/Graduação informado.');
-      setLoading(false);
-      return;
-    }
 
     // Preencher subgrupamento automaticamente para usuários não-admin
     if (!editId && !isAdmin && subgrupamentoId) {
@@ -420,34 +349,14 @@ export default function CadastrarMilitar() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700">Quadro</label>
-                <Select
-                  value={formData.quadro_id || ''}
-                  onValueChange={(v) => handleChange('quadro_id', v)}
-                  disabled={!categoriaPosto}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={categoriaPosto ? 'Selecione um quadro compatível...' : 'Selecione o Posto/Graduação primeiro'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {quadrosCompativeis.map((quadro) => (
-                      <SelectItem key={quadro.id} value={quadro.id}>
-                        {quadro.nome}{quadro.sigla ? ` (${quadro.sigla})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {categoriaPosto && quadrosCompativeis.length === 0 && (
-                  <p className="text-xs text-amber-700">Nenhum quadro ativo compatível com a categoria selecionada.</p>
-                )}
-                {mensagemCompatibilidadeQuadro && (
-                  <p className="text-xs text-red-600">{mensagemCompatibilidadeQuadro}</p>
-                )}
-                {!mensagemCompatibilidadeQuadro && quadroSelecionado && (
-                  <p className="text-xs text-slate-500">Categoria do quadro: {quadroSelecionado.categoria}</p>
-                )}
-              </div>
+              <FormField
+                label="Quadro"
+                name="quadro"
+                value={formData.quadro}
+                onChange={handleChange}
+                type="select"
+                options={['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QBMPT']}
+              />
               <FormField
                 label="Data de Inclusão"
                 name="data_inclusao"
@@ -612,193 +521,67 @@ export default function CadastrarMilitar() {
             </div>
           </FormSection>
 
-          {/* Documentos */}
-          <FormSection title="Documentos" icon={FileText}>
+          {/* Documentação */}
+          <FormSection title="Documentação" icon={FileText}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <FormField
-                label="RG"
-                name="rg"
-                value={formData.rg}
-                onChange={handleChange}
-              />
-              <FormField
-                label="Órgão Expedidor"
-                name="orgao_expedidor_rg"
-                value={formData.orgao_expedidor_rg}
-                onChange={handleChange}
-              />
-              <FormField
-                label="UF RG"
-                name="uf_rg"
-                value={formData.uf_rg}
-                onChange={handleChange}
-                type="select"
-                options={UFS}
-              />
-              <FormField
-                label="Categoria CNH"
-                name="cnh_categoria"
-                value={formData.cnh_categoria}
-                onChange={handleChange}
-                type="select"
-                options={['A', 'B', 'AB', 'C', 'D', 'E', 'AC', 'AD', 'AE']}
-              />
-              <FormField
-                label="Validade CNH"
-                name="cnh_validade"
-                value={formData.cnh_validade}
-                onChange={handleChange}
-                type="date"
-              />
-              <FormField
-                label="Número CNH"
-                name="cnh_numero"
-                value={formData.cnh_numero}
-                onChange={handleChange}
-              />
-              <FormField
-                label="CPF"
-                name="cpf"
-                value={formData.cpf}
-                onChange={handleChange}
-              />
+              <FormField label="RG" name="rg" value={formData.rg} onChange={handleChange} />
+              <FormField label="Órgão Expedidor" name="orgao_expedidor_rg" value={formData.orgao_expedidor_rg} onChange={handleChange} />
+              <FormField label="UF RG" name="uf_rg" value={formData.uf_rg} onChange={handleChange} type="select" options={UFS} />
+              <FormField label="CPF" name="cpf" value={formData.cpf} onChange={handleChange} />
             </div>
           </FormSection>
 
-          {/* Dados Bancários */}
-          <FormSection title="Dados Bancários" icon={Building}>
+          {/* Habilitação */}
+          <FormSection title="Habilitação" icon={GraduationCap}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                label="Banco"
-                name="banco"
-                value={formData.banco}
-                onChange={handleChange}
-              />
-              <FormField
-                label="Agência"
-                name="agencia"
-                value={formData.agencia}
-                onChange={handleChange}
-              />
-              <FormField
-                label="Conta"
-                name="conta"
-                value={formData.conta}
-                onChange={handleChange}
-              />
+              <FormField label="CNH Número" name="cnh_numero" value={formData.cnh_numero} onChange={handleChange} />
+              <FormField label="CNH Categoria" name="cnh_categoria" value={formData.cnh_categoria} onChange={handleChange} type="select" options={['A', 'B', 'C', 'D', 'E']} />
+              <FormField label="Validade CNH" name="cnh_validade" value={formData.cnh_validade} onChange={handleChange} type="date" />
             </div>
           </FormSection>
 
-          {/* Contatos */}
-          <FormSection title="Contatos" icon={Phone}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <FormField
-                label="Email Particular"
-                name="email_particular"
-                value={formData.email_particular}
-                onChange={handleChange}
-                type="email"
-              />
-              <FormField
-                label="Telefone"
-                name="telefone"
-                value={formData.telefone}
-                onChange={handleChange}
-              />
-              <FormField
-                label="Email Funcional"
-                name="email_funcional"
-                value={formData.email_funcional}
-                onChange={handleChange}
-                type="email"
-              />
-            </div>
-          </FormSection>
-
-          {/* Dados Antropométricos */}
-          <FormSection title="Dados Antropométricos" icon={User}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                label="Altura (m)"
-                name="altura"
-                value={formData.altura}
-                onChange={handleChange}
-                type="number"
-                placeholder="Ex: 1.75"
-              />
-              <FormField
-                label="Peso (kg)"
-                name="peso"
-                value={formData.peso}
-                onChange={handleChange}
-                type="number"
-                placeholder="Ex: 75"
-              />
-              <FormField
-                label="Etnia"
-                name="etnia"
-                value={formData.etnia}
-                onChange={handleChange}
-                type="select"
-                options={['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena']}
-              />
+          {/* Contato */}
+          <FormSection title="Contato" icon={Phone}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField label="Telefone" name="telefone" value={formData.telefone} onChange={handleChange} />
+              <FormField label="E-mail Particular" name="email_particular" value={formData.email_particular} onChange={handleChange} />
+              <FormField label="E-mail Funcional" name="email_funcional" value={formData.email_funcional} onChange={handleChange} className="md:col-span-2" />
             </div>
           </FormSection>
 
           {/* Endereço */}
           <FormSection title="Endereço" icon={MapPin}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <FormField
-                label="Logradouro"
-                name="logradouro"
-                value={formData.logradouro}
-                onChange={handleChange}
-                className="md:col-span-2"
-              />
-              <FormField
-                label="Número"
-                name="numero_endereco"
-                value={formData.numero_endereco}
-                onChange={handleChange}
-              />
-              <FormField
-                label="CEP"
-                name="cep"
-                value={formData.cep}
-                onChange={handleChange}
-              />
-              <FormField
-                label="Bairro"
-                name="bairro"
-                value={formData.bairro}
-                onChange={handleChange}
-              />
-              <FormField
-                label="Cidade"
-                name="cidade"
-                value={formData.cidade}
-                onChange={handleChange}
-              />
-              <FormField
-                label="UF"
-                name="uf"
-                value={formData.uf}
-                onChange={handleChange}
-                type="select"
-                options={UFS}
-              />
-              <FormField
-                label="Complemento"
-                name="complemento"
-                value={formData.complemento}
-                onChange={handleChange}
-                className="md:col-span-2"
-              />
+              <FormField label="CEP" name="cep" value={formData.cep} onChange={handleChange} />
+              <FormField label="Logradouro" name="logradouro" value={formData.logradouro} onChange={handleChange} className="md:col-span-2" />
+              <FormField label="Número" name="numero_endereco" value={formData.numero_endereco} onChange={handleChange} />
+              <FormField label="Complemento" name="complemento" value={formData.complemento} onChange={handleChange} />
+              <FormField label="Bairro" name="bairro" value={formData.bairro} onChange={handleChange} />
+              <FormField label="Cidade" name="cidade" value={formData.cidade} onChange={handleChange} />
+              <FormField label="UF" name="uf" value={formData.uf} onChange={handleChange} type="select" options={UFS} />
+            </div>
+          </FormSection>
+
+          {/* Informações Bancárias */}
+          <FormSection title="Informações Bancárias" icon={Building}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField label="Banco" name="banco" value={formData.banco} onChange={handleChange} />
+              <FormField label="Agência" name="agencia" value={formData.agencia} onChange={handleChange} />
+              <FormField label="Conta" name="conta" value={formData.conta} onChange={handleChange} />
+            </div>
+          </FormSection>
+
+          {/* Informações Físicas */}
+          <FormSection title="Informações Físicas" icon={Heart}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField label="Altura (m)" name="altura" value={formData.altura} onChange={handleChange} type="number" step="0.01" />
+              <FormField label="Peso (kg)" name="peso" value={formData.peso} onChange={handleChange} type="number" step="0.1" />
+              <FormField label="Etnia" name="etnia" value={formData.etnia} onChange={handleChange} type="select" options={['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena', 'Não declarada']} />
             </div>
           </FormSection>
 
           {/* Habilidades */}
-          <FormSection title="Habilidades" icon={GraduationCap}>
+          <FormSection title="Habilidades e Cursos" icon={GraduationCap}>
             <TagInput
               label="Habilidades"
               name="habilidades"
@@ -807,37 +590,6 @@ export default function CadastrarMilitar() {
               placeholder="Adicionar habilidade..."
             />
           </FormSection>
-
-          {/* Link de Alterações Anteriores */}
-          <FormSection title="Documentos Externos" icon={FileText}>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Link para Alterações Anteriores (Drive/Pasta)</label>
-              <p className="text-xs text-slate-400">Cole o link de uma pasta no Drive com os documentos de alterações anteriores deste militar.</p>
-              <input
-                type="url"
-                value={formData.link_alteracoes_anteriores || ''}
-                onChange={e => handleChange('link_alteracoes_anteriores', e.target.value)}
-                placeholder="https://drive.google.com/..."
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f]"
-              />
-            </div>
-          </FormSection>
-
-          {/* Submit Button Mobile */}
-          <div className="md:hidden">
-            <Button
-              type="submit"
-              disabled={loading || !formData.nome_completo || !formData.matricula}
-              className="w-full bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white py-6"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-              ) : (
-                <Save className="w-5 h-5 mr-2" />
-              )}
-              Salvar Cadastro
-            </Button>
-          </div>
         </form>
       </div>
     </div>
