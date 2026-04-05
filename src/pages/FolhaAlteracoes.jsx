@@ -499,10 +499,25 @@ export default function FolhaAlteracoes() {
   return (
     <div className="folha-alteracoes-page min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <style>{`
+        @media screen {
+          .print-only-document {
+            display: none !important;
+          }
+        }
+
         @media print {
           @page {
             size: A4;
             margin: 14mm 12mm 16mm 12mm;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          .print-only-document,
+          .print-only-document * {
+            visibility: visible !important;
           }
 
           body {
@@ -510,59 +525,70 @@ export default function FolhaAlteracoes() {
           }
 
           .folha-alteracoes-page {
-            min-height: auto !important;
+            position: static !important;
             background: #fff !important;
           }
 
-          .no-print {
-            display: none !important;
-          }
-
-          .print-container {
-            max-width: 100% !important;
+          .print-only-document {
+            display: block !important;
+            position: absolute !important;
+            inset: 0 !important;
+            width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
+            color: #111827 !important;
+            font-family: "Times New Roman", Times, serif !important;
+            font-size: 11pt !important;
+            line-height: 1.3 !important;
           }
 
-          .print-document-card {
-            box-shadow: none !important;
+          .print-only-document .doc-sheet {
             border: none !important;
-            background: transparent !important;
-          }
-
-          .print-document-content {
-            padding: 0 !important;
-            margin: 0 !important;
-            gap: 0.75rem !important;
-          }
-
-          .print-sheet {
-            border: 1px solid #d1d5db !important;
             border-radius: 0 !important;
             background: #fff !important;
-            padding: 9mm 8mm !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
+            padding: 0 !important;
+            margin: 0 0 4mm 0 !important;
+            box-shadow: none !important;
           }
 
-          .print-section {
-            page-break-inside: avoid;
-            break-inside: avoid;
+          .print-only-document .doc-title {
+            letter-spacing: normal !important;
+            font-size: 15pt !important;
+            margin: 0 !important;
           }
 
-          .print-year-block {
-            page-break-inside: avoid;
-            break-inside: avoid;
+          .print-only-document .doc-subtitle {
+            margin: 2mm 0 0 0 !important;
+            font-size: 10.5pt !important;
           }
 
-          .print-month-block {
-            page-break-inside: avoid;
-            break-inside: avoid;
+          .print-only-document .doc-grid {
+            gap: 1.5mm 4mm !important;
           }
 
-          .print-break-before {
-            page-break-before: always;
-            break-before: page;
+          .print-only-document .doc-row {
+            break-inside: avoid-page;
+          }
+
+          .print-only-document .doc-section-title {
+            margin: 4mm 0 2mm !important;
+          }
+
+          .print-only-document .doc-year {
+            break-inside: auto !important;
+          }
+
+          .print-only-document .doc-month {
+            break-inside: avoid-page;
+            margin-bottom: 2mm !important;
+          }
+
+          .screen-preview,
+          .no-print,
+          .print-document-card,
+          .print-document-content,
+          .print-container > :not(.print-only-document) {
+            display: none !important;
           }
         }
       `}</style>
@@ -779,6 +805,74 @@ export default function FolhaAlteracoes() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {previa && (
+          <section className="print-only-document">
+            <article className="doc-sheet doc-section">
+              <header className="text-center border-b border-black pb-2">
+                <p className="doc-title font-bold uppercase">FOLHA DE ALTERAÇÕES</p>
+                <p className="doc-subtitle">Resumo de Identificação e Histórico Funcional</p>
+              </header>
+
+              <div className="doc-grid grid grid-cols-2 mt-3 text-[10.5pt]">
+                <div className="doc-row"><strong>Nome:</strong> {valorComFallback(previa.militar.nome_completo)}</div>
+                <div className="doc-row"><strong>Matrícula:</strong> {valorComFallback(previa.militar.matricula)}</div>
+                <div className="doc-row"><strong>Posto/Graduação:</strong> {valorComFallback(previa.militar.posto_graduacao)}</div>
+                <div className="doc-row"><strong>Quadro:</strong> {valorComFallback(previa.militar.quadro)}</div>
+                <div className="doc-row"><strong>Identidade:</strong> {montarIdentidade(previa.militar)}</div>
+                <div className="doc-row">
+                  <strong>OBM/Unidade:</strong> {valorComFallback(previa.militar.unidade || previa.militar.unidade_lotacao || previa.militar.lotacao)}
+                </div>
+                <div className="doc-row">
+                  <strong>Período:</strong> {formatarData(previa.periodo.dataInicial)} a {formatarData(previa.periodo.dataFinal)}
+                </div>
+                <div className="doc-row"><strong>Comportamento:</strong> {valorComFallback(previa.militar.comportamento, 'Sem alteração')}</div>
+                <div className="doc-row"><strong>Data de Inclusão:</strong> {formatarDataOuNaoInformado(previa.militar.data_inclusao)}</div>
+                <div className="doc-row"><strong>Data de Nascimento:</strong> {formatarDataOuNaoInformado(previa.militar.data_nascimento)}</div>
+                <div className="doc-row"><strong>Naturalidade:</strong> {montarNaturalidade(previa.militar)}</div>
+                <div className="doc-row"><strong>Estado Civil:</strong> {valorComFallback(previa.militar.estado_civil)}</div>
+                <div className="doc-row"><strong>Tipo Sanguíneo/RH:</strong> {montarTipoSanguineoRh(previa.militar)}</div>
+                <div className="doc-row"><strong>Sinais Particulares:</strong> {obterSinaisParticulares(previa.militar)}</div>
+              </div>
+            </article>
+
+            <article className="doc-sheet mt-2">
+              <h2 className="doc-section-title font-bold uppercase text-[11pt] border-b border-black pb-1">Histórico de Alterações</h2>
+
+              {loadingHistorico && (
+                <p className="mt-2">Carregando histórico do período...</p>
+              )}
+
+              {!loadingHistorico && historicoPorAnoMes.length === 0 && (
+                <p className="mt-2">Não foi possível montar o histórico para o período selecionado.</p>
+              )}
+
+              {!loadingHistorico && historicoPorAnoMes.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {historicoPorAnoMes.map((ano) => (
+                    <section key={ano.ano} className="doc-year">
+                      <h3 className="font-bold">ANO {ano.ano}</h3>
+                      {ano.meses.map((mes) => (
+                        <div key={mes.chave} className="doc-month ml-3 mt-1">
+                          <p className="font-semibold">{mes.titulo}</p>
+                          {mes.eventos.length === 0 ? (
+                            <p className="italic">Sem alteração.</p>
+                          ) : (
+                            <ol className="list-decimal ml-5">
+                              {mes.eventos.map((evento, index) => (
+                                <li key={`${evento.origem}-${evento.data}-${index}`}>{evento.texto}</li>
+                              ))}
+                            </ol>
+                          )}
+                        </div>
+                      ))}
+                    </section>
+                  ))}
+                </div>
+              )}
+            </article>
+          </section>
         )}
       </div>
     </div>
