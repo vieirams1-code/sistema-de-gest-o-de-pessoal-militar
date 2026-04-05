@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -41,6 +41,7 @@ export default function Configuracoes() {
   const [quadroEmEdicao, setQuadroEmEdicao] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, type: null, id: null });
   const [addQuadroDialogOpen, setAddQuadroDialogOpen] = useState(false);
+  const [erroCadastroQuadro, setErroCadastroQuadro] = useState('');
   const [editConfirmStep, setEditConfirmStep] = useState(0);
   const [editImpactCount, setEditImpactCount] = useState(0);
   const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
@@ -59,8 +60,15 @@ export default function Configuracoes() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quadros-militares'] });
       setNovoQuadro({ nome: '', sigla: '', categoria: CATEGORIA_QUADRO_OFICIAL, ativo: true });
+      setErroCadastroQuadro('');
       setAddQuadroDialogOpen(false);
-    }
+      alert('Quadro cadastrado com sucesso.');
+    },
+    onError: (error) => {
+      const message = error?.message || 'Não foi possível salvar o quadro. Verifique os dados e tente novamente.';
+      setErroCadastroQuadro(message);
+      alert(message);
+    },
   });
   const updateQuadroMutation = useMutation({
     mutationFn: ({ id, payload }) => base44.entities.QuadroMilitar.update(id, payload),
@@ -106,6 +114,16 @@ export default function Configuracoes() {
     }
   };
 
+  const quadrosPorNomeNormalizado = useMemo(() => (
+    quadros.reduce((acc, item) => {
+      const key = (item?.nome || '').trim().toUpperCase();
+      if (!key) return acc;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {})
+  ), [quadros]);
+
   const countMilitaresVinculadosAoQuadro = async (quadro) => {
     if (!quadro?.id) return 0;
 
@@ -127,9 +145,23 @@ export default function Configuracoes() {
     }
   };
 
-  const handleCreateQuadro = () => {
+  const handleCreateQuadro = (event) => {
+    event?.preventDefault();
+
     if (!canAccessAction('gerir_configuracoes')) return;
-    if (!novoQuadro.nome.trim()) return;
+
+    const nomeNormalizado = novoQuadro.nome.trim().toUpperCase();
+    if (!nomeNormalizado) {
+      setErroCadastroQuadro('Informe o nome do quadro para salvar.');
+      return;
+    }
+
+    if (quadrosPorNomeNormalizado[nomeNormalizado]?.length) {
+      setErroCadastroQuadro('Já existe um quadro com este nome. Use outro nome para continuar.');
+      return;
+    }
+
+    setErroCadastroQuadro('');
     createQuadroMutation.mutate({
       nome: novoQuadro.nome.trim(),
       sigla: novoQuadro.sigla.trim(),
@@ -248,7 +280,7 @@ export default function Configuracoes() {
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Quadros</h2>
             <p className="text-sm text-slate-500 mb-4">Cadastre quadros com categoria obrigatória (Oficial/Praça) para uso no cadastro de militar.</p>
             <div className="mb-6">
-              <Button onClick={() => setAddQuadroDialogOpen(true)} disabled={!canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+              <Button onClick={() => { setErroCadastroQuadro(''); setAddQuadroDialogOpen(true); }} disabled={!canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-4 h-4 mr-2" /> Adicionar Quadro
               </Button>
             </div>
@@ -305,29 +337,32 @@ export default function Configuracoes() {
           <TiposPublicacaoManager />
         </div>
 
-        <Dialog open={addQuadroDialogOpen} onOpenChange={setAddQuadroDialogOpen}>
+        <Dialog open={addQuadroDialogOpen} onOpenChange={(open) => { setAddQuadroDialogOpen(open); if (!open) setErroCadastroQuadro(''); }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Novo quadro</DialogTitle>
               <DialogDescription>Preencha os dados para cadastrar um novo quadro.</DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-1 gap-3">
+            <form onSubmit={handleCreateQuadro} className="grid grid-cols-1 gap-3">
               <Input
                 value={novoQuadro.nome}
-                onChange={(e) => setNovoQuadro((prev) => ({ ...prev, nome: e.target.value }))}
+                onChange={(e) => {
+                  setNovoQuadro((prev) => ({ ...prev, nome: e.target.value }));
+                  if (erroCadastroQuadro) setErroCadastroQuadro('');
+                }}
                 placeholder="Nome do quadro"
-                disabled={!canAccessAction('gerir_configuracoes')}
+                disabled={!canAccessAction('gerir_configuracoes') || createQuadroMutation.isPending}
               />
               <Input
                 value={novoQuadro.sigla}
                 onChange={(e) => setNovoQuadro((prev) => ({ ...prev, sigla: e.target.value }))}
                 placeholder="Sigla (opcional)"
-                disabled={!canAccessAction('gerir_configuracoes')}
+                disabled={!canAccessAction('gerir_configuracoes') || createQuadroMutation.isPending}
               />
               <Select
                 value={novoQuadro.categoria}
                 onValueChange={(value) => setNovoQuadro((prev) => ({ ...prev, categoria: value }))}
-                disabled={!canAccessAction('gerir_configuracoes')}
+                disabled={!canAccessAction('gerir_configuracoes') || createQuadroMutation.isPending}
               >
                 <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
                 <SelectContent>
@@ -335,13 +370,16 @@ export default function Configuracoes() {
                   <SelectItem value={CATEGORIA_QUADRO_PRACA}>{CATEGORIA_QUADRO_PRACA}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAddQuadroDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={handleCreateQuadro} disabled={!novoQuadro.nome.trim() || !canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-                Salvar
-              </Button>
-            </DialogFooter>
+              {erroCadastroQuadro && (
+                <p className="text-sm text-red-600">{erroCadastroQuadro}</p>
+              )}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setAddQuadroDialogOpen(false); setErroCadastroQuadro(''); }}>Cancelar</Button>
+                <Button type="submit" disabled={!canAccessAction('gerir_configuracoes') || createQuadroMutation.isPending} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                  {createQuadroMutation.isPending ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
 
