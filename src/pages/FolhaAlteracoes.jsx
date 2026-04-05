@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
 import { FileSpreadsheet, Printer } from 'lucide-react';
 
 const MESES = [
@@ -29,61 +30,6 @@ function formatarData(isoDate) {
   const [ano, mes, dia] = String(isoDate).split('-');
   if (!ano || !mes || !dia) return isoDate;
   return `${dia}/${mes}/${ano}`;
-}
-
-function formatarDataOuNaoInformado(isoDate) {
-  return isoDate ? formatarData(isoDate) : 'Não informado';
-}
-
-function valorComFallback(valor, fallback = 'Não informado') {
-  if (valor === null || valor === undefined) return fallback;
-  const texto = String(valor).trim();
-  return texto ? texto : fallback;
-}
-
-function montarNaturalidade(militar) {
-  const cidade = String(militar?.naturalidade || '').trim();
-  const uf = String(militar?.naturalidade_uf || '').trim();
-  if (cidade && uf) return `${cidade}/${uf}`;
-  if (cidade) return cidade;
-  if (uf) return uf;
-  return 'Não informado';
-}
-
-function montarIdentidade(militar) {
-  const rg = String(militar?.rg || '').trim();
-  const orgao = String(militar?.orgao_expedidor_rg || '').trim();
-  if (rg && orgao) return `${rg} / ${orgao}`;
-  if (rg) return rg;
-  if (orgao) return orgao;
-  return 'Não informado';
-}
-
-function montarTipoSanguineoRh(militar) {
-  const tipo = String(militar?.tipo_sanguineo || militar?.tipo_sanguineo_abo || '').trim();
-  const rh = String(militar?.fator_rh || militar?.rh || '').trim();
-
-  if (tipo && rh) return `${tipo} ${rh}`;
-  if (tipo) return tipo;
-  if (rh) return rh;
-  return 'Não informado';
-}
-
-function obterSinaisParticulares(militar) {
-  const candidatos = [
-    militar?.sinais_particulares,
-    militar?.sinal_particular,
-    militar?.outras_notas,
-    militar?.observacoes,
-    militar?.observacao,
-  ];
-
-  for (const valor of candidatos) {
-    const texto = String(valor || '').trim();
-    if (texto) return texto;
-  }
-
-  return 'Sem alteração';
 }
 
 function formatarDataExtensa(isoDate) {
@@ -728,228 +674,30 @@ export default function FolhaAlteracoes() {
                 </p>
               </div>
 
-              <div className="print-sheet print-section rounded-xl border border-[#1e3a5f]/20 bg-white p-5 md:p-6 space-y-5 print:border-slate-300">
-                <div className="text-center border-b border-slate-200 pb-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Folha de Alterações</p>
-                  <p className="text-lg md:text-xl font-bold text-[#1e3a5f] mt-1">Resumo de Identificação do Militar</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Nome</p>
-                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.nome_completo)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Matrícula</p>
-                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.matricula)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Posto/Graduação</p>
-                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.posto_graduacao)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Quadro</p>
-                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.quadro)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Identidade / Órgão Expedidor</p>
-                    <p className="font-semibold text-slate-800">{montarIdentidade(previa.militar)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">OBM / Unidade</p>
-                    <p className="font-semibold text-slate-800">
-                      {valorComFallback(previa.militar.unidade || previa.militar.unidade_lotacao || previa.militar.lotacao)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Período da Folha</p>
-                    <p className="font-semibold text-slate-800">
-                      {formatarData(previa.periodo.dataInicial)} até {formatarData(previa.periodo.dataFinal)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Comportamento Atual</p>
-                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.comportamento, 'Sem alteração')}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Data de Inclusão</p>
-                    <p className="font-semibold text-slate-800">{formatarDataOuNaoInformado(previa.militar.data_inclusao)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Estado Civil</p>
-                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.estado_civil)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Naturalidade</p>
-                    <p className="font-semibold text-slate-800">{montarNaturalidade(previa.militar)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Data de Nascimento</p>
-                    <p className="font-semibold text-slate-800">{formatarDataOuNaoInformado(previa.militar.data_nascimento)}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Tipo Sanguíneo / Fator RH</p>
-                    <p className="font-semibold text-slate-800">{montarTipoSanguineoRh(previa.militar)}</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Sinais Particulares / Outras Notas</p>
-                    <p className="font-semibold text-slate-800 break-words">{obterSinaisParticulares(previa.militar)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="print-sheet print-section print-break-before rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
-                <p className="text-base font-semibold text-slate-800">Histórico de Alterações</p>
-
-                {loadingHistorico && (
-                  <p className="text-sm text-slate-500">Carregando histórico do período...</p>
-                )}
-
-                {!loadingHistorico && historicoPorAnoMes.length === 0 && (
-                  <p className="text-sm text-slate-500">Não foi possível montar o histórico para o período selecionado.</p>
-                )}
-
-                {!loadingHistorico && historicoPorAnoMes.length > 0 && (
-                  <div className="space-y-4">
-                    {historicoPorAnoMes.map((ano) => (
-                      <div key={ano.ano} className="print-year-block rounded-lg border border-slate-200 bg-white p-4 space-y-3">
-                        <h3 className="text-sm md:text-base font-bold text-[#1e3a5f]">ANO {ano.ano}</h3>
-
-                        <div className="space-y-3">
-                          {ano.meses.map((mes) => (
-                            <div key={mes.chave} className="print-month-block rounded-md border border-slate-100 p-3 bg-slate-50/70">
-                              <p className="text-xs md:text-sm font-semibold text-slate-700 mb-2">{mes.titulo}</p>
-
-                              {mes.eventos.length === 0 ? (
-                                <p className="text-sm text-slate-500 italic">Sem alteração</p>
-                              ) : (
-                                <ol className="space-y-2">
-                                  {mes.eventos.map((evento, index) => (
-                                    <li
-                                      key={`${evento.origem}-${evento.data}-${index}`}
-                                      className="grid grid-cols-[auto,1fr] gap-x-2 text-sm text-slate-800 leading-[1.65]"
-                                    >
-                                      <span className="font-semibold whitespace-nowrap">({index + 1})</span>
-                                      <p className="text-justify [text-justify:inter-word] whitespace-pre-line m-0">
-                                        {evento.texto}
-                                      </p>
-                                    </li>
-                                  ))}
-                                </ol>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="print-sheet print-section rounded-xl border border-amber-200 bg-amber-50 p-3">
-                <p className="text-xs text-amber-800">
-                  Fontes desta fase: Férias, Atestados, Publicações Ex Officio e Punições Disciplinares (quando disponíveis com data no cadastro).
-                </p>
-                <p className="text-xs text-amber-700 mt-1">
-                  Estrutura preparada para ampliar outras fontes sem alterar o layout do histórico.
-                </p>
-              </div>
-
-              <div className="print-sheet print-section rounded-xl border border-slate-300 bg-white p-4 md:p-5">
-                <div className="text-sm text-slate-700 text-right">
-                  <p>{localFechamento}, {dataFechamento}.</p>
-                </div>
-                <div className="mt-10 max-w-md ml-auto text-center text-sm text-slate-700">
-                  <div className="border-t border-slate-500 pt-2">
-                    <p className="font-medium">Assinatura da autoridade competente</p>
-                    <p className="text-xs text-slate-500 mt-1">(Nome completo / posto ou graduação)</p>
-                  </div>
-                </div>
-              </div>
+              <FolhaAlteracoesDocumento
+                previa={previa}
+                historicoPorAnoMes={historicoPorAnoMes}
+                loadingHistorico={loadingHistorico}
+                localFechamento={localFechamento}
+                dataFechamento={dataFechamento}
+                formatarData={formatarData}
+                variant="screen"
+              />
             </CardContent>
           </Card>
         )}
 
         {previa && (
           <section className="print-only-document">
-            <article className="doc-sheet doc-section">
-              <header className="text-center border-b border-black pb-2">
-                <p className="doc-title font-bold uppercase">FOLHA DE ALTERAÇÕES</p>
-                <p className="doc-subtitle">Resumo de Identificação e Histórico Funcional</p>
-              </header>
-
-              <div className="doc-grid grid grid-cols-2 mt-3 text-[10.5pt]">
-                <div className="doc-row"><strong>Nome:</strong> {valorComFallback(previa.militar.nome_completo)}</div>
-                <div className="doc-row"><strong>Matrícula:</strong> {valorComFallback(previa.militar.matricula)}</div>
-                <div className="doc-row"><strong>Posto/Graduação:</strong> {valorComFallback(previa.militar.posto_graduacao)}</div>
-                <div className="doc-row"><strong>Quadro:</strong> {valorComFallback(previa.militar.quadro)}</div>
-                <div className="doc-row"><strong>Identidade:</strong> {montarIdentidade(previa.militar)}</div>
-                <div className="doc-row">
-                  <strong>OBM/Unidade:</strong> {valorComFallback(previa.militar.unidade || previa.militar.unidade_lotacao || previa.militar.lotacao)}
-                </div>
-                <div className="doc-row">
-                  <strong>Período:</strong> {formatarData(previa.periodo.dataInicial)} a {formatarData(previa.periodo.dataFinal)}
-                </div>
-                <div className="doc-row"><strong>Comportamento:</strong> {valorComFallback(previa.militar.comportamento, 'Sem alteração')}</div>
-                <div className="doc-row"><strong>Data de Inclusão:</strong> {formatarDataOuNaoInformado(previa.militar.data_inclusao)}</div>
-                <div className="doc-row"><strong>Data de Nascimento:</strong> {formatarDataOuNaoInformado(previa.militar.data_nascimento)}</div>
-                <div className="doc-row"><strong>Naturalidade:</strong> {montarNaturalidade(previa.militar)}</div>
-                <div className="doc-row"><strong>Estado Civil:</strong> {valorComFallback(previa.militar.estado_civil)}</div>
-                <div className="doc-row"><strong>Tipo Sanguíneo/RH:</strong> {montarTipoSanguineoRh(previa.militar)}</div>
-                <div className="doc-row"><strong>Sinais Particulares:</strong> {obterSinaisParticulares(previa.militar)}</div>
-              </div>
-            </article>
-
-            <article className="doc-sheet mt-2">
-              <h2 className="doc-section-title font-bold uppercase text-[11pt] border-b border-black pb-1">Histórico de Alterações</h2>
-
-              {loadingHistorico && (
-                <p className="mt-2">Carregando histórico do período...</p>
-              )}
-
-              {!loadingHistorico && historicoPorAnoMes.length === 0 && (
-                <p className="mt-2">Não foi possível montar o histórico para o período selecionado.</p>
-              )}
-
-              {!loadingHistorico && historicoPorAnoMes.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  {historicoPorAnoMes.map((ano) => (
-                    <section key={ano.ano} className="doc-year">
-                      <h3 className="font-bold">ANO {ano.ano}</h3>
-                      {ano.meses.map((mes) => (
-                        <div key={mes.chave} className="doc-month ml-3 mt-1">
-                          <p className="font-semibold">{mes.titulo}</p>
-                          {mes.eventos.length === 0 ? (
-                            <p className="italic">Sem alteração.</p>
-                          ) : (
-                            <ol className="doc-event-list">
-                              {mes.eventos.map((evento, index) => (
-                                <li key={`${evento.origem}-${evento.data}-${index}`} className="doc-event-item">
-                                  <span className="doc-event-marker">({index + 1})</span>
-                                  <p className="doc-event-body">{evento.texto}</p>
-                                </li>
-                              ))}
-                            </ol>
-                          )}
-                        </div>
-                      ))}
-                    </section>
-                  ))}
-                </div>
-              )}
-            </article>
-
-            <article className="doc-sheet mt-2">
-              <div className="text-right">
-                <p>{localFechamento}, {dataFechamento}.</p>
-              </div>
-              <div className="mt-16 w-[72mm] ml-auto text-center">
-                <div className="border-t border-black pt-1">
-                  <p>Assinatura da autoridade competente</p>
-                  <p className="text-[9.5pt]">(Nome completo / posto ou graduação)</p>
-                </div>
-              </div>
-            </article>
+            <FolhaAlteracoesDocumento
+              previa={previa}
+              historicoPorAnoMes={historicoPorAnoMes}
+              loadingHistorico={loadingHistorico}
+              localFechamento={localFechamento}
+              dataFechamento={dataFechamento}
+              formatarData={formatarData}
+              variant="print"
+            />
           </section>
         )}
       </div>
