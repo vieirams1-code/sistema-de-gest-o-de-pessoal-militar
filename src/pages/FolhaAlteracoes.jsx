@@ -34,6 +34,9 @@ function formatarData(isoDate) {
 function normalizarDataISO(value) {
   if (!value) return null;
   if (typeof value === 'string') {
+    const brMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+
     const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (match) return `${match[1]}-${match[2]}-${match[3]}`;
     return null;
@@ -100,6 +103,42 @@ function agruparHistoricoPorAnoMes(eventos, dataInicial, dataFinal) {
   return Array.from(agrupadoPorAno.entries())
     .sort((a, b) => a[0] - b[0])
     .map(([ano, mesesDoAno]) => ({ ano, meses: mesesDoAno }));
+}
+
+function getEntitySafe(entityName) {
+  return base44?.entities?.[entityName] || null;
+}
+
+async function listarPorMilitar(entityName, militarId, sort) {
+  const entity = getEntitySafe(entityName);
+  if (!entity?.filter) return [];
+
+  const tentativas = [
+    { militar_id: militarId },
+    { militarId: militarId },
+  ];
+
+  for (const filtro of tentativas) {
+    try {
+      const resultado = await entity.filter(filtro, sort);
+      if (Array.isArray(resultado) && resultado.length > 0) {
+        return resultado;
+      }
+    } catch (error) {
+      // continua para fallback
+    }
+  }
+
+  try {
+    const lista = await entity.list(sort, 2000);
+    if (!Array.isArray(lista)) return [];
+    return lista.filter((item) => {
+      const militarRef = item?.militar_id || item?.militarId || item?.militar?.id || item?.militar;
+      return String(militarRef || '') === String(militarId || '');
+    });
+  } catch (error) {
+    return [];
+  }
 }
 
 export default function FolhaAlteracoes() {
@@ -196,12 +235,15 @@ export default function FolhaAlteracoes() {
       const inicioPeriodo = previa.periodo.dataInicial;
       const fimPeriodo = previa.periodo.dataFinal;
 
-      const [ferias, atestados, publicacoes, punicoes] = await Promise.all([
-        base44.entities.Ferias.filter({ militar_id: militarId }, '-data_inicio').catch(() => []),
-        base44.entities.Atestado.filter({ militar_id: militarId }, '-data_inicio').catch(() => []),
-        base44.entities.PublicacaoExOfficio.filter({ militar_id: militarId }, '-data_publicacao').catch(() => []),
-        base44.entities.PunicaoDisciplinar?.filter({ militar_id: militarId }, '-data_punicao').catch(() => []) || Promise.resolve([]),
+      const [ferias, atestados, publicacoesExOfficio, punicoes] = await Promise.all([
+        listarPorMilitar('Ferias', militarId, '-data_inicio'),
+        listarPorMilitar('Atestado', militarId, '-data_inicio'),
+        listarPorMilitar('PublicacaoExOfficio', militarId, '-data_publicacao'),
+        listarPorMilitar('PunicaoDisciplinar', militarId, '-data_punicao'),
       ]);
+
+      const publicacoesLivro = await listarPorMilitar('RegistroLivro', militarId, '-data_registro');
+      const publicacoes = [...publicacoesExOfficio, ...publicacoesLivro];
 
       const filtrarPorPeriodo = (data) => Boolean(data && data >= inicioPeriodo && data <= fimPeriodo);
 
@@ -242,10 +284,17 @@ export default function FolhaAlteracoes() {
 
       const eventosPublicacoes = publicacoes
         .map((item) => {
-          const dataEvento = normalizarDataISO(item.data_publicacao || item.data_registro || item.data_bg || item.created_date);
+          const dataEvento = normalizarDataISO(
+            item.data_publicacao ||
+            item.data_registro ||
+            item.data_inicio ||
+            item.data_bg ||
+            item.data_punicao ||
+            item.created_date
+          );
           if (!filtrarPorPeriodo(dataEvento)) return null;
 
-          const tipoPublicacao = item.tipo_registro || item.tipo || 'Publicação';
+          const tipoPublicacao = item.tipo_registro || item.tipo || item.categoria || 'Publicação';
           const numeroBg = item.numero_bg ? ` - BG ${item.numero_bg}` : '';
 
           return {
