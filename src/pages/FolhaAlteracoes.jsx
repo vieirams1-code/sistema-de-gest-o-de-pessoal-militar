@@ -31,6 +31,80 @@ function formatarData(isoDate) {
   return `${dia}/${mes}/${ano}`;
 }
 
+function formatarDataExtensa(isoDate) {
+  if (!isoDate) return '';
+  const [ano, mes, dia] = String(isoDate).split('-').map(Number);
+  if (!ano || !mes || !dia) return String(isoDate);
+  const dateObj = new Date(Date.UTC(ano, mes - 1, dia));
+  return dateObj.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function getTextoOficialRegistro(item) {
+  const camposPreferenciais = [
+    'texto_publicacao',
+    'texto_renderizado',
+    'texto_oficial',
+    'texto_base',
+    'texto_complemento',
+    'nota_para_bg',
+    'observacoes',
+    'descricao',
+    'historico',
+    'resumo',
+  ];
+
+  for (const campo of camposPreferenciais) {
+    const valor = item?.[campo];
+    if (typeof valor === 'string' && valor.trim()) {
+      return valor.trim();
+    }
+  }
+
+  return '';
+}
+
+function montarTextoAdministrativo({ tipo, dataEvento, item }) {
+  const dataExtensa = formatarDataExtensa(dataEvento);
+  const dataCurta = formatarData(dataEvento);
+
+  if (tipo === 'Férias') {
+    const dias = Number(item?.dias || 0);
+    const periodoRef = item?.periodo_aquisitivo_ref ? `, referente ao período aquisitivo ${item.periodo_aquisitivo_ref}` : '';
+    const fracao = item?.fracionamento ? `, em ${item.fracionamento}` : '';
+    const diasLabel = dias > 0 ? `${dias} dia(s)` : 'período regulamentar';
+    return `Em ${dataExtensa}, entrou em gozo de férias por ${diasLabel}${periodoRef}${fracao}.`;
+  }
+
+  if (tipo === 'Atestado') {
+    const tipoAfastamento = item?.tipo_afastamento || 'afastamento médico';
+    const dias = Number(item?.dias || 0);
+    const diasLabel = dias > 0 ? `, pelo prazo de ${dias} dia(s)` : '';
+    const cid = item?.cid_10 ? `, CID ${item.cid_10}` : '';
+    return `Em ${dataExtensa}, foi registrado ${tipoAfastamento.toLowerCase()}${diasLabel}${cid}.`;
+  }
+
+  if (tipo === 'Publicação') {
+    const tipoPublicacao = item?.tipo_registro || item?.tipo || item?.categoria || 'publicação administrativa';
+    const numeroBg = item?.numero_bg ? `, no BG nº ${item.numero_bg}` : '';
+    return `Em ${dataExtensa}, foi lançada ${String(tipoPublicacao).toLowerCase()}${numeroBg}.`;
+  }
+
+  if (tipo === 'Punição') {
+    const tipoPunicao = item?.tipo_punicao || 'punição disciplinar';
+    const diasPunicao = Number(item?.dias_punicao || 0);
+    const diasLabel = diasPunicao > 0 ? `, pelo prazo de ${diasPunicao} dia(s)` : '';
+    const boletim = item?.boletim_numero ? `, conforme boletim nº ${item.boletim_numero}` : '';
+    return `Em ${dataExtensa}, foi aplicada ${String(tipoPunicao).toLowerCase()}${diasLabel}${boletim}.`;
+  }
+
+  return `Em ${dataCurta}, foi registrada alteração administrativa.`;
+}
+
 function normalizarDataISO(value) {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -254,10 +328,12 @@ export default function FolhaAlteracoes() {
 
           const periodoRef = item.periodo_aquisitivo_ref ? ` (${item.periodo_aquisitivo_ref})` : '';
           const fracao = item.fracionamento ? ` - ${item.fracionamento}` : '';
+          const textoOficial = getTextoOficialRegistro(item);
 
           return {
             data: dataEvento,
             tipo: 'Férias',
+            texto: textoOficial || montarTextoAdministrativo({ tipo: 'Férias', dataEvento, item }),
             descricao: `${item.dias || 0} dia(s) de férias${periodoRef}${fracao}`,
             origem: 'Ferias',
           };
@@ -272,10 +348,12 @@ export default function FolhaAlteracoes() {
           const tipoAfastamento = item.tipo_afastamento || 'Afastamento médico';
           const dias = item.dias ? ` (${item.dias} dia(s))` : '';
           const cid = item.cid_10 ? ` - CID ${item.cid_10}` : '';
+          const textoOficial = getTextoOficialRegistro(item);
 
           return {
             data: dataEvento,
             tipo: 'Atestado',
+            texto: textoOficial || montarTextoAdministrativo({ tipo: 'Atestado', dataEvento, item }),
             descricao: `${tipoAfastamento}${dias}${cid}`,
             origem: 'Atestado',
           };
@@ -296,10 +374,12 @@ export default function FolhaAlteracoes() {
 
           const tipoPublicacao = item.tipo_registro || item.tipo || item.categoria || 'Publicação';
           const numeroBg = item.numero_bg ? ` - BG ${item.numero_bg}` : '';
+          const textoOficial = getTextoOficialRegistro(item);
 
           return {
             data: dataEvento,
             tipo: 'Publicação',
+            texto: textoOficial || montarTextoAdministrativo({ tipo: 'Publicação', dataEvento, item }),
             descricao: `${tipoPublicacao}${numeroBg}`,
             origem: 'PublicacaoExOfficio',
           };
@@ -314,10 +394,12 @@ export default function FolhaAlteracoes() {
           const tipoPunicao = item.tipo_punicao || 'Punição disciplinar';
           const dias = item.dias_punicao ? ` - ${item.dias_punicao} dia(s)` : '';
           const status = item.status_punicao ? ` (${item.status_punicao})` : '';
+          const textoOficial = getTextoOficialRegistro(item);
 
           return {
             data: dataEvento,
             tipo: 'Punição',
+            texto: textoOficial || montarTextoAdministrativo({ tipo: 'Punição', dataEvento, item }),
             descricao: `${tipoPunicao}${dias}${status}`,
             origem: 'PunicaoDisciplinar',
           };
@@ -479,19 +561,14 @@ export default function FolhaAlteracoes() {
                               {mes.eventos.length === 0 ? (
                                 <p className="text-sm text-slate-500 italic">Sem alteração</p>
                               ) : (
-                                <ul className="space-y-2">
+                                <ol className="space-y-2">
                                   {mes.eventos.map((evento, index) => (
-                                    <li key={`${evento.origem}-${evento.data}-${index}`} className="rounded border border-slate-200 bg-white px-3 py-2">
-                                      <p className="text-sm text-slate-800">
-                                        <span className="font-semibold">{formatarData(evento.data)}</span>
-                                        {' • '}
-                                        <span className="font-medium">{evento.tipo}</span>
-                                      </p>
-                                      <p className="text-sm text-slate-600">{evento.descricao}</p>
-                                      <p className="text-xs text-slate-500">Origem: {evento.origem}</p>
+                                    <li key={`${evento.origem}-${evento.data}-${index}`} className="text-sm text-slate-800 leading-relaxed">
+                                      <span className="font-semibold">({index + 1}) </span>
+                                      <span>{evento.texto}</span>
                                     </li>
                                   ))}
-                                </ul>
+                                </ol>
                               )}
                             </div>
                           ))}
