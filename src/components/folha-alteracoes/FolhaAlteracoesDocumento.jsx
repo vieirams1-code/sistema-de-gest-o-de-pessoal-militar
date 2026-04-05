@@ -69,6 +69,9 @@ export default function FolhaAlteracoesDocumento({
           <p>
             <strong>Período da folha:</strong> {formatarData(previa.periodo.dataInicial)} a {formatarData(previa.periodo.dataFinal)}
           </p>
+          {previa?.periodo?.tipo === 'mes-ano' && previa?.periodo?.descricaoSelecao && (
+            <p><strong>Referência (Mês/Ano):</strong> {previa.periodo.descricaoSelecao}</p>
+          )}
           {exibirComportamento && (
             <p><strong>Comportamento:</strong> {valorComFallback(previa.militar.comportamento, 'Sem alteração')}</p>
           )}

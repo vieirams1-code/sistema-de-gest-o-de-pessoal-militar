@@ -31,6 +31,10 @@ const MESES = [
   'NOVEMBRO',
   'DEZEMBRO',
 ];
+const TIPOS_PERIODO = {
+  DATAS_COMPLETAS: 'datas-completas',
+  MES_ANO: 'mes-ano',
+};
 
 function formatarData(isoDate) {
   if (!isoDate) return '-';
@@ -211,6 +215,29 @@ function listarMesesNoPeriodo(dataInicial, dataFinal) {
   return itens;
 }
 
+function toAnoMesTexto(ano, mes) {
+  if (!ano || !mes) return '';
+  return `${String(mes).padStart(2, '0')}/${ano}`;
+}
+
+function converterMesAnoParaPeriodo({ mesInicial, anoInicial, mesFinal, anoFinal }) {
+  if (!mesInicial || !anoInicial || !mesFinal || !anoFinal) {
+    return { dataInicial: '', dataFinal: '', valido: false, descricaoSelecao: '' };
+  }
+
+  const primeiroDia = `${anoInicial}-${String(mesInicial).padStart(2, '0')}-01`;
+  const ultimoDiaMesFinal = new Date(Date.UTC(Number(anoFinal), Number(mesFinal), 0)).getUTCDate();
+  const ultimoDia = `${anoFinal}-${String(mesFinal).padStart(2, '0')}-${String(ultimoDiaMesFinal).padStart(2, '0')}`;
+  const valido = primeiroDia <= ultimoDia;
+
+  return {
+    dataInicial: primeiroDia,
+    dataFinal: ultimoDia,
+    valido,
+    descricaoSelecao: `${toAnoMesTexto(anoInicial, mesInicial)} a ${toAnoMesTexto(anoFinal, mesFinal)}`,
+  };
+}
+
 function agruparHistoricoPorAnoMes(eventos, dataInicial, dataFinal) {
   const meses = listarMesesNoPeriodo(dataInicial, dataFinal);
   const agrupadoPorAno = new Map();
@@ -326,8 +353,13 @@ export default function FolhaAlteracoes() {
   } = useCurrentUser();
 
   const [filtroMilitarId, setFiltroMilitarId] = useState('');
+  const [tipoPeriodo, setTipoPeriodo] = useState(TIPOS_PERIODO.DATAS_COMPLETAS);
   const [dataInicial, setDataInicial] = useState('');
   const [dataFinal, setDataFinal] = useState('');
+  const [mesInicial, setMesInicial] = useState('');
+  const [anoInicial, setAnoInicial] = useState('');
+  const [mesFinal, setMesFinal] = useState('');
+  const [anoFinal, setAnoFinal] = useState('');
   const [previa, setPrevia] = useState(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [signatarioPopoverOpen, setSignatarioPopoverOpen] = useState(false);
@@ -414,7 +446,38 @@ export default function FolhaAlteracoes() {
     }
   }, [militaresOrdenados, impressaoConfig.signatarioId]);
 
-  const periodoValido = Boolean(dataInicial && dataFinal && dataInicial <= dataFinal);
+  const anosDisponiveis = useMemo(() => {
+    const anoAtual = new Date().getUTCFullYear();
+    return Array.from({ length: 21 }, (_, index) => anoAtual - 10 + index);
+  }, []);
+
+  const periodoConvertidoMesAno = useMemo(
+    () => converterMesAnoParaPeriodo({ mesInicial, anoInicial, mesFinal, anoFinal }),
+    [mesInicial, anoInicial, mesFinal, anoFinal]
+  );
+
+  const periodoEfetivo = useMemo(() => {
+    if (tipoPeriodo === TIPOS_PERIODO.MES_ANO) {
+      return {
+        dataInicial: periodoConvertidoMesAno.dataInicial,
+        dataFinal: periodoConvertidoMesAno.dataFinal,
+        valido: periodoConvertidoMesAno.valido,
+        descricaoSelecao: periodoConvertidoMesAno.descricaoSelecao,
+        tipo: TIPOS_PERIODO.MES_ANO,
+      };
+    }
+
+    const valido = Boolean(dataInicial && dataFinal && dataInicial <= dataFinal);
+    return {
+      dataInicial,
+      dataFinal,
+      valido,
+      descricaoSelecao: '',
+      tipo: TIPOS_PERIODO.DATAS_COMPLETAS,
+    };
+  }, [tipoPeriodo, periodoConvertidoMesAno, dataInicial, dataFinal]);
+
+  const periodoValido = periodoEfetivo.valido;
 
   const { data: historicoAlteracoes = [], isLoading: loadingHistorico } = useQuery({
     queryKey: ['folha-alteracoes-historico', previa?.militar?.id, previa?.periodo?.dataInicial, previa?.periodo?.dataFinal],
@@ -550,8 +613,10 @@ export default function FolhaAlteracoes() {
     setPrevia({
       militar: militarSelecionado,
       periodo: {
-        dataInicial,
-        dataFinal,
+        dataInicial: periodoEfetivo.dataInicial,
+        dataFinal: periodoEfetivo.dataFinal,
+        tipo: periodoEfetivo.tipo,
+        descricaoSelecao: periodoEfetivo.descricaoSelecao,
       },
       geradoEm: new Date().toISOString(),
     });
@@ -872,14 +937,97 @@ export default function FolhaAlteracoes() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Data inicial</label>
-                <Input type="date" value={dataInicial} onChange={(event) => setDataInicial(event.target.value)} />
+                <label className="text-sm font-medium text-slate-700">Tipo de período</label>
+                <Select value={tipoPeriodo} onValueChange={setTipoPeriodo}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TIPOS_PERIODO.DATAS_COMPLETAS}>Datas completas</SelectItem>
+                    <SelectItem value={TIPOS_PERIODO.MES_ANO}>Mês/Ano</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Data final</label>
-                <Input type="date" value={dataFinal} onChange={(event) => setDataFinal(event.target.value)} />
-              </div>
+              {tipoPeriodo === TIPOS_PERIODO.DATAS_COMPLETAS ? (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Data inicial</label>
+                    <Input type="date" value={dataInicial} onChange={(event) => setDataInicial(event.target.value)} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Data final</label>
+                    <Input type="date" value={dataFinal} onChange={(event) => setDataFinal(event.target.value)} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Mês inicial</label>
+                    <Select value={mesInicial} onValueChange={setMesInicial}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o mês" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MESES.map((mes, index) => (
+                          <SelectItem key={mes} value={String(index + 1).padStart(2, '0')}>
+                            {mes}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Ano inicial</label>
+                    <Select value={anoInicial} onValueChange={setAnoInicial}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o ano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {anosDisponiveis.map((ano) => (
+                          <SelectItem key={`ano-inicial-${ano}`} value={String(ano)}>
+                            {ano}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Mês final</label>
+                    <Select value={mesFinal} onValueChange={setMesFinal}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o mês" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MESES.map((mes, index) => (
+                          <SelectItem key={`mes-final-${mes}`} value={String(index + 1).padStart(2, '0')}>
+                            {mes}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Ano final</label>
+                    <Select value={anoFinal} onValueChange={setAnoFinal}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o ano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {anosDisponiveis.map((ano) => (
+                          <SelectItem key={`ano-final-${ano}`} value={String(ano)}>
+                            {ano}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
 
               <div className="flex items-end">
                 <Button
@@ -893,8 +1041,18 @@ export default function FolhaAlteracoes() {
               </div>
             </div>
 
-            {!!dataInicial && !!dataFinal && dataInicial > dataFinal && (
+            {tipoPeriodo === TIPOS_PERIODO.DATAS_COMPLETAS && !!dataInicial && !!dataFinal && dataInicial > dataFinal && (
               <p className="text-sm text-red-600">A data inicial não pode ser maior que a data final.</p>
+            )}
+
+            {tipoPeriodo === TIPOS_PERIODO.MES_ANO && !!mesInicial && !!anoInicial && !!mesFinal && !!anoFinal && !periodoConvertidoMesAno.valido && (
+              <p className="text-sm text-red-600">O mês/ano inicial não pode ser maior que o mês/ano final.</p>
+            )}
+
+            {tipoPeriodo === TIPOS_PERIODO.MES_ANO && periodoConvertidoMesAno.valido && (
+              <p className="text-xs text-slate-500">
+                Período convertido automaticamente: {formatarData(periodoConvertidoMesAno.dataInicial)} a {formatarData(periodoConvertidoMesAno.dataFinal)}.
+              </p>
             )}
           </CardContent>
         </Card>
