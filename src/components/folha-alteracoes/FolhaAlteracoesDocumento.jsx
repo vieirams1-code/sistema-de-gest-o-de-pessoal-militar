@@ -33,6 +33,7 @@ export default function FolhaAlteracoesDocumento({
 
   let contadorEventos = 0;
   const isPrint = variant === 'print';
+  const localAssinatura = String(impressaoConfig?.localAssinatura || '').trim() || localFechamento;
 
   return (
     <article
@@ -106,14 +107,18 @@ export default function FolhaAlteracoesDocumento({
 
       <footer className="mt-8 text-[11pt]">
         <p className="text-right">
-          {valorComFallback(localFechamento)}, {valorComFallback(dataFechamento)}.
+          {valorComFallback(localAssinatura)}, {valorComFallback(dataFechamento)}.
         </p>
 
-        <div className="mt-16 ml-auto w-[75mm] text-center">
-          <div className="border-t border-black pt-1">
-            <p className="font-semibold uppercase">{valorComFallback(impressaoConfig?.signatarioLinha1, '')}</p>
-            <p className="font-semibold uppercase">{valorComFallback(impressaoConfig?.signatarioLinha2, '')}</p>
-            <p className="font-semibold">{valorComFallback(impressaoConfig?.cargoFuncao, 'ASSINATURA')}</p>
+        <div className="mt-16 ml-auto w-[88mm] max-w-full text-center">
+          <div className="border-t border-black px-2 pt-1">
+            <p className="font-semibold uppercase leading-tight whitespace-nowrap text-[10.5pt]">
+              {valorComFallback(impressaoConfig?.signatarioLinha1, '')}
+            </p>
+            <p className="font-semibold uppercase leading-tight text-[10.5pt]">
+              {valorComFallback(impressaoConfig?.signatarioLinha2, '')}
+            </p>
+            <p className="font-semibold leading-tight text-[10.5pt]">{valorComFallback(impressaoConfig?.cargoFuncao, 'ASSINATURA')}</p>
           </div>
         </div>
       </footer>
