@@ -25,7 +25,7 @@ export default function FolhaAlteracoesDocumento({
   loadingHistorico,
   localFechamento,
   dataFechamento,
-  configFolha,
+  impressaoConfig,
   variant = 'screen',
   formatarData,
 }) {
@@ -42,11 +42,12 @@ export default function FolhaAlteracoesDocumento({
       ].join(' ')}
     >
       <header className="text-center">
-        <p className="text-[11pt] font-semibold uppercase tracking-wide">{valorComFallback(configFolha?.cabecalho_linha_1, 'ESTADO DE MATO GROSSO DO SUL')}</p>
-        <p className="text-[11pt] font-semibold uppercase tracking-wide">{valorComFallback(configFolha?.cabecalho_linha_2, 'CORPO DE BOMBEIROS MILITAR')}</p>
-        <p className="text-[10.5pt] uppercase tracking-wide">{valorComFallback(configFolha?.cabecalho_linha_3, obterObm(previa.militar))}</p>
+        <p className="text-[11pt] font-semibold uppercase tracking-wide">ESTADO DE MATO GROSSO DO SUL</p>
+        <p className="text-[11pt] font-semibold uppercase tracking-wide">CORPO DE BOMBEIROS MILITAR</p>
+        <p className="text-[10.5pt] uppercase tracking-wide">{valorComFallback(impressaoConfig?.cabecalhoLinha3, obterObm(previa.militar))}</p>
+        <p className="text-[10.5pt] uppercase tracking-wide">{valorComFallback(impressaoConfig?.cabecalhoLinha4)}</p>
         <div className="my-2 border-t border-black" />
-        <h1 className="text-[14pt] font-bold uppercase">{valorComFallback(configFolha?.titulo_documento, 'FOLHA DE ALTERAÇÕES')}</h1>
+        <h1 className="text-[14pt] font-bold uppercase">FOLHA DE ALTERAÇÕES</h1>
       </header>
 
       <section className="mt-4 border border-black p-3 text-[10.5pt]">
@@ -105,14 +106,13 @@ export default function FolhaAlteracoesDocumento({
 
       <footer className="mt-8 text-[11pt]">
         <p className="text-right">
-          {valorComFallback(configFolha?.local_padrao, localFechamento)}, {valorComFallback(configFolha?.texto_data_final, dataFechamento)}.
+          {valorComFallback(localFechamento)}, {valorComFallback(dataFechamento)}.
         </p>
 
         <div className="mt-16 ml-auto w-[75mm] text-center">
           <div className="border-t border-black pt-1">
-            <p className="font-semibold uppercase">{valorComFallback(configFolha?.cargo_autoridade, 'Assinatura')}</p>
-            <p className="font-semibold uppercase">{configFolha?.nome_autoridade || ''}</p>
-            <p>{configFolha?.texto_complementar || ''}</p>
+            <p className="font-semibold uppercase">{valorComFallback(impressaoConfig?.cargoFuncao, 'ASSINATURA')}</p>
+            <p className="font-semibold uppercase">{valorComFallback(impressaoConfig?.signatarioNome, '')}</p>
           </div>
         </div>
       </footer>

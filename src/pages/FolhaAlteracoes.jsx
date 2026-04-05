@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -7,8 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
-import { FileSpreadsheet, Printer } from 'lucide-react';
+import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const MESES = [
   'JANEIRO',
@@ -200,58 +205,36 @@ function getEntitySafe(entityName) {
   return base44?.entities?.[entityName] || null;
 }
 
-function normalizarEscopo(value) {
-  const escopo = String(value || 'GLOBAL').trim().toUpperCase();
-  if (escopo === 'SETOR' || escopo === 'SUBSETOR' || escopo === 'UNIDADE') return escopo;
-  return 'GLOBAL';
+function getStorageKey(user) {
+  const identificador = user?.id || user?.email || 'anonimo';
+  return `sgp:folha-alteracoes:impressao:${identificador}`;
 }
 
-function resolveContextoMilitar(militar, estruturaById) {
-  const setorId = String(militar?.grupamento_id || '').trim();
-  const subgrupamentoId = String(militar?.subgrupamento_id || '').trim();
-  const subgrupo = estruturaById.get(subgrupamentoId);
-
-  const isUnidade = String(subgrupo?.tipo || '').toLowerCase() === 'unidade';
-  const unidadeId = isUnidade ? subgrupamentoId : '';
-  const subsetorId = isUnidade ? String(subgrupo?.grupamento_id || '').trim() : subgrupamentoId;
-
+function getDefaultImpressaoConfig() {
   return {
-    setor_id: setorId,
-    subsetor_id: subsetorId,
-    unidade_id: unidadeId,
+    cabecalhoLinha3: '',
+    cabecalhoLinha4: '',
+    signatarioId: '',
+    cargoFuncao: '',
   };
 }
 
-function matchConfigEscopo(config, escopo, contexto) {
-  const setorId = String(config?.setor_id || '').trim();
-  const subsetorId = String(config?.subsetor_id || '').trim();
-  const unidadeId = String(config?.unidade_id || '').trim();
+function carregarConfigImpressao(user) {
+  if (typeof window === 'undefined') return getDefaultImpressaoConfig();
 
-  if (escopo === 'GLOBAL') return true;
-  if (escopo === 'SETOR') return Boolean(contexto.setor_id && setorId === contexto.setor_id);
-  if (escopo === 'SUBSETOR') return Boolean(contexto.setor_id && contexto.subsetor_id && setorId === contexto.setor_id && subsetorId === contexto.subsetor_id);
-  if (escopo === 'UNIDADE') return Boolean(
-    contexto.setor_id &&
-    contexto.subsetor_id &&
-    contexto.unidade_id &&
-    setorId === contexto.setor_id &&
-    subsetorId === contexto.subsetor_id &&
-    unidadeId === contexto.unidade_id
-  );
-
-  return false;
-}
-
-function resolveConfigFolha(configs = [], contexto = {}) {
-  const ordem = ['UNIDADE', 'SUBSETOR', 'SETOR', 'GLOBAL'];
-  const ativos = configs.filter((item) => item?.ativo !== false);
-
-  for (const escopo of ordem) {
-    const match = ativos.find((item) => normalizarEscopo(item.escopo) === escopo && matchConfigEscopo(item, escopo, contexto));
-    if (match) return match;
+  try {
+    const bruto = window.localStorage.getItem(getStorageKey(user));
+    if (!bruto) return getDefaultImpressaoConfig();
+    const parsed = JSON.parse(bruto);
+    return {
+      cabecalhoLinha3: String(parsed?.cabecalhoLinha3 || ''),
+      cabecalhoLinha4: String(parsed?.cabecalhoLinha4 || ''),
+      signatarioId: String(parsed?.signatarioId || ''),
+      cargoFuncao: String(parsed?.cargoFuncao || ''),
+    };
+  } catch (error) {
+    return getDefaultImpressaoConfig();
   }
-
-  return null;
 }
 
 async function listarPorMilitar(entityName, militarId, sort) {
@@ -288,6 +271,7 @@ async function listarPorMilitar(entityName, militarId, sort) {
 
 export default function FolhaAlteracoes() {
   const {
+    user,
     isAdmin,
     subgrupamentoId,
     subgrupamentoTipo,
@@ -306,6 +290,10 @@ export default function FolhaAlteracoes() {
   const [dataInicial, setDataInicial] = useState('');
   const [dataFinal, setDataFinal] = useState('');
   const [previa, setPrevia] = useState(null);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [signatarioPopoverOpen, setSignatarioPopoverOpen] = useState(false);
+  const [buscaSignatario, setBuscaSignatario] = useState('');
+  const [impressaoConfig, setImpressaoConfig] = useState(getDefaultImpressaoConfig());
 
   const { data: militares = [], isLoading: loadingMilitares } = useQuery({
     queryKey: ['folha-alteracoes-militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
@@ -368,6 +356,24 @@ export default function FolhaAlteracoes() {
     () => militaresOrdenados.find((militar) => militar.id === filtroMilitarId) || null,
     [militaresOrdenados, filtroMilitarId]
   );
+
+  useEffect(() => {
+    if (!user?.id && !user?.email) return;
+    setImpressaoConfig(carregarConfigImpressao(user));
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    if (!user?.id && !user?.email) return;
+    window.localStorage.setItem(getStorageKey(user), JSON.stringify(impressaoConfig));
+  }, [impressaoConfig, user?.id, user?.email]);
+
+  useEffect(() => {
+    if (!impressaoConfig.signatarioId) return;
+    const signatarioExiste = militaresOrdenados.some((item) => item.id === impressaoConfig.signatarioId);
+    if (!signatarioExiste) {
+      setImpressaoConfig((prev) => ({ ...prev, signatarioId: '' }));
+    }
+  }, [militaresOrdenados, impressaoConfig.signatarioId]);
 
   const periodoValido = Boolean(dataInicial && dataFinal && dataInicial <= dataFinal);
 
@@ -487,25 +493,6 @@ export default function FolhaAlteracoes() {
     return agruparHistoricoPorAnoMes(historicoAlteracoes, previa.periodo.dataInicial, previa.periodo.dataFinal);
   }, [historicoAlteracoes, previa]);
 
-  const { data: configuracoesFolha = [] } = useQuery({
-    queryKey: ['folha-alteracoes-config-impressao'],
-    queryFn: () => base44.entities.FolhaAlteracoesConfig.list('-created_date'),
-    enabled: isAccessResolved,
-  });
-
-  const { data: estruturaOrganizacional = [] } = useQuery({
-    queryKey: ['folha-alteracoes-estrutura-impressao'],
-    queryFn: () => base44.entities.Subgrupamento.list(),
-    enabled: isAccessResolved,
-  });
-
-  const configFolhaSelecionada = useMemo(() => {
-    if (!previa?.militar) return null;
-    const estruturaById = new Map((estruturaOrganizacional || []).map((item) => [item.id, item]));
-    const contexto = resolveContextoMilitar(previa.militar, estruturaById);
-    return resolveConfigFolha(configuracoesFolha, contexto);
-  }, [previa, estruturaOrganizacional, configuracoesFolha]);
-
   const handleGerarPrevia = () => {
     if (!militarSelecionado || !periodoValido) return;
 
@@ -529,6 +516,22 @@ export default function FolhaAlteracoes() {
 
   const localFechamento = obterLocalFechamento(previa?.militar);
   const dataFechamento = formatarDataExtensa(previa?.periodo?.dataFinal || previa?.geradoEm);
+  const signatarioSelecionado = useMemo(
+    () => militaresOrdenados.find((militar) => militar.id === impressaoConfig.signatarioId) || null,
+    [militaresOrdenados, impressaoConfig.signatarioId]
+  );
+  const signatarioNome = signatarioSelecionado
+    ? `${signatarioSelecionado.posto_graduacao ? `${signatarioSelecionado.posto_graduacao} ` : ''}${signatarioSelecionado.nome_completo || signatarioSelecionado.nome_guerra || ''}`.trim()
+    : '';
+  const militaresSignatariosFiltrados = useMemo(() => {
+    const termo = buscaSignatario.trim().toLowerCase();
+    if (!termo) return militaresOrdenados;
+    return militaresOrdenados.filter((militar) => (
+      String(militar.nome_completo || '').toLowerCase().includes(termo) ||
+      String(militar.nome_guerra || '').toLowerCase().includes(termo) ||
+      String(militar.matricula || '').toLowerCase().includes(termo)
+    ));
+  }, [buscaSignatario, militaresOrdenados]);
 
   if (!loadingUser && isAccessResolved && !canAccessModule('militares')) {
     return <AccessDenied modulo="Efetivo" />;
@@ -665,10 +668,116 @@ export default function FolhaAlteracoes() {
               Geração e impressão da folha de alterações do militar (versão inicial de prévia em tela).
             </p>
           </div>
-          <div className="hidden md:flex h-12 w-12 items-center justify-center rounded-xl bg-[#1e3a5f]/10 text-[#1e3a5f]">
-            <FileSpreadsheet className="w-6 h-6" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="border-slate-300" onClick={() => setConfigOpen(true)}>
+              <Settings2 className="w-4 h-4 mr-2" />
+              Configurar impressão
+            </Button>
+            <div className="hidden md:flex h-12 w-12 items-center justify-center rounded-xl bg-[#1e3a5f]/10 text-[#1e3a5f]">
+              <FileSpreadsheet className="w-6 h-6" />
+            </div>
           </div>
         </div>
+
+        <Sheet open={configOpen} onOpenChange={setConfigOpen}>
+          <SheetContent side="right" className="sm:max-w-xl w-full overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Configuração da impressão</SheetTitle>
+              <SheetDescription>
+                Esses dados ficam salvos localmente para o usuário logado e podem ser alterados a qualquer momento.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-6 space-y-5">
+              <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+                <h3 className="font-semibold text-slate-800">Cabeçalho</h3>
+                <div className="space-y-1">
+                  <Label>Linha 1 (fixa)</Label>
+                  <Input value="ESTADO DE MATO GROSSO DO SUL" disabled />
+                </div>
+                <div className="space-y-1">
+                  <Label>Linha 2 (fixa)</Label>
+                  <Input value="CORPO DE BOMBEIROS MILITAR" disabled />
+                </div>
+                <div className="space-y-1">
+                  <Label>Linha 3 (editável)</Label>
+                  <Input
+                    value={impressaoConfig.cabecalhoLinha3}
+                    onChange={(event) => setImpressaoConfig((prev) => ({ ...prev, cabecalhoLinha3: event.target.value }))}
+                    placeholder="Ex.: COMANDO DE ÁREA..."
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Linha 4 (editável)</Label>
+                  <Input
+                    value={impressaoConfig.cabecalhoLinha4}
+                    onChange={(event) => setImpressaoConfig((prev) => ({ ...prev, cabecalhoLinha4: event.target.value }))}
+                    placeholder="Ex.: SUBUNIDADE / SEÇÃO..."
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+                <h3 className="font-semibold text-slate-800">Assinatura</h3>
+
+                <div className="space-y-2">
+                  <Label>Militar signatário</Label>
+                  <Popover open={signatarioPopoverOpen} onOpenChange={setSignatarioPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="w-full justify-between">
+                        <span className="truncate">
+                          {signatarioNome || 'Selecione um militar'}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[360px] p-0" align="start">
+                      <Command>
+                        <CommandInput
+                          placeholder="Buscar por nome, guerra ou matrícula..."
+                          value={buscaSignatario}
+                          onValueChange={setBuscaSignatario}
+                        />
+                        <CommandEmpty>Nenhum militar encontrado.</CommandEmpty>
+                        <CommandGroup className="max-h-72 overflow-auto">
+                          {militaresSignatariosFiltrados.map((militar) => {
+                            const nome = `${militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}${militar.nome_completo || militar.nome_guerra || ''}`.trim();
+                            return (
+                              <CommandItem
+                                key={militar.id}
+                                value={`${nome} ${militar.matricula || ''}`}
+                                onSelect={() => {
+                                  setImpressaoConfig((prev) => ({ ...prev, signatarioId: militar.id }));
+                                  setSignatarioPopoverOpen(false);
+                                  setBuscaSignatario('');
+                                }}
+                              >
+                                <Check className={cn('mr-2 h-4 w-4', impressaoConfig.signatarioId === militar.id ? 'opacity-100' : 'opacity-0')} />
+                                <span className="truncate">{nome}{militar.matricula ? ` • Mat ${militar.matricula}` : ''}</span>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Cargo/Função do signatário</Label>
+                  <Input
+                    value={impressaoConfig.cargoFuncao}
+                    onChange={(event) => setImpressaoConfig((prev) => ({ ...prev, cargoFuncao: event.target.value }))}
+                    placeholder="Ex.: Comandante do 2º SGBM"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-500">
+                Persistência: localStorage do navegador, isolado por usuário logado.
+              </p>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         <Card className="no-print shadow-sm border-slate-200">
           <CardHeader>
@@ -753,7 +862,10 @@ export default function FolhaAlteracoes() {
                 loadingHistorico={loadingHistorico}
                 localFechamento={localFechamento}
                 dataFechamento={dataFechamento}
-                configFolha={configFolhaSelecionada}
+                impressaoConfig={{
+                  ...impressaoConfig,
+                  signatarioNome,
+                }}
                 formatarData={formatarData}
                 variant="screen"
               />
@@ -769,7 +881,10 @@ export default function FolhaAlteracoes() {
               loadingHistorico={loadingHistorico}
               localFechamento={localFechamento}
               dataFechamento={dataFechamento}
-              configFolha={configFolhaSelecionada}
+              impressaoConfig={{
+                ...impressaoConfig,
+                signatarioNome,
+              }}
               formatarData={formatarData}
               variant="print"
             />
