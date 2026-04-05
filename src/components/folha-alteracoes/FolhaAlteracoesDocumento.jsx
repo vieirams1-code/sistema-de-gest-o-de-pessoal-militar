@@ -102,7 +102,12 @@ export default function FolhaAlteracoesDocumento({
                           className="grid grid-cols-[auto,1fr] gap-x-2 leading-[1.5]"
                         >
                           <span className="font-semibold">({contadorEventos})</span>
-                          <p className="m-0 text-justify [text-justify:inter-word] whitespace-pre-line">{evento.texto}</p>
+                          <div>
+                            <p className="m-0 text-justify [text-justify:inter-word] whitespace-pre-line">{evento.texto}</p>
+                            {evento.referenciaBoletim && (
+                              <p className="mt-0.5 text-[10pt] text-slate-700">{evento.referenciaBoletim}</p>
+                            )}
+                          </div>
                         </li>
                       );
                     })}

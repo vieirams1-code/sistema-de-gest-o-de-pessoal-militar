@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
+import { STATUS_PUBLICACAO, calcularStatusPublicacaoRegistro, normalizarStatusPublicacao } from '@/components/publicacao/publicacaoStateMachine';
 import { montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
 import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -145,6 +146,41 @@ function normalizarDataISO(value) {
   const mes = String(dateObj.getMonth() + 1).padStart(2, '0');
   const dia = String(dateObj.getDate()).padStart(2, '0');
   return `${ano}-${mes}-${dia}`;
+}
+
+function toText(value) {
+  return String(value || '').trim();
+}
+
+function extrairDadosBg(item = {}) {
+  const numero = toText(item?.numero_bg || item?.boletim_numero);
+  const data = normalizarDataISO(item?.data_bg || item?.boletim_data);
+  return {
+    numero,
+    data,
+    completo: Boolean(numero && data),
+  };
+}
+
+function statusPublicado(item = {}) {
+  const statusInformado =
+    normalizarStatusPublicacao(item?.status_calculado) ||
+    normalizarStatusPublicacao(item?.status_publicacao) ||
+    normalizarStatusPublicacao(item?.status);
+
+  const statusResolvido = statusInformado || calcularStatusPublicacaoRegistro(item);
+  return statusResolvido === STATUS_PUBLICACAO.PUBLICADO;
+}
+
+function registroPublicadoEmBg(item = {}) {
+  const bg = extrairDadosBg(item);
+  return statusPublicado(item) && bg.completo;
+}
+
+function montarReferenciaBoletim(item = {}) {
+  const bg = extrairDadosBg(item);
+  if (!bg.completo) return '';
+  return `Boletim ${bg.numero}, de ${formatarData(bg.data)}`;
 }
 
 function listarMesesNoPeriodo(dataInicial, dataFinal) {
@@ -403,6 +439,8 @@ export default function FolhaAlteracoes() {
 
       const eventosFerias = ferias
         .map((item) => {
+          if (!registroPublicadoEmBg(item)) return null;
+
           const dataEvento = normalizarDataISO(item.data_inicio || item.created_date);
           if (!filtrarPorPeriodo(dataEvento)) return null;
 
@@ -414,6 +452,7 @@ export default function FolhaAlteracoes() {
             data: dataEvento,
             tipo: 'Férias',
             texto: textoOficial || montarTextoAdministrativo({ tipo: 'Férias', dataEvento, item }),
+            referenciaBoletim: montarReferenciaBoletim(item),
             descricao: `${item.dias || 0} dia(s) de férias${periodoRef}${fracao}`,
             origem: 'Ferias',
           };
@@ -422,6 +461,8 @@ export default function FolhaAlteracoes() {
 
       const eventosAtestados = atestados
         .map((item) => {
+          if (!registroPublicadoEmBg(item)) return null;
+
           const dataEvento = normalizarDataISO(item.data_inicio || item.created_date);
           if (!filtrarPorPeriodo(dataEvento)) return null;
 
@@ -434,6 +475,7 @@ export default function FolhaAlteracoes() {
             data: dataEvento,
             tipo: 'Atestado',
             texto: textoOficial || montarTextoAdministrativo({ tipo: 'Atestado', dataEvento, item }),
+            referenciaBoletim: montarReferenciaBoletim(item),
             descricao: `${tipoAfastamento}${dias}${cid}`,
             origem: 'Atestado',
           };
@@ -442,6 +484,8 @@ export default function FolhaAlteracoes() {
 
       const eventosPublicacoes = publicacoes
         .map((item) => {
+          if (!registroPublicadoEmBg(item)) return null;
+
           const dataEvento = normalizarDataISO(
             item.data_publicacao ||
             item.data_registro ||
@@ -460,6 +504,7 @@ export default function FolhaAlteracoes() {
             data: dataEvento,
             tipo: 'Publicação',
             texto: textoOficial || montarTextoAdministrativo({ tipo: 'Publicação', dataEvento, item }),
+            referenciaBoletim: montarReferenciaBoletim(item),
             descricao: `${tipoPublicacao}${numeroBg}`,
             origem: 'PublicacaoExOfficio',
           };
@@ -468,6 +513,8 @@ export default function FolhaAlteracoes() {
 
       const eventosPunicoes = (punicoes || [])
         .map((item) => {
+          if (!registroPublicadoEmBg(item)) return null;
+
           const dataEvento = normalizarDataISO(item.data_punicao || item.data_inicio_cumprimento || item.boletim_data || item.created_date);
           if (!filtrarPorPeriodo(dataEvento)) return null;
 
@@ -480,6 +527,7 @@ export default function FolhaAlteracoes() {
             data: dataEvento,
             tipo: 'Punição',
             texto: textoOficial || montarTextoAdministrativo({ tipo: 'Punição', dataEvento, item }),
+            referenciaBoletim: montarReferenciaBoletim(item),
             descricao: `${tipoPunicao}${dias}${status}`,
             origem: 'PunicaoDisciplinar',
           };
