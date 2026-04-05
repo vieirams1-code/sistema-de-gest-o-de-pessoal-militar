@@ -30,6 +30,43 @@ const MESES = [
   'DEZEMBRO',
 ];
 
+const ABREVIACOES_POSTO_GRADUACAO = {
+  CORONEL: 'CEL',
+  'TENENTE CORONEL': 'TC',
+  MAJOR: 'MAJ',
+  'CAPITÃO': 'CAP',
+  CAPITAO: 'CAP',
+  '1º TENENTE': '1º TEN',
+  '1° TENENTE': '1º TEN',
+  '1O TENENTE': '1º TEN',
+  '2º TENENTE': '2º TEN',
+  '2° TENENTE': '2º TEN',
+  '2O TENENTE': '2º TEN',
+  ASPIRANTE: 'ASP',
+  SUBTENENTE: 'ST',
+  '1º SARGENTO': '1º SGT',
+  '1° SARGENTO': '1º SGT',
+  '1O SARGENTO': '1º SGT',
+  '2º SARGENTO': '2º SGT',
+  '2° SARGENTO': '2º SGT',
+  '2O SARGENTO': '2º SGT',
+  '3º SARGENTO': '3º SGT',
+  '3° SARGENTO': '3º SGT',
+  '3O SARGENTO': '3º SGT',
+  CABO: 'CB',
+  SOLDADO: 'SD',
+};
+
+function abreviarPostoGraduacao(postoGraduacao) {
+  const valor = String(postoGraduacao || '').trim();
+  if (!valor) return '';
+  const chave = valor
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toUpperCase();
+  return ABREVIACOES_POSTO_GRADUACAO[chave] || valor.toUpperCase();
+}
+
 function formatarData(isoDate) {
   if (!isoDate) return '-';
   const [ano, mes, dia] = String(isoDate).split('-');
@@ -216,6 +253,7 @@ function getDefaultImpressaoConfig() {
     cabecalhoLinha4: '',
     signatarioId: '',
     cargoFuncao: '',
+    localAssinatura: '',
   };
 }
 
@@ -231,6 +269,7 @@ function carregarConfigImpressao(user) {
       cabecalhoLinha4: String(parsed?.cabecalhoLinha4 || ''),
       signatarioId: String(parsed?.signatarioId || ''),
       cargoFuncao: String(parsed?.cargoFuncao || ''),
+      localAssinatura: String(parsed?.localAssinatura || ''),
     };
   } catch (error) {
     return getDefaultImpressaoConfig();
@@ -529,7 +568,7 @@ export default function FolhaAlteracoes() {
   const signatarioLinha1 = signatarioSelecionado
     ? [
       signatarioNome,
-      [signatarioSelecionado.posto_graduacao, signatarioSelecionado.quadro].filter(Boolean).join(' ').trim(),
+      [abreviarPostoGraduacao(signatarioSelecionado.posto_graduacao), signatarioSelecionado.quadro].filter(Boolean).join(' ').trim(),
     ].filter(Boolean).join(' - ')
     : '';
   const signatarioLinha2 = signatarioSelecionado?.matricula
@@ -780,6 +819,15 @@ export default function FolhaAlteracoes() {
                     value={impressaoConfig.cargoFuncao}
                     onChange={(event) => setImpressaoConfig((prev) => ({ ...prev, cargoFuncao: event.target.value }))}
                     placeholder="Ex.: Comandante do 2º SGBM"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Local da assinatura</Label>
+                  <Input
+                    value={impressaoConfig.localAssinatura}
+                    onChange={(event) => setImpressaoConfig((prev) => ({ ...prev, localAssinatura: event.target.value }))}
+                    placeholder="Ex.: Campo Grande-MS"
                   />
                 </div>
               </div>
