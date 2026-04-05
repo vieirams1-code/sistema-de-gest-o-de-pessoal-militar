@@ -17,6 +17,7 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import { filterQuadrosMilitares } from '@/services/quadroMilitarEntityService';
 import {
   CATEGORIA_QUADRO_OFICIAL,
   classificarPostoGraduacao,
@@ -136,7 +137,7 @@ export default function CadastrarMilitar() {
 
   const { data: quadrosMilitares = [] } = useQuery({
     queryKey: ['quadros-militares', 'ativo'],
-    queryFn: () => base44.entities.QuadroMilitar.filter({ ativo: true }, 'nome'),
+    queryFn: () => filterQuadrosMilitares({ ativo: true }, 'nome'),
     enabled: isAccessResolved && hasMilitaresAccess,
   });
 
