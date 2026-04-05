@@ -111,8 +111,9 @@ export default function FolhaAlteracoesDocumento({
 
         <div className="mt-16 ml-auto w-[75mm] text-center">
           <div className="border-t border-black pt-1">
-            <p className="font-semibold uppercase">{valorComFallback(impressaoConfig?.cargoFuncao, 'ASSINATURA')}</p>
-            <p className="font-semibold uppercase">{valorComFallback(impressaoConfig?.signatarioNome, '')}</p>
+            <p className="font-semibold uppercase">{valorComFallback(impressaoConfig?.signatarioLinha1, '')}</p>
+            <p className="font-semibold uppercase">{valorComFallback(impressaoConfig?.signatarioLinha2, '')}</p>
+            <p className="font-semibold">{valorComFallback(impressaoConfig?.cargoFuncao, 'ASSINATURA')}</p>
           </div>
         </div>
       </footer>
