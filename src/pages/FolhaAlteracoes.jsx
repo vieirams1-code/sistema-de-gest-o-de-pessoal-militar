@@ -99,6 +99,22 @@ function formatarDataExtensa(isoDate) {
   });
 }
 
+function obterLocalFechamento(militar) {
+  const cidade = String(
+    militar?.cidade ||
+    militar?.municipio ||
+    militar?.naturalidade ||
+    militar?.cidade_lotacao ||
+    ''
+  ).trim();
+  const uf = String(militar?.uf || militar?.estado || militar?.naturalidade_uf || '').trim();
+
+  if (cidade && uf) return `${cidade}/${uf}`;
+  if (cidade) return cidade;
+  if (uf) return uf;
+  return 'Local não informado';
+}
+
 function getTextoOficialRegistro(item) {
   const camposPreferenciais = [
     'texto_publicacao',
@@ -492,6 +508,9 @@ export default function FolhaAlteracoes() {
     window.print();
   };
 
+  const localFechamento = obterLocalFechamento(previa?.militar);
+  const dataFechamento = formatarDataExtensa(previa?.periodo?.dataFinal || previa?.geradoEm);
+
   if (!loadingUser && isAccessResolved && !canAccessModule('militares')) {
     return <AccessDenied modulo="Efetivo" />;
   }
@@ -581,6 +600,33 @@ export default function FolhaAlteracoes() {
           .print-only-document .doc-month {
             break-inside: avoid-page;
             margin-bottom: 2mm !important;
+          }
+
+          .print-only-document .doc-event-list {
+            list-style: none !important;
+            margin: 1mm 0 0 0 !important;
+            padding: 0 !important;
+          }
+
+          .print-only-document .doc-event-item {
+            display: grid !important;
+            grid-template-columns: auto 1fr !important;
+            column-gap: 1.5mm !important;
+            align-items: start !important;
+            margin-top: 1.5mm !important;
+            line-height: 1.45 !important;
+          }
+
+          .print-only-document .doc-event-marker {
+            font-weight: 700 !important;
+            white-space: nowrap !important;
+          }
+
+          .print-only-document .doc-event-body {
+            text-align: justify !important;
+            text-justify: inter-word !important;
+            white-space: pre-line !important;
+            margin: 0 !important;
           }
 
           .screen-preview,
@@ -779,9 +825,14 @@ export default function FolhaAlteracoes() {
                               ) : (
                                 <ol className="space-y-2">
                                   {mes.eventos.map((evento, index) => (
-                                    <li key={`${evento.origem}-${evento.data}-${index}`} className="text-sm text-slate-800 leading-relaxed">
-                                      <span className="font-semibold">({index + 1}) </span>
-                                      <span>{evento.texto}</span>
+                                    <li
+                                      key={`${evento.origem}-${evento.data}-${index}`}
+                                      className="grid grid-cols-[auto,1fr] gap-x-2 text-sm text-slate-800 leading-[1.65]"
+                                    >
+                                      <span className="font-semibold whitespace-nowrap">({index + 1})</span>
+                                      <p className="text-justify [text-justify:inter-word] whitespace-pre-line m-0">
+                                        {evento.texto}
+                                      </p>
                                     </li>
                                   ))}
                                 </ol>
@@ -802,6 +853,18 @@ export default function FolhaAlteracoes() {
                 <p className="text-xs text-amber-700 mt-1">
                   Estrutura preparada para ampliar outras fontes sem alterar o layout do histórico.
                 </p>
+              </div>
+
+              <div className="print-sheet print-section rounded-xl border border-slate-300 bg-white p-4 md:p-5">
+                <div className="text-sm text-slate-700 text-right">
+                  <p>{localFechamento}, {dataFechamento}.</p>
+                </div>
+                <div className="mt-10 max-w-md ml-auto text-center text-sm text-slate-700">
+                  <div className="border-t border-slate-500 pt-2">
+                    <p className="font-medium">Assinatura da autoridade competente</p>
+                    <p className="text-xs text-slate-500 mt-1">(Nome completo / posto ou graduação)</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -859,9 +922,12 @@ export default function FolhaAlteracoes() {
                           {mes.eventos.length === 0 ? (
                             <p className="italic">Sem alteração.</p>
                           ) : (
-                            <ol className="list-decimal ml-5">
+                            <ol className="doc-event-list">
                               {mes.eventos.map((evento, index) => (
-                                <li key={`${evento.origem}-${evento.data}-${index}`}>{evento.texto}</li>
+                                <li key={`${evento.origem}-${evento.data}-${index}`} className="doc-event-item">
+                                  <span className="doc-event-marker">({index + 1})</span>
+                                  <p className="doc-event-body">{evento.texto}</p>
+                                </li>
                               ))}
                             </ol>
                           )}
@@ -871,6 +937,18 @@ export default function FolhaAlteracoes() {
                   ))}
                 </div>
               )}
+            </article>
+
+            <article className="doc-sheet mt-2">
+              <div className="text-right">
+                <p>{localFechamento}, {dataFechamento}.</p>
+              </div>
+              <div className="mt-16 w-[72mm] ml-auto text-center">
+                <div className="border-t border-black pt-1">
+                  <p>Assinatura da autoridade competente</p>
+                  <p className="text-[9.5pt]">(Nome completo / posto ou graduação)</p>
+                </div>
+              </div>
             </article>
           </section>
         )}
