@@ -1,4 +1,5 @@
 import React from 'react';
+import { classificarPostoGraduacao } from '@/utils/postoQuadroCompatibilidade';
 
 function valorComFallback(valor, fallback = 'Não informado') {
   if (valor === null || valor === undefined) return fallback;
@@ -38,6 +39,8 @@ export default function FolhaAlteracoesDocumento({
   const cabecalhoAssinatura = localAssinatura
     ? `${localAssinatura}, ${dataAssinatura}.`
     : `${dataAssinatura}.`;
+  const classificacaoMilitar = classificarPostoGraduacao(previa?.militar?.posto_graduacao);
+  const exibirComportamento = classificacaoMilitar === 'praca';
 
   return (
     <article
@@ -66,7 +69,9 @@ export default function FolhaAlteracoesDocumento({
           <p>
             <strong>Período da folha:</strong> {formatarData(previa.periodo.dataInicial)} a {formatarData(previa.periodo.dataFinal)}
           </p>
-          <p><strong>Comportamento:</strong> {valorComFallback(previa.militar.comportamento, 'Sem alteração')}</p>
+          {exibirComportamento && (
+            <p><strong>Comportamento:</strong> {valorComFallback(previa.militar.comportamento, 'Sem alteração')}</p>
+          )}
         </div>
       </section>
 
