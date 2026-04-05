@@ -31,6 +31,61 @@ function formatarData(isoDate) {
   return `${dia}/${mes}/${ano}`;
 }
 
+function formatarDataOuNaoInformado(isoDate) {
+  return isoDate ? formatarData(isoDate) : 'Não informado';
+}
+
+function valorComFallback(valor, fallback = 'Não informado') {
+  if (valor === null || valor === undefined) return fallback;
+  const texto = String(valor).trim();
+  return texto ? texto : fallback;
+}
+
+function montarNaturalidade(militar) {
+  const cidade = String(militar?.naturalidade || '').trim();
+  const uf = String(militar?.naturalidade_uf || '').trim();
+  if (cidade && uf) return `${cidade}/${uf}`;
+  if (cidade) return cidade;
+  if (uf) return uf;
+  return 'Não informado';
+}
+
+function montarIdentidade(militar) {
+  const rg = String(militar?.rg || '').trim();
+  const orgao = String(militar?.orgao_expedidor_rg || '').trim();
+  if (rg && orgao) return `${rg} / ${orgao}`;
+  if (rg) return rg;
+  if (orgao) return orgao;
+  return 'Não informado';
+}
+
+function montarTipoSanguineoRh(militar) {
+  const tipo = String(militar?.tipo_sanguineo || militar?.tipo_sanguineo_abo || '').trim();
+  const rh = String(militar?.fator_rh || militar?.rh || '').trim();
+
+  if (tipo && rh) return `${tipo} ${rh}`;
+  if (tipo) return tipo;
+  if (rh) return rh;
+  return 'Não informado';
+}
+
+function obterSinaisParticulares(militar) {
+  const candidatos = [
+    militar?.sinais_particulares,
+    militar?.sinal_particular,
+    militar?.outras_notas,
+    militar?.observacoes,
+    militar?.observacao,
+  ];
+
+  for (const valor of candidatos) {
+    const texto = String(valor || '').trim();
+    if (texto) return texto;
+  }
+
+  return 'Sem alteração';
+}
+
 function formatarDataExtensa(isoDate) {
   if (!isoDate) return '';
   const [ano, mes, dia] = String(isoDate).split('-').map(Number);
@@ -505,34 +560,73 @@ export default function FolhaAlteracoes() {
               <CardTitle className="text-lg text-[#1e3a5f]">Prévia da Folha de Alterações</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-slate-500">Nome</p>
-                  <p className="font-semibold text-slate-800">{previa.militar.nome_completo || '-'}</p>
+              <div className="rounded-xl border border-[#1e3a5f]/20 bg-white p-5 md:p-6 space-y-5 print:border-slate-300">
+                <div className="text-center border-b border-slate-200 pb-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Folha de Alterações</p>
+                  <p className="text-lg md:text-xl font-bold text-[#1e3a5f] mt-1">Resumo de Identificação do Militar</p>
                 </div>
-                <div>
-                  <p className="text-slate-500">Matrícula</p>
-                  <p className="font-semibold text-slate-800">{previa.militar.matricula || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Posto/Graduação</p>
-                  <p className="font-semibold text-slate-800">{previa.militar.posto_graduacao || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Quadro</p>
-                  <p className="font-semibold text-slate-800">{previa.militar.quadro || '-'}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-slate-500">Unidade/Lotação</p>
-                  <p className="font-semibold text-slate-800">
-                    {previa.militar.unidade || previa.militar.unidade_lotacao || previa.militar.lotacao || '-'}
-                  </p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-slate-500">Período selecionado</p>
-                  <p className="font-semibold text-slate-800">
-                    {formatarData(previa.periodo.dataInicial)} até {formatarData(previa.periodo.dataFinal)}
-                  </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Nome</p>
+                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.nome_completo)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Matrícula</p>
+                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.matricula)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Posto/Graduação</p>
+                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.posto_graduacao)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Quadro</p>
+                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.quadro)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Identidade / Órgão Expedidor</p>
+                    <p className="font-semibold text-slate-800">{montarIdentidade(previa.militar)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">OBM / Unidade</p>
+                    <p className="font-semibold text-slate-800">
+                      {valorComFallback(previa.militar.unidade || previa.militar.unidade_lotacao || previa.militar.lotacao)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Período da Folha</p>
+                    <p className="font-semibold text-slate-800">
+                      {formatarData(previa.periodo.dataInicial)} até {formatarData(previa.periodo.dataFinal)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Comportamento Atual</p>
+                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.comportamento, 'Sem alteração')}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Data de Inclusão</p>
+                    <p className="font-semibold text-slate-800">{formatarDataOuNaoInformado(previa.militar.data_inclusao)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Estado Civil</p>
+                    <p className="font-semibold text-slate-800">{valorComFallback(previa.militar.estado_civil)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Naturalidade</p>
+                    <p className="font-semibold text-slate-800">{montarNaturalidade(previa.militar)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Data de Nascimento</p>
+                    <p className="font-semibold text-slate-800">{formatarDataOuNaoInformado(previa.militar.data_nascimento)}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Tipo Sanguíneo / Fator RH</p>
+                    <p className="font-semibold text-slate-800">{montarTipoSanguineoRh(previa.militar)}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-slate-500 uppercase text-[11px] tracking-wide">Sinais Particulares / Outras Notas</p>
+                    <p className="font-semibold text-slate-800 break-words">{obterSinaisParticulares(previa.militar)}</p>
+                  </div>
                 </div>
               </div>
 
