@@ -17,6 +17,7 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import { getQuadrosCompativeis, isPostoOficial, isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
 
 const initialFormData = {
   nome_completo: '',
@@ -96,8 +97,7 @@ const POSTOS_GRADUACOES = [
   { value: 'Soldado', label: 'Soldado (SD)', grupo: 'Praças' },
 ];
 
-const POSTOS_OFICIAIS = ['Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'];
-const isOficial = (posto) => POSTOS_OFICIAIS.includes(posto);
+const QUADROS_FIXOS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QBMPT'];
 
 export default function CadastrarMilitar() {
   const navigate = useNavigate();
@@ -111,6 +111,7 @@ export default function CadastrarMilitar() {
 
   const [loading, setLoading] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
+  const [avisoCompatibilidadeQuadro, setAvisoCompatibilidadeQuadro] = useState('');
 
 
   const { data: editingMilitar, isLoading: loadingEdit } = useQuery({
@@ -136,13 +137,49 @@ export default function CadastrarMilitar() {
   }, [editingMilitar]);
 
   const [motivoComportamento, setMotivoComportamento] = useState('');
+  const quadrosCompativeis = getQuadrosCompativeis(formData.posto_graduacao, QUADROS_FIXOS);
 
   const handleChange = (name, value) => {
+    if (name === 'posto_graduacao') {
+      const quadroAtual = formData.quadro;
+      const precisaLimparQuadro = quadroAtual && !isQuadroCompativel(value, quadroAtual);
+      setFormData((prev) => ({
+        ...prev,
+        posto_graduacao: value,
+        quadro: precisaLimparQuadro ? '' : prev.quadro,
+      }));
+      setAvisoCompatibilidadeQuadro(
+        precisaLimparQuadro
+          ? `O quadro "${quadroAtual}" foi removido porque não é compatível com o posto/graduação selecionado.`
+          : '',
+      );
+      return;
+    }
+
+    if (name === 'quadro') {
+      if (!isQuadroCompativel(formData.posto_graduacao, value)) {
+        setAvisoCompatibilidadeQuadro(
+          `O quadro "${value}" não é compatível com o posto/graduação selecionado.`,
+        );
+        return;
+      }
+      setAvisoCompatibilidadeQuadro('');
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isQuadroCompativel(formData.posto_graduacao, formData.quadro)) {
+      const categoria = isPostoOficial(formData.posto_graduacao) ? 'oficial' : 'praça';
+      const quadrosPermitidos = getQuadrosCompativeis(formData.posto_graduacao, QUADROS_FIXOS).join(', ');
+      window.alert(
+        `Combinação inválida: o posto/graduação selecionado é ${categoria} e só permite os quadros: ${quadrosPermitidos}.`,
+      );
+      return;
+    }
 
     setLoading(true);
 
@@ -355,7 +392,8 @@ export default function CadastrarMilitar() {
                 value={formData.quadro}
                 onChange={handleChange}
                 type="select"
-                options={['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QBMPT']}
+                options={quadrosCompativeis}
+                hint={avisoCompatibilidadeQuadro}
               />
               <FormField
                 label="Data de Inclusão"
@@ -366,7 +404,7 @@ export default function CadastrarMilitar() {
               />
               <div className="space-y-1.5 md:col-span-2">
               <label className="text-sm font-medium text-slate-700">Comportamento</label>
-              {isOficial(formData.posto_graduacao) ? (
+              {isPostoOficial(formData.posto_graduacao) ? (
                 <div className="px-3 py-2 border rounded-md bg-slate-100 text-slate-400 text-sm italic">
                   Não aplicável para Oficiais
                 </div>
@@ -384,7 +422,7 @@ export default function CadastrarMilitar() {
                   </div>
                 </div>
               )}
-              {!isOficial(formData.posto_graduacao) && formData.comportamento !== comportamentoOriginal && comportamentoOriginal !== null && (
+              {!isPostoOficial(formData.posto_graduacao) && formData.comportamento !== comportamentoOriginal && comportamentoOriginal !== null && (
                 <div className="mt-2">
                   <label className="text-xs font-medium text-slate-600">Motivo da alteração <span className="text-red-500">*</span></label>
                   <input
