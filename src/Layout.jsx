@@ -23,6 +23,7 @@ import {
   Building2,
   GitBranch,
   BookMarked,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,6 +42,7 @@ const menuGroups = [
     title: 'Pessoal',
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
+      { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'militares' },
     ],
   },
   {
