@@ -484,14 +484,90 @@ export default function FolhaAlteracoes() {
     });
   };
 
+  const handleImprimir = () => {
+    window.print();
+  };
+
+  const handleExportarPdf = () => {
+    window.print();
+  };
+
   if (!loadingUser && isAccessResolved && !canAccessModule('militares')) {
     return <AccessDenied modulo="Efetivo" />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-start justify-between gap-4">
+    <div className="folha-alteracoes-page min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <style>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 14mm 12mm 16mm 12mm;
+          }
+
+          body {
+            background: #fff !important;
+          }
+
+          .folha-alteracoes-page {
+            min-height: auto !important;
+            background: #fff !important;
+          }
+
+          .no-print {
+            display: none !important;
+          }
+
+          .print-container {
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          .print-document-card {
+            box-shadow: none !important;
+            border: none !important;
+            background: transparent !important;
+          }
+
+          .print-document-content {
+            padding: 0 !important;
+            margin: 0 !important;
+            gap: 0.75rem !important;
+          }
+
+          .print-sheet {
+            border: 1px solid #d1d5db !important;
+            border-radius: 0 !important;
+            background: #fff !important;
+            padding: 9mm 8mm !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .print-section {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .print-year-block {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .print-month-block {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .print-break-before {
+            page-break-before: always;
+            break-before: page;
+          }
+        }
+      `}</style>
+      <div className="print-container max-w-6xl mx-auto px-4 py-8 space-y-6">
+        <div className="no-print flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Folha de Alterações</h1>
             <p className="text-slate-500 mt-1">
@@ -503,7 +579,7 @@ export default function FolhaAlteracoes() {
           </div>
         </div>
 
-        <Card className="shadow-sm border-slate-200">
+        <Card className="no-print shadow-sm border-slate-200">
           <CardHeader>
             <CardTitle className="text-lg text-[#1e3a5f]">Filtros</CardTitle>
           </CardHeader>
@@ -555,12 +631,32 @@ export default function FolhaAlteracoes() {
         </Card>
 
         {previa && (
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader>
+          <Card className="print-document-card shadow-sm border-slate-200">
+            <CardHeader className="no-print">
               <CardTitle className="text-lg text-[#1e3a5f]">Prévia da Folha de Alterações</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="rounded-xl border border-[#1e3a5f]/20 bg-white p-5 md:p-6 space-y-5 print:border-slate-300">
+            <CardContent className="print-document-content space-y-6">
+              <div className="no-print flex flex-wrap gap-3">
+                <Button
+                  className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                  onClick={handleImprimir}
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  Imprimir
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-[#1e3a5f] text-[#1e3a5f] hover:bg-[#1e3a5f]/5"
+                  onClick={handleExportarPdf}
+                >
+                  Exportar PDF
+                </Button>
+                <p className="text-xs text-slate-500 self-center">
+                  Dica: use o destino &quot;Salvar como PDF&quot; na janela de impressão para gerar o arquivo PDF.
+                </p>
+              </div>
+
+              <div className="print-sheet print-section rounded-xl border border-[#1e3a5f]/20 bg-white p-5 md:p-6 space-y-5 print:border-slate-300">
                 <div className="text-center border-b border-slate-200 pb-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Folha de Alterações</p>
                   <p className="text-lg md:text-xl font-bold text-[#1e3a5f] mt-1">Resumo de Identificação do Militar</p>
@@ -630,7 +726,7 @@ export default function FolhaAlteracoes() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+              <div className="print-sheet print-section print-break-before rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
                 <p className="text-base font-semibold text-slate-800">Histórico de Alterações</p>
 
                 {loadingHistorico && (
@@ -644,12 +740,12 @@ export default function FolhaAlteracoes() {
                 {!loadingHistorico && historicoPorAnoMes.length > 0 && (
                   <div className="space-y-4">
                     {historicoPorAnoMes.map((ano) => (
-                      <div key={ano.ano} className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+                      <div key={ano.ano} className="print-year-block rounded-lg border border-slate-200 bg-white p-4 space-y-3">
                         <h3 className="text-sm md:text-base font-bold text-[#1e3a5f]">ANO {ano.ano}</h3>
 
                         <div className="space-y-3">
                           {ano.meses.map((mes) => (
-                            <div key={mes.chave} className="rounded-md border border-slate-100 p-3 bg-slate-50/70">
+                            <div key={mes.chave} className="print-month-block rounded-md border border-slate-100 p-3 bg-slate-50/70">
                               <p className="text-xs md:text-sm font-semibold text-slate-700 mb-2">{mes.titulo}</p>
 
                               {mes.eventos.length === 0 ? (
@@ -673,7 +769,7 @@ export default function FolhaAlteracoes() {
                 )}
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <div className="print-sheet print-section rounded-xl border border-amber-200 bg-amber-50 p-3">
                 <p className="text-xs text-amber-800">
                   Fontes desta fase: Férias, Atestados, Publicações Ex Officio e Punições Disciplinares (quando disponíveis com data no cadastro).
                 </p>
