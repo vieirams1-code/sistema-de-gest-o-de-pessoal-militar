@@ -34,6 +34,10 @@ export default function FolhaAlteracoesDocumento({
   let contadorEventos = 0;
   const isPrint = variant === 'print';
   const localAssinatura = String(impressaoConfig?.localAssinatura || '').trim() || localFechamento;
+  const dataAssinatura = String(dataFechamento || '').trim();
+  const cabecalhoAssinatura = localAssinatura
+    ? `${localAssinatura}, ${dataAssinatura}.`
+    : `${dataAssinatura}.`;
 
   return (
     <article
@@ -107,12 +111,12 @@ export default function FolhaAlteracoesDocumento({
 
       <footer className="mt-8 text-[11pt]">
         <p className="text-right">
-          {valorComFallback(localAssinatura)}, {valorComFallback(dataFechamento)}.
+          {cabecalhoAssinatura}
         </p>
 
-        <div className="mt-16 ml-auto w-[88mm] max-w-full text-center">
+        <div className="mt-16 mx-auto w-[110mm] max-w-full text-center px-2">
           <div className="border-t border-black px-2 pt-1">
-            <p className="font-semibold uppercase leading-tight whitespace-nowrap text-[10.5pt]">
+            <p className="fa-signature-line mx-auto w-fit max-w-full whitespace-nowrap break-keep font-semibold uppercase leading-tight text-[10.5pt]">
               {valorComFallback(impressaoConfig?.signatarioLinha1, '')}
             </p>
             <p className="font-semibold uppercase leading-tight text-[10.5pt]">

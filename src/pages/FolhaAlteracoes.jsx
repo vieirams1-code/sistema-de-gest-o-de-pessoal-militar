@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
+import { montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
 import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,43 +30,6 @@ const MESES = [
   'NOVEMBRO',
   'DEZEMBRO',
 ];
-
-const ABREVIACOES_POSTO_GRADUACAO = {
-  CORONEL: 'CEL',
-  'TENENTE CORONEL': 'TC',
-  MAJOR: 'MAJ',
-  'CAPITÃO': 'CAP',
-  CAPITAO: 'CAP',
-  '1º TENENTE': '1º TEN',
-  '1° TENENTE': '1º TEN',
-  '1O TENENTE': '1º TEN',
-  '2º TENENTE': '2º TEN',
-  '2° TENENTE': '2º TEN',
-  '2O TENENTE': '2º TEN',
-  ASPIRANTE: 'ASP',
-  SUBTENENTE: 'ST',
-  '1º SARGENTO': '1º SGT',
-  '1° SARGENTO': '1º SGT',
-  '1O SARGENTO': '1º SGT',
-  '2º SARGENTO': '2º SGT',
-  '2° SARGENTO': '2º SGT',
-  '2O SARGENTO': '2º SGT',
-  '3º SARGENTO': '3º SGT',
-  '3° SARGENTO': '3º SGT',
-  '3O SARGENTO': '3º SGT',
-  CABO: 'CB',
-  SOLDADO: 'SD',
-};
-
-function abreviarPostoGraduacao(postoGraduacao) {
-  const valor = String(postoGraduacao || '').trim();
-  if (!valor) return '';
-  const chave = valor
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toUpperCase();
-  return ABREVIACOES_POSTO_GRADUACAO[chave] || valor.toUpperCase();
-}
 
 function formatarData(isoDate) {
   if (!isoDate) return '-';
@@ -100,7 +64,7 @@ function obterLocalFechamento(militar) {
   if (cidade && uf) return `${cidade}/${uf}`;
   if (cidade) return cidade;
   if (uf) return uf;
-  return 'Local não informado';
+  return '';
 }
 
 function getTextoOficialRegistro(item) {
@@ -566,10 +530,7 @@ export default function FolhaAlteracoes() {
     ? `${signatarioSelecionado.posto_graduacao ? `${signatarioSelecionado.posto_graduacao} ` : ''}${signatarioNome}`.trim()
     : '';
   const signatarioLinha1 = signatarioSelecionado
-    ? [
-      signatarioNome,
-      [abreviarPostoGraduacao(signatarioSelecionado.posto_graduacao), signatarioSelecionado.quadro].filter(Boolean).join(' ').trim(),
-    ].filter(Boolean).join(' - ')
+    ? montarLinhaAssinatura(signatarioNome, signatarioSelecionado.posto_graduacao, signatarioSelecionado.quadro)
     : '';
   const signatarioLinha2 = signatarioSelecionado?.matricula
     ? `MATRÍCULA ${String(signatarioSelecionado.matricula).trim()}`
