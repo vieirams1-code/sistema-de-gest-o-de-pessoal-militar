@@ -66,6 +66,7 @@ import DetalheComportamento from './pages/DetalheComportamento';
 import EditarJISO from './pages/EditarJISO';
 import Ferias from './pages/Ferias';
 import FichaMilitar from './pages/FichaMilitar';
+import FolhaAlteracoes from './pages/FolhaAlteracoes';
 import Home from './pages/Home';
 import Medalhas from './pages/Medalhas';
 import Militares from './pages/Militares';
@@ -110,6 +111,7 @@ export const PAGES = {
     "EditarJISO": EditarJISO,
     "Ferias": Ferias,
     "FichaMilitar": FichaMilitar,
+    "FolhaAlteracoes": FolhaAlteracoes,
     "Home": Home,
     "Medalhas": Medalhas,
     "Militares": Militares,
