@@ -200,6 +200,60 @@ function getEntitySafe(entityName) {
   return base44?.entities?.[entityName] || null;
 }
 
+function normalizarEscopo(value) {
+  const escopo = String(value || 'GLOBAL').trim().toUpperCase();
+  if (escopo === 'SETOR' || escopo === 'SUBSETOR' || escopo === 'UNIDADE') return escopo;
+  return 'GLOBAL';
+}
+
+function resolveContextoMilitar(militar, estruturaById) {
+  const setorId = String(militar?.grupamento_id || '').trim();
+  const subgrupamentoId = String(militar?.subgrupamento_id || '').trim();
+  const subgrupo = estruturaById.get(subgrupamentoId);
+
+  const isUnidade = String(subgrupo?.tipo || '').toLowerCase() === 'unidade';
+  const unidadeId = isUnidade ? subgrupamentoId : '';
+  const subsetorId = isUnidade ? String(subgrupo?.grupamento_id || '').trim() : subgrupamentoId;
+
+  return {
+    setor_id: setorId,
+    subsetor_id: subsetorId,
+    unidade_id: unidadeId,
+  };
+}
+
+function matchConfigEscopo(config, escopo, contexto) {
+  const setorId = String(config?.setor_id || '').trim();
+  const subsetorId = String(config?.subsetor_id || '').trim();
+  const unidadeId = String(config?.unidade_id || '').trim();
+
+  if (escopo === 'GLOBAL') return true;
+  if (escopo === 'SETOR') return Boolean(contexto.setor_id && setorId === contexto.setor_id);
+  if (escopo === 'SUBSETOR') return Boolean(contexto.setor_id && contexto.subsetor_id && setorId === contexto.setor_id && subsetorId === contexto.subsetor_id);
+  if (escopo === 'UNIDADE') return Boolean(
+    contexto.setor_id &&
+    contexto.subsetor_id &&
+    contexto.unidade_id &&
+    setorId === contexto.setor_id &&
+    subsetorId === contexto.subsetor_id &&
+    unidadeId === contexto.unidade_id
+  );
+
+  return false;
+}
+
+function resolveConfigFolha(configs = [], contexto = {}) {
+  const ordem = ['UNIDADE', 'SUBSETOR', 'SETOR', 'GLOBAL'];
+  const ativos = configs.filter((item) => item?.ativo !== false);
+
+  for (const escopo of ordem) {
+    const match = ativos.find((item) => normalizarEscopo(item.escopo) === escopo && matchConfigEscopo(item, escopo, contexto));
+    if (match) return match;
+  }
+
+  return null;
+}
+
 async function listarPorMilitar(entityName, militarId, sort) {
   const entity = getEntitySafe(entityName);
   if (!entity?.filter) return [];
@@ -432,6 +486,25 @@ export default function FolhaAlteracoes() {
     if (!previa?.periodo?.dataInicial || !previa?.periodo?.dataFinal) return [];
     return agruparHistoricoPorAnoMes(historicoAlteracoes, previa.periodo.dataInicial, previa.periodo.dataFinal);
   }, [historicoAlteracoes, previa]);
+
+  const { data: configuracoesFolha = [] } = useQuery({
+    queryKey: ['folha-alteracoes-config-impressao'],
+    queryFn: () => base44.entities.FolhaAlteracoesConfig.list('-created_date'),
+    enabled: isAccessResolved,
+  });
+
+  const { data: estruturaOrganizacional = [] } = useQuery({
+    queryKey: ['folha-alteracoes-estrutura-impressao'],
+    queryFn: () => base44.entities.Subgrupamento.list(),
+    enabled: isAccessResolved,
+  });
+
+  const configFolhaSelecionada = useMemo(() => {
+    if (!previa?.militar) return null;
+    const estruturaById = new Map((estruturaOrganizacional || []).map((item) => [item.id, item]));
+    const contexto = resolveContextoMilitar(previa.militar, estruturaById);
+    return resolveConfigFolha(configuracoesFolha, contexto);
+  }, [previa, estruturaOrganizacional, configuracoesFolha]);
 
   const handleGerarPrevia = () => {
     if (!militarSelecionado || !periodoValido) return;
@@ -680,6 +753,7 @@ export default function FolhaAlteracoes() {
                 loadingHistorico={loadingHistorico}
                 localFechamento={localFechamento}
                 dataFechamento={dataFechamento}
+                configFolha={configFolhaSelecionada}
                 formatarData={formatarData}
                 variant="screen"
               />
@@ -695,6 +769,7 @@ export default function FolhaAlteracoes() {
               loadingHistorico={loadingHistorico}
               localFechamento={localFechamento}
               dataFechamento={dataFechamento}
+              configFolha={configFolhaSelecionada}
               formatarData={formatarData}
               variant="print"
             />

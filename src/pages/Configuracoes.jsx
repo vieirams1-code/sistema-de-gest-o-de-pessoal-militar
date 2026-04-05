@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings, Trash2, Plus, Sliders } from 'lucide-react';
 import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoManager';
+import FolhaAlteracoesConfigManager from '@/components/configuracoes/FolhaAlteracoesConfigManager';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import {
@@ -130,6 +131,8 @@ export default function Configuracoes() {
           </div>
 
           <TiposPublicacaoManager />
+
+          <FolhaAlteracoesConfigManager canEdit={canAccessAction('gerir_configuracoes')} />
         </div>
 
         <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
