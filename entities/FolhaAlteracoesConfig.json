@@ -1,0 +1,68 @@
+{
+  "name": "FolhaAlteracoesConfig",
+  "type": "object",
+  "title": "Configuração da Folha de Alterações",
+  "description": "Personalização de cabeçalho e assinatura da Folha de Alterações por escopo organizacional.",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "default": ""
+    },
+    "escopo": {
+      "type": "string",
+      "default": "GLOBAL"
+    },
+    "setor_id": {
+      "type": "string",
+      "default": ""
+    },
+    "subsetor_id": {
+      "type": "string",
+      "default": ""
+    },
+    "unidade_id": {
+      "type": "string",
+      "default": ""
+    },
+    "cabecalho_linha_1": {
+      "type": "string",
+      "default": ""
+    },
+    "cabecalho_linha_2": {
+      "type": "string",
+      "default": ""
+    },
+    "cabecalho_linha_3": {
+      "type": "string",
+      "default": ""
+    },
+    "titulo_documento": {
+      "type": "string",
+      "default": "FOLHA DE ALTERAÇÕES"
+    },
+    "local_padrao": {
+      "type": "string",
+      "default": ""
+    },
+    "texto_data_final": {
+      "type": "string",
+      "default": ""
+    },
+    "cargo_autoridade": {
+      "type": "string",
+      "default": ""
+    },
+    "nome_autoridade": {
+      "type": "string",
+      "default": ""
+    },
+    "texto_complementar": {
+      "type": "string",
+      "default": ""
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

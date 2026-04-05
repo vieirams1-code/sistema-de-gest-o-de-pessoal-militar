@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings, Trash2, Plus, Sliders } from 'lucide-react';
 import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoManager';
+import FolhaAlteracoesConfigManager from '@/components/configuracoes/FolhaAlteracoesConfigManager';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { CATEGORIA_QUADRO_OFICIAL, CATEGORIA_QUADRO_PRACA } from '@/utils/postoGraduacaoClassificacao';
@@ -389,6 +390,8 @@ export default function Configuracoes() {
           </div>
 
           <TiposPublicacaoManager />
+
+          <FolhaAlteracoesConfigManager canEdit={canAccessAction('gerir_configuracoes')} />
         </div>
 
         <Dialog open={addQuadroDialogOpen} onOpenChange={(open) => { setAddQuadroDialogOpen(open); if (!open) setErroCadastroQuadro(''); }}>
