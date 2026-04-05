@@ -521,7 +521,19 @@ export default function FolhaAlteracoes() {
     [militaresOrdenados, impressaoConfig.signatarioId]
   );
   const signatarioNome = signatarioSelecionado
-    ? `${signatarioSelecionado.posto_graduacao ? `${signatarioSelecionado.posto_graduacao} ` : ''}${signatarioSelecionado.nome_completo || signatarioSelecionado.nome_guerra || ''}`.trim()
+    ? String(signatarioSelecionado.nome_completo || signatarioSelecionado.nome_guerra || '').trim()
+    : '';
+  const signatarioLabel = signatarioSelecionado
+    ? `${signatarioSelecionado.posto_graduacao ? `${signatarioSelecionado.posto_graduacao} ` : ''}${signatarioNome}`.trim()
+    : '';
+  const signatarioLinha1 = signatarioSelecionado
+    ? [
+      signatarioNome,
+      [signatarioSelecionado.posto_graduacao, signatarioSelecionado.quadro].filter(Boolean).join(' ').trim(),
+    ].filter(Boolean).join(' - ')
+    : '';
+  const signatarioLinha2 = signatarioSelecionado?.matricula
+    ? `MATRÍCULA ${String(signatarioSelecionado.matricula).trim()}`
     : '';
   const militaresSignatariosFiltrados = useMemo(() => {
     const termo = buscaSignatario.trim().toLowerCase();
@@ -725,7 +737,7 @@ export default function FolhaAlteracoes() {
                     <PopoverTrigger asChild>
                       <Button variant="outline" role="combobox" className="w-full justify-between">
                         <span className="truncate">
-                          {signatarioNome || 'Selecione um militar'}
+                          {signatarioLabel || 'Selecione um militar'}
                         </span>
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -864,7 +876,8 @@ export default function FolhaAlteracoes() {
                 dataFechamento={dataFechamento}
                 impressaoConfig={{
                   ...impressaoConfig,
-                  signatarioNome,
+                  signatarioLinha1,
+                  signatarioLinha2,
                 }}
                 formatarData={formatarData}
                 variant="screen"
@@ -883,7 +896,8 @@ export default function FolhaAlteracoes() {
               dataFechamento={dataFechamento}
               impressaoConfig={{
                 ...impressaoConfig,
-                signatarioNome,
+                signatarioLinha1,
+                signatarioLinha2,
               }}
               formatarData={formatarData}
               variant="print"
