@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -10,6 +10,14 @@ import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoMa
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { CATEGORIA_QUADRO_OFICIAL, CATEGORIA_QUADRO_PRACA } from '@/utils/postoGraduacaoClassificacao';
+import {
+  createQuadroMilitar,
+  deleteQuadroMilitar,
+  getMensagemErroQuadro,
+  listQuadrosMilitares,
+  updateQuadroMilitar,
+  getQuadroMilitarEntityInfo,
+} from '@/services/quadroMilitarEntityService';
 import {
   Dialog,
   DialogContent,
@@ -46,35 +54,66 @@ export default function Configuracoes() {
   const [editImpactCount, setEditImpactCount] = useState(0);
   const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
   const [deleteImpactData, setDeleteImpactData] = useState({ id: null, nome: '', quantidade: 0 });
+  const [quadroFeedback, setQuadroFeedback] = useState({ type: '', message: '' });
+  const [entityQuadroEmUso, setEntityQuadroEmUso] = useState('detectando...');
 
   const selectedTab = searchParams.get('tab') || 'adicoes';
 
+  useEffect(() => {
+    let ativo = true;
+
+    const detectarEntity = async () => {
+      try {
+        const info = await getQuadroMilitarEntityInfo();
+        if (ativo) setEntityQuadroEmUso(info?.entityName || 'indisponível');
+      } catch {
+        if (ativo) setEntityQuadroEmUso('indisponível');
+      }
+    };
+
+    detectarEntity();
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date'), enabled: isAccessResolved && hasConfiguracoesAccess });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date'), enabled: isAccessResolved && hasConfiguracoesAccess });
-  const { data: quadros = [] } = useQuery({ queryKey: ['quadros-militares'], queryFn: () => base44.entities.QuadroMilitar.list('nome'), enabled: isAccessResolved && hasConfiguracoesAccess });
+  const { data: quadros = [] } = useQuery({
+    queryKey: ['quadros-militares'],
+    queryFn: () => listQuadrosMilitares('nome'),
+    enabled: isAccessResolved && hasConfiguracoesAccess
+  });
 
   const createLotacaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Lotacao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setNovaLotacao(''); } });
   const createFuncaoMutation = useMutation({ mutationFn: (nome) => base44.entities.Funcao.create({ nome, ativa: true }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['funcoes'] }); setNovaFuncao(''); } });
   const createQuadroMutation = useMutation({
-    mutationFn: (payload) => base44.entities.QuadroMilitar.create(payload),
+    mutationFn: (payload) => createQuadroMilitar(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quadros-militares'] });
       setNovoQuadro({ nome: '', sigla: '', categoria: CATEGORIA_QUADRO_OFICIAL, ativo: true });
       setErroCadastroQuadro('');
+      setQuadroFeedback({ type: 'success', message: 'Quadro cadastrado com sucesso.' });
       setAddQuadroDialogOpen(false);
-      alert('Quadro cadastrado com sucesso.');
     },
     onError: (error) => {
-      const message = error?.message || 'Não foi possível salvar o quadro. Verifique os dados e tente novamente.';
+      const message = getMensagemErroQuadro(error, 'Não foi possível salvar o quadro. Verifique os dados e tente novamente.');
       setErroCadastroQuadro(message);
-      alert(message);
+      setQuadroFeedback({ type: 'error', message });
     },
   });
   const updateQuadroMutation = useMutation({
-    mutationFn: ({ id, payload }) => base44.entities.QuadroMilitar.update(id, payload),
+    mutationFn: ({ id, payload }) => updateQuadroMilitar(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quadros-militares'] });
       setQuadroEmEdicao(null);
+      setQuadroFeedback({ type: 'success', message: 'Quadro atualizado com sucesso.' });
+    },
+    onError: (error) => {
+      setQuadroFeedback({
+        type: 'error',
+        message: getMensagemErroQuadro(error, 'Não foi possível atualizar o quadro no momento.')
+      });
     }
   });
   const deleteLotacaoMutation = useMutation({ mutationFn: (id) => base44.entities.Lotacao.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['lotacoes'] }); setDeleteDialog({ open: false, type: null, id: null }); } });
@@ -90,15 +129,21 @@ export default function Configuracoes() {
         throw new Error(`Exclusão bloqueada: o quadro está vinculado a ${militaresVinculados.length} militar(es). Regra adotada: não permitir exclusão com dependências.`); // regra explícita
       }
 
-      await base44.entities.QuadroMilitar.delete(id);
+      await deleteQuadroMilitar(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quadros-militares'] });
       setDeleteDialog({ open: false, type: null, id: null });
-      alert('Quadro excluído com sucesso. Regra aplicada: exclusão apenas sem dependências.');
+      setQuadroFeedback({
+        type: 'success',
+        message: 'Quadro excluído com sucesso. Regra aplicada: exclusão apenas sem dependências.'
+      });
     },
     onError: (error) => {
-      alert(error?.message || 'Não foi possível excluir o quadro.');
+      setQuadroFeedback({
+        type: 'error',
+        message: getMensagemErroQuadro(error, 'Não foi possível excluir o quadro.')
+      });
       setDeleteDialog({ open: false, type: null, id: null });
     }
   });
@@ -147,6 +192,7 @@ export default function Configuracoes() {
 
   const handleCreateQuadro = (event) => {
     event?.preventDefault();
+    setQuadroFeedback({ type: '', message: '' });
 
     if (!canAccessAction('gerir_configuracoes')) return;
 
@@ -279,8 +325,16 @@ export default function Configuracoes() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h2 className="text-xl font-semibold text-[#1e3a5f] mb-4">Quadros</h2>
             <p className="text-sm text-slate-500 mb-4">Cadastre quadros com categoria obrigatória (Oficial/Praça) para uso no cadastro de militar.</p>
+            {quadroFeedback.message && (
+              <p className={`text-sm mb-4 ${quadroFeedback.type === 'error' ? 'text-red-600' : 'text-emerald-700'}`}>
+                {quadroFeedback.message}
+              </p>
+            )}
+            <p className="text-xs text-slate-500 mb-4">
+              Entidade de quadros em uso: <strong>{entityQuadroEmUso}</strong>
+            </p>
             <div className="mb-6">
-              <Button onClick={() => { setErroCadastroQuadro(''); setAddQuadroDialogOpen(true); }} disabled={!canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+              <Button onClick={() => { setErroCadastroQuadro(''); setQuadroFeedback({ type: '', message: '' }); setAddQuadroDialogOpen(true); }} disabled={!canAccessAction('gerir_configuracoes')} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-4 h-4 mr-2" /> Adicionar Quadro
               </Button>
             </div>
