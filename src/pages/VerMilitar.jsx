@@ -422,9 +422,18 @@ export default function VerMilitar() {
                     </div>
                     <div className="rounded-lg border p-3">
                       <p className="text-slate-500">Próxima melhoria</p>
-                      <p className="font-semibold">{proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—'}</p>
+                      <p className="font-semibold">
+                        {avaliacaoComportamento?.inconsistente_para_calculo
+                          ? 'Bloqueada por inconsistência'
+                          : (proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—')}
+                      </p>
                     </div>
                   </div>
+                  {avaliacaoComportamento?.inconsistente_para_calculo && (
+                    <p className="mt-3 text-xs text-red-600">
+                      Não foi possível calcular comportamento: {(avaliacaoComportamento?.inconsistencias || []).map((item) => item.labelCampo).join(', ')}.
+                    </p>
+                  )}
                   {avaliacaoComportamento?.fundamento && (
                     <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
                   )}
