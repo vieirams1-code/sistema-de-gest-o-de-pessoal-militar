@@ -12,7 +12,6 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
-import { STATUS_PUBLICACAO, calcularStatusPublicacaoRegistro, normalizarStatusPublicacao } from '@/components/publicacao/publicacaoStateMachine';
 import { montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
 import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -96,43 +95,6 @@ function getTextoOficialRegistro(item) {
   return '';
 }
 
-function montarTextoAdministrativo({ tipo, dataEvento, item }) {
-  const dataExtensa = formatarDataExtensa(dataEvento);
-  const dataCurta = formatarData(dataEvento);
-
-  if (tipo === 'Férias') {
-    const dias = Number(item?.dias || 0);
-    const periodoRef = item?.periodo_aquisitivo_ref ? `, referente ao período aquisitivo ${item.periodo_aquisitivo_ref}` : '';
-    const fracao = item?.fracionamento ? `, em ${item.fracionamento}` : '';
-    const diasLabel = dias > 0 ? `${dias} dia(s)` : 'período regulamentar';
-    return `Em ${dataExtensa}, entrou em gozo de férias por ${diasLabel}${periodoRef}${fracao}.`;
-  }
-
-  if (tipo === 'Atestado') {
-    const tipoAfastamento = item?.tipo_afastamento || 'afastamento médico';
-    const dias = Number(item?.dias || 0);
-    const diasLabel = dias > 0 ? `, pelo prazo de ${dias} dia(s)` : '';
-    const cid = item?.cid_10 ? `, CID ${item.cid_10}` : '';
-    return `Em ${dataExtensa}, foi registrado ${tipoAfastamento.toLowerCase()}${diasLabel}${cid}.`;
-  }
-
-  if (tipo === 'Publicação') {
-    const tipoPublicacao = item?.tipo_registro || item?.tipo || item?.categoria || 'publicação administrativa';
-    const numeroBg = item?.numero_bg ? `, no BG nº ${item.numero_bg}` : '';
-    return `Em ${dataExtensa}, foi lançada ${String(tipoPublicacao).toLowerCase()}${numeroBg}.`;
-  }
-
-  if (tipo === 'Punição') {
-    const tipoPunicao = item?.tipo_punicao || 'punição disciplinar';
-    const diasPunicao = Number(item?.dias_punicao || 0);
-    const diasLabel = diasPunicao > 0 ? `, pelo prazo de ${diasPunicao} dia(s)` : '';
-    const boletim = item?.boletim_numero ? `, conforme boletim nº ${item.boletim_numero}` : '';
-    return `Em ${dataExtensa}, foi aplicada ${String(tipoPunicao).toLowerCase()}${diasLabel}${boletim}.`;
-  }
-
-  return `Em ${dataCurta}, foi registrada alteração administrativa.`;
-}
-
 function normalizarDataISO(value) {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -167,13 +129,7 @@ function extrairDadosBg(item = {}) {
 }
 
 function statusPublicado(item = {}) {
-  const statusInformado =
-    normalizarStatusPublicacao(item?.status_calculado) ||
-    normalizarStatusPublicacao(item?.status_publicacao) ||
-    normalizarStatusPublicacao(item?.status);
-
-  const statusResolvido = statusInformado || calcularStatusPublicacaoRegistro(item);
-  return statusResolvido === STATUS_PUBLICACAO.PUBLICADO;
+  return toText(item?.status) === 'Publicado';
 }
 
 function registroPublicadoEmBg(item = {}) {
@@ -488,116 +444,31 @@ export default function FolhaAlteracoes() {
       const inicioPeriodo = previa.periodo.dataInicial;
       const fimPeriodo = previa.periodo.dataFinal;
 
-      const [ferias, atestados, publicacoesExOfficio, punicoes] = await Promise.all([
-        listarPorMilitar('Ferias', militarId, '-data_inicio'),
-        listarPorMilitar('Atestado', militarId, '-data_inicio'),
-        listarPorMilitar('PublicacaoExOfficio', militarId, '-data_publicacao'),
-        listarPorMilitar('PunicaoDisciplinar', militarId, '-data_punicao'),
-      ]);
-
-      const publicacoesLivro = await listarPorMilitar('RegistroLivro', militarId, '-data_registro');
-      const publicacoes = [...publicacoesExOfficio, ...publicacoesLivro];
+      const publicacoes = await listarPorMilitar('PublicacaoExOfficio', militarId, '-data_bg');
 
       const filtrarPorPeriodo = (data) => Boolean(data && data >= inicioPeriodo && data <= fimPeriodo);
-
-      const eventosFerias = ferias
-        .map((item) => {
-          if (!registroPublicadoEmBg(item)) return null;
-
-          const dataEvento = normalizarDataISO(item.data_inicio || item.created_date);
-          if (!filtrarPorPeriodo(dataEvento)) return null;
-
-          const periodoRef = item.periodo_aquisitivo_ref ? ` (${item.periodo_aquisitivo_ref})` : '';
-          const fracao = item.fracionamento ? ` - ${item.fracionamento}` : '';
-          const textoOficial = getTextoOficialRegistro(item);
-
-          return {
-            data: dataEvento,
-            tipo: 'Férias',
-            texto: textoOficial || montarTextoAdministrativo({ tipo: 'Férias', dataEvento, item }),
-            referenciaBoletim: montarReferenciaBoletim(item),
-            descricao: `${item.dias || 0} dia(s) de férias${periodoRef}${fracao}`,
-            origem: 'Ferias',
-          };
-        })
-        .filter(Boolean);
-
-      const eventosAtestados = atestados
-        .map((item) => {
-          if (!registroPublicadoEmBg(item)) return null;
-
-          const dataEvento = normalizarDataISO(item.data_inicio || item.created_date);
-          if (!filtrarPorPeriodo(dataEvento)) return null;
-
-          const tipoAfastamento = item.tipo_afastamento || 'Afastamento médico';
-          const dias = item.dias ? ` (${item.dias} dia(s))` : '';
-          const cid = item.cid_10 ? ` - CID ${item.cid_10}` : '';
-          const textoOficial = getTextoOficialRegistro(item);
-
-          return {
-            data: dataEvento,
-            tipo: 'Atestado',
-            texto: textoOficial || montarTextoAdministrativo({ tipo: 'Atestado', dataEvento, item }),
-            referenciaBoletim: montarReferenciaBoletim(item),
-            descricao: `${tipoAfastamento}${dias}${cid}`,
-            origem: 'Atestado',
-          };
-        })
-        .filter(Boolean);
 
       const eventosPublicacoes = publicacoes
         .map((item) => {
           if (!registroPublicadoEmBg(item)) return null;
-
-          const dataEvento = normalizarDataISO(
-            item.data_publicacao ||
-            item.data_registro ||
-            item.data_inicio ||
-            item.data_bg ||
-            item.data_punicao ||
-            item.created_date
-          );
+          const dataEvento = normalizarDataISO(item.data_bg);
           if (!filtrarPorPeriodo(dataEvento)) return null;
 
           const tipoPublicacao = item.tipo_registro || item.tipo || item.categoria || 'Publicação';
-          const numeroBg = item.numero_bg ? ` - BG ${item.numero_bg}` : '';
           const textoOficial = getTextoOficialRegistro(item);
 
           return {
             data: dataEvento,
             tipo: 'Publicação',
-            texto: textoOficial || montarTextoAdministrativo({ tipo: 'Publicação', dataEvento, item }),
+            texto: textoOficial,
             referenciaBoletim: montarReferenciaBoletim(item),
-            descricao: `${tipoPublicacao}${numeroBg}`,
+            descricao: `${tipoPublicacao} - BG ${item.numero_bg}`,
             origem: 'PublicacaoExOfficio',
           };
         })
         .filter(Boolean);
 
-      const eventosPunicoes = (punicoes || [])
-        .map((item) => {
-          if (!registroPublicadoEmBg(item)) return null;
-
-          const dataEvento = normalizarDataISO(item.data_punicao || item.data_inicio_cumprimento || item.boletim_data || item.created_date);
-          if (!filtrarPorPeriodo(dataEvento)) return null;
-
-          const tipoPunicao = item.tipo_punicao || 'Punição disciplinar';
-          const dias = item.dias_punicao ? ` - ${item.dias_punicao} dia(s)` : '';
-          const status = item.status_punicao ? ` (${item.status_punicao})` : '';
-          const textoOficial = getTextoOficialRegistro(item);
-
-          return {
-            data: dataEvento,
-            tipo: 'Punição',
-            texto: textoOficial || montarTextoAdministrativo({ tipo: 'Punição', dataEvento, item }),
-            referenciaBoletim: montarReferenciaBoletim(item),
-            descricao: `${tipoPunicao}${dias}${status}`,
-            origem: 'PunicaoDisciplinar',
-          };
-        })
-        .filter(Boolean);
-
-      return [...eventosFerias, ...eventosAtestados, ...eventosPublicacoes, ...eventosPunicoes].sort((a, b) => a.data.localeCompare(b.data));
+      return eventosPublicacoes.sort((a, b) => a.data.localeCompare(b.data));
     },
     enabled: !!previa,
   });
