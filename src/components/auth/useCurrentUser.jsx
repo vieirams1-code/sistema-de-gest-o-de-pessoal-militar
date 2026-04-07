@@ -2,6 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
 const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
+const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
+
+const normalizeAccessMode = (value) => {
+  const normalized = toLowerSafe(value);
+  if (!normalized) return null;
+  if (SELF_RESTRICTED_SCOPES.has(normalized)) return 'proprio';
+  if (normalized === 'setor') return 'setor';
+  if (normalized === 'subsetor') return 'subsetor';
+  if (normalized === 'unidade') return 'unidade';
+  if (normalized === 'admin') return 'admin';
+  return normalized;
+};
 
 const getNestedValue = (obj, path) => {
   if (!obj) return null;
@@ -72,21 +84,24 @@ export function useCurrentUser() {
   });
 
   const acesso = usuarioAcessoList?.[0] || null;
+  const resolvedTipoAcesso = normalizeAccessMode(acesso?.tipo_acesso) || 'proprio';
+  const isSelfRestrictedScope = resolvedTipoAcesso === 'proprio';
 
   // Resolve as propriedades explicitamente usando UsuarioAcesso.
   // Em modo de impersonação, não herdar permissões do admin original (fail-closed).
   const isAdmin = acesso
-    ? acesso.tipo_acesso === 'admin'
+    ? resolvedTipoAcesso === 'admin'
     : (!impersonationContext.isImpersonating && (user?.role === 'admin' || user?.isAdmin === true));
 
   const subgrupamentoId = acesso
-    ? (acesso.subgrupamento_id || acesso.grupamento_id || null)
+    ? (isSelfRestrictedScope ? null : (acesso.subgrupamento_id || acesso.grupamento_id || null))
     : (!impersonationContext.isImpersonating ? (user?.subgrupamento_id || null) : null);
 
   const subgrupamentoTipo = acesso
-    ? (acesso.tipo_acesso === 'setor' ? 'Grupamento' :
-       acesso.tipo_acesso === 'subsetor' ? 'Subgrupamento' :
-       acesso.tipo_acesso === 'unidade' ? 'Unidade' : null)
+    ? (isSelfRestrictedScope ? null
+      : (resolvedTipoAcesso === 'setor' ? 'Grupamento' :
+       resolvedTipoAcesso === 'subsetor' ? 'Subgrupamento' :
+       resolvedTipoAcesso === 'unidade' ? 'Unidade' : null))
     : (!impersonationContext.isImpersonating ? (user?.subgrupamento_tipo || null) : null);
 
   const userEmail = accessLookupEmail || null;
@@ -96,7 +111,7 @@ export function useCurrentUser() {
   // Modo de acesso: 'admin', 'setor', 'subsetor', 'unidade', 'proprio'
   let modoAcesso = 'proprio';
   if (acesso) {
-    modoAcesso = acesso.tipo_acesso || 'proprio';
+    modoAcesso = resolvedTipoAcesso;
   } else if (!impersonationContext.isImpersonating) {
     if (isAdmin) modoAcesso = 'admin';
     else if (subgrupamentoId) {
@@ -121,7 +136,7 @@ export function useCurrentUser() {
   const isAccessResolved = !accessLookupEmail || (!loadingAcesso && fetchedAcesso && (!requiresUnidades || (!loadingUnidades && fetchedUnidades)));
 
   const getAccessModeFromUser = (targetUser, targetAcesso = null) => {
-    if (targetAcesso) return targetAcesso.tipo_acesso || 'proprio';
+    if (targetAcesso) return normalizeAccessMode(targetAcesso.tipo_acesso) || 'proprio';
     if (!targetUser) return 'proprio';
     if (targetUser.role === 'admin' || targetUser.isAdmin === true) return 'admin';
     if (targetUser.subgrupamento_tipo === 'Grupamento') return 'setor';
