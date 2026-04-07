@@ -1,3 +1,5 @@
+import { obterInconsistenciasCalculoComportamento } from '@/utils/inconsistenciasCadastrais';
+
 const PRACAS = new Set(['Subtenente', '1º Sargento', '2º Sargento', '3º Sargento', 'Cabo', 'Soldado']);
 
 const STATUS_EXCLUIDOS = new Set(['ANULADA']);
@@ -199,6 +201,24 @@ export function calcularComportamento(punicoes, postoGraduacao, hoje = new Date(
 
   const referencia = toDate(hoje) || new Date();
   const dataInclusao = toDate(config.dataInclusaoMilitar || config.data_inclusao || null);
+  const inconsistenciasCalculo = obterInconsistenciasCalculoComportamento({
+    data_inclusao: config.dataInclusaoMilitar || config.data_inclusao || null,
+    posto_graduacao: postoGraduacao,
+  });
+
+  if (inconsistenciasCalculo.length > 0) {
+    return {
+      comportamento: null,
+      fundamento: 'Cálculo bloqueado por inconsistência cadastral.',
+      inconsistente_para_calculo: true,
+      inconsistencias: inconsistenciasCalculo,
+      detalhes: {
+        bloqueado_por_inconsistencia: true,
+        inconsistencias: inconsistenciasCalculo,
+      },
+    };
+  }
+
   const punicoesEntrada = Array.isArray(punicoes) ? punicoes : [];
 
   const punicoesValidas = punicoesEntrada
@@ -283,6 +303,7 @@ export function calcularProximaMelhoria(punicoes, postoGraduacao, hoje = new Dat
   const referencia = toDate(hoje) || new Date();
   const atual = calcularComportamento(punicoes, postoGraduacao, referencia, config);
   if (!atual) return null;
+  if (atual?.inconsistente_para_calculo) return null;
 
   const punicoesValidas = (Array.isArray(punicoes) ? punicoes : [])
     .filter((p) => isPunicaoValida(p, config))

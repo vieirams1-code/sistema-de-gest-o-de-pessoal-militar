@@ -14,6 +14,7 @@ import {
 import { differenceInDays, format } from 'date-fns';
 import AfastamentosVigentesPanel from '@/components/dashboard/AfastamentosVigentesPanel';
 import { ptBR } from 'date-fns/locale';
+import { listarInconsistenciasCadastraisMilitar } from '@/utils/inconsistenciasCadastrais';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
   return (
@@ -146,7 +147,14 @@ export default function Home() {
 
   const atestadosAtivos = atestados.filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
   const punicoesAtivas = punicoes.filter(p => p.status_punicao === 'Ativa' || p.status_punicao === 'Em Curso');
-  const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamento.length;
+  const inconsistenciasCadastrais = militares.flatMap((militar) => (
+    listarInconsistenciasCadastraisMilitar(militar).map((inconsistencia) => ({
+      militarId: militar.id,
+      militarNome: militar.nome_completo || 'Militar sem nome',
+      ...inconsistencia,
+    }))
+  ));
+  const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamento.length + inconsistenciasCadastrais.length;
   const registrosRecentes = registrosLivro.slice(0, 5);
   const jisosAgendadas = jisos
     .filter((jiso) => {
@@ -294,6 +302,35 @@ export default function Home() {
                       titulo={p.militar_nome}
                       subtitulo={`${p.comportamento_atual || 'Bom'} → ${p.comportamento_sugerido} (${p.data_detectada || 'sem data'})`}
                     />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {inconsistenciasCadastrais.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-rose-500" />
+                    <h2 className="font-semibold text-slate-800">Inconsistências Cadastrais</h2>
+                    <Badge className="bg-rose-100 text-rose-700">{inconsistenciasCadastrais.length}</Badge>
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {inconsistenciasCadastrais.slice(0, 20).map((item, index) => (
+                    <div key={`${item.militarId}-${item.tipo}-${index}`} className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                      <p className="text-sm font-medium text-rose-900">
+                        {item.militarNome} — sem {item.labelCampo}
+                      </p>
+                      <p className="text-xs text-rose-800">{item.impacto}</p>
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 mt-1 text-xs text-rose-700"
+                        onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${item.militarId}`)}
+                      >
+                        Corrigir cadastro
+                      </Button>
+                    </div>
                   ))}
                 </div>
               </div>

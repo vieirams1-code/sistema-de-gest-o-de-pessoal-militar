@@ -62,6 +62,7 @@ export default function AvaliacaoComportamento() {
           calculado,
           proxima,
           pendenciaExistente,
+          inconsistenteCalculo: Boolean(calculado?.inconsistente_para_calculo),
           divergente: (militar.comportamento || 'Bom') !== calculado?.comportamento,
         };
       });
@@ -166,7 +167,7 @@ export default function AvaliacaoComportamento() {
   };
 
   const gerarPendencia = async (linha) => {
-    if (!linha.divergente || linha.pendenciaExistente || !linha.calculado?.comportamento) return;
+    if (!linha.divergente || linha.pendenciaExistente || !linha.calculado?.comportamento || linha.inconsistenteCalculo) return;
     await criarPendenciaComportamentoSemDuplicidade({
       militar_id: linha.militar.id,
       militar_nome: linha.militar.nome_completo,
@@ -182,7 +183,7 @@ export default function AvaliacaoComportamento() {
   };
 
   const gerarPendencias = async () => {
-    for (const linha of avaliacao.filter((a) => a.divergente && !a.pendenciaExistente)) {
+    for (const linha of avaliacao.filter((a) => a.divergente && !a.pendenciaExistente && !a.inconsistenteCalculo)) {
       // eslint-disable-next-line no-await-in-loop
       await gerarPendencia(linha);
     }
@@ -256,18 +257,24 @@ export default function AvaliacaoComportamento() {
                   <td className="p-3">{linha.militar.comportamento || 'Bom'}</td>
                   <td className="p-3">{linha.calculado?.comportamento || '—'}</td>
                   <td className="p-3">
-                    {linha.divergente
+                    {linha.inconsistenteCalculo
+                      ? 'Bloqueado por inconsistência cadastral'
+                      : linha.divergente
                       ? `${linha.militar.comportamento || 'Bom'} → ${linha.calculado?.comportamento || '—'}`
                       : 'Sem mudança'}
                   </td>
-                  <td className="p-3">{linha.calculado?.fundamento || '—'}</td>
+                  <td className="p-3">
+                    {linha.inconsistenteCalculo
+                      ? (linha.calculado?.inconsistencias || []).map((item) => item.labelCampo).join(', ')
+                      : (linha.calculado?.fundamento || '—')}
+                  </td>
                   <td className="p-3">{linha.proxima?.data ? `${linha.proxima.data} (${linha.proxima.comportamento_futuro})` : '—'}</td>
                   <td className="p-3">
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => navigate(createPageUrl('DetalheComportamento') + `?id=${linha.militar.id}`)}>
                         Detalhar
                       </Button>
-                      {linha.divergente ? (
+                      {linha.divergente && !linha.inconsistenteCalculo ? (
                         <>
                           <Button size="sm" onClick={() => abrirModalAprovacao(linha)}>
                             <CheckCircle2 className="w-4 h-4 mr-1" />

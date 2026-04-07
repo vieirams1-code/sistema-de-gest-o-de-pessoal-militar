@@ -708,6 +708,14 @@ export async function recalcularComportamentoEMarcarPendencia(militarId) {
     dataInclusaoMilitar: militar.data_inclusao,
   });
 
+  if (resultado?.inconsistente_para_calculo) {
+    return {
+      executado: false,
+      motivo: 'calculo_bloqueado_inconsistencia_cadastral',
+      inconsistencias: resultado?.inconsistencias || [],
+    };
+  }
+
   if (!resultado?.comportamento) return { executado: false, motivo: 'calculo_sem_resultado' };
 
   if (resultado.comportamento !== militar.comportamento) {
