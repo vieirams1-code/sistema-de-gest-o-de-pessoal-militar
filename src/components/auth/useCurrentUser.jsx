@@ -77,7 +77,7 @@ export function useCurrentUser() {
 
   /**
    * Permissão por módulo via UsuarioAcesso.
-   * Campos: acesso_militares, acesso_folha_alteracoes, acesso_ferias, acesso_livro,
+   * Campos: acesso_dashboard, acesso_militares, acesso_folha_alteracoes, acesso_ferias, acesso_livro,
    *         acesso_publicacoes, acesso_atestados, acesso_armamentos, acesso_medalhas, acesso_templates,
    *         acesso_configuracoes, acesso_quadro_operacional
    *
