@@ -3,6 +3,7 @@ export const permissionStructure = [
     category: 'Gestão de Pessoal',
     modules: [
       { key: 'acesso_militares', label: 'Militares', actions: [] },
+      { key: 'acesso_folha_alteracoes', label: 'Folha de Alterações', actions: [] },
       {
         key: 'acesso_ferias',
         label: 'Férias',
