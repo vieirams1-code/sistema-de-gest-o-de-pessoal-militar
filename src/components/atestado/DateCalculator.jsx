@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { addDays, format } from 'date-fns';
-import { Calendar, Calculator } from 'lucide-react';
+import { Calculator } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
