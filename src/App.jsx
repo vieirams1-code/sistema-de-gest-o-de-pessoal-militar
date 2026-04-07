@@ -13,7 +13,7 @@ import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 
 const { Pages, Layout } = pagesConfig;
-const homeRoute = '/VerMilitar';
+const homeRoute = '/Home';
 
 const adminOnlyPages = new Set([
   // Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação
@@ -24,6 +24,7 @@ const adminOnlyPages = new Set([
 
 
 const moduleGuardByPage = {
+  Home: { moduleKey: 'dashboard', moduleName: 'Dashboard' },
   AgendarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
   AgendaJISO: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   EditarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
