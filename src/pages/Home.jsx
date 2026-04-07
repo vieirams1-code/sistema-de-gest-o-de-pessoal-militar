@@ -15,6 +15,8 @@ import { differenceInDays, format } from 'date-fns';
 import AfastamentosVigentesPanel from '@/components/dashboard/AfastamentosVigentesPanel';
 import { ptBR } from 'date-fns/locale';
 import { listarInconsistenciasCadastraisMilitar } from '@/utils/inconsistenciasCadastrais';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
   return (
@@ -76,6 +78,12 @@ function ShortcutButton({ icon: Icon, label, to, navigate }) {
 
 export default function Home() {
   const navigate = useNavigate();
+  const { canAccessModule, isLoading, isAccessResolved } = useCurrentUser();
+  const hasDashboardAccess = canAccessModule('dashboard');
+
+  if (!isLoading && isAccessResolved && !hasDashboardAccess) {
+    return <AccessDenied modulo="Dashboard" />;
+  }
   const punicaoEntity = getPunicaoEntity();
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
@@ -87,31 +95,37 @@ export default function Home() {
   const { data: militares = [] } = useQuery({
     queryKey: ['militares-ativos'],
     queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
+    enabled: hasDashboardAccess,
   });
 
   const { data: periodos = [] } = useQuery({
     queryKey: ['periodos-aquisitivos'],
     queryFn: () => base44.entities.PeriodoAquisitivo.list(),
+    enabled: hasDashboardAccess,
   });
 
   const { data: atestados = [] } = useQuery({
     queryKey: ['atestados-ativos'],
     queryFn: () => base44.entities.Atestado.list(),
+    enabled: hasDashboardAccess,
   });
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['punicoes-ativas'],
     queryFn: () => punicaoEntity.list(),
+    enabled: hasDashboardAccess,
   });
 
   const { data: armamentos = [] } = useQuery({
     queryKey: ['armamentos'],
     queryFn: () => base44.entities.Armamento.list(),
+    enabled: hasDashboardAccess,
   });
 
   const { data: registrosLivro = [] } = useQuery({
     queryKey: ['registros-livro-recentes'],
     queryFn: () => base44.entities.RegistroLivro.list('-created_date'),
+    enabled: hasDashboardAccess,
   });
 
   const { data: publicacoesUrgentes = [] } = useQuery({
@@ -123,14 +137,17 @@ export default function Home() {
       ]);
       return [...exofficio, ...livro].filter(p => p.status !== 'Publicado' && (p.urgente || p.importante));
     },
+    enabled: hasDashboardAccess,
   });
   const { data: pendenciasComportamento = [] } = useQuery({
     queryKey: ['dashboard-pendencias-comportamento'],
     queryFn: () => base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' }),
+    enabled: hasDashboardAccess,
   });
   const { data: jisos = [] } = useQuery({
     queryKey: ['dashboard-jisos'],
     queryFn: () => base44.entities.JISO.list('-data_jiso'),
+    enabled: hasDashboardAccess,
   });
 
   // Alertas de férias por nível

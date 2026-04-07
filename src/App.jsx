@@ -13,7 +13,7 @@ import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
 
 const { Pages, Layout } = pagesConfig;
-const homeRoute = '/VerMilitar';
+const homeRoute = '/Home';
 
 const adminOnlyPages = new Set([
   // Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação
