@@ -1,48 +1,103 @@
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
+const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
+
+const getNestedValue = (obj, path) => {
+  if (!obj) return null;
+  return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : null), obj);
+};
+
+const resolveImpersonationContext = (user) => {
+  const baseEmail = toLowerSafe(user?.email);
+
+  const impersonatedEmailCandidates = [
+    'impersonated_user_email',
+    'impersonatedEmail',
+    'impersonated.email',
+    'impersonation.user_email',
+    'impersonation.email',
+    'impersonation.target_user_email',
+    'acting_as_email',
+    'actingAsEmail',
+    'acting_as.user_email',
+    'acting_as.email',
+    'act_as_email',
+    'as_user_email',
+    'target_user_email',
+    'target.email',
+  ]
+    .map((path) => toLowerSafe(getNestedValue(user, path)))
+    .filter(Boolean);
+
+  const explicitFlag = [
+    user?.is_impersonating,
+    user?.isImpersonating,
+    user?.impersonation_active,
+    user?.acting_as,
+    user?.impersonation?.active,
+  ].some(Boolean);
+
+  const impersonatedEmail = impersonatedEmailCandidates.find((email) => email !== baseEmail) || null;
+  const isImpersonating = Boolean(explicitFlag || impersonatedEmail);
+
+  return {
+    baseEmail,
+    impersonatedEmail,
+    isImpersonating,
+    effectiveEmail: impersonatedEmail || baseEmail,
+  };
+};
+
 export function useCurrentUser() {
   const { data: user, isLoading: loadingAuth } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    gcTime: 60 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
+
+  const impersonationContext = resolveImpersonationContext(user);
+  const accessLookupEmail = impersonationContext.effectiveEmail;
 
   const { data: usuarioAcessoList, isLoading: loadingAcesso, isFetched: fetchedAcesso } = useQuery({
-    queryKey: ['usuarioAcesso', user?.email],
-    queryFn: () => base44.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true }),
-    enabled: !!user?.email,
-    staleTime: 5 * 60 * 1000,
+    queryKey: ['usuarioAcesso', accessLookupEmail, impersonationContext.isImpersonating],
+    queryFn: () => base44.entities.UsuarioAcesso.filter({ user_email: accessLookupEmail, ativo: true }),
+    enabled: !!accessLookupEmail,
+    staleTime: 0,
+    gcTime: 60 * 1000,
+    refetchOnMount: 'always',
   });
 
-  const acesso = usuarioAcessoList?.[0]; // Pega o primeiro acesso ativo encontrado
+  const acesso = usuarioAcessoList?.[0] || null;
 
-  // Observação: mesmo com perfil vinculado (perfil_id/perfil_nome), a autorização em runtime
-  // continua baseada nos booleanos do próprio UsuarioAcesso para manter compatibilidade.
-  // Resolve as propriedades explicitamente usando UsuarioAcesso, com fallback para o modelo antigo (User)
-  const isAdmin = acesso 
-    ? acesso.tipo_acesso === 'admin' 
-    : (user?.role === 'admin' || user?.isAdmin === true);
+  // Resolve as propriedades explicitamente usando UsuarioAcesso.
+  // Em modo de impersonação, não herdar permissões do admin original (fail-closed).
+  const isAdmin = acesso
+    ? acesso.tipo_acesso === 'admin'
+    : (!impersonationContext.isImpersonating && (user?.role === 'admin' || user?.isAdmin === true));
 
-  const subgrupamentoId = acesso 
-    ? (acesso.subgrupamento_id || acesso.grupamento_id || null) 
-    : (user?.subgrupamento_id || null);
+  const subgrupamentoId = acesso
+    ? (acesso.subgrupamento_id || acesso.grupamento_id || null)
+    : (!impersonationContext.isImpersonating ? (user?.subgrupamento_id || null) : null);
 
-  const subgrupamentoTipo = acesso 
-    ? (acesso.tipo_acesso === 'setor' ? 'Grupamento' : 
-       acesso.tipo_acesso === 'subsetor' ? 'Subgrupamento' : 
-       acesso.tipo_acesso === 'unidade' ? 'Unidade' : null) 
-    : (user?.subgrupamento_tipo || null);
+  const subgrupamentoTipo = acesso
+    ? (acesso.tipo_acesso === 'setor' ? 'Grupamento' :
+       acesso.tipo_acesso === 'subsetor' ? 'Subgrupamento' :
+       acesso.tipo_acesso === 'unidade' ? 'Unidade' : null)
+    : (!impersonationContext.isImpersonating ? (user?.subgrupamento_tipo || null) : null);
 
-  const userEmail = user?.email || null;
-  const linkedMilitarId = acesso ? (acesso.militar_id || null) : (user?.militar_id || null);
-  const linkedMilitarEmail = acesso ? (acesso.militar_email || null) : (user?.militar_email || null);
+  const userEmail = accessLookupEmail || null;
+  const linkedMilitarId = acesso ? (acesso.militar_id || null) : (!impersonationContext.isImpersonating ? (user?.militar_id || null) : null);
+  const linkedMilitarEmail = acesso ? (acesso.militar_email || null) : (!impersonationContext.isImpersonating ? (user?.militar_email || null) : null);
 
   // Modo de acesso: 'admin', 'setor', 'subsetor', 'unidade', 'proprio'
   let modoAcesso = 'proprio';
   if (acesso) {
     modoAcesso = acesso.tipo_acesso || 'proprio';
-  } else {
+  } else if (!impersonationContext.isImpersonating) {
     if (isAdmin) modoAcesso = 'admin';
     else if (subgrupamentoId) {
       if (subgrupamentoTipo === 'Grupamento') modoAcesso = 'setor';
@@ -63,7 +118,7 @@ export function useCurrentUser() {
   });
 
   const isLoading = loadingAuth || loadingAcesso || (requiresUnidades && loadingUnidades);
-  const isAccessResolved = !user?.email || (!loadingAcesso && fetchedAcesso && (!requiresUnidades || (!loadingUnidades && fetchedUnidades)));
+  const isAccessResolved = !accessLookupEmail || (!loadingAcesso && fetchedAcesso && (!requiresUnidades || (!loadingUnidades && fetchedUnidades)));
 
   const getAccessModeFromUser = (targetUser, targetAcesso = null) => {
     if (targetAcesso) return targetAcesso.tipo_acesso || 'proprio';
@@ -75,71 +130,38 @@ export function useCurrentUser() {
     return 'proprio';
   };
 
-  /**
-   * Permissão por módulo via UsuarioAcesso.
-   * Campos: acesso_militares, acesso_folha_alteracoes, acesso_ferias, acesso_livro,
-   *         acesso_publicacoes, acesso_atestados, acesso_armamentos, acesso_medalhas, acesso_templates,
-   *         acesso_configuracoes, acesso_quadro_operacional
-   *
-   * @param {string} modulo — ex: 'ferias', 'militares', 'configuracoes'
-   */
   const canAccessModule = (modulo) => {
-    if (user?.email && !isAccessResolved) return false;
+    if (accessLookupEmail && !isAccessResolved) return false;
 
-    // Admin sem registro de acesso → libera tudo (fallback legado)
-    if (isAdmin && !acesso) return true;
-    // Admin com registro → respeita campo se existir, senão libera
-    if (isAdmin && acesso) {
-      const campo = `acesso_${modulo}`;
-      return acesso[campo] !== false; // undefined/true → true
-    }
-    // Usuário comum com registro → lê o campo
     if (acesso) {
       const campo = `acesso_${modulo}`;
+      if (isAdmin) return acesso[campo] !== false;
       return acesso[campo] === true;
     }
-    // Sem registro e sem admin → bloqueia
+
+    if (impersonationContext.isImpersonating) return false;
+    if (isAdmin) return true;
     return false;
   };
 
-  /**
-   * Permissão por ação sensível via UsuarioAcesso.
-   * Campos: perm_admin_mode, perm_gerir_cadeia_ferias, perm_excluir_ferias,
-   *         perm_recalcular_ferias, perm_gerir_templates, perm_gerir_permissoes,
-   *         perm_gerir_estrutura, perm_editar_publicacoes, perm_publicar_bg,
-   *         perm_tornar_sem_efeito_publicacao, perm_apostilar_publicacao,
-   *         perm_publicar_ata_jiso, perm_publicar_homologacao, perm_gerir_jiso,
-   *         perm_registrar_decisao_jiso, perm_excluir_atestado, perm_gerir_quadro,
-   *         perm_mover_card, perm_gerir_colunas, perm_arquivar_card,
-   *         perm_gerir_acoes_operacionais, perm_excluir_acao_operacional,
-   *         perm_gerir_configuracoes
-   *
-   * @param {string} acao — ex: 'admin_mode', 'excluir_ferias', 'gerir_cadeia_ferias'
-   */
   const canAccessAction = (acao) => {
-    if (user?.email && !isAccessResolved) return false;
+    if (accessLookupEmail && !isAccessResolved) return false;
 
-    if (isAdmin && !acesso) return true;
-    if (isAdmin && acesso) {
-      const campo = `perm_${acao}`;
-      return acesso[campo] !== false;
-    }
     if (acesso) {
       const campo = `perm_${acao}`;
+      if (isAdmin) return acesso[campo] !== false;
       return acesso[campo] === true;
     }
+
+    if (impersonationContext.isImpersonating) return false;
+    if (isAdmin) return true;
     return false;
   };
 
-  /**
-   * Retorna true se o usuário tem acesso ao registro.
-   * @param registro - objeto com grupamento_id, subgrupamento_id e/ou created_by
-   */
   const hasAccess = (registro) => {
     if (!registro) return false;
     if (isAdmin) return true;
 
-    // Modo Setor: vê tudo do setor (via grupamento_id) e seus subsetores
     if (modoAcesso === 'setor') {
       return (
         registro.grupamento_id === subgrupamentoId ||
@@ -147,18 +169,15 @@ export function useCurrentUser() {
       );
     }
 
-    // Modo Subsetor/Seção: vê o próprio subsetor e as unidades filhas
     if (modoAcesso === 'subsetor') {
       const scopeIds = [subgrupamentoId, ...unidadesFilhas.map(u => u.id)];
       return scopeIds.includes(registro.subgrupamento_id);
     }
 
-    // Modo Unidade: vê apenas a própria unidade (id exato)
     if (modoAcesso === 'unidade') {
       return registro.subgrupamento_id === subgrupamentoId;
     }
 
-    // Modo Próprio: acessa apenas registros criados pelo próprio email ou com created_by igual ao email
     if (modoAcesso === 'proprio') {
       return (
         registro.created_by === userEmail ||
@@ -213,6 +232,15 @@ export function useCurrentUser() {
     return [];
   };
 
+  const resolvedAccessContext = {
+    isImpersonating: impersonationContext.isImpersonating,
+    baseEmail: impersonationContext.baseEmail,
+    effectiveEmail: accessLookupEmail,
+    hasAcessoRecord: Boolean(acesso),
+    modoAcesso,
+    isAdmin,
+  };
+
   return {
     user,
     acesso,
@@ -232,5 +260,6 @@ export function useCurrentUser() {
     hasSelfAccess,
     getMilitarScopeFilters,
     getAccessModeFromUser,
+    resolvedAccessContext,
   };
 }
