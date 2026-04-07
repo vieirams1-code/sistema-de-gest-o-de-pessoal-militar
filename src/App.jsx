@@ -24,6 +24,7 @@ const adminOnlyPages = new Set([
 
 
 const moduleGuardByPage = {
+  Home: { moduleKey: 'militares', moduleName: 'Dashboard' },
   AgendarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },
   AgendaJISO: { moduleKey: 'atestados', moduleName: 'Atestados' }, // alias legado
   EditarJISO: { moduleKey: 'atestados', moduleName: 'Atestados' },

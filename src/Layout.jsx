@@ -35,7 +35,7 @@ const menuGroups = [
   {
     title: 'Principal',
     items: [
-      { name: 'Dashboard', page: 'Home', icon: Home },
+      { name: 'Dashboard', page: 'Home', icon: Home, moduleKey: 'militares' },
     ],
   },
   {

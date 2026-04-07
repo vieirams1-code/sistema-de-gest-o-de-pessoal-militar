@@ -14,6 +14,15 @@ const initialPermissions = {
   ...modulosList.reduce((acc, m) => ({ ...acc, [m.key]: false }), {}),
   ...acoesSensiveis.reduce((acc, a) => ({ ...acc, [a.key]: false }), {})
 };
+const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
+
+const normalizeAccessMode = (value) => {
+  const normalized = (value || '').toString().trim().toLowerCase();
+  if (!normalized) return 'proprio';
+  if (SELF_RESTRICTED_SCOPES.has(normalized)) return 'proprio';
+  if (['admin', 'setor', 'subsetor', 'unidade'].includes(normalized)) return normalized;
+  return 'proprio';
+};
 
 const toBooleanPermission = (value) => {
   if (typeof value === 'string') {
@@ -121,7 +130,7 @@ export default function PermissoesUsuarios() {
 
     setSelectedUser(fullAcesso);
     setIsNewAcesso(false);
-    setUserAccessMode(fullAcesso.tipo_acesso || 'proprio');
+    setUserAccessMode(normalizeAccessMode(fullAcesso.tipo_acesso));
     setUserNomeUsuario(fullAcesso.nome_usuario || '');
     setUserUserEmail(fullAcesso.user_email || '');
     setUserAtivo(fullAcesso.ativo !== false);
@@ -212,14 +221,16 @@ export default function PermissoesUsuarios() {
         ...normalizedPermissions
       };
 
+      const normalizedAccessMode = normalizeAccessMode(userAccessMode);
+
       let roleData = {};
-      if (userAccessMode === 'admin') {
+      if (normalizedAccessMode === 'admin') {
         roleData = { tipo_acesso: 'admin', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: '', militar_email: '' };
-      } else if (userAccessMode === 'subsetor' && sub) {
+      } else if (normalizedAccessMode === 'subsetor' && sub) {
         roleData = { tipo_acesso: 'subsetor', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento', militar_id: '', militar_email: '' };
-      } else if (userAccessMode === 'setor' && grupamento) {
+      } else if (normalizedAccessMode === 'setor' && grupamento) {
         roleData = { tipo_acesso: 'setor', grupamento_id: grupamento.id, grupamento_nome: grupamento.nome, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: 'Grupamento', militar_id: '', militar_email: '' };
-      } else if (userAccessMode === 'unidade' && uni) {
+      } else if (normalizedAccessMode === 'unidade' && uni) {
         roleData = { tipo_acesso: 'unidade', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: uni.id, subgrupamento_nome: uni.nome, subgrupamento_tipo: 'Unidade', militar_id: '', militar_email: '' };
       } else {
         roleData = { tipo_acesso: 'proprio', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: userMilitarId || '', militar_email: militarEmailVinculado };
