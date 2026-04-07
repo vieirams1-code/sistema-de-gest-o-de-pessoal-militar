@@ -68,12 +68,6 @@ export default function EstruturaOrganizacional() {
     return todos.map(item => ({ ...item, parentId: getParentId(item), tipoNormalizado: normalizeTipo(item) }));
   }, [todos]);
 
-  if (loadingUser || !isAccessResolved) return null;
-  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
-  if (!canAccessAction('gerir_estrutura')) {
-    return <AccessDenied modulo="Estrutura Organizacional" />;
-  }
-
   const setores = estrutura.filter(s => s.tipoNormalizado === 'Setor');
   const subsetores = estrutura.filter(s => s.tipoNormalizado === 'Subsetor');
   const unidades = estrutura.filter(s => s.tipoNormalizado === 'Unidade');
@@ -102,6 +96,12 @@ export default function EstruturaOrganizacional() {
       setDeleteDialog({ open: false, id: null });
     },
   });
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
+  if (!canAccessAction('gerir_estrutura')) {
+    return <AccessDenied modulo="Estrutura Organizacional" />;
+  }
 
   const startEdit = (s) => {
     setEditingId(s.id);

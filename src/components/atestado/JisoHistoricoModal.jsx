@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
-import { format, addDays, parseISO, subDays } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 import { PlusCircle, History, Trash2 } from 'lucide-react';
 
 export default function JisoHistoricoModal({ atestado, open, onClose }) {

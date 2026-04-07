@@ -10,7 +10,6 @@ import {
   ArrowLeft, 
   Pencil, 
   FileText, 
-  User, 
   Calendar,
   Clock,
   Stethoscope,

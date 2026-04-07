@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Camera, Upload, User } from 'lucide-react';
+import { Camera, User } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { Button } from "@/components/ui/button";
 
 export default function PhotoUpload({ value, onChange }) {
   const [uploading, setUploading] = useState(false);
