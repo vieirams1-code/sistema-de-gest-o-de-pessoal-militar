@@ -52,7 +52,7 @@ const moduleGuardByPage = {
   CadastrarRegistroRP: { moduleKey: 'livro', moduleName: 'Registro de Publicações' },
   AvaliacaoComportamento: { moduleKey: 'militares', moduleName: 'Efetivo' },
   DetalheComportamento: { moduleKey: 'militares', moduleName: 'Efetivo' },
-  FolhaAlteracoes: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  FolhaAlteracoes: { moduleKey: 'folha_alteracoes', moduleName: 'Folha de Alterações' },
   CadastrarMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   CadastrarPunicao: { moduleKey: 'militares', moduleName: 'Efetivo' },
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },

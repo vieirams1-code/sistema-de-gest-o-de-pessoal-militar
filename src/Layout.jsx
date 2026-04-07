@@ -42,7 +42,7 @@ const menuGroups = [
     title: 'Pessoal',
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
-      { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'militares' },
+      { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'folha_alteracoes' },
     ],
   },
   {
