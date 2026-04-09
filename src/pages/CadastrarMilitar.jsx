@@ -99,6 +99,34 @@ const POSTOS_GRADUACOES = [
 
 const QUADROS_FIXOS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QBMPT'];
 
+const onlyDigits = (value = '') => String(value).replace(/\D/g, '');
+
+const formatMatricula = (value = '') => {
+  const digits = onlyDigits(value).slice(0, 9);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
+
+const isValidCPF = (value = '') => {
+  const digits = onlyDigits(value);
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+
+  const calcDigit = (base, factor) => {
+    let total = 0;
+    for (let i = 0; i < base.length; i += 1) {
+      total += parseInt(base[i], 10) * (factor - i);
+    }
+    const result = (total * 10) % 11;
+    return result === 10 ? 0 : result;
+  };
+
+  const d1 = calcDigit(digits.slice(0, 9), 10);
+  const d2 = calcDigit(digits.slice(0, 10), 11);
+
+  return d1 === parseInt(digits[9], 10) && d2 === parseInt(digits[10], 10);
+};
+
 export default function CadastrarMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -124,14 +152,14 @@ export default function CadastrarMilitar() {
     enabled: !!editId,
     onSuccess: (data) => {
       if (data) {
-        setFormData({ ...initialFormData, ...data });
+        setFormData({ ...initialFormData, ...data, matricula: formatMatricula(data.matricula) });
       }
     }
   });
 
   React.useEffect(() => {
     if (editingMilitar) {
-      setFormData({ ...initialFormData, ...editingMilitar });
+      setFormData({ ...initialFormData, ...editingMilitar, matricula: formatMatricula(editingMilitar.matricula) });
       setComportamentoOriginal(editingMilitar.comportamento || null);
     }
   }, [editingMilitar]);
@@ -140,6 +168,11 @@ export default function CadastrarMilitar() {
   const quadrosCompativeis = getQuadrosCompativeis(formData.posto_graduacao, QUADROS_FIXOS);
 
   const handleChange = (name, value) => {
+    if (name === 'matricula') {
+      setFormData(prev => ({ ...prev, matricula: formatMatricula(value) }));
+      return;
+    }
+
     if (name === 'posto_graduacao') {
       const quadroAtual = formData.quadro;
       const precisaLimparQuadro = quadroAtual && !isQuadroCompativel(value, quadroAtual);
@@ -171,6 +204,18 @@ export default function CadastrarMilitar() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const matriculaDigits = onlyDigits(formData.matricula);
+    if (matriculaDigits.length !== 9) {
+      window.alert('Matrícula inválida. Use o formato 108.747-021.');
+      return;
+    }
+
+    const cpfDigits = onlyDigits(formData.cpf);
+    if (cpfDigits && !isValidCPF(cpfDigits)) {
+      window.alert('CPF inválido.');
+      return;
+    }
 
     if (!isQuadroCompativel(formData.posto_graduacao, formData.quadro)) {
       const categoria = isPostoOficial(formData.posto_graduacao) ? 'oficial' : 'praça';
