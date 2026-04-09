@@ -1,5 +1,9 @@
 # Base44 App
 
+## Nota sobre módulo removido
+
+A lógica de antiguidade/promoção foi removida do projeto e não deve ser reintroduzida. O build agora executa uma checagem automática que falha caso sejam adicionados termos bloqueados relacionados a esse módulo.
+
 ## Publicação automática no GitHub (sincronizar com Base44)
 
 Este projeto inclui um script para publicar alterações automaticamente no repositório GitHub conectado ao Base44.
