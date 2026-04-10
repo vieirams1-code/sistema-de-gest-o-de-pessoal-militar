@@ -291,8 +291,19 @@ function normalizarCPF(valor, alertas) {
 function formatarTelefone(valor, alertas) {
   const numeros = somenteNumeros(valor);
   if (!numeros) return '';
-  if (numeros.length === 11) return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`;
-  if (numeros.length === 10) return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 6)}-${numeros.slice(6)}`;
+
+  let numerosNormalizados = numeros;
+  if ((numeros.length === 12 || numeros.length === 13) && numeros.startsWith('55')) {
+    numerosNormalizados = numeros.slice(2);
+  }
+
+  if (numerosNormalizados.length === 11) {
+    return `(${numerosNormalizados.slice(0, 2)}) ${numerosNormalizados.slice(2, 7)}-${numerosNormalizados.slice(7)}`;
+  }
+  if (numerosNormalizados.length === 10) {
+    return `(${numerosNormalizados.slice(0, 2)}) ${numerosNormalizados.slice(2, 6)}-${numerosNormalizados.slice(6)}`;
+  }
+
   alertas.push('Telefone inválido no sistema antigo. Campo deixado em branco para revisão.');
   return '';
 }
