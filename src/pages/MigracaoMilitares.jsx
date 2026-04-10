@@ -76,14 +76,19 @@ export default function MigracaoMilitares() {
   };
 
   const handleImportar = async (incluirAlertas) => {
-    if (!analise || !historicoId) return;
+    if (!analise) return;
     try {
       setCarregando(true);
       const usuario = await base44.auth.me();
+      const historicoIdAtual = historicoId || (await salvarAnaliseHistorico(analise, usuario))?.id;
+      if (!historicoIdAtual) {
+        throw new Error('Não foi possível criar o registro de histórico da importação.');
+      }
+      if (!historicoId) setHistoricoId(historicoIdAtual);
       const resultado = await importarAnalise({
         analise,
         incluirAlertas,
-        historicoId,
+        historicoId: historicoIdAtual,
         usuario,
       });
       setResultadoImportacao(resultado);
