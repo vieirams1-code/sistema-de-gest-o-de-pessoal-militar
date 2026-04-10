@@ -17,6 +17,13 @@ const statusClass = {
   ERRO: 'bg-rose-100 text-rose-800',
 };
 
+function motivoPrincipal(linha) {
+  if (linha.erros?.length) return linha.erros[0];
+  if (linha.revisoes?.length) return linha.revisoes[0];
+  if (linha.alertas?.length) return linha.alertas[0];
+  return '—';
+}
+
 export default function TabelaPreviaMigracaoAtestados({ linhas, onSelectLinha }) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -33,7 +40,7 @@ export default function TabelaPreviaMigracaoAtestados({ linhas, onSelectLinha })
               <th className="text-left p-3">Data término</th>
               <th className="text-left p-3">Dias</th>
               <th className="text-left p-3">Status publicação</th>
-              <th className="text-left p-3">Alertas</th>
+              <th className="text-left p-3">Motivo principal</th>
             </tr>
           </thead>
           <tbody>
@@ -48,7 +55,7 @@ export default function TabelaPreviaMigracaoAtestados({ linhas, onSelectLinha })
                 <td className="p-3">{linha.transformado.data_termino_br || '—'}</td>
                 <td className="p-3">{linha.transformado.dias || '—'}</td>
                 <td className="p-3">{linha.transformado.status_publicacao || '—'}</td>
-                <td className="p-3">{linha.alertas[0] || '—'}</td>
+                <td className="p-3">{motivoPrincipal(linha)}</td>
               </tr>
             ))}
           </tbody>

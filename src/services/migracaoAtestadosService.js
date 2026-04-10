@@ -38,6 +38,21 @@ const HEADER_ALIAS = {
 
 const LIMIAR_DIAS_JISO = 15;
 
+const POSTO_EQUIVALENCIAS = {
+  SD: ['SOLDADO'],
+  CB: ['CABO'],
+  '3SGT': ['3 SARGENTO', '3º SARGENTO', 'TERCEIRO SARGENTO'],
+  '2SGT': ['2 SARGENTO', '2º SARGENTO', 'SEGUNDO SARGENTO'],
+  '1SGT': ['1 SARGENTO', '1º SARGENTO', 'PRIMEIRO SARGENTO'],
+  ST: ['SUBTENENTE'],
+  ASP: ['ASPIRANTE'],
+  TEN: ['TENENTE', '2 TENENTE', '1 TENENTE', '2º TENENTE', '1º TENENTE'],
+  CAP: ['CAPITAO', 'CAPITÃO'],
+  MAJ: ['MAJOR'],
+  TC: ['TENENTE CORONEL'],
+  CEL: ['CORONEL'],
+};
+
 function limparTexto(valor) {
   return String(valor ?? '').trim();
 }
@@ -48,6 +63,16 @@ function normalizarChave(valor) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+function normalizarTextoComparacao(valor) {
+  return limparTexto(valor)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function parseCsv(texto) {
@@ -189,10 +214,10 @@ function interpretarStatusPublicacao({ nota_para_bg, numero_bg, data_bg }) {
   return '';
 }
 
-function determinarStatusLinha({ erros, ignorado, revisar, alertas }) {
+function determinarStatusLinha({ erros, ignorado, revisoes, alertas }) {
   if (erros.length) return STATUS_LINHA.ERRO;
   if (ignorado) return STATUS_LINHA.IGNORADO;
-  if (revisar) return STATUS_LINHA.REVISAR;
+  if (revisoes.length) return STATUS_LINHA.REVISAR;
   if (alertas.length) return STATUS_LINHA.APTO_COM_ALERTA;
   return STATUS_LINHA.APTO;
 }
@@ -207,13 +232,54 @@ async function listarMilitares() {
   return base44.entities.Militar.list('-created_date', 10000);
 }
 
+function tokenizarMilitar(textoMilitar) {
+  const normalizado = normalizarTextoComparacao(textoMilitar);
+  if (!normalizado) return { posto: '', nome: '' };
+  const partes = normalizado.split(' ').filter(Boolean);
+  if (partes.length === 1) return { posto: '', nome: partes[0] };
+  return {
+    posto: partes[0],
+    nome: partes.slice(1).join(' '),
+  };
+}
+
+function obterVariantesPosto(posto) {
+  const base = normalizarTextoComparacao(posto).replace(/\s+/g, '');
+  if (!base) return new Set();
+  const variantes = new Set([base]);
+
+  Object.entries(POSTO_EQUIVALENCIAS).forEach(([abreviado, completos]) => {
+    const ab = normalizarTextoComparacao(abreviado).replace(/\s+/g, '');
+    const compNorm = completos.map((c) => normalizarTextoComparacao(c).replace(/\s+/g, ''));
+    if (base === ab || compNorm.includes(base)) {
+      variantes.add(ab);
+      compNorm.forEach((c) => variantes.add(c));
+    }
+  });
+
+  return variantes;
+}
+
 function resolverMilitarPorTexto(textoMilitar, militares) {
-  const texto = limparTexto(textoMilitar).toUpperCase();
+  const texto = limparTexto(textoMilitar);
   if (!texto) return { militar: null, candidatos: [] };
 
+  const { posto, nome } = tokenizarMilitar(texto);
+  const nomeNorm = normalizarTextoComparacao(nome || texto);
+  const postoVariantes = obterVariantesPosto(posto);
+
   const candidatos = militares.filter((m) => {
-    const composto = `${limparTexto(m.posto_graduacao)} ${limparTexto(m.nome_guerra)}`.trim().toUpperCase();
-    return composto && (composto === texto || composto.includes(texto) || texto.includes(composto));
+    const postoMilitar = normalizarTextoComparacao(m.posto_graduacao).replace(/\s+/g, '');
+    const nomeGuerra = normalizarTextoComparacao(m.nome_guerra);
+    const nomeCompleto = normalizarTextoComparacao(m.nome_completo);
+
+    const postoOk = postoVariantes.size === 0 || postoVariantes.has(postoMilitar);
+    const nomeBase = nomeNorm || normalizarTextoComparacao(texto);
+
+    const nomeGuerraOk = nomeBase && (nomeGuerra === nomeBase || nomeGuerra.includes(nomeBase) || nomeBase.includes(nomeGuerra));
+    const nomeCompletoOk = nomeBase && (nomeCompleto === nomeBase || nomeCompleto.includes(nomeBase) || nomeBase.includes(nomeCompleto));
+
+    return postoOk && (nomeGuerraOk || nomeCompletoOk);
   });
 
   if (candidatos.length === 1) return { militar: candidatos[0], candidatos };
@@ -230,6 +296,18 @@ async function existeDuplicacao(payload) {
     data_termino: payload.data_termino,
   });
   return itens.length > 0;
+}
+
+function chaveDuplicidade({ militar_id, medico, tipo_afastamento, cid_10, data_inicio, data_termino }) {
+  if (!militar_id || !tipo_afastamento || !data_inicio || !data_termino) return '';
+  return [
+    limparTexto(militar_id),
+    normalizarTextoComparacao(medico),
+    normalizarTextoComparacao(tipo_afastamento),
+    normalizarTextoComparacao(cid_10),
+    data_inicio,
+    data_termino,
+  ].join('|');
 }
 
 function montarResumo(linhas) {
@@ -293,8 +371,8 @@ export async function analisarArquivoMigracaoAtestados(file) {
     const linhaNumero = i + 1;
     const alertas = [];
     const erros = [];
+    const revisoes = [];
     const observacoes = [];
-    let revisar = false;
     let ignorado = false;
 
     const militarOriginal = valorLinha(cells, headerMap, 'militar');
@@ -309,9 +387,8 @@ export async function analisarArquivoMigracaoAtestados(file) {
 
     const { militar, candidatos } = resolverMilitarPorTexto(militarOriginal, militares);
     if (!militar) {
-      revisar = true;
-      if (candidatos.length === 0) erros.push('Militar não encontrado para vínculo automático.');
-      if (candidatos.length > 1) erros.push('Mais de um militar possível para vínculo automático.');
+      if (candidatos.length === 0) revisoes.push('Militar não localizado para vínculo automático.');
+      if (candidatos.length > 1) revisoes.push('Múltiplos militares possíveis para vínculo automático.');
     }
 
     const tipoNormalizado = limparTexto(tipoOriginal);
@@ -334,17 +411,19 @@ export async function analisarArquivoMigracaoAtestados(file) {
 
     const calculado = diffDiasInclusivo(dataInicio, dataTermino);
     const dataRetorno = dataTermino ? adicionarDias(dataTermino, 1) : '';
+    const retornoOriginal = parseDataBrOuIso(valorLinha(cells, headerMap, 'retorno'));
 
-    if (dataInicio && dataTermino && calculado !== null) {
-      if (dataInicio > dataTermino || (Number.isFinite(dias) && dias !== calculado)) {
-        revisar = true;
-        erros.push('Inconsistência entre datas, duração e retorno do atestado. Revisão manual necessária.');
+    if (dataInicio && dataTermino && calculado !== null && Number.isFinite(dias)) {
+      if (dataInicio > dataTermino || dias !== calculado) {
+        revisoes.push('Incoerência entre datas e dias do atestado.');
+      }
+      if (retornoOriginal && retornoOriginal !== dataRetorno) {
+        revisoes.push('Incoerência entre data de retorno informada e período do atestado.');
       }
     }
 
     if ((numeroBg && !dataBg) || (!numeroBg && dataBg)) {
-      revisar = true;
-      erros.push('BG e Data do BG vieram preenchidos de forma incompleta. Revisão manual necessária.');
+      revisoes.push('Publicação histórica incompleta: BG sem data ou data sem BG.');
     }
 
     const { medico, crm } = splitMedico(medicoOriginal, alertas);
@@ -401,6 +480,7 @@ export async function analisarArquivoMigracaoAtestados(file) {
         observacoes: observacoes.join('\n'),
       },
       alertas,
+      revisoes,
       erros,
       candidatosMilitar: candidatos.map((m) => ({
         id: m.id,
@@ -412,10 +492,65 @@ export async function analisarArquivoMigracaoAtestados(file) {
       ajusteMilitarManual: false,
       publicacaoMigrada: Boolean(status_publicacao),
       idAtestadoCriado: null,
+      suspeitaDuplicidade: false,
     };
 
-    linha.status = determinarStatusLinha({ erros, ignorado, revisar, alertas });
+    linha.status = determinarStatusLinha({ erros, ignorado, revisoes, alertas });
     linhas.push(linha);
+  }
+
+  const mapaDuplicidadePreview = new Map();
+  linhas.forEach((linha) => {
+    const chave = chaveDuplicidade(linha.transformado);
+    if (!chave) return;
+    const lista = mapaDuplicidadePreview.get(chave) || [];
+    lista.push(linha);
+    mapaDuplicidadePreview.set(chave, lista);
+  });
+
+  mapaDuplicidadePreview.forEach((duplicadas) => {
+    if (duplicadas.length < 2) return;
+    duplicadas.forEach((linha) => {
+      linha.suspeitaDuplicidade = true;
+      if (!linha.revisoes.includes('Suspeita de duplicidade dentro do arquivo de prévia.')) {
+        linha.revisoes.push('Suspeita de duplicidade dentro do arquivo de prévia.');
+      }
+      linha.status = determinarStatusLinha({
+        erros: linha.erros,
+        ignorado: linha.status === STATUS_LINHA.IGNORADO,
+        revisoes: linha.revisoes,
+        alertas: linha.alertas,
+      });
+    });
+  });
+
+  for (const linha of linhas) {
+    if (linha.status === STATUS_LINHA.IGNORADO || linha.status === STATUS_LINHA.ERRO) continue;
+    const chave = chaveDuplicidade(linha.transformado);
+    if (!chave) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    const duplicadoExistente = await existeDuplicacao({
+      militar_id: linha.transformado.militar_id,
+      medico: linha.transformado.medico,
+      tipo_afastamento: linha.transformado.tipo_afastamento,
+      cid_10: linha.transformado.cid_10,
+      data_inicio: linha.transformado.data_inicio,
+      data_termino: linha.transformado.data_termino,
+    });
+
+    if (duplicadoExistente) {
+      linha.suspeitaDuplicidade = true;
+      if (!linha.revisoes.includes('Suspeita de duplicidade com registro já existente.')) {
+        linha.revisoes.push('Suspeita de duplicidade com registro já existente.');
+      }
+      linha.status = determinarStatusLinha({
+        erros: linha.erros,
+        ignorado: linha.status === STATUS_LINHA.IGNORADO,
+        revisoes: linha.revisoes,
+        alertas: linha.alertas,
+      });
+    }
   }
 
   const resumo = montarResumo(linhas);
@@ -450,7 +585,9 @@ export async function salvarAnaliseHistoricoAtestados(analise, usuario) {
       resumo: analise.resumo,
       linhas: analise.linhas,
       alertas: analise.linhas.flatMap((l) => l.alertas),
+      revisoes: analise.linhas.flatMap((l) => l.revisoes || []),
       erros: analise.linhas.flatMap((l) => l.erros),
+      ajustes_manuais_militar: analise.linhas.filter((l) => l.ajusteMilitarManual).map((l) => l.linhaNumero),
       ids_criados: [],
     }),
     observacoes: 'Lote registrado apenas como análise inicial.',
@@ -463,7 +600,10 @@ export function atualizarMilitarLinhaAnalise(analise, linhaNumero, militar) {
   const novasLinhas = analise.linhas.map((linha) => {
     if (linha.linhaNumero !== linhaNumero) return linha;
 
-    const errosFiltrados = linha.erros.filter((e) => !e.includes('Militar não encontrado') && !e.includes('Mais de um militar possível'));
+    const revisoesFiltradas = (linha.revisoes || []).filter(
+      (r) => !r.includes('Militar não localizado') && !r.includes('Múltiplos militares possíveis'),
+    );
+
     const alertas = [...linha.alertas];
     if (!alertas.includes('Militar ajustado manualmente na prévia de importação.')) {
       alertas.push('Militar ajustado manualmente na prévia de importação.');
@@ -483,11 +623,15 @@ export function atualizarMilitarLinhaAnalise(analise, linhaNumero, militar) {
       },
       ajusteMilitarManual: true,
       alertas,
-      erros: errosFiltrados,
+      revisoes: revisoesFiltradas,
     };
 
-    const revisar = atualizado.erros.some((e) => e.includes('Inconsistência') || e.includes('BG e Data do BG'));
-    atualizado.status = determinarStatusLinha({ erros: atualizado.erros, ignorado: linha.status === STATUS_LINHA.IGNORADO, revisar, alertas: atualizado.alertas });
+    atualizado.status = determinarStatusLinha({
+      erros: atualizado.erros,
+      ignorado: linha.status === STATUS_LINHA.IGNORADO,
+      revisoes: atualizado.revisoes,
+      alertas: atualizado.alertas,
+    });
     return atualizado;
   });
 
@@ -578,13 +722,16 @@ export async function importarAnaliseAtestados({ analise, incluirAlertas, histor
         periodo: `${linha.transformado.data_inicio_br} a ${linha.transformado.data_termino_br}`,
         status_linha: linha.status,
         alertas: linha.alertas,
+        revisoes: linha.revisoes || [],
         erros: linha.erros,
         ajuste_manual_militar: linha.ajusteMilitarManual,
         publicacao_migrada: linha.publicacaoMigrada,
         id_atestado_criado: linha.idAtestadoCriado,
       })),
       alertas: analise.linhas.flatMap((x) => x.alertas),
+      revisoes: analise.linhas.flatMap((x) => x.revisoes || []),
       erros: analise.linhas.flatMap((x) => x.erros),
+      ajustes_manuais_militar: analise.linhas.filter((x) => x.ajusteMilitarManual).map((x) => x.linhaNumero),
       ids_criados: idsCriados,
       importado_por: usuario?.full_name || usuario?.email || '',
       importado_em: agora.toISOString(),
@@ -618,12 +765,14 @@ export async function importarAnaliseAtestados({ analise, incluirAlertas, histor
   }
 }
 
-export function exportarRelatorioMigracaoAtestados(relatorio, nomeArquivo) {
-  const blob = new Blob([JSON.stringify(relatorio, null, 2)], { type: 'application/json' });
+export function exportarRelatorioMigracaoAtestados(relatorio, nomeArquivo = 'relatorio-migracao-atestados.json') {
+  const blob = new Blob([JSON.stringify(relatorio, null, 2)], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = nomeArquivo || `relatorio-migracao-atestados-${Date.now()}.json`;
-  anchor.click();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
