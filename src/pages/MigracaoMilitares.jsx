@@ -25,6 +25,8 @@ const filtros = [
   { id: 'ERRO', label: 'Erros' },
 ];
 
+const ERRO_ENTIDADE_HISTORICO = 'Falha ao acessar o histórico de importação de militares. Verifique se a entidade ImportacaoMilitares está publicada no app.';
+
 export default function MigracaoMilitares() {
   const { isAdmin, isLoading, isAccessResolved } = useCurrentUser();
   const { toast } = useToast();
@@ -65,9 +67,12 @@ export default function MigracaoMilitares() {
 
       toast({ title: 'Análise concluída', description: 'Prévia gerada com sucesso.' });
     } catch (error) {
+      const mensagem = String(error?.message || '').includes('Entity schema ImportacaoMilitares not found in app')
+        ? ERRO_ENTIDADE_HISTORICO
+        : error?.message || 'Não foi possível analisar o arquivo.';
       toast({
         title: 'Falha na análise',
-        description: error?.message || 'Não foi possível analisar o arquivo.',
+        description: mensagem,
         variant: 'destructive',
       });
     } finally {
@@ -94,7 +99,10 @@ export default function MigracaoMilitares() {
       setResultadoImportacao(resultado);
       toast({ title: 'Importação finalizada', description: `Foram importados ${resultado.totalImportadas} registros.` });
     } catch (error) {
-      toast({ title: 'Erro na importação', description: error?.message || 'Falha ao importar lote.', variant: 'destructive' });
+      const mensagem = String(error?.message || '').includes('Entity schema ImportacaoMilitares not found in app')
+        ? ERRO_ENTIDADE_HISTORICO
+        : error?.message || 'Falha ao importar lote.';
+      toast({ title: 'Erro na importação', description: mensagem, variant: 'destructive' });
     } finally {
       setCarregando(false);
     }
