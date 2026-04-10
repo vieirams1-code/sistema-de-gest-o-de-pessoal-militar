@@ -68,6 +68,7 @@ import Ferias from './pages/Ferias';
 import FichaMilitar from './pages/FichaMilitar';
 import FolhaAlteracoes from './pages/FolhaAlteracoes';
 import Home from './pages/Home';
+import HistoricoImportacoesMilitares from './pages/HistoricoImportacoesMilitares';
 import Medalhas from './pages/Medalhas';
 import Militares from './pages/Militares';
 import PeriodosAquisitivos from './pages/PeriodosAquisitivos';
@@ -115,6 +116,7 @@ export const PAGES = {
     "FichaMilitar": FichaMilitar,
     "FolhaAlteracoes": FolhaAlteracoes,
     "Home": Home,
+    "HistoricoImportacoesMilitares": HistoricoImportacoesMilitares,
     "Medalhas": Medalhas,
     "Militares": Militares,
     "PeriodosAquisitivos": PeriodosAquisitivos,

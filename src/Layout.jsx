@@ -25,6 +25,7 @@ import {
   BookMarked,
   FileSpreadsheet,
   FileUp,
+  History,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -100,6 +101,7 @@ const adminMenuGroup = {
     { name: 'Estrutura Organizacional', page: 'EstruturaOrganizacional', icon: GitBranch, actionKey: 'gerir_estrutura' },
     { name: 'Lotação de Militares', page: 'LotacaoMilitares', icon: Building2, actionKey: 'gerir_estrutura' },
     { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, adminOnly: true },
+    { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, adminOnly: true },
     { name: 'Migração de Atestados', page: 'MigracaoAtestados', icon: FileSpreadsheet, adminOnly: true },
   ],
 };
