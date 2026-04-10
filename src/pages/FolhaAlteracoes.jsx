@@ -129,12 +129,31 @@ function extrairDadosBg(item = {}) {
 }
 
 function statusPublicado(item = {}) {
-  return toText(item?.status) === 'Publicado';
+  return toText(item?.status) === 'Publicado' || toText(item?.status_publicacao) === 'Publicado';
 }
 
 function registroPublicadoEmBg(item = {}) {
   const bg = extrairDadosBg(item);
   return statusPublicado(item) && bg.completo;
+}
+
+function montarEventoAtestado(item, filtrarPorPeriodo) {
+  if (!registroPublicadoEmBg(item)) return null;
+  const dataEvento = normalizarDataISO(item.data_bg);
+  if (!filtrarPorPeriodo(dataEvento)) return null;
+
+  const texto = toText(item?.texto_publicacao) || toText(item?.nota_para_bg);
+  if (!texto) return null;
+
+  return {
+    id: item.id,
+    data: dataEvento,
+    tipo: 'Atestado',
+    texto,
+    referenciaBoletim: montarReferenciaBoletim(item),
+    descricao: `Atestado - BG ${item.numero_bg}`,
+    origem: 'Atestado',
+  };
 }
 
 function montarReferenciaBoletim(item = {}) {
@@ -444,7 +463,10 @@ export default function FolhaAlteracoes() {
       const inicioPeriodo = previa.periodo.dataInicial;
       const fimPeriodo = previa.periodo.dataFinal;
 
-      const publicacoes = await listarPorMilitar('PublicacaoExOfficio', militarId, '-data_bg');
+      const [publicacoes, atestados] = await Promise.all([
+        listarPorMilitar('PublicacaoExOfficio', militarId, '-data_bg'),
+        listarPorMilitar('Atestado', militarId, '-data_bg'),
+      ]);
 
       const filtrarPorPeriodo = (data) => Boolean(data && data >= inicioPeriodo && data <= fimPeriodo);
 
@@ -468,7 +490,17 @@ export default function FolhaAlteracoes() {
         })
         .filter(Boolean);
 
-      return eventosPublicacoes.sort((a, b) => a.data.localeCompare(b.data));
+      const eventosAtestados = atestados
+        .map((item) => montarEventoAtestado(item, filtrarPorPeriodo))
+        .filter(Boolean);
+
+      const deduplicado = new Map();
+      [...eventosPublicacoes, ...eventosAtestados].forEach((evento) => {
+        const key = `${evento.origem}-${evento.id || `${evento.data}-${evento.referenciaBoletim}`}`;
+        if (!deduplicado.has(key)) deduplicado.set(key, evento);
+      });
+
+      return Array.from(deduplicado.values()).sort((a, b) => a.data.localeCompare(b.data));
     },
     enabled: !!previa,
   });

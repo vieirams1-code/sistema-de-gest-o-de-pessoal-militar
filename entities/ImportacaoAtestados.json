@@ -1,0 +1,27 @@
+{
+  "name": "ImportacaoAtestados",
+  "type": "object",
+  "title": "Importação de Atestados",
+  "description": "Histórico e auditoria dos lotes de migração de atestados médicos legados.",
+  "properties": {
+    "nome_arquivo": { "type": "string", "default": "" },
+    "tipo_arquivo": { "type": "string", "default": "" },
+    "hash_arquivo": { "type": "string", "default": "" },
+    "data_importacao": { "type": "date", "default": "" },
+    "importado_por": { "type": "string", "default": "" },
+    "importado_por_nome": { "type": "string", "default": "" },
+    "total_linhas": { "type": "number", "default": 0 },
+    "total_aptas": { "type": "number", "default": 0 },
+    "total_aptas_com_alerta": { "type": "number", "default": 0 },
+    "total_revisar": { "type": "number", "default": 0 },
+    "total_ignoradas": { "type": "number", "default": 0 },
+    "total_erros": { "type": "number", "default": 0 },
+    "total_importadas": { "type": "number", "default": 0 },
+    "total_nao_importadas": { "type": "number", "default": 0 },
+    "status_importacao": { "type": "string", "default": "Analisado" },
+    "importar_linhas_com_alerta": { "type": "boolean", "default": false },
+    "versao_regra_migracao": { "type": "string", "default": "v1.0.0" },
+    "relatorio_json": { "type": "string", "default": "" },
+    "observacoes": { "type": "string", "default": "" }
+  }
+}
