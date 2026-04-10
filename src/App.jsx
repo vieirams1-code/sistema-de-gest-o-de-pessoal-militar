@@ -20,6 +20,7 @@ const adminOnlyPages = new Set([
   // de uma action key específica na arquitetura (ex: gerir_solicitacoes_atualizacao).
   'SolicitacoesAtualizacao',
   'Subgrupamentos',
+  'HistoricoImportacoesMilitares',
 ]);
 
 
