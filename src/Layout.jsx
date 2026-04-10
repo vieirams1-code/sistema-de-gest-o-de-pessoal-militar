@@ -24,6 +24,7 @@ import {
   GitBranch,
   BookMarked,
   FileSpreadsheet,
+  FileUp,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -98,6 +99,7 @@ const adminMenuGroup = {
     { name: 'Perfis de Permissão', page: 'PerfisPermissao', icon: Shield, actionKey: 'gerir_permissoes' },
     { name: 'Estrutura Organizacional', page: 'EstruturaOrganizacional', icon: GitBranch, actionKey: 'gerir_estrutura' },
     { name: 'Lotação de Militares', page: 'LotacaoMilitares', icon: Building2, actionKey: 'gerir_estrutura' },
+    { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, adminOnly: true },
   ],
 };
 
