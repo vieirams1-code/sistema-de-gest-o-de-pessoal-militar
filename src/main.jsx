@@ -2,6 +2,13 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
+import { ImportacaoMilitares, ImportacaoAtestados, PunicaoDisciplinar } from '@/api/entities'
+
+
+// Mantém o módulo de entidades carregado no bundle para sincronização/publicação no runtime Base44.
+void ImportacaoMilitares;
+void ImportacaoAtestados;
+void PunicaoDisciplinar;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   // <React.StrictMode>
