@@ -604,8 +604,14 @@ function relatorioFromAnalise(analise, extras = {}) {
 function getHistoricoImportacaoEntity() {
   const entity = base44?.entities?.[HISTORICO_ENTITY_NAME];
   if (!entity?.create || !entity?.update) {
-    throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+    return null;
   }
+  return entity;
+}
+
+function assertHistoricoEntity() {
+  const entity = getHistoricoImportacaoEntity();
+  if (!entity) throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
   return entity;
 }
 
@@ -628,6 +634,12 @@ export async function salvarAnaliseHistorico(analise, usuario) {
     observacoes: '',
   };
 
+  if (!historicoEntity) {
+    // Fallback: entidade indisponível no runtime — retorna objeto simulado sem persistência
+    console.warn('[ImportacaoMilitares] Entidade não disponível no runtime. Histórico NÃO foi salvo.');
+    return { id: null, _historicoNaoSalvo: true, ...payload };
+  }
+
   try {
     return await historicoEntity.create(payload);
   } catch (error) {
@@ -640,22 +652,26 @@ export async function salvarAnaliseHistorico(analise, usuario) {
 
 export async function importarAnalise({ analise, incluirAlertas, historicoId, usuario }) {
   const historicoEntity = getHistoricoImportacaoEntity();
+  const historicoDisponivel = !!historicoEntity && !!historicoId;
+
+  if (historicoDisponivel) {
+    try {
+      await historicoEntity.update(historicoId, {
+        status_importacao: 'Importando',
+        importar_linhas_com_alerta: incluirAlertas,
+      });
+    } catch (error) {
+      if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
+        throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+      }
+      throw error;
+    }
+  }
+
   const podeImportar = (linha) => linha.status === STATUS_LINHA.APTO || (incluirAlertas && linha.status === STATUS_LINHA.APTO_COM_ALERTA);
   const elegiveis = analise.linhas.filter(podeImportar);
   const idsCriados = [];
   const naoImportadas = [];
-
-  try {
-    await historicoEntity.update(historicoId, {
-      status_importacao: 'Importando',
-      importar_linhas_com_alerta: incluirAlertas,
-    });
-  } catch (error) {
-    if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
-      throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
-    }
-    throw error;
-  }
 
   try {
     for (const linha of elegiveis) {
@@ -695,15 +711,17 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       },
     });
 
-    await historicoEntity.update(historicoId, {
-      importado_por: usuario?.email || '',
-      importado_por_nome: usuario?.full_name || usuario?.name || '',
-      total_importadas: totalImportadas,
-      total_nao_importadas: totalNaoImportadas,
-      status_importacao: statusImportacao,
-      importar_linhas_com_alerta: incluirAlertas,
-      relatorio_json: JSON.stringify(relatorio, null, 2),
-    });
+    if (historicoDisponivel) {
+      await historicoEntity.update(historicoId, {
+        importado_por: usuario?.email || '',
+        importado_por_nome: usuario?.full_name || usuario?.name || '',
+        total_importadas: totalImportadas,
+        total_nao_importadas: totalNaoImportadas,
+        status_importacao: statusImportacao,
+        importar_linhas_com_alerta: incluirAlertas,
+        relatorio_json: JSON.stringify(relatorio, null, 2),
+      });
+    }
 
     return {
       statusImportacao,
@@ -714,16 +732,17 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       relatorio,
     };
   } catch (error) {
-    try {
-      await historicoEntity.update(historicoId, {
-        status_importacao: 'Falhou',
-        observacoes: error?.message || 'Falha ao importar lote.',
-      });
-    } catch (updateError) {
-      if (String(updateError?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
-        throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+    if (historicoDisponivel) {
+      try {
+        await historicoEntity.update(historicoId, {
+          status_importacao: 'Falhou',
+          observacoes: error?.message || 'Falha ao importar lote.',
+        });
+      } catch (updateError) {
+        if (String(updateError?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
+          console.warn('[ImportacaoMilitares] Não foi possível atualizar status de falha no histórico.');
+        }
       }
-      throw updateError;
     }
     if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
       throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);

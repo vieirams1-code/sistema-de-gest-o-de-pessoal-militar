@@ -11,6 +11,7 @@ import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react
 import { addDays, format as formatDate } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { createPageUrl } from '@/utils';
 import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 
