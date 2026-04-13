@@ -382,12 +382,39 @@ function formatarData(valor, { obrigatoria = false, mensagemErro, mensagemAlerta
 
 function normalizarNumeroLivre(valor, mensagemAlerta, alertas) {
   const limpo = limparTexto(valor).replace(',', '.');
-  if (!limpo) return '';
+  if (!limpo) return null;
   if (!/^\d+(\.\d+)?$/.test(limpo)) {
     alertas.push(mensagemAlerta);
-    return '';
+    return null;
   }
-  return limpo;
+  const numero = Number(limpo);
+  if (!Number.isFinite(numero)) {
+    alertas.push(mensagemAlerta);
+    return null;
+  }
+  return numero;
+}
+
+function sanitizarCamposNumericosMilitar(payload) {
+  const sanitizado = { ...payload };
+  ['altura', 'peso'].forEach((campo) => {
+    const valor = sanitizado[campo];
+    if (valor === '' || valor === null || valor === undefined) {
+      delete sanitizado[campo];
+      return;
+    }
+    if (typeof valor === 'number') {
+      if (!Number.isFinite(valor)) delete sanitizado[campo];
+      return;
+    }
+    const convertido = Number(String(valor).replace(',', '.').trim());
+    if (Number.isFinite(convertido)) {
+      sanitizado[campo] = convertido;
+    } else {
+      delete sanitizado[campo];
+    }
+  });
+  return sanitizado;
 }
 
 function mapEscolaridade(valor, alertas) {
@@ -691,7 +718,8 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
         continue;
       }
 
-      const criado = await base44.entities.Militar.create(linha.transformado);
+      const payloadMilitar = sanitizarCamposNumericosMilitar(linha.transformado);
+      const criado = await base44.entities.Militar.create(payloadMilitar);
       idsCriados.push(criado?.id);
     }
 
