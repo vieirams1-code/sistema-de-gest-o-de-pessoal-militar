@@ -129,7 +129,20 @@ function toUpperTrim(valor) {
   return limparTexto(valor).toUpperCase();
 }
 
+function detectarDelimitador(texto) {
+  const primeiraLinha = String(texto || '').split(/\r\n|\n|\r/)[0] || '';
+  const candidatos = [';', ',', '\t'];
+
+  const contagens = candidatos.map((delimitador) => ({
+    delimitador,
+    total: primeiraLinha.split(delimitador).length - 1,
+  }));
+
+  return contagens.sort((a, b) => b.total - a.total)[0]?.delimitador || ';';
+}
+
 function parseCsv(texto) {
+  const delimitador = detectarDelimitador(texto);
   const linhas = [];
   let atual = '';
   let linha = [];
@@ -138,17 +151,24 @@ function parseCsv(texto) {
   for (let i = 0; i < texto.length; i += 1) {
     const char = texto[i];
     const prox = texto[i + 1];
+
     if (char === '"') {
       if (emAspas && prox === '"') {
         atual += '"';
         i += 1;
-      } else {
-        emAspas = !emAspas;
+        continue;
       }
-      continue;
+
+      const inicioCampo = atual.length === 0;
+      const fimCampo = !prox || prox === delimitador || prox === '\n' || prox === '\r';
+
+      if (emAspas || inicioCampo || fimCampo) {
+        emAspas = !emAspas;
+        continue;
+      }
     }
 
-    if (!emAspas && (char === ',' || char === ';' || char === '\t')) {
+    if (!emAspas && char === delimitador) {
       linha.push(atual);
       atual = '';
       continue;
@@ -603,7 +623,6 @@ export async function salvarAnaliseHistorico(analise, usuario) {
     total_nao_importadas: analise.resumo.total_linhas,
     status_importacao: 'Analisado',
     importar_linhas_com_alerta: false,
-    ignorar_duplicadas: false,
     versao_regra_migracao: analise.versao_regra_migracao,
     relatorio_json: JSON.stringify(relatorioFromAnalise(analise), null, 2),
     observacoes: '',
@@ -683,7 +702,6 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       total_nao_importadas: totalNaoImportadas,
       status_importacao: statusImportacao,
       importar_linhas_com_alerta: incluirAlertas,
-      ignorar_duplicadas: true,
       relatorio_json: JSON.stringify(relatorio, null, 2),
     });
 

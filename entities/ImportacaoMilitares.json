@@ -72,10 +72,6 @@
       "type": "boolean",
       "default": false
     },
-    "ignorar_duplicadas": {
-      "type": "boolean",
-      "default": false
-    },
     "versao_regra_migracao": {
       "type": "string",
       "default": "v1.0.0"
