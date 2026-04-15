@@ -100,9 +100,17 @@ const adminMenuGroup = {
     { name: 'Perfis de Permissão', page: 'PerfisPermissao', icon: Shield, actionKey: 'gerir_permissoes' },
     { name: 'Estrutura Organizacional', page: 'EstruturaOrganizacional', icon: GitBranch, actionKey: 'gerir_estrutura' },
     { name: 'Lotação de Militares', page: 'LotacaoMilitares', icon: Building2, actionKey: 'gerir_estrutura' },
-    { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, adminOnly: true },
-    { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, adminOnly: true },
-    { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, adminOnly: true },
+    {
+      name: 'Migração',
+      page: 'MigracaoMilitares',
+      icon: FileUp,
+      adminOnly: true,
+      children: [
+        { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, adminOnly: true },
+        { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, adminOnly: true },
+        { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, adminOnly: true },
+      ],
+    },
   ],
 };
 
