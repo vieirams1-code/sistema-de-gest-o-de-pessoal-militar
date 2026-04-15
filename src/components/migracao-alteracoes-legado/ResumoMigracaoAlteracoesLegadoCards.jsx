@@ -6,12 +6,14 @@ const itens = [
   { key: 'total_aptas_com_alerta', label: 'Aptas c/ alerta', cor: 'text-amber-700' },
   { key: 'total_revisar', label: 'Revisar', cor: 'text-indigo-700' },
   { key: 'total_ignoradas', label: 'Ignoradas', cor: 'text-slate-700' },
+  { key: 'total_pendentes_classificacao', label: 'Pendentes classif.', cor: 'text-indigo-700' },
+  { key: 'total_excluidas_lote', label: 'Excluídas lote', cor: 'text-zinc-700' },
   { key: 'total_erros', label: 'Erros', cor: 'text-rose-700' },
 ];
 
 export default function ResumoMigracaoAlteracoesLegadoCards({ resumo }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-8 gap-3">
       {itens.map((item) => (
         <div key={item.key} className="bg-white border border-slate-200 rounded-xl p-4">
           <p className="text-xs text-slate-500 uppercase tracking-wide">{item.label}</p>

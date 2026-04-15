@@ -15,6 +15,7 @@ export default function DetalheLinhaMigracaoAlteracaoLegado({
   tiposPublicacaoValidos = [],
   onSelecionarMilitar,
   onSelecionarTipoPublicacao,
+  onSelecionarDestinoFinal,
 }) {
   if (!linha) return null;
 
@@ -70,6 +71,29 @@ export default function DetalheLinhaMigracaoAlteracaoLegado({
             </p>
           </div>
 
+
+          <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+            <Label>Definir destino final da linha no lote</Label>
+            <Select
+              value={linha.transformado.destino_final || 'IMPORTAR'}
+              onValueChange={(valor) => onSelecionarDestinoFinal?.(linha, valor)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o destino final" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IMPORTAR">IMPORTAR</SelectItem>
+                <SelectItem value="PENDENTE_CLASSIFICACAO">PENDENTE_CLASSIFICACAO</SelectItem>
+                <SelectItem value="IGNORAR">IGNORAR</SelectItem>
+                <SelectItem value="EXCLUIDO_DO_LOTE">EXCLUIDO_DO_LOTE</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500">
+              Destino sugerido pela planilha/GPT: <strong>{linha.transformado.destino_sugerido || '—'}</strong>
+              {linha.transformado.motivo_destino ? ` • Motivo: ${linha.transformado.motivo_destino}` : ''}
+            </p>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-4">
             <section className="bg-emerald-50 rounded-lg p-3 md:col-span-2">
               <h3 className="font-semibold mb-2">Trecho legado capturado</h3>
@@ -82,6 +106,7 @@ export default function DetalheLinhaMigracaoAlteracaoLegado({
                 <p><strong>Tipo BG legado:</strong> {linha.transformado.tipo_bg_legado || '—'}</p>
                 <p><strong>Tipo sugerido:</strong> {linha.transformado.tipo_publicacao_sugerido || '—'}</p>
                 <p><strong>Tipo final confirmado:</strong> {linha.transformado.tipo_publicacao_confirmado || 'Pendente'}</p>
+                <p><strong>Destino final:</strong> {linha.transformado.destino_final || 'IMPORTAR'}</p>
                 <p><strong>Confiança:</strong> {linha.transformado.confianca_classificacao || '—'}</p>
                 <p><strong>Revisão manual (origem planilha):</strong> {linha.transformado.revisao_manual || '—'}</p>
                 <p className="md:col-span-2"><strong>Motivo:</strong> {linha.transformado.motivo_classificacao || '—'}</p>

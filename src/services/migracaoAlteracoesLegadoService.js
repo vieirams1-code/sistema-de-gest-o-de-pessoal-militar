@@ -9,6 +9,7 @@ export const STATUS_LINHA = {
   REVISAR: 'REVISAR',
   IGNORADO: 'IGNORADO',
   ERRO: 'ERRO',
+  EXCLUIDO_DO_LOTE: 'EXCLUIDO_DO_LOTE',
 };
 
 const STATUS_IMPORTACAO = {
@@ -21,6 +22,13 @@ const STATUS_IMPORTACAO = {
 
 const REGRA_VERSAO = 'v1.0.0';
 const TIPO_NEUTRO_LEGADO = 'LEGADO_NAO_CLASSIFICADO';
+
+export const DESTINO_FINAL = {
+  IMPORTAR: 'IMPORTAR',
+  PENDENTE_CLASSIFICACAO: 'PENDENTE_CLASSIFICACAO',
+  IGNORAR: 'IGNORAR',
+  EXCLUIDO_DO_LOTE: 'EXCLUIDO_DO_LOTE',
+};
 
 const HEADER_ALIAS = {
   nota_id_legado: ['nota id', 'nota_id', 'nota', 'numero_nota'],
@@ -53,6 +61,8 @@ const HEADER_ALIAS = {
   motivo_classificacao: ['motivo_classificacao', 'motivo classificacao', 'motivo classificação'],
   regra_usada: ['regra_usada', 'regra usada'],
   observacao_classificacao: ['observacao_classificacao', 'observação_classificacao', 'observacao classificacao', 'observação classificação'],
+  destino_sugerido: ['destino_sugerido', 'destino sugerido'],
+  motivo_destino: ['motivo_destino', 'motivo destino'],
 };
 
 function limparTexto(valor) {
@@ -311,9 +321,10 @@ function statusEhPublicadoLegado(status) {
   return ['PUBLICADO', 'PUBLICADA', 'PUBLICACAO', 'PUBLICAÇÃO'].includes(s) || s.includes('PUBLICAD');
 }
 
-function calcularStatusLinha({ erros, revisoes, ignorado, alertas }) {
+function calcularStatusLinha({ erros, revisoes, ignorado, alertas, destinoFinal }) {
+  if (destinoFinal === DESTINO_FINAL.EXCLUIDO_DO_LOTE) return STATUS_LINHA.EXCLUIDO_DO_LOTE;
   if (erros.length) return STATUS_LINHA.ERRO;
-  if (ignorado) return STATUS_LINHA.IGNORADO;
+  if (ignorado || destinoFinal === DESTINO_FINAL.IGNORAR) return STATUS_LINHA.IGNORADO;
   if (revisoes.length) return STATUS_LINHA.REVISAR;
   if (alertas.length) return STATUS_LINHA.APTO_COM_ALERTA;
   return STATUS_LINHA.APTO;
@@ -366,6 +377,9 @@ function mapCamposTransformados(row, colunas) {
     motivo_classificacao: valor('motivo_classificacao'),
     regra_usada: valor('regra_usada'),
     observacao_classificacao: valor('observacao_classificacao'),
+    destino_sugerido: valor('destino_sugerido'),
+    motivo_destino: valor('motivo_destino'),
+    destino_final: '',
     tipo_publicacao_confirmado: '',
     tipo_publicacao_confirmado_manualmente: false,
     status_publicacao: 'Publicado',
@@ -393,6 +407,40 @@ function resolverTipoSugeridoValido(tipoSugerido, tiposValidosMap) {
   if (!valor) return null;
   if (normalizarTextoComparacao(valor) === normalizarTextoComparacao(TIPO_NEUTRO_LEGADO)) return null;
   return tiposValidosMap.get(normalizarTextoComparacao(valor)) || null;
+}
+
+
+function resolverDestinoFinal(destinoSugerido, fallback = DESTINO_FINAL.IMPORTAR) {
+  const normalizado = normalizarTextoComparacao(destinoSugerido);
+  if (!normalizado) return fallback;
+  if (normalizado === DESTINO_FINAL.IMPORTAR) return DESTINO_FINAL.IMPORTAR;
+  if (normalizado === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) return DESTINO_FINAL.PENDENTE_CLASSIFICACAO;
+  if (normalizado === DESTINO_FINAL.IGNORAR) return DESTINO_FINAL.IGNORAR;
+  if (normalizado === DESTINO_FINAL.EXCLUIDO_DO_LOTE) return DESTINO_FINAL.EXCLUIDO_DO_LOTE;
+  return fallback;
+}
+
+function atualizarLinhaComStatus(linha) {
+  const destinoFinal = linha.transformado.destino_final || DESTINO_FINAL.IMPORTAR;
+  const status = calcularStatusLinha({
+    erros: linha.erros || [],
+    revisoes: linha.revisoes || [],
+    alertas: linha.alertas || [],
+    ignorado: false,
+    destinoFinal,
+  });
+
+  return {
+    ...linha,
+    transformado: {
+      ...linha.transformado,
+      classificacao_pendente: destinoFinal === DESTINO_FINAL.PENDENTE_CLASSIFICACAO,
+      tipo_publicacao: destinoFinal === DESTINO_FINAL.PENDENTE_CLASSIFICACAO
+        ? TIPO_NEUTRO_LEGADO
+        : (linha.transformado.tipo_publicacao_confirmado || TIPO_NEUTRO_LEGADO),
+    },
+    status,
+  };
 }
 
 function resolverMilitar(transformado, indicesMilitares) {
@@ -452,6 +500,8 @@ function gerarResumo(linhas) {
     if (linha.status === STATUS_LINHA.REVISAR) acc.total_revisar += 1;
     if (linha.status === STATUS_LINHA.IGNORADO) acc.total_ignoradas += 1;
     if (linha.status === STATUS_LINHA.ERRO) acc.total_erros += 1;
+    if (linha.status === STATUS_LINHA.EXCLUIDO_DO_LOTE) acc.total_excluidas_lote += 1;
+    if (linha.transformado?.destino_final === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) acc.total_pendentes_classificacao += 1;
     if (linha.alertas?.length) acc.total_alertas += 1;
     if (linha.revisoes?.some((r) => r.includes('duplicidade'))) acc.total_duplicidades += 1;
     return acc;
@@ -462,6 +512,8 @@ function gerarResumo(linhas) {
     total_revisar: 0,
     total_ignoradas: 0,
     total_erros: 0,
+    total_excluidas_lote: 0,
+    total_pendentes_classificacao: 0,
     total_alertas: 0,
     total_duplicidades: 0,
   });
@@ -517,10 +569,20 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
       transformado.tipo_publicacao_sugerido = tipoSugeridoValido;
       transformado.tipo_publicacao_confirmado = tipoSugeridoValido;
       transformado.tipo_publicacao = tipoSugeridoValido;
+      transformado.destino_final = resolverDestinoFinal(transformado.destino_sugerido, DESTINO_FINAL.IMPORTAR);
     } else {
       transformado.tipo_publicacao_confirmado = '';
       transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
-      revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
+      transformado.destino_final = resolverDestinoFinal(transformado.destino_sugerido, DESTINO_FINAL.PENDENTE_CLASSIFICACAO);
+      if (transformado.destino_final !== DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
+        revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
+      }
+    }
+
+    if (transformado.destino_final === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
+      transformado.classificacao_pendente = true;
+      transformado.tipo_publicacao_confirmado = '';
+      transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
     }
 
     if (!transformado.numero_bg) erros.push('Número do BG obrigatório ausente.');
@@ -581,7 +643,9 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
     if ((duplicidadeArquivo.get(linha.chave_duplicidade) || 0) > 1) {
       linha.revisoes.push('Suspeita de duplicidade dentro do arquivo atual.');
     }
-    linha.status = calcularStatusLinha({ erros: linha.erros, revisoes: linha.revisoes, alertas: linha.alertas, ignorado: false });
+    const linhaAtualizada = atualizarLinhaComStatus(linha);
+    linha.status = linhaAtualizada.status;
+    linha.transformado = linhaAtualizada.transformado;
   });
 
   const resumo = gerarResumo(linhas);
@@ -624,20 +688,12 @@ export function atualizarMilitarLinhaAnalise(analise, linhaNumero, militar) {
       timestamp: new Date().toISOString(),
     });
 
-    const status = calcularStatusLinha({
-      erros: linha.erros || [],
-      revisoes,
-      alertas: linha.alertas || [],
-      ignorado: false,
-    });
-
-    return {
+    return atualizarLinhaComStatus({
       ...linha,
       revisoes,
-      status,
       transformado,
       ajustes_manuais: ajustes,
-    };
+    });
   });
 
   return {
@@ -675,20 +731,59 @@ export function atualizarTipoPublicacaoLinhaAnalise(analise, linhaNumero, tipoPu
       timestamp: new Date().toISOString(),
     });
 
-    const status = calcularStatusLinha({
-      erros: linha.erros || [],
-      revisoes,
-      alertas: linha.alertas || [],
-      ignorado: false,
-    });
-
-    return {
+    return atualizarLinhaComStatus({
       ...linha,
       revisoes,
-      status,
       transformado,
       ajustes_manuais: ajustes,
+    });
+  });
+
+  return {
+    ...analise,
+    linhas: linhasAtualizadas,
+    resumo: gerarResumo(linhasAtualizadas),
+  };
+}
+
+
+export function atualizarDestinoLinhaAnalise(analise, linhaNumero, destinoFinal) {
+  if (!analise) return analise;
+
+  const destinoNormalizado = resolverDestinoFinal(destinoFinal, DESTINO_FINAL.IMPORTAR);
+
+  const linhasAtualizadas = analise.linhas.map((linha) => {
+    if (linha.linhaNumero !== linhaNumero) return linha;
+
+    const revisoesBase = (linha.revisoes || []).filter((r) => !r.includes('Tipo de publicação pendente'));
+    const revisoes = [...revisoesBase];
+
+    const transformado = {
+      ...linha.transformado,
+      destino_final: destinoNormalizado,
     };
+
+    if (destinoNormalizado === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
+      transformado.tipo_publicacao_confirmado = '';
+      transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
+    } else if (!transformado.tipo_publicacao_confirmado) {
+      revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
+    }
+
+    const ajustes = [...(linha.ajustes_manuais || [])];
+    ajustes.push({
+      tipo: 'DESTINO_FINAL',
+      antes: linha.transformado.destino_final || DESTINO_FINAL.IMPORTAR,
+      depois: destinoNormalizado,
+      timestamp: new Date().toISOString(),
+    });
+
+    return atualizarLinhaComStatus({
+      ...linha,
+      revisoes,
+      transformado,
+      ajustes_manuais: ajustes,
+    });
   });
 
   return {
@@ -701,7 +796,9 @@ export function atualizarTipoPublicacaoLinhaAnalise(analise, linhaNumero, tipoPu
 function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
   const t = linha.transformado;
   const textoPrincipal = t.conteudo_trecho_legado || t.materia_legado || `Registro legado importado (Nota ID: ${t.nota_id_legado || 'N/I'})`;
-  const tipoFinal = t.tipo_publicacao_confirmado || t.tipo_publicacao_sugerido || t.tipo_publicacao || TIPO_NEUTRO_LEGADO;
+  const tipoFinal = t.destino_final === DESTINO_FINAL.PENDENTE_CLASSIFICACAO
+    ? TIPO_NEUTRO_LEGADO
+    : (t.tipo_publicacao_confirmado || t.tipo_publicacao_sugerido || t.tipo_publicacao || TIPO_NEUTRO_LEGADO);
   const rastreabilidadeClassificacao = {
     tipo_publicacao_sugerido: t.tipo_publicacao_sugerido || '',
     tipo_publicacao_confirmado: t.tipo_publicacao_confirmado || '',
@@ -710,6 +807,9 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
     motivo_classificacao: t.motivo_classificacao || '',
     regra_usada: t.regra_usada || '',
     observacao_classificacao: t.observacao_classificacao || '',
+    destino_sugerido: t.destino_sugerido || '',
+    destino_final: t.destino_final || DESTINO_FINAL.IMPORTAR,
+    motivo_destino: t.motivo_destino || '',
   };
 
   return {
@@ -739,6 +839,16 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
     importado_por_legado_nome: usuario?.full_name || usuario?.name || usuario?.email || '',
     importado_em_legado: new Date().toISOString(),
     tipo_publicacao_original_legado: t.tipo_publicacao,
+    tipo_publicacao_sugerido: t.tipo_publicacao_sugerido || '',
+    tipo_publicacao_confirmado: t.tipo_publicacao_confirmado || '',
+    confianca_classificacao: t.confianca_classificacao || '',
+    motivo_classificacao: t.motivo_classificacao || '',
+    regra_usada: t.regra_usada || '',
+    observacao_classificacao: t.observacao_classificacao || '',
+    destino_sugerido: t.destino_sugerido || '',
+    destino_final: t.destino_final || DESTINO_FINAL.IMPORTAR,
+    motivo_destino: t.motivo_destino || '',
+    classificacao_pendente: t.destino_final === DESTINO_FINAL.PENDENTE_CLASSIFICACAO,
     nota_id_legado: t.nota_id_legado,
     cargo_legado: t.cargo_legado,
     nome_guerra_legado: t.nome_guerra_legado,
@@ -779,7 +889,14 @@ export async function salvarAnaliseHistoricoAlteracoesLegado(analise, usuario) {
   return historico;
 }
 
-export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, historicoId, usuario }) {
+
+function linhaTemSomenteRevisaoTipo(linha) {
+  const revisoes = linha.revisoes || [];
+  if (!revisoes.length) return true;
+  return revisoes.every((r) => r.includes('Tipo de publicação pendente'));
+}
+
+export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, incluirPendentesClassificacao = false, historicoId, usuario }) {
   if (!analise?.linhas?.length) throw new Error('Análise inválida para importação.');
   const avisosHistorico = [];
   let historicoImportando = null;
@@ -789,6 +906,7 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
       historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
         status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
         importar_linhas_com_alerta: !!incluirAlertas,
+        importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
       });
     } catch (error) {
       avisosHistorico.push(error?.message || 'Não foi possível atualizar o histórico para status de importação em andamento.');
@@ -797,7 +915,14 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     avisosHistorico.push('Importação executada sem salvar histórico do lote, pois a entidade de histórico não está disponível no ambiente.');
   }
 
-  const importaveis = analise.linhas.filter((linha) => linha.status === STATUS_LINHA.APTO || (incluirAlertas && linha.status === STATUS_LINHA.APTO_COM_ALERTA));
+  const importaveis = analise.linhas.filter((linha) => {
+    const destino = linha.transformado?.destino_final || DESTINO_FINAL.IMPORTAR;
+    if (linha.status === STATUS_LINHA.ERRO || linha.status === STATUS_LINHA.EXCLUIDO_DO_LOTE || destino === DESTINO_FINAL.IGNORAR || destino === DESTINO_FINAL.EXCLUIDO_DO_LOTE) return false;
+    if (destino === DESTINO_FINAL.PENDENTE_CLASSIFICACAO) return !!incluirPendentesClassificacao && !linha.erros?.length && linhaTemSomenteRevisaoTipo(linha);
+    if (linha.status === STATUS_LINHA.APTO) return true;
+    if (linha.status === STATUS_LINHA.APTO_COM_ALERTA) return !!incluirAlertas;
+    return false;
+  });
   const naoImportadas = analise.linhas.filter((linha) => !importaveis.includes(linha));
 
   const resultado = {
@@ -829,6 +954,7 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     totalNaoImportadas: resultado.totalNaoImportadas,
     errosImportacao: resultado.erros,
     incluirAlertas,
+    incluirPendentesClassificacao,
     historicoId,
     finalizadoEm: new Date().toISOString(),
   };
@@ -843,6 +969,7 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
         ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
         status_importacao: statusFinal,
         importar_linhas_com_alerta: !!incluirAlertas,
+        importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
         relatorio_json: JSON.stringify(relatorio),
         observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
       });
@@ -872,4 +999,31 @@ export function exportarRelatorioMigracaoAlteracoesLegado(relatorio, nomeArquivo
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+
+export async function listarPublicacoesLegadoPendentesClassificacao() {
+  return base44.entities.PublicacaoExOfficio.filter({
+    origem_registro: 'legado',
+    classificacao_pendente: true,
+    tipo: TIPO_NEUTRO_LEGADO,
+  }, '-created_date');
+}
+
+export async function classificarPublicacaoLegadoPendente({ publicacaoId, tipoPublicacaoConfirmado, usuario, tiposPublicacaoCustom = [] }) {
+  const tiposValidosMap = resolverTiposPublicacaoValidos(tiposPublicacaoCustom);
+  const tipoValido = tiposValidosMap.get(normalizarTextoComparacao(tipoPublicacaoConfirmado || ''));
+  if (!tipoValido) {
+    throw new Error('Tipo de publicação inválido para classificação posterior.');
+  }
+
+  return base44.entities.PublicacaoExOfficio.update(publicacaoId, {
+    tipo: tipoValido,
+    tipo_publicacao_confirmado: tipoValido,
+    classificacao_pendente: false,
+    destino_final: DESTINO_FINAL.IMPORTAR,
+    classificado_posteriormente_por_id: usuario?.id || usuario?.email || '',
+    classificado_posteriormente_por_nome: usuario?.full_name || usuario?.name || usuario?.email || '',
+    classificado_posteriormente_em: new Date().toISOString(),
+  });
 }

@@ -14,6 +14,7 @@ import {
   analisarArquivoMigracaoAlteracoesLegado,
   atualizarMilitarLinhaAnalise,
   atualizarTipoPublicacaoLinhaAnalise,
+  atualizarDestinoLinhaAnalise,
   exportarRelatorioMigracaoAlteracoesLegado,
   importarAnaliseAlteracoesLegado,
   salvarAnaliseHistoricoAlteracoesLegado,
@@ -25,6 +26,7 @@ const filtros = [
   { id: 'APTO_COM_ALERTA', label: 'Aptos com alerta' },
   { id: 'REVISAR', label: 'Revisar' },
   { id: 'IGNORADO', label: 'Ignorados' },
+  { id: 'EXCLUIDO_DO_LOTE', label: 'Excluídos do lote' },
   { id: 'ERRO', label: 'Erros' },
 ];
 
@@ -113,7 +115,7 @@ export default function MigracaoAlteracoesLegado() {
     }
   };
 
-  const handleImportar = async (incluirAlertas) => {
+  const handleImportar = async (incluirAlertas, incluirPendentesClassificacao = false) => {
     if (!analise) {
       toast({ title: 'Análise obrigatória', description: 'Analise um arquivo antes de iniciar a importação.', variant: 'destructive' });
       return;
@@ -125,6 +127,7 @@ export default function MigracaoAlteracoesLegado() {
       const resultado = await importarAnaliseAlteracoesLegado({
         analise,
         incluirAlertas,
+        incluirPendentesClassificacao,
         historicoId: historicoId || null,
         usuario,
       });
@@ -162,6 +165,15 @@ export default function MigracaoAlteracoesLegado() {
   const handleAjusteTipoPublicacao = (linha, tipoPublicacao) => {
     if (!analise) return;
     const proxima = atualizarTipoPublicacaoLinhaAnalise(analise, linha.linhaNumero, tipoPublicacao);
+    setAnalise(proxima);
+    const atualizada = proxima.linhas.find((x) => x.linhaNumero === linha.linhaNumero);
+    setLinhaSelecionada(atualizada || null);
+  };
+
+
+  const handleAjusteDestinoFinal = (linha, destinoFinal) => {
+    if (!analise) return;
+    const proxima = atualizarDestinoLinhaAnalise(analise, linha.linhaNumero, destinoFinal);
     setAnalise(proxima);
     const atualizada = proxima.linhas.find((x) => x.linhaNumero === linha.linhaNumero);
     setLinhaSelecionada(atualizada || null);
@@ -238,11 +250,13 @@ export default function MigracaoAlteracoesLegado() {
               tiposPublicacaoValidos={analise.tipos_publicacao_validos || []}
               onSelectLinha={setLinhaSelecionada}
               onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
+              onSelecionarDestinoFinal={handleAjusteDestinoFinal}
             />
 
             <div className="flex flex-wrap gap-2">
               <Button disabled={!podeImportar} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
-              <Button disabled={!podeImportar} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true)}>Importar aptas e aptas com alerta</Button>
+              <Button disabled={!podeImportar} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true, false)}>Importar aptas e aptas com alerta</Button>
+              <Button disabled={!podeImportar} className="bg-indigo-600 hover:bg-indigo-700" onClick={() => handleImportar(true, true)}>Importar incluindo pendentes de classificação</Button>
               <Button variant="outline" onClick={() => exportarRelatorioMigracaoAlteracoesLegado({ ...analise, estado: 'Analise' }, `relatorio-analise-alteracoes-legado-${analise.arquivo.nome}.json`)}>
                 <Download className="w-4 h-4 mr-2" /> Exportar relatório
               </Button>
@@ -278,6 +292,7 @@ export default function MigracaoAlteracoesLegado() {
         tiposPublicacaoValidos={analise?.tipos_publicacao_validos || []}
         onSelecionarMilitar={handleAjusteMilitar}
         onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
+        onSelecionarDestinoFinal={handleAjusteDestinoFinal}
       />
     </div>
   );
