@@ -18,6 +18,8 @@ const STATUS_IMPORTACAO = {
 };
 
 const REGRA_VERSAO = 'v1.0.0';
+const HISTORICO_ENTITY_NAME = 'ImportacaoAtestados';
+const HISTORICO_ENTITY_ERROR_MESSAGE = 'Falha ao acessar o histórico de importação de atestados. Verifique se a entidade ImportacaoAtestados está publicada no app.';
 const TIPOS_ACEITOS = new Set(['Afastamento Total', 'Esforço Físico']);
 
 const HEADER_ALIAS = {
@@ -128,6 +130,8 @@ function isLinhaVazia(cells) {
 
 function normalizarCelulaExcel(valor) {
   if (valor === null || valor === undefined) return '';
+  if (valor instanceof Date) return valor;
+  if (typeof valor === 'number') return valor;
   return String(valor).trim();
 }
 
@@ -297,37 +301,65 @@ function mapHeaders(cabecalho = []) {
 function valorLinha(cells, map, campo) {
   const idx = map[campo];
   if (idx === undefined) return '';
-  return limparTexto(cells[idx]);
+  return cells[idx] ?? '';
+}
+
+function isDataValida(y, m, d) {
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return false;
+  if (y < 1000 || m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const data = new Date(Date.UTC(y, m - 1, d));
+  return data.getUTCFullYear() === y && data.getUTCMonth() === (m - 1) && data.getUTCDate() === d;
+}
+
+function formatIso(y, m, d) {
+  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function parseExcelSerial(numeroExcel) {
+  if (!Number.isFinite(numeroExcel) || numeroExcel <= 0) return '';
+  const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+  const convertido = new Date(excelEpoch.getTime() + (numeroExcel * 86400000));
+  if (Number.isNaN(convertido.getTime())) return '';
+  return formatIso(convertido.getUTCFullYear(), convertido.getUTCMonth() + 1, convertido.getUTCDate());
 }
 
 function parseDataBrOuIso(valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+
+  if (valor instanceof Date) {
+    if (Number.isNaN(valor.getTime())) return '';
+    return formatIso(valor.getFullYear(), valor.getMonth() + 1, valor.getDate());
+  }
+
+  if (typeof valor === 'number') {
+    return parseExcelSerial(valor);
+  }
+
   const texto = limparTexto(valor);
   if (!texto) return '';
 
-  const br = texto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+  const br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (br) {
+    const dia = Number(br[1]);
+    const mes = Number(br[2]);
+    const ano = Number(br[3]);
+    return isDataValida(ano, mes, dia) ? formatIso(ano, mes, dia) : '';
+  }
 
   const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  if (iso) {
+    const ano = Number(iso[1]);
+    const mes = Number(iso[2]);
+    const dia = Number(iso[3]);
+    return isDataValida(ano, mes, dia) ? formatIso(ano, mes, dia) : '';
+  }
 
   const numeroExcel = Number(texto.replace(',', '.'));
-  if (Number.isFinite(numeroExcel) && numeroExcel > 59) {
-    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-    const convertido = new Date(excelEpoch.getTime() + (numeroExcel * 86400000));
-    if (!Number.isNaN(convertido.getTime())) {
-      const y = convertido.getUTCFullYear();
-      const m = String(convertido.getUTCMonth() + 1).padStart(2, '0');
-      const d = String(convertido.getUTCDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    }
-  }
+  if (Number.isFinite(numeroExcel)) return parseExcelSerial(numeroExcel);
 
   const dateObj = new Date(texto);
   if (Number.isNaN(dateObj.getTime())) return '';
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const d = String(dateObj.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return formatIso(dateObj.getFullYear(), dateObj.getMonth() + 1, dateObj.getDate());
 }
 
 function formatDataBr(iso) {
@@ -403,6 +435,18 @@ async function gerarHashArquivo(file) {
 
 async function listarMilitares() {
   return base44.entities.Militar.list('-created_date', 10000);
+}
+
+function getHistoricoImportacaoEntity() {
+  const entity = base44?.entities?.[HISTORICO_ENTITY_NAME];
+  if (!entity?.create || !entity?.update) return null;
+  return entity;
+}
+
+function assertHistoricoImportacaoEntity() {
+  const entity = getHistoricoImportacaoEntity();
+  if (!entity) throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+  return entity;
 }
 
 function tokenizarMilitar(textoMilitar) {
@@ -739,6 +783,7 @@ export async function analisarArquivoMigracaoAtestados(file) {
 }
 
 export async function salvarAnaliseHistoricoAtestados(analise, usuario) {
+  const historicoEntity = assertHistoricoImportacaoEntity();
   const payload = {
     nome_arquivo: analise.arquivo.nome,
     tipo_arquivo: analise.arquivo.tipo,
@@ -765,7 +810,14 @@ export async function salvarAnaliseHistoricoAtestados(analise, usuario) {
     observacoes: 'Lote registrado apenas como análise inicial.',
   };
 
-  return base44.entities.ImportacaoAtestados.create(payload);
+  try {
+    return await historicoEntity.create(payload);
+  } catch (error) {
+    if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
+      throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+    }
+    throw error;
+  }
 }
 
 export function atualizarMilitarLinhaAnalise(analise, linhaNumero, militar) {
@@ -811,13 +863,21 @@ export function atualizarMilitarLinhaAnalise(analise, linhaNumero, militar) {
 }
 
 export async function importarAnaliseAtestados({ analise, incluirAlertas, historicoId, usuario }) {
+  const historicoEntity = assertHistoricoImportacaoEntity();
   const agora = new Date();
   const hojeIso = agora.toISOString().slice(0, 10);
 
-  await base44.entities.ImportacaoAtestados.update(historicoId, {
-    status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
-    importar_linhas_com_alerta: incluirAlertas,
-  });
+  try {
+    await historicoEntity.update(historicoId, {
+      status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
+      importar_linhas_com_alerta: incluirAlertas,
+    });
+  } catch (error) {
+    if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
+      throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+    }
+    throw error;
+  }
 
   const idsCriados = [];
   const naoImportadas = [];
@@ -910,7 +970,7 @@ export async function importarAnaliseAtestados({ analise, incluirAlertas, histor
       linhas_nao_importadas: naoImportadas,
     };
 
-    await base44.entities.ImportacaoAtestados.update(historicoId, {
+    await historicoEntity.update(historicoId, {
       ...analise.resumo,
       total_importadas: totalImportadas,
       total_nao_importadas: totalNaoImportadas,
@@ -929,10 +989,19 @@ export async function importarAnaliseAtestados({ analise, incluirAlertas, histor
       relatorio,
     };
   } catch (error) {
-    await base44.entities.ImportacaoAtestados.update(historicoId, {
-      status_importacao: STATUS_IMPORTACAO.FALHOU,
-      observacoes: error?.message || 'Falha durante a importação do lote.',
-    });
+    try {
+      await historicoEntity.update(historicoId, {
+        status_importacao: STATUS_IMPORTACAO.FALHOU,
+        observacoes: error?.message || 'Falha durante a importação do lote.',
+      });
+    } catch (updateError) {
+      if (String(updateError?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
+        console.warn('[ImportacaoAtestados] Não foi possível atualizar status de falha no histórico.');
+      }
+    }
+    if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
+      throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+    }
     throw error;
   }
 }
