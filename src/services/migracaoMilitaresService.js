@@ -382,20 +382,36 @@ function formatarData(valor, { obrigatoria = false, mensagemErro, mensagemAlerta
 
 function parseNumeroLivre(valor) {
   const limpo = limparTexto(valor);
-  if (!limpo) return null;
+  if (!limpo) return undefined;
 
-  const normalizado = limpo.replace(',', '.');
-  if (!/^\d+(\.\d+)?$/.test(normalizado)) return null;
+  const semEspacos = limpo.replace(/\s+/g, '');
+  const possuiVirgula = semEspacos.includes(',');
+  const possuiPonto = semEspacos.includes('.');
+  let normalizado = semEspacos;
+
+  if (possuiVirgula && possuiPonto) {
+    const ultimaVirgula = semEspacos.lastIndexOf(',');
+    const ultimoPonto = semEspacos.lastIndexOf('.');
+    if (ultimaVirgula > ultimoPonto) {
+      normalizado = semEspacos.replace(/\./g, '').replace(',', '.');
+    } else {
+      normalizado = semEspacos.replace(/,/g, '');
+    }
+  } else if (possuiVirgula) {
+    normalizado = semEspacos.replace(',', '.');
+  }
+
+  if (!/^[+-]?\d+(\.\d+)?$/.test(normalizado)) return undefined;
 
   const numero = Number(normalizado);
-  return Number.isFinite(numero) ? numero : null;
+  return Number.isFinite(numero) ? numero : undefined;
 }
 
 function normalizarNumeroLivre(valor, mensagemAlerta, alertas) {
   const numero = parseNumeroLivre(valor);
   const campoVazio = !limparTexto(valor);
 
-  if (numero === null && !campoVazio) {
+  if (numero === undefined && !campoVazio) {
     alertas.push(mensagemAlerta);
   }
 
@@ -418,7 +434,7 @@ function sanitizarCamposNumericosMilitar(payload) {
     }
 
     const convertido = parseNumeroLivre(valor);
-    if (convertido === null) {
+    if (convertido === undefined) {
       delete sanitizado[campo];
       return;
     }
