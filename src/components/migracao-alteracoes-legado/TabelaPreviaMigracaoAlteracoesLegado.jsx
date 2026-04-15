@@ -91,8 +91,8 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
                     <td className="p-3 align-top max-w-[280px] truncate" title={motivoPrincipal(linha)}>{motivoPrincipal(linha)}</td>
                   </tr>
                   {expandida && (
-                    <tr className="border-t border-slate-100 bg-slate-50/70">
-                      <td colSpan={12} className="p-4">
+                    <tr className="border-t border-slate-100 bg-slate-50/50">
+                      <td colSpan={12} className="px-4 py-3">
                         <DetalheLinhaMigracaoAlteracaoLegado
                           linha={linha}
                           modoInline
