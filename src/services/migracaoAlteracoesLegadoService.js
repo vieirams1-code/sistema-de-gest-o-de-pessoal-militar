@@ -33,7 +33,17 @@ const HEADER_ALIAS = {
   submateria_legado: ['submateria', 'submatéria'],
   status_legado: ['status'],
   link_download_legado: ['link', 'link download', 'download'],
-  conteudo_trecho_legado: ['conteudo', 'conteúdo', 'trecho', 'texto'],
+  conteudo_trecho_legado: [
+    'conteudo (trecho)',
+    'conteúdo (trecho)',
+    'conteudotrecho',
+    'conteudo_trecho',
+    'conteudo trecho',
+    'conteudo',
+    'conteúdo',
+    'trecho',
+    'texto',
+  ],
   numero_bg: ['numero bg', 'número bg', 'bg numero', 'bg'],
   data_publicacao: ['data publicacao', 'data publicação', 'data bg', 'data'],
 };
@@ -603,6 +613,7 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
     nota_para_bg: `LEGADO - Nota ID ${t.nota_id_legado || 'N/I'}`,
     texto_publicacao: textoPrincipal,
     texto_base: textoPrincipal,
+    texto: textoPrincipal,
     observacoes: [
       'Registro importado de base legada.',
       `Histórico de lote: ${historicoId || 'N/I'}.`,
