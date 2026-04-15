@@ -17,7 +17,8 @@
       "default": ""
     },
     "data_importacao": {
-      "type": "date",
+      "type": "string",
+      "format": "date-time",
       "default": ""
     },
     "importado_por": {
@@ -89,5 +90,9 @@
       "default": false,
       "description": "Campo legado de ocultação (descontinuado). A exclusão real do lote deve usar remoção física do registro."
     }
-  }
+  },
+  "required": [
+    "nome_arquivo",
+    "data_importacao"
+  ]
 }

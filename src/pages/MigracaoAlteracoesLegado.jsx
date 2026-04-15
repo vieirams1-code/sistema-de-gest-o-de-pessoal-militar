@@ -27,6 +27,8 @@ const filtros = [
   { id: 'ERRO', label: 'Erros' },
 ];
 
+const ERRO_ENTIDADE_HISTORICO = 'Falha ao acessar o histórico da migração de alterações legado. Verifique se a entidade ImportacaoAlteracoesLegado está publicada no app.';
+
 function filtrarBusca(linha, termo) {
   if (!termo) return true;
   const alvo = [
@@ -67,6 +69,7 @@ export default function MigracaoAlteracoesLegado() {
     if (!arquivo) return;
     try {
       setCarregando(true);
+      setHistoricoId(null);
       const [resultado, usuario, listaMilitares] = await Promise.all([
         analisarArquivoMigracaoAlteracoesLegado(arquivo),
         base44.auth.me(),
@@ -77,13 +80,19 @@ export default function MigracaoAlteracoesLegado() {
       setResultadoImportacao(null);
 
       const historico = await salvarAnaliseHistoricoAlteracoesLegado(resultado, usuario);
-      setHistoricoId(historico?.id);
+      if (!historico?.id) {
+        throw new Error('A análise foi concluída, mas o histórico do lote não foi salvo. Verifique a entidade ImportacaoAlteracoesLegado e tente novamente.');
+      }
+      setHistoricoId(historico.id);
 
       toast({ title: 'Análise concluída', description: 'Prévia da migração de alterações legado gerada com sucesso.' });
     } catch (error) {
+      const mensagem = String(error?.message || '').includes('Entity schema ImportacaoAlteracoesLegado not found in app')
+        ? ERRO_ENTIDADE_HISTORICO
+        : error?.message || 'Não foi possível analisar o arquivo.';
       toast({
         title: 'Falha na análise',
-        description: error?.message || 'Não foi possível analisar o arquivo.',
+        description: mensagem,
         variant: 'destructive',
       });
     } finally {
@@ -92,20 +101,42 @@ export default function MigracaoAlteracoesLegado() {
   };
 
   const handleImportar = async (incluirAlertas) => {
-    if (!analise || !historicoId) return;
+    if (!analise) {
+      toast({
+        title: 'Importação indisponível',
+        description: 'Nenhuma análise encontrada. Faça a análise do arquivo antes de importar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setCarregando(true);
       const usuario = await base44.auth.me();
+      let historicoIdAtual = historicoId;
+
+      if (!historicoIdAtual) {
+        const historicoRecriado = await salvarAnaliseHistoricoAlteracoesLegado(analise, usuario);
+        historicoIdAtual = historicoRecriado?.id || null;
+        if (!historicoIdAtual) {
+          throw new Error('Não foi possível salvar o histórico do lote. A importação não pode continuar sem histórico.');
+        }
+        setHistoricoId(historicoIdAtual);
+      }
+
       const resultado = await importarAnaliseAlteracoesLegado({
         analise,
         incluirAlertas,
-        historicoId,
+        historicoId: historicoIdAtual,
         usuario,
       });
       setResultadoImportacao(resultado);
       toast({ title: 'Importação finalizada', description: `Foram importadas ${resultado.totalImportadas} publicações legado.` });
     } catch (error) {
-      toast({ title: 'Erro na importação', description: error?.message || 'Falha ao importar lote.', variant: 'destructive' });
+      const mensagem = String(error?.message || '').includes('Entity schema ImportacaoAlteracoesLegado not found in app')
+        ? ERRO_ENTIDADE_HISTORICO
+        : error?.message || 'Falha ao importar lote.';
+      toast({ title: 'Erro na importação', description: mensagem, variant: 'destructive' });
     } finally {
       setCarregando(false);
     }
@@ -186,9 +217,15 @@ export default function MigracaoAlteracoesLegado() {
 
             <TabelaPreviaMigracaoAlteracoesLegado linhas={linhasFiltradas} onSelectLinha={setLinhaSelecionada} />
 
+            {!historicoId && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-900 rounded-xl p-4 text-sm">
+                O histórico do lote ainda não foi salvo. A importação ficará bloqueada até o histórico ser criado.
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
-              <Button disabled={carregando} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
-              <Button disabled={carregando} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true)}>Importar aptas e aptas com alerta</Button>
+              <Button disabled={!analise || carregando || !historicoId} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
+              <Button disabled={!analise || carregando || !historicoId} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true)}>Importar aptas e aptas com alerta</Button>
               <Button variant="outline" onClick={() => exportarRelatorioMigracaoAlteracoesLegado({ ...analise, estado: 'Analise' }, `relatorio-analise-alteracoes-legado-${analise.arquivo.nome}.json`)}>
                 <Download className="w-4 h-4 mr-2" /> Exportar relatório
               </Button>

@@ -5,7 +5,9 @@ const ENTITY_ERROR_MESSAGE = 'Falha ao acessar o histórico da migração de alt
 
 function getEntity() {
   const entity = base44?.entities?.[ENTITY_NAME];
-  if (!entity) throw new Error(ENTITY_ERROR_MESSAGE);
+  if (!entity || typeof entity.create !== 'function' || typeof entity.update !== 'function') {
+    throw new Error(ENTITY_ERROR_MESSAGE);
+  }
   return entity;
 }
 
