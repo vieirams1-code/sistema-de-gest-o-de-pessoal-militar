@@ -1,0 +1,91 @@
+{
+  "name": "ImportacaoAtestados",
+  "type": "object",
+  "properties": {
+    "nome_arquivo": {
+      "type": "string",
+      "description": "Nome do arquivo importado"
+    },
+    "tipo_arquivo": {
+      "type": "string",
+      "description": "Tipo MIME do arquivo"
+    },
+    "hash_arquivo": {
+      "type": "string",
+      "description": "Hash SHA-256 do arquivo"
+    },
+    "data_importacao": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data e hora da importação"
+    },
+    "importado_por": {
+      "type": "string",
+      "description": "Identificador de quem realizou a operação"
+    },
+    "importado_por_nome": {
+      "type": "string",
+      "description": "Nome de quem realizou a operação"
+    },
+    "total_linhas": {
+      "type": "number",
+      "default": 0
+    },
+    "total_aptas": {
+      "type": "number",
+      "default": 0
+    },
+    "total_aptas_com_alerta": {
+      "type": "number",
+      "default": 0
+    },
+    "total_revisar": {
+      "type": "number",
+      "default": 0
+    },
+    "total_ignoradas": {
+      "type": "number",
+      "default": 0
+    },
+    "total_erros": {
+      "type": "number",
+      "default": 0
+    },
+    "total_importadas": {
+      "type": "number",
+      "default": 0
+    },
+    "total_nao_importadas": {
+      "type": "number",
+      "default": 0
+    },
+    "status_importacao": {
+      "type": "string",
+      "enum": [
+        "Analisado",
+        "Importando",
+        "Importado",
+        "Importado Parcial",
+        "Falhou"
+      ],
+      "default": "Analisado"
+    },
+    "importar_linhas_com_alerta": {
+      "type": "boolean",
+      "default": false
+    },
+    "versao_regra_migracao": {
+      "type": "string"
+    },
+    "relatorio_json": {
+      "type": "string"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome_arquivo",
+    "data_importacao"
+  ]
+}
