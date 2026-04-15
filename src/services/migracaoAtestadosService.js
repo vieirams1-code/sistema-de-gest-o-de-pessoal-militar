@@ -39,6 +39,23 @@ const HEADER_ALIAS = {
   arquivo: ['arquivo'],
 };
 
+const HEADER_TOKEN_RULES = {
+  militar: [['militar'], ['posto', 'nome', 'guerra']],
+  tipo: [['tipo', 'atestado'], ['tipo', 'afastamento'], ['tipo']],
+  medico: [['medico']],
+  cid: [['cid']],
+  data_inicio: [['data', 'inicio'], ['inicio']],
+  data_termino: [['data', 'termino'], ['termino']],
+  dias: [['dias']],
+  retorno: [['data', 'retorno'], ['retorno']],
+  status_legado: [['status']],
+  nota_para_bg: [['nota', 'bg']],
+  texto_publicacao: [['texto', 'publicacao']],
+  numero_bg: [['numero', 'bg'], ['bg']],
+  data_bg: [['data', 'bg']],
+  arquivo: [['arquivo']],
+};
+
 const LIMIAR_DIAS_JISO = 15;
 
 const POSTO_EQUIVALENCIAS = {
@@ -76,6 +93,16 @@ function normalizarTextoComparacao(valor) {
     .replace(/[^A-Z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function tokenizarCabecalho(valor) {
+  return limparTexto(valor)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter(Boolean);
 }
 
 function parseCsv(texto) {
@@ -287,15 +314,41 @@ async function lerArquivoComoTabela(file) {
 }
 
 function mapHeaders(cabecalho = []) {
-  const normalizados = cabecalho.map((h) => normalizarChave(h));
-  return Object.entries(HEADER_ALIAS).reduce((acc, [campo, aliases]) => {
-    const idx = aliases
-      .map((alias) => normalizarChave(alias))
-      .map((aliasNorm) => normalizados.indexOf(aliasNorm))
-      .find((index) => index >= 0);
-    if (idx >= 0) acc[campo] = idx;
-    return acc;
-  }, {});
+  const headers = cabecalho.map((header, index) => ({
+    index,
+    normalizado: normalizarChave(header),
+    tokens: new Set(tokenizarCabecalho(header)),
+  }));
+
+  const indicesUsados = new Set();
+  const resultado = {};
+
+  Object.entries(HEADER_ALIAS).forEach(([campo, aliases]) => {
+    const aliasNormalizados = aliases.map((alias) => normalizarChave(alias));
+    const encontrado = headers.find(
+      (header) => !indicesUsados.has(header.index) && aliasNormalizados.includes(header.normalizado),
+    );
+    if (encontrado) {
+      resultado[campo] = encontrado.index;
+      indicesUsados.add(encontrado.index);
+    }
+  });
+
+  Object.entries(HEADER_TOKEN_RULES).forEach(([campo, regrasTokens]) => {
+    if (resultado[campo] !== undefined) return;
+
+    const encontrado = headers.find((header) => {
+      if (indicesUsados.has(header.index)) return false;
+      return regrasTokens.some((regra) => regra.every((token) => header.tokens.has(token)));
+    });
+
+    if (encontrado) {
+      resultado[campo] = encontrado.index;
+      indicesUsados.add(encontrado.index);
+    }
+  });
+
+  return resultado;
 }
 
 function valorLinha(cells, map, campo) {
