@@ -979,8 +979,6 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     } catch (error) {
       avisosHistorico.push(error?.message || 'Não foi possível atualizar o histórico para status de importação em andamento.');
     }
-  } else {
-    avisosHistorico.push('Importação executada sem salvar histórico do lote, pois a entidade de histórico não está disponível no ambiente.');
   }
 
   const importaveis = analise.linhas.filter((linha) => {
