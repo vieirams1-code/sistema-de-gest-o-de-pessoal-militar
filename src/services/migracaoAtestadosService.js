@@ -317,8 +317,10 @@ function formatIso(y, m, d) {
 
 function parseExcelSerial(numeroExcel) {
   if (!Number.isFinite(numeroExcel) || numeroExcel <= 0) return '';
+  const serialInteiro = Math.floor(numeroExcel);
+  if (serialInteiro <= 0) return '';
   const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-  const convertido = new Date(excelEpoch.getTime() + (numeroExcel * 86400000));
+  const convertido = new Date(excelEpoch.getTime() + (serialInteiro * 86400000));
   if (Number.isNaN(convertido.getTime())) return '';
   return formatIso(convertido.getUTCFullYear(), convertido.getUTCMonth() + 1, convertido.getUTCDate());
 }
@@ -338,7 +340,7 @@ function parseDataBrOuIso(valor) {
   const texto = limparTexto(valor);
   if (!texto) return '';
 
-  const br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
   if (br) {
     const dia = Number(br[1]);
     const mes = Number(br[2]);
@@ -346,7 +348,7 @@ function parseDataBrOuIso(valor) {
     return isDataValida(ano, mes, dia) ? formatIso(ano, mes, dia) : '';
   }
 
-  const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const iso = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
   if (iso) {
     const ano = Number(iso[1]);
     const mes = Number(iso[2]);
@@ -808,6 +810,7 @@ export async function salvarAnaliseHistoricoAtestados(analise, usuario) {
       ids_criados: [],
     }),
     observacoes: 'Lote registrado apenas como análise inicial.',
+    oculto_no_historico: false,
   };
 
   try {

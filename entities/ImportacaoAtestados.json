@@ -22,6 +22,7 @@
     "importar_linhas_com_alerta": { "type": "boolean", "default": false },
     "versao_regra_migracao": { "type": "string", "default": "v1.0.0" },
     "relatorio_json": { "type": "string", "default": "" },
-    "observacoes": { "type": "string", "default": "" }
+    "observacoes": { "type": "string", "default": "" },
+    "oculto_no_historico": { "type": "boolean", "default": false }
   }
 }
