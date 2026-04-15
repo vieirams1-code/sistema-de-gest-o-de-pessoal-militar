@@ -493,7 +493,7 @@ export default function CadastrarRegistroRP() {
       }
       : null;
     const registroDestino = { ...formData, status: statusCalculadoFormulario };
-    const validacaoTransicao = validarPayloadPublicacao({ registroAtual, registroDestino });
+    const validacaoTransicao = validarPayloadPublicacao({ registroAtual: registroAtual ?? {}, registroDestino });
     if (!validacaoTransicao.valido) {
       if (registroEdicao?.id) {
         const moduloPersistencia = moduloOrigemEdicao === 'Livro' ? MODULO_LIVRO : MODULO_EX_OFFICIO;
