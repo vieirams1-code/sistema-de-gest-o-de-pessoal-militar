@@ -11,13 +11,13 @@ export default function UploadMigracaoAtestados({ file, onFileChange, onAnalisar
         </div>
         <div>
           <h2 className="font-semibold text-slate-800">Upload da planilha legada</h2>
-          <p className="text-sm text-slate-500">Selecione arquivo CSV/TXT exportado do sistema antigo.</p>
+          <p className="text-sm text-slate-500">Envie um arquivo CSV ou Excel (.xlsx) com os dados dos atestados.</p>
         </div>
       </div>
 
       <input
         type="file"
-        accept=".csv,.txt"
+        accept=".csv,.txt,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
         onChange={(event) => onFileChange(event.target.files?.[0] || null)}
         className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
       />
