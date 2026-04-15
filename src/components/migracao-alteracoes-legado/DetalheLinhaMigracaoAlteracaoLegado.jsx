@@ -41,6 +41,10 @@ export default function DetalheLinhaMigracaoAlteracaoLegado({ linha, open, onOpe
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
+            <section className="bg-emerald-50 rounded-lg p-3 md:col-span-2">
+              <h3 className="font-semibold mb-2">Trecho legado capturado</h3>
+              <p className="text-xs whitespace-pre-wrap">{linha.transformado.conteudo_trecho_legado || 'Sem trecho legado informado na planilha.'}</p>
+            </section>
             <section className="bg-slate-50 rounded-lg p-3">
               <h3 className="font-semibold mb-2">Dados originais</h3>
               <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(linha.original, null, 2)}</pre>
