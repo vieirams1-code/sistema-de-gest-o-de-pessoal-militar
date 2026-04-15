@@ -22,6 +22,15 @@ const STATUS_IMPORTACAO = {
 
 const REGRA_VERSAO = 'v1.0.0';
 const TIPO_NEUTRO_LEGADO = 'LEGADO_NAO_CLASSIFICADO';
+const MAPEAMENTO_CLASSIFICACAO_MINIMA = [
+  { materia: 'HOMOLOGAÇÃO DE ATESTADO MÉDICO', tipo: 'Homologação de Atestado' },
+  { materia: 'ATA DE INSPEÇÃO DE SAÚDE', tipo: 'Ata JISO' },
+  { materia: 'MELHORIA DE COMPORTAMENTO', tipo: 'Melhoria de Comportamento' },
+  { materia: 'ELOGIO INDIVIDUAL', tipo: 'Elogio Individual' },
+  { materia: 'DESIGNAÇÃO DE FUNÇÃO', tipo: 'Designação de Função' },
+  { materia: 'LUTO', tipo: 'Luto' },
+  { materia: 'CERTIFICADO DE CURSO', tipo: 'Cursos / Estágios / Capacitações' },
+];
 
 export const DESTINO_FINAL = {
   IMPORTAR: 'IMPORTAR',
@@ -402,11 +411,20 @@ function resolverTiposPublicacaoValidos(tiposCustom = []) {
   return map;
 }
 
-function resolverTipoSugeridoValido(tipoSugerido, tiposValidosMap) {
-  const valor = limparTexto(tipoSugerido);
-  if (!valor) return null;
-  if (normalizarTextoComparacao(valor) === normalizarTextoComparacao(TIPO_NEUTRO_LEGADO)) return null;
-  return tiposValidosMap.get(normalizarTextoComparacao(valor)) || null;
+function resolverTipoClassificacaoMinima(transformado, tiposValidosMap) {
+  const materiaNorm = normalizarTextoComparacao(transformado.materia_legado);
+  if (!materiaNorm) return null;
+
+  const correspondencia = MAPEAMENTO_CLASSIFICACAO_MINIMA.find((item) => normalizarTextoComparacao(item.materia) === materiaNorm);
+  if (!correspondencia) return null;
+
+  const tipoValido = tiposValidosMap.get(normalizarTextoComparacao(correspondencia.tipo));
+  if (!tipoValido) return null;
+
+  return {
+    tipoPublicacao: tipoValido,
+    regraUsada: `EQ_MATERIA:${correspondencia.materia}`,
+  };
 }
 
 
@@ -564,16 +582,22 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
       erros.push('Matéria legado ausente sem identificador mínimo alternativo (Nota ID).');
     }
 
-    const tipoSugeridoValido = resolverTipoSugeridoValido(transformado.tipo_publicacao_sugerido, tiposValidosMap);
-    if (tipoSugeridoValido) {
-      transformado.tipo_publicacao_sugerido = tipoSugeridoValido;
-      transformado.tipo_publicacao_confirmado = tipoSugeridoValido;
-      transformado.tipo_publicacao = tipoSugeridoValido;
-      transformado.destino_final = resolverDestinoFinal(transformado.destino_sugerido, DESTINO_FINAL.IMPORTAR);
+    const classificacaoMinima = resolverTipoClassificacaoMinima(transformado, tiposValidosMap);
+    if (classificacaoMinima) {
+      transformado.tipo_publicacao_sugerido = classificacaoMinima.tipoPublicacao;
+      transformado.tipo_publicacao_confirmado = classificacaoMinima.tipoPublicacao;
+      transformado.tipo_publicacao = classificacaoMinima.tipoPublicacao;
+      transformado.confianca_classificacao = 'ALTA';
+      transformado.regra_usada = classificacaoMinima.regraUsada;
+      transformado.motivo_classificacao = 'Correspondência exata e inequívoca da matéria legado para tipo atual.';
+      transformado.destino_sugerido = DESTINO_FINAL.IMPORTAR;
+      transformado.destino_final = DESTINO_FINAL.IMPORTAR;
     } else {
       transformado.tipo_publicacao_confirmado = '';
       transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
-      transformado.destino_final = resolverDestinoFinal(transformado.destino_sugerido, DESTINO_FINAL.PENDENTE_CLASSIFICACAO);
+      transformado.destino_sugerido = DESTINO_FINAL.PENDENTE_CLASSIFICACAO;
+      transformado.destino_final = DESTINO_FINAL.PENDENTE_CLASSIFICACAO;
+      transformado.motivo_destino = limparTexto(transformado.motivo_destino) || 'Sem equivalência segura para classificação automática mínima.';
       if (transformado.destino_final !== DESTINO_FINAL.PENDENTE_CLASSIFICACAO) {
         revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
       }
@@ -755,7 +779,7 @@ export function atualizarDestinoLinhaAnalise(analise, linhaNumero, destinoFinal)
   const linhasAtualizadas = analise.linhas.map((linha) => {
     if (linha.linhaNumero !== linhaNumero) return linha;
 
-    const revisoesBase = (linha.revisoes || []).filter((r) => !r.includes('Tipo de publicação pendente'));
+    const revisoesBase = (linha.revisoes || []).filter((r) => !r.includes('Tipo de publicação pendente') && !r.includes('Motivo obrigatório'));
     const revisoes = [...revisoesBase];
 
     const transformado = {
@@ -769,12 +793,56 @@ export function atualizarDestinoLinhaAnalise(analise, linhaNumero, destinoFinal)
     } else if (!transformado.tipo_publicacao_confirmado) {
       revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
     }
+    if ([DESTINO_FINAL.IGNORAR, DESTINO_FINAL.EXCLUIDO_DO_LOTE].includes(destinoNormalizado) && !limparTexto(transformado.motivo_destino)) {
+      revisoes.push('Motivo obrigatório para destino IGNORAR ou EXCLUIDO_DO_LOTE.');
+    }
 
     const ajustes = [...(linha.ajustes_manuais || [])];
     ajustes.push({
       tipo: 'DESTINO_FINAL',
       antes: linha.transformado.destino_final || DESTINO_FINAL.IMPORTAR,
       depois: destinoNormalizado,
+      timestamp: new Date().toISOString(),
+    });
+
+    return atualizarLinhaComStatus({
+      ...linha,
+      revisoes,
+      transformado,
+      ajustes_manuais: ajustes,
+    });
+  });
+
+  return {
+    ...analise,
+    linhas: linhasAtualizadas,
+    resumo: gerarResumo(linhasAtualizadas),
+  };
+}
+
+export function atualizarMotivoDestinoLinhaAnalise(analise, linhaNumero, motivoDestino) {
+  if (!analise) return analise;
+
+  const linhasAtualizadas = analise.linhas.map((linha) => {
+    if (linha.linhaNumero !== linhaNumero) return linha;
+
+    const transformado = {
+      ...linha.transformado,
+      motivo_destino: limparTexto(motivoDestino),
+    };
+    const revisoes = (linha.revisoes || []).filter((r) => !r.includes('Motivo obrigatório'));
+    if (
+      [DESTINO_FINAL.IGNORAR, DESTINO_FINAL.EXCLUIDO_DO_LOTE].includes(transformado.destino_final)
+      && !transformado.motivo_destino
+    ) {
+      revisoes.push('Motivo obrigatório para destino IGNORAR ou EXCLUIDO_DO_LOTE.');
+    }
+
+    const ajustes = [...(linha.ajustes_manuais || [])];
+    ajustes.push({
+      tipo: 'MOTIVO_DESTINO',
+      antes: linha.transformado.motivo_destino || null,
+      depois: transformado.motivo_destino || null,
       timestamp: new Date().toISOString(),
     });
 

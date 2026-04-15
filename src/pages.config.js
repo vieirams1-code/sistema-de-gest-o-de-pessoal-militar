@@ -59,6 +59,7 @@ import CadastrarMedalha from './pages/CadastrarMedalha';
 import CadastrarMilitar from './pages/CadastrarMilitar';
 import CadastrarPublicacao from './pages/CadastrarPublicacao';
 import CadastrarPunicao from './pages/CadastrarPunicao';
+import ClassificacaoPendentesLegado from './pages/ClassificacaoPendentesLegado';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import Configuracoes from './pages/Configuracoes';
@@ -107,6 +108,7 @@ export const PAGES = {
     "CadastrarMilitar": CadastrarMilitar,
     "CadastrarPublicacao": CadastrarPublicacao,
     "CadastrarPunicao": CadastrarPunicao,
+    "ClassificacaoPendentesLegado": ClassificacaoPendentesLegado,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "ConciliacaoBoletim": ConciliacaoBoletim,
     "Configuracoes": Configuracoes,

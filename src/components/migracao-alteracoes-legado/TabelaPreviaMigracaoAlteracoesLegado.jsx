@@ -54,9 +54,10 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
               <th className="text-left p-3">Militar vinculado</th>
               <th className="text-left p-3">Matéria legado</th>
               <th className="text-left p-3">Tipo BG legado</th>
+              <th className="text-left p-3">Trecho legado</th>
               <th className="text-left p-3">Tipo sugerido</th>
-              <th className="text-left p-3">Confiança</th>
               <th className="text-left p-3">Tipo confirmado</th>
+              <th className="text-left p-3">Tipo final importação</th>
               <th className="text-left p-3">Destino sugerido</th>
               <th className="text-left p-3">Destino final</th>
               <th className="text-left p-3">Ações</th>
@@ -71,8 +72,8 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
                 <td className="p-3">{linha.transformado.militar_nome || '—'}</td>
                 <td className="p-3">{linha.transformado.materia_legado || '—'}</td>
                 <td className="p-3">{linha.transformado.tipo_bg_legado || '—'}</td>
+                <td className="p-3 max-w-[260px] truncate" title={linha.transformado.conteudo_trecho_legado || ''}>{linha.transformado.conteudo_trecho_legado || '—'}</td>
                 <td className="p-3">{linha.transformado.tipo_publicacao_sugerido || '—'}</td>
-                <td className="p-3">{linha.transformado.confianca_classificacao || '—'}</td>
                 <td className="p-3">
                   <div onClick={(event) => event.stopPropagation()}>
                     <Select
@@ -91,6 +92,7 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
                     </Select>
                   </div>
                 </td>
+                <td className="p-3">{linha.transformado.tipo_publicacao || 'LEGADO_NAO_CLASSIFICADO'}</td>
                 <td className="p-3">{linha.transformado.destino_sugerido || '—'}</td>
                 <td className="p-3">
                   <div onClick={(event) => event.stopPropagation()}>
