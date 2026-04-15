@@ -2,6 +2,7 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 function labelMilitar(m) {
   return `${m.posto_graduacao ? `${m.posto_graduacao} ` : ''}${m.nome_completo || m.nome_guerra || ''} ${m.matricula ? `(${m.matricula})` : ''}`.trim();
@@ -16,6 +17,7 @@ export default function DetalheLinhaMigracaoAlteracaoLegado({
   onSelecionarMilitar,
   onSelecionarTipoPublicacao,
   onSelecionarDestinoFinal,
+  onAlterarMotivoDestino,
 }) {
   if (!linha) return null;
 
@@ -89,9 +91,17 @@ export default function DetalheLinhaMigracaoAlteracaoLegado({
               </SelectContent>
             </Select>
             <p className="text-xs text-slate-500">
-              Destino sugerido pela planilha/GPT: <strong>{linha.transformado.destino_sugerido || '—'}</strong>
+              Destino sugerido automaticamente: <strong>{linha.transformado.destino_sugerido || '—'}</strong>
               {linha.transformado.motivo_destino ? ` • Motivo: ${linha.transformado.motivo_destino}` : ''}
             </p>
+            <div className="space-y-1">
+              <Label className="text-xs">Motivo da decisão (obrigatório para IGNORAR e EXCLUIDO_DO_LOTE)</Label>
+              <Textarea
+                value={linha.transformado.motivo_destino || ''}
+                onChange={(event) => onAlterarMotivoDestino?.(linha, event.target.value)}
+                placeholder="Ex.: linha fora de escopo do lote atual."
+              />
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -100,7 +110,7 @@ export default function DetalheLinhaMigracaoAlteracaoLegado({
               <p className="text-xs whitespace-pre-wrap">{linha.transformado.conteudo_trecho_legado || 'Sem trecho legado informado na planilha.'}</p>
             </section>
             <section className="bg-blue-50 rounded-lg p-3 md:col-span-2">
-              <h3 className="font-semibold mb-2">Classificação prévia (GPT/planilha)</h3>
+              <h3 className="font-semibold mb-2">Classificação automática mínima</h3>
               <div className="grid md:grid-cols-2 gap-2 text-xs">
                 <p><strong>Matéria legado:</strong> {linha.transformado.materia_legado || '—'}</p>
                 <p><strong>Tipo BG legado:</strong> {linha.transformado.tipo_bg_legado || '—'}</p>

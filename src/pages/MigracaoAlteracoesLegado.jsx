@@ -15,6 +15,7 @@ import {
   atualizarMilitarLinhaAnalise,
   atualizarTipoPublicacaoLinhaAnalise,
   atualizarDestinoLinhaAnalise,
+  atualizarMotivoDestinoLinhaAnalise,
   exportarRelatorioMigracaoAlteracoesLegado,
   importarAnaliseAlteracoesLegado,
   salvarAnaliseHistoricoAlteracoesLegado,
@@ -179,6 +180,14 @@ export default function MigracaoAlteracoesLegado() {
     setLinhaSelecionada(atualizada || null);
   };
 
+  const handleAjusteMotivoDestino = (linha, motivoDestino) => {
+    if (!analise) return;
+    const proxima = atualizarMotivoDestinoLinhaAnalise(analise, linha.linhaNumero, motivoDestino);
+    setAnalise(proxima);
+    const atualizada = proxima.linhas.find((x) => x.linhaNumero === linha.linhaNumero);
+    setLinhaSelecionada(atualizada || null);
+  };
+
   const reiniciarFluxo = () => {
     setArquivo(null);
     setAnalise(null);
@@ -211,11 +220,12 @@ export default function MigracaoAlteracoesLegado() {
             <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 text-sm">
               <p className="font-semibold mb-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Regras desta migração</p>
               <ul className="list-disc pl-6 space-y-1">
-                <li>Cada linha da planilha gera um registro individual em PublicacaoExOfficio.</li>
+                <li>Cada linha da planilha bruta do legado gera um registro individual em PublicacaoExOfficio.</li>
                 <li>Registros válidos entram como publicados, com BG e data BG obrigatórios.</li>
                 <li>A origem legado é marcada com <code>origem_registro=legado</code> e <code>importado_legado=true</code>.</li>
                 <li>Nota ID legado é preservada em campo próprio, separado do número do BG.</li>
-                <li>Vínculo com militar pode ser revisado manualmente antes da importação.</li>
+                <li>Sem correspondência segura de tipo, o padrão é <code>PENDENTE_CLASSIFICACAO</code> com <code>LEGADO_NAO_CLASSIFICADO</code>.</li>
+                <li>Vínculo com militar e tipo final podem ser revisados manualmente antes da importação.</li>
               </ul>
             </div>
             <UploadMigracaoAlteracoesLegado file={arquivo} onFileChange={setArquivo} onAnalisar={handleAnalisar} loading={carregando} />
@@ -293,6 +303,7 @@ export default function MigracaoAlteracoesLegado() {
         onSelecionarMilitar={handleAjusteMilitar}
         onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
         onSelecionarDestinoFinal={handleAjusteDestinoFinal}
+        onAlterarMotivoDestino={handleAjusteMotivoDestino}
       />
     </div>
   );
