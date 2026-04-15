@@ -7,7 +7,15 @@ function labelMilitar(m) {
   return `${m.posto_graduacao ? `${m.posto_graduacao} ` : ''}${m.nome_completo || m.nome_guerra || ''} ${m.matricula ? `(${m.matricula})` : ''}`.trim();
 }
 
-export default function DetalheLinhaMigracaoAlteracaoLegado({ linha, open, onOpenChange, militares = [], onSelecionarMilitar }) {
+export default function DetalheLinhaMigracaoAlteracaoLegado({
+  linha,
+  open,
+  onOpenChange,
+  militares = [],
+  tiposPublicacaoValidos = [],
+  onSelecionarMilitar,
+  onSelecionarTipoPublicacao,
+}) {
   if (!linha) return null;
 
   return (
@@ -40,10 +48,46 @@ export default function DetalheLinhaMigracaoAlteracaoLegado({ linha, open, onOpe
             </Select>
           </div>
 
+          <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+            <Label>Confirmar / trocar tipo final para importação</Label>
+            <Select
+              value={linha.transformado.tipo_publicacao_confirmado || '__none__'}
+              onValueChange={(valor) => onSelecionarTipoPublicacao?.(linha, valor === '__none__' ? '' : valor)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o tipo final" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Pendente de classificação</SelectItem>
+                {tiposPublicacaoValidos.map((tipo) => (
+                  <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500">
+              Sugerido: <strong>{linha.transformado.tipo_publicacao_sugerido || '—'}</strong>
+              {linha.transformado.confianca_classificacao ? ` • Confiança: ${linha.transformado.confianca_classificacao}` : ''}
+            </p>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-4">
             <section className="bg-emerald-50 rounded-lg p-3 md:col-span-2">
               <h3 className="font-semibold mb-2">Trecho legado capturado</h3>
               <p className="text-xs whitespace-pre-wrap">{linha.transformado.conteudo_trecho_legado || 'Sem trecho legado informado na planilha.'}</p>
+            </section>
+            <section className="bg-blue-50 rounded-lg p-3 md:col-span-2">
+              <h3 className="font-semibold mb-2">Classificação prévia (GPT/planilha)</h3>
+              <div className="grid md:grid-cols-2 gap-2 text-xs">
+                <p><strong>Matéria legado:</strong> {linha.transformado.materia_legado || '—'}</p>
+                <p><strong>Tipo BG legado:</strong> {linha.transformado.tipo_bg_legado || '—'}</p>
+                <p><strong>Tipo sugerido:</strong> {linha.transformado.tipo_publicacao_sugerido || '—'}</p>
+                <p><strong>Tipo final confirmado:</strong> {linha.transformado.tipo_publicacao_confirmado || 'Pendente'}</p>
+                <p><strong>Confiança:</strong> {linha.transformado.confianca_classificacao || '—'}</p>
+                <p><strong>Revisão manual (origem planilha):</strong> {linha.transformado.revisao_manual || '—'}</p>
+                <p className="md:col-span-2"><strong>Motivo:</strong> {linha.transformado.motivo_classificacao || '—'}</p>
+                <p className="md:col-span-2"><strong>Regra usada:</strong> {linha.transformado.regra_usada || '—'}</p>
+                <p className="md:col-span-2"><strong>Observação:</strong> {linha.transformado.observacao_classificacao || '—'}</p>
+              </div>
             </section>
             <section className="bg-slate-50 rounded-lg p-3">
               <h3 className="font-semibold mb-2">Dados originais</h3>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const statusLabel = {
   APTO: 'Apto',
@@ -30,7 +31,12 @@ function resumoTrecho(texto) {
   return valor.length > 100 ? `${valor.slice(0, 100)}...` : valor;
 }
 
-export default function TabelaPreviaMigracaoAlteracoesLegado({ linhas, onSelectLinha }) {
+export default function TabelaPreviaMigracaoAlteracoesLegado({
+  linhas,
+  tiposPublicacaoValidos = [],
+  onSelectLinha,
+  onSelecionarTipoPublicacao,
+}) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
@@ -45,6 +51,10 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({ linhas, onSelectL
               <th className="text-left p-3">Tipo BG legado</th>
               <th className="text-left p-3">BG número</th>
               <th className="text-left p-3">Data publicação</th>
+              <th className="text-left p-3">Tipo sugerido</th>
+              <th className="text-left p-3">Confiança</th>
+              <th className="text-left p-3">Tipo final</th>
+              <th className="text-left p-3">Revisão tipo</th>
               <th className="text-left p-3">Trecho legado</th>
               <th className="text-left p-3">Motivo principal</th>
             </tr>
@@ -60,6 +70,33 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({ linhas, onSelectL
                 <td className="p-3">{linha.transformado.tipo_bg_legado || '—'}</td>
                 <td className="p-3">{linha.transformado.numero_bg || '—'}</td>
                 <td className="p-3">{linha.transformado.data_bg_br || '—'}</td>
+                <td className="p-3">{linha.transformado.tipo_publicacao_sugerido || '—'}</td>
+                <td className="p-3">{linha.transformado.confianca_classificacao || '—'}</td>
+                <td className="p-3">
+                  <div onClick={(event) => event.stopPropagation()}>
+                    <Select
+                      value={linha.transformado.tipo_publicacao_confirmado || '__none__'}
+                      onValueChange={(valor) => onSelecionarTipoPublicacao?.(linha, valor === '__none__' ? '' : valor)}
+                    >
+                      <SelectTrigger className="w-[220px]">
+                        <SelectValue placeholder="Selecionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Pendente de classificação</SelectItem>
+                        {tiposPublicacaoValidos.map((tipo) => (
+                          <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </td>
+                <td className="p-3">
+                  {(linha.transformado.tipo_publicacao_confirmado || '').trim() ? (
+                    <Badge className="bg-emerald-100 text-emerald-800">Sem revisão</Badge>
+                  ) : (
+                    <Badge className="bg-indigo-100 text-indigo-800">Revisar</Badge>
+                  )}
+                </td>
                 <td className="p-3">{resumoTrecho(linha.transformado.conteudo_trecho_legado)}</td>
                 <td className="p-3">{motivoPrincipal(linha)}</td>
               </tr>

@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { strFromU8, unzipSync } from 'fflate';
 import { atualizarHistoricoImportacaoAlteracoesLegado, criarHistoricoImportacaoAlteracoesLegado } from '@/services/importacaoAlteracoesLegadoService';
+import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
@@ -46,6 +47,12 @@ const HEADER_ALIAS = {
   ],
   numero_bg: ['numero bg', 'número bg', 'bg numero', 'bg'],
   data_publicacao: ['data publicacao', 'data publicação', 'data bg', 'data'],
+  tipo_publicacao_sugerido: ['tipo_publicacao_sugerido', 'tipo publicacao sugerido', 'tipo publicação sugerido'],
+  confianca_classificacao: ['confianca_classificacao', 'confiança_classificacao', 'confianca classificacao', 'confiança classificação'],
+  revisao_manual: ['revisao_manual', 'revisão_manual', 'revisao manual', 'revisão manual'],
+  motivo_classificacao: ['motivo_classificacao', 'motivo classificacao', 'motivo classificação'],
+  regra_usada: ['regra_usada', 'regra usada'],
+  observacao_classificacao: ['observacao_classificacao', 'observação_classificacao', 'observacao classificacao', 'observação classificação'],
 };
 
 function limparTexto(valor) {
@@ -353,10 +360,39 @@ function mapCamposTransformados(row, colunas) {
     data_bg: dataBg,
     data_bg_br: formatDateBr(dataBg),
     tipo_publicacao: TIPO_NEUTRO_LEGADO,
+    tipo_publicacao_sugerido: valor('tipo_publicacao_sugerido'),
+    confianca_classificacao: valor('confianca_classificacao'),
+    revisao_manual: valor('revisao_manual'),
+    motivo_classificacao: valor('motivo_classificacao'),
+    regra_usada: valor('regra_usada'),
+    observacao_classificacao: valor('observacao_classificacao'),
+    tipo_publicacao_confirmado: '',
+    tipo_publicacao_confirmado_manualmente: false,
     status_publicacao: 'Publicado',
     origem_registro: 'legado',
     importado_legado: true,
   };
+}
+
+function resolverTiposPublicacaoValidos(tiposCustom = []) {
+  const tipos = getTiposRPFiltrados({ tiposCustom });
+  const map = new Map();
+  tipos.forEach((tipo) => {
+    const value = limparTexto(tipo?.value);
+    const label = limparTexto(tipo?.label || tipo?.value);
+    if (!value) return;
+    const canonico = label || value;
+    map.set(normalizarTextoComparacao(value), canonico);
+    map.set(normalizarTextoComparacao(label), canonico);
+  });
+  return map;
+}
+
+function resolverTipoSugeridoValido(tipoSugerido, tiposValidosMap) {
+  const valor = limparTexto(tipoSugerido);
+  if (!valor) return null;
+  if (normalizarTextoComparacao(valor) === normalizarTextoComparacao(TIPO_NEUTRO_LEGADO)) return null;
+  return tiposValidosMap.get(normalizarTextoComparacao(valor)) || null;
 }
 
 function resolverMilitar(transformado, indicesMilitares) {
@@ -444,10 +480,13 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
     throw new Error(`Cabeçalhos obrigatórios ausentes na planilha: ${ausentes.join(', ')}.`);
   }
 
-  const [militares, publicacoesLegadoExistentes] = await Promise.all([
+  const [militares, publicacoesLegadoExistentes, tiposPublicacaoCustom] = await Promise.all([
     base44.entities.Militar.list('-created_date', 10000),
     base44.entities.PublicacaoExOfficio.filter({ importado_legado: true }, '-created_date'),
+    base44.entities.TipoPublicacaoCustom.list('-created_date').catch(() => []),
   ]);
+  const tiposValidosMap = resolverTiposPublicacaoValidos(tiposPublicacaoCustom);
+  const tiposPublicacaoValidos = Array.from(new Set(Array.from(tiposValidosMap.values()))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   const militarIndices = buildMilitarIndices(militares);
   const duplicidadeExistente = new Set(publicacoesLegadoExistentes.map((item) => construirChaveDuplicidade({
@@ -471,6 +510,17 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
 
     if (!transformado.materia_legado && !transformado.nota_id_legado) {
       erros.push('Matéria legado ausente sem identificador mínimo alternativo (Nota ID).');
+    }
+
+    const tipoSugeridoValido = resolverTipoSugeridoValido(transformado.tipo_publicacao_sugerido, tiposValidosMap);
+    if (tipoSugeridoValido) {
+      transformado.tipo_publicacao_sugerido = tipoSugeridoValido;
+      transformado.tipo_publicacao_confirmado = tipoSugeridoValido;
+      transformado.tipo_publicacao = tipoSugeridoValido;
+    } else {
+      transformado.tipo_publicacao_confirmado = '';
+      transformado.tipo_publicacao = TIPO_NEUTRO_LEGADO;
+      revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
     }
 
     if (!transformado.numero_bg) erros.push('Número do BG obrigatório ausente.');
@@ -545,6 +595,7 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
     },
     versao_regra_migracao: REGRA_VERSAO,
     tipo_publicacao_neutro: TIPO_NEUTRO_LEGADO,
+    tipos_publicacao_validos: tiposPublicacaoValidos,
     linhas,
     resumo,
   };
@@ -596,15 +647,76 @@ export function atualizarMilitarLinhaAnalise(analise, linhaNumero, militar) {
   };
 }
 
+export function atualizarTipoPublicacaoLinhaAnalise(analise, linhaNumero, tipoPublicacaoConfirmado) {
+  if (!analise) return analise;
+
+  const tipoMap = new Map((analise.tipos_publicacao_validos || []).map((tipo) => [normalizarTextoComparacao(tipo), tipo]));
+  const valorSelecionado = limparTexto(tipoPublicacaoConfirmado);
+  const tipoValido = tipoMap.get(normalizarTextoComparacao(valorSelecionado)) || '';
+
+  const linhasAtualizadas = analise.linhas.map((linha) => {
+    if (linha.linhaNumero !== linhaNumero) return linha;
+
+    const revisoes = (linha.revisoes || []).filter((r) => !r.includes('Tipo de publicação pendente'));
+    const transformado = {
+      ...linha.transformado,
+      tipo_publicacao_confirmado: tipoValido,
+      tipo_publicacao_confirmado_manualmente: true,
+      tipo_publicacao: tipoValido || TIPO_NEUTRO_LEGADO,
+    };
+
+    if (!tipoValido) revisoes.push('Tipo de publicação pendente: sugestão ausente/inválida ou LEGADO_NAO_CLASSIFICADO.');
+
+    const ajustes = [...(linha.ajustes_manuais || [])];
+    ajustes.push({
+      tipo: 'TIPO_PUBLICACAO',
+      antes: linha.transformado.tipo_publicacao_confirmado || null,
+      depois: tipoValido || null,
+      timestamp: new Date().toISOString(),
+    });
+
+    const status = calcularStatusLinha({
+      erros: linha.erros || [],
+      revisoes,
+      alertas: linha.alertas || [],
+      ignorado: false,
+    });
+
+    return {
+      ...linha,
+      revisoes,
+      status,
+      transformado,
+      ajustes_manuais: ajustes,
+    };
+  });
+
+  return {
+    ...analise,
+    linhas: linhasAtualizadas,
+    resumo: gerarResumo(linhasAtualizadas),
+  };
+}
+
 function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
   const t = linha.transformado;
   const textoPrincipal = t.conteudo_trecho_legado || t.materia_legado || `Registro legado importado (Nota ID: ${t.nota_id_legado || 'N/I'})`;
+  const tipoFinal = t.tipo_publicacao_confirmado || t.tipo_publicacao_sugerido || t.tipo_publicacao || TIPO_NEUTRO_LEGADO;
+  const rastreabilidadeClassificacao = {
+    tipo_publicacao_sugerido: t.tipo_publicacao_sugerido || '',
+    tipo_publicacao_confirmado: t.tipo_publicacao_confirmado || '',
+    confianca_classificacao: t.confianca_classificacao || '',
+    revisao_manual: t.revisao_manual || '',
+    motivo_classificacao: t.motivo_classificacao || '',
+    regra_usada: t.regra_usada || '',
+    observacao_classificacao: t.observacao_classificacao || '',
+  };
 
   return {
     militar_id: t.militar_id,
     militar_nome: t.militar_nome,
     militar_matricula: t.militar_matricula,
-    tipo: t.tipo_publicacao || TIPO_NEUTRO_LEGADO,
+    tipo: tipoFinal,
     status: 'Publicado',
     status_publicacao: 'Publicado',
     numero_bg: t.numero_bg,
@@ -618,6 +730,7 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
       'Registro importado de base legada.',
       `Histórico de lote: ${historicoId || 'N/I'}.`,
       t.materia_legado ? `Matéria legado: ${t.materia_legado}` : '',
+      `Classificação legado (JSON): ${JSON.stringify(rastreabilidadeClassificacao)}`,
     ].filter(Boolean).join(' '),
     origem_registro: 'legado',
     importado_legado: true,
