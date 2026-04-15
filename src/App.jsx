@@ -21,6 +21,7 @@ const adminOnlyPages = new Set([
   'SolicitacoesAtualizacao',
   'Subgrupamentos',
   'HistoricoImportacoesMilitares',
+  'MigracaoAlteracoesLegado',
 ]);
 
 

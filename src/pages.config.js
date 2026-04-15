@@ -87,6 +87,7 @@ import LotacaoMilitares from './pages/LotacaoMilitares';
 import Livro from './pages/Livro';
 import MigracaoMilitares from './pages/MigracaoMilitares';
 import MigracaoAtestados from './pages/MigracaoAtestados';
+import MigracaoAlteracoesLegado from './pages/MigracaoAlteracoesLegado';
 import PerfisPermissao from './pages/PerfisPermissao';
 import PermissoesUsuarios from './pages/PermissoesUsuarios';
 import RP from './pages/RP';
@@ -135,6 +136,7 @@ export const PAGES = {
     "Livro": Livro,
     "MigracaoMilitares": MigracaoMilitares,
     "MigracaoAtestados": MigracaoAtestados,
+    "MigracaoAlteracoesLegado": MigracaoAlteracoesLegado,
     "PerfisPermissao": PerfisPermissao,
     "PermissoesUsuarios": PermissoesUsuarios,
     "RP": RP,

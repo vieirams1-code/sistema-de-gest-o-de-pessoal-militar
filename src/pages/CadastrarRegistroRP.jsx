@@ -293,6 +293,10 @@ export default function CadastrarRegistroRP() {
     () => calcularStatusPublicacaoRegistro(formData),
     [formData.nota_para_bg, formData.numero_bg, formData.data_bg]
   );
+  const isRegistroLegadoImportado = Boolean(
+    registroEdicao?.importado_legado || String(registroEdicao?.origem_registro || '').toLowerCase() === 'legado'
+  );
+  const permitirAjusteTipoLegadoPublicado = isEditing && isRegistroLegadoImportado && moduloOrigemEdicao === 'ExOfficio';
 
   useEffect(() => {
     setFormData((prev) => {
@@ -624,7 +628,7 @@ export default function CadastrarRegistroRP() {
                       <p className="font-semibold text-[#1e3a5f]">{selectedTipo.label}</p>
                       <p className="text-xs text-slate-500">{selectedTipo.grupo} · {selectedTipo.modulo === MODULO_LIVRO ? 'Livro' : 'Ex Offício'}</p>
                     </div>
-                    {!isEditing && (
+                    {(!isEditing || permitirAjusteTipoLegadoPublicado) && (
                       <Button
                         type="button"
                         variant="ghost"
@@ -635,7 +639,7 @@ export default function CadastrarRegistroRP() {
                           setFormData(prev => ({ ...prev, tipo_registro: '' }));
                         }}
                       >
-                        Alterar
+                        {permitirAjusteTipoLegadoPublicado ? 'Ajustar tipo legado' : 'Alterar'}
                       </Button>
                     )}
                   </div>
