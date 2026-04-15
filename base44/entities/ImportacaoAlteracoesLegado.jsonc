@@ -1,0 +1,34 @@
+{
+  "name": "ImportacaoAlteracoesLegado",
+  "type": "object",
+  "properties": {
+    "nome_arquivo": { "type": "string" },
+    "tipo_arquivo": { "type": "string" },
+    "hash_arquivo": { "type": "string" },
+    "data_importacao": { "type": "string", "format": "date-time" },
+    "importado_por": { "type": "string" },
+    "importado_por_nome": { "type": "string" },
+    "total_linhas": { "type": "number", "default": 0 },
+    "total_aptas": { "type": "number", "default": 0 },
+    "total_aptas_com_alerta": { "type": "number", "default": 0 },
+    "total_revisar": { "type": "number", "default": 0 },
+    "total_ignoradas": { "type": "number", "default": 0 },
+    "total_erros": { "type": "number", "default": 0 },
+    "total_importadas": { "type": "number", "default": 0 },
+    "total_nao_importadas": { "type": "number", "default": 0 },
+    "total_duplicidades": { "type": "number", "default": 0 },
+    "total_alertas": { "type": "number", "default": 0 },
+    "ajustes_manuais": { "type": "number", "default": 0 },
+    "status_importacao": {
+      "type": "string",
+      "enum": ["Analisado", "Importando", "Importado", "Importado Parcial", "Falhou"],
+      "default": "Analisado"
+    },
+    "importar_linhas_com_alerta": { "type": "boolean", "default": false },
+    "versao_regra_migracao": { "type": "string" },
+    "relatorio_json": { "type": "string" },
+    "observacoes": { "type": "string" },
+    "oculto_no_historico": { "type": "boolean", "default": false }
+  },
+  "required": ["nome_arquivo", "data_importacao"]
+}
