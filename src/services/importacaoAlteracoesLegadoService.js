@@ -1,7 +1,7 @@
 import { base44 } from '@/api/base44Client';
 
 const ENTITY_NAME = 'ImportacaoAlteracoesLegado';
-const ENTITY_ERROR_MESSAGE = 'Falha ao acessar histórico da migração legada. Verifique se a entidade ImportacaoAlteracoesLegado foi publicada no app.';
+const ENTITY_ERROR_MESSAGE = 'Falha ao acessar o histórico da migração de alterações legado. Verifique se a entidade ImportacaoAlteracoesLegado está publicada no app.';
 
 function getEntity() {
   const entity = base44?.entities?.[ENTITY_NAME];
@@ -9,10 +9,24 @@ function getEntity() {
   return entity;
 }
 
+function isSchemaNotFoundError(error) {
+  const message = String(error?.message || '');
+  return message.includes(`Entity schema ${ENTITY_NAME} not found in app`);
+}
+
+async function runWithFriendlyEntityError(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (isSchemaNotFoundError(error)) throw new Error(ENTITY_ERROR_MESSAGE);
+    throw error;
+  }
+}
+
 export async function criarHistoricoImportacaoAlteracoesLegado(payload) {
-  return getEntity().create(payload);
+  return runWithFriendlyEntityError(() => getEntity().create(payload));
 }
 
 export async function atualizarHistoricoImportacaoAlteracoesLegado(id, payload) {
-  return getEntity().update(id, payload);
+  return runWithFriendlyEntityError(() => getEntity().update(id, payload));
 }
