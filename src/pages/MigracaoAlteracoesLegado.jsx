@@ -13,6 +13,7 @@ import DetalheLinhaMigracaoAlteracaoLegado from '@/components/migracao-alteracoe
 import {
   analisarArquivoMigracaoAlteracoesLegado,
   atualizarMilitarLinhaAnalise,
+  atualizarTipoPublicacaoLinhaAnalise,
   exportarRelatorioMigracaoAlteracoesLegado,
   importarAnaliseAlteracoesLegado,
   salvarAnaliseHistoricoAlteracoesLegado,
@@ -158,6 +159,14 @@ export default function MigracaoAlteracoesLegado() {
     setLinhaSelecionada(atualizada || null);
   };
 
+  const handleAjusteTipoPublicacao = (linha, tipoPublicacao) => {
+    if (!analise) return;
+    const proxima = atualizarTipoPublicacaoLinhaAnalise(analise, linha.linhaNumero, tipoPublicacao);
+    setAnalise(proxima);
+    const atualizada = proxima.linhas.find((x) => x.linhaNumero === linha.linhaNumero);
+    setLinhaSelecionada(atualizada || null);
+  };
+
   const reiniciarFluxo = () => {
     setArquivo(null);
     setAnalise(null);
@@ -224,7 +233,12 @@ export default function MigracaoAlteracoesLegado() {
               </div>
             </div>
 
-            <TabelaPreviaMigracaoAlteracoesLegado linhas={linhasFiltradas} onSelectLinha={setLinhaSelecionada} />
+            <TabelaPreviaMigracaoAlteracoesLegado
+              linhas={linhasFiltradas}
+              tiposPublicacaoValidos={analise.tipos_publicacao_validos || []}
+              onSelectLinha={setLinhaSelecionada}
+              onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
+            />
 
             <div className="flex flex-wrap gap-2">
               <Button disabled={!podeImportar} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
@@ -261,7 +275,9 @@ export default function MigracaoAlteracoesLegado() {
         open={Boolean(linhaSelecionada)}
         onOpenChange={(open) => !open && setLinhaSelecionada(null)}
         militares={militares}
+        tiposPublicacaoValidos={analise?.tipos_publicacao_validos || []}
         onSelecionarMilitar={handleAjusteMilitar}
+        onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
       />
     </div>
   );
