@@ -49,7 +49,15 @@
       "type": "number",
       "default": 0
     },
-    "total_duplicadas": {
+    "total_duplicidades": {
+      "type": "number",
+      "default": 0
+    },
+    "total_alertas": {
+      "type": "number",
+      "default": 0
+    },
+    "ajustes_manuais": {
       "type": "number",
       "default": 0
     },
@@ -67,6 +75,13 @@
     },
     "status_importacao": {
       "type": "string",
+      "enum": [
+        "Analisado",
+        "Importando",
+        "Importado",
+        "Importado Parcial",
+        "Falhou"
+      ],
       "default": "Analisado"
     },
     "importar_linhas_com_alerta": {
