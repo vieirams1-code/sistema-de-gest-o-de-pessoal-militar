@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye } from 'lucide-react';
+import { Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -26,7 +26,13 @@ function LinhaResumo({ label, valor }) {
   );
 }
 
-export default function HistoricoImportacoesMilitaresLista({ lotes, onAbrirDetalhe }) {
+export default function HistoricoImportacoesMilitaresLista({
+  lotes,
+  mostrarOcultadas = false,
+  onAbrirDetalhe,
+  onOcultarLote,
+  onRestaurarLote,
+}) {
   if (!lotes.length) {
     return <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500 bg-white">Nenhum lote encontrado para os filtros selecionados.</div>;
   }
@@ -43,6 +49,16 @@ export default function HistoricoImportacoesMilitaresLista({ lotes, onAbrirDetal
             </div>
             <div className="flex items-center gap-2">
               <Badge className={statusGeralClass(lote.statusGeral)}>{lote.statusGeral}</Badge>
+              {lote.ocultoNoHistorico ? <Badge variant="secondary">Ocultado</Badge> : null}
+              {mostrarOcultadas && lote.ocultoNoHistorico ? (
+                <Button variant="outline" size="sm" onClick={() => onRestaurarLote?.(lote)}>
+                  <RotateCcw className="w-4 h-4 mr-1" /> Restaurar
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" className="text-slate-600" onClick={() => onOcultarLote?.(lote)}>
+                  <EyeOff className="w-4 h-4 mr-1" /> Ocultar do histórico
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => onAbrirDetalhe(lote)}>
                 <Eye className="w-4 h-4 mr-1" /> Ver detalhe
               </Button>
