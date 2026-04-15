@@ -48,6 +48,7 @@ export default function MigracaoAlteracoesLegado() {
   const [arquivo, setArquivo] = useState(null);
   const [analise, setAnalise] = useState(null);
   const [historicoId, setHistoricoId] = useState(null);
+  const [historicoDisponivel, setHistoricoDisponivel] = useState(true);
   const [carregando, setCarregando] = useState(false);
   const [filtro, setFiltro] = useState('TODOS');
   const [busca, setBusca] = useState('');
@@ -63,7 +64,7 @@ export default function MigracaoAlteracoesLegado() {
     });
   }, [analise, filtro, busca]);
 
-  const podeImportar = !!analise && !!historicoId && !carregando;
+  const podeImportar = !!analise && !carregando;
 
   const handleAnalisar = async () => {
     if (!arquivo) {
@@ -73,6 +74,7 @@ export default function MigracaoAlteracoesLegado() {
     try {
       setCarregando(true);
       setHistoricoId(null);
+      setHistoricoDisponivel(true);
       setResultadoImportacao(null);
       setLinhaSelecionada(null);
       const [resultado, usuario, listaMilitares] = await Promise.all([
@@ -81,18 +83,25 @@ export default function MigracaoAlteracoesLegado() {
         base44.entities.Militar.list('-created_date', 10000),
       ]);
       setMilitares(listaMilitares);
-
-      const historico = await salvarAnaliseHistoricoAlteracoesLegado(resultado, usuario);
-      if (!historico?.id) {
-        throw new Error('A análise foi concluída, mas o histórico do lote não foi salvo. Verifique a entidade ImportacaoAlteracoesLegado.');
-      }
-
       setAnalise(resultado);
-      setHistoricoId(historico.id);
       toast({ title: 'Análise concluída', description: 'Prévia da migração de alterações legado gerada com sucesso.' });
+
+      try {
+        const historico = await salvarAnaliseHistoricoAlteracoesLegado(resultado, usuario);
+        setHistoricoId(historico?.id || null);
+        setHistoricoDisponivel(Boolean(historico?.id));
+      } catch (historicoError) {
+        setHistoricoId(null);
+        setHistoricoDisponivel(false);
+        toast({
+          title: 'Análise pronta sem histórico',
+          description: historicoError?.message || 'Não foi possível salvar histórico do lote. A importação seguirá disponível sem histórico.',
+        });
+      }
     } catch (error) {
       setAnalise(null);
       setHistoricoId(null);
+      setHistoricoDisponivel(true);
       toast({
         title: 'Falha na análise',
         description: error?.message || 'Não foi possível analisar o arquivo.',
@@ -112,29 +121,28 @@ export default function MigracaoAlteracoesLegado() {
     try {
       setCarregando(true);
       const usuario = await base44.auth.me();
-      let loteHistoricoId = historicoId;
-
-      if (!loteHistoricoId) {
-        toast({
-          title: 'Histórico do lote ausente',
-          description: 'O histórico não foi encontrado. O sistema tentará recriar o lote antes de importar.',
-        });
-        const historicoRecriado = await salvarAnaliseHistoricoAlteracoesLegado(analise, usuario);
-        loteHistoricoId = historicoRecriado?.id;
-        if (!loteHistoricoId) {
-          throw new Error('Não foi possível salvar o histórico do lote. Revise a publicação da entidade ImportacaoAlteracoesLegado.');
-        }
-        setHistoricoId(loteHistoricoId);
-      }
-
       const resultado = await importarAnaliseAlteracoesLegado({
         analise,
         incluirAlertas,
-        historicoId: loteHistoricoId,
+        historicoId: historicoId || null,
         usuario,
       });
       setResultadoImportacao(resultado);
-      toast({ title: 'Importação finalizada', description: `Foram importadas ${resultado.totalImportadas} publicações legado.` });
+
+      const importouSemHistorico = !historicoDisponivel || !historicoId;
+      if (importouSemHistorico) {
+        toast({
+          title: 'Importação finalizada sem histórico',
+          description: 'Importação executada sem salvar histórico do lote, pois a entidade de histórico não está disponível no ambiente.',
+        });
+      } else if (resultado.avisosHistorico?.length) {
+        toast({
+          title: 'Importação finalizada com aviso',
+          description: resultado.avisosHistorico[0],
+        });
+      } else {
+        toast({ title: 'Importação finalizada', description: `Foram importadas ${resultado.totalImportadas} publicações legado.` });
+      }
     } catch (error) {
       toast({ title: 'Erro na importação', description: error?.message || 'Falha ao importar lote.', variant: 'destructive' });
     } finally {
@@ -154,6 +162,7 @@ export default function MigracaoAlteracoesLegado() {
     setArquivo(null);
     setAnalise(null);
     setHistoricoId(null);
+    setHistoricoDisponivel(true);
     setResultadoImportacao(null);
     setBusca('');
     setFiltro('TODOS');

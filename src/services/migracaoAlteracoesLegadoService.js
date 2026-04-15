@@ -668,12 +668,21 @@ export async function salvarAnaliseHistoricoAlteracoesLegado(analise, usuario) {
 
 export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, historicoId, usuario }) {
   if (!analise?.linhas?.length) throw new Error('Análise inválida para importação.');
-  if (!historicoId) throw new Error('Histórico do lote não encontrado. Refaça a análise ou gere um novo histórico antes de importar.');
+  const avisosHistorico = [];
+  let historicoImportando = null;
 
-  const historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
-    status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
-    importar_linhas_com_alerta: !!incluirAlertas,
-  });
+  if (historicoId) {
+    try {
+      historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+        status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
+        importar_linhas_com_alerta: !!incluirAlertas,
+      });
+    } catch (error) {
+      avisosHistorico.push(error?.message || 'Não foi possível atualizar o histórico para status de importação em andamento.');
+    }
+  } else {
+    avisosHistorico.push('Importação executada sem salvar histórico do lote, pois a entidade de histórico não está disponível no ambiente.');
+  }
 
   const importaveis = analise.linhas.filter((linha) => linha.status === STATUS_LINHA.APTO || (incluirAlertas && linha.status === STATUS_LINHA.APTO_COM_ALERTA));
   const naoImportadas = analise.linhas.filter((linha) => !importaveis.includes(linha));
@@ -711,20 +720,28 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     finalizadoEm: new Date().toISOString(),
   };
 
-  const historicoFinal = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
-    ...analise.resumo,
-    total_importadas: resultado.totalImportadas,
-    total_nao_importadas: resultado.totalNaoImportadas,
-    ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
-    status_importacao: statusFinal,
-    importar_linhas_com_alerta: !!incluirAlertas,
-    relatorio_json: JSON.stringify(relatorio),
-    observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
-  });
+  let historicoFinal = null;
+  if (historicoId) {
+    try {
+      historicoFinal = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+        ...analise.resumo,
+        total_importadas: resultado.totalImportadas,
+        total_nao_importadas: resultado.totalNaoImportadas,
+        ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
+        status_importacao: statusFinal,
+        importar_linhas_com_alerta: !!incluirAlertas,
+        relatorio_json: JSON.stringify(relatorio),
+        observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
+      });
+    } catch (error) {
+      avisosHistorico.push(error?.message || 'Não foi possível atualizar o histórico após a importação.');
+    }
+  }
 
   return {
     historicoInicial: historicoImportando,
     historicoFinal,
+    avisosHistorico,
     statusImportacao: statusFinal,
     totalImportadas: resultado.totalImportadas,
     totalNaoImportadas: resultado.totalNaoImportadas,
