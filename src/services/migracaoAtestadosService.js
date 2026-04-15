@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { strFromU8, unzipSync } from 'fflate';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
@@ -121,6 +122,166 @@ function parseCsv(texto) {
   return linhas;
 }
 
+function isLinhaVazia(cells) {
+  return !cells.some((cell) => limparTexto(cell));
+}
+
+function normalizarCelulaExcel(valor) {
+  if (valor === null || valor === undefined) return '';
+  return String(valor).trim();
+}
+
+function parseExcel(linhasPlanilha) {
+  const linhas = linhasPlanilha
+    .map((linha) => linha.map(normalizarCelulaExcel))
+    .filter((linha) => !isLinhaVazia(linha));
+
+  if (!linhas.length) {
+    throw new Error('Planilha sem conteúdo válido para análise.');
+  }
+
+  if (isLinhaVazia(linhas[0])) {
+    throw new Error('Planilha sem cabeçalhos válidos para análise.');
+  }
+
+  return linhas;
+}
+
+function parseXml(xmlString) {
+  return new DOMParser().parseFromString(xmlString, 'application/xml');
+}
+
+function getZipText(arquivosZip, caminho) {
+  const conteudo = arquivosZip[caminho];
+  if (!conteudo) return null;
+  return strFromU8(conteudo);
+}
+
+function resolverCaminho(base, destino) {
+  if (!destino) return null;
+  if (destino.startsWith('/')) return destino.replace(/^\//, '');
+  const partesBase = base.split('/').slice(0, -1);
+  destino.split('/').forEach((parte) => {
+    if (!parte || parte === '.') return;
+    if (parte === '..') {
+      partesBase.pop();
+      return;
+    }
+    partesBase.push(parte);
+  });
+  return partesBase.join('/');
+}
+
+function extrairSharedStrings(arquivosZip) {
+  const xml = getZipText(arquivosZip, 'xl/sharedStrings.xml');
+  if (!xml) return [];
+  const doc = parseXml(xml);
+  return Array.from(doc.getElementsByTagName('si')).map((item) => {
+    const textos = Array.from(item.getElementsByTagName('t')).map((node) => node.textContent || '');
+    return textos.join('');
+  });
+}
+
+function extrairIndiceColuna(celulaRef) {
+  const letras = (celulaRef.match(/[A-Z]+/) || [''])[0];
+  let indice = 0;
+  for (let i = 0; i < letras.length; i += 1) {
+    indice = (indice * 26) + (letras.charCodeAt(i) - 64);
+  }
+  return Math.max(indice - 1, 0);
+}
+
+function valorCelulaExcel(celula, sharedStrings) {
+  const tipo = celula.getAttribute('t');
+  if (tipo === 'inlineStr') {
+    return Array.from(celula.getElementsByTagName('t')).map((node) => node.textContent || '').join('');
+  }
+
+  const valorNode = celula.getElementsByTagName('v')[0];
+  if (!valorNode) return '';
+  const valor = valorNode.textContent || '';
+
+  if (tipo === 's') {
+    const idx = Number(valor);
+    return Number.isFinite(idx) ? sharedStrings[idx] || '' : '';
+  }
+  if (tipo === 'b') return valor === '1' ? 'TRUE' : 'FALSE';
+
+  return valor;
+}
+
+function extrairLinhasPlanilha(sheetXml, sharedStrings) {
+  const sheetDoc = parseXml(sheetXml);
+  const rows = Array.from(sheetDoc.getElementsByTagName('row'));
+  return rows.map((row) => {
+    const cells = [];
+    Array.from(row.getElementsByTagName('c')).forEach((celula) => {
+      const ref = celula.getAttribute('r') || '';
+      const colIdx = extrairIndiceColuna(ref);
+      cells[colIdx] = normalizarCelulaExcel(valorCelulaExcel(celula, sharedStrings));
+    });
+    return cells.map((cell) => cell ?? '');
+  });
+}
+
+function extrairPrimeiraPlanilhaComDados(arquivosZip) {
+  const workbookXml = getZipText(arquivosZip, 'xl/workbook.xml');
+  const relsXml = getZipText(arquivosZip, 'xl/_rels/workbook.xml.rels');
+  if (!workbookXml || !relsXml) {
+    throw new Error('Arquivo Excel inválido ou corrompido.');
+  }
+
+  const workbookDoc = parseXml(workbookXml);
+  const relsDoc = parseXml(relsXml);
+  const relMap = Array.from(relsDoc.getElementsByTagName('Relationship')).reduce((acc, rel) => {
+    acc[rel.getAttribute('Id')] = rel.getAttribute('Target');
+    return acc;
+  }, {});
+  const sharedStrings = extrairSharedStrings(arquivosZip);
+
+  const sheets = Array.from(workbookDoc.getElementsByTagName('sheet'));
+  for (const sheet of sheets) {
+    const relId = sheet.getAttribute('r:id') || sheet.getAttribute('id');
+    const target = relMap[relId];
+    const caminhoPlanilha = resolverCaminho('xl/workbook.xml', target || '');
+    const sheetXml = getZipText(arquivosZip, caminhoPlanilha);
+    if (!sheetXml) continue;
+    const linhas = extrairLinhasPlanilha(sheetXml, sharedStrings);
+    if (linhas.some((linha) => !isLinhaVazia(linha))) return linhas;
+  }
+
+  throw new Error('Arquivo Excel sem aba válida com dados para análise.');
+}
+
+async function lerXlsxPrimeiraAbaUtil(file) {
+  const buffer = await file.arrayBuffer();
+  const arquivosZip = unzipSync(new Uint8Array(buffer));
+  return extrairPrimeiraPlanilhaComDados(arquivosZip);
+}
+
+async function lerArquivoComoTabela(file) {
+  const nomeArquivo = String(file?.name || '').toLowerCase();
+  const isCsv = nomeArquivo.endsWith('.csv') || nomeArquivo.endsWith('.txt');
+  const isXlsx = nomeArquivo.endsWith('.xlsx');
+  const isXls = nomeArquivo.endsWith('.xls');
+
+  if (isCsv) {
+    const texto = await file.text();
+    return parseCsv(texto);
+  }
+
+  if (isXls) {
+    throw new Error('Formato .xls não suportado nesta versão. Envie o arquivo em .xlsx ou CSV.');
+  }
+
+  if (isXlsx) {
+    const linhasPlanilha = await lerXlsxPrimeiraAbaUtil(file);
+    return parseExcel(linhasPlanilha);
+  }
+
+  throw new Error('Formato de arquivo não suportado. Envie CSV ou Excel (.xlsx).');
+}
+
 function mapHeaders(cabecalho = []) {
   const normalizados = cabecalho.map((h) => normalizarChave(h));
   return Object.entries(HEADER_ALIAS).reduce((acc, [campo, aliases]) => {
@@ -148,6 +309,18 @@ function parseDataBrOuIso(valor) {
 
   const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const numeroExcel = Number(texto.replace(',', '.'));
+  if (Number.isFinite(numeroExcel) && numeroExcel > 59) {
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const convertido = new Date(excelEpoch.getTime() + (numeroExcel * 86400000));
+    if (!Number.isNaN(convertido.getTime())) {
+      const y = convertido.getUTCFullYear();
+      const m = String(convertido.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(convertido.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
 
   const dateObj = new Date(texto);
   if (Number.isNaN(dateObj.getTime())) return '';
@@ -358,8 +531,7 @@ function montarPayloadAtestado({ linha, militar, dataImportacaoIso }) {
 }
 
 export async function analisarArquivoMigracaoAtestados(file) {
-  const texto = await file.text();
-  const parsed = parseCsv(texto);
+  const parsed = await lerArquivoComoTabela(file);
   if (parsed.length < 2) throw new Error('Arquivo sem dados suficientes para análise.');
 
   const headerMap = mapHeaders(parsed[0]);
