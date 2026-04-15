@@ -83,6 +83,10 @@
     "observacoes": {
       "type": "string",
       "default": ""
+    },
+    "oculto_no_historico": {
+      "type": "boolean",
+      "default": false
     }
   }
 }
