@@ -190,8 +190,8 @@ export default function MigracaoAlteracoesLegado() {
   if (!isAdmin) return <AccessDenied modulo="Migração de Alterações Legado" />;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6">
+      <div className="max-w-[96rem] mx-auto space-y-6">
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
             <Database className="w-6 h-6" />

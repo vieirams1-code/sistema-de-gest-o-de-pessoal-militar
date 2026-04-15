@@ -19,6 +19,15 @@ function LinhaAvisoCompacta({ titulo, itens = [], className = '' }) {
   );
 }
 
+function CampoResumo({ label, value }) {
+  return (
+    <div className="min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2">
+      <p className="text-[11px] font-medium text-slate-500">{label}</p>
+      <p className="text-xs text-slate-800 break-words">{value || '—'}</p>
+    </div>
+  );
+}
+
 function ConteudoDetalheLinha({
   linha,
   militares = [],
@@ -30,11 +39,12 @@ function ConteudoDetalheLinha({
 }) {
   const destinoFinal = linha.transformado.destino_final || 'IMPORTAR';
   const exigeMotivo = destinoFinal === 'IGNORAR' || destinoFinal === 'EXCLUIDO_DO_LOTE';
+  const temAvisos = Boolean(linha.erros?.length || linha.revisoes?.length || linha.alertas?.length);
 
   return (
     <div className="space-y-3 text-sm">
-      <div className="grid gap-2 md:grid-cols-3">
-        <div className="space-y-1">
+      <div className="grid gap-2 lg:grid-cols-3">
+        <div className="space-y-1 min-w-0">
           <Label className="text-xs text-slate-600">Militar vinculado</Label>
           <Select
             value={linha.transformado.militar_id || '__none__'}
@@ -44,7 +54,7 @@ function ConteudoDetalheLinha({
               if (militar) onSelecionarMilitar?.(linha, militar);
             }}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Selecione um militar" />
             </SelectTrigger>
             <SelectContent>
@@ -56,13 +66,13 @@ function ConteudoDetalheLinha({
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-0">
           <Label className="text-xs text-slate-600">Tipo confirmado</Label>
           <Select
             value={linha.transformado.tipo_publicacao_confirmado || '__none__'}
             onValueChange={(valor) => onSelecionarTipoPublicacao?.(linha, valor === '__none__' ? '' : valor)}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Selecione o tipo final" />
             </SelectTrigger>
             <SelectContent>
@@ -74,13 +84,13 @@ function ConteudoDetalheLinha({
           </Select>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-0">
           <Label className="text-xs text-slate-600">Destino final</Label>
           <Select
             value={destinoFinal}
             onValueChange={(valor) => onSelecionarDestinoFinal?.(linha, valor)}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full">
               <SelectValue placeholder="Selecione o destino final" />
             </SelectTrigger>
             <SelectContent>
@@ -93,20 +103,20 @@ function ConteudoDetalheLinha({
         </div>
       </div>
 
-      <p className="text-[11px] text-slate-500 leading-relaxed">
-        <strong>Matéria legado:</strong> {linha.transformado.materia_legado || '—'}{' '}
-        <span className="text-slate-300">|</span>{' '}
-        <strong>Tipo BG legado:</strong> {linha.transformado.tipo_bg_legado || '—'}{' '}
-        <span className="text-slate-300">|</span>{' '}
-        <strong>Tipo sugerido:</strong> {linha.transformado.tipo_publicacao_sugerido || '—'}{' '}
-        <span className="text-slate-300">|</span>{' '}
-        <strong>Confiança:</strong> {linha.transformado.confianca_classificacao || '—'}
-      </p>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <CampoResumo label="Matéria legado" value={linha.transformado.materia_legado} />
+        <CampoResumo label="Tipo BG legado" value={linha.transformado.tipo_bg_legado} />
+        <CampoResumo label="Tipo sugerido" value={linha.transformado.tipo_publicacao_sugerido} />
+        <CampoResumo label="Confiança" value={linha.transformado.confianca_classificacao} />
+      </div>
 
-      <div className="border border-slate-200 rounded-md bg-white p-3 max-h-52 overflow-auto">
-        <p className="text-xs whitespace-pre-wrap leading-relaxed text-slate-700">
-          {linha.transformado.conteudo_trecho_legado || 'Sem trecho legado informado na planilha.'}
-        </p>
+      <div className="space-y-1">
+        <Label className="text-xs text-slate-600">Trecho legado completo</Label>
+        <div className="border border-slate-200 rounded-md bg-white p-3 max-h-60 overflow-y-auto">
+          <p className="text-xs whitespace-pre-wrap break-words leading-relaxed text-slate-700">
+            {linha.transformado.conteudo_trecho_legado || 'Sem trecho legado informado na planilha.'}
+          </p>
+        </div>
       </div>
 
       {exigeMotivo && (
@@ -121,11 +131,13 @@ function ConteudoDetalheLinha({
         </div>
       )}
 
-      <div className="space-y-1">
-        <LinhaAvisoCompacta titulo="Erros" itens={linha.erros} className="bg-rose-50 text-rose-800 border border-rose-200" />
-        <LinhaAvisoCompacta titulo="Pendências" itens={linha.revisoes || []} className="bg-indigo-50 text-indigo-800 border border-indigo-200" />
-        <LinhaAvisoCompacta titulo="Alertas" itens={linha.alertas} className="bg-amber-50 text-amber-800 border border-amber-200" />
-      </div>
+      {temAvisos && (
+        <div className="space-y-1">
+          <LinhaAvisoCompacta titulo="Erros" itens={linha.erros} className="bg-rose-50 text-rose-800 border border-rose-200" />
+          <LinhaAvisoCompacta titulo="Pendências" itens={linha.revisoes || []} className="bg-indigo-50 text-indigo-800 border border-indigo-200" />
+          <LinhaAvisoCompacta titulo="Alertas" itens={linha.alertas} className="bg-amber-50 text-amber-800 border border-amber-200" />
+        </div>
+      )}
     </div>
   );
 }
