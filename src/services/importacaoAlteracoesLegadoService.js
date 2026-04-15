@@ -23,10 +23,19 @@ async function runWithFriendlyEntityError(operation) {
   }
 }
 
+function garantirRetornoHistorico(registro, acao) {
+  if (!registro?.id) {
+    throw new Error(`Não foi possível ${acao} o histórico da migração legado: resposta sem ID válido.`);
+  }
+  return registro;
+}
+
 export async function criarHistoricoImportacaoAlteracoesLegado(payload) {
-  return runWithFriendlyEntityError(() => getEntity().create(payload));
+  const criado = await runWithFriendlyEntityError(() => getEntity().create(payload));
+  return garantirRetornoHistorico(criado, 'criar');
 }
 
 export async function atualizarHistoricoImportacaoAlteracoesLegado(id, payload) {
-  return runWithFriendlyEntityError(() => getEntity().update(id, payload));
+  const atualizado = await runWithFriendlyEntityError(() => getEntity().update(id, payload));
+  return garantirRetornoHistorico(atualizado, 'atualizar');
 }

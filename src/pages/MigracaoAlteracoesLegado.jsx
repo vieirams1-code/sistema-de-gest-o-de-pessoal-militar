@@ -63,24 +63,36 @@ export default function MigracaoAlteracoesLegado() {
     });
   }, [analise, filtro, busca]);
 
+  const podeImportar = !!analise && !!historicoId && !carregando;
+
   const handleAnalisar = async () => {
-    if (!arquivo) return;
+    if (!arquivo) {
+      toast({ title: 'Arquivo obrigatório', description: 'Selecione um arquivo antes de iniciar a análise.', variant: 'destructive' });
+      return;
+    }
     try {
       setCarregando(true);
+      setHistoricoId(null);
+      setResultadoImportacao(null);
+      setLinhaSelecionada(null);
       const [resultado, usuario, listaMilitares] = await Promise.all([
         analisarArquivoMigracaoAlteracoesLegado(arquivo),
         base44.auth.me(),
         base44.entities.Militar.list('-created_date', 10000),
       ]);
       setMilitares(listaMilitares);
-      setAnalise(resultado);
-      setResultadoImportacao(null);
 
       const historico = await salvarAnaliseHistoricoAlteracoesLegado(resultado, usuario);
-      setHistoricoId(historico?.id);
+      if (!historico?.id) {
+        throw new Error('A análise foi concluída, mas o histórico do lote não foi salvo. Verifique a entidade ImportacaoAlteracoesLegado.');
+      }
 
+      setAnalise(resultado);
+      setHistoricoId(historico.id);
       toast({ title: 'Análise concluída', description: 'Prévia da migração de alterações legado gerada com sucesso.' });
     } catch (error) {
+      setAnalise(null);
+      setHistoricoId(null);
       toast({
         title: 'Falha na análise',
         description: error?.message || 'Não foi possível analisar o arquivo.',
@@ -92,14 +104,33 @@ export default function MigracaoAlteracoesLegado() {
   };
 
   const handleImportar = async (incluirAlertas) => {
-    if (!analise || !historicoId) return;
+    if (!analise) {
+      toast({ title: 'Análise obrigatória', description: 'Analise um arquivo antes de iniciar a importação.', variant: 'destructive' });
+      return;
+    }
+
     try {
       setCarregando(true);
       const usuario = await base44.auth.me();
+      let loteHistoricoId = historicoId;
+
+      if (!loteHistoricoId) {
+        toast({
+          title: 'Histórico do lote ausente',
+          description: 'O histórico não foi encontrado. O sistema tentará recriar o lote antes de importar.',
+        });
+        const historicoRecriado = await salvarAnaliseHistoricoAlteracoesLegado(analise, usuario);
+        loteHistoricoId = historicoRecriado?.id;
+        if (!loteHistoricoId) {
+          throw new Error('Não foi possível salvar o histórico do lote. Revise a publicação da entidade ImportacaoAlteracoesLegado.');
+        }
+        setHistoricoId(loteHistoricoId);
+      }
+
       const resultado = await importarAnaliseAlteracoesLegado({
         analise,
         incluirAlertas,
-        historicoId,
+        historicoId: loteHistoricoId,
         usuario,
       });
       setResultadoImportacao(resultado);
@@ -187,8 +218,8 @@ export default function MigracaoAlteracoesLegado() {
             <TabelaPreviaMigracaoAlteracoesLegado linhas={linhasFiltradas} onSelectLinha={setLinhaSelecionada} />
 
             <div className="flex flex-wrap gap-2">
-              <Button disabled={carregando} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
-              <Button disabled={carregando} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true)}>Importar aptas e aptas com alerta</Button>
+              <Button disabled={!podeImportar} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
+              <Button disabled={!podeImportar} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true)}>Importar aptas e aptas com alerta</Button>
               <Button variant="outline" onClick={() => exportarRelatorioMigracaoAlteracoesLegado({ ...analise, estado: 'Analise' }, `relatorio-analise-alteracoes-legado-${analise.arquivo.nome}.json`)}>
                 <Download className="w-4 h-4 mr-2" /> Exportar relatório
               </Button>

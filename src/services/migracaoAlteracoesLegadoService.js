@@ -659,13 +659,18 @@ export async function salvarAnaliseHistoricoAlteracoesLegado(analise, usuario) {
     observacoes: 'Lote analisado de migração de alterações legado.',
   };
 
-  return criarHistoricoImportacaoAlteracoesLegado(payload);
+  const historico = await criarHistoricoImportacaoAlteracoesLegado(payload);
+  if (!historico?.id) {
+    throw new Error('Falha ao salvar histórico da análise: resposta sem ID válido.');
+  }
+  return historico;
 }
 
 export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas = false, historicoId, usuario }) {
   if (!analise?.linhas?.length) throw new Error('Análise inválida para importação.');
+  if (!historicoId) throw new Error('Histórico do lote não encontrado. Refaça a análise ou gere um novo histórico antes de importar.');
 
-  await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+  const historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
     status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
     importar_linhas_com_alerta: !!incluirAlertas,
   });
@@ -706,7 +711,7 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     finalizadoEm: new Date().toISOString(),
   };
 
-  await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+  const historicoFinal = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
     ...analise.resumo,
     total_importadas: resultado.totalImportadas,
     total_nao_importadas: resultado.totalNaoImportadas,
@@ -718,6 +723,8 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
   });
 
   return {
+    historicoInicial: historicoImportando,
+    historicoFinal,
     statusImportacao: statusFinal,
     totalImportadas: resultado.totalImportadas,
     totalNaoImportadas: resultado.totalNaoImportadas,
