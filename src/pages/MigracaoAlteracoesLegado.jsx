@@ -9,7 +9,6 @@ import { base44 } from '@/api/base44Client';
 import UploadMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/UploadMigracaoAlteracoesLegado';
 import ResumoMigracaoAlteracoesLegadoCards from '@/components/migracao-alteracoes-legado/ResumoMigracaoAlteracoesLegadoCards';
 import TabelaPreviaMigracaoAlteracoesLegado from '@/components/migracao-alteracoes-legado/TabelaPreviaMigracaoAlteracoesLegado';
-import DetalheLinhaMigracaoAlteracaoLegado from '@/components/migracao-alteracoes-legado/DetalheLinhaMigracaoAlteracaoLegado';
 import {
   analisarArquivoMigracaoAlteracoesLegado,
   atualizarMilitarLinhaAnalise,
@@ -56,7 +55,7 @@ export default function MigracaoAlteracoesLegado() {
   const [carregando, setCarregando] = useState(false);
   const [filtro, setFiltro] = useState('TODOS');
   const [busca, setBusca] = useState('');
-  const [linhaSelecionada, setLinhaSelecionada] = useState(null);
+  const [avisoHistorico, setAvisoHistorico] = useState('');
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
   const [militares, setMilitares] = useState([]);
 
@@ -80,7 +79,7 @@ export default function MigracaoAlteracoesLegado() {
       setHistoricoId(null);
       setHistoricoDisponivel(true);
       setResultadoImportacao(null);
-      setLinhaSelecionada(null);
+      setAvisoHistorico('');
       const [resultado, usuario, listaMilitares] = await Promise.all([
         analisarArquivoMigracaoAlteracoesLegado(arquivo),
         base44.auth.me(),
@@ -94,13 +93,11 @@ export default function MigracaoAlteracoesLegado() {
         const historico = await salvarAnaliseHistoricoAlteracoesLegado(resultado, usuario);
         setHistoricoId(historico?.id || null);
         setHistoricoDisponivel(Boolean(historico?.id));
+        setAvisoHistorico('');
       } catch (historicoError) {
         setHistoricoId(null);
         setHistoricoDisponivel(false);
-        toast({
-          title: 'Análise pronta sem histórico',
-          description: historicoError?.message || 'Não foi possível salvar histórico do lote. A importação seguirá disponível sem histórico.',
-        });
+        setAvisoHistorico(historicoError?.message || 'Análise sem histórico: a entidade de histórico não está disponível no ambiente.');
       }
     } catch (error) {
       setAnalise(null);
@@ -134,12 +131,11 @@ export default function MigracaoAlteracoesLegado() {
       });
       setResultadoImportacao(resultado);
 
-      const importouSemHistorico = !historicoDisponivel || !historicoId;
-      if (importouSemHistorico) {
-        toast({
-          title: 'Importação finalizada sem histórico',
-          description: 'Importação executada sem salvar histórico do lote, pois a entidade de histórico não está disponível no ambiente.',
-        });
+      const avisoHistoricoIndisponivel = resultado.avisosHistorico?.find((aviso) => aviso.includes('entidade de histórico não está disponível'));
+      if (avisoHistoricoIndisponivel) {
+        setHistoricoDisponivel(false);
+        setAvisoHistorico('Análise sem histórico: a entidade ImportacaoAlteracoesLegado não está disponível neste ambiente.');
+        toast({ title: 'Importação finalizada', description: `Foram importadas ${resultado.totalImportadas} publicações legado.` });
       } else if (resultado.avisosHistorico?.length) {
         toast({
           title: 'Importação finalizada com aviso',
@@ -159,16 +155,12 @@ export default function MigracaoAlteracoesLegado() {
     if (!analise) return;
     const proxima = atualizarMilitarLinhaAnalise(analise, linha.linhaNumero, militar);
     setAnalise(proxima);
-    const atualizada = proxima.linhas.find((x) => x.linhaNumero === linha.linhaNumero);
-    setLinhaSelecionada(atualizada || null);
   };
 
   const handleAjusteTipoPublicacao = (linha, tipoPublicacao) => {
     if (!analise) return;
     const proxima = atualizarTipoPublicacaoLinhaAnalise(analise, linha.linhaNumero, tipoPublicacao);
     setAnalise(proxima);
-    const atualizada = proxima.linhas.find((x) => x.linhaNumero === linha.linhaNumero);
-    setLinhaSelecionada(atualizada || null);
   };
 
 
@@ -176,16 +168,12 @@ export default function MigracaoAlteracoesLegado() {
     if (!analise) return;
     const proxima = atualizarDestinoLinhaAnalise(analise, linha.linhaNumero, destinoFinal);
     setAnalise(proxima);
-    const atualizada = proxima.linhas.find((x) => x.linhaNumero === linha.linhaNumero);
-    setLinhaSelecionada(atualizada || null);
   };
 
   const handleAjusteMotivoDestino = (linha, motivoDestino) => {
     if (!analise) return;
     const proxima = atualizarMotivoDestinoLinhaAnalise(analise, linha.linhaNumero, motivoDestino);
     setAnalise(proxima);
-    const atualizada = proxima.linhas.find((x) => x.linhaNumero === linha.linhaNumero);
-    setLinhaSelecionada(atualizada || null);
   };
 
   const reiniciarFluxo = () => {
@@ -196,7 +184,6 @@ export default function MigracaoAlteracoesLegado() {
     setResultadoImportacao(null);
     setBusca('');
     setFiltro('TODOS');
-    setLinhaSelecionada(null);
   };
 
   if (isLoading || !isAccessResolved) return null;
@@ -255,12 +242,21 @@ export default function MigracaoAlteracoesLegado() {
               </div>
             </div>
 
+            {!historicoDisponivel && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 text-sm">
+                <p className="font-semibold">Análise sem histórico</p>
+                <p>{avisoHistorico || 'A entidade ImportacaoAlteracoesLegado não está disponível neste ambiente. A análise e a importação continuam habilitadas no modo degradado.'}</p>
+              </div>
+            )}
+
             <TabelaPreviaMigracaoAlteracoesLegado
               linhas={linhasFiltradas}
+              militares={militares}
               tiposPublicacaoValidos={analise.tipos_publicacao_validos || []}
-              onSelectLinha={setLinhaSelecionada}
+              onSelecionarMilitar={handleAjusteMilitar}
               onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
               onSelecionarDestinoFinal={handleAjusteDestinoFinal}
+              onAlterarMotivoDestino={handleAjusteMotivoDestino}
             />
 
             <div className="flex flex-wrap gap-2">
@@ -293,18 +289,6 @@ export default function MigracaoAlteracoesLegado() {
           </div>
         )}
       </div>
-
-      <DetalheLinhaMigracaoAlteracaoLegado
-        linha={linhaSelecionada}
-        open={Boolean(linhaSelecionada)}
-        onOpenChange={(open) => !open && setLinhaSelecionada(null)}
-        militares={militares}
-        tiposPublicacaoValidos={analise?.tipos_publicacao_validos || []}
-        onSelecionarMilitar={handleAjusteMilitar}
-        onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
-        onSelecionarDestinoFinal={handleAjusteDestinoFinal}
-        onAlterarMotivoDestino={handleAjusteMotivoDestino}
-      />
     </div>
   );
 }
