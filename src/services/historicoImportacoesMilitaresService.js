@@ -235,7 +235,6 @@ function normalizarLote(item) {
     },
     linhas,
     observacoes: pickFirstString(item?.observacoes),
-    ocultoNoHistorico: Boolean(item?.oculto_no_historico),
     relatorioRaw: relatorio,
   };
 }
@@ -275,24 +274,19 @@ export async function listarHistoricoImportacoesMilitares() {
     .sort((a, b) => new Date(b.dataHora || 0).getTime() - new Date(a.dataHora || 0).getTime());
 }
 
-export async function atualizarOcultacaoHistoricoImportacaoMilitares(loteId, ocultoNoHistorico) {
+export async function excluirHistoricoImportacaoMilitares(loteId) {
   const entity = base44?.entities?.[ENTITY_NAME];
-  if (!entity?.update) {
-    throw new Error('Falha ao atualizar histórico de importações. Entidade ImportacaoMilitares não encontrada.');
+  if (!entity?.delete) {
+    throw new Error('Falha ao excluir histórico de importações. Entidade ImportacaoMilitares não encontrada.');
   }
 
-  return entity.update(loteId, {
-    oculto_no_historico: Boolean(ocultoNoHistorico),
-  });
+  return entity.delete(loteId);
 }
 
 export function filtrarLotesHistorico(lotes, filtros) {
   const termo = String(filtros?.arquivo || '').trim().toLowerCase();
 
   return (lotes || []).filter((lote) => {
-    const mostrarOcultadas = Boolean(filtros?.mostrarOcultadas);
-    if (!mostrarOcultadas && lote.ocultoNoHistorico) return false;
-
     if (termo && !String(lote.nomeArquivo || '').toLowerCase().includes(termo)) return false;
     if ((filtros?.inicio || filtros?.fim) && !isDateInRange(lote.dataHora, filtros?.inicio, filtros?.fim)) return false;
 

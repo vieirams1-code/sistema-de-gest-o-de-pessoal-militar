@@ -9,7 +9,7 @@ import HistoricoImportacoesMilitaresFiltros from '@/components/migracao-militare
 import HistoricoImportacoesMilitaresLista from '@/components/migracao-militares/HistoricoImportacoesMilitaresLista';
 import DetalheImportacaoMilitaresDrawer from '@/components/migracao-militares/DetalheImportacaoMilitaresDrawer';
 import {
-  atualizarOcultacaoHistoricoImportacaoMilitares,
+  excluirHistoricoImportacaoMilitares,
   filtrarLotesHistorico,
   listarHistoricoImportacoesMilitares,
   montarResumoHistorico,
@@ -26,8 +26,9 @@ const FILTROS_INICIAIS = {
   comRevisar: false,
   comLinhasErro: false,
   comAlerta: false,
-  mostrarOcultadas: false,
 };
+
+const TEXTO_CONFIRMACAO_EXCLUSAO = `Deseja excluir este lote do histórico de importação?\nEsta ação remove apenas o registro do histórico e não apaga os militares já importados.`;
 
 export default function HistoricoImportacoesMilitares() {
   const { isAdmin, isLoading, isAccessResolved } = useCurrentUser();
@@ -37,6 +38,7 @@ export default function HistoricoImportacoesMilitares() {
   const [carregando, setCarregando] = useState(true);
   const [lotes, setLotes] = useState([]);
   const [loteSelecionado, setLoteSelecionado] = useState(null);
+  const [lotesExcluindo, setLotesExcluindo] = useState({});
 
   const carregar = async () => {
     try {
@@ -58,42 +60,36 @@ export default function HistoricoImportacoesMilitares() {
     carregar();
   }, []);
 
-  const ocultarLote = async (lote) => {
+  const excluirLote = async (lote) => {
     if (!lote?.id) return;
-    const confirmar = window.confirm(`Deseja ocultar o lote "${lote.nomeArquivo || 'Sem nome'}" do histórico?`);
+    if (lotesExcluindo[lote.id]) return;
+
+    const confirmar = window.confirm(TEXTO_CONFIRMACAO_EXCLUSAO);
     if (!confirmar) return;
 
+    setLotesExcluindo((prev) => ({ ...prev, [lote.id]: true }));
+
     try {
-      await atualizarOcultacaoHistoricoImportacaoMilitares(lote.id, true);
-      setLotes((prev) => prev.map((item) => (item.id === lote.id ? { ...item, ocultoNoHistorico: true } : item)));
+      await excluirHistoricoImportacaoMilitares(lote.id);
+
+      setLotes((prev) => prev.filter((item) => item.id !== lote.id));
+      setLoteSelecionado((prev) => (prev?.id === lote.id ? null : prev));
+
       toast({
-        title: 'Lote ocultado',
-        description: 'O lote foi removido da listagem padrão do histórico.',
+        title: 'Lote excluído do histórico',
+        description: 'O registro foi removido do histórico. Os militares importados permanecem intactos.',
       });
     } catch (error) {
       toast({
-        title: 'Falha ao ocultar lote',
-        description: error?.message || 'Não foi possível ocultar este lote no momento.',
+        title: 'Falha ao excluir lote',
+        description: error?.message || 'Não foi possível excluir este lote no momento.',
         variant: 'destructive',
       });
-    }
-  };
-
-  const restaurarLote = async (lote) => {
-    if (!lote?.id) return;
-
-    try {
-      await atualizarOcultacaoHistoricoImportacaoMilitares(lote.id, false);
-      setLotes((prev) => prev.map((item) => (item.id === lote.id ? { ...item, ocultoNoHistorico: false } : item)));
-      toast({
-        title: 'Lote restaurado',
-        description: 'O lote voltou a aparecer normalmente no histórico.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Falha ao restaurar lote',
-        description: error?.message || 'Não foi possível restaurar este lote no momento.',
-        variant: 'destructive',
+    } finally {
+      setLotesExcluindo((prev) => {
+        const next = { ...prev };
+        delete next[lote.id];
+        return next;
       });
     }
   };
@@ -135,10 +131,9 @@ export default function HistoricoImportacoesMilitares() {
         ) : (
           <HistoricoImportacoesMilitaresLista
             lotes={lotesFiltrados}
-            mostrarOcultadas={filtros.mostrarOcultadas}
+            lotesExcluindo={lotesExcluindo}
             onAbrirDetalhe={setLoteSelecionado}
-            onOcultarLote={ocultarLote}
-            onRestaurarLote={restaurarLote}
+            onExcluirLote={excluirLote}
           />
         )}
       </div>
