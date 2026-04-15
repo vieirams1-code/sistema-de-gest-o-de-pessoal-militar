@@ -86,7 +86,8 @@
     },
     "oculto_no_historico": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "description": "Campo legado de ocultação (descontinuado). A exclusão real do lote deve usar remoção física do registro."
     }
   }
 }

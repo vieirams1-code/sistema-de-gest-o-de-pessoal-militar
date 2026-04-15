@@ -34,7 +34,6 @@ export default function HistoricoImportacoesMilitaresFiltros({ filtros, onChange
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-        <FiltroSwitch id="mostrar-ocultadas" label="Mostrar ocultadas" checked={filtros.mostrarOcultadas} onChange={(v) => onChangeFiltros({ mostrarOcultadas: v })} />
         <FiltroSwitch id="com-pendencias" label="Lote com pendências" checked={filtros.comPendencias} onChange={(v) => onChangeFiltros({ comPendencias: v })} />
         <FiltroSwitch id="com-erro" label="Lote com erro" checked={filtros.comErro} onChange={(v) => onChangeFiltros({ comErro: v })} />
         <FiltroSwitch id="concluida" label="Importação concluída" checked={filtros.somenteConcluida} onChange={(v) => onChangeFiltros({ somenteConcluida: v })} />
