@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollText } from 'lucide-react';
+import { listarRegistrosMilitar, vinculaRegistroAoMilitar } from '@/services/registrosMilitarService';
 
 function normalizarDataISO(valor) {
   if (!valor) return '';
@@ -53,6 +54,10 @@ function extrairDescricao(registro) {
   return 'Registro sem descrição detalhada.';
 }
 
+function getStatusPublicacaoLabel(registro) {
+  return String(registro?.status_publicacao || registro?.status || '').trim() || 'Sem status';
+}
+
 export default function RegistrosMilitar() {
   const { isAccessResolved, isLoading: loadingUser, canAccessModule } = useCurrentUser();
   const [filtroMilitarId, setFiltroMilitarId] = useState('all');
@@ -68,7 +73,7 @@ export default function RegistrosMilitar() {
 
   const { data: registros = [], isLoading: loadingRegistros } = useQuery({
     queryKey: ['registros-militar-registros'],
-    queryFn: () => base44.entities.RegistroLivro.list('-created_date', 10000),
+    queryFn: listarRegistrosMilitar,
     enabled: isAccessResolved && canAccessMilitares,
   });
 
@@ -80,22 +85,36 @@ export default function RegistrosMilitar() {
     [militares],
   );
 
+  const militarSelecionado = useMemo(() => {
+    if (filtroMilitarId === 'all') return null;
+    return militaresPorId[filtroMilitarId] || null;
+  }, [filtroMilitarId, militaresPorId]);
+
   const registrosOrdenados = useMemo(() => {
     const buscaLower = busca.trim().toLowerCase();
 
     return registros
       .filter((registro) => {
-        if (filtroMilitarId !== 'all' && registro?.militar_id !== filtroMilitarId) return false;
+        if (militarSelecionado && !vinculaRegistroAoMilitar(registro, militarSelecionado)) return false;
 
         if (!buscaLower) return true;
 
         const militar = militaresPorId[registro?.militar_id] || {};
-        const nomeMilitar = `${militar?.posto_graduacao || ''} ${militar?.nome_guerra || militar?.nome_completo || ''}`.toLowerCase();
+        const nomeMilitar = [
+          militar?.posto_graduacao,
+          militar?.nome_guerra || militar?.nome_completo,
+          registro?.militar_nome,
+          registro?.militar_matricula,
+        ].filter(Boolean).join(' ').toLowerCase();
+
         const textoRegistro = [
           extrairDescricao(registro),
           registro?.numero_bg,
           registro?.tipo_registro,
+          registro?.tipo,
           registro?.origem_tipo,
+          registro?.origem_registro,
+          getStatusPublicacaoLabel(registro),
         ].join(' ').toLowerCase();
 
         return nomeMilitar.includes(buscaLower) || textoRegistro.includes(buscaLower);
@@ -106,15 +125,37 @@ export default function RegistrosMilitar() {
           registro?.data_evento || registro?.data_publicacao || registro?.data_bg || registro?.created_date,
         );
 
+        const nomeRegistro = String(registro?.militar_nome || '').trim();
+        const militarNome = nomeRegistro
+          || `${militar?.posto_graduacao ? `${militar.posto_graduacao} ` : ''}${militar?.nome_guerra || militar?.nome_completo || 'Militar não identificado'}`;
+
         return {
           ...registro,
           dataEvento,
           descricao: extrairDescricao(registro),
-          militarNome: `${militar?.posto_graduacao ? `${militar.posto_graduacao} ` : ''}${militar?.nome_guerra || militar?.nome_completo || 'Militar não identificado'}`,
+          militarNome,
         };
       })
       .sort((a, b) => (b.dataEvento || '').localeCompare(a.dataEvento || ''));
-  }, [busca, filtroMilitarId, militaresPorId, registros]);
+  }, [busca, militarSelecionado, militaresPorId, registros]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (!militarSelecionado) return;
+
+    const total = registrosOrdenados.length;
+    const legado = registrosOrdenados.filter((item) => item.origem_registro === 'legado').length;
+    const sistema = total - legado;
+
+    console.info('[RegistrosMilitar] Consulta por militar', {
+      militar_id: militarSelecionado.id,
+      militar_matricula: militarSelecionado.matricula,
+      militar_nome: militarSelecionado.nome_completo,
+      total,
+      legado,
+      sistema,
+    });
+  }, [militarSelecionado, registrosOrdenados]);
 
   if (loadingUser || !isAccessResolved) {
     return <div className="p-6">Carregando...</div>;
@@ -164,7 +205,7 @@ export default function RegistrosMilitar() {
             <Input
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
-              placeholder="Pesquisar por tipo, descrição ou BG"
+              placeholder="Pesquisar por tipo, descrição, origem ou BG"
             />
           </div>
         </CardContent>
@@ -182,15 +223,23 @@ export default function RegistrosMilitar() {
           ) : (
             <ul className="space-y-3">
               {registrosOrdenados.map((registro) => (
-                <li key={registro.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                <li key={`${registro.origem_fonte || 'registro'}-${registro.id}`} className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-slate-900">{registro.militarNome}</p>
                     <p className="text-xs text-slate-500">{formatarData(registro.dataEvento)}</p>
                   </div>
                   <p className="mt-1 text-sm text-slate-700">{registro.descricao}</p>
                   <p className="mt-2 text-xs text-slate-500">
-                    Tipo: {registro.tipo_registro || '-'} • BG: {registro.numero_bg || '-'}
+                    Tipo: {registro.tipo_registro || registro.tipo || '-'} • BG: {registro.numero_bg || '-'}
                   </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${registro.origem_registro === 'legado' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+                      {registro.origem_registro === 'legado' ? 'Legado' : 'Sistema'}
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                      {getStatusPublicacaoLabel(registro)}
+                    </span>
+                  </div>
                 </li>
               ))}
             </ul>
