@@ -85,3 +85,29 @@ export async function listarRegistrosMilitar() {
 
   return [...sistemaNormalizado, ...exOfficioNormalizado];
 }
+
+function getEntityFromRegistro(registro) {
+  if (registro?.origem_fonte === 'PublicacaoExOfficio') return base44.entities.PublicacaoExOfficio;
+  return base44.entities.RegistroLivro;
+}
+
+export async function atualizarTipoRegistroMilitar(registro, novoTipo, audit = {}) {
+  const entity = getEntityFromRegistro(registro);
+  const tipoNormalizado = limparTexto(novoTipo);
+
+  const payload = registro?.origem_fonte === 'PublicacaoExOfficio'
+    ? { tipo: tipoNormalizado }
+    : { tipo_registro: tipoNormalizado };
+
+  if (audit?.userEmail) {
+    payload.tipo_alterado_por = audit.userEmail;
+    payload.tipo_alterado_em = new Date().toISOString();
+  }
+
+  return entity.update(registro.id, payload);
+}
+
+export async function excluirRegistroMilitar(registro) {
+  const entity = getEntityFromRegistro(registro);
+  return entity.delete(registro.id);
+}
