@@ -20,3 +20,8 @@ export function isRegistroLegado(registro) {
   if (registro.importado_legado === true) return true;
   return String(registro.origem_registro || '').trim().toLowerCase() === 'legado';
 }
+
+export function filtrarRegistrosSistema(registros = []) {
+  if (!Array.isArray(registros)) return [];
+  return registros.filter((registro) => !isRegistroLegado(registro));
+}
