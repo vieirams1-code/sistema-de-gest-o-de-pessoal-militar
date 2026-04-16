@@ -24,6 +24,10 @@ import {
   criarChavePendenciaComportamento,
   obterHistoricoComportamentoMilitar,
 } from '@/services/justicaDisciplinaService';
+import {
+  getMensagemRegistrosSistemaPerfilMilitar,
+  isRegistroLegado,
+} from '@/config/perfilMilitarRegistrosConfig';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -81,6 +85,14 @@ function Section({ title, icon: Icon, children }) {
 function formatDate(date) {
   if (!date) return null;
   try { return format(new Date(date + 'T00:00:00'), "dd/MM/yyyy"); } catch { return date; }
+}
+
+function AvisoRegistrosSistema() {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs text-slate-600">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
+    </div>
+  );
 }
 
 export default function VerMilitar() {
@@ -172,30 +184,45 @@ export default function VerMilitar() {
     return unicas;
   }, [pendenciasComportamento]);
 
+  const feriasSistema = React.useMemo(() => ferias.filter((item) => !isRegistroLegado(item)), [ferias]);
+  const atestadosSistema = React.useMemo(() => atestados.filter((item) => !isRegistroLegado(item)), [atestados]);
+  const medalhasSistema = React.useMemo(() => medalhas.filter((item) => !isRegistroLegado(item)), [medalhas]);
+  const armamentosSistema = React.useMemo(() => armamentos.filter((item) => !isRegistroLegado(item)), [armamentos]);
+  const periodosSistema = React.useMemo(() => periodos.filter((item) => !isRegistroLegado(item)), [periodos]);
+  const historicoComportamentoSistema = React.useMemo(
+    () => historicoComportamento.filter((item) => !isRegistroLegado(item)),
+    [historicoComportamento]
+  );
+  const punicoesSistema = React.useMemo(() => punicoes.filter((item) => !isRegistroLegado(item)), [punicoes]);
+  const pendenciasComportamentoSistema = React.useMemo(
+    () => pendenciasComportamentoUnicas.filter((item) => !isRegistroLegado(item)),
+    [pendenciasComportamentoUnicas]
+  );
+
   const avaliacaoComportamento = React.useMemo(() => {
     if (!militar) return null;
-    return calcularComportamento(punicoes, militar.posto_graduacao, new Date(), {
+    return calcularComportamento(punicoesSistema, militar.posto_graduacao, new Date(), {
       dataInclusaoMilitar: militar.data_inclusao,
     });
-  }, [militar, punicoes]);
+  }, [militar, punicoesSistema]);
 
   const proximaMelhoria = React.useMemo(() => {
     if (!militar) return null;
-    return calcularProximaMelhoria(punicoes, militar.posto_graduacao, new Date(), {
+    return calcularProximaMelhoria(punicoesSistema, militar.posto_graduacao, new Date(), {
       dataInclusaoMilitar: militar.data_inclusao,
     });
-  }, [militar, punicoes]);
+  }, [militar, punicoesSistema]);
 
   const ultimaPunicaoPorMilitar = React.useMemo(() => {
-    const ultima = punicoes[0];
+    const ultima = punicoesSistema[0];
     if (!ultima) return null;
     return {
       tipo: ultima.tipo_punicao || ultima.tipo || 'Punição disciplinar',
       data: ultima.data_inicio_cumprimento || ultima.data_inicio || ultima.created_date || '',
     };
-  }, [punicoes]);
+  }, [punicoesSistema]);
 
-  const historicoChartData = React.useMemo(() => historicoComportamento.map((evento) => {
+  const historicoChartData = React.useMemo(() => historicoComportamentoSistema.map((evento) => {
     const dataAlteracao = String(evento?.data_alteracao || '').slice(0, 10);
     const year = Number(dataAlteracao.slice(0, 4));
 
@@ -204,7 +231,7 @@ export default function VerMilitar() {
       level: toChartLevel(evento?.comportamento_novo),
       desc: evento?.motivo_mudanca || evento?.motivo_mudanca_resolvido || evento?.observacoes || 'Alteração de comportamento registrada.',
     };
-  }).filter((item) => Number.isFinite(item.year)), [historicoComportamento]);
+  }).filter((item) => Number.isFinite(item.year)), [historicoComportamentoSistema]);
 
   if (loadingUser || isLoading) {
     return (
@@ -410,6 +437,7 @@ export default function VerMilitar() {
           {comportamentoElegivel && (
             <TabsContent value="comportamento">
               <div className="space-y-6">
+                <AvisoRegistrosSistema />
                 <Section title="Situação Atual do Comportamento" icon={Activity}>
                   <div className="grid md:grid-cols-3 gap-3 text-sm">
                     <div className="rounded-lg border p-3">
@@ -440,11 +468,11 @@ export default function VerMilitar() {
                 </Section>
 
                 <Section title="Pendências de Comportamento" icon={AlertTriangle}>
-                  {pendenciasComportamentoUnicas.length === 0 ? (
+                  {pendenciasComportamentoSistema.length === 0 ? (
                     <p className="text-sm text-slate-500">Sem pendências de comportamento no momento.</p>
                   ) : (
                     <div className="space-y-3">
-                      {pendenciasComportamentoUnicas.map((pendencia) => (
+                      {pendenciasComportamentoSistema.map((pendencia) => (
                         <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                           <p className="text-sm font-semibold text-amber-900">
                             {(pendencia.comportamento_atual || militar.comportamento || '—')} → {(pendencia.comportamento_sugerido || avaliacaoComportamento?.comportamento || militar.comportamento || '—')}
@@ -467,16 +495,16 @@ export default function VerMilitar() {
                       title="Evolução anual do comportamento"
                       height={220}
                     />
-                    <ComportamentoTimeline eventos={historicoComportamento} />
+                    <ComportamentoTimeline eventos={historicoComportamentoSistema} />
                   </div>
                 </Section>
 
                 <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
-                  {punicoes.length === 0 ? (
+                  {punicoesSistema.length === 0 ? (
                     <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p>
                   ) : (
                     <div className="space-y-2">
-                      {punicoes.slice(0, 5).map((punicao) => (
+                      {punicoesSistema.slice(0, 5).map((punicao) => (
                         <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
                           <p className="text-sm font-medium text-slate-800">{punicao.tipo_punicao || punicao.tipo || 'Punição'}</p>
                           <p className="text-xs text-slate-500">
@@ -495,17 +523,18 @@ export default function VerMilitar() {
           {/* Férias */}
           <TabsContent value="ferias">
             <div className="space-y-4">
+              <AvisoRegistrosSistema />
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-slate-700">Períodos Aquisitivos e Férias</h3>
               </div>
-              {periodos.length === 0 && ferias.length === 0 ? (
+              {periodosSistema.length === 0 && feriasSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Calendar className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum registro de férias</p>
                 </div>
               ) : (
                 <>
-                  {periodos.filter(p => p.status !== 'Inativo').map(p => (
+                  {periodosSistema.filter(p => p.status !== 'Inativo').map(p => (
                     <div key={p.id} className="bg-white rounded-xl border border-slate-200 p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold text-slate-800">{p.ano_referencia}</span>
@@ -516,7 +545,7 @@ export default function VerMilitar() {
                       <p className="text-xs text-slate-500">
                         {formatDate(p.inicio_aquisitivo)} a {formatDate(p.fim_aquisitivo)} · Limite: {formatDate(p.data_limite_gozo)} · {p.dias_gozados || 0}/{p.dias_direito || 30} dias gozados
                       </p>
-                      {ferias.filter(f => f.periodo_aquisitivo_id === p.id).map(f => (
+                      {feriasSistema.filter(f => f.periodo_aquisitivo_id === p.id).map(f => (
                         <div key={f.id} className="mt-2 ml-4 p-2 bg-slate-50 rounded-lg text-xs">
                           <span className="font-medium">Fração: {f.dias} dias</span> — {formatDate(f.data_inicio)} a {formatDate(f.data_fim)}
                           {f.fracionamento && <span className="text-slate-500 ml-2">({f.fracionamento})</span>}
@@ -533,12 +562,13 @@ export default function VerMilitar() {
           {/* Atestados */}
           <TabsContent value="atestados">
             <div className="space-y-3">
-              {atestados.length === 0 ? (
+              <AvisoRegistrosSistema />
+              {atestadosSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum atestado registrado</p>
                 </div>
-              ) : atestados.map(a => (
+              ) : atestadosSistema.map(a => (
                 <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -558,12 +588,13 @@ export default function VerMilitar() {
           {/* Medalhas */}
           <TabsContent value="medalhas">
             <div className="space-y-3">
-              {medalhas.length === 0 ? (
+              <AvisoRegistrosSistema />
+              {medalhasSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Award className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhuma medalha registrada</p>
                 </div>
-              ) : medalhas.filter(m => m.status === 'Concedido').map(m => (
+              ) : medalhasSistema.filter(m => m.status === 'Concedido').map(m => (
                 <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-800">{m.tipo_medalha_nome}</span>
@@ -581,12 +612,13 @@ export default function VerMilitar() {
           {/* Armamentos */}
           <TabsContent value="armamentos">
             <div className="space-y-3">
-              {armamentos.length === 0 ? (
+              <AvisoRegistrosSistema />
+              {armamentosSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Shield className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum armamento registrado</p>
                 </div>
-              ) : armamentos.map(a => (
+              ) : armamentosSistema.map(a => (
                 <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-800">{a.tipo} — {a.marca || ''} {a.calibre}</span>
