@@ -91,6 +91,7 @@ import MigracaoAlteracoesLegado from './pages/MigracaoAlteracoesLegado';
 import PerfisPermissao from './pages/PerfisPermissao';
 import PermissoesUsuarios from './pages/PermissoesUsuarios';
 import RP from './pages/RP';
+import RegistrosMilitar from './pages/RegistrosMilitar';
 import CadastrarRegistroRP from './pages/CadastrarRegistroRP';
 import __Layout from './Layout.jsx';
 
@@ -140,6 +141,7 @@ export const PAGES = {
     "PerfisPermissao": PerfisPermissao,
     "PermissoesUsuarios": PermissoesUsuarios,
     "RP": RP,
+    "RegistrosMilitar": RegistrosMilitar,
     "CadastrarRegistroRP": CadastrarRegistroRP,
 }
 
