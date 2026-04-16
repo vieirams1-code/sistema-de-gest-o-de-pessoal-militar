@@ -22,8 +22,10 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
-import { ScrollText, Trash2, Pencil, ChevronsUpDown, Check } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ScrollText, Trash2, Pencil, ChevronsUpDown, Check, Eye, EyeOff } from 'lucide-react';
 import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
+import { getRegistroTipoVisual } from '@/components/militar/registroTipoVisual';
 import {
   atualizarTipoRegistroMilitar,
   excluirRegistroMilitar,
@@ -656,31 +658,49 @@ export default function RegistrosMilitar() {
             <ul className="space-y-3">
               {registrosOrdenados.map((registro) => {
                 const expanded = expandedRegistroId === registro.id;
+                const tipoVisual = getRegistroTipoVisual(registro.tipoRegistro, { isLegadoNaoClassificado: registro.isLegadoNaoClassificado });
+                const TipoIcon = tipoVisual.icon;
+                const origemLabel = registro.origemRegistro === 'legado' ? 'Legado' : 'Sistema';
+                const statusBadgeClass = registro.publicado
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-blue-200 bg-blue-50 text-blue-700';
 
                 return (
-                  <li key={`${registro.origem_fonte || 'registro'}-${registro.id}`} className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-slate-900">{registro.militarNome}</p>
-                      <p className="text-xs text-slate-500">{formatarData(registro.dataEvento)}</p>
+                  <li key={`${registro.origem_fonte || 'registro'}-${registro.id}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-slate-300">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-slate-900">{registro.militarNome}</p>
+                        <div className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${tipoVisual.className}`}>
+                          <TipoIcon className="h-3.5 w-3.5" />
+                          <span>{registro.tipoRegistro || tipoVisual.label}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-medium text-slate-600">Data do registro</p>
+                        <p className="text-sm font-semibold text-slate-900">{formatarData(registro.dataEvento)}</p>
+                      </div>
                     </div>
 
-                    <p className="mt-1 text-sm text-slate-700">{getResumoTexto(registro.descricao)}</p>
+                    <p className="mt-3 text-sm text-slate-700">{getResumoTexto(registro.descricao)}</p>
 
-                    <p className="mt-2 text-xs text-slate-500">
-                      Tipo: {registro.tipoRegistro || '-'} • Status: {registro.statusPublicacao} • Origem: {registro.origemRegistro === 'legado' ? 'Legado' : 'Sistema'} • BG: {registro.numero_bg || '-'}
-                    </p>
+                    <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2 xl:grid-cols-4">
+                      <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Status:</strong> {registro.statusPublicacao}</p>
+                      <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Origem:</strong> {origemLabel}</p>
+                      <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>BG:</strong> {registro.numero_bg || '-'}</p>
+                      <p className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1"><strong>Matrícula:</strong> {registro.militar_matricula || registro.matricula_legado || '-'}</p>
+                    </div>
 
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${registro.origemRegistro === 'legado' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
-                        {registro.origemRegistro === 'legado' ? 'Legado' : 'Sistema'}
-                      </span>
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant="outline" className={registro.origemRegistro === 'legado' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-100 text-slate-700'}>
+                        {origemLabel}
+                      </Badge>
+                      <Badge variant="outline" className={statusBadgeClass}>
                         {registro.statusPublicacao}
-                      </span>
+                      </Badge>
                       {registro.classificacaoPendente && (
-                        <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700">
+                        <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
                           Classificação pendente
-                        </span>
+                        </Badge>
                       )}
                     </div>
 
@@ -691,6 +711,7 @@ export default function RegistrosMilitar() {
                         size="sm"
                         onClick={() => setExpandedRegistroId(expanded ? null : registro.id)}
                       >
+                        {expanded ? <EyeOff className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />}
                         {expanded ? 'Ocultar detalhes' : 'Ver detalhes'}
                       </Button>
 
