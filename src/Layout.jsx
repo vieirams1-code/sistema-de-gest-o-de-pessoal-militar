@@ -45,6 +45,7 @@ const menuGroups = [
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
       { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'folha_alteracoes' },
+      { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText },
     ],
   },
   {
