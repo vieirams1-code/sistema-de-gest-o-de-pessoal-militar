@@ -87,10 +87,10 @@ function formatDate(date) {
   try { return format(new Date(date + 'T00:00:00'), "dd/MM/yyyy"); } catch { return date; }
 }
 
-function AvisoRegistrosSistema() {
+function AvisoRegistrosSistema({ mensagemRegistrosSistema }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-      <p className="text-xs text-slate-600">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
+      <p className="text-xs text-slate-600">{mensagemRegistrosSistema}</p>
     </div>
   );
 }
@@ -187,6 +187,10 @@ export default function VerMilitar() {
   const feriasSistema = React.useMemo(() => filtrarRegistrosSistema(ferias), [ferias]);
   const atestadosSistema = React.useMemo(() => filtrarRegistrosSistema(atestados), [atestados]);
   const medalhasSistema = React.useMemo(() => filtrarRegistrosSistema(medalhas), [medalhas]);
+  const medalhasConcedidasSistema = React.useMemo(
+    () => medalhasSistema.filter((medalha) => medalha.status === 'Concedido'),
+    [medalhasSistema]
+  );
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
   const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
   const historicoComportamentoSistema = React.useMemo(() => filtrarRegistrosSistema(historicoComportamento), [historicoComportamento]);
@@ -195,6 +199,7 @@ export default function VerMilitar() {
     () => filtrarRegistrosSistema(pendenciasComportamentoUnicas),
     [pendenciasComportamentoUnicas]
   );
+  const mensagemRegistrosSistema = React.useMemo(() => getMensagemRegistrosSistemaPerfilMilitar(), []);
 
   const avaliacaoComportamento = React.useMemo(() => {
     if (!militar) return null;
@@ -434,7 +439,7 @@ export default function VerMilitar() {
           {comportamentoElegivel && (
             <TabsContent value="comportamento">
               <div className="space-y-6">
-                <AvisoRegistrosSistema />
+                <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
                 <Section title="Situação Atual do Comportamento" icon={Activity}>
                   <div className="grid md:grid-cols-3 gap-3 text-sm">
                     <div className="rounded-lg border p-3">
@@ -520,7 +525,7 @@ export default function VerMilitar() {
           {/* Férias */}
           <TabsContent value="ferias">
             <div className="space-y-4">
-              <AvisoRegistrosSistema />
+              <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-slate-700">Períodos Aquisitivos e Férias</h3>
               </div>
@@ -528,7 +533,7 @@ export default function VerMilitar() {
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Calendar className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum registro de férias</p>
-                  <p className="text-xs text-slate-400 mt-2">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
+                  <p className="text-xs text-slate-400 mt-2">{mensagemRegistrosSistema}</p>
                 </div>
               ) : (
                 <>
@@ -560,12 +565,12 @@ export default function VerMilitar() {
           {/* Atestados */}
           <TabsContent value="atestados">
             <div className="space-y-3">
-              <AvisoRegistrosSistema />
+              <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
               {atestadosSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum atestado registrado</p>
-                  <p className="text-xs text-slate-400 mt-2">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
+                  <p className="text-xs text-slate-400 mt-2">{mensagemRegistrosSistema}</p>
                 </div>
               ) : atestadosSistema.map(a => (
                 <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
@@ -587,14 +592,14 @@ export default function VerMilitar() {
           {/* Medalhas */}
           <TabsContent value="medalhas">
             <div className="space-y-3">
-              <AvisoRegistrosSistema />
-              {medalhasSistema.length === 0 ? (
+              <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
+              {medalhasConcedidasSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Award className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhuma medalha registrada</p>
-                  <p className="text-xs text-slate-400 mt-2">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
+                  <p className="text-xs text-slate-400 mt-2">{mensagemRegistrosSistema}</p>
                 </div>
-              ) : medalhasSistema.filter(m => m.status === 'Concedido').map(m => (
+              ) : medalhasConcedidasSistema.map(m => (
                 <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-800">{m.tipo_medalha_nome}</span>
@@ -612,12 +617,12 @@ export default function VerMilitar() {
           {/* Armamentos */}
           <TabsContent value="armamentos">
             <div className="space-y-3">
-              <AvisoRegistrosSistema />
+              <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
               {armamentosSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Shield className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum armamento registrado</p>
-                  <p className="text-xs text-slate-400 mt-2">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
+                  <p className="text-xs text-slate-400 mt-2">{mensagemRegistrosSistema}</p>
                 </div>
               ) : armamentosSistema.map(a => (
                 <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">

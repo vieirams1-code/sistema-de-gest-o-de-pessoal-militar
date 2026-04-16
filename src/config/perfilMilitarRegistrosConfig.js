@@ -1,7 +1,15 @@
 import { format } from 'date-fns';
 
-export const PERFIL_MILITAR_CORTE_SISTEMA_ISO = '2026-01-01';
-export const PERFIL_MILITAR_MODULO_REGISTROS_LABEL = 'Registros do Militar';
+const PERFIL_MILITAR_CORTE_SISTEMA_ISO_PADRAO = '2026-01-01';
+
+function resolverCorteSistemaIso() {
+  const valorConfigurado = String(import.meta?.env?.VITE_PERFIL_MILITAR_CORTE_SISTEMA_ISO || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valorConfigurado)) return valorConfigurado;
+  return PERFIL_MILITAR_CORTE_SISTEMA_ISO_PADRAO;
+}
+
+export const PERFIL_MILITAR_CORTE_SISTEMA_ISO = resolverCorteSistemaIso();
+export const PERFIL_MILITAR_MODULO_REGISTROS_LABEL = String(import.meta?.env?.VITE_PERFIL_MILITAR_MODULO_REGISTROS_LABEL || 'Registros do Militar').trim() || 'Registros do Militar';
 
 export function getPerfilMilitarCorteSistemaLabel() {
   try {
