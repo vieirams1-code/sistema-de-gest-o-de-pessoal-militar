@@ -25,8 +25,8 @@ import {
   obterHistoricoComportamentoMilitar,
 } from '@/services/justicaDisciplinaService';
 import {
+  filtrarRegistrosSistema,
   getMensagemRegistrosSistemaPerfilMilitar,
-  isRegistroLegado,
 } from '@/config/perfilMilitarRegistrosConfig';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
@@ -184,18 +184,15 @@ export default function VerMilitar() {
     return unicas;
   }, [pendenciasComportamento]);
 
-  const feriasSistema = React.useMemo(() => ferias.filter((item) => !isRegistroLegado(item)), [ferias]);
-  const atestadosSistema = React.useMemo(() => atestados.filter((item) => !isRegistroLegado(item)), [atestados]);
-  const medalhasSistema = React.useMemo(() => medalhas.filter((item) => !isRegistroLegado(item)), [medalhas]);
-  const armamentosSistema = React.useMemo(() => armamentos.filter((item) => !isRegistroLegado(item)), [armamentos]);
-  const periodosSistema = React.useMemo(() => periodos.filter((item) => !isRegistroLegado(item)), [periodos]);
-  const historicoComportamentoSistema = React.useMemo(
-    () => historicoComportamento.filter((item) => !isRegistroLegado(item)),
-    [historicoComportamento]
-  );
-  const punicoesSistema = React.useMemo(() => punicoes.filter((item) => !isRegistroLegado(item)), [punicoes]);
+  const feriasSistema = React.useMemo(() => filtrarRegistrosSistema(ferias), [ferias]);
+  const atestadosSistema = React.useMemo(() => filtrarRegistrosSistema(atestados), [atestados]);
+  const medalhasSistema = React.useMemo(() => filtrarRegistrosSistema(medalhas), [medalhas]);
+  const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
+  const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
+  const historicoComportamentoSistema = React.useMemo(() => filtrarRegistrosSistema(historicoComportamento), [historicoComportamento]);
+  const punicoesSistema = React.useMemo(() => filtrarRegistrosSistema(punicoes), [punicoes]);
   const pendenciasComportamentoSistema = React.useMemo(
-    () => pendenciasComportamentoUnicas.filter((item) => !isRegistroLegado(item)),
+    () => filtrarRegistrosSistema(pendenciasComportamentoUnicas),
     [pendenciasComportamentoUnicas]
   );
 
@@ -531,6 +528,7 @@ export default function VerMilitar() {
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Calendar className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum registro de férias</p>
+                  <p className="text-xs text-slate-400 mt-2">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
                 </div>
               ) : (
                 <>
@@ -567,6 +565,7 @@ export default function VerMilitar() {
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum atestado registrado</p>
+                  <p className="text-xs text-slate-400 mt-2">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
                 </div>
               ) : atestadosSistema.map(a => (
                 <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
@@ -593,6 +592,7 @@ export default function VerMilitar() {
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Award className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhuma medalha registrada</p>
+                  <p className="text-xs text-slate-400 mt-2">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
                 </div>
               ) : medalhasSistema.filter(m => m.status === 'Concedido').map(m => (
                 <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4">
@@ -617,6 +617,7 @@ export default function VerMilitar() {
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Shield className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum armamento registrado</p>
+                  <p className="text-xs text-slate-400 mt-2">{getMensagemRegistrosSistemaPerfilMilitar()}</p>
                 </div>
               ) : armamentosSistema.map(a => (
                 <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
