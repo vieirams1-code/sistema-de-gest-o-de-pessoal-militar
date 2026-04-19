@@ -1,0 +1,18 @@
+{
+  "name": "MatriculaMilitar",
+  "type": "object",
+  "title": "Matrícula Militar",
+  "description": "Histórico de matrículas vinculadas à pessoa militar.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "matricula": { "type": "string", "default": "" },
+    "matricula_normalizada": { "type": "string", "default": "" },
+    "tipo_matricula": { "type": "string", "default": "Principal" },
+    "situacao": { "type": "string", "default": "Ativa" },
+    "is_atual": { "type": "boolean", "default": true },
+    "data_inicio": { "type": "date", "default": "" },
+    "data_fim": { "type": "date", "default": "" },
+    "motivo": { "type": "string", "default": "" },
+    "origem_registro": { "type": "string", "default": "" }
+  }
+}

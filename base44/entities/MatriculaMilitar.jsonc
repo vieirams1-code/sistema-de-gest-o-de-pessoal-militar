@@ -1,0 +1,18 @@
+{
+  "name": "MatriculaMilitar",
+  "type": "object",
+  "description": "Histórico de múltiplas matrículas por militar sem perder rastreabilidade.",
+  "properties": {
+    "militar_id": { "type": "string", "description": "ID do militar vinculado." },
+    "matricula": { "type": "string", "description": "Matrícula formatada para apresentação." },
+    "matricula_normalizada": { "type": "string", "description": "Matrícula somente com dígitos para unicidade." },
+    "tipo_matricula": { "type": "string", "description": "Principal, secundária ou outra classificação operacional." },
+    "situacao": { "type": "string", "description": "Ativa, encerrada ou suspensa." },
+    "is_atual": { "type": "boolean", "default": true, "description": "Indica a matrícula atual do militar." },
+    "data_inicio": { "type": "string", "format": "date", "description": "Data de início da vigência da matrícula." },
+    "data_fim": { "type": "string", "format": "date", "description": "Data de encerramento da vigência da matrícula." },
+    "motivo": { "type": "string", "description": "Justificativa operacional para o registro." },
+    "origem_registro": { "type": "string", "description": "Origem do registro: cadastro_manual, importacao_legado, saneamento, etc." }
+  },
+  "required": ["militar_id", "matricula", "matricula_normalizada", "is_atual"]
+}

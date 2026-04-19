@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
 import { strFromU8, unzipSync } from 'fflate';
+import { criarMilitarComMatricula, localizarDuplicidadeForte, normalizarMatricula } from '@/services/militarIdentidadeService';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
@@ -9,7 +10,7 @@ export const STATUS_LINHA = {
   ERRO: 'ERRO',
 };
 
-const REGRA_VERSAO = 'v1.0.0';
+const REGRA_VERSAO = 'v1.1.0';
 const HISTORICO_ENTITY_NAME = 'ImportacaoMilitares';
 const HISTORICO_ENTITY_ERROR_MESSAGE = 'Falha ao acessar o histórico de importação de militares. Verifique se a entidade ImportacaoMilitares está publicada no app.';
 
@@ -701,7 +702,7 @@ export async function analisarArquivoMigracao(file) {
   const cabecalho = dadosCsv[0];
   const headerMap = mapHeaders(cabecalho);
   const militaresExistentes = await base44.entities.Militar.list();
-  const matriculasExistentes = new Set((militaresExistentes || []).map((m) => limparTexto(m?.matricula)));
+  const matriculasExistentes = new Set((militaresExistentes || []).map((m) => normalizarMatricula(m?.matricula)));
 
   const linhas = dadosCsv.slice(1).map((cells, idx) => {
     const alertas = [];
@@ -717,9 +718,10 @@ export async function analisarArquivoMigracao(file) {
       erros,
     });
 
-    const duplicado = matricula ? matriculasExistentes.has(matricula) : false;
+    const matriculaNormalizada = normalizarMatricula(matricula);
+    const duplicado = matriculaNormalizada ? matriculasExistentes.has(matriculaNormalizada) : false;
     if (duplicado) {
-      alertas.push('Já existe militar com esta matrícula no sistema novo. Importação automática bloqueada.');
+      alertas.push('Matrícula já cadastrada no sistema. Importação automática bloqueada.');
     }
 
     const militarPayload = {
@@ -780,7 +782,23 @@ export async function analisarArquivoMigracao(file) {
       foto: '',
     };
 
-    const status = definirStatusLinha(erros, alertas, duplicado);
+    const cpf = militarPayload.cpf;
+    const duplicidadeForte = (matricula && !duplicado && !erros.length)
+      ? militaresExistentes.find((existente) => {
+        const cpfMatch = cpf && limparTexto(existente?.cpf) && limparTexto(existente?.cpf) === cpf;
+        const nomeDataMatch = limparTexto(existente?.nome_canonico || existente?.nome_completo).toUpperCase()
+          === limparTexto(militarPayload.nome_completo).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+          && limparTexto(existente?.data_nascimento)
+          && limparTexto(existente?.data_nascimento) === limparTexto(militarPayload.data_nascimento);
+        return cpfMatch || nomeDataMatch;
+      })
+      : null;
+
+    if (duplicidadeForte) {
+      alertas.push('Possível duplicidade identificada por CPF e/ou nome + data de nascimento. Encaminhar para revisão.');
+    }
+
+    const status = definirStatusLinha(erros, alertas, duplicado || Boolean(duplicidadeForte));
 
     return {
       linhaNumero: idx + 2,
@@ -894,7 +912,17 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
 
       const duplicidade = await base44.entities.Militar.filter({ matricula });
       if (duplicidade.length > 0) {
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Duplicidade detectada na revalidação.' });
+        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada.' });
+        continue;
+      }
+
+      const duplicidadeForte = await localizarDuplicidadeForte({
+        cpf: linha.transformado.cpf,
+        nomeCanonico: linha.transformado.nome_completo,
+        dataNascimento: linha.transformado.data_nascimento,
+      });
+      if (duplicidadeForte) {
+        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Possível duplicidade identificada. Encaminhar para revisão humana.' });
         continue;
       }
       if (!data_inclusao) {
@@ -907,7 +935,7 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       }
 
       const payloadMilitar = sanitizarCamposNumericosMilitar(linha.transformado);
-      const criado = await base44.entities.Militar.create(payloadMilitar);
+      const criado = await criarMilitarComMatricula(payloadMilitar, { origemRegistro: 'importacao_legado' });
       idsCriados.push(criado?.id);
     }
 
