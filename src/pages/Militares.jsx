@@ -18,8 +18,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Users, Grid3X3, List } from 'lucide-react';
+import { Plus, Search, Users, Grid3X3, List, GitBranch } from 'lucide-react';
 import MilitarCard from '@/components/militar/MilitarCard';
+import MapaDeLotacao from '@/components/militar/MapaDeLotacao';
 
 export default function Militares() {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ export default function Militares() {
   const [postoFilter, setPostoFilter] = useState('all');
   const [mostrarInativos, setMostrarInativos] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
+  const [visualizacaoMode, setVisualizacaoMode] = useState('lista');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
@@ -271,22 +273,43 @@ export default function Militares() {
               </Select>
               <div className="flex border border-slate-200 rounded-lg overflow-hidden">
                 <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="icon"
-                  onClick={() => setViewMode('grid')}
-                  className={viewMode === 'grid' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
+                  variant={visualizacaoMode === 'lista' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setVisualizacaoMode('lista')}
+                  className={visualizacaoMode === 'lista' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f] rounded-none' : 'rounded-none'}
                 >
-                  <Grid3X3 className="w-4 h-4" />
+                  Lista
                 </Button>
                 <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="icon"
-                  onClick={() => setViewMode('list')}
-                  className={viewMode === 'list' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
+                  variant={visualizacaoMode === 'mapa' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setVisualizacaoMode('mapa')}
+                  className={visualizacaoMode === 'mapa' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f] rounded-none' : 'rounded-none'}
                 >
-                  <List className="w-4 h-4" />
+                  <GitBranch className="w-4 h-4 mr-1" />
+                  Mapa
                 </Button>
               </div>
+              {visualizacaoMode === 'lista' && (
+                <div className="flex border border-slate-200 rounded-lg overflow-hidden">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="icon"
+                    onClick={() => setViewMode('grid')}
+                    className={viewMode === 'grid' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
+                  >
+                    <Grid3X3 className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    size="icon"
+                    onClick={() => setViewMode('list')}
+                    className={viewMode === 'list' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4">
@@ -333,6 +356,8 @@ export default function Militares() {
               </Button>
             )}
           </div>
+        ) : visualizacaoMode === 'mapa' ? (
+          <MapaDeLotacao militares={filteredMilitares} />
         ) : (
           <div className="space-y-6">
             {orderedPostos
