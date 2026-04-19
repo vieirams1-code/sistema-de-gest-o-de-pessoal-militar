@@ -17,6 +17,7 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
+import { atualizarMilitarSemTrocarMatricula, criarMilitarComMatricula, formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
 import { getQuadrosCompativeis, isPostoOficial, isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
 
 const initialFormData = {
@@ -230,6 +231,7 @@ export default function CadastrarMilitar() {
 
     const dataToSave = {
       ...formData,
+      matricula: formatarMatriculaPadrao(formData.matricula),
       altura: formData.altura ? parseFloat(formData.altura) : null,
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
@@ -241,11 +243,17 @@ export default function CadastrarMilitar() {
     }
 
     let militarId = editId;
-    if (editId) {
-      await base44.entities.Militar.update(editId, dataToSave);
-    } else {
-      const criado = await base44.entities.Militar.create(dataToSave);
-      militarId = criado.id;
+    try {
+      if (editId) {
+        await atualizarMilitarSemTrocarMatricula(editId, dataToSave);
+      } else {
+        const criado = await criarMilitarComMatricula(dataToSave, { origemRegistro: 'cadastro_manual' });
+        militarId = criado.id;
+      }
+    } catch (error) {
+      setLoading(false);
+      window.alert(error?.message || 'Falha ao salvar militar.');
+      return;
     }
 
     if (!editId && militarId) {
