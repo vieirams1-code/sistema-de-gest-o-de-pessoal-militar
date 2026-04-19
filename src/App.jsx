@@ -58,6 +58,7 @@ const moduleGuardByPage = {
   FolhaAlteracoes: { moduleKey: 'folha_alteracoes', moduleName: 'Folha de Alterações' },
   CadastrarMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   CadastrarPunicao: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  RegistrosMilitar: { moduleKey: 'militares', moduleName: 'Registros do Militar' },
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   Configuracoes: { moduleKey: 'configuracoes', moduleName: 'Configurações' },
   ConciliacaoBoletim: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
