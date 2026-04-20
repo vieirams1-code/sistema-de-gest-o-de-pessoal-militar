@@ -28,6 +28,7 @@ import {
   filtrarRegistrosSistema,
   getMensagemRegistrosSistemaPerfilMilitar,
 } from '@/config/perfilMilitarRegistrosConfig';
+import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -107,6 +108,26 @@ export default function VerMilitar() {
     queryKey: ['militar', id],
     queryFn: async () => { const list = await base44.entities.Militar.filter({ id }); return list[0] || null; },
     enabled: !!id && isAccessResolved
+  });
+  const { data: matriculasMilitar = [] } = useQuery({
+    queryKey: ['militar-matriculas', id],
+    queryFn: () => base44.entities.MatriculaMilitar.filter({ militar_id: id }, '-data_inicio'),
+    enabled: !!id && isAccessResolved
+  });
+  const militarEnriquecido = React.useMemo(() => {
+    if (!militar) return null;
+    const indice = montarIndiceMatriculas(matriculasMilitar);
+    return enriquecerMilitarComMatriculas(militar, indice);
+  }, [militar, matriculasMilitar]);
+  const militarMesclado = isMilitarMesclado(militarEnriquecido || militar);
+
+  const { data: militarDestinoMerge } = useQuery({
+    queryKey: ['militar-merge-destino', militar?.merged_into_id],
+    queryFn: async () => {
+      const list = await base44.entities.Militar.filter({ id: militar.merged_into_id });
+      return list[0] || null;
+    },
+    enabled: Boolean(militar?.merged_into_id),
   });
 
   const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
@@ -301,6 +322,15 @@ export default function VerMilitar() {
         <div className="space-y-2 mb-4">
           <AlertasContrato militarId={id} />
           {militar.data_inclusao && <TempoServico dataInclusao={militar.data_inclusao} />}
+          {militarMesclado && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Cadastro mesclado</p>
+              <p>
+                Este militar foi mesclado e deve ser usado apenas para consulta histórica.
+                {militarDestinoMerge?.id ? ` Registro destino: ${militarDestinoMerge.nome_completo || militarDestinoMerge.nome_guerra} (${militarDestinoMerge.matricula || 'sem matrícula'}).` : ''}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Profile Header */}
@@ -329,7 +359,7 @@ export default function VerMilitar() {
                 </h2>
                 {militar.nome_guerra && <p className="text-white/80">{militar.nome_completo}</p>}
                 <div className="flex flex-wrap gap-4 mt-3 text-sm text-white/80">
-                  {militar.matricula && <span>Mat: {militar.matricula}</span>}
+                  {(militarEnriquecido?.matricula_atual || militar.matricula) && <span>Mat. atual: {militarEnriquecido?.matricula_atual || militar.matricula}</span>}
                   {militar.quadro && <span>Quadro: {militar.quadro}</span>}
                   {militar.lotacao && <span>Lotação: {militar.lotacao}</span>}
                   {militar.funcao && <span>Função: {militar.funcao}</span>}
@@ -364,7 +394,7 @@ export default function VerMilitar() {
                 <Section title="Dados Funcionais" icon={Briefcase}>
                   <div className="grid grid-cols-2 gap-x-4">
                     <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
-                    <InfoItem label="Matrícula" value={militar.matricula} />
+                    <InfoItem label="Matrícula atual" value={militarEnriquecido?.matricula_atual || militar.matricula} />
                     <InfoItem label="Posto/Graduação" value={militar.posto_graduacao} />
                     <InfoItem label="Quadro" value={militar.quadro} />
                     <InfoItem label="Situação" value={militar.situacao_militar} />
@@ -372,6 +402,19 @@ export default function VerMilitar() {
                     <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
                     {militar.destino && <InfoItem label="Destino/Cedência" value={militar.destino} />}
                   </div>
+                  {!!militarEnriquecido?.matriculas_historico?.length && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-slate-500">Histórico de matrículas</p>
+                      {militarEnriquecido.matriculas_historico.map((mat) => (
+                        <div key={mat.id || `${mat.matricula}-${mat.data_inicio}`} className={`rounded-md border px-3 py-2 text-xs ${mat.is_atual ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                          <p className="font-semibold text-slate-700">{mat.matricula_formatada || mat.matricula} {mat.is_atual ? '(Atual)' : ''}</p>
+                          <p className="text-slate-500">
+                            Tipo: {mat.tipo_matricula || '—'} • Situação: {mat.situacao || '—'} • Início: {formatDate(mat.data_inicio) || '—'} • Fim: {formatDate(mat.data_fim) || '—'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Section>
                 <Section title="Dados Pessoais" icon={User}>
                   <div className="grid grid-cols-2 gap-x-4">

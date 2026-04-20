@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getFeriasElegiveisPorOperacao, getMensagemSemElegibilidade } from '@/components/livro/feriasOperacaoUtils';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 
 export default function MilitarSelector({ value, onChange, onMilitarSelect, livroOperacaoFerias = null, dataBase = '', somenteElegiveis = false }) {
   const [open, setOpen] = useState(false);
@@ -28,7 +29,8 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
     queryFn: async () => {
       if (isAdmin) {
         const all = await base44.entities.Militar.list('-nome_completo');
-        return all.filter((m) => m.status_cadastro !== 'Inativo');
+        const enriquecidos = await carregarMilitaresComMatriculas(all);
+        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
       }
 
       if (modoAcesso === 'setor') {
@@ -37,18 +39,20 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
           base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-nome_completo'),
         ]);
         const ids = new Set();
-        return [...porGrupamento, ...porSubgrupamento]
-          .filter((m) => m.status_cadastro !== 'Inativo')
+        const permitidos = [...porGrupamento, ...porSubgrupamento]
           .filter((m) => {
             if (!hasAccess(m) || ids.has(m.id)) return false;
             ids.add(m.id);
             return true;
           });
+        const enriquecidos = await carregarMilitaresComMatriculas(permitidos);
+        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
       }
 
       if (modoAcesso === 'subsetor' && subgrupamentoId) {
         const list = await base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-nome_completo');
-        return list.filter((m) => m.status_cadastro !== 'Inativo').filter(hasAccess);
+        const enriquecidos = await carregarMilitaresComMatriculas(list.filter(hasAccess));
+        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
       }
 
       if (modoAcesso === 'proprio') {
@@ -67,14 +71,15 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
 
         const batches = await Promise.all(requests);
         const ids = new Set();
-        return batches
+        const vinculados = batches
           .flat()
-          .filter((m) => m.status_cadastro !== 'Inativo')
           .filter((m) => {
             if (!hasSelfAccess(m) || ids.has(m.id)) return false;
             ids.add(m.id);
             return true;
           });
+        const enriquecidos = await carregarMilitaresComMatriculas(vinculados);
+        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
       }
 
       return [];
@@ -103,11 +108,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
 
   const militaresDisponiveis = useMemo(() => (somenteElegiveis && livroOperacaoFerias ? feriasElegibilidade : militares), [feriasElegibilidade, livroOperacaoFerias, militares, somenteElegiveis]);
 
-  const filteredMilitares = militaresDisponiveis.filter(m => 
-    m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.nome_guerra?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.matricula?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMilitares = militaresDisponiveis.filter((m) => militarCorrespondeBusca(m, searchTerm));
 
   const handleSelect = (militar) => {
     onChange('militar_id', militar.id);

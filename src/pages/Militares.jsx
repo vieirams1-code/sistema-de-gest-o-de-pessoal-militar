@@ -21,6 +21,11 @@ import {
 import { Plus, Search, Users, Grid3X3, List, GitBranch } from 'lucide-react';
 import MilitarCard from '@/components/militar/MilitarCard';
 import MapaDeLotacao from '@/components/militar/MapaDeLotacao';
+import {
+  carregarMilitaresComMatriculas,
+  filtrarMilitaresOperacionais,
+  militarCorrespondeBusca,
+} from '@/services/matriculaMilitarViewService';
 
 export default function Militares() {
   const navigate = useNavigate();
@@ -52,7 +57,10 @@ export default function Militares() {
   const { data: militares = [], isLoading } = useQuery({
     queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.Militar.list('-created_date');
+      if (isAdmin) {
+        const lista = await base44.entities.Militar.list('-created_date');
+        return carregarMilitaresComMatriculas(lista);
+      }
 
       if (modoAcesso === 'proprio') {
         const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
@@ -70,11 +78,12 @@ export default function Militares() {
 
         const batches = await Promise.all(requests);
         const ids = new Set();
-        return batches.flat().filter((m) => {
+        const vinculados = batches.flat().filter((m) => {
           if (!hasSelfAccess(m) || ids.has(m.id)) return false;
           ids.add(m.id);
           return true;
         });
+        return carregarMilitaresComMatriculas(vinculados);
       }
 
       const filters = getMilitarScopeFilters();
@@ -87,7 +96,7 @@ export default function Militares() {
       for (const m of batches.flat()) {
         if (!ids.has(m.id)) { ids.add(m.id); merged.push(m); }
       }
-      return merged;
+      return carregarMilitaresComMatriculas(merged);
     },
     enabled: isAccessResolved,
   });
@@ -101,11 +110,9 @@ export default function Militares() {
     }
   });
 
-  const filteredMilitares = militares.filter(m => {
-    const matchesSearch = 
-      m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.nome_guerra?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.matricula?.toLowerCase().includes(searchTerm.toLowerCase());
+  const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos });
+  const filteredMilitares = operacionais.filter(m => {
+    const matchesSearch = militarCorrespondeBusca(m, searchTerm);
     
     const matchesStatus = statusFilter === 'all' || m.status_cadastro === statusFilter;
     const matchesPosto = postoFilter === 'all' || m.posto_graduacao === postoFilter;
@@ -146,7 +153,8 @@ export default function Militares() {
     }
   };
 
-  const militaresAtivos = militares.filter(m => m.status_cadastro !== 'Inativo');
+  const militaresAtivos = filtrarMilitaresOperacionais(militares, { incluirInativos: false });
+  const militaresOperacionaisComInativos = filtrarMilitaresOperacionais(militares, { incluirInativos: true });
 
   if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
   
@@ -155,7 +163,7 @@ export default function Militares() {
     ativos: militaresAtivos.filter(m => m.status_cadastro === 'Ativo' || !m.status_cadastro).length,
     oficiais: militaresAtivos.filter(m => ['2º Tenente', '1º Tenente', 'Capitão', 'Major', 'Tenente-Coronel', 'Coronel', 'Aspirante'].includes(m.posto_graduacao)).length,
     pracas: militaresAtivos.filter(m => ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente'].includes(m.posto_graduacao)).length,
-    inativos: militares.filter(m => m.status_cadastro === 'Inativo').length
+    inativos: militaresOperacionaisComInativos.filter(m => m.status_cadastro === 'Inativo').length
   };
 
   return (
