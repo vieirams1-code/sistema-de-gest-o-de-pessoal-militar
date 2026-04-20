@@ -17,8 +17,9 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
-import { atualizarMilitarSemTrocarMatricula, criarMilitarComMatricula, formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
+import { adicionarNovaMatriculaMilitar, atualizarMilitarSemTrocarMatricula, criarMilitarComMatricula, formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
 import { getQuadrosCompativeis, isPostoOficial, isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
+import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 
 const initialFormData = {
   nome_completo: '',
@@ -141,6 +142,10 @@ export default function CadastrarMilitar() {
   const [loading, setLoading] = useState(false);
   const [comportamentoOriginal, setComportamentoOriginal] = useState(null);
   const [avisoCompatibilidadeQuadro, setAvisoCompatibilidadeQuadro] = useState('');
+  const [novaMatricula, setNovaMatricula] = useState('');
+  const [novoTipoMatricula, setNovoTipoMatricula] = useState('Secundária');
+  const [novoMotivoMatricula, setNovoMotivoMatricula] = useState('Atualização administrativa');
+  const [novaDataInicio, setNovaDataInicio] = useState('');
 
 
   const { data: editingMilitar, isLoading: loadingEdit } = useQuery({
@@ -164,6 +169,18 @@ export default function CadastrarMilitar() {
       setComportamentoOriginal(editingMilitar.comportamento || null);
     }
   }, [editingMilitar]);
+
+  const { data: matriculasMilitar = [] } = useQuery({
+    queryKey: ['militar-matriculas-edicao', editId],
+    queryFn: () => base44.entities.MatriculaMilitar.filter({ militar_id: editId }, '-data_inicio'),
+    enabled: !!editId,
+  });
+  const militarDetalhado = React.useMemo(() => {
+    if (!editingMilitar) return null;
+    const indice = montarIndiceMatriculas(matriculasMilitar);
+    return enriquecerMilitarComMatriculas(editingMilitar, indice);
+  }, [editingMilitar, matriculasMilitar]);
+  const militarMesclado = isMilitarMesclado(militarDetalhado || editingMilitar);
 
   const [motivoComportamento, setMotivoComportamento] = useState('');
   const quadrosCompativeis = getQuadrosCompativeis(formData.posto_graduacao, QUADROS_FIXOS);
@@ -205,6 +222,10 @@ export default function CadastrarMilitar() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (editId && militarMesclado) {
+      window.alert('Cadastro mesclado: edição operacional bloqueada. Consulte o cadastro de destino.');
+      return;
+    }
 
     const matriculaDigits = onlyDigits(formData.matricula);
     if (matriculaDigits.length !== 9) {
@@ -290,6 +311,41 @@ export default function CadastrarMilitar() {
     navigate(createPageUrl('Militares'));
   };
 
+  const handleAdicionarNovaMatricula = async () => {
+    if (!editId) return;
+    const matriculaDigits = onlyDigits(novaMatricula);
+    if (matriculaDigits.length !== 9) {
+      window.alert('Informe uma matrícula válida para inclusão (formato 108.747-021).');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await adicionarNovaMatriculaMilitar({
+        militarId: editId,
+        matricula: novaMatricula,
+        tipoMatricula: novoTipoMatricula,
+        motivo: novoMotivoMatricula || 'Atualização administrativa',
+        origemRegistro: 'acao_administrativa',
+        dataInicio: novaDataInicio,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['militar', editId] }),
+        queryClient.invalidateQueries({ queryKey: ['militar-matriculas-edicao', editId] }),
+        queryClient.invalidateQueries({ queryKey: ['militares'] }),
+      ]);
+      setNovaMatricula('');
+      setNovoTipoMatricula('Secundária');
+      setNovoMotivoMatricula('Atualização administrativa');
+      setNovaDataInicio('');
+      window.alert('Nova matrícula adicionada com sucesso e marcada como matrícula atual. A matrícula anterior foi preservada no histórico.');
+    } catch (error) {
+      window.alert(error?.message || 'Falha ao adicionar nova matrícula.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
 
@@ -326,7 +382,7 @@ export default function CadastrarMilitar() {
           </div>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !formData.nome_completo || !formData.matricula}
+            disabled={loading || !formData.nome_completo || !formData.matricula || (Boolean(editId) && militarMesclado)}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white px-6"
           >
             {loading ? (
@@ -402,7 +458,45 @@ export default function CadastrarMilitar() {
               {formData.data_inclusao && (
                 <TempoServico dataInclusao={formData.data_inclusao} />
               )}
+              {militarMesclado && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  Cadastro mesclado: edição geral bloqueada para evitar operação sobre registro já consolidado.
+                </div>
+              )}
             </div>
+          )}
+
+          {editId && isAdmin && !militarMesclado && (
+            <FormSection title="Ação Administrativa: Adicionar nova matrícula" icon={FileText} defaultOpen={true}>
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600">
+                  Este fluxo adiciona uma nova matrícula e a marca como atual, preservando automaticamente as matrículas anteriores no histórico.
+                </p>
+                {!!militarDetalhado?.matriculas_historico?.length && (
+                  <div className="space-y-2">
+                    {militarDetalhado.matriculas_historico.map((mat) => (
+                      <div key={mat.id || `${mat.matricula}-${mat.data_inicio}`} className={`rounded-md border px-3 py-2 text-xs ${mat.is_atual ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                        <p className="font-semibold text-slate-700">{mat.matricula_formatada || mat.matricula} {mat.is_atual ? '(Atual)' : ''}</p>
+                        <p className="text-slate-500">
+                          Tipo: {mat.tipo_matricula || '—'} • Situação: {mat.situacao || '—'} • Início: {mat.data_inicio || '—'} • Fim: {mat.data_fim || '—'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <FormField label="Nova matrícula" name="nova_matricula" value={novaMatricula} onChange={(_, value) => setNovaMatricula(formatMatricula(value))} required />
+                  <FormField label="Tipo" name="tipo_matricula" value={novoTipoMatricula} onChange={(_, value) => setNovoTipoMatricula(value)} type="select" options={['Secundária', 'Principal', 'Temporária']} />
+                  <FormField label="Data de início" name="data_inicio_matricula" value={novaDataInicio} onChange={(_, value) => setNovaDataInicio(value)} type="date" />
+                  <FormField label="Motivo" name="motivo_matricula" value={novoMotivoMatricula} onChange={(_, value) => setNovoMotivoMatricula(value)} />
+                </div>
+                <div className="flex justify-end">
+                  <Button type="button" onClick={handleAdicionarNovaMatricula} disabled={loading || !novaMatricula} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                    Adicionar nova matrícula
+                  </Button>
+                </div>
+              </div>
+            </FormSection>
           )}
 
           {/* Dados Funcionais */}
@@ -417,9 +511,11 @@ export default function CadastrarMilitar() {
               <FormField
                 label="Matrícula"
                 name="matricula"
-                value={formData.matricula}
+                value={editId ? (militarDetalhado?.matricula_atual || formData.matricula) : formData.matricula}
                 onChange={handleChange}
                 required
+                disabled={!!editId}
+                hint={editId ? 'Troca direta bloqueada. Use a ação administrativa "Adicionar nova matrícula".' : ''}
               />
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-slate-700">Posto/Graduação</label>

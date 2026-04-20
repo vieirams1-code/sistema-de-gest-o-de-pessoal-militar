@@ -110,14 +110,24 @@ test('permite histórico e garante somente uma matrícula atual', async () => {
     MatriculaMilitar: createEntity([{ id: 'x1', militar_id: 'm1', matricula: '108.747-021', matricula_normalizada: '108747021', is_atual: true }]),
   });
 
-  await adicionarNovaMatriculaMilitar({ militarId: 'm1', matricula: '999.888-777', motivo: 'Segunda matrícula' });
+  await adicionarNovaMatriculaMilitar({
+    militarId: 'm1',
+    matricula: '999.888-777',
+    tipoMatricula: 'Secundária',
+    motivo: 'Segunda matrícula',
+    origemRegistro: 'acao_administrativa',
+    dataInicio: '2025-01-01',
+  });
 
   const todas = await entities.MatriculaMilitar.list();
   const atuais = todas.filter((m) => m.militar_id === 'm1' && m.is_atual === true);
   const antigas = todas.filter((m) => m.militar_id === 'm1' && m.is_atual === false);
+  const [militarAtualizado] = await entities.Militar.filter({ id: 'm1' });
 
   assert.equal(atuais.length, 1);
   assert.equal(antigas.length, 1);
+  assert.equal(atuais[0].origem_registro, 'acao_administrativa');
+  assert.equal(militarAtualizado.matricula, '999.888-777');
 });
 
 test('merge manual bem-sucedido preserva vínculos e matrículas e grava auditoria', async () => {
