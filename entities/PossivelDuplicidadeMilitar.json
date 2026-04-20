@@ -1,0 +1,20 @@
+{
+  "name": "PossivelDuplicidadeMilitar",
+  "type": "object",
+  "title": "Possível Duplicidade de Militar",
+  "description": "Fila de revisão humana para suspeitas de duplicidade sem merge automático.",
+  "properties": {
+    "militar_existente_id": { "type": "string", "default": "" },
+    "militar_candidato_id": { "type": "string", "default": "" },
+    "payload_novo_cadastro": { "type": "string", "default": "" },
+    "snapshot_comparativo": { "type": "string", "default": "" },
+    "motivo": { "type": "string", "default": "" },
+    "nivel_confianca": { "type": "number", "default": 0 },
+    "status": { "type": "string", "default": "PENDENTE" },
+    "origem_fluxo": { "type": "string", "default": "" },
+    "criado_por": { "type": "string", "default": "" },
+    "resolvido_por": { "type": "string", "default": "" },
+    "created_at": { "type": "date", "default": "" },
+    "resolved_at": { "type": "date", "default": "" }
+  }
+}
