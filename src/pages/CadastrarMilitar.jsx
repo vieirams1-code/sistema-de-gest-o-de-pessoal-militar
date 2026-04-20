@@ -245,9 +245,9 @@ export default function CadastrarMilitar() {
     let militarId = editId;
     try {
       if (editId) {
-        await atualizarMilitarSemTrocarMatricula(editId, dataToSave);
+        await atualizarMilitarSemTrocarMatricula(editId, dataToSave, { resolvidoPor: user?.email || '' });
       } else {
-        const criado = await criarMilitarComMatricula(dataToSave, { origemRegistro: 'cadastro_manual' });
+        const criado = await criarMilitarComMatricula(dataToSave, { origemRegistro: 'cadastro_manual', criadoPor: user?.email || '' });
         militarId = criado.id;
       }
     } catch (error) {

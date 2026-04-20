@@ -1,7 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
 import { strFromU8, unzipSync } from 'fflate';
-import { criarMilitarComMatricula, localizarDuplicidadeForte, normalizarMatricula } from '@/services/militarIdentidadeService';
+import { criarMilitarComMatricula, localizarDuplicidadeForte, normalizarMatricula, registrarPossivelDuplicidade } from '@/services/militarIdentidadeService';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
@@ -912,7 +912,15 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
 
       const duplicidade = await base44.entities.Militar.filter({ matricula });
       if (duplicidade.length > 0) {
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada.' });
+        await registrarPossivelDuplicidade({
+          militarExistenteId: duplicidade[0]?.id || '',
+          payloadNovoCadastro: linha.transformado,
+          motivo: 'Matrícula já cadastrada durante importação.',
+          nivelConfianca: 1,
+          criadoPor: usuario?.email || '',
+          origemFluxo: 'importacao_legado',
+        });
+        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada. Pendência enviada para revisão humana.' });
         continue;
       }
 
@@ -922,7 +930,15 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
         dataNascimento: linha.transformado.data_nascimento,
       });
       if (duplicidadeForte) {
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Possível duplicidade identificada. Encaminhar para revisão humana.' });
+        await registrarPossivelDuplicidade({
+          militarExistenteId: duplicidadeForte.id,
+          payloadNovoCadastro: linha.transformado,
+          motivo: 'Possível duplicidade identificada durante importação por CPF e/ou nome + data de nascimento.',
+          nivelConfianca: 0.95,
+          criadoPor: usuario?.email || '',
+          origemFluxo: 'importacao_legado',
+        });
+        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Possível duplicidade identificada. Pendência enviada para revisão humana.' });
         continue;
       }
       if (!data_inclusao) {
@@ -935,7 +951,7 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       }
 
       const payloadMilitar = sanitizarCamposNumericosMilitar(linha.transformado);
-      const criado = await criarMilitarComMatricula(payloadMilitar, { origemRegistro: 'importacao_legado' });
+      const criado = await criarMilitarComMatricula(payloadMilitar, { origemRegistro: 'importacao_legado', criadoPor: usuario?.email || '' });
       idsCriados.push(criado?.id);
     }
 

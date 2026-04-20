@@ -1,0 +1,16 @@
+{
+  "name": "MergeMilitarLog",
+  "type": "object",
+  "description": "Auditoria imutável de merges manuais de cadastro militar.",
+  "properties": {
+    "militar_origem_id": { "type": "string", "description": "ID do militar origem (cadastro mesclado)." },
+    "militar_destino_id": { "type": "string", "description": "ID do militar destino (cadastro preservado)." },
+    "snapshot_origem": { "type": "string", "description": "Snapshot completo do militar origem antes do merge." },
+    "snapshot_destino_antes": { "type": "string", "description": "Snapshot do destino antes do merge." },
+    "snapshot_destino_depois": { "type": "string", "description": "Snapshot do destino após o merge." },
+    "motivo": { "type": "string", "description": "Justificativa operacional do merge." },
+    "executado_por": { "type": "string", "description": "Usuário executor do merge." },
+    "created_at": { "type": "string", "format": "date-time", "description": "Data/hora da execução." }
+  },
+  "required": ["militar_origem_id", "militar_destino_id", "snapshot_origem", "snapshot_destino_antes", "snapshot_destino_depois"]
+}

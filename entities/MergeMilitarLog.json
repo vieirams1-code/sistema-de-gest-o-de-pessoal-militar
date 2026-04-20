@@ -1,0 +1,16 @@
+{
+  "name": "MergeMilitarLog",
+  "type": "object",
+  "title": "Log de Merge de Militar",
+  "description": "Auditoria de merges manuais entre cadastros militares.",
+  "properties": {
+    "militar_origem_id": { "type": "string", "default": "" },
+    "militar_destino_id": { "type": "string", "default": "" },
+    "snapshot_origem": { "type": "string", "default": "" },
+    "snapshot_destino_antes": { "type": "string", "default": "" },
+    "snapshot_destino_depois": { "type": "string", "default": "" },
+    "motivo": { "type": "string", "default": "" },
+    "executado_por": { "type": "string", "default": "" },
+    "created_at": { "type": "date", "default": "" }
+  }
+}

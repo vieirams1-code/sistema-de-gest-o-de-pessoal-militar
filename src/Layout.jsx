@@ -109,6 +109,7 @@ const adminMenuGroup = {
       children: [
         { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, adminOnly: true },
         { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, adminOnly: true },
+        { name: 'Revisão Duplicidades', page: 'RevisaoDuplicidadesMilitar', icon: History, adminOnly: true },
         { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, adminOnly: true },
         { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: FileSpreadsheet, adminOnly: true },
       ],
