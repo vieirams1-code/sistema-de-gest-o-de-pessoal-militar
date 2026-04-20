@@ -32,6 +32,12 @@ import {
   listarRegistrosMilitar,
   vinculaRegistroAoMilitar,
 } from '@/services/registrosMilitarService';
+import {
+  enriquecerMilitarComMatriculas,
+  isMilitarMesclado,
+  militarCorrespondeBusca,
+  montarIndiceMatriculas,
+} from '@/services/matriculaMilitarViewService';
 
 function normalizarDataISO(valor) {
   if (!valor) return '';
@@ -147,6 +153,12 @@ export default function RegistrosMilitar() {
     enabled: isAccessResolved && canAccessMilitares,
   });
 
+  const { data: matriculas = [] } = useQuery({
+    queryKey: ['registros-militar-matriculas'],
+    queryFn: () => base44.entities.MatriculaMilitar.list('-created_date', 10000),
+    enabled: isAccessResolved && canAccessMilitares,
+  });
+
   const { data: registros = [], isLoading: loadingRegistros } = useQuery({
     queryKey: ['registros-militar-registros'],
     queryFn: listarRegistrosMilitar,
@@ -161,9 +173,14 @@ export default function RegistrosMilitar() {
 
   const tiposValidos = useMemo(() => getTiposRPFiltrados({ tiposCustom }), [tiposCustom]);
 
+  const militaresEnriquecidos = useMemo(() => {
+    const indice = montarIndiceMatriculas(matriculas);
+    return militares.map((militar) => enriquecerMilitarComMatriculas(militar, indice));
+  }, [matriculas, militares]);
+
   const militaresOrdenados = useMemo(
-    () => [...militares].sort((a, b) => String(a.nome_guerra || a.nome_completo || '').localeCompare(String(b.nome_guerra || b.nome_completo || ''), 'pt-BR')),
-    [militares],
+    () => [...militaresEnriquecidos].sort((a, b) => String(a.nome_guerra || a.nome_completo || '').localeCompare(String(b.nome_guerra || b.nome_completo || ''), 'pt-BR')),
+    [militaresEnriquecidos],
   );
 
   const militaresPorId = useMemo(
@@ -178,15 +195,7 @@ export default function RegistrosMilitar() {
     const termo = toSearch(buscaMilitar).trim();
     if (!termo) return militaresOrdenados;
 
-    return militaresOrdenados.filter((militar) => {
-      const alvo = toSearch([
-        militar?.posto_graduacao,
-        militar?.nome_completo,
-        militar?.nome_guerra,
-        militar?.matricula,
-      ].filter(Boolean).join(' '));
-      return alvo.includes(termo);
-    });
+    return militaresOrdenados.filter((militar) => militarCorrespondeBusca(militar, termo));
   }, [buscaMilitar, militaresOrdenados]);
 
   const militarSelecionado = useMemo(() => {
@@ -451,6 +460,11 @@ export default function RegistrosMilitar() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {militarSelecionado && isMilitarMesclado(militarSelecionado) && (
+            <div className="xl:col-span-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Este militar está com status <strong>MESCLADO</strong>. A consulta é administrativa e pode incluir dados históricos.
+            </div>
+          )}
           <div className="space-y-2 xl:col-span-2">
             <Label>Militar (nome, nome de guerra ou matrícula)</Label>
             <Popover open={openMilitarPopover} onOpenChange={setOpenMilitarPopover}>
@@ -494,6 +508,7 @@ export default function RegistrosMilitar() {
                         {militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}
                         {militar.nome_guerra || militar.nome_completo}
                         <span className="ml-1 text-xs text-slate-500">• {militar.matricula || 'Sem matrícula'}</span>
+                        {isMilitarMesclado(militar) && <Badge variant="outline" className="ml-2 border-amber-300 text-amber-700">MESCLADO</Badge>}
                       </CommandItem>
                     ))}
                   </CommandGroup>

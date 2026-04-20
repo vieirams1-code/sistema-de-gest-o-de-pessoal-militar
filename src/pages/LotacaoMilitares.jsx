@@ -8,6 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from "@/components/ui/use-toast";
+import {
+  enriquecerMilitarComMatriculas,
+  filtrarMilitaresOperacionais,
+  militarCorrespondeBusca,
+  montarIndiceMatriculas,
+} from '@/services/matriculaMilitarViewService';
 
 const normalizeTipo = (tipo) => {
   if (tipo === 'Grupamento') return 'Setor';
@@ -31,6 +37,12 @@ export default function LotacaoMilitares() {
     queryKey: ['militares-ativos'], 
     queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) 
   });
+
+  const { data: matriculas = [], isLoading: loadingMatriculas } = useQuery({
+    queryKey: ['lotacao-matriculas-militar'],
+    queryFn: () => base44.entities.MatriculaMilitar.list('-created_date', 10000),
+    enabled: hasMilitaresAccess,
+  });
   
   const { data: estruturaRaw = [], isLoading: loadingEstrutura } = useQuery({
     queryKey: ['estruturaOrganizacional'],
@@ -44,16 +56,20 @@ export default function LotacaoMilitares() {
   const setores = estrutura.filter(s => s.tipoNormalizado === 'Setor');
   const getFilhos = (parentId, nivelTarget) => estrutura.filter(s => s.grupamento_id === parentId && s.tipoNormalizado === nivelTarget);
 
+  const militaresComMatriculaAtual = useMemo(() => {
+    const indiceMatriculas = montarIndiceMatriculas(matriculas);
+    return militares.map((m) => enriquecerMilitarComMatriculas(m, indiceMatriculas));
+  }, [matriculas, militares]);
+
   // Filtragem de militares
   const militaresFiltrados = useMemo(() => {
-    return militares
+    return filtrarMilitaresOperacionais(militaresComMatriculaAtual)
       .filter(m => {
-        if (!searchMilitar) return true;
-        const q = searchMilitar.toLowerCase();
-        return (m.nome_completo?.toLowerCase().includes(q) || m.matricula?.includes(q) || m.posto_graduacao?.toLowerCase().includes(q));
+        if (!searchMilitar?.trim()) return true;
+        return militarCorrespondeBusca(m, searchMilitar);
       })
       .sort((a, b) => String(a?.nome_completo || '').localeCompare(String(b?.nome_completo || ''), 'pt-BR'));
-  }, [militares, searchMilitar]);
+  }, [militaresComMatriculaAtual, searchMilitar]);
 
   const toggleExpand = (id, e) => {
     e.stopPropagation();
@@ -276,7 +292,7 @@ export default function LotacaoMilitares() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-0">
-              {loadingMilitares ? (
+              {loadingMilitares || loadingMatriculas ? (
                 <p className="text-center text-slate-400 py-10">Carregando militares...</p>
               ) : militaresFiltrados.length === 0 ? (
                 <p className="text-center text-slate-400 py-10">Nenhum militar encontrado para a busca.</p>
