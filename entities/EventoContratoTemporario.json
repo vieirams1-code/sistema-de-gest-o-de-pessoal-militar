@@ -1,0 +1,17 @@
+{
+  "name": "EventoContratoTemporario",
+  "type": "object",
+  "title": "Evento de Contrato Temporário",
+  "description": "Linha do tempo de eventos administrativos do contrato temporário.",
+  "properties": {
+    "contrato_temporario_id": { "type": "string", "default": "" },
+    "tipo_evento": { "type": "string", "default": "OBSERVACAO" },
+    "data_evento": { "type": "date", "default": "" },
+    "titulo": { "type": "string", "default": "" },
+    "descricao": { "type": "string", "default": "" },
+    "numero_referencia": { "type": "string", "default": "" },
+    "processo_referencia": { "type": "string", "default": "" },
+    "publicacao_referencia": { "type": "string", "default": "" },
+    "created_by": { "type": "string", "default": "" }
+  }
+}

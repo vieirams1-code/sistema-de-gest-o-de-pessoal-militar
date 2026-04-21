@@ -46,6 +46,7 @@ const menuGroups = [
       { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
       { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'folha_alteracoes' },
       { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText, moduleKey: 'militares' },
+      { name: 'Vínculos Temporários', page: 'VinculosTemporarios', icon: CalendarClock, moduleKey: 'militares' },
     ],
   },
   {
