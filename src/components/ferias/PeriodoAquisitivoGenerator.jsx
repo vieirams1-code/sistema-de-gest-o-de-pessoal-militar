@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +14,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  enriquecerMilitarComMatriculas,
+  filtrarMilitaresOperacionais,
+  montarIndiceMatriculas,
+} from '@/services/matriculaMilitarViewService';
 
 const ANOS_RETROSPECTIVOS = 3;
 const PERIODOS_FUTUROS = 2;
@@ -67,10 +72,23 @@ export default function PeriodoAquisitivoGenerator() {
     queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
   });
 
+  const { data: matriculasMilitar = [] } = useQuery({
+    queryKey: ['militares-ativos-matriculas'],
+    queryFn: () => base44.entities.MatriculaMilitar.list('-created_date'),
+  });
+
   const { data: periodosExistentes = [] } = useQuery({
     queryKey: ['periodos-aquisitivos'],
     queryFn: () => base44.entities.PeriodoAquisitivo.list(),
   });
+
+  const militaresOperacionais = useMemo(() => {
+    const indiceMatriculas = montarIndiceMatriculas(matriculasMilitar);
+    return filtrarMilitaresOperacionais(
+      (militares || []).map((militar) => enriquecerMilitarComMatriculas(militar, indiceMatriculas)),
+      { incluirInativos: false }
+    );
+  }, [militares, matriculasMilitar]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -81,7 +99,7 @@ export default function PeriodoAquisitivoGenerator() {
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
-      for (const militar of militares) {
+      for (const militar of militaresOperacionais) {
         if (!militar.data_inclusao) continue;
 
         const dataInclusao = parseDateOnly(militar.data_inclusao);
@@ -106,7 +124,7 @@ export default function PeriodoAquisitivoGenerator() {
               militar_id: militar.id,
               militar_nome: militar.nome_completo,
               militar_posto: militar.posto_graduacao,
-              militar_matricula: militar.matricula,
+              militar_matricula: militar.matricula_atual || militar.matricula || '',
               inicio_aquisitivo: format(dataInicio, 'yyyy-MM-dd'),
               fim_aquisitivo: format(dataFimPeriodo, 'yyyy-MM-dd'),
               data_limite_gozo: format(dataLimiteGozo, 'yyyy-MM-dd'),
@@ -173,7 +191,7 @@ export default function PeriodoAquisitivoGenerator() {
           <Alert>
             <Calendar className="w-4 h-4" />
             <AlertDescription>
-              <strong>{militares.length}</strong> militares ativos serão processados.
+              <strong>{militaresOperacionais.length}</strong> militares ativos serão processados.
               Apenas períodos que ainda não existem serão criados.
             </AlertDescription>
           </Alert>
