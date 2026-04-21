@@ -1,6 +1,8 @@
 let clientOverride = null;
 let runtimeClientPromise = null;
 
+const STATUS_PENDENCIA_FINAIS = new Set(['aplicada', 'descartada', 'cancelada', 'encerrada']);
+
 async function getClient() {
   if (clientOverride) return clientOverride;
   if (!runtimeClientPromise) {
@@ -22,6 +24,12 @@ function dataISOHoje() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function pendenciaEstaAtiva(pendencia = {}) {
+  const status = String(pendencia?.status_pendencia || '').trim().toLowerCase();
+  if (!status) return true;
+  return !STATUS_PENDENCIA_FINAIS.has(status);
+}
+
 export function __setMilitarExclusaoClientForTests(client) {
   clientOverride = client;
 }
@@ -36,9 +44,9 @@ export async function tratarPendenciasComportamentoNaExclusaoMilitar(militarId, 
   }
 
   const pendencias = await pendenciaEntity.filter({ militar_id: id });
-  const abertas = (pendencias || []).filter((item) => String(item?.status_pendencia || '').trim() === 'Pendente');
+  const ativas = (pendencias || []).filter((item) => pendenciaEstaAtiva(item));
 
-  await Promise.all(abertas.map((item) => {
+  await Promise.all(ativas.map((item) => {
     const detalhesAtuais = String(item?.detalhes_calculo || '').trim();
     const marcador = `Encerrada automaticamente por exclusão do militar em ${dataISOHoje()}`;
     const detalhes = detalhesAtuais ? `${detalhesAtuais} | ${marcador}` : marcador;
@@ -51,7 +59,7 @@ export async function tratarPendenciasComportamentoNaExclusaoMilitar(militarId, 
     });
   }));
 
-  return { totalEncontradas: pendencias.length, totalTratadas: abertas.length };
+  return { totalEncontradas: pendencias.length, totalTratadas: ativas.length };
 }
 
 export async function excluirMilitarComDependencias(militarId, { executadoPor = '' } = {}) {
