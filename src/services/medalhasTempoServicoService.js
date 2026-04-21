@@ -102,6 +102,10 @@ export function deduplicarTiposMedalha(tipos = []) {
   return Array.from(unicos.values());
 }
 
+function normalizarCodigo(valor) {
+  return String(valor || '').trim().toUpperCase() || null;
+}
+
 function mapearCodigoTempoPorTexto(valor) {
   const texto = normalizarTexto(valor);
   if (!texto) return null;
@@ -130,15 +134,68 @@ export function obterCodigoFaixaPorAnos(anosServico) {
   return 'TEMPO_10';
 }
 
+export function isImpedimentoAtivo(impedimento, referencia = new Date()) {
+  if (!impedimento || impedimento.ativo === false) return false;
+
+  const dataRef = new Date(referencia);
+  if (Number.isNaN(dataRef.getTime())) return false;
+
+  const dataInicio = impedimento.data_inicio ? new Date(impedimento.data_inicio) : null;
+  const dataFim = impedimento.data_fim ? new Date(impedimento.data_fim) : null;
+
+  if (dataInicio && !Number.isNaN(dataInicio.getTime()) && dataRef < dataInicio) return false;
+  if (dataFim && !Number.isNaN(dataFim.getTime()) && dataRef > dataFim) return false;
+  return true;
+}
+
+export function temImpedimentoAplicavel({ impedimentos = [], militarId, medalhaDevidaCodigo, referencia = new Date() }) {
+  if (!militarId) return false;
+
+  return impedimentos.some((item) => {
+    if (item?.militar_id !== militarId) return false;
+    if (!isImpedimentoAtivo(item, referencia)) return false;
+
+    const tipoImpedida = normalizarCodigo(item.tipo_medalha_codigo);
+    if (!tipoImpedida && !item.tipo_medalha_id) return true;
+    if (tipoImpedida && tipoImpedida === normalizarCodigo(medalhaDevidaCodigo)) return true;
+    return false;
+  });
+}
+
+export function criarIndicacaoAutomatica({ militar, medalhaDevida, tipoMedalha }) {
+  if (!militar?.id || !tipoMedalha?.id || !medalhaDevida) {
+    throw new Error('Dados insuficientes para criar indicação automática.');
+  }
+
+  const hoje = new Date().toISOString().split('T')[0];
+  return {
+    militar_id: militar.id,
+    militar_nome: militar.nome_completo || militar.nome || '',
+    militar_posto: militar.posto_graduacao || militar.posto || '',
+    militar_matricula: militar.matricula || '',
+    tipo_medalha_id: tipoMedalha.id,
+    tipo_medalha_nome: tipoMedalha.nome,
+    tipo_medalha_codigo: medalhaDevida,
+    data_indicacao: hoje,
+    status: 'INDICADA',
+    origem_registro: 'APURACAO_TEMPO_SERVICO',
+    observacoes: 'Indicação automática gerada na apuração de medalhas.',
+  };
+}
+
 function indexarTipos(tipos = []) {
   const porId = new Map();
   const porCodigo = new Map();
   const porNomeNormalizado = new Map();
 
+  [...TIPOS_FIXOS_MEDALHA_TEMPO, ...tipos].forEach((tipo) => {
+    if (tipo?.id) porId.set(tipo.id, tipo);
+  });
+
   deduplicarTiposMedalha([...TIPOS_FIXOS_MEDALHA_TEMPO, ...tipos]).forEach((tipo) => {
     if (!tipo) return;
-    if (tipo.id) porId.set(tipo.id, tipo);
-    if (tipo.codigo) porCodigo.set(tipo.codigo, tipo);
+    const codigoNormalizado = normalizarCodigo(tipo.codigo);
+    if (codigoNormalizado) porCodigo.set(codigoNormalizado, { ...tipo, codigo: codigoNormalizado });
     const nomeNormalizado = normalizarTexto(tipo.nome);
     if (nomeNormalizado) porNomeNormalizado.set(nomeNormalizado, tipo);
   });
@@ -152,8 +209,9 @@ function resolverTipoMedalha(registro, tipoIndexado) {
     return tipoIndexado.porId.get(registro.tipo_medalha_id);
   }
 
-  if (registro.tipo_medalha_codigo && tipoIndexado.porCodigo.has(registro.tipo_medalha_codigo)) {
-    return tipoIndexado.porCodigo.get(registro.tipo_medalha_codigo);
+  const codigoRegistro = normalizarCodigo(registro.tipo_medalha_codigo);
+  if (codigoRegistro && tipoIndexado.porCodigo.has(codigoRegistro)) {
+    return tipoIndexado.porCodigo.get(codigoRegistro);
   }
 
   const nomeNormalizado = normalizarTexto(registro.tipo_medalha_nome);
@@ -183,7 +241,7 @@ function isMedalhaTempoServico(registro, tipoIndexado) {
   const tipo = resolverTipoMedalha(registro, tipoIndexado);
   if (tipo?.categoria === CATEGORIA_TEMPO_SERVICO) return true;
 
-  const codigo = tipo?.codigo || registro?.tipo_medalha_codigo || mapearCodigoTempoPorTexto(registro?.tipo_medalha_nome);
+  const codigo = normalizarCodigo(tipo?.codigo || registro?.tipo_medalha_codigo || mapearCodigoTempoPorTexto(registro?.tipo_medalha_nome));
   if (CODIGOS_TEMPO_AUTOMATICO.includes(codigo)) return true;
 
   return false;
@@ -203,7 +261,13 @@ function obterMaiorMedalhaTempoRecebida(medalhas, tipoIndexado) {
   ));
 }
 
-export function apurarMedalhaTempoServicoMilitar({ militar, medalhas = [], tiposMedalha = [], referencia = new Date() }) {
+export function apurarMedalhaTempoServicoMilitar({
+  militar,
+  medalhas = [],
+  tiposMedalha = [],
+  impedimentos = [],
+  referencia = new Date(),
+}) {
   const tipoIndexado = indexarTipos(tiposMedalha);
   const tempoServico = calcularTempoServico(militar, referencia);
   const tempoServicoAnos = tempoServico.valido ? tempoServico.anos_completos : null;
@@ -234,6 +298,16 @@ export function apurarMedalhaTempoServicoMilitar({ militar, medalhas = [], tipos
     situacao = 'INCONSISTENTE';
   }
 
+  const impedido = medalhaDevidaCodigo && temImpedimentoAplicavel({
+    impedimentos,
+    militarId: militar?.id,
+    medalhaDevidaCodigo,
+    referencia,
+  });
+  if (situacao !== 'INCONSISTENTE' && impedido) {
+    situacao = 'IMPEDIDO';
+  }
+
   return {
     militar_id: militar?.id || null,
     tempo_servico_anos: tempoServicoAnos,
@@ -245,7 +319,13 @@ export function apurarMedalhaTempoServicoMilitar({ militar, medalhas = [], tipos
   };
 }
 
-export function apurarListaMilitaresTempoServico({ militares = [], medalhas = [], tiposMedalha = [], referencia = new Date() }) {
+export function apurarListaMilitaresTempoServico({
+  militares = [],
+  medalhas = [],
+  tiposMedalha = [],
+  impedimentos = [],
+  referencia = new Date(),
+}) {
   const medalhasPorMilitar = medalhas.reduce((acc, medalha) => {
     const militarId = medalha?.militar_id;
     if (!militarId) return acc;
@@ -260,6 +340,7 @@ export function apurarListaMilitaresTempoServico({ militares = [], medalhas = []
       militar,
       medalhas: medalhasPorMilitar.get(militar.id) || [],
       tiposMedalha,
+      impedimentos,
       referencia,
     }),
   }));

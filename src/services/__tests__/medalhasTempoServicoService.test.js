@@ -6,9 +6,12 @@ import {
   apurarListaMilitaresTempoServico,
   apurarMedalhaTempoServicoMilitar,
   calcularAnosTempoServico,
+  criarIndicacaoAutomatica,
   deduplicarTiposMedalha,
+  isImpedimentoAtivo,
   normalizarStatusMedalha,
   obterCodigoFaixaPorAnos,
+  temImpedimentoAplicavel,
 } from '../medalhasTempoServicoService.js';
 
 test('calcula faixa alcançada por tempo de serviço', () => {
@@ -194,6 +197,75 @@ test('apuração aceita data de inclusão legada em formato BR', () => {
 
   assert.equal(apuracao.tempo_servico_anos, 16);
   assert.equal(apuracao.situacao, 'ELEGIVEL');
+});
+
+test('apuração considera medalha concedida legada por tipo_medalha_id', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm16', data_inclusao: '2006-04-21' },
+    medalhas: [
+      {
+        militar_id: 'm16',
+        tipo_medalha_id: 'tipo20',
+        status: 'PUBLICADA',
+      },
+    ],
+    tiposMedalha: [...TIPOS_FIXOS_MEDALHA_TEMPO, { id: 'tipo20', codigo: 'TEMPO_20', categoria: 'TEMPO_SERVICO', ordem_hierarquica: 20 }],
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.maior_medalha_recebida_codigo, 'TEMPO_20');
+  assert.equal(apuracao.situacao, 'JA_CONTEMPLADO');
+});
+
+test('impedimento ativo aplicável classifica militar como IMPEDIDO', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm17', data_inclusao: '2006-04-21' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    impedimentos: [
+      { militar_id: 'm17', ativo: true, tipo_medalha_codigo: 'TEMPO_20', data_inicio: '2026-01-01' },
+    ],
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.medalha_devida_codigo, 'TEMPO_20');
+  assert.equal(apuracao.situacao, 'IMPEDIDO');
+});
+
+test('remoção/desativação do impedimento volta a permitir indicação', () => {
+  const bloqueado = temImpedimentoAplicavel({
+    militarId: 'm18',
+    medalhaDevidaCodigo: 'TEMPO_20',
+    referencia: new Date('2026-04-21T00:00:00Z'),
+    impedimentos: [{ militar_id: 'm18', ativo: true, tipo_medalha_codigo: 'TEMPO_20' }],
+  });
+  const liberado = temImpedimentoAplicavel({
+    militarId: 'm18',
+    medalhaDevidaCodigo: 'TEMPO_20',
+    referencia: new Date('2026-04-21T00:00:00Z'),
+    impedimentos: [{ militar_id: 'm18', ativo: false, tipo_medalha_codigo: 'TEMPO_20' }],
+  });
+
+  assert.equal(bloqueado, true);
+  assert.equal(liberado, false);
+});
+
+test('ação de indicar monta payload em status INDICADA', () => {
+  const payload = criarIndicacaoAutomatica({
+    militar: { id: 'm19', nome_completo: 'Fulano', posto_graduacao: 'CB', matricula: '123' },
+    medalhaDevida: 'TEMPO_20',
+    tipoMedalha: { id: 'tipo20', nome: 'Medalha de Tempo de Serviço - 20 anos' },
+  });
+
+  assert.equal(payload.status, 'INDICADA');
+  assert.equal(payload.militar_id, 'm19');
+  assert.equal(payload.tipo_medalha_id, 'tipo20');
+  assert.equal(payload.tipo_medalha_codigo, 'TEMPO_20');
+});
+
+test('isImpedimentoAtivo respeita vigência', () => {
+  assert.equal(isImpedimentoAtivo({ ativo: true, data_inicio: '2026-01-01', data_fim: '2026-12-31' }, new Date('2026-04-21')), true);
+  assert.equal(isImpedimentoAtivo({ ativo: true, data_inicio: '2027-01-01' }, new Date('2026-04-21')), false);
 });
 
 test('deduplica tipos de medalha por código/nome técnico', () => {
