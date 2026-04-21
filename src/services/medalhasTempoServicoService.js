@@ -55,7 +55,19 @@ export const TIPOS_FIXOS_MEDALHA_TEMPO = [
   },
 ];
 
-const STATUS_CONSIDERADOS_CONCESSAO = new Set(['CONCEDIDO', 'Concedido', 'PUBLICADO', 'Publicado']);
+const STATUS_MAP = new Map([
+  ['INDICADO', 'INDICADA'],
+  ['INDICADA', 'INDICADA'],
+  ['CONCEDIDO', 'CONCEDIDA'],
+  ['CONCEDIDA', 'CONCEDIDA'],
+  ['PUBLICADO', 'CONCEDIDA'],
+  ['PUBLICADA', 'CONCEDIDA'],
+  ['CANCELADO', 'CANCELADA'],
+  ['CANCELADA', 'CANCELADA'],
+  ['NEGADO', 'CANCELADA'],
+]);
+
+const STATUS_CONSIDERADOS_CONCESSAO = new Set(['CONCEDIDA']);
 
 const CODIGOS_TEMPO_AUTOMATICO = ['TEMPO_10', 'TEMPO_20', 'TEMPO_30', 'TEMPO_40'];
 
@@ -66,6 +78,28 @@ function normalizarTexto(valor) {
     .replace(/[^a-zA-Z0-9]+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+export function normalizarStatusMedalha(status) {
+  const chave = String(status || '').trim().toUpperCase();
+  return STATUS_MAP.get(chave) || chave || null;
+}
+
+export function deduplicarTiposMedalha(tipos = []) {
+  const unicos = new Map();
+
+  tipos.forEach((tipo) => {
+    if (!tipo) return;
+    const chaveCodigo = String(tipo.codigo || '').trim().toUpperCase();
+    const chaveNome = normalizarTexto(tipo.nome);
+    const chave = chaveCodigo ? `COD:${chaveCodigo}` : `NOME:${chaveNome}`;
+    if (!chaveNome && !chaveCodigo) return;
+    if (!unicos.has(chave)) {
+      unicos.set(chave, tipo);
+    }
+  });
+
+  return Array.from(unicos.values());
 }
 
 function mapearCodigoTempoPorTexto(valor) {
@@ -101,7 +135,7 @@ function indexarTipos(tipos = []) {
   const porCodigo = new Map();
   const porNomeNormalizado = new Map();
 
-  [...TIPOS_FIXOS_MEDALHA_TEMPO, ...tipos].forEach((tipo) => {
+  deduplicarTiposMedalha([...TIPOS_FIXOS_MEDALHA_TEMPO, ...tipos]).forEach((tipo) => {
     if (!tipo) return;
     if (tipo.id) porId.set(tipo.id, tipo);
     if (tipo.codigo) porCodigo.set(tipo.codigo, tipo);
@@ -157,7 +191,7 @@ function isMedalhaTempoServico(registro, tipoIndexado) {
 
 function obterMaiorMedalhaTempoRecebida(medalhas, tipoIndexado) {
   const candidatas = medalhas
-    .filter((item) => STATUS_CONSIDERADOS_CONCESSAO.has(item.status))
+    .filter((item) => STATUS_CONSIDERADOS_CONCESSAO.has(normalizarStatusMedalha(item.status)))
     .filter((item) => isMedalhaTempoServico(item, tipoIndexado));
 
   if (!candidatas.length) return null;

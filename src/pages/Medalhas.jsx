@@ -21,16 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
 
 const statusColors = {
-  Indicado: 'bg-yellow-100 text-yellow-700',
-  INDICADO: 'bg-yellow-100 text-yellow-700',
-  Concedido: 'bg-green-100 text-green-700',
-  CONCEDIDO: 'bg-green-100 text-green-700',
-  PUBLICADO: 'bg-blue-100 text-blue-700',
-  RASCUNHO: 'bg-slate-100 text-slate-700',
-  CANCELADO: 'bg-red-100 text-red-700',
-  Negado: 'bg-red-100 text-red-700',
+  INDICADA: 'bg-yellow-100 text-yellow-700',
+  CONCEDIDA: 'bg-green-100 text-green-700',
+  CANCELADA: 'bg-red-100 text-red-700',
 };
 
 function formatDate(d) {
@@ -65,12 +61,6 @@ export default function Medalhas() {
     enabled: isAccessResolved && hasMedalhasAccess,
   });
 
-  const { data: tiposMedalha = [] } = useQuery({
-    queryKey: ['tipos-medalha'],
-    queryFn: () => base44.entities.TipoMedalha.filter({ ativa: true }),
-    enabled: isAccessResolved && hasMedalhasAccess,
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Medalha.delete(id),
     onSuccess: () => {
@@ -84,7 +74,7 @@ export default function Medalhas() {
       m.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.tipo_medalha_nome?.toLowerCase().includes(searchTerm.toLowerCase());
-    const normalizado = (m.status || '').toUpperCase();
+    const normalizado = normalizarStatusMedalha(m.status);
     const matchStatus = statusFilter === 'all' || normalizado === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -121,9 +111,9 @@ export default function Medalhas() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
             {[
-            { label: 'Indicadas', value: medalhas.filter(m => ['INDICADO', 'Indicado'].includes(m.status)).length, color: 'text-yellow-600', bg: 'bg-yellow-100' },
-            { label: 'Concedidas', value: medalhas.filter(m => ['CONCEDIDO', 'Concedido'].includes(m.status)).length, color: 'text-green-600', bg: 'bg-green-100' },
-            { label: 'Canceladas', value: medalhas.filter(m => ['CANCELADO', 'Negado'].includes(m.status)).length, color: 'text-red-600', bg: 'bg-red-100' },
+            { label: 'Indicadas', value: medalhas.filter(m => normalizarStatusMedalha(m.status) === 'INDICADA').length, color: 'text-yellow-600', bg: 'bg-yellow-100' },
+            { label: 'Concedidas', value: medalhas.filter(m => normalizarStatusMedalha(m.status) === 'CONCEDIDA').length, color: 'text-green-600', bg: 'bg-green-100' },
+            { label: 'Canceladas', value: medalhas.filter(m => normalizarStatusMedalha(m.status) === 'CANCELADA').length, color: 'text-red-600', bg: 'bg-red-100' },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
               <div className="flex items-center gap-3">
@@ -157,11 +147,9 @@ export default function Medalhas() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos Status</SelectItem>
-                <SelectItem value="INDICADO">Indicado</SelectItem>
-                <SelectItem value="CONCEDIDO">Concedido</SelectItem>
-                <SelectItem value="PUBLICADO">Publicado</SelectItem>
-                <SelectItem value="RASCUNHO">Rascunho</SelectItem>
-                <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                <SelectItem value="INDICADA">Indicada</SelectItem>
+                <SelectItem value="CONCEDIDA">Concedida</SelectItem>
+                <SelectItem value="CANCELADA">Cancelada</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -189,8 +177,8 @@ export default function Medalhas() {
                       <h3 className="font-semibold text-slate-900">
                         {medalha.militar_posto} {medalha.militar_nome}
                       </h3>
-                      <Badge className={statusColors[medalha.status] || 'bg-slate-100 text-slate-700'}>
-                        {medalha.status}
+                      <Badge className={statusColors[normalizarStatusMedalha(medalha.status)] || 'bg-slate-100 text-slate-700'}>
+                        {normalizarStatusMedalha(medalha.status) || medalha.status}
                       </Badge>
                     </div>
                     <p className="text-sm font-medium text-slate-700 mb-1">{medalha.tipo_medalha_nome}</p>
@@ -198,8 +186,7 @@ export default function Medalhas() {
                     <div className="flex gap-4 mt-2 text-xs text-slate-500">
                       <span>Indicação: {formatDate(medalha.data_indicacao)}</span>
                       {medalha.data_concessao && <span>Concessão: {formatDate(medalha.data_concessao)}</span>}
-                      {medalha.numero_publicacao && <span>Nº Pub.: {medalha.numero_publicacao}</span>}
-                      {medalha.boletim_ou_do && <span>{medalha.boletim_ou_do}</span>}
+                      {medalha.numero_publicacao && <span>DOEMS: {medalha.numero_publicacao}</span>}
                     </div>
                     {medalha.observacoes && (
                       <p className="text-sm text-slate-500 mt-2">{medalha.observacoes}</p>

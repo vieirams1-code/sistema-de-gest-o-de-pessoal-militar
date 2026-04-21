@@ -12,7 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
-import { garantirCatalogoFixoMedalhaTempo } from '@/services/medalhasTempoServicoService';
+import { deduplicarTiposMedalha, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
 
 export default function CadastrarMedalha() {
   const navigate = useNavigate();
@@ -32,18 +32,19 @@ export default function CadastrarMedalha() {
     tipo_medalha_nome: '',
     data_indicacao: new Date().toISOString().split('T')[0],
     data_concessao: '',
-    data_publicacao: '',
     numero_publicacao: '',
-    boletim_ou_do: '',
-    status: 'RASCUNHO',
+    status: 'INDICADA',
     origem_registro: 'MANUAL',
-    documento_referencia: '',
+    doems_numero: '',
     observacoes: '',
   });
 
   const { data: tiposMedalha = [] } = useQuery({
     queryKey: ['tipos-medalha'],
-    queryFn: () => base44.entities.TipoMedalha.filter({ ativa: true }, 'nome')
+    queryFn: async () => {
+      const tipos = await base44.entities.TipoMedalha.filter({ ativa: true }, 'nome');
+      return deduplicarTiposMedalha(tipos);
+    },
   });
 
   useQuery({
@@ -63,7 +64,12 @@ export default function CadastrarMedalha() {
 
   useEffect(() => {
     if (medalhaExistente) {
-      setFormData(medalhaExistente);
+      setFormData((prev) => ({
+        ...prev,
+        ...medalhaExistente,
+        status: normalizarStatusMedalha(medalhaExistente.status) || 'INDICADA',
+        doems_numero: medalhaExistente.doems_numero || medalhaExistente.numero_publicacao || medalhaExistente.documento_referencia || '',
+      }));
     }
   }, [medalhaExistente]);
 
@@ -71,7 +77,7 @@ export default function CadastrarMedalha() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const isConcedido = ['CONCEDIDO', 'Concedido'].includes(formData.status);
+  const isConcedida = formData.status === 'CONCEDIDA';
 
   const handleTipoMedalhaChange = (tipoId) => {
     const tipo = tiposMedalha.find(t => t.id === tipoId);
@@ -87,10 +93,17 @@ export default function CadastrarMedalha() {
     setLoading(true);
 
     try {
+      const payload = {
+        ...formData,
+        status: normalizarStatusMedalha(formData.status) || 'INDICADA',
+        numero_publicacao: formData.doems_numero || '',
+        boletim_ou_do: formData.doems_numero ? 'DOEMS' : '',
+        documento_referencia: formData.doems_numero ? `DOEMS ${formData.doems_numero}` : '',
+      };
       if (medalhaId) {
-        await base44.entities.Medalha.update(medalhaId, formData);
+        await base44.entities.Medalha.update(medalhaId, payload);
       } else {
-        await base44.entities.Medalha.create(formData);
+        await base44.entities.Medalha.create(payload);
       }
       queryClient.invalidateQueries({ queryKey: ['medalhas'] });
       navigate(createPageUrl('Medalhas'));
@@ -122,7 +135,7 @@ export default function CadastrarMedalha() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-[#1e3a5f]">{medalhaId ? 'Editar' : 'Nova'} Indicação</h1>
-              <p className="text-slate-500 text-sm">{medalhaId ? 'Editar indicação de medalha' : 'Indicar militar para medalha'}</p>
+              <p className="text-slate-500 text-sm">{medalhaId ? 'Editar medalha' : 'Cadastrar medalha'}</p>
             </div>
           </div>
           <Button onClick={handleSubmit} disabled={loading || !formData.militar_id || !formData.tipo_medalha_id} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
@@ -173,85 +186,37 @@ export default function CadastrarMedalha() {
                 type="date"
                 required
               />
-              <FormField
-                label="Data de Concessão"
-                name="data_concessao"
-                value={formData.data_concessao}
-                onChange={handleChange}
-                type="date"
-              />
-              <div className="col-span-2">
-                <Label>Status</Label>
+                  <div className="col-span-2">
+                    <Label>Status</Label>
                 <Select value={formData.status} onValueChange={(v) => handleChange('status', v)}>
                   <SelectTrigger className="mt-1.5">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="RASCUNHO">Rascunho</SelectItem>
-                    <SelectItem value="INDICADO">Indicado</SelectItem>
-                    <SelectItem value="PUBLICADO">Publicado</SelectItem>
-                    <SelectItem value="CONCEDIDO">Concedido</SelectItem>
-                    <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                    <SelectItem value="INDICADA">Indicada</SelectItem>
+                    <SelectItem value="CONCEDIDA">Concedida</SelectItem>
+                    <SelectItem value="CANCELADA">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2">
-                <Label>Origem do Registro</Label>
-                <Select value={formData.origem_registro} onValueChange={(v) => handleChange('origem_registro', v)}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MANUAL">Manual</SelectItem>
-                    <SelectItem value="IMPORTACAO">Importação</SelectItem>
-                    <SelectItem value="APURACAO">Apuração</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {isConcedido && (
+              {isConcedida && (
                 <>
                   <FormField
-                    label="Boletim Geral / DOEMS"
-                    name="documento_referencia"
-                    value={formData.documento_referencia}
+                    label="Número do DOEMS"
+                    name="doems_numero"
+                    value={formData.doems_numero}
                     onChange={handleChange}
-                    placeholder="Ex: BG nº 045/2025 ou DOEMS nº 001"
+                    placeholder="Ex: nº 12.345/2026"
                   />
                   <FormField
-                    label="Data do BG/DOEMS"
-                    name="data_publicacao"
-                    value={formData.data_publicacao}
+                    label="Data da Concessão"
+                    name="data_concessao"
+                    value={formData.data_concessao}
                     onChange={handleChange}
                     type="date"
                   />
                 </>
               )}
-              {!isConcedido && (
-                <div className="col-span-2">
-                  <FormField
-                    label="Documento de Referência"
-                    name="documento_referencia"
-                    value={formData.documento_referencia}
-                    onChange={handleChange}
-                  />
-                </div>
-              )}
-              <div className="col-span-2">
-                <FormField
-                  label="Número da Publicação"
-                  name="numero_publicacao"
-                  value={formData.numero_publicacao}
-                  onChange={handleChange}
-                />
-              </div>
-              <div className="col-span-2">
-                <FormField
-                  label="Boletim / DO"
-                  name="boletim_ou_do"
-                  value={formData.boletim_ou_do}
-                  onChange={handleChange}
-                />
-              </div>
               <div className="col-span-2">
                 <Label>Observações</Label>
                 <Textarea
