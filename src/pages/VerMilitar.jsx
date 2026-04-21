@@ -165,6 +165,11 @@ export default function VerMilitar() {
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
+  const { data: contratosTemporarios = [] } = useQuery({
+    queryKey: ['ver-contratos-temporarios', id],
+    queryFn: () => base44.entities.ContratoTemporario.filter({ militar_id: id }, '-data_inicio'),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
 
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
@@ -214,6 +219,7 @@ export default function VerMilitar() {
   );
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
   const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
+  const contratosTemporariosSistema = React.useMemo(() => filtrarRegistrosSistema(contratosTemporarios), [contratosTemporarios]);
   const historicoComportamentoSistema = React.useMemo(() => filtrarRegistrosSistema(historicoComportamento), [historicoComportamento]);
   const punicoesSistema = React.useMemo(() => filtrarRegistrosSistema(punicoes), [punicoes]);
   const pendenciasComportamentoSistema = React.useMemo(
@@ -385,6 +391,7 @@ export default function VerMilitar() {
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
             <TabsTrigger value="medalhas"><Award className="w-4 h-4 mr-1" />Medalhas</TabsTrigger>
             <TabsTrigger value="armamentos"><Shield className="w-4 h-4 mr-1" />Armamentos</TabsTrigger>
+            <TabsTrigger value="vinculo-temporario"><Briefcase className="w-4 h-4 mr-1" />Vínculo Temporário</TabsTrigger>
           </TabsList>
 
           {/* Dados Pessoais */}
@@ -680,6 +687,33 @@ export default function VerMilitar() {
                 </div>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="vinculo-temporario">
+            <Section title="Vínculo Temporário" icon={Briefcase}>
+              {contratosTemporariosSistema.length === 0 ? (
+                <div className="space-y-3">
+                  <p className="text-slate-500">Nenhum contrato temporário vinculado a este militar.</p>
+                  <Button variant="outline" onClick={() => navigate(createPageUrl('VinculosTemporarios'))}>
+                    Abrir módulo de Vínculos Temporários
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {contratosTemporariosSistema.map((contrato) => (
+                    <div key={contrato.id} className="rounded-lg border border-slate-200 p-3">
+                      <p className="font-semibold text-slate-800">{contrato.tipo_vinculo || 'Vínculo temporário'}</p>
+                      <p className="text-sm text-slate-600">Status: {contrato.status || '-'}</p>
+                      <p className="text-sm text-slate-600">Início: {formatDate(contrato.data_inicio) || '-'}</p>
+                      <p className="text-sm text-slate-600">Fim prevista: {formatDate(contrato.data_fim_prevista) || '-'}</p>
+                    </div>
+                  ))}
+                  <Button variant="outline" onClick={() => navigate(createPageUrl('VinculosTemporarios'))}>
+                    Gerenciar no módulo
+                  </Button>
+                </div>
+              )}
+            </Section>
           </TabsContent>
         </Tabs>
       </div>
