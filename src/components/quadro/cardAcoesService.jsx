@@ -1,3 +1,5 @@
+// Wrapper de compatibilidade para imports legados com extensão .jsx.
+// Fonte canônica: cardAcoesService.js
 export {
   getCardAcoesEntityInfo,
   listCardAcoes,
