@@ -14,6 +14,8 @@
     "data_fim_prevista": { "type": "date", "default": "" },
     "data_fim_efetiva": { "type": "date", "default": "" },
     "status": { "type": "string", "default": "RASCUNHO" },
+    "numero_doems": { "type": "string", "default": "" },
+    "data_doems": { "type": "date", "default": "" },
     "permite_renovacao": { "type": "boolean", "default": true },
     "publicado_do": { "type": "boolean", "default": false },
     "data_publicacao": { "type": "date", "default": "" },
