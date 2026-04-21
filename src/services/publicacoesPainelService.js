@@ -1,5 +1,21 @@
 import { base44 } from '@/api/base44Client';
 
+async function expandirMilitarIdsComMesclados(militarIds = []) {
+  const idsBase = [...new Set((militarIds || []).filter(Boolean))];
+  if (!idsBase.length) return [];
+
+  const relacionados = await Promise.all(
+    idsBase.map((id) => base44.entities.Militar.filter({ merged_into_id: id }))
+  );
+
+  const idsMesclados = relacionados
+    .flat()
+    .map((militar) => militar?.id)
+    .filter(Boolean);
+
+  return [...new Set([...idsBase, ...idsMesclados])];
+}
+
 export async function listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters }) {
   if (isAdmin) return null;
 
@@ -7,7 +23,8 @@ export async function listarMilitarIdsEscopo({ isAdmin, getMilitarScopeFilters }
   if (!scopeFilters.length) return [];
 
   const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
-  return [...new Set(militarQueries.flat().map((m) => m.id).filter(Boolean))];
+  const militarIdsEscopo = [...new Set(militarQueries.flat().map((m) => m.id).filter(Boolean))];
+  return expandirMilitarIdsComMesclados(militarIdsEscopo);
 }
 
 export async function listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }) {
