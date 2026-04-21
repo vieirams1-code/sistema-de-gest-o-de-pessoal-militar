@@ -24,6 +24,12 @@ import { mapPeriodosAquisitivosPorMilitar } from '@/components/ferias/periodosAq
 import PeriodoAquisitivoCard from '@/components/ferias/PeriodoAquisitivoCard';
 import PeriodoAquisitivoGenerator from '@/components/ferias/PeriodoAquisitivoGenerator';
 import GerenciarPeriodoModal from '@/components/ferias/GerenciarPeriodoModal';
+import {
+  enriquecerMilitarComMatriculas,
+  filtrarMilitaresOperacionais,
+  militarCorrespondeBusca,
+  montarIndiceMatriculas,
+} from '@/services/matriculaMilitarViewService';
 
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
@@ -53,6 +59,16 @@ export default function PeriodosAquisitivos() {
     queryFn: () => base44.entities.RegistroLivro.list(),
   });
 
+  const { data: militares = [] } = useQuery({
+    queryKey: ['periodos-aquisitivos-militares'],
+    queryFn: () => base44.entities.Militar.list(),
+  });
+
+  const { data: matriculasMilitar = [] } = useQuery({
+    queryKey: ['periodos-aquisitivos-matriculas'],
+    queryFn: () => base44.entities.MatriculaMilitar.list('-created_date'),
+  });
+
 
   const updatePeriodoMutation = useMutation({
     mutationFn: ({ periodoId, payload }) => base44.entities.PeriodoAquisitivo.update(periodoId, payload),
@@ -73,10 +89,47 @@ export default function PeriodosAquisitivos() {
   });
 
 
+  const militaresEnriquecidos = useMemo(() => {
+    const indice = montarIndiceMatriculas(matriculasMilitar);
+    return filtrarMilitaresOperacionais(
+      (militares || []).map((m) => enriquecerMilitarComMatriculas(m, indice)),
+      { incluirInativos: true }
+    );
+  }, [militares, matriculasMilitar]);
 
+  const militaresPorId = useMemo(
+    () => new Map(militaresEnriquecidos.map((m) => [String(m.id), m])),
+    [militaresEnriquecidos]
+  );
 
+  const periodosTransformados = useMemo(() => {
+    const mapeados = mapPeriodosAquisitivosPorMilitar({ periodos, ferias });
 
-  const periodosTransformados = useMemo(() => mapPeriodosAquisitivosPorMilitar({ periodos, ferias }), [periodos, ferias]);
+    return {
+      ...mapeados,
+      militares: mapeados.militares
+        .map((grupo) => {
+          const militarAtual = militaresPorId.get(String(grupo?.militar?.id || ''));
+
+          if (!militarAtual) return grupo;
+
+          return {
+            ...grupo,
+            militar: {
+              ...grupo.militar,
+              matricula: militarAtual.matricula_atual || grupo.militar.matricula || '',
+              matricula_atual: militarAtual.matricula_atual || grupo.militar.matricula || '',
+              matriculas_historico: militarAtual.matriculas_historico || [],
+            },
+          };
+        })
+        .filter((grupo) => {
+          const militarId = String(grupo?.militar?.id || '');
+          if (!militarId) return true;
+          return militaresPorId.has(militarId);
+        }),
+    };
+  }, [periodos, ferias, militaresPorId]);
 
   const periodosFlat = useMemo(
     () => periodosTransformados.militares.flatMap((grupoMilitar) => grupoMilitar.periodos),
@@ -95,9 +148,18 @@ export default function PeriodosAquisitivos() {
         .map((grupoMilitar) => {
           const periodosFiltrados = grupoMilitar.periodos.filter((periodo) => {
             const searchLower = searchTerm.toLowerCase();
+            const matchesMilitarTermo = militarCorrespondeBusca(
+              {
+                nome_guerra: grupoMilitar.militar.nome_guerra,
+                matricula: grupoMilitar.militar.matricula,
+                matricula_atual: grupoMilitar.militar.matricula_atual,
+                matriculas_historico: grupoMilitar.militar.matriculas_historico,
+              },
+              searchTerm
+            );
             const matchesSearch =
+              matchesMilitarTermo ||
               grupoMilitar.militar.nome_guerra?.toLowerCase().includes(searchLower) ||
-              grupoMilitar.militar.matricula?.toLowerCase().includes(searchLower) ||
               periodo.referencia?.includes(searchTerm);
             const matchesStatus = statusFilter === 'all' || periodo.status_operacional === statusFilter;
             const matchesMilitar = militarFilter === 'all' || grupoMilitar.militar.id === militarFilter;
