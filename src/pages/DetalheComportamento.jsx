@@ -8,6 +8,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import { getPunicaoEntity, obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
+import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
 
 
 const COMPORTAMENTO_LEVEL = {
@@ -32,7 +33,12 @@ export default function DetalheComportamento() {
 
   const { data: militar } = useQuery({
     queryKey: ['detalhe-comportamento-militar', id],
-    queryFn: () => base44.entities.Militar.filter({ id }).then((r) => r[0] || null),
+    queryFn: async () => {
+      const [militarBase] = await base44.entities.Militar.filter({ id });
+      if (!militarBase) return null;
+      const [militarEnriquecido] = await carregarMilitaresComMatriculas([militarBase]);
+      return militarEnriquecido || militarBase;
+    },
     enabled: !!id,
   });
 
@@ -87,7 +93,12 @@ export default function DetalheComportamento() {
 
         <div className="bg-white rounded-xl border p-4">
           <h2 className="font-semibold">{militar.posto_graduacao} {militar.nome_completo}</h2>
-          <p className="text-sm text-slate-500">Matrícula: {militar.matricula}</p>
+          <p className="text-sm text-slate-500">Matrícula: {militar.matricula_atual || militar.matricula || '—'}</p>
+          {isMilitarMesclado(militar) && (
+            <p className="mt-2 text-xs text-amber-700">
+              Registro de militar mesclado: visualização apenas para contexto administrativo/histórico.
+            </p>
+          )}
           <p className="mt-2"><strong>Comportamento atual:</strong> {militar.comportamento || 'Bom'}</p>
           <p><strong>Comportamento calculado:</strong> {calculado?.comportamento || '—'}</p>
           <p><strong>Fundamento:</strong> {calculado?.fundamento || '—'}</p>

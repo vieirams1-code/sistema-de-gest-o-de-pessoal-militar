@@ -17,6 +17,7 @@ import {
   registrarMarcoHistoricoComportamento,
 } from '@/services/justicaDisciplinaService';
 import { gerarPublicacaoRPAutomaticaPorHistoricoComportamento } from '@/services/comportamentoRPService';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
@@ -31,7 +32,11 @@ export default function AvaliacaoComportamento() {
 
   const { data: militares = [], isLoading } = useQuery({
     queryKey: ['avaliacao-comportamento-militares'],
-    queryFn: () => base44.entities.Militar.list(),
+    queryFn: async () => {
+      const lista = await base44.entities.Militar.list();
+      const enriquecidos = await carregarMilitaresComMatriculas(lista);
+      return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
+    },
   });
   const { data: punicoes = [], isLoading: loadingPunicoes } = useQuery({
     queryKey: ['avaliacao-comportamento-punicoes'],
@@ -45,7 +50,7 @@ export default function AvaliacaoComportamento() {
   const avaliacao = useMemo(() => {
     return militares
       .filter((m) => PRACAS.has(m.posto_graduacao))
-      .filter((m) => (`${m.nome_completo} ${m.matricula}`).toLowerCase().includes(filtro.toLowerCase()))
+      .filter((m) => militarCorrespondeBusca(m, filtro))
       .map((militar) => {
         const punicoesMilitar = punicoes.filter((p) => p.militar_id === militar.id);
         const calculado = calcularComportamento(punicoesMilitar, militar.posto_graduacao, new Date(), {

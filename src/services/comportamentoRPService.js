@@ -7,6 +7,8 @@ import {
   marcoEhValidoParaGeracaoRP,
   obterTemplatePadraoComportamento,
 } from '@/utils/comportamentoTemplateUtils';
+import { formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
+import { isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 
 function normalizarTexto(value) {
   return String(value || '').trim();
@@ -74,6 +76,15 @@ async function buscarPublicacaoExistentePorHistorico(historicoId) {
   return Array.isArray(porOrigem) && porOrigem.length > 0 ? porOrigem[0] : null;
 }
 
+async function obterMatriculaAtualMilitar(militar = {}) {
+  const matriculaPayload = normalizarTexto(militar?.matricula_atual || militar?.matricula);
+  if (matriculaPayload) return formatarMatriculaPadrao(matriculaPayload);
+
+  if (!militar?.id) return '';
+  const historicoMatriculas = await base44.entities.MatriculaMilitar.filter({ militar_id: militar.id }, '-created_date');
+  return resolverMatriculaAtual(militar, Array.isArray(historicoMatriculas) ? historicoMatriculas : []);
+}
+
 export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
   militar,
   marco,
@@ -101,6 +112,10 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
       motivo: `Campos obrigatórios ausentes: ${camposAusentes.join(', ')}`,
       camposAusentes,
     };
+  }
+
+  if (isMilitarMesclado(militar)) {
+    return { ok: false, publicado: false, etapa: 'validacao', motivo: 'militar_mesclado_fluxo_operacional' };
   }
 
   if (!houveMudancaRealDeComportamento(marco)) {
@@ -172,12 +187,13 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
     };
   }
 
+  const matriculaAtual = await obterMatriculaAtualMilitar(militar);
   const geradoEm = new Date().toISOString();
   const payloadPublicacao = {
     militar_id: militar.id,
     militar_nome: militar.nome_completo || militar.nome_guerra || '',
     militar_posto: militar.posto_graduacao || '',
-    militar_matricula: militar.matricula || '',
+    militar_matricula: matriculaAtual || formatarMatriculaPadrao(militar.matricula || ''),
     tipo: tipoTemplate,
     data_publicacao: dataPublicacao,
     status: 'Aguardando Nota',
