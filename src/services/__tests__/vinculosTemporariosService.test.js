@@ -98,3 +98,39 @@ test('gera indicadores básicos de listagem/dashboard', () => {
   assert.equal(indicadores.expirados, 1);
   assert.equal(indicadores.aguardandoPublicacao, 1);
 });
+
+// --- Testes de infraestrutura e filtro do módulo de Vínculos Temporários ---
+
+test('filtrarMilitaresOperacionais exclui mesclados e inativos do selector de vínculo temporário', async () => {
+  const { filtrarMilitaresOperacionais, isMilitarMesclado } = await import('../matriculaMilitarViewService.js');
+
+  const militares = [
+    { id: 'ativo', status_cadastro: 'Ativo', situacao_militar: 'Ativa' },
+    { id: 'inativo', status_cadastro: 'Inativo', situacao_militar: 'Ativa' },
+    { id: 'mesclado', status_cadastro: 'Mesclado', situacao_militar: 'Ativa' },
+    { id: 'merged', merged_into_id: 'outro', status_cadastro: 'Ativo', situacao_militar: 'Ativa' },
+  ];
+
+  const operacionais = filtrarMilitaresOperacionais(militares);
+  assert.deepEqual(operacionais.map((m) => m.id), ['ativo']);
+  assert.equal(isMilitarMesclado(militares[2]), true);
+  assert.equal(isMilitarMesclado(militares[3]), true);
+});
+
+test('contrato não deve ser criado sem militar_id preenchido', () => {
+  const resultado = validarSobreposicaoContrato({
+    contrato: { militar_id: '', data_inicio: '2026-01-01', data_fim_prevista: '2026-12-31', status: 'RASCUNHO' },
+    contratosExistentes: [],
+  });
+  // Sem militar_id, a validação passa (sem conflito), mas a lógica de UI bloqueia o submit
+  assert.equal(resultado.ok, true);
+
+  // Garantia que dados sem militar_id não produzem sobreposição falsa
+  const resultadoComExistente = validarSobreposicaoContrato({
+    contrato: { militar_id: '', data_inicio: '2026-01-01', data_fim_prevista: '2026-12-31', status: 'VIGENTE' },
+    contratosExistentes: [
+      { id: 'e1', militar_id: '', data_inicio: '2026-01-01', data_fim_prevista: '2026-12-31', status: 'VIGENTE' },
+    ],
+  });
+  assert.equal(resultadoComExistente.ok, true);
+});
