@@ -30,6 +30,12 @@ import {
 } from '@/config/perfilMilitarRegistrosConfig';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { apurarMedalhaTempoServicoMilitar } from '@/services/medalhasTempoServicoService';
+import {
+  calcularBadgeVigenciaContrato,
+  calcularStatusContratoTemporario,
+  listarContratosAtuais,
+  listarHistoricoCadeia,
+} from '@/services/vinculosTemporariosService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -231,6 +237,15 @@ export default function VerMilitar() {
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
   const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
   const contratosTemporariosSistema = React.useMemo(() => filtrarRegistrosSistema(contratosTemporarios), [contratosTemporarios]);
+  const contratosTemporariosComStatus = React.useMemo(() => contratosTemporariosSistema.map((contrato) => ({
+    ...contrato,
+    status_calculado: calcularStatusContratoTemporario(contrato),
+    badge_vigencia: calcularBadgeVigenciaContrato(contrato),
+  })), [contratosTemporariosSistema]);
+  const contratosTemporariosAtuais = React.useMemo(
+    () => listarContratosAtuais(contratosTemporariosComStatus),
+    [contratosTemporariosComStatus]
+  );
   const historicoComportamentoSistema = React.useMemo(() => filtrarRegistrosSistema(historicoComportamento), [historicoComportamento]);
   const punicoesSistema = React.useMemo(() => filtrarRegistrosSistema(punicoes), [punicoes]);
   const pendenciasComportamentoSistema = React.useMemo(
@@ -713,7 +728,7 @@ export default function VerMilitar() {
 
           <TabsContent value="vinculo-temporario">
             <Section title="Vínculo Temporário" icon={Briefcase}>
-              {contratosTemporariosSistema.length === 0 ? (
+              {contratosTemporariosAtuais.length === 0 ? (
                 <div className="space-y-3">
                   <p className="text-slate-500">Nenhum contrato temporário vinculado a este militar.</p>
                   <Button variant="outline" onClick={() => navigate(createPageUrl('VinculosTemporarios'))}>
@@ -722,14 +737,26 @@ export default function VerMilitar() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {contratosTemporariosSistema.map((contrato) => (
-                    <div key={contrato.id} className="rounded-lg border border-slate-200 p-3">
-                      <p className="font-semibold text-slate-800">{contrato.tipo_vinculo || 'Vínculo temporário'}</p>
-                      <p className="text-sm text-slate-600">Status: {contrato.status || '-'}</p>
-                      <p className="text-sm text-slate-600">Início: {formatDate(contrato.data_inicio) || '-'}</p>
-                      <p className="text-sm text-slate-600">Fim prevista: {formatDate(contrato.data_fim_prevista) || '-'}</p>
-                    </div>
-                  ))}
+                  {contratosTemporariosAtuais.map((contratoAtual) => {
+                    const historico = listarHistoricoCadeia(contratosTemporariosComStatus, contratoAtual);
+                    return (
+                      <div key={contratoAtual.id} className="rounded-lg border border-slate-200 p-3">
+                        <p className="font-semibold text-slate-800">{contratoAtual.tipo_vinculo || 'Vínculo temporário'}</p>
+                        <p className="text-sm text-slate-600">Status: {contratoAtual.status_calculado || '-'}</p>
+                        <p className="text-sm text-slate-600">Início: {formatDate(contratoAtual.data_inicio) || '-'}</p>
+                        <p className="text-sm text-slate-600">Vigência: {formatDate(contratoAtual.data_inicio) || '-'} até {formatDate(contratoAtual.data_fim_prevista) || '-'}</p>
+                        <p className="text-sm text-slate-600">DOEMS: {contratoAtual.numero_doems || contratoAtual.numero_diario_oficial || '-'} {contratoAtual.data_doems || contratoAtual.data_publicacao ? `• ${formatDate(contratoAtual.data_doems || contratoAtual.data_publicacao)}` : ''}</p>
+                        {contratoAtual.badge_vigencia && (
+                          <Badge variant="secondary" className="mt-2">
+                            {contratoAtual.badge_vigencia === 'A_VENCER' ? 'A vencer' : 'Expirado'}
+                          </Badge>
+                        )}
+                        <p className="mt-2 text-xs text-slate-500">
+                          Histórico resumido de renovações: {historico.length} contrato(s) anterior(es).
+                        </p>
+                      </div>
+                    );
+                  })}
                   <Button variant="outline" onClick={() => navigate(createPageUrl('VinculosTemporarios'))}>
                     Gerenciar no módulo
                   </Button>

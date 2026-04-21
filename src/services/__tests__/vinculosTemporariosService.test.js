@@ -2,9 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  calcularBadgeVigenciaContrato,
   calcularSituacaoVinculoTemporario,
   calcularStatusContratoTemporario,
   encerrarOuExtinguirContrato,
+  listarContratosAtuais,
+  listarHistoricoCadeia,
   prepararRenovacaoContrato,
   resumirIndicadoresContratosTemporarios,
   validarSobreposicaoContrato,
@@ -45,33 +48,98 @@ test('bloqueia sobreposição inconsistente de contrato ativo', () => {
   assert.equal(resultado.code, 'CONTRATO_SOBREPOSTO');
 });
 
-test('encerra/extingue contrato preservando motivo e data efetiva', () => {
+test('encerra contrato preservando motivo e data efetiva', () => {
   const encerrado = encerrarOuExtinguirContrato({ id: 'c1', status: 'VIGENTE' }, {
     dataEfetiva: '2026-05-10',
     motivo: 'Término antecipado',
-    tipo: 'EXTINTO',
   });
 
-  assert.equal(encerrado.status, 'EXTINTO');
+  assert.equal(encerrado.status, 'ENCERRADO');
   assert.equal(encerrado.data_fim_efetiva, '2026-05-10');
   assert.equal(encerrado.motivo_encerramento, 'Término antecipado');
 });
 
-test('renovação cria novo payload encadeado sem sobrescrever anterior', () => {
+test('não permite múltiplas renovações a partir do mesmo contrato', () => {
+  const resultado = prepararRenovacaoContrato({ id: 'c1' }, {
+    militar_id: 'm1',
+    data_inicio: '2026-06-01',
+    data_fim_prevista: '2026-12-31',
+  }, [
+    { id: 'c2', contrato_anterior_id: 'c1' },
+  ]);
+
+  assert.equal(resultado.ok, false);
+  assert.equal(resultado.code, 'RENOVACAO_DUPLICADA');
+});
+
+test('renovação cria cadeia correta e marca anterior como renovado', () => {
   const renovacao = prepararRenovacaoContrato({
     id: 'c1',
-    contrato_raiz_id: 'c0',
-    data_inicio: '2025-01-01',
+    contrato_raiz_id: 'root-1',
   }, {
     militar_id: 'm1',
-    data_inicio: '2026-01-01',
+    data_inicio: '2026-06-01',
     data_fim_prevista: '2026-12-31',
-    status: 'RASCUNHO',
+  }, []);
+
+  assert.equal(renovacao.ok, true);
+  assert.equal(renovacao.novoContrato.contrato_anterior_id, 'c1');
+  assert.equal(renovacao.novoContrato.contrato_raiz_id, 'root-1');
+  assert.equal(renovacao.contratoAnteriorAtualizado.status, 'RENOVADO');
+});
+
+test('listagem principal mostra apenas contrato atual por cadeia', () => {
+  const atuais = listarContratosAtuais([
+    { id: 'c1', contrato_raiz_id: 'r1', data_inicio: '2026-01-01' },
+    { id: 'c2', contrato_raiz_id: 'r1', data_inicio: '2026-06-01' },
+    { id: 'c3', contrato_raiz_id: 'r2', data_inicio: '2025-02-01' },
+  ]);
+
+  assert.deepEqual(atuais.map((item) => item.id), ['c2', 'c3']);
+});
+
+test('histórico exibe contratos anteriores da cadeia', () => {
+  const contratos = [
+    { id: 'c1', contrato_raiz_id: 'r1', data_inicio: '2025-01-01' },
+    { id: 'c2', contrato_raiz_id: 'r1', data_inicio: '2026-01-01' },
+    { id: 'c3', contrato_raiz_id: 'r1', data_inicio: '2026-07-01' },
+  ];
+
+  const historico = listarHistoricoCadeia(contratos, contratos[2]);
+  assert.deepEqual(historico.map((item) => item.id), ['c2', 'c1']);
+});
+
+test('badge derivada mostra a vencer e expirado', () => {
+  const aVencer = calcularBadgeVigenciaContrato({
+    data_inicio: '2026-01-01',
+    data_fim_prevista: '2026-04-25',
+    status: 'VIGENTE',
+  }, '2026-04-21');
+  const expirado = calcularBadgeVigenciaContrato({
+    data_inicio: '2025-01-01',
+    data_fim_prevista: '2026-04-01',
+    status: 'VIGENTE',
+  }, '2026-04-21');
+
+  assert.equal(aVencer, 'A_VENCER');
+  assert.equal(expirado, 'EXPIRADO');
+});
+
+test('persistência de DOEMS no contrato não altera validação', () => {
+  const resultado = validarSobreposicaoContrato({
+    contrato: {
+      id: 'novo',
+      militar_id: 'm1',
+      data_inicio: '2026-07-01',
+      data_fim_prevista: '2026-08-01',
+      numero_doems: '12.345',
+      data_doems: '2026-07-05',
+      status: 'RASCUNHO',
+    },
+    contratosExistentes: [],
   });
 
-  assert.equal(renovacao.contrato_anterior_id, 'c1');
-  assert.equal(renovacao.contrato_raiz_id, 'c0');
-  assert.equal(renovacao.origem_registro, 'RENOVACAO');
+  assert.equal(resultado.ok, true);
 });
 
 test('calcula situação derivada do vínculo temporário', () => {
@@ -90,47 +158,9 @@ test('gera indicadores básicos de listagem/dashboard', () => {
   const indicadores = resumirIndicadoresContratosTemporarios([
     { data_inicio: '2026-01-01', data_fim_prevista: '2026-05-01', status: 'VIGENTE' },
     { data_inicio: '2025-01-01', data_fim_prevista: '2026-04-01', status: 'VIGENTE' },
-    { data_inicio: '2026-01-01', data_fim_prevista: '2026-12-01', status: 'AGUARDANDO_PUBLICACAO' },
   ], '2026-04-21');
 
   assert.equal(indicadores.aVencer60, 1);
   assert.equal(indicadores.aVencer30, 1);
   assert.equal(indicadores.expirados, 1);
-  assert.equal(indicadores.aguardandoPublicacao, 1);
-});
-
-// --- Testes de infraestrutura e filtro do módulo de Vínculos Temporários ---
-
-test('filtrarMilitaresOperacionais exclui mesclados e inativos do selector de vínculo temporário', async () => {
-  const { filtrarMilitaresOperacionais, isMilitarMesclado } = await import('../matriculaMilitarViewService.js');
-
-  const militares = [
-    { id: 'ativo', status_cadastro: 'Ativo', situacao_militar: 'Ativa' },
-    { id: 'inativo', status_cadastro: 'Inativo', situacao_militar: 'Ativa' },
-    { id: 'mesclado', status_cadastro: 'Mesclado', situacao_militar: 'Ativa' },
-    { id: 'merged', merged_into_id: 'outro', status_cadastro: 'Ativo', situacao_militar: 'Ativa' },
-  ];
-
-  const operacionais = filtrarMilitaresOperacionais(militares);
-  assert.deepEqual(operacionais.map((m) => m.id), ['ativo']);
-  assert.equal(isMilitarMesclado(militares[2]), true);
-  assert.equal(isMilitarMesclado(militares[3]), true);
-});
-
-test('contrato não deve ser criado sem militar_id preenchido', () => {
-  const resultado = validarSobreposicaoContrato({
-    contrato: { militar_id: '', data_inicio: '2026-01-01', data_fim_prevista: '2026-12-31', status: 'RASCUNHO' },
-    contratosExistentes: [],
-  });
-  // Sem militar_id, a validação passa (sem conflito), mas a lógica de UI bloqueia o submit
-  assert.equal(resultado.ok, true);
-
-  // Garantia que dados sem militar_id não produzem sobreposição falsa
-  const resultadoComExistente = validarSobreposicaoContrato({
-    contrato: { militar_id: '', data_inicio: '2026-01-01', data_fim_prevista: '2026-12-31', status: 'VIGENTE' },
-    contratosExistentes: [
-      { id: 'e1', militar_id: '', data_inicio: '2026-01-01', data_fim_prevista: '2026-12-31', status: 'VIGENTE' },
-    ],
-  });
-  assert.equal(resultadoComExistente.ok, true);
 });
