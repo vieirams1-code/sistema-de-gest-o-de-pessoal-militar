@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
+import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
 
 export default function AgendarJISO() {
   const navigate = useNavigate();
@@ -24,22 +26,25 @@ export default function AgendarJISO() {
     queryFn: async () => {
       if (isAdmin) {
         const all = await base44.entities.Atestado.list('-created_date');
-        return all.filter(a => a.necessita_jiso);
+        const jiso = all.filter((a) => a.necessita_jiso);
+        return enriquecerAtestadosComContextoMilitar(jiso, { contexto: 'operacional', filtrarMesclados: true });
       }
       const scopeFilters = getMilitarScopeFilters();
       if (!scopeFilters.length) return [];
       const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
-      const militaresAcess = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
+      const militaresEscopo = await carregarMilitaresComMatriculas(militarQueries.flat());
+      const militaresOperacionais = filtrarMilitaresOperacionais(militaresEscopo, { incluirInativos: true });
+      const militarIds = [...new Set(militaresOperacionais.map((m) => m.id).filter(Boolean))];
       if (!militarIds.length) return [];
 
-      const queryPromises = militarIds.map(id => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
+      const queryPromises = militarIds.map((id) => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
       const arrays = await Promise.all(queryPromises);
-      const m = new Map();
-      arrays.flat().forEach(item => {
-        if(item.necessita_jiso) m.set(item.id, item);
+      const unicos = new Map();
+      arrays.flat().forEach((item) => {
+        if (item.necessita_jiso) unicos.set(item.id, item);
       });
-      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
+      const ordenados = Array.from(unicos.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+      return enriquecerAtestadosComContextoMilitar(ordenados, { contexto: 'operacional', filtrarMesclados: true });
     },
     enabled: hasAtestadosAccess && isAccessResolved,
   });
@@ -66,6 +71,8 @@ export default function AgendarJISO() {
 
   const filteredAtestados = atestados.filter(a =>
     a.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.militar_matricula_label?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.militar_matricula_atual?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     a.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -152,7 +159,7 @@ export default function AgendarJISO() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-slate-600">
                         <div>
                           <p className="text-xs text-slate-500">Matrícula</p>
-                          <p className="font-medium">{atestado.militar_matricula}</p>
+                          <p className="font-medium">{atestado.militar_matricula_label || atestado.militar_matricula_atual || atestado.militar_matricula || '—'}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-500">Tipo</p>

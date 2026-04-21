@@ -47,6 +47,7 @@ import {
   isPublicacaoAtestadoAtiva,
 } from './atestadoPublicacaoHelpers';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContextService';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -106,6 +107,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
   });
 
   const diasExtensoMap = { 1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze' };
+  const matriculaOperacional = montarLabelMilitarAtestado(atestado, { contexto: 'operacional' });
+  const matriculaDocumental = montarLabelMilitarAtestado(atestado, { contexto: 'documental' });
 
   const gerarTextoHomologacao = (form) => {
     const tmpl = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templates, {
@@ -118,7 +121,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     return aplicarTemplate(tmpl.template, {
       posto_nome: posto,
       nome_completo: atestado.militar_nome,
-      matricula: atestado.militar_matricula,
+      matricula: matriculaDocumental,
       dias: String(atestado.dias),
       dias_extenso: String(diasExtensoMap[atestado.dias] || atestado.dias),
       tipo_afastamento: (atestado.tipo_afastamento || '').toLowerCase(),
@@ -138,7 +141,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
     return aplicarTemplate(tmpl.template, {
       posto_nome: posto,
       nome_completo: atestado.militar_nome,
-      matricula: atestado.militar_matricula,
+      matricula: matriculaDocumental,
       secao_jiso: form.secao_jiso || '___',
       data_ata: formatarDataExtenso(form.data_ata),
       finalidade_jiso: form.finalidade_jiso || '___',
@@ -200,7 +203,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       militar_id: atestado.militar_id,
       militar_nome: atestado.militar_nome,
       militar_posto: atestado.militar_posto,
-      militar_matricula: atestado.militar_matricula,
+      militar_matricula: matriculaDocumental,
       data_publicacao: homologacaoForm.data_publicacao,
       atestado_homologado_id: atestado.id,
       texto_publicacao: homologacaoForm.texto_publicacao,
@@ -253,7 +256,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
       militar_id: atestado.militar_id,
       militar_nome: atestado.militar_nome,
       militar_posto: atestado.militar_posto,
-      militar_matricula: atestado.militar_matricula,
+      militar_matricula: matriculaDocumental,
       data_publicacao: ataJisoForm.data_publicacao,
       atestados_jiso_ids: [atestado.id],
       finalidade_jiso: ataJisoForm.finalidade_jiso,
@@ -380,9 +383,9 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 {atestado.militar_posto && `${atestado.militar_posto} `}
                 {atestado.militar_nome}
               </h3>
-              {atestado.militar_matricula && (
+              {(matriculaOperacional || atestado.militar_matricula) && (
                 <p className="text-gray-500 text-sm flex items-center gap-1.5">
-                  {atestado.militar_posto || 'Militar'} <span className="w-1 h-1 bg-gray-300 rounded-full" /> Mat: {atestado.militar_matricula}
+                  {atestado.militar_posto || 'Militar'} <span className="w-1 h-1 bg-gray-300 rounded-full" /> Mat: {matriculaOperacional || '—'}
                 </p>
               )}
             </div>

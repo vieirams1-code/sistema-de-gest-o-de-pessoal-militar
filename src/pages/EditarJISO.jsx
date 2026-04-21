@@ -14,6 +14,8 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { createPageUrl } from '@/utils';
 import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
+import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
 
 export default function EditarJISO() {
   const navigate = useNavigate();
@@ -105,7 +107,7 @@ export default function EditarJISO() {
       posto_nome: postoNome,
       posto: abreviatura,
       nome_completo: atestado.militar_nome || '',
-      matricula: atestado.militar_matricula || '',
+      matricula: atestadoContexto.militar_matricula_atual || atestado.militar_matricula || '',
       finalidade_jiso: formData.finalidade_jiso || '',
       secao_jiso: formData.secao_jiso || '',
       data_ata: formatarData(formData.data_jiso),
@@ -115,15 +117,41 @@ export default function EditarJISO() {
     return aplicarTemplate(tmpl.template, vars);
   };
 
+
+  const { data: militarAtestado = null } = useQuery({
+    queryKey: ['militar-atestado-jiso', atestado?.militar_id],
+    queryFn: async () => {
+      if (!atestado?.militar_id) return null;
+      const rows = await base44.entities.Militar.filter({ id: atestado.militar_id });
+      if (!rows?.length) return null;
+      const [enriquecido] = await carregarMilitaresComMatriculas([rows[0]]);
+      return enriquecido || rows[0];
+    },
+    enabled: !!atestado?.militar_id && hasAtestadosAccess,
+  });
+
+  const atestadoContexto = React.useMemo(
+    () => aplicarContextoMilitarNoAtestado(atestado || {}, militarAtestado, { contexto: 'operacional' }),
+    [atestado, militarAtestado],
+  );
+  const militarMesclado = isMilitarMesclado(militarAtestado || {});
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (militarMesclado) {
+      alert('Registro bloqueado: militar mesclado é permitido apenas para consulta histórica.');
+      return;
+    }
+
     const jisoData = {
       atestado_id: atestadoId,
       militar_id: atestado.militar_id,
       militar_nome: atestado.militar_nome,
       militar_posto: atestado.militar_posto,
-      militar_matricula: atestado.militar_matricula,
+      militar_matricula: atestadoContexto.militar_matricula_atual || atestado.militar_matricula,
+      militar_matricula_atual: atestadoContexto.militar_matricula_atual || atestado.militar_matricula,
+      militar_matricula_vinculo: atestadoContexto.militar_matricula_vinculo || atestado.militar_matricula,
       ...formData,
       dias_original: atestado.dias,
       dias_jiso: formData.dias_jiso ? parseInt(formData.dias_jiso) : null,
@@ -208,14 +236,14 @@ export default function EditarJISO() {
                 {jiso ? 'Editar JISO' : 'Registrar JISO'}
               </h1>
               <p className="text-slate-500 text-sm">
-                {atestado.militar_posto} {atestado.militar_nome}
+                {atestado.militar_posto} {atestado.militar_nome} · Mat: {atestadoContexto.militar_matricula_atual || atestado.militar_matricula || '—'}
               </p>
             </div>
           </div>
           <Button
             onClick={handleSubmit}
             className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-            disabled={!!templateError}
+            disabled={!!templateError || militarMesclado}
           >
             <Save className="w-5 h-5 mr-2" />
             Salvar
@@ -223,6 +251,16 @@ export default function EditarJISO() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {militarMesclado && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-amber-800">Registro histórico (militar mesclado)</h4>
+                <p className="text-sm text-amber-700 mt-1">A edição operacional da JISO foi bloqueada para evitar vínculo ativo com cadastro mesclado.</p>
+              </div>
+            </div>
+          )}
+
           {templateError && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
               <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />

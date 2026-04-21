@@ -23,6 +23,8 @@ import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHel
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { getAtestadoIdsVinculados, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
+import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
 
 const STATUS_FLUXO_FINALIZADO = new Set([
   'Homologado pela JISO',
@@ -71,20 +73,25 @@ export default function Atestados() {
   const { data: atestados = [], isLoading } = useQuery({
     queryKey: ['atestados', isAdmin],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.Atestado.list('-created_date');
-      
+      if (isAdmin) {
+        const all = await base44.entities.Atestado.list('-created_date');
+        return enriquecerAtestadosComContextoMilitar(all, { contexto: 'operacional', filtrarMesclados: true });
+      }
+
       const scopeFilters = getMilitarScopeFilters();
       if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
-      const militaresAcess = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcess.map(m => m.id).filter(Boolean))];
+      const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
+      const militaresEscopo = await carregarMilitaresComMatriculas(militarQueries.flat());
+      const militaresOperacionais = filtrarMilitaresOperacionais(militaresEscopo, { incluirInativos: true });
+      const militarIds = [...new Set(militaresOperacionais.map((m) => m.id).filter(Boolean))];
       if (!militarIds.length) return [];
-      
-      const queryPromises = militarIds.map(id => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
+
+      const queryPromises = militarIds.map((id) => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
       const arrays = await Promise.all(queryPromises);
-      const m = new Map();
-      arrays.flat().forEach(item => m.set(item.id, item));
-      return Array.from(m.values()).sort((a,b) => new Date(b.created_date||0) - new Date(a.created_date||0));
+      const unicos = new Map();
+      arrays.flat().forEach((item) => unicos.set(item.id, item));
+      const ordenados = Array.from(unicos.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
+      return enriquecerAtestadosComContextoMilitar(ordenados, { contexto: 'operacional', filtrarMesclados: true });
     },
     enabled: isAccessResolved && hasAtestadosAccess
   });
@@ -115,6 +122,8 @@ export default function Atestados() {
   const applyFilters = (list) => list.filter(a => {
     const matchesSearch =
       a.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.militar_matricula_label?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.militar_matricula_atual?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.medico?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.cid_10?.toLowerCase().includes(searchTerm.toLowerCase());
