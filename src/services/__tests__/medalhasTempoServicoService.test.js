@@ -6,6 +6,8 @@ import {
   apurarListaMilitaresTempoServico,
   apurarMedalhaTempoServicoMilitar,
   calcularAnosTempoServico,
+  deduplicarTiposMedalha,
+  normalizarStatusMedalha,
   obterCodigoFaixaPorAnos,
 } from '../medalhasTempoServicoService.js';
 
@@ -37,7 +39,7 @@ test('militar com 30 anos já contemplado com TEMPO_30 não aparece como elegív
     {
       militar_id: 'm2',
       tipo_medalha_codigo: 'TEMPO_30',
-      status: 'CONCEDIDO',
+      status: 'CONCEDIDA',
     },
   ];
 
@@ -58,7 +60,7 @@ test('militar com medalha inferior e tempo maior permanece elegível para a faix
     {
       militar_id: 'm3',
       tipo_medalha_codigo: 'TEMPO_20',
-      status: 'CONCEDIDO',
+      status: 'CONCEDIDA',
     },
   ];
 
@@ -80,7 +82,7 @@ test('apuração em lista retorna militares processados', () => {
     { id: 'm2', data_inclusao: '1990-01-01' },
   ];
   const medalhas = [
-    { militar_id: 'm2', tipo_medalha_codigo: 'TEMPO_20', status: 'CONCEDIDO' },
+    { militar_id: 'm2', tipo_medalha_codigo: 'TEMPO_20', status: 'CONCEDIDA' },
   ];
 
   const lista = apurarListaMilitaresTempoServico({
@@ -180,4 +182,34 @@ test('motor reconhece codigos de medalha de tempo a partir de nomes legados text
 
     assert.equal(apuracao.maior_medalha_recebida_codigo, caso.codigoEsperado);
   }
+});
+
+test('apuração aceita data de inclusão legada em formato BR', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm15', data_inclusao: '20/04/2010' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.tempo_servico_anos, 16);
+  assert.equal(apuracao.situacao, 'ELEGIVEL');
+});
+
+test('deduplica tipos de medalha por código/nome técnico', () => {
+  const tipos = deduplicarTiposMedalha([
+    { id: '1', codigo: 'TEMPO_20', nome: 'Medalha de Tempo de Serviço - 20 anos' },
+    { id: '2', codigo: 'TEMPO_20', nome: 'Medalha de Tempo de Serviço - 20 anos (duplicada)' },
+    { id: '3', nome: 'Medalha Dom Pedro II' },
+    { id: '4', nome: ' Medalha   Dom Pedro II ' },
+  ]);
+
+  assert.equal(tipos.length, 2);
+});
+
+test('normaliza status da medalha para fluxo indicada > concedida > cancelada', () => {
+  assert.equal(normalizarStatusMedalha('INDICADO'), 'INDICADA');
+  assert.equal(normalizarStatusMedalha('Concedido'), 'CONCEDIDA');
+  assert.equal(normalizarStatusMedalha('PUBLICADO'), 'CONCEDIDA');
+  assert.equal(normalizarStatusMedalha('Negado'), 'CANCELADA');
 });

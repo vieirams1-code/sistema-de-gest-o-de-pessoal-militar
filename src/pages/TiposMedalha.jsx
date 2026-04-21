@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   TIPOS_FIXOS_MEDALHA_TEMPO,
+  deduplicarTiposMedalha,
   garantirCatalogoFixoMedalhaTempo,
 } from '@/services/medalhasTempoServicoService';
 
@@ -40,7 +41,10 @@ export default function TiposMedalha() {
 
   const { data: tipos = [] } = useQuery({
     queryKey: ['tipos-medalha'],
-    queryFn: () => base44.entities.TipoMedalha.list('-created_date')
+    queryFn: async () => {
+      const lista = await base44.entities.TipoMedalha.list('-created_date');
+      return deduplicarTiposMedalha(lista);
+    },
   });
 
   useQuery({

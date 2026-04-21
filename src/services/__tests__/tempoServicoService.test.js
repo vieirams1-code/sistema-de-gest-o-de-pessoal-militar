@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { calcularTempoServico, parseDateSafe, resolverDataBaseTempoServico } from '../tempoServicoService.js';
+import { calcularTempoServico, normalizarDataParaCampoCanonico, parseDateSafe, resolverDataBaseTempoServico } from '../tempoServicoService.js';
 
 test('calcula tempo de serviço em dias e anos com data válida', () => {
   const resultado = calcularTempoServico(
@@ -17,12 +17,18 @@ test('calcula tempo de serviço em dias e anos com data válida', () => {
 
 test('parseDateSafe aceita formatos suportados e bloqueia parsing frouxo', () => {
   assert.ok(parseDateSafe('2015-01-01'));
+  assert.ok(parseDateSafe('21/04/2015'));
   assert.ok(parseDateSafe('2015-01-01T03:00:00Z'));
   assert.ok(parseDateSafe(1451606400000));
   assert.ok(parseDateSafe('1451606400000'));
   assert.ok(parseDateSafe({ seconds: 1451606400 }));
-  assert.equal(parseDateSafe('21/04/2015'), null);
   assert.equal(parseDateSafe('data invalida'), null);
+});
+
+test('normalizarDataParaCampoCanonico converte entrada legada para yyyy-mm-dd', () => {
+  assert.equal(normalizarDataParaCampoCanonico('21/04/2015'), '2015-04-21');
+  assert.equal(normalizarDataParaCampoCanonico('2015-04-21'), '2015-04-21');
+  assert.equal(normalizarDataParaCampoCanonico('31/02/2015'), '');
 });
 
 test('resolverDataBaseTempoServico usa fonte canônica com fallback controlado', () => {

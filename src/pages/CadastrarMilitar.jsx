@@ -20,6 +20,7 @@ import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoCompo
 import { adicionarNovaMatriculaMilitar, atualizarMilitarSemTrocarMatricula, criarMilitarComMatricula, formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
 import { getQuadrosCompativeis, isPostoOficial, isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
+import { normalizarDataParaCampoCanonico } from '@/services/tempoServicoService';
 
 const initialFormData = {
   nome_completo: '',
@@ -129,6 +130,20 @@ const isValidCPF = (value = '') => {
   return d1 === parseInt(digits[9], 10) && d2 === parseInt(digits[10], 10);
 };
 
+const normalizarMilitarParaFormulario = (militar = {}) => {
+  const dataCanonica =
+    normalizarDataParaCampoCanonico(militar.data_inclusao) ||
+    normalizarDataParaCampoCanonico(militar.data_ingresso) ||
+    normalizarDataParaCampoCanonico(militar.data_praca);
+
+  return {
+    ...initialFormData,
+    ...militar,
+    data_inclusao: dataCanonica,
+    matricula: formatMatricula(militar.matricula),
+  };
+};
+
 export default function CadastrarMilitar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -158,14 +173,14 @@ export default function CadastrarMilitar() {
     enabled: !!editId,
     onSuccess: (data) => {
       if (data) {
-        setFormData({ ...initialFormData, ...data, matricula: formatMatricula(data.matricula) });
+        setFormData(normalizarMilitarParaFormulario(data));
       }
     }
   });
 
   React.useEffect(() => {
     if (editingMilitar) {
-      setFormData({ ...initialFormData, ...editingMilitar, matricula: formatMatricula(editingMilitar.matricula) });
+      setFormData(normalizarMilitarParaFormulario(editingMilitar));
       setComportamentoOriginal(editingMilitar.comportamento || null);
     }
   }, [editingMilitar]);
@@ -252,6 +267,7 @@ export default function CadastrarMilitar() {
 
     const dataToSave = {
       ...formData,
+      data_inclusao: normalizarDataParaCampoCanonico(formData.data_inclusao),
       matricula: formatarMatriculaPadrao(formData.matricula),
       altura: formData.altura ? parseFloat(formData.altura) : null,
       peso: formData.peso ? parseFloat(formData.peso) : null

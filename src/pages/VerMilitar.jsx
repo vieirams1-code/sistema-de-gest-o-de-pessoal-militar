@@ -29,7 +29,7 @@ import {
   getMensagemRegistrosSistemaPerfilMilitar,
 } from '@/config/perfilMilitarRegistrosConfig';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
-import { apurarMedalhaTempoServicoMilitar } from '@/services/medalhasTempoServicoService';
+import { apurarMedalhaTempoServicoMilitar, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -214,7 +214,7 @@ export default function VerMilitar() {
   const atestadosSistema = React.useMemo(() => filtrarRegistrosSistema(atestados), [atestados]);
   const medalhasSistema = React.useMemo(() => filtrarRegistrosSistema(medalhas), [medalhas]);
   const medalhasConcedidasSistema = React.useMemo(
-    () => medalhasSistema.filter((medalha) => ['Concedido', 'CONCEDIDO', 'Publicado', 'PUBLICADO'].includes(medalha.status)),
+    () => medalhasSistema.filter((medalha) => normalizarStatusMedalha(medalha.status) === 'CONCEDIDA'),
     [medalhasSistema]
   );
   const apuracaoTempoServico = React.useMemo(() => apurarMedalhaTempoServicoMilitar({

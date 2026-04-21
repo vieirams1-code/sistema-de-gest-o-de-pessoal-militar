@@ -2,6 +2,7 @@ import { differenceInDays, differenceInYears } from 'date-fns';
 
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_WITH_TIME_REGEX = /^\d{4}-\d{2}-\d{2}T.+$/;
+const BR_DATE_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/;
 const NUMERIC_STRING_REGEX = /^\d+$/;
 
 function isValidDate(date) {
@@ -39,6 +40,20 @@ export function parseDateSafe(value) {
       return isValidDate(date) ? date : null;
     }
 
+    const brDateMatch = trimmed.match(BR_DATE_REGEX);
+    if (brDateMatch) {
+      const [, dayStr, monthStr, yearStr] = brDateMatch;
+      const day = Number(dayStr);
+      const month = Number(monthStr);
+      const year = Number(yearStr);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      const isSameDate =
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() === month - 1 &&
+        date.getUTCDate() === day;
+      return isSameDate ? date : null;
+    }
+
     if (ISO_WITH_TIME_REGEX.test(trimmed)) {
       const date = new Date(trimmed);
       return isValidDate(date) ? date : null;
@@ -60,6 +75,16 @@ export function parseDateSafe(value) {
   }
 
   return null;
+}
+
+export function normalizarDataParaCampoCanonico(value) {
+  const parsed = parseDateSafe(value);
+  if (!parsed) return '';
+
+  const yyyy = parsed.getUTCFullYear();
+  const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function resolverDataBaseTempoServico(militar = {}) {
