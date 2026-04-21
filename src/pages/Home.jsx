@@ -14,7 +14,12 @@ import {
 import { differenceInDays, format } from 'date-fns';
 import AfastamentosVigentesPanel from '@/components/dashboard/AfastamentosVigentesPanel';
 import { ptBR } from 'date-fns/locale';
-import { listarInconsistenciasCadastraisMilitar } from '@/utils/inconsistenciasCadastrais';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import {
+  filtrarPendenciasComportamentoDashboard,
+  listarInconsistenciasCadastraisDashboard,
+} from '@/services/dashboardMilitarPendenciasService';
+import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewService';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
   return (
@@ -77,6 +82,16 @@ function ShortcutButton({ icon: Icon, label, to, navigate }) {
 export default function Home() {
   const navigate = useNavigate();
   const punicaoEntity = getPunicaoEntity();
+  const {
+    isAdmin,
+    modoAcesso,
+    userEmail,
+    linkedMilitarId,
+    linkedMilitarEmail,
+    hasSelfAccess,
+    getMilitarScopeFilters,
+    isAccessResolved,
+  } = useCurrentUser();
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
@@ -85,8 +100,53 @@ export default function Home() {
   const dataFormatada = format(new Date(), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
   const { data: militares = [] } = useQuery({
-    queryKey: ['militares-ativos'],
-    queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
+    queryKey: ['militares-ativos', isAdmin, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
+    queryFn: async () => {
+      if (isAdmin) {
+        const lista = await base44.entities.Militar.list('-created_date');
+        return carregarMilitaresComMatriculas(lista);
+      }
+
+      if (modoAcesso === 'proprio') {
+        const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
+        if (!linkedMilitarId && knownEmails.length === 0) return [];
+
+        const requests = [];
+        if (linkedMilitarId) requests.push(base44.entities.Militar.filter({ id: linkedMilitarId }, '-created_date'));
+        for (const email of knownEmails) {
+          requests.push(base44.entities.Militar.filter({ email }, '-created_date'));
+          requests.push(base44.entities.Militar.filter({ email_particular: email }, '-created_date'));
+          requests.push(base44.entities.Militar.filter({ email_funcional: email }, '-created_date'));
+          requests.push(base44.entities.Militar.filter({ created_by: email }, '-created_date'));
+          requests.push(base44.entities.Militar.filter({ militar_email: email }, '-created_date'));
+        }
+
+        const batches = await Promise.all(requests);
+        const ids = new Set();
+        const vinculados = batches.flat().filter((m) => {
+          if (!hasSelfAccess(m) || ids.has(m.id)) return false;
+          ids.add(m.id);
+          return true;
+        });
+        return carregarMilitaresComMatriculas(vinculados);
+      }
+
+      const filters = getMilitarScopeFilters();
+      if (!filters.length) return [];
+
+      const requests = filters.map((filtro) => base44.entities.Militar.filter(filtro, '-created_date'));
+      const batches = await Promise.all(requests);
+      const ids = new Set();
+      const merged = [];
+      for (const militar of batches.flat()) {
+        if (!ids.has(militar.id)) {
+          ids.add(militar.id);
+          merged.push(militar);
+        }
+      }
+      return carregarMilitaresComMatriculas(merged);
+    },
+    enabled: isAccessResolved,
   });
 
   const { data: periodos = [] } = useQuery({
@@ -147,14 +207,9 @@ export default function Home() {
 
   const atestadosAtivos = atestados.filter(a => a.status === 'Ativo' || a.status === 'Em Curso');
   const punicoesAtivas = punicoes.filter(p => p.status_punicao === 'Ativa' || p.status_punicao === 'Em Curso');
-  const inconsistenciasCadastrais = militares.flatMap((militar) => (
-    listarInconsistenciasCadastraisMilitar(militar).map((inconsistencia) => ({
-      militarId: militar.id,
-      militarNome: militar.nome_completo || 'Militar sem nome',
-      ...inconsistencia,
-    }))
-  ));
-  const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamento.length + inconsistenciasCadastrais.length;
+  const pendenciasComportamentoValidas = filtrarPendenciasComportamentoDashboard(pendenciasComportamento, militares);
+  const inconsistenciasCadastrais = listarInconsistenciasCadastraisDashboard(militares);
+  const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamentoValidas.length + inconsistenciasCadastrais.length;
   const registrosRecentes = registrosLivro.slice(0, 5);
   const jisosAgendadas = jisos
     .filter((jiso) => {
@@ -282,20 +337,20 @@ export default function Home() {
             )}
 
             {/* Pendências de comportamento */}
-            {pendenciasComportamento.length > 0 && (
+            {pendenciasComportamentoValidas.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Star className="w-5 h-5 text-indigo-500" />
                     <h2 className="font-semibold text-slate-800">Pendências de Comportamento</h2>
-                    <Badge className="bg-indigo-100 text-indigo-700">{pendenciasComportamento.length}</Badge>
+                    <Badge className="bg-indigo-100 text-indigo-700">{pendenciasComportamentoValidas.length}</Badge>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => navigate(createPageUrl('AvaliacaoComportamento'))}>
                     Validar <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
                 <div className="space-y-2 max-h-52 overflow-y-auto">
-                  {pendenciasComportamento.slice(0, 10).map((p) => (
+                  {pendenciasComportamentoValidas.slice(0, 10).map((p) => (
                     <AlertItem
                       key={p.id}
                       nivel="atencao"
