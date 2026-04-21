@@ -42,6 +42,7 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
             <th className="text-left p-3 w-36">Status</th>
             <th className="text-left p-3 w-[18%]">Militar legado</th>
             <th className="text-left p-3 w-[18%]">Militar vinculado</th>
+            <th className="text-left p-3 w-[15%]">Matrículas</th>
             <th className="text-left p-3 w-[24%]">Matéria legado</th>
             <th className="text-left p-3 w-[15%]">Tipo confirmado</th>
             <th className="text-left p-3 w-[15%]">Destino final</th>
@@ -76,6 +77,11 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
                     <p className="truncate" title={linha.transformado.militar_nome || ''}>{linha.transformado.militar_nome || '—'}</p>
                   </td>
                   <td className="p-3 align-top min-w-0">
+                    <p className="truncate text-xs" title={`Legado: ${linha.transformado.matricula_legado || '—'} | Atual: ${linha.transformado.militar_matricula_atual || linha.transformado.militar_matricula || '—'}`}>
+                      L: {linha.transformado.matricula_legado || '—'} • A: {linha.transformado.militar_matricula_atual || linha.transformado.militar_matricula || '—'}
+                    </p>
+                  </td>
+                  <td className="p-3 align-top min-w-0">
                     <p className="truncate" title={linha.transformado.materia_legado || ''}>{linha.transformado.materia_legado || '—'}</p>
                   </td>
                   <td className="p-3 align-top min-w-0">
@@ -87,7 +93,7 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
                 </tr>
                 {expandida && (
                   <tr className="border-t border-slate-100 bg-slate-50/60">
-                    <td colSpan={7} className="px-4 py-3">
+                    <td colSpan={8} className="px-4 py-3">
                       <DetalheLinhaMigracaoAlteracaoLegado
                         linha={linha}
                         modoInline

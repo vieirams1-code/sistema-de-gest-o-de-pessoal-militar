@@ -104,6 +104,8 @@ function ConteudoDetalheLinha({
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <CampoResumo label="Matrícula legado (registro histórico)" value={linha.transformado.matricula_legado} />
+        <CampoResumo label="Matrícula atual do militar" value={linha.transformado.militar_matricula_atual || linha.transformado.militar_matricula} />
         <CampoResumo label="Matéria legado" value={linha.transformado.materia_legado} />
         <CampoResumo label="Tipo BG legado" value={linha.transformado.tipo_bg_legado} />
         <CampoResumo label="Tipo sugerido" value={linha.transformado.tipo_publicacao_sugerido} />

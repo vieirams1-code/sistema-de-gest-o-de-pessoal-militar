@@ -100,6 +100,20 @@ function somenteNumeros(valor) {
   return limparTexto(valor).replace(/\D/g, '');
 }
 
+function listarMatriculasMilitar(militar = {}) {
+  const candidatas = [
+    militar?.matricula_atual,
+    militar?.matricula,
+    ...(Array.isArray(militar?.matriculas_historico) ? militar.matriculas_historico.map((item) => item?.matricula || item?.matricula_normalizada) : []),
+  ];
+
+  return Array.from(new Set(candidatas.map(somenteNumeros).filter(Boolean)));
+}
+
+function nomeMilitarNormalizado(militar = {}) {
+  return normalizarTextoComparacao(militar?.nome_completo || militar?.nome_guerra);
+}
+
 function parseCsv(texto) {
   const linhas = [];
   let atual = '';
@@ -469,7 +483,7 @@ function resolverMilitar(transformado, indicesMilitares) {
     const candidatosMatricula = indicesMilitares.byMatricula.get(matriculaNorm);
     if (candidatosMatricula.length === 1) return { militar: candidatosMatricula[0], metodo: 'MATRICULA_EXATA' };
 
-    const filtradosNome = candidatosMatricula.filter((m) => normalizarTextoComparacao(m.nome_completo).includes(nomeNorm));
+    const filtradosNome = candidatosMatricula.filter((m) => nomeNorm && nomeMilitarNormalizado(m) === nomeNorm);
     if (filtradosNome.length === 1) return { militar: filtradosNome[0], metodo: 'MATRICULA_COM_NOME' };
 
     return { candidatos: candidatosMatricula, metodo: 'AMBIGUO_MATRICULA' };
@@ -489,13 +503,13 @@ function buildMilitarIndices(militares = []) {
   const byNome = new Map();
 
   militares.forEach((militar) => {
-    const matricula = somenteNumeros(militar?.matricula);
-    const nome = normalizarTextoComparacao(militar?.nome_completo || militar?.nome_guerra);
+    const matriculas = listarMatriculasMilitar(militar);
+    const nome = nomeMilitarNormalizado(militar);
 
-    if (matricula) {
+    matriculas.forEach((matricula) => {
       if (!byMatricula.has(matricula)) byMatricula.set(matricula, []);
       byMatricula.get(matricula).push(militar);
-    }
+    });
 
     if (nome) {
       if (!byNome.has(nome)) byNome.set(nome, []);
@@ -618,10 +632,19 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
 
     const resolucao = resolverMilitar(transformado, militarIndices);
     if (resolucao.militar) {
+      const matriculaAtualMilitar = resolucao.militar.matricula_atual || resolucao.militar.matricula || '';
       transformado.militar_id = resolucao.militar.id;
       transformado.militar_nome = resolucao.militar.nome_completo || resolucao.militar.nome_guerra || '';
-      transformado.militar_matricula = resolucao.militar.matricula || '';
+      transformado.militar_matricula = matriculaAtualMilitar;
+      transformado.militar_matricula_atual = matriculaAtualMilitar;
+      transformado.militar_matricula_vinculo = transformado.matricula_legado || '';
       transformado.vinculo_automatico_metodo = resolucao.metodo;
+
+      const matriculaLegadoNorm = somenteNumeros(transformado.matricula_legado);
+      const matriculaAtualNorm = somenteNumeros(matriculaAtualMilitar);
+      if (matriculaLegadoNorm && matriculaAtualNorm && matriculaLegadoNorm !== matriculaAtualNorm) {
+        alertas.push('Matrícula legado difere da matrícula atual do militar vinculado; registro legado foi preservado.');
+      }
     } else if (resolucao.metodo === 'AMBIGUO_MATRICULA' || resolucao.metodo === 'AMBIGUO_NOME') {
       revisoes.push('Múltiplos militares possíveis para vínculo automático; revisar manualmente.');
     } else {
@@ -700,7 +723,9 @@ export function atualizarMilitarLinhaAnalise(analise, linhaNumero, militar) {
       ...linha.transformado,
       militar_id: militar?.id || '',
       militar_nome: militar?.nome_completo || militar?.nome_guerra || '',
-      militar_matricula: militar?.matricula || '',
+      militar_matricula: militar?.matricula_atual || militar?.matricula || '',
+      militar_matricula_atual: militar?.matricula_atual || militar?.matricula || '',
+      militar_matricula_vinculo: linha.transformado.matricula_legado || '',
       vinculo_automatico_metodo: militar?.id ? 'AJUSTE_MANUAL' : linha.transformado.vinculo_automatico_metodo,
     };
 
@@ -884,6 +909,8 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
     militar_id: t.militar_id,
     militar_nome: t.militar_nome,
     militar_matricula: t.militar_matricula,
+    militar_matricula_atual: t.militar_matricula_atual || t.militar_matricula || '',
+    militar_matricula_vinculo: t.militar_matricula_vinculo || t.matricula_legado || '',
     tipo: tipoFinal,
     status: 'Publicado',
     status_publicacao: 'Publicado',
