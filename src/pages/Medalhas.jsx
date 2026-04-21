@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import { normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
+import { normalizarStatusMedalha, obterTipoMedalhaPorCodigo, resolverCodigoTipoMedalha } from '@/services/medalhasTempoServicoService';
 
 const statusColors = {
   INDICADA: 'bg-yellow-100 text-yellow-700',
@@ -60,6 +60,11 @@ export default function Medalhas() {
     },
     enabled: isAccessResolved && hasMedalhasAccess,
   });
+  const { data: tiposMedalha = [] } = useQuery({
+    queryKey: ['medalhas-tipos'],
+    queryFn: () => base44.entities.TipoMedalha.list('nome'),
+    enabled: isAccessResolved && hasMedalhasAccess,
+  });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Medalha.delete(id),
@@ -69,11 +74,22 @@ export default function Medalhas() {
     },
   });
 
-  const filteredMedalhas = medalhas.filter(m => {
+  const medalhasExibicao = medalhas.map((medalha) => {
+    const codigoNormalizado = resolverCodigoTipoMedalha(medalha);
+    const tipoCatalogado = obterTipoMedalhaPorCodigo(codigoNormalizado, tiposMedalha);
+    return {
+      ...medalha,
+      tipo_medalha_codigo_normalizado: codigoNormalizado,
+      tipo_medalha_exibicao: tipoCatalogado?.nome || medalha.tipo_medalha_nome,
+    };
+  });
+
+  const filteredMedalhas = medalhasExibicao.filter(m => {
     const matchSearch =
       m.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.tipo_medalha_nome?.toLowerCase().includes(searchTerm.toLowerCase());
+      m.tipo_medalha_exibicao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.tipo_medalha_codigo_normalizado?.toLowerCase().includes(searchTerm.toLowerCase());
     const normalizado = normalizarStatusMedalha(m.status);
     const matchStatus = statusFilter === 'all' || normalizado === statusFilter;
     return matchSearch && matchStatus;
@@ -181,7 +197,10 @@ export default function Medalhas() {
                         {normalizarStatusMedalha(medalha.status) || medalha.status}
                       </Badge>
                     </div>
-                    <p className="text-sm font-medium text-slate-700 mb-1">{medalha.tipo_medalha_nome}</p>
+                    <p className="text-sm font-medium text-slate-700 mb-1">{medalha.tipo_medalha_exibicao}</p>
+                    {medalha.tipo_medalha_nome && medalha.tipo_medalha_nome !== medalha.tipo_medalha_exibicao && (
+                      <p className="text-xs text-slate-500">Registro legado: {medalha.tipo_medalha_nome}</p>
+                    )}
                     <p className="text-sm text-slate-500">Mat: {medalha.militar_matricula}</p>
                     <div className="flex gap-4 mt-2 text-xs text-slate-500">
                       <span>Indicação: {formatDate(medalha.data_indicacao)}</span>
