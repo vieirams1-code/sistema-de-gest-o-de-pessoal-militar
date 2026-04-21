@@ -363,7 +363,7 @@ export default function VerMilitar() {
         {/* Alertas e tempo de serviço */}
         <div className="space-y-2 mb-4">
           <AlertasContrato militarId={id} />
-          {militar.data_inclusao && <TempoServico dataInclusao={militar.data_inclusao} />}
+          <TempoServico militar={militar} />
           {militarMesclado && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Cadastro mesclado</p>

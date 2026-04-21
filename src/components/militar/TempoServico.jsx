@@ -3,10 +3,8 @@ import { format } from 'date-fns';
 
 import { calcularTempoServico } from '@/services/tempoServicoService';
 
-export default function TempoServico({ dataInclusao, className = '' }) {
-  if (!dataInclusao) return null;
-
-  const tempoServico = calcularTempoServico({ data_inclusao: dataInclusao });
+export default function TempoServico({ militar = null, className = '' }) {
+  const tempoServico = calcularTempoServico(militar || {});
 
   if (!tempoServico.valido || typeof tempoServico.dias_servico !== 'number' || typeof tempoServico.anos_completos !== 'number') {
     return (
