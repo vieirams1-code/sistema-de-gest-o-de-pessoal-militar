@@ -300,6 +300,7 @@ export default function LotacaoMilitares() {
                 <div className="divide-y divide-slate-100">
                   {militaresFiltrados.map(m => {
                     const isSelected = selectedMilitares.includes(m.id);
+                    const matriculaAtual = m.matricula_atual || m.matricula || 'N/I';
                     // Computa lotacao formatada
                     const lotacaoText = m.subgrupamento_nome ? `${m.subgrupamento_nome}${m.grupamento_nome && m.grupamento_nome !== m.subgrupamento_nome ? ` (${m.grupamento_nome})` : ''}` : m.grupamento_nome || 'Sem lotação';
                     
@@ -317,7 +318,7 @@ export default function LotacaoMilitares() {
                               {m.nome_completo}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <p className="text-xs text-slate-500 font-medium truncate">Mat. {m.matricula}</p>
+                              <p className="text-xs text-slate-500 font-medium truncate">Mat. {matriculaAtual}</p>
                             </div>
                           </div>
                         </div>

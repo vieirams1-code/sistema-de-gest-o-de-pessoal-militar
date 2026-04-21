@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Building2, ChevronDown, ChevronRight, Eye, Grip, Shield, Users } from 'lucide-react';
+import { filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 
 const postoAbreviado = {
   Soldado: 'Sd',
@@ -103,6 +104,8 @@ function buildColumns(militares) {
 }
 
 function MilitarCompactCard({ militar, onViewMilitar }) {
+  const matriculaAtual = militar.matricula_atual || militar.matricula || 'N/I';
+
   return (
     <button
       type="button"
@@ -126,7 +129,7 @@ function MilitarCompactCard({ militar, onViewMilitar }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <span className="text-[11px] font-medium text-slate-500">Mat. {militar.matricula || 'N/I'}</span>
+          <span className="text-[11px] font-medium text-slate-500">Mat. {matriculaAtual}</span>
           <Eye className="h-3.5 w-3.5 text-slate-400" />
         </div>
       </div>
@@ -184,7 +187,7 @@ function SetorColumn({ setor, paletteClass, expandedUnits, onToggleUnit, onExpan
   const allExpanded = setor.unidades.every((unidade) => !!expandedUnits[unidade.id]);
 
   return (
-    <div className="w-[360px] shrink-0 space-y-4">
+    <div className="w-[380px] shrink-0 rounded-3xl border border-slate-200/80 bg-white/70 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm">
       <div className={`rounded-2xl bg-gradient-to-r ${paletteClass} p-4 text-white shadow-sm`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -204,7 +207,7 @@ function SetorColumn({ setor, paletteClass, expandedUnits, onToggleUnit, onExpan
         </div>
       </div>
 
-      <div className="relative space-y-3">
+      <div className="relative mt-4 space-y-3">
         <span className="pointer-events-none absolute left-[7px] top-0 h-full w-px bg-slate-200" />
         {setor.unidades.map((unidade) => (
           <UnidadeCard
@@ -226,7 +229,8 @@ export default function MapaDeLotacao({ militares = [], onViewMilitar }) {
   const dragStateRef = useRef({ isDragging: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 });
   const [isDragging, setIsDragging] = useState(false);
 
-  const columns = useMemo(() => buildColumns(militares), [militares]);
+  const militaresOperacionais = useMemo(() => filtrarMilitaresOperacionais(militares), [militares]);
+  const columns = useMemo(() => buildColumns(militaresOperacionais), [militaresOperacionais]);
 
   const toggleUnit = (id) => {
     setExpandedUnits((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -277,7 +281,7 @@ export default function MapaDeLotacao({ militares = [], onViewMilitar }) {
     setIsDragging(false);
   };
 
-  if (!militares.length) {
+  if (!militaresOperacionais.length) {
     return (
       <div className="rounded-xl border border-slate-100 bg-white p-8 text-center text-slate-500">
         Nenhum militar disponível para montar o mapa de lotação.
@@ -326,7 +330,7 @@ export default function MapaDeLotacao({ militares = [], onViewMilitar }) {
 
       <div className="flex items-center gap-4 border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1">
-          <Users className="h-3.5 w-3.5" /> {militares.length} militar(es) no mapa
+          <Users className="h-3.5 w-3.5" /> {militaresOperacionais.length} militar(es) no mapa
         </span>
         <span>Unidades iniciam recolhidas para priorizar legibilidade.</span>
       </div>
