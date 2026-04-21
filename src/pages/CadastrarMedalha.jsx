@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
+import { garantirCatalogoFixoMedalhaTempo } from '@/services/medalhasTempoServicoService';
 
 export default function CadastrarMedalha() {
   const navigate = useNavigate();
@@ -31,14 +32,24 @@ export default function CadastrarMedalha() {
     tipo_medalha_nome: '',
     data_indicacao: new Date().toISOString().split('T')[0],
     data_concessao: '',
-    status: 'Indicado',
+    data_publicacao: '',
+    numero_publicacao: '',
+    boletim_ou_do: '',
+    status: 'RASCUNHO',
+    origem_registro: 'MANUAL',
     documento_referencia: '',
-    observacoes: ''
+    observacoes: '',
   });
 
   const { data: tiposMedalha = [] } = useQuery({
     queryKey: ['tipos-medalha'],
     queryFn: () => base44.entities.TipoMedalha.filter({ ativa: true }, 'nome')
+  });
+
+  useQuery({
+    queryKey: ['tipos-medalha-fixos-sync-cadastro'],
+    queryFn: () => garantirCatalogoFixoMedalhaTempo(base44),
+    enabled: isAccessResolved && hasMedalhasAccess,
   });
 
   const { data: medalhaExistente, isLoading: loadingMedalha } = useQuery({
@@ -60,7 +71,7 @@ export default function CadastrarMedalha() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const isConcedido = formData.status === 'Concedido';
+  const isConcedido = ['CONCEDIDO', 'Concedido'].includes(formData.status);
 
   const handleTipoMedalhaChange = (tipoId) => {
     const tipo = tiposMedalha.find(t => t.id === tipoId);
@@ -176,9 +187,24 @@ export default function CadastrarMedalha() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Indicado">Indicado</SelectItem>
-                    <SelectItem value="Concedido">Concedido</SelectItem>
-                    <SelectItem value="Negado">Negado</SelectItem>
+                    <SelectItem value="RASCUNHO">Rascunho</SelectItem>
+                    <SelectItem value="INDICADO">Indicado</SelectItem>
+                    <SelectItem value="PUBLICADO">Publicado</SelectItem>
+                    <SelectItem value="CONCEDIDO">Concedido</SelectItem>
+                    <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <Label>Origem do Registro</Label>
+                <Select value={formData.origem_registro} onValueChange={(v) => handleChange('origem_registro', v)}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MANUAL">Manual</SelectItem>
+                    <SelectItem value="IMPORTACAO">Importação</SelectItem>
+                    <SelectItem value="APURACAO">Apuração</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -193,8 +219,8 @@ export default function CadastrarMedalha() {
                   />
                   <FormField
                     label="Data do BG/DOEMS"
-                    name="data_concessao"
-                    value={formData.data_concessao}
+                    name="data_publicacao"
+                    value={formData.data_publicacao}
                     onChange={handleChange}
                     type="date"
                   />
@@ -210,6 +236,22 @@ export default function CadastrarMedalha() {
                   />
                 </div>
               )}
+              <div className="col-span-2">
+                <FormField
+                  label="Número da Publicação"
+                  name="numero_publicacao"
+                  value={formData.numero_publicacao}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="col-span-2">
+                <FormField
+                  label="Boletim / DO"
+                  name="boletim_ou_do"
+                  value={formData.boletim_ou_do}
+                  onChange={handleChange}
+                />
+              </div>
               <div className="col-span-2">
                 <Label>Observações</Label>
                 <Textarea

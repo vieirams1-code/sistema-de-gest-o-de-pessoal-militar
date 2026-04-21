@@ -24,6 +24,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  TIPOS_FIXOS_MEDALHA_TEMPO,
+  garantirCatalogoFixoMedalhaTempo,
+} from '@/services/medalhasTempoServicoService';
 
 export default function TiposMedalha() {
   const queryClient = useQueryClient();
@@ -37,6 +41,12 @@ export default function TiposMedalha() {
   const { data: tipos = [] } = useQuery({
     queryKey: ['tipos-medalha'],
     queryFn: () => base44.entities.TipoMedalha.list('-created_date')
+  });
+
+  useQuery({
+    queryKey: ['tipos-medalha-fixos-sync'],
+    queryFn: () => garantirCatalogoFixoMedalhaTempo(base44),
+    enabled: isAccessResolved && hasMedalhasAccess,
   });
 
   const createMutation = useMutation({
@@ -58,6 +68,8 @@ export default function TiposMedalha() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+
+  const codigosFixos = new Set(TIPOS_FIXOS_MEDALHA_TEMPO.map((item) => item.codigo));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -81,17 +93,24 @@ export default function TiposMedalha() {
             <div key={tipo.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-slate-900 mb-1">{tipo.nome}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-slate-900">{tipo.nome}</h3>
+                    {codigosFixos.has(tipo.codigo) && (
+                      <span className="text-xs rounded-full px-2 py-0.5 bg-blue-100 text-blue-700">Fixo</span>
+                    )}
+                  </div>
                   {tipo.descricao && <p className="text-sm text-slate-600">{tipo.descricao}</p>}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setDeleteDialog({ open: true, id: tipo.id })}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {!codigosFixos.has(tipo.codigo) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeleteDialog({ open: true, id: tipo.id })}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           ))}

@@ -29,6 +29,7 @@ import {
   getMensagemRegistrosSistemaPerfilMilitar,
 } from '@/config/perfilMilitarRegistrosConfig';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
+import { apurarMedalhaTempoServicoMilitar } from '@/services/medalhasTempoServicoService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -153,6 +154,11 @@ export default function VerMilitar() {
     queryFn: () => base44.entities.Medalha.filter({ militar_id: id }, '-data_indicacao'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
+  const { data: tiposMedalha = [] } = useQuery({
+    queryKey: ['ver-tipos-medalha'],
+    queryFn: () => base44.entities.TipoMedalha.list('nome'),
+    enabled: !!id && isAccessResolved && canViewMilitar,
+  });
 
   const { data: armamentos = [] } = useQuery({
     queryKey: ['ver-armamentos', id],
@@ -214,9 +220,14 @@ export default function VerMilitar() {
   const atestadosSistema = React.useMemo(() => filtrarRegistrosSistema(atestados), [atestados]);
   const medalhasSistema = React.useMemo(() => filtrarRegistrosSistema(medalhas), [medalhas]);
   const medalhasConcedidasSistema = React.useMemo(
-    () => medalhasSistema.filter((medalha) => medalha.status === 'Concedido'),
+    () => medalhasSistema.filter((medalha) => ['Concedido', 'CONCEDIDO', 'Publicado', 'PUBLICADO'].includes(medalha.status)),
     [medalhasSistema]
   );
+  const apuracaoTempoServico = React.useMemo(() => apurarMedalhaTempoServicoMilitar({
+    militar,
+    medalhas: medalhasSistema,
+    tiposMedalha,
+  }), [medalhasSistema, militar, tiposMedalha]);
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
   const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
   const contratosTemporariosSistema = React.useMemo(() => filtrarRegistrosSistema(contratosTemporarios), [contratosTemporarios]);
@@ -643,6 +654,17 @@ export default function VerMilitar() {
           <TabsContent value="medalhas">
             <div className="space-y-3">
               <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <p className="text-sm text-slate-600">
+                  Tempo de serviço considerado: <span className="font-semibold text-slate-800">{apuracaoTempoServico.tempo_servico_anos ?? '—'} anos</span>
+                </p>
+                <p className="text-sm text-slate-600">
+                  Medalha devida atualmente: <span className="font-semibold text-slate-800">{apuracaoTempoServico.medalha_devida_codigo || '—'}</span>
+                </p>
+                <p className="text-sm text-slate-600">
+                  Situação de apuração: <span className="font-semibold text-slate-800">{apuracaoTempoServico.situacao}</span>
+                </p>
+              </div>
               {medalhasConcedidasSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Award className="w-12 h-12 mx-auto text-slate-300 mb-3" />
