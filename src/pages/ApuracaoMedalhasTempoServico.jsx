@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Medal, Search, ArrowLeft } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Medal, Search, ArrowLeft, Ban, CheckCircle2 } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -11,9 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useToast } from '@/components/ui/use-toast';
 import {
   TIPOS_FIXOS_MEDALHA_TEMPO,
   apurarListaMilitaresTempoServico,
+  criarIndicacaoAutomatica,
   garantirCatalogoFixoMedalhaTempo,
 } from '@/services/medalhasTempoServicoService';
 
@@ -21,11 +23,14 @@ const situacaoColor = {
   SEM_DIREITO: 'bg-slate-100 text-slate-700',
   ELEGIVEL: 'bg-yellow-100 text-yellow-800',
   JA_CONTEMPLADO: 'bg-green-100 text-green-800',
+  IMPEDIDO: 'bg-orange-100 text-orange-800',
   INCONSISTENTE: 'bg-red-100 text-red-800',
 };
 
 export default function ApuracaoMedalhasTempoServico() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
 
@@ -58,13 +63,72 @@ export default function ApuracaoMedalhasTempoServico() {
     enabled: isAccessResolved && hasMedalhasAccess,
   });
 
+  const { data: impedimentos = [] } = useQuery({
+    queryKey: ['apuracao-medalhas-impedimentos'],
+    queryFn: () => base44.entities.ImpedimentoMedalha.list('-created_date'),
+    enabled: isAccessResolved && hasMedalhasAccess,
+  });
+
+  const indicarMutation = useMutation({
+    mutationFn: async (item) => {
+      const tipo = (tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO)
+        .find((registro) => registro.codigo === item.medalha_devida_codigo);
+
+      if (!tipo?.id) {
+        throw new Error(`Tipo da medalha ${item.medalha_devida_codigo} não encontrado.`);
+      }
+
+      const payload = criarIndicacaoAutomatica({
+        militar: item.militar,
+        medalhaDevida: item.medalha_devida_codigo,
+        tipoMedalha: tipo,
+      });
+      return base44.entities.Medalha.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-registros'] });
+      queryClient.invalidateQueries({ queryKey: ['medalhas'] });
+      toast({ title: 'Indicação criada', description: 'A medalha foi indicada com status INDICADA.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Erro ao indicar', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const impedirMutation = useMutation({
+    mutationFn: async ({ militarId, medalhaCodigo, motivo }) => base44.entities.ImpedimentoMedalha.create({
+      militar_id: militarId,
+      tipo_medalha_codigo: medalhaCodigo || '',
+      ativo: true,
+      data_inicio: new Date().toISOString().split('T')[0],
+      motivo,
+      observacoes: '',
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
+      toast({ title: 'Impedimento ativado' });
+    },
+  });
+
+  const removerImpedimentoMutation = useMutation({
+    mutationFn: async ({ id }) => base44.entities.ImpedimentoMedalha.update(id, {
+      ativo: false,
+      data_fim: new Date().toISOString().split('T')[0],
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
+      toast({ title: 'Impedimento removido' });
+    },
+  });
+
   const apuracoes = useMemo(
     () => apurarListaMilitaresTempoServico({
       militares,
       medalhas,
+      impedimentos,
       tiposMedalha: tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO,
     }),
-    [militares, medalhas, tiposMedalha],
+    [militares, medalhas, tiposMedalha, impedimentos],
   );
 
   const unidadesDisponiveis = useMemo(
@@ -119,6 +183,7 @@ export default function ApuracaoMedalhasTempoServico() {
               <SelectItem value="TODOS">Todas situações</SelectItem>
               <SelectItem value="ELEGIVEL">Elegíveis</SelectItem>
               <SelectItem value="INCONSISTENTE">Inconsistentes</SelectItem>
+              <SelectItem value="IMPEDIDO">Impedidos</SelectItem>
               <SelectItem value="JA_CONTEMPLADO">Já contemplados</SelectItem>
               <SelectItem value="SEM_DIREITO">Sem direito</SelectItem>
             </SelectContent>
@@ -154,6 +219,7 @@ export default function ApuracaoMedalhasTempoServico() {
                 <th className="text-left p-3">Maior recebida</th>
                 <th className="text-left p-3">Medalha devida</th>
                 <th className="text-left p-3">Situação</th>
+                <th className="text-left p-3">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -170,11 +236,63 @@ export default function ApuracaoMedalhasTempoServico() {
                   <td className="p-3">
                     <Badge className={situacaoColor[item.situacao] || situacaoColor.SEM_DIREITO}>{item.situacao}</Badge>
                   </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      {item.situacao === 'ELEGIVEL' && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                            disabled={indicarMutation.isPending}
+                            onClick={() => indicarMutation.mutate(item)}
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                            Indicar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={impedirMutation.isPending}
+                            onClick={() => {
+                              const motivo = window.prompt('Motivo do impedimento:');
+                              if (!motivo) return;
+                              impedirMutation.mutate({
+                                militarId: item.militar_id,
+                                medalhaCodigo: item.medalha_devida_codigo,
+                                motivo,
+                              });
+                            }}
+                          >
+                            <Ban className="w-4 h-4 mr-1" />
+                            Impedir
+                          </Button>
+                        </>
+                      )}
+                      {item.situacao === 'IMPEDIDO' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={removerImpedimentoMutation.isPending}
+                          onClick={() => {
+                            const impedimentoAtivo = impedimentos.find((imp) => (
+                              imp.militar_id === item.militar_id
+                              && imp.ativo !== false
+                              && (!imp.tipo_medalha_codigo || imp.tipo_medalha_codigo === item.medalha_devida_codigo)
+                            ));
+                            if (!impedimentoAtivo) return;
+                            removerImpedimentoMutation.mutate({ id: impedimentoAtivo.id });
+                          }}
+                        >
+                          Remover impedimento
+                        </Button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
               {apuracoesFiltradas.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">Nenhum militar encontrado para os filtros selecionados.</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-500">Nenhum militar encontrado para os filtros selecionados.</td>
                 </tr>
               )}
             </tbody>
