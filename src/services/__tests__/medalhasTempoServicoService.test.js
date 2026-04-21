@@ -123,3 +123,61 @@ test('militar com mais de 10 anos aparece elegível quando cabível', () => {
   assert.equal(apuracao.situacao, 'ELEGIVEL');
   assert.equal(apuracao.medalha_devida_codigo, 'TEMPO_10');
 });
+
+test('apuracao reconhece medalha legada textual e classifica como JA_CONTEMPLADO', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm12', data_inclusao: '2006-04-21' },
+    medalhas: [
+      {
+        militar_id: 'm12',
+        tipo_medalha_nome: 'Medalha de Tempo de Serviço - 20 anos',
+        status: 'Concedido',
+      },
+    ],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.maior_medalha_recebida_codigo, 'TEMPO_20');
+  assert.equal(apuracao.medalha_devida_codigo, 'TEMPO_20');
+  assert.equal(apuracao.situacao, 'JA_CONTEMPLADO');
+});
+
+test('apuracao usa mesma camada de tempo de servico com fallback de data_ingresso', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm13', data_inclusao: '', data_ingresso: '2010-04-20' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.tempo_servico_anos, 16);
+  assert.equal(apuracao.medalha_devida_codigo, 'TEMPO_10');
+  assert.equal(apuracao.situacao, 'ELEGIVEL');
+});
+
+test('motor reconhece codigos de medalha de tempo a partir de nomes legados textuais', () => {
+  const casos = [
+    { nome: 'Medalha de Tempo de Serviço - 10 anos', codigoEsperado: 'TEMPO_10' },
+    { nome: 'Medalha de Tempo de Serviço - 20 anos', codigoEsperado: 'TEMPO_20' },
+    { nome: 'Medalha de Tempo de Serviço - 30 anos', codigoEsperado: 'TEMPO_30' },
+    { nome: 'Medalha de Tempo de Serviço - 40 anos', codigoEsperado: 'TEMPO_40' },
+  ];
+
+  for (const [index, caso] of casos.entries()) {
+    const apuracao = apurarMedalhaTempoServicoMilitar({
+      militar: { id: `m14-${index}`, data_inclusao: '1980-04-20' },
+      medalhas: [
+        {
+          militar_id: `m14-${index}`,
+          tipo_medalha_nome: caso.nome,
+          status: 'CONCEDIDO',
+        },
+      ],
+      tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+      referencia: new Date('2026-04-21T00:00:00Z'),
+    });
+
+    assert.equal(apuracao.maior_medalha_recebida_codigo, caso.codigoEsperado);
+  }
+});

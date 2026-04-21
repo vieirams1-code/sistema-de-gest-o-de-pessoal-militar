@@ -59,6 +59,30 @@ const STATUS_CONSIDERADOS_CONCESSAO = new Set(['CONCEDIDO', 'Concedido', 'PUBLIC
 
 const CODIGOS_TEMPO_AUTOMATICO = ['TEMPO_10', 'TEMPO_20', 'TEMPO_30', 'TEMPO_40'];
 
+function normalizarTexto(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function mapearCodigoTempoPorTexto(valor) {
+  const texto = normalizarTexto(valor);
+  if (!texto) return null;
+
+  if (texto.includes('dom pedro ii') || texto.includes('dom pedro 2')) return 'DOM_PEDRO_II';
+  if (!texto.includes('tempo') || !texto.includes('servico')) return null;
+
+  if (texto.includes('40')) return 'TEMPO_40';
+  if (texto.includes('30')) return 'TEMPO_30';
+  if (texto.includes('20')) return 'TEMPO_20';
+  if (texto.includes('10')) return 'TEMPO_10';
+
+  return null;
+}
+
 export function calcularAnosTempoServico(militar, referencia = new Date()) {
   const tempoServico = calcularTempoServico(militar, referencia);
   return tempoServico.valido ? tempoServico.anos_completos : null;
@@ -75,14 +99,17 @@ export function obterCodigoFaixaPorAnos(anosServico) {
 function indexarTipos(tipos = []) {
   const porId = new Map();
   const porCodigo = new Map();
+  const porNomeNormalizado = new Map();
 
   [...TIPOS_FIXOS_MEDALHA_TEMPO, ...tipos].forEach((tipo) => {
     if (!tipo) return;
     if (tipo.id) porId.set(tipo.id, tipo);
     if (tipo.codigo) porCodigo.set(tipo.codigo, tipo);
+    const nomeNormalizado = normalizarTexto(tipo.nome);
+    if (nomeNormalizado) porNomeNormalizado.set(nomeNormalizado, tipo);
   });
 
-  return { porId, porCodigo };
+  return { porId, porCodigo, porNomeNormalizado };
 }
 
 function resolverTipoMedalha(registro, tipoIndexado) {
@@ -93,6 +120,16 @@ function resolverTipoMedalha(registro, tipoIndexado) {
 
   if (registro.tipo_medalha_codigo && tipoIndexado.porCodigo.has(registro.tipo_medalha_codigo)) {
     return tipoIndexado.porCodigo.get(registro.tipo_medalha_codigo);
+  }
+
+  const nomeNormalizado = normalizarTexto(registro.tipo_medalha_nome);
+  if (nomeNormalizado && tipoIndexado.porNomeNormalizado.has(nomeNormalizado)) {
+    return tipoIndexado.porNomeNormalizado.get(nomeNormalizado);
+  }
+
+  const codigoLegado = mapearCodigoTempoPorTexto(registro.tipo_medalha_nome);
+  if (codigoLegado && tipoIndexado.porCodigo.has(codigoLegado)) {
+    return tipoIndexado.porCodigo.get(codigoLegado);
   }
 
   return null;
@@ -112,7 +149,7 @@ function isMedalhaTempoServico(registro, tipoIndexado) {
   const tipo = resolverTipoMedalha(registro, tipoIndexado);
   if (tipo?.categoria === CATEGORIA_TEMPO_SERVICO) return true;
 
-  const codigo = tipo?.codigo || registro?.tipo_medalha_codigo;
+  const codigo = tipo?.codigo || registro?.tipo_medalha_codigo || mapearCodigoTempoPorTexto(registro?.tipo_medalha_nome);
   if (CODIGOS_TEMPO_AUTOMATICO.includes(codigo)) return true;
 
   return false;
