@@ -1,5 +1,4 @@
-const STATUS_FINALIZADOS = new Set(['ENCERRADO', 'EXTINTO', 'RENOVADO']);
-const STATUS_ATIVOS_OPERACIONAIS = new Set(['RASCUNHO', 'VIGENTE']);
+const STATUS_ENCERRADO = 'ENCERRADO';
 
 const toDateOnly = (value) => {
   if (!value) return null;
@@ -19,175 +18,117 @@ const diffDays = (end, start) => {
 };
 
 export function calcularStatusContratoTemporario(contrato, todayInput = new Date()) {
-  if (!contrato) return 'RASCUNHO';
+  if (!contrato) return 'EXPIRADO';
 
-  const today = toDateOnly(todayInput) || new Date();
   const statusAtual = String(contrato.status || '').toUpperCase();
-
-  if (statusAtual === 'RENOVADO') return 'RENOVADO';
-  if (statusAtual === 'ENCERRADO' || statusAtual === 'EXTINTO') return 'ENCERRADO';
-
-  const dataInicio = toDateOnly(contrato.data_inicio);
-  if (!dataInicio || today < dataInicio) return 'RASCUNHO';
-
-  const dataFim = toDateOnly(contrato.data_fim_efetiva || contrato.data_fim_prevista);
-  if (!dataFim) return 'VIGENTE';
-
-  if (today > dataFim) {
-    return statusAtual === 'RENOVADO' ? 'RENOVADO' : 'VIGENTE';
-  }
-
-  return 'VIGENTE';
-}
-
-export function calcularBadgeVigenciaContrato(contrato, todayInput = new Date(), janelaDias = 30) {
-  if (!contrato) return null;
-  const statusBase = calcularStatusContratoTemporario(contrato, todayInput);
-  if (statusBase !== 'VIGENTE') return null;
+  if (statusAtual === STATUS_ENCERRADO) return STATUS_ENCERRADO;
 
   const today = toDateOnly(todayInput) || new Date();
-  const dataFim = toDateOnly(contrato.data_fim_efetiva || contrato.data_fim_prevista);
-  if (!dataFim) return null;
+  const dataFim = toDateOnly(contrato.data_fim_atual || contrato.data_fim_prevista || contrato.data_fim_efetiva);
+
+  if (!dataFim) return 'VIGENTE';
 
   const diasRestantes = diffDays(dataFim, today);
   if (diasRestantes < 0) return 'EXPIRADO';
-  if (diasRestantes <= janelaDias) return 'A_VENCER';
-  return null;
+  if (diasRestantes <= 30) return 'A_VENCER';
+  return 'VIGENTE';
 }
 
-export function isContratoAtivoOperacional(contrato, todayInput = new Date()) {
-  const status = calcularStatusContratoTemporario(contrato, todayInput);
-  if (!STATUS_ATIVOS_OPERACIONAIS.has(status)) return false;
-  return calcularBadgeVigenciaContrato(contrato, todayInput) !== 'EXPIRADO';
-}
-
-function faixaContrato(contrato) {
-  const inicio = toDateOnly(contrato?.data_inicio);
-  const fim = toDateOnly(contrato?.data_fim_efetiva || contrato?.data_fim_prevista);
-  return { inicio, fim };
-}
-
-function existeSobreposicaoFaixas(atual, outro) {
-  if (!atual.inicio || !outro.inicio) return false;
-
-  const fimAtual = atual.fim || new Date('2999-12-31T00:00:00Z');
-  const fimOutro = outro.fim || new Date('2999-12-31T00:00:00Z');
-
-  return atual.inicio <= fimOutro && outro.inicio <= fimAtual;
-}
-
-export function validarSobreposicaoContrato({ contrato, contratosExistentes = [], today = new Date() }) {
+export function validarContratoAtivoUnico({ contrato, contratosExistentes = [], today = new Date() }) {
   if (!contrato?.militar_id) return { ok: true };
 
-  const candidatos = contratosExistentes.filter((item) => item?.militar_id === contrato.militar_id && item.id !== contrato.id);
-  const faixaNovo = faixaContrato(contrato);
+  const conflito = contratosExistentes.find((item) => {
+    if (!item || item.id === contrato.id || item.militar_id !== contrato.militar_id) return false;
+    const status = calcularStatusContratoTemporario(item, today);
+    return status === 'VIGENTE' || status === 'A_VENCER';
+  });
 
-  for (const item of candidatos) {
-    if (!isContratoAtivoOperacional(item, today)) continue;
-    const faixaExistente = faixaContrato(item);
-    if (!existeSobreposicaoFaixas(faixaNovo, faixaExistente)) continue;
-    return {
-      ok: false,
-      code: 'CONTRATO_SOBREPOSTO',
-      message: 'Já existe contrato ativo e sobreposto para este militar.',
-      conflictingId: item.id,
-    };
-  }
+  if (!conflito) return { ok: true };
 
-  return { ok: true };
-}
-
-export function encerrarOuExtinguirContrato(contrato, { dataEfetiva, motivo }) {
   return {
-    ...contrato,
-    status: 'ENCERRADO',
-    data_fim_efetiva: toIsoDay(dataEfetiva),
-    motivo_encerramento: motivo || contrato?.motivo_encerramento || '',
+    ok: false,
+    code: 'CONTRATO_ATIVO_EXISTENTE',
+    message: 'Já existe contrato ativo para este militar.',
+    conflictingId: conflito.id,
   };
 }
 
-export function prepararRenovacaoContrato(contratoAnterior, payloadNovoContrato, contratosExistentes = []) {
-  const possuiFilho = contratosExistentes.some((item) => item?.contrato_anterior_id === contratoAnterior?.id);
-  if (possuiFilho) {
-    return {
-      ok: false,
-      code: 'RENOVACAO_DUPLICADA',
-      message: 'Este contrato já possui uma renovação vinculada.',
-    };
-  }
-
-  const raizId = contratoAnterior?.contrato_raiz_id || contratoAnterior?.id || null;
+export function aplicarRenovacaoContrato(contrato, { dataRegistro, boletim, detalhes, novaDataFim }) {
+  const dataFimAnterior = toIsoDay(contrato?.data_fim_atual || contrato?.data_fim_prevista);
+  const dataFimNova = toIsoDay(novaDataFim);
 
   return {
-    ok: true,
-    novoContrato: {
-      ...payloadNovoContrato,
-      contrato_anterior_id: contratoAnterior?.id || null,
-      contrato_raiz_id: raizId,
-      status: 'RASCUNHO',
-      origem_registro: payloadNovoContrato?.origem_registro || 'RENOVACAO_INTERNA',
+    contratoAtualizado: {
+      ...contrato,
+      data_fim_atual: dataFimNova,
+      status: calcularStatusContratoTemporario({ ...contrato, data_fim_atual: dataFimNova }),
     },
-    contratoAnteriorAtualizado: {
-      ...contratoAnterior,
-      status: 'RENOVADO',
-      contrato_raiz_id: raizId,
+    historico: {
+      tipo_registro: 'RENOVACAO',
+      data_registro: toIsoDay(dataRegistro) || toIsoDay(new Date()),
+      boletim: boletim || '',
+      detalhes: detalhes || '',
+      data_fim_anterior: dataFimAnterior,
+      data_fim_nova: dataFimNova,
     },
   };
 }
 
-const contratoSortTs = (contrato) => toDateOnly(contrato?.data_inicio)?.getTime() || 0;
-
-export function obterIdCadeiaContrato(contrato) {
-  return contrato?.contrato_raiz_id || contrato?.id || null;
+export function criarHistoricoContrato({ tipoRegistro, dataRegistro, boletim, detalhes, dataFimAnterior, dataFimNova }) {
+  return {
+    tipo_registro: tipoRegistro,
+    data_registro: toIsoDay(dataRegistro) || toIsoDay(new Date()),
+    boletim: boletim || '',
+    detalhes: detalhes || '',
+    data_fim_anterior: toIsoDay(dataFimAnterior),
+    data_fim_nova: toIsoDay(dataFimNova),
+  };
 }
 
-export function listarContratosAtuais(contratos = []) {
-  const mapa = new Map();
-  contratos.forEach((contrato) => {
-    const chainId = obterIdCadeiaContrato(contrato);
-    const atual = mapa.get(chainId);
-    if (!atual || contratoSortTs(contrato) > contratoSortTs(atual)) {
-      mapa.set(chainId, contrato);
-    }
+export function encerrarContratoTemporario(contrato, { dataRegistro, boletim, detalhes }) {
+  const dataFimAtual = toIsoDay(contrato?.data_fim_atual || contrato?.data_fim_prevista);
+  return {
+    contratoAtualizado: {
+      ...contrato,
+      status: STATUS_ENCERRADO,
+    },
+    historico: {
+      tipo_registro: 'ENCERRAMENTO',
+      data_registro: toIsoDay(dataRegistro) || toIsoDay(new Date()),
+      boletim: boletim || '',
+      detalhes: detalhes || '',
+      data_fim_anterior: dataFimAtual,
+      data_fim_nova: dataFimAtual,
+    },
+  };
+}
+
+export function obterUltimoBoletim(historicos = []) {
+  const registro = [...historicos]
+    .filter((item) => item?.boletim)
+    .sort((a, b) => String(b.data_registro || '').localeCompare(String(a.data_registro || '')))[0];
+  return registro?.boletim || '';
+}
+
+export function montarCardsContratosTemporarios({ contratos = [], militares = [], historicos = [], today = new Date() }) {
+  const militarLookup = new Map(militares.map((m) => [m.id, m]));
+  const historicosPorContrato = historicos.reduce((acc, item) => {
+    const key = item.contrato_temporario_id;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  return contratos.map((contrato) => {
+    const militar = militarLookup.get(contrato.militar_id);
+    const historicoContrato = historicosPorContrato[contrato.id] || [];
+    return {
+      ...contrato,
+      militar_nome: militar?.nome_completo || 'Militar não encontrado',
+      militar_matricula: militar?.matricula_atual || militar?.matricula || '-',
+      status_calculado: calcularStatusContratoTemporario(contrato, today),
+      ultimo_boletim: obterUltimoBoletim(historicoContrato),
+      historico: historicoContrato.sort((a, b) => String(b.data_registro || '').localeCompare(String(a.data_registro || ''))),
+    };
   });
-  return Array.from(mapa.values()).sort((a, b) => contratoSortTs(b) - contratoSortTs(a));
 }
-
-export function listarHistoricoCadeia(contratos = [], contratoAtual = null) {
-  if (!contratoAtual) return [];
-  const chainId = obterIdCadeiaContrato(contratoAtual);
-  return contratos
-    .filter((item) => obterIdCadeiaContrato(item) === chainId && item.id !== contratoAtual.id)
-    .sort((a, b) => contratoSortTs(b) - contratoSortTs(a));
-}
-
-export function calcularSituacaoVinculoTemporario(contratoVigente) {
-  if (!contratoVigente) return 'SEM_VIGENTE';
-  const badge = calcularBadgeVigenciaContrato(contratoVigente);
-  if (badge === 'A_VENCER') return 'A_VENCER';
-  if (badge === 'EXPIRADO') return 'EXPIRADO';
-  return 'REGULAR';
-}
-
-export function resumirIndicadoresContratosTemporarios(contratos = [], todayInput = new Date()) {
-  const today = toDateOnly(todayInput) || new Date();
-  const total = { aVencer60: 0, aVencer30: 0, expirados: 0, aguardandoPublicacao: 0 };
-
-  contratos.forEach((contrato) => {
-    const badge = calcularBadgeVigenciaContrato(contrato, today, 60);
-    if (badge === 'EXPIRADO') total.expirados += 1;
-
-    const fim = toDateOnly(contrato?.data_fim_efetiva || contrato?.data_fim_prevista);
-    if (!fim) return;
-    const dias = diffDays(fim, today);
-    if (dias >= 0 && dias <= 60) total.aVencer60 += 1;
-    if (dias >= 0 && dias <= 30) total.aVencer30 += 1;
-  });
-
-  return total;
-}
-
-export const VinculoTemporarioConstants = {
-  STATUS_ATIVOS_OPERACIONAIS,
-  STATUS_FINALIZADOS,
-};
