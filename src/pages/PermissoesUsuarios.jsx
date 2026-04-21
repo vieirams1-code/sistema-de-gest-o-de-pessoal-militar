@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 
 const initialPermissions = {
   ...modulosList.reduce((acc, m) => ({ ...acc, [m.key]: false }), {}),
@@ -70,7 +71,15 @@ export default function PermissoesUsuarios() {
 
 
   // Queries — só executam após resolução do acesso e confirmação de permissão
-  const { data: militares = [] } = useQuery({ queryKey: ['militares-ativos'], queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }), enabled: hasAccess });
+  const { data: militares = [] } = useQuery({
+    queryKey: ['militares-ativos'],
+    queryFn: async () => {
+      const militaresAtivos = await base44.entities.Militar.filter({ status_cadastro: 'Ativo' });
+      const militaresEnriquecidos = await carregarMilitaresComMatriculas(militaresAtivos);
+      return filtrarMilitaresOperacionais(militaresEnriquecidos, { incluirInativos: false });
+    },
+    enabled: hasAccess
+  });
   const { data: subgrupamentos = [] } = useQuery({ queryKey: ['subgrupamentos'], queryFn: () => base44.entities.Subgrupamento.filter({ ativo: true }, 'nome'), enabled: hasAccess });
   const { data: acessos = [], error: acessosError } = useQuery({
     queryKey: ['usuariosAcesso'],
@@ -208,6 +217,7 @@ export default function PermissoesUsuarios() {
       const perfilSelected = selectedProfilePreview;
 
       const militarVinculado = militares.find((m) => m.id === userMilitarId);
+      const militarMatriculaAtual = militarVinculado?.matricula_atual || militarVinculado?.matricula || '';
       const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
 
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
@@ -225,15 +235,25 @@ export default function PermissoesUsuarios() {
 
       let roleData = {};
       if (normalizedAccessMode === 'admin') {
-        roleData = { tipo_acesso: 'admin', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: '', militar_email: '' };
+        roleData = { tipo_acesso: 'admin', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: '', militar_email: '', militar_matricula: '' };
       } else if (normalizedAccessMode === 'subsetor' && sub) {
-        roleData = { tipo_acesso: 'subsetor', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento', militar_id: '', militar_email: '' };
+        roleData = { tipo_acesso: 'subsetor', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento', militar_id: '', militar_email: '', militar_matricula: '' };
       } else if (normalizedAccessMode === 'setor' && grupamento) {
-        roleData = { tipo_acesso: 'setor', grupamento_id: grupamento.id, grupamento_nome: grupamento.nome, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: 'Grupamento', militar_id: '', militar_email: '' };
+        roleData = { tipo_acesso: 'setor', grupamento_id: grupamento.id, grupamento_nome: grupamento.nome, subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: 'Grupamento', militar_id: '', militar_email: '', militar_matricula: '' };
       } else if (normalizedAccessMode === 'unidade' && uni) {
-        roleData = { tipo_acesso: 'unidade', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: uni.id, subgrupamento_nome: uni.nome, subgrupamento_tipo: 'Unidade', militar_id: '', militar_email: '' };
+        roleData = { tipo_acesso: 'unidade', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: uni.id, subgrupamento_nome: uni.nome, subgrupamento_tipo: 'Unidade', militar_id: '', militar_email: '', militar_matricula: '' };
       } else {
-        roleData = { tipo_acesso: 'proprio', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: userMilitarId || '', militar_email: militarEmailVinculado };
+        roleData = {
+          tipo_acesso: 'proprio',
+          grupamento_id: '',
+          grupamento_nome: '',
+          subgrupamento_id: '',
+          subgrupamento_nome: '',
+          subgrupamento_tipo: null,
+          militar_id: userMilitarId || '',
+          militar_email: militarEmailVinculado,
+          militar_matricula: militarMatriculaAtual
+        };
       }
 
       const dataToSave = { ...baseData, ...roleData };
@@ -533,7 +553,7 @@ export default function PermissoesUsuarios() {
                                   <SelectContent>
                                     <SelectItem value="_nenhum">— Selecione —</SelectItem>
                                     {militaresOrdenados.map((m) => (
-                                      <SelectItem key={m.id} value={m.id}>{m.posto_graduacao ? `${m.posto_graduacao} ` : ''}{m.nome_completo} {m.matricula ? `- Mat ${m.matricula}` : ''}</SelectItem>
+                                      <SelectItem key={m.id} value={m.id}>{m.posto_graduacao ? `${m.posto_graduacao} ` : ''}{m.nome_completo} {(m.matricula_atual || m.matricula) ? `- Mat ${m.matricula_atual || m.matricula}` : ''}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>

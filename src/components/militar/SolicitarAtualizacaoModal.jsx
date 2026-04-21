@@ -50,7 +50,7 @@ export default function SolicitarAtualizacaoModal({ militar, onClose, onSaved })
       militar_id: militar.id,
       militar_nome: militar.nome_completo,
       militar_posto: militar.posto_graduacao,
-      militar_matricula: militar.matricula,
+      militar_matricula: militar.matricula_atual || militar.matricula || '',
       campo_chave: campoSelecionado,
       campo_label: campoAtual?.label || campoSelecionado,
       valor_atual: String(valorAtual),
