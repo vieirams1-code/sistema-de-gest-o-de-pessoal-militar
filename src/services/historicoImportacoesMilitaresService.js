@@ -48,6 +48,10 @@ function pickFirstString(...candidatos) {
   return '';
 }
 
+function pickMatriculaAtual(...candidatos) {
+  return pickFirstString(...candidatos);
+}
+
 function safeJsonParse(texto, fallback) {
   if (typeof texto !== 'string' || !texto.trim()) return fallback;
   try {
@@ -119,13 +123,25 @@ function normalizarLinha(raw, index) {
   );
 
   const status = normalizarStatusLinha(raw?.status, erros, alertas);
+  const matriculaHistorica = pickFirstString(
+    original?.matricula,
+    original?.['matrícula'],
+    raw?.matricula,
+  );
+  const matriculaAtual = pickMatriculaAtual(
+    transformado?.matricula_atual,
+    transformado?.matricula,
+    raw?.matricula_atual,
+  );
 
   return {
     id: raw?.id || `linha-${index + 1}`,
     linhaNumero: toNumber(raw?.linhaNumero, raw?.linha_numero, index + 1),
     status,
     nome: pickFirstString(transformado?.nome_completo, original?.nome_completo, original?.nome, raw?.nome),
-    matricula: pickFirstString(transformado?.matricula, original?.matricula, original?.['matrícula']),
+    matricula: matriculaAtual || matriculaHistorica,
+    matricula_atual: matriculaAtual,
+    matricula_historica: matriculaHistorica,
     posto: pickFirstString(transformado?.posto_graduacao, original?.posto_graduacao, original?.posto, original?.['posto/graduação']),
     cpf: pickFirstString(transformado?.cpf, original?.cpf),
     telefone: pickFirstString(transformado?.telefone, original?.telefone, original?.celular),
@@ -342,7 +358,8 @@ export function exportarCsvHistoricoHumano(lote) {
   const headers = [
     'status',
     'nome',
-    'matricula',
+    'matricula_atual',
+    'matricula_historica',
     'posto',
     'cpf',
     'telefone',
@@ -356,7 +373,8 @@ export function exportarCsvHistoricoHumano(lote) {
   const linhas = (lote?.linhas || []).map((linha) => [
     linha.status,
     linha.nome,
-    linha.matricula,
+    linha.matricula_atual || linha.matricula || '',
+    linha.matricula_historica || '',
     linha.posto,
     linha.cpf,
     linha.telefone,

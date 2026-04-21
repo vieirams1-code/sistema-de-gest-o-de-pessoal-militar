@@ -22,7 +22,7 @@ export default function TabelaLinhasImportacaoMilitares({ linhas, onSelecionarLi
             <tr>
               <th className="text-left p-2">Status</th>
               <th className="text-left p-2">Nome</th>
-              <th className="text-left p-2">Matrícula</th>
+              <th className="text-left p-2">Matrículas (atual/histórica)</th>
               <th className="text-left p-2">Posto/Graduação</th>
               <th className="text-left p-2">CPF</th>
               <th className="text-left p-2">Principal motivo</th>
@@ -40,7 +40,11 @@ export default function TabelaLinhasImportacaoMilitares({ linhas, onSelecionarLi
               >
                 <td className="p-2"><StatusBadge status={linha.status} /></td>
                 <td className="p-2">{linha.nome || '—'}</td>
-                <td className="p-2">{linha.matricula || '—'}</td>
+                <td className="p-2">
+                  <span title={`Atual: ${linha.matricula_atual || '—'} | Histórica: ${linha.matricula_historica || '—'}`}>
+                    {linha.matricula_atual || '—'} / {linha.matricula_historica || '—'}
+                  </span>
+                </td>
                 <td className="p-2">{linha.posto || '—'}</td>
                 <td className="p-2">{linha.cpf || '—'}</td>
                 <td className="p-2 max-w-[320px] truncate" title={linha.principalMotivo}>{linha.principalMotivo}</td>
