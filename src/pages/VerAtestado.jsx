@@ -24,6 +24,8 @@ import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
+import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700',
@@ -85,6 +87,24 @@ export default function VerAtestado() {
     enabled: !!id
   });
 
+
+  const { data: militarAtestado = null } = useQuery({
+    queryKey: ['militar-atestado', atestado?.militar_id],
+    queryFn: async () => {
+      if (!atestado?.militar_id) return null;
+      const rows = await base44.entities.Militar.filter({ id: atestado.militar_id });
+      if (!rows?.length) return null;
+      const [enriquecido] = await carregarMilitaresComMatriculas([rows[0]]);
+      return enriquecido || rows[0];
+    },
+    enabled: !!atestado?.militar_id,
+  });
+
+  const atestadoView = React.useMemo(
+    () => aplicarContextoMilitarNoAtestado(atestado || {}, militarAtestado, { contexto: 'documental' }),
+    [atestado, militarAtestado],
+  );
+
   if (loadingUser || !isAccessResolved) return null;
   if (!hasAtestadosAccess) return <AccessDenied modulo="Atestados" />;
 
@@ -95,6 +115,7 @@ export default function VerAtestado() {
       </div>
     );
   }
+
 
   if (!atestado) {
     return (
@@ -185,6 +206,13 @@ export default function VerAtestado() {
           </Button>
         </div>
 
+          {militarAtestado && isMilitarMesclado(militarAtestado) && (
+            <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-800">Registro vinculado a militar mesclado</p>
+              <p className="text-xs text-amber-700 mt-1">Este atestado permanece disponível apenas para consulta histórica/documental.</p>
+            </div>
+          )}
+
         {/* Main Info Card */}
         <Card className="shadow-sm mb-6 overflow-hidden">
           <div className="bg-gradient-to-r from-[#1e3a5f] to-[#2d4a6f] p-6 text-white">
@@ -207,11 +235,14 @@ export default function VerAtestado() {
                   )}
                 </div>
                 <h2 className="text-2xl font-bold mb-1">
-                  {atestado.militar_posto && `${atestado.militar_posto} `}
-                  {atestado.militar_nome}
+                  {atestadoView.militar_posto && `${atestadoView.militar_posto} `}
+                  {atestadoView.militar_nome}
                 </h2>
-                {atestado.militar_matricula && (
-                  <p className="text-white/80">Matrícula: {atestado.militar_matricula}</p>
+                {atestadoView.militar_matricula_label && (
+                  <p className="text-white/80">Matrícula no registro: {atestadoView.militar_matricula_label}</p>
+                )}
+                {atestadoView.militar_matricula_atual && atestadoView.militar_matricula_atual !== atestadoView.militar_matricula_label && (
+                  <p className="text-white/80">Matrícula atual: {atestadoView.militar_matricula_atual}</p>
                 )}
               </div>
             </div>

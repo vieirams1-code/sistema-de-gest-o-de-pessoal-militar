@@ -23,6 +23,8 @@ const initialFormData = {
   militar_nome: '',
   militar_posto: '',
   militar_matricula: '',
+  militar_matricula_atual: '',
+  militar_matricula_vinculo: '',
   medico: '',
   arquivo_atestado: '',
   tipo_afastamento: 'Afastamento Total',
