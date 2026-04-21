@@ -98,3 +98,28 @@ test('apuração em lista retorna militares processados', () => {
 test('calcularAnosTempoServico retorna null sem data base válida', () => {
   assert.equal(calcularAnosTempoServico({ id: 'm9' }), null);
 });
+
+
+test('apuração classifica como INCONSISTENTE quando não há cálculo válido de tempo', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm10', data_inclusao: '31/02/2010' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.tempo_servico_anos, null);
+  assert.equal(apuracao.situacao, 'INCONSISTENTE');
+});
+
+test('militar com mais de 10 anos aparece elegível quando cabível', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm11', data_inclusao: '2010-04-20' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.situacao, 'ELEGIVEL');
+  assert.equal(apuracao.medalha_devida_codigo, 'TEMPO_10');
+});

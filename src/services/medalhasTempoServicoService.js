@@ -1,4 +1,4 @@
-import { differenceInYears } from 'date-fns';
+import { calcularTempoServico } from './tempoServicoService.js';
 
 export const CATEGORIA_TEMPO_SERVICO = 'TEMPO_SERVICO';
 
@@ -59,16 +59,9 @@ const STATUS_CONSIDERADOS_CONCESSAO = new Set(['CONCEDIDO', 'Concedido', 'PUBLIC
 
 const CODIGOS_TEMPO_AUTOMATICO = ['TEMPO_10', 'TEMPO_20', 'TEMPO_30', 'TEMPO_40'];
 
-const isValidDate = (value) => {
-  if (!value) return false;
-  const date = value instanceof Date ? value : new Date(value);
-  return !Number.isNaN(date.getTime());
-};
-
 export function calcularAnosTempoServico(militar, referencia = new Date()) {
-  const dataBase = militar?.data_inclusao || militar?.data_ingresso || militar?.data_praca;
-  if (!isValidDate(dataBase) || !isValidDate(referencia)) return null;
-  return Math.max(0, differenceInYears(new Date(referencia), new Date(dataBase)));
+  const tempoServico = calcularTempoServico(militar, referencia);
+  return tempoServico.valido ? tempoServico.anos_completos : null;
 }
 
 export function obterCodigoFaixaPorAnos(anosServico) {
@@ -141,17 +134,20 @@ function obterMaiorMedalhaTempoRecebida(medalhas, tipoIndexado) {
 
 export function apurarMedalhaTempoServicoMilitar({ militar, medalhas = [], tiposMedalha = [], referencia = new Date() }) {
   const tipoIndexado = indexarTipos(tiposMedalha);
-  const tempoServicoAnos = calcularAnosTempoServico(militar, referencia);
+  const tempoServico = calcularTempoServico(militar, referencia);
+  const tempoServicoAnos = tempoServico.valido ? tempoServico.anos_completos : null;
   const faixaAlcancadaCodigo = obterCodigoFaixaPorAnos(tempoServicoAnos);
   const faixaAlcancadaTipo = faixaAlcancadaCodigo ? tipoIndexado.porCodigo.get(faixaAlcancadaCodigo) : null;
   const maiorMedalhaRecebida = obterMaiorMedalhaTempoRecebida(medalhas, tipoIndexado);
   const maiorMedalhaRecebidaOrdem = obterOrdemHierarquicaRegistro(maiorMedalhaRecebida, tipoIndexado);
   const faixaAlcancadaOrdem = faixaAlcancadaTipo?.ordem_hierarquica || -1;
 
-  let situacao = 'SEM_DIREITO';
+  let situacao = tempoServico.valido ? 'SEM_DIREITO' : 'INCONSISTENTE';
   let medalhaDevidaCodigo = null;
 
-  if (faixaAlcancadaCodigo) {
+  if (!tempoServico.valido) {
+    situacao = 'INCONSISTENTE';
+  } else if (faixaAlcancadaCodigo) {
     medalhaDevidaCodigo = faixaAlcancadaCodigo;
 
     if (!maiorMedalhaRecebida) {
