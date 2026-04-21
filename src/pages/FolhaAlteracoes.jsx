@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
 import { montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -259,6 +260,18 @@ function getDefaultImpressaoConfig() {
   };
 }
 
+function obterMatriculaAtualMilitar(militar = {}) {
+  const matriculaAtual = String(militar?.matricula_atual || militar?.matricula || '').trim();
+  return matriculaAtual;
+}
+
+function montarLabelMilitar(militar = {}) {
+  const nome = `${militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}${militar.nome_guerra || militar.nome_completo || ''}`.trim();
+  const matriculaAtual = obterMatriculaAtualMilitar(militar);
+  if (!matriculaAtual) return nome;
+  return `${nome} • Mat ${matriculaAtual}`;
+}
+
 function carregarConfigImpressao(user) {
   if (typeof window === 'undefined') return getDefaultImpressaoConfig();
 
@@ -346,7 +359,8 @@ export default function FolhaAlteracoes() {
     queryFn: async () => {
       if (isAdmin) {
         const listaAdmin = await base44.entities.Militar.list('-nome_completo');
-        return listaAdmin.filter((m) => m.status_cadastro !== 'Inativo');
+        const militaresComMatricula = await carregarMilitaresComMatriculas(listaAdmin);
+        return filtrarMilitaresOperacionais(militaresComMatricula);
       }
 
       if (modoAcesso === 'proprio') {
@@ -365,14 +379,15 @@ export default function FolhaAlteracoes() {
 
         const batches = await Promise.all(requests);
         const ids = new Set();
-        return batches
+        const militaresFiltrados = batches
           .flat()
-          .filter((m) => m.status_cadastro !== 'Inativo')
           .filter((m) => {
             if (!hasSelfAccess(m) || ids.has(m.id)) return false;
             ids.add(m.id);
             return true;
           });
+        const militaresComMatricula = await carregarMilitaresComMatriculas(militaresFiltrados);
+        return filtrarMilitaresOperacionais(militaresComMatricula);
       }
 
       const filters = getMilitarScopeFilters();
@@ -381,14 +396,15 @@ export default function FolhaAlteracoes() {
       const requests = filters.map((filtro) => base44.entities.Militar.filter(filtro, '-nome_completo'));
       const batches = await Promise.all(requests);
       const ids = new Set();
-      return batches
+      const militaresFiltrados = batches
         .flat()
-        .filter((m) => m.status_cadastro !== 'Inativo')
         .filter((m) => {
           if (ids.has(m.id)) return false;
           ids.add(m.id);
           return true;
         });
+      const militaresComMatricula = await carregarMilitaresComMatriculas(militaresFiltrados);
+      return filtrarMilitaresOperacionais(militaresComMatricula);
     },
     enabled: isAccessResolved,
   });
@@ -548,17 +564,14 @@ export default function FolhaAlteracoes() {
   const signatarioLinha1 = signatarioSelecionado
     ? montarLinhaAssinatura(signatarioNome, signatarioSelecionado.posto_graduacao, signatarioSelecionado.quadro)
     : '';
-  const signatarioLinha2 = signatarioSelecionado?.matricula
-    ? `MATRÍCULA ${String(signatarioSelecionado.matricula).trim()}`
+  const matriculaAtualSignatario = obterMatriculaAtualMilitar(signatarioSelecionado);
+  const signatarioLinha2 = matriculaAtualSignatario
+    ? `MATRÍCULA ${matriculaAtualSignatario}`
     : '';
   const militaresSignatariosFiltrados = useMemo(() => {
     const termo = buscaSignatario.trim().toLowerCase();
     if (!termo) return militaresOrdenados;
-    return militaresOrdenados.filter((militar) => (
-      String(militar.nome_completo || '').toLowerCase().includes(termo) ||
-      String(militar.nome_guerra || '').toLowerCase().includes(termo) ||
-      String(militar.matricula || '').toLowerCase().includes(termo)
-    ));
+    return militaresOrdenados.filter((militar) => militarCorrespondeBusca(militar, termo));
   }, [buscaSignatario, militaresOrdenados]);
 
   if (!loadingUser && isAccessResolved && !canAccessModule('militares')) {
@@ -761,7 +774,7 @@ export default function FolhaAlteracoes() {
                     <PopoverContent className="w-[360px] p-0" align="start">
                       <Command>
                         <CommandInput
-                          placeholder="Buscar por nome, guerra ou matrícula..."
+                          placeholder="Buscar por nome, guerra, CPF, RG ou matrícula..."
                           value={buscaSignatario}
                           onValueChange={setBuscaSignatario}
                         />
@@ -769,10 +782,11 @@ export default function FolhaAlteracoes() {
                         <CommandGroup className="max-h-72 overflow-auto">
                           {militaresSignatariosFiltrados.map((militar) => {
                             const nome = `${militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}${militar.nome_completo || militar.nome_guerra || ''}`.trim();
+                            const matriculaAtual = obterMatriculaAtualMilitar(militar);
                             return (
                               <CommandItem
                                 key={militar.id}
-                                value={`${nome} ${militar.matricula || ''}`}
+                                value={`${nome} ${matriculaAtual}`}
                                 onSelect={() => {
                                   setImpressaoConfig((prev) => ({ ...prev, signatarioId: militar.id }));
                                   setSignatarioPopoverOpen(false);
@@ -780,7 +794,7 @@ export default function FolhaAlteracoes() {
                                 }}
                               >
                                 <Check className={cn('mr-2 h-4 w-4', impressaoConfig.signatarioId === militar.id ? 'opacity-100' : 'opacity-0')} />
-                                <span className="truncate">{nome}{militar.matricula ? ` • Mat ${militar.matricula}` : ''}</span>
+                                <span className="truncate">{nome}{matriculaAtual ? ` • Mat ${matriculaAtual}` : ''}</span>
                               </CommandItem>
                             );
                           })}
@@ -810,7 +824,7 @@ export default function FolhaAlteracoes() {
               </div>
 
               <p className="text-xs text-slate-500">
-                Persistência: localStorage do navegador, isolado por usuário logado.
+                Persistência: localStorage do navegador, isolado por usuário logado. Registros mesclados e inativos ficam ocultos nesta tela operacional.
               </p>
             </div>
           </SheetContent>
@@ -831,8 +845,7 @@ export default function FolhaAlteracoes() {
                   <SelectContent>
                     {militaresOrdenados.map((militar) => (
                       <SelectItem key={militar.id} value={militar.id}>
-                        {(militar.posto_graduacao ? `${militar.posto_graduacao} ` : '') + (militar.nome_guerra || militar.nome_completo)}
-                        {militar.matricula ? ` • Mat ${militar.matricula}` : ''}
+                        {montarLabelMilitar(militar)}
                       </SelectItem>
                     ))}
                   </SelectContent>

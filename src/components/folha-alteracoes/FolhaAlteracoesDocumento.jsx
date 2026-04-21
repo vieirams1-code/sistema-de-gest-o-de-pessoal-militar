@@ -1,5 +1,6 @@
 import React from 'react';
 import { classificarPostoGraduacao } from '@/utils/postoQuadroCompatibilidade';
+import { resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 
 function valorComFallback(valor, fallback = 'Não informado') {
   if (valor === null || valor === undefined) return fallback;
@@ -41,6 +42,7 @@ export default function FolhaAlteracoesDocumento({
     : `${dataAssinatura}.`;
   const classificacaoMilitar = classificarPostoGraduacao(previa?.militar?.posto_graduacao);
   const exibirComportamento = classificacaoMilitar === 'praca';
+  const matriculaAtualMilitar = resolverMatriculaAtual(previa?.militar, previa?.militar?.matriculas_historico || []);
 
   return (
     <article
@@ -61,7 +63,7 @@ export default function FolhaAlteracoesDocumento({
       <section className="mt-4 border border-black p-3 text-[10.5pt]">
         <div className="grid grid-cols-1 gap-y-1 md:grid-cols-2 md:gap-x-6">
           <p><strong>Nome:</strong> {valorComFallback(previa.militar.nome_completo)}</p>
-          <p><strong>Matrícula:</strong> {valorComFallback(previa.militar.matricula)}</p>
+          <p><strong>Matrícula:</strong> {valorComFallback(matriculaAtualMilitar)}</p>
           <p><strong>Posto/Graduação:</strong> {valorComFallback(previa.militar.posto_graduacao)}</p>
           <p><strong>Quadro:</strong> {valorComFallback(previa.militar.quadro)}</p>
           <p><strong>Identidade / Órgão Expedidor:</strong> {montarIdentidade(previa.militar)}</p>
