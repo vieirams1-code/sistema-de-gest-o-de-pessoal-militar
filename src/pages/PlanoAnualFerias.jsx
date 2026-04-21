@@ -211,8 +211,13 @@ export default function PlanoAnualFerias() {
                               {f.militar_nome}
                             </p>
                             <p className="text-sm text-slate-500">
-                              Mat: {f.militar_matricula_label || f.militar_matricula || '—'} | Período: {formatDate(f.data_inicio)} a {formatDate(f.data_retorno)}
+                              Mat: {f.militar_matricula_label || f.militar_matricula_atual || f.militar_matricula || '—'} | Período: {formatDate(f.data_inicio)} a {formatDate(f.data_retorno)}
                             </p>
+                            {f.militar_mesclado && (
+                              <p className="text-xs text-amber-700">
+                                Registro vinculado a militar mesclado (somente histórico documental).
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-3">
                             <Badge variant="outline" className="bg-white">
