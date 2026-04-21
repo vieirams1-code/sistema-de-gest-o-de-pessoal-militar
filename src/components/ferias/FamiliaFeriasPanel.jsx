@@ -20,6 +20,7 @@ import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { calcularSnapshotInterrupcao } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import AdminCadeiaPanel from '@/components/ferias/AdminCadeiaPanel';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { montarLabelMilitarFerias } from '@/services/feriasMilitarContextService';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -252,6 +253,9 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, mo
       .pop();
   }, [eventosVinculados]);
 
+
+  const matriculaDocumental = useMemo(() => montarLabelMilitarFerias(ferias, { contexto: 'documental' }), [ferias]);
+
   const indicadores = useMemo(() => {
     const diasTotais = Number(ferias.dias || 0);
     const hoje = new Date();
@@ -341,10 +345,16 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, mo
               </span>
             </div>
 
-            {ferias.militar_matricula && (
+            {matriculaDocumental && (
               <div className="flex justify-between items-center">
                 <span className="text-xs text-slate-500">Matrícula</span>
-                <span className="text-sm text-slate-700">{ferias.militar_matricula}</span>
+                <span className="text-sm text-slate-700">{matriculaDocumental}</span>
+              </div>
+            )}
+
+            {ferias.militar_mesclado && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1">
+                <span className="text-[11px] text-amber-800">Registro histórico vinculado a militar mesclado.</span>
               </div>
             )}
 
