@@ -51,9 +51,18 @@ export function vinculaRegistroAoMilitar(registro, militar) {
     return true;
   }
 
-  const matriculaRegistro = normalizarMatricula(registro?.militar_matricula || registro?.matricula_legado);
+  const matriculasRegistro = [
+    registro?.militar_matricula_atual,
+    registro?.militar_matricula,
+    registro?.militar_matricula_legado,
+    registro?.matricula_legado,
+    registro?.matricula,
+  ]
+    .map(normalizarMatricula)
+    .filter(Boolean);
+
   const matriculasMilitar = extrairMatriculasMilitar(militar);
-  if (matriculaRegistro && matriculasMilitar.includes(matriculaRegistro)) {
+  if (matriculasRegistro.some((matricula) => matriculasMilitar.includes(matricula))) {
     return true;
   }
 

@@ -131,6 +131,12 @@ function extrairMatriculasHistoricasTexto(registro = {}, origemTipo = '') {
   const legado = String(registro?.militar_matricula_legado || '').trim();
   if (legado) lista.push(legado);
 
+  const registroCongelado = String(registro?.militar_matricula || '').trim();
+  if (registroCongelado) lista.push(registroCongelado);
+
+  const atualDerivada = String(registro?.militar_matricula_atual || registro?.militar?.matricula_atual || registro?.militar?.matricula || '').trim();
+  if (atualDerivada) lista.push(atualDerivada);
+
   return [...new Set(lista)].join(' ');
 }
 
@@ -185,18 +191,23 @@ function normalizarRegistro(registro) {
     registro.status_calculado ||
     (origemTipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcularStatusPublicacaoRegistro(registro));
   const statusCanonico = obterStatusCanonicoPublicacao({ ...registro, status_calculado: statusOrigem });
-  const matriculaAtual = origemTipo === 'livro'
+  const matriculaRegistroHistorica = pickPrimeiroValor(
+    registro?.militar_matricula,
+    registro?.militar_matricula_legado,
+  );
+
+  const matriculaAtualDerivada = origemTipo === 'livro'
     ? pickPrimeiroValor(
       registro?.militar?.matricula_atual,
       registro?.militar?.matricula,
       registro?.militar_matricula_atual,
-      registro?.militar_matricula,
+      matriculaRegistroHistorica,
     )
     : pickPrimeiroValor(
       registro?.militar_matricula_atual,
-      registro?.militar_matricula,
       registro?.militar?.matricula_atual,
       registro?.militar?.matricula,
+      matriculaRegistroHistorica,
     );
 
   return {
@@ -215,7 +226,9 @@ function normalizarRegistro(registro) {
     militar_posto_graduacao: postoGraduacao,
     militar_quadro: quadro,
     militar_nome_institucional: montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao: militarNomeCompleto }),
-    militar_matricula: matriculaAtual,
+    militar_matricula: matriculaAtualDerivada || matriculaRegistroHistorica,
+    militar_matricula_atual: matriculaAtualDerivada,
+    militar_matricula_registro: matriculaRegistroHistorica,
     militar_matriculas_busca: extrairMatriculasHistoricasTexto(registro, origemTipo),
     militar_id: origemTipo === 'livro' ? (registro?.militar?.id || registro?.militar_id) : registro.militar_id,
     created_date: origemTipo === 'livro' ? (registro?.detalhes?.criado_em_iso || registro.created_date) : registro.created_date,
@@ -443,6 +456,8 @@ export default function Publicacoes() {
     const matchesSearch =
       containsTerm(r.militar_nome, termo) ||
       containsTerm(r.militar_matricula, termo) ||
+      containsTerm(r.militar_matricula_atual, termo) ||
+      containsTerm(r.militar_matricula_registro, termo) ||
       containsTerm(r.militar_matriculas_busca, termo) ||
       containsTerm(r.numero_bg, termo) ||
       containsTerm(r.nota_para_bg, termo) ||

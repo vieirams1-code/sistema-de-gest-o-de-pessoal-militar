@@ -205,7 +205,7 @@ function getTextoPublicacaoRegistro({
       data_interrupcao: registro?.data_registro || registro?.data_inicio || null,
       militar_nome: registro?.militar_nome || militar?.nome_completo || militar?.nome,
       militar_posto: registro?.militar_posto || militar?.posto_graduacao,
-      militar_matricula: registro?.militar_matricula || militar?.matricula,
+      militar_matricula: registro?.militar_matricula || militar?.matricula_atual || militar?.matricula,
       periodo_aquisitivo_ref: registro?.periodo_aquisitivo || ferias?.periodo_aquisitivo_ref || '',
       saldo_remanescente: registro?.saldo_remanescente ?? ferias?.saldo_remanescente,
       dias_gozados_interrupcao: registro?.dias_gozados ?? ferias?.dias_gozados_interrupcao,
@@ -268,7 +268,9 @@ function mapMilitar(registro, militar) {
       null,
     posto_graduacao: registro?.militar_posto || militar?.posto_graduacao || militar?.militar_posto || null,
     quadro: registro?.militar_quadro || militar?.quadro || null,
-    matricula: registro?.militar_matricula || militar?.matricula || militar?.militar_matricula || null,
+    matricula: militar?.matricula_atual || militar?.matricula || registro?.militar_matricula || militar?.militar_matricula || null,
+    matricula_atual: militar?.matricula_atual || militar?.matricula || null,
+    matricula_registro: registro?.militar_matricula || null,
   };
 }
 
