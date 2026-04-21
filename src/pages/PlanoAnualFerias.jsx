@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Plus, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import { enriquecerFeriasComContextoMilitar } from '@/services/feriasMilitarContextService';
 
 const meses = [
   { nome: 'Janeiro', valor: 'Janeiro', numero: 1 },
@@ -39,11 +40,12 @@ export default function PlanoAnualFerias() {
     queryKey: ['ferias-ano', anoSelecionado],
     queryFn: async () => {
       const todasFerias = await base44.entities.Ferias.list();
-      return todasFerias.filter(f => {
+      const filtradas = todasFerias.filter(f => {
         if (!f.data_inicio) return false;
         const ano = new Date(f.data_inicio + 'T00:00:00').getFullYear();
         return ano === anoSelecionado;
       });
+      return enriquecerFeriasComContextoMilitar(filtradas, { contexto: 'operacional' });
     }
   });
 
@@ -209,7 +211,7 @@ export default function PlanoAnualFerias() {
                               {f.militar_nome}
                             </p>
                             <p className="text-sm text-slate-500">
-                              Mat: {f.militar_matricula} | Período: {formatDate(f.data_inicio)} a {formatDate(f.data_retorno)}
+                              Mat: {f.militar_matricula_label || f.militar_matricula || '—'} | Período: {formatDate(f.data_inicio)} a {formatDate(f.data_retorno)}
                             </p>
                           </div>
                           <div className="flex items-center gap-3">

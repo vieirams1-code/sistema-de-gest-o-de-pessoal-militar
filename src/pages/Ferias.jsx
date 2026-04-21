@@ -59,6 +59,7 @@ import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -295,7 +296,10 @@ export default function Ferias() {
   const { data: ferias = [], isLoading } = useQuery({
     queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.Ferias.list('-data_inicio');
+      if (isAdmin) {
+        const lista = await base44.entities.Ferias.list('-data_inicio');
+        return enriquecerFeriasComContextoMilitar(lista, { contexto: 'operacional' });
+      }
 
       const militarScopeFilters = getMilitarScopeFilters();
       if (!militarScopeFilters.length) return [];
@@ -321,11 +325,13 @@ export default function Ferias() {
         merged.push(registro);
       }
 
-      return merged.sort((a, b) => {
+      const sorted = merged.sort((a, b) => {
         const da = new Date(`${a?.data_inicio || '1900-01-01'}T00:00:00`).getTime();
         const db = new Date(`${b?.data_inicio || '1900-01-01'}T00:00:00`).getTime();
         return db - da;
       });
+
+      return enriquecerFeriasComContextoMilitar(sorted, { contexto: 'operacional' });
     },
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
@@ -385,10 +391,7 @@ export default function Ferias() {
 
   const filteredFerias = useMemo(() => {
     return ferias.filter((f) => {
-      const matchesSearch =
-        f.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        f.periodo_aquisitivo_ref?.includes(searchTerm);
+      const matchesSearch = feriasCorrespondeBusca(f, searchTerm);
 
       const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -746,7 +749,10 @@ export default function Ferias() {
                                 )}
                                 {f.militar_nome}
                               </span>
-                              <p className="text-xs text-slate-400">Mat: {f.militar_matricula}</p>
+                              <p className="text-xs text-slate-400">Mat: {f.militar_matricula_label || f.militar_matricula || '—'}</p>
+                              {f.militar_mesclado && (
+                                <p className="text-[11px] text-amber-700">Registro vinculado a militar mesclado (somente histórico documental).</p>
+                              )}
                             </td>
 
                             <td className="px-4 py-3 text-slate-600">{f.periodo_aquisitivo_ref || '-'}</td>

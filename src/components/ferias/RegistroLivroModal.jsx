@@ -31,6 +31,7 @@ import {
 } from '@/components/ferias/feriasRules';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
 
 const NOMES_OPERACIONAIS = {
   'Saída Férias': 'Início',
@@ -504,11 +505,7 @@ export default function RegistroLivroModal({
     setSaving(true);
 
     try {
-      const registroPayload = {
-        militar_id: ferias.militar_id,
-        militar_nome: ferias.militar_nome,
-        militar_posto: ferias.militar_posto,
-        militar_matricula: ferias.militar_matricula,
+      const registroPayload = montarPayloadRegistroLivroFerias(ferias, {
         ferias_id: ferias.id,
         periodo_aquisitivo: ferias.periodo_aquisitivo_ref || '',
         data_registro: dataRegistro,
@@ -520,7 +517,7 @@ export default function RegistroLivroModal({
         status: statusPublicacao,
         observacoes: observacoes || '',
         texto_publicacao: textoPublicacao || '',
-      };
+      });
 
       if (tipoRegistro === 'Interrupção de Férias' && resumo) {
         registroPayload.dias = Number(resumo.diasNoMomento || ferias.dias || 0);
