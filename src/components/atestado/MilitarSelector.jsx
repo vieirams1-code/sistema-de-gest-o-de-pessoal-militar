@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getFeriasElegiveisPorOperacao, getMensagemSemElegibilidade } from '@/components/livro/feriasOperacaoUtils';
-import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, isMilitarMesclado, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 
 export default function MilitarSelector({ value, onChange, onMilitarSelect, livroOperacaoFerias = null, dataBase = '', somenteElegiveis = false }) {
   const [open, setOpen] = useState(false);
@@ -101,7 +101,10 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
     queryFn: async () => {
       if (!value) return null;
       const list = await base44.entities.Militar.filter({ id: value });
-      return list[0] || null;
+      const [militar] = list;
+      if (!militar) return null;
+      const [enriquecido] = await carregarMilitaresComMatriculas([militar]);
+      return enriquecido || militar;
     },
     enabled: !!value
   });
@@ -111,16 +114,17 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
   const filteredMilitares = militaresDisponiveis.filter((m) => militarCorrespondeBusca(m, searchTerm));
 
   const handleSelect = (militar) => {
+    if (isMilitarMesclado(militar)) return;
     onChange('militar_id', militar.id);
     if (onMilitarSelect) {
       onMilitarSelect({
         id: militar.id,
         militar_nome: militar.nome_completo,
         militar_posto: militar.posto_graduacao,
-        militar_matricula: militar.matricula,
+        militar_matricula: militar.matricula_atual || militar.matricula,
         nome_completo: militar.nome_completo,
         posto_graduacao: militar.posto_graduacao,
-        matricula: militar.matricula
+        matricula: militar.matricula_atual || militar.matricula
       });
     }
     setOpen(false);
@@ -162,8 +166,9 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
               {selectedMilitar.nome_guerra || selectedMilitar.nome_completo}
             </p>
             <p className="text-xs text-slate-500 truncate">
-              Mat: {selectedMilitar.matricula}
+              Mat: {selectedMilitar.matricula_atual || selectedMilitar.matricula || '—'}
             </p>
+            {isMilitarMesclado(selectedMilitar) && <p className="text-[11px] text-amber-700">Militar mesclado (apenas histórico).</p>}
           </div>
           <Button
             type="button"
@@ -224,7 +229,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
                         {militar.nome_guerra || militar.nome_completo}
                       </p>
                       <p className="text-xs text-slate-500 truncate">
-                        Mat: {militar.matricula}
+                        Mat: {militar.matricula_atual || militar.matricula || '—'}
                       </p>
                     </div>
                   </CommandItem>

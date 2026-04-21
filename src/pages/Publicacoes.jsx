@@ -108,6 +108,32 @@ function pickPrimeiroValor(...valores) {
   return '';
 }
 
+function extrairMatriculasHistoricasTexto(registro = {}, origemTipo = '') {
+  const lista = [];
+  if (origemTipo === 'livro') {
+    const historicoContrato = registro?.militar?.matriculas_historico;
+    if (Array.isArray(historicoContrato)) {
+      historicoContrato.forEach((item) => {
+        const valor = String(item?.matricula_formatada || item?.matricula || '').trim();
+        if (valor) lista.push(valor);
+      });
+    }
+  }
+
+  const historicosRegistro = registro?.militar_matriculas_historico;
+  if (Array.isArray(historicosRegistro)) {
+    historicosRegistro.forEach((item) => {
+      const valor = String(item?.matricula_formatada || item?.matricula || item || '').trim();
+      if (valor) lista.push(valor);
+    });
+  }
+
+  const legado = String(registro?.militar_matricula_legado || '').trim();
+  if (legado) lista.push(legado);
+
+  return [...new Set(lista)].join(' ');
+}
+
 function normalizarRegistro(registro) {
   const origemTipo = detectarOrigemTipo(registro);
   const militarContrato = registro?.militar || {};
@@ -159,6 +185,19 @@ function normalizarRegistro(registro) {
     registro.status_calculado ||
     (origemTipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcularStatusPublicacaoRegistro(registro));
   const statusCanonico = obterStatusCanonicoPublicacao({ ...registro, status_calculado: statusOrigem });
+  const matriculaAtual = origemTipo === 'livro'
+    ? pickPrimeiroValor(
+      registro?.militar?.matricula_atual,
+      registro?.militar?.matricula,
+      registro?.militar_matricula_atual,
+      registro?.militar_matricula,
+    )
+    : pickPrimeiroValor(
+      registro?.militar_matricula_atual,
+      registro?.militar_matricula,
+      registro?.militar?.matricula_atual,
+      registro?.militar?.matricula,
+    );
 
   return {
     ...registro,
@@ -176,7 +215,8 @@ function normalizarRegistro(registro) {
     militar_posto_graduacao: postoGraduacao,
     militar_quadro: quadro,
     militar_nome_institucional: montarNomeInstitucional({ postoGraduacao, quadro, nomeExibicao: militarNomeCompleto }),
-    militar_matricula: origemTipo === 'livro' ? (registro?.militar?.matricula || registro?.militar_matricula) : registro.militar_matricula,
+    militar_matricula: matriculaAtual,
+    militar_matriculas_busca: extrairMatriculasHistoricasTexto(registro, origemTipo),
     militar_id: origemTipo === 'livro' ? (registro?.militar?.id || registro?.militar_id) : registro.militar_id,
     created_date: origemTipo === 'livro' ? (registro?.detalhes?.criado_em_iso || registro.created_date) : registro.created_date,
     data_registro: origemTipo === 'livro' ? (registro.data_inicio_iso || registro.data_registro) : registro.data_registro,
@@ -403,6 +443,7 @@ export default function Publicacoes() {
     const matchesSearch =
       containsTerm(r.militar_nome, termo) ||
       containsTerm(r.militar_matricula, termo) ||
+      containsTerm(r.militar_matriculas_busca, termo) ||
       containsTerm(r.numero_bg, termo) ||
       containsTerm(r.nota_para_bg, termo) ||
       containsTerm(r.tipo, termo) ||
