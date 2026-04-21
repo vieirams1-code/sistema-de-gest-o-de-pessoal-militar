@@ -122,7 +122,7 @@ export default function CadastrarArmamento() {
                   militar_id: data.id || prev.militar_id,
                   militar_nome: data.militar_nome || data.nome_completo,
                   militar_posto: data.militar_posto || data.posto_graduacao,
-                  militar_matricula: data.militar_matricula || data.matricula
+                  militar_matricula: data.matricula_atual || data.militar_matricula || data.matricula
                 }));
               }}
             />
