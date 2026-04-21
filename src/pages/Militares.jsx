@@ -26,6 +26,7 @@ import {
   filtrarMilitaresOperacionais,
   militarCorrespondeBusca,
 } from '@/services/matriculaMilitarViewService';
+import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
 
 export default function Militares() {
   const navigate = useNavigate();
@@ -102,9 +103,11 @@ export default function Militares() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Militar.delete(id),
+    mutationFn: (id) => excluirMilitarComDependencias(id, { executadoPor: userEmail || '' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['militares'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-pendencias-comportamento'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
       setDeleteDialogOpen(false);
       setMilitarToDelete(null);
     }
