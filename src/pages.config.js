@@ -84,7 +84,6 @@ import TemplatesTexto from './pages/TemplatesTexto';
 import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
-import VinculosTemporarios from './pages/VinculosTemporarios';
 import EstruturaOrganizacional from './pages/EstruturaOrganizacional';
 import LotacaoMilitares from './pages/LotacaoMilitares';
 import Livro from './pages/Livro';
@@ -137,7 +136,6 @@ export const PAGES = {
     "TiposMedalha": TiposMedalha,
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
-    "VinculosTemporarios": VinculosTemporarios,
     "EstruturaOrganizacional": EstruturaOrganizacional,
     "LotacaoMilitares": LotacaoMilitares,
     "Livro": Livro,

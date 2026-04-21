@@ -423,7 +423,6 @@ export default function CadastrarMilitar() {
                   onChange={handleChange}
                   type="select"
                   options={['Ativa', 'Reserva Remunerada', 'Reformado', 'Designado', 'Convocado']}
-                  hint={['Designado', 'Convocado'].includes(formData.situacao_militar) ? 'Situação vinculada a vínculo temporário.' : ''}
                 />
                 <FuncaoSelector
                   value={formData.funcao}
