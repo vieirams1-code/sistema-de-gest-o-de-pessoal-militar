@@ -38,6 +38,7 @@ const moduleGuardByPage = {
   Militares: { moduleKey: 'militares', moduleName: 'Efetivo' },
   Armamentos: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
   Medalhas: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
+  ApuracaoMedalhasTempoServico: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   CadastrarPublicacao: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
   Publicacoes: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
   QuadroOperacional: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
