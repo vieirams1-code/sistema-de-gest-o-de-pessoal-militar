@@ -1,6 +1,8 @@
 import { calcularTempoServico } from './tempoServicoService.js';
 
 export const CATEGORIA_TEMPO_SERVICO = 'TEMPO_SERVICO';
+export const CATEGORIA_DOM_PEDRO_II = 'DOM_PEDRO_II';
+export const DOM_PEDRO_II_ANOS_MINIMOS_PADRAO = 30;
 
 export const TIPOS_FIXOS_MEDALHA_TEMPO = [
   {
@@ -46,7 +48,7 @@ export const TIPOS_FIXOS_MEDALHA_TEMPO = [
   {
     codigo: 'DOM_PEDRO_II',
     nome: 'Medalha Dom Pedro II',
-    categoria: CATEGORIA_TEMPO_SERVICO,
+    categoria: CATEGORIA_DOM_PEDRO_II,
     ordem_hierarquica: 50,
     anos_minimos: null,
     ativo: true,
@@ -121,6 +123,21 @@ function mapearCodigoTempoPorTexto(valor) {
   return null;
 }
 
+export function resolverCodigoTipoMedalha(registroOuTexto) {
+  if (!registroOuTexto) return null;
+  const valorCodigo = typeof registroOuTexto === 'object'
+    ? registroOuTexto.tipo_medalha_codigo || registroOuTexto.codigo
+    : registroOuTexto;
+  const codigoDireto = normalizarCodigo(valorCodigo);
+  const pareceCodigoTecnico = /^[A-Z0-9_]+$/.test(String(codigoDireto || ''));
+  if (codigoDireto && pareceCodigoTecnico) return codigoDireto;
+
+  const texto = typeof registroOuTexto === 'object'
+    ? registroOuTexto.tipo_medalha_nome || registroOuTexto.nome
+    : registroOuTexto;
+  return mapearCodigoTempoPorTexto(texto);
+}
+
 export function calcularAnosTempoServico(militar, referencia = new Date()) {
   const tempoServico = calcularTempoServico(militar, referencia);
   return tempoServico.valido ? tempoServico.anos_completos : null;
@@ -192,10 +209,16 @@ function indexarTipos(tipos = []) {
     if (tipo?.id) porId.set(tipo.id, tipo);
   });
 
-  deduplicarTiposMedalha([...TIPOS_FIXOS_MEDALHA_TEMPO, ...tipos]).forEach((tipo) => {
+  [...tipos, ...TIPOS_FIXOS_MEDALHA_TEMPO].forEach((tipo) => {
     if (!tipo) return;
     const codigoNormalizado = normalizarCodigo(tipo.codigo);
-    if (codigoNormalizado) porCodigo.set(codigoNormalizado, { ...tipo, codigo: codigoNormalizado });
+    if (codigoNormalizado) {
+      const atual = porCodigo.get(codigoNormalizado);
+      const proximo = { ...tipo, codigo: codigoNormalizado };
+      if (!atual || (!atual.id && proximo.id)) {
+        porCodigo.set(codigoNormalizado, proximo);
+      }
+    }
     const nomeNormalizado = normalizarTexto(tipo.nome);
     if (nomeNormalizado) porNomeNormalizado.set(nomeNormalizado, tipo);
   });
@@ -225,6 +248,13 @@ function resolverTipoMedalha(registro, tipoIndexado) {
   }
 
   return null;
+}
+
+export function obterTipoMedalhaPorCodigo(codigo, tiposMedalha = []) {
+  const tipoIndexado = indexarTipos(tiposMedalha);
+  const codigoNormalizado = normalizarCodigo(codigo);
+  if (!codigoNormalizado) return null;
+  return tipoIndexado.porCodigo.get(codigoNormalizado) || null;
 }
 
 function obterOrdemHierarquicaRegistro(registro, tipoIndexado) {
@@ -346,11 +376,89 @@ export function apurarListaMilitaresTempoServico({
   }));
 }
 
+function obterMaiorMedalhaDomPedroRecebida(medalhas, tipoIndexado) {
+  return medalhas.find((item) => (
+    STATUS_CONSIDERADOS_CONCESSAO.has(normalizarStatusMedalha(item.status))
+    && resolverCodigoTipoMedalha(resolverTipoMedalha(item, tipoIndexado) || item) === 'DOM_PEDRO_II'
+  )) || null;
+}
+
+export function apurarMedalhaDomPedroIIMilitar({
+  militar,
+  medalhas = [],
+  tiposMedalha = [],
+  impedimentos = [],
+  referencia = new Date(),
+  anosMinimos = DOM_PEDRO_II_ANOS_MINIMOS_PADRAO,
+}) {
+  const tipoIndexado = indexarTipos(tiposMedalha);
+  const tempoServico = calcularTempoServico(militar, referencia);
+  const tempoServicoAnos = tempoServico.valido ? tempoServico.anos_completos : null;
+  const jaRecebeu = Boolean(obterMaiorMedalhaDomPedroRecebida(medalhas, tipoIndexado));
+
+  let situacao = 'SEM_DIREITO';
+  if (!tempoServico.valido) {
+    situacao = 'INCONSISTENTE';
+  } else if (jaRecebeu) {
+    situacao = 'JA_CONTEMPLADO';
+  } else if (tempoServicoAnos >= anosMinimos) {
+    situacao = 'ELEGIVEL';
+  }
+
+  const medalhaDevidaCodigo = (situacao === 'ELEGIVEL' || situacao === 'JA_CONTEMPLADO') ? 'DOM_PEDRO_II' : null;
+  const impedido = medalhaDevidaCodigo && temImpedimentoAplicavel({
+    impedimentos,
+    militarId: militar?.id,
+    medalhaDevidaCodigo,
+    referencia,
+  });
+  if (situacao === 'ELEGIVEL' && impedido) {
+    situacao = 'IMPEDIDO';
+  }
+
+  return {
+    militar_id: militar?.id || null,
+    tempo_servico_anos: tempoServicoAnos,
+    maior_medalha_recebida_codigo: jaRecebeu ? 'DOM_PEDRO_II' : null,
+    medalha_devida_codigo: medalhaDevidaCodigo,
+    situacao,
+  };
+}
+
+export function apurarListaMilitaresDomPedroII({
+  militares = [],
+  medalhas = [],
+  tiposMedalha = [],
+  impedimentos = [],
+  referencia = new Date(),
+  anosMinimos = DOM_PEDRO_II_ANOS_MINIMOS_PADRAO,
+}) {
+  const medalhasPorMilitar = medalhas.reduce((acc, medalha) => {
+    const militarId = medalha?.militar_id;
+    if (!militarId) return acc;
+    if (!acc.has(militarId)) acc.set(militarId, []);
+    acc.get(militarId).push(medalha);
+    return acc;
+  }, new Map());
+
+  return militares.map((militar) => ({
+    militar,
+    ...apurarMedalhaDomPedroIIMilitar({
+      militar,
+      medalhas: medalhasPorMilitar.get(militar.id) || [],
+      tiposMedalha,
+      impedimentos,
+      referencia,
+      anosMinimos,
+    }),
+  }));
+}
+
 export async function garantirCatalogoFixoMedalhaTempo(base44Client) {
   const existentes = await base44Client.entities.TipoMedalha.list('-created_date');
-  const codigosExistentes = new Set(existentes.map((item) => item.codigo).filter(Boolean));
+  const codigosExistentes = new Set(existentes.map((item) => normalizarCodigo(item.codigo)).filter(Boolean));
 
-  const pendentes = TIPOS_FIXOS_MEDALHA_TEMPO.filter((tipo) => !codigosExistentes.has(tipo.codigo));
+  const pendentes = TIPOS_FIXOS_MEDALHA_TEMPO.filter((tipo) => !codigosExistentes.has(normalizarCodigo(tipo.codigo)));
   if (!pendentes.length) return { created: 0 };
 
   await Promise.all(pendentes.map((tipo) => base44Client.entities.TipoMedalha.create(tipo)));

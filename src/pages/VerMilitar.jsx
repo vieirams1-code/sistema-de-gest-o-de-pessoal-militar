@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -30,6 +32,7 @@ import {
 } from '@/config/perfilMilitarRegistrosConfig';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { apurarMedalhaTempoServicoMilitar, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
+import { useToast } from '@/components/ui/use-toast';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -99,11 +102,19 @@ function AvisoRegistrosSistema({ mensagemRegistrosSistema }) {
 
 export default function VerMilitar() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const selectedTab = searchParams.get('tab') || 'comportamento';
   const { isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [showSolicitacao, setShowSolicitacao] = useState(false);
+  const [impedimentoForm, setImpedimentoForm] = useState({
+    data_inicio: new Date().toISOString().split('T')[0],
+    data_fim: '',
+    motivo: '',
+    observacoes: '',
+  });
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
@@ -157,6 +168,11 @@ export default function VerMilitar() {
   const { data: tiposMedalha = [] } = useQuery({
     queryKey: ['ver-tipos-medalha'],
     queryFn: () => base44.entities.TipoMedalha.list('nome'),
+    enabled: !!id && isAccessResolved && canViewMilitar,
+  });
+  const { data: impedimentosMedalha = [] } = useQuery({
+    queryKey: ['ver-impedimentos-medalha', id],
+    queryFn: () => base44.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date'),
     enabled: !!id && isAccessResolved && canViewMilitar,
   });
 
@@ -222,6 +238,41 @@ export default function VerMilitar() {
     medalhas: medalhasSistema,
     tiposMedalha,
   }), [medalhasSistema, militar, tiposMedalha]);
+  const impedimentoAtivoGeral = React.useMemo(
+    () => impedimentosMedalha.find((item) => item.ativo !== false && !item.tipo_medalha_codigo && !item.tipo_medalha_id),
+    [impedimentosMedalha],
+  );
+
+  const criarImpedimentoMutation = useMutation({
+    mutationFn: async () => base44.entities.ImpedimentoMedalha.create({
+      militar_id: id,
+      ativo: true,
+      data_inicio: impedimentoForm.data_inicio || new Date().toISOString().split('T')[0],
+      data_fim: impedimentoForm.data_fim || '',
+      motivo: impedimentoForm.motivo,
+      observacoes: impedimentoForm.observacoes,
+      tipo_medalha_codigo: '',
+      tipo_medalha_id: '',
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ver-impedimentos-medalha', id] });
+      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
+      toast({ title: 'Impedimento geral ativado para medalhas' });
+      setImpedimentoForm((atual) => ({ ...atual, motivo: '', observacoes: '' }));
+    },
+  });
+
+  const removerImpedimentoMutation = useMutation({
+    mutationFn: async (impedimentoId) => base44.entities.ImpedimentoMedalha.update(impedimentoId, {
+      ativo: false,
+      data_fim: new Date().toISOString().split('T')[0],
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ver-impedimentos-medalha', id] });
+      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
+      toast({ title: 'Impedimento removido' });
+    },
+  });
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
   const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
   const historicoComportamentoSistema = React.useMemo(() => filtrarRegistrosSistema(historicoComportamento), [historicoComportamento]);
@@ -656,6 +707,72 @@ export default function VerMilitar() {
                 <p className="text-sm text-slate-600">
                   Situação de apuração: <span className="font-semibold text-slate-800">{apuracaoTempoServico.situacao}</span>
                 </p>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-800">Impedimento geral de medalhas</h3>
+                  <Badge className={impedimentoAtivoGeral ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}>
+                    {impedimentoAtivoGeral ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </div>
+                {impedimentoAtivoGeral ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-600">Início: {formatDate(impedimentoAtivoGeral.data_inicio) || '—'} · Fim: {formatDate(impedimentoAtivoGeral.data_fim) || '—'}</p>
+                    <p className="text-xs text-slate-600">Motivo: {impedimentoAtivoGeral.motivo || '—'}</p>
+                    <p className="text-xs text-slate-600">Observações: {impedimentoAtivoGeral.observacoes || '—'}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={removerImpedimentoMutation.isPending}
+                      onClick={() => removerImpedimentoMutation.mutate(impedimentoAtivoGeral.id)}
+                    >
+                      Remover impedimento
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Data início</Label>
+                      <Input
+                        type="date"
+                        value={impedimentoForm.data_inicio}
+                        onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, data_inicio: event.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Data fim (opcional)</Label>
+                      <Input
+                        type="date"
+                        value={impedimentoForm.data_fim}
+                        onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, data_fim: event.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Motivo</Label>
+                      <Input
+                        value={impedimentoForm.motivo}
+                        onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, motivo: event.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>Observações</Label>
+                      <Input
+                        value={impedimentoForm.observacoes}
+                        onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, observacoes: event.target.value }))}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Button
+                        size="sm"
+                        className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                        disabled={criarImpedimentoMutation.isPending || !impedimentoForm.motivo.trim()}
+                        onClick={() => criarImpedimentoMutation.mutate()}
+                      >
+                        Ativar impedimento geral
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
               {medalhasConcedidasSistema.length === 0 ? (
                 <div className="bg-white rounded-xl p-8 text-center border border-slate-200">

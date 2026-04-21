@@ -2,15 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  DOM_PEDRO_II_ANOS_MINIMOS_PADRAO,
   TIPOS_FIXOS_MEDALHA_TEMPO,
+  apurarListaMilitaresDomPedroII,
   apurarListaMilitaresTempoServico,
+  apurarMedalhaDomPedroIIMilitar,
   apurarMedalhaTempoServicoMilitar,
   calcularAnosTempoServico,
   criarIndicacaoAutomatica,
   deduplicarTiposMedalha,
   isImpedimentoAtivo,
   normalizarStatusMedalha,
+  obterTipoMedalhaPorCodigo,
   obterCodigoFaixaPorAnos,
+  resolverCodigoTipoMedalha,
   temImpedimentoAplicavel,
 } from '../medalhasTempoServicoService.js';
 
@@ -261,6 +266,59 @@ test('ação de indicar monta payload em status INDICADA', () => {
   assert.equal(payload.militar_id, 'm19');
   assert.equal(payload.tipo_medalha_id, 'tipo20');
   assert.equal(payload.tipo_medalha_codigo, 'TEMPO_20');
+});
+
+test('resolução por código encontra tipo mesmo com catálogo misto', () => {
+  const tipo = obterTipoMedalhaPorCodigo('TEMPO_10', [{ id: 'fixo10', codigo: 'TEMPO_10', nome: 'Medalha de Tempo de Serviço - 10 anos' }]);
+  assert.equal(tipo.id, 'fixo10');
+  assert.equal(resolverCodigoTipoMedalha('Medalha de Tempo de Serviço - 20 anos'), 'TEMPO_20');
+});
+
+test('apuração Dom Pedro II é separada da apuração de tempo e respeita base configurável', () => {
+  const apuracao = apurarMedalhaDomPedroIIMilitar({
+    militar: { id: 'm20', data_inclusao: '1990-04-21' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+    anosMinimos: DOM_PEDRO_II_ANOS_MINIMOS_PADRAO,
+  });
+
+  assert.equal(apuracao.medalha_devida_codigo, 'DOM_PEDRO_II');
+  assert.equal(apuracao.situacao, 'ELEGIVEL');
+});
+
+test('apuração Dom Pedro II marca já contemplado e impedido sem misturar faixas de tempo', () => {
+  const jaContemplado = apurarMedalhaDomPedroIIMilitar({
+    militar: { id: 'm21', data_inclusao: '1990-04-21' },
+    medalhas: [{ militar_id: 'm21', tipo_medalha_nome: 'Medalha Dom Pedro II', status: 'CONCEDIDA' }],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+  assert.equal(jaContemplado.situacao, 'JA_CONTEMPLADO');
+
+  const impedido = apurarMedalhaDomPedroIIMilitar({
+    militar: { id: 'm22', data_inclusao: '1990-04-21' },
+    medalhas: [],
+    impedimentos: [{ militar_id: 'm22', ativo: true, tipo_medalha_codigo: 'DOM_PEDRO_II' }],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+  assert.equal(impedido.situacao, 'IMPEDIDO');
+});
+
+test('lista Dom Pedro II retorna mesma quantidade de militares processados', () => {
+  const lista = apurarListaMilitaresDomPedroII({
+    militares: [
+      { id: 'm23', data_inclusao: '1990-04-21' },
+      { id: 'm24', data_inclusao: '2022-04-21' },
+    ],
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+  assert.equal(lista.length, 2);
+  assert.equal(lista[0].medalha_devida_codigo, 'DOM_PEDRO_II');
+  assert.equal(lista[1].situacao, 'SEM_DIREITO');
 });
 
 test('isImpedimentoAtivo respeita vigência', () => {

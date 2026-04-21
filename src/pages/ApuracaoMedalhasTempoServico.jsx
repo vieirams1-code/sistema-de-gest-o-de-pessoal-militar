@@ -26,9 +26,11 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from '@/components/ui/use-toast';
 import {
   TIPOS_FIXOS_MEDALHA_TEMPO,
+  apurarListaMilitaresDomPedroII,
   apurarListaMilitaresTempoServico,
   criarIndicacaoAutomatica,
   garantirCatalogoFixoMedalhaTempo,
+  obterTipoMedalhaPorCodigo,
 } from '@/services/medalhasTempoServicoService';
 
 const situacaoBadgeConfig = {
@@ -74,6 +76,7 @@ export default function ApuracaoMedalhasTempoServico() {
   const hasMedalhasAccess = canAccessModule('medalhas');
 
   const [search, setSearch] = useState('');
+  const [modoApuracao, setModoApuracao] = useState('TEMPO_SERVICO');
   const [situacaoFilter, setSituacaoFilter] = useState('TODOS');
   const [faixaFilter, setFaixaFilter] = useState('TODAS');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
@@ -116,11 +119,16 @@ export default function ApuracaoMedalhasTempoServico() {
 
   const indicarMutation = useMutation({
     mutationFn: async (item) => {
-      const tipo = (tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO)
-        .find((registro) => registro.codigo === item.medalha_devida_codigo);
+      let tipo = obterTipoMedalhaPorCodigo(item.medalha_devida_codigo, tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO);
 
       if (!tipo?.id) {
-        throw new Error(`Tipo da medalha ${item.medalha_devida_codigo} não encontrado.`);
+        await garantirCatalogoFixoMedalhaTempo(base44);
+        const tiposAtualizados = await base44.entities.TipoMedalha.list('nome');
+        tipo = obterTipoMedalhaPorCodigo(item.medalha_devida_codigo, tiposAtualizados);
+      }
+
+      if (!tipo?.id) {
+        throw new Error(`Tipo da medalha ${item.medalha_devida_codigo} não encontrado no catálogo.`);
       }
 
       const payload = criarIndicacaoAutomatica({
@@ -132,6 +140,7 @@ export default function ApuracaoMedalhasTempoServico() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-registros'] });
+      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-tipos'] });
       queryClient.invalidateQueries({ queryKey: ['medalhas'] });
       toast({ title: 'Indicação criada', description: 'A medalha foi indicada com status INDICADA.' });
     },
@@ -140,40 +149,21 @@ export default function ApuracaoMedalhasTempoServico() {
     },
   });
 
-  const impedirMutation = useMutation({
-    mutationFn: async ({ militarId, medalhaCodigo, motivo }) => base44.entities.ImpedimentoMedalha.create({
-      militar_id: militarId,
-      tipo_medalha_codigo: medalhaCodigo || '',
-      ativo: true,
-      data_inicio: new Date().toISOString().split('T')[0],
-      motivo,
-      observacoes: '',
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
-      toast({ title: 'Impedimento ativado' });
-    },
-  });
-
-  const removerImpedimentoMutation = useMutation({
-    mutationFn: async ({ id }) => base44.entities.ImpedimentoMedalha.update(id, {
-      ativo: false,
-      data_fim: new Date().toISOString().split('T')[0],
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
-      toast({ title: 'Impedimento removido' });
-    },
-  });
-
   const apuracoes = useMemo(
-    () => apurarListaMilitaresTempoServico({
-      militares,
-      medalhas,
-      impedimentos,
-      tiposMedalha: tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO,
-    }),
-    [militares, medalhas, tiposMedalha, impedimentos],
+    () => (modoApuracao === 'DOM_PEDRO_II'
+      ? apurarListaMilitaresDomPedroII({
+        militares,
+        medalhas,
+        impedimentos,
+        tiposMedalha: tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO,
+      })
+      : apurarListaMilitaresTempoServico({
+        militares,
+        medalhas,
+        impedimentos,
+        tiposMedalha: tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO,
+      })),
+    [militares, medalhas, tiposMedalha, impedimentos, modoApuracao],
   );
 
   const totaisResumo = useMemo(() => apuracoes.reduce((acc, item) => {
@@ -239,7 +229,11 @@ export default function ApuracaoMedalhasTempoServico() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-[#1e3a5f]">Apuração de Medalhas</h1>
-                <p className="text-sm text-slate-600 mt-1">Apuração institucional de medalhas por tempo de serviço.</p>
+                <p className="text-sm text-slate-600 mt-1">
+                  {modoApuracao === 'DOM_PEDRO_II'
+                    ? 'Apuração institucional da medalha Dom Pedro II.'
+                    : 'Apuração institucional de medalhas por tempo de serviço.'}
+                </p>
               </div>
             </div>
             <Badge className="bg-slate-100 text-slate-700 border-slate-200">
@@ -276,6 +270,15 @@ export default function ApuracaoMedalhasTempoServico() {
               />
             </div>
             <div className="lg:col-span-3">
+              <Select value={modoApuracao} onValueChange={setModoApuracao}>
+                <SelectTrigger><SelectValue placeholder="Tipo de apuração" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TEMPO_SERVICO">Tempo de serviço</SelectItem>
+                  <SelectItem value="DOM_PEDRO_II">Dom Pedro II</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="lg:col-span-3">
               <Select value={situacaoFilter} onValueChange={setSituacaoFilter}>
                 <SelectTrigger><SelectValue placeholder="Situação" /></SelectTrigger>
                 <SelectContent>
@@ -293,10 +296,16 @@ export default function ApuracaoMedalhasTempoServico() {
                 <SelectTrigger><SelectValue placeholder="Medalha devida" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="TODAS">Todas faixas</SelectItem>
-                  <SelectItem value="TEMPO_10">10 anos</SelectItem>
-                  <SelectItem value="TEMPO_20">20 anos</SelectItem>
-                  <SelectItem value="TEMPO_30">30 anos</SelectItem>
-                  <SelectItem value="TEMPO_40">40 anos</SelectItem>
+                  {modoApuracao === 'DOM_PEDRO_II' ? (
+                    <SelectItem value="DOM_PEDRO_II">Dom Pedro II</SelectItem>
+                  ) : (
+                    <>
+                      <SelectItem value="TEMPO_10">10 anos</SelectItem>
+                      <SelectItem value="TEMPO_20">20 anos</SelectItem>
+                      <SelectItem value="TEMPO_30">30 anos</SelectItem>
+                      <SelectItem value="TEMPO_40">40 anos</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -355,55 +364,30 @@ export default function ApuracaoMedalhasTempoServico() {
 
                   <div className="md:col-span-3 flex items-center justify-start md:justify-end gap-2 flex-wrap">
                     {item.situacao === 'ELEGIVEL' && (
-                      <>
-                        <Button
-                          size="sm"
-                          className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                          disabled={indicarMutation.isPending}
-                          onClick={() => indicarMutation.mutate(item)}
-                        >
-                          <CheckCircle2 className="w-4 h-4 mr-1" />
-                          Indicar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={impedirMutation.isPending}
-                          onClick={() => {
-                            const motivo = window.prompt('Motivo do impedimento:');
-                            if (!motivo) return;
-                            impedirMutation.mutate({
-                              militarId: item.militar_id,
-                              medalhaCodigo: item.medalha_devida_codigo,
-                              motivo,
-                            });
-                          }}
-                        >
-                          <Ban className="w-4 h-4 mr-1" />
-                          Impedir
-                        </Button>
-                      </>
-                    )}
-
-                    {item.situacao === 'IMPEDIDO' && (
                       <Button
                         size="sm"
-                        variant="outline"
-                        disabled={removerImpedimentoMutation.isPending}
-                        onClick={() => {
-                          if (!impedimentoAtivo) return;
-                          removerImpedimentoMutation.mutate({ id: impedimentoAtivo.id });
-                        }}
+                        className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                        disabled={indicarMutation.isPending}
+                        onClick={() => indicarMutation.mutate(item)}
                       >
-                        Remover impedimento
+                        <CheckCircle2 className="w-4 h-4 mr-1" />
+                        Indicar
                       </Button>
                     )}
 
-                    {item.situacao !== 'ELEGIVEL' && item.situacao !== 'IMPEDIDO' && (
+                    {item.situacao !== 'ELEGIVEL' && (
                       <Button size="sm" variant="outline" disabled>
                         Indicação indisponível
                       </Button>
                     )}
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`${createPageUrl('VerMilitar')}?id=${item.militar_id}&tab=medalhas`)}
+                    >
+                      Gerenciar impedimento
+                    </Button>
 
                     <Button
                       size="icon"
