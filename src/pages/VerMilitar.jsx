@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ArrowLeft, Pencil, User, Briefcase, FileText,
+  ArrowLeft, Pencil, User, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
   Shield, Award, Send, Activity, AlertTriangle
 } from 'lucide-react';
@@ -30,10 +30,6 @@ import {
 } from '@/config/perfilMilitarRegistrosConfig';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { apurarMedalhaTempoServicoMilitar } from '@/services/medalhasTempoServicoService';
-import {
-  calcularStatusContratoTemporario,
-  obterUltimoBoletim,
-} from '@/services/vinculosTemporariosService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -175,17 +171,6 @@ export default function VerMilitar() {
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
-  const { data: contratosTemporarios = [] } = useQuery({
-    queryKey: ['ver-contratos-temporarios', id],
-    queryFn: () => base44.entities.ContratoTemporario.filter({ militar_id: id }, '-data_inicio'),
-    enabled: !!id && isAccessResolved && canViewMilitar
-  });
-  const { data: historicoContratosTemporarios = [] } = useQuery({
-    queryKey: ['ver-historico-contratos-temporarios', id],
-    queryFn: () => base44.entities.HistoricoContratoTemporario.list('-data_registro'),
-    enabled: !!id && isAccessResolved && canViewMilitar
-  });
-
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
     queryFn: async () => {
@@ -239,23 +224,6 @@ export default function VerMilitar() {
   }), [medalhasSistema, militar, tiposMedalha]);
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
   const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
-  const contratosTemporariosSistema = React.useMemo(() => filtrarRegistrosSistema(contratosTemporarios), [contratosTemporarios]);
-  const contratosTemporariosComStatus = React.useMemo(() => contratosTemporariosSistema.map((contrato) => ({
-    ...contrato,
-    status_calculado: calcularStatusContratoTemporario(contrato),
-  })), [contratosTemporariosSistema]);
-  const historicoContratosTemporariosSistema = React.useMemo(
-    () => filtrarRegistrosSistema(historicoContratosTemporarios),
-    [historicoContratosTemporarios]
-  );
-  const contratoTemporarioAtual = React.useMemo(() => [...contratosTemporariosComStatus]
-    .sort((a, b) => String(b.updated_date || b.created_date || '').localeCompare(String(a.updated_date || a.created_date || '')))[0] || null, [contratosTemporariosComStatus]);
-  const historicoContratoAtual = React.useMemo(() => {
-    if (!contratoTemporarioAtual) return [];
-    return historicoContratosTemporariosSistema
-      .filter((item) => item.contrato_temporario_id === contratoTemporarioAtual.id)
-      .sort((a, b) => String(b.data_registro || '').localeCompare(String(a.data_registro || '')));
-  }, [contratoTemporarioAtual, historicoContratosTemporariosSistema]);
   const historicoComportamentoSistema = React.useMemo(() => filtrarRegistrosSistema(historicoComportamento), [historicoComportamento]);
   const punicoesSistema = React.useMemo(() => filtrarRegistrosSistema(punicoes), [punicoes]);
   const pendenciasComportamentoSistema = React.useMemo(
@@ -427,7 +395,6 @@ export default function VerMilitar() {
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
             <TabsTrigger value="medalhas"><Award className="w-4 h-4 mr-1" />Medalhas</TabsTrigger>
             <TabsTrigger value="armamentos"><Shield className="w-4 h-4 mr-1" />Armamentos</TabsTrigger>
-            <TabsTrigger value="vinculo-temporario"><Briefcase className="w-4 h-4 mr-1" />Vínculo Temporário</TabsTrigger>
           </TabsList>
 
           {/* Dados Pessoais */}
@@ -736,34 +703,6 @@ export default function VerMilitar() {
             </div>
           </TabsContent>
 
-          <TabsContent value="vinculo-temporario">
-            <Section title="Vínculo Temporário" icon={Briefcase}>
-              {!contratoTemporarioAtual ? (
-                <div className="space-y-3">
-                  <p className="text-slate-500">Nenhum contrato temporário vinculado a este militar.</p>
-                  <Button variant="outline" onClick={() => navigate(createPageUrl('VinculosTemporarios'))}>
-                    Abrir módulo de Vínculos Temporários
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-slate-200 p-3">
-                    <p className="font-semibold text-slate-800">{contratoTemporarioAtual?.tipo_vinculo || 'Vínculo temporário'}</p>
-                    <p className="text-sm text-slate-600">Status: {contratoTemporarioAtual?.status_calculado || '-'}</p>
-                    <p className="text-sm text-slate-600">Início: {formatDate(contratoTemporarioAtual?.data_inicio) || '-'}</p>
-                    <p className="text-sm text-slate-600">Fim atual: {formatDate(contratoTemporarioAtual?.data_fim_atual || contratoTemporarioAtual?.data_fim_prevista) || '-'}</p>
-                    <p className="text-sm text-slate-600">Último boletim: {obterUltimoBoletim(historicoContratoAtual) || '-'}</p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      Histórico resumido: {historicoContratoAtual.slice(0, 3).map((item) => `${item.tipo_registro}${item.boletim ? ` (${item.boletim})` : ''}`).join(' • ') || 'Sem registros'}
-                    </p>
-                  </div>
-                  <Button variant="outline" onClick={() => navigate(createPageUrl('VinculosTemporarios'))}>
-                    Gerenciar no módulo
-                  </Button>
-                </div>
-              )}
-            </Section>
-          </TabsContent>
         </Tabs>
       </div>
 
