@@ -1,4 +1,4 @@
-import { resolverTipoFeriasCanonico } from '@/components/ferias/feriasTipoResolver';
+import { resolverTipoFeriasCanonico } from '../ferias/feriasTipoResolver.js';
 
 export const TEMPLATE_BLOQUEIO_MENSAGEM =
   'Template obrigatório não encontrado para este tipo de registro. Cadastre um template antes de continuar.';

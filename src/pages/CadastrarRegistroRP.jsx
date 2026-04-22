@@ -28,6 +28,7 @@ import {
   getTemplateAtivoPorTipo,
   tipoExigeTemplate,
 } from '@/components/rp/templateValidation';
+import { aplicarTemplate, abreviarPosto, formatDateBR } from '@/components/utils/templateUtils';
 import {
   anexarEventoAuditoriaPublicacao,
   calcularStatusPublicacaoRegistro,
@@ -57,6 +58,47 @@ function formatarDataExtenso(dataStr) {
   if (!dataStr) return '';
   const d = new Date(dataStr + 'T00:00:00');
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {} } = {}) {
+  const postoBase = formData.militar_posto || militar?.posto_graduacao || militar?.posto || '';
+  const postoAbreviado = abreviarPosto(postoBase);
+  const dataRegistro = formData.data_registro || formData.data_publicacao || '';
+
+  const variaveis = {
+    ...formData,
+    militar_nome: formData.militar_nome || militar?.nome_completo || '',
+    nome_completo: formData.militar_nome || militar?.nome_completo || '',
+    militar_matricula: formData.militar_matricula || militar?.matricula || '',
+    matricula: formData.militar_matricula || militar?.matricula || '',
+    militar_posto: postoBase,
+    posto: postoAbreviado,
+    posto_nome: postoAbreviado ? `${postoAbreviado} QOBM` : '',
+    posto_graduacao: postoBase,
+    data_registro: formatDateBR(dataRegistro),
+    data_publicacao: formatDateBR(dataRegistro),
+    data_bg: formatDateBR(formData.data_bg),
+    data_inicio: formatDateBR(formData.data_inicio),
+    data_termino: formatDateBR(formData.data_termino),
+    data_retorno: formatDateBR(formData.data_retorno),
+    data_portaria: formatDateBR(formData.data_portaria),
+    data_punicao: formatDateBR(formData.data_punicao),
+    data_designacao: formatDateBR(formData.data_designacao),
+    data_ata: formatDateBR(formData.data_ata),
+    data_melhoria: formatDateBR(formData.data_melhoria),
+    data_documento: formatDateBR(formData.data_documento),
+    data_fato: formatDateBR(formData.data_fato),
+    data_cedencia: formatDateBR(formData.data_cedencia),
+    data_transferencia: formatDateBR(formData.data_transferencia),
+    grupamento_id: militar?.grupamento_id || formData.grupamento_id || user?.grupamento_id || '',
+    subgrupamento_id: militar?.subgrupamento_id || formData.subgrupamento_id || user?.subgrupamento_id || '',
+    subgrupamento_tipo: militar?.subgrupamento_tipo || formData.subgrupamento_tipo || user?.subgrupamento_tipo || '',
+    unidade_id: militar?.unidade_id || formData.unidade_id || '',
+    usuario_nome: user?.full_name || user?.name || '',
+    usuario_email: user?.email || '',
+  };
+
+  return variaveis;
 }
 
 export default function CadastrarRegistroRP() {
@@ -150,6 +192,7 @@ export default function CadastrarRegistroRP() {
   const [operacaoFeriasSelecionada, setOperacaoFeriasSelecionada] = useState(null);
   const [originalActEntries, setOriginalActEntries] = useState([]);
   const [moduloOrigemEdicao, setModuloOrigemEdicao] = useState(null);
+  const [textoEditadoManualmente, setTextoEditadoManualmente] = useState(false);
   const isSubmittingRef = useRef(false);
 
   // Fetch existing record when editing
@@ -265,10 +308,64 @@ export default function CadastrarRegistroRP() {
   }, [formData.tipo_registro, tiposCustom]);
 
   const contextoTemplate = useMemo(() => ({
-    grupamento_id: militarSelecionado?.grupamento_id,
-    subgrupamento_id: militarSelecionado?.subgrupamento_id,
-    subgrupamento_tipo: militarSelecionado?.subgrupamento_tipo,
-  }), [militarSelecionado?.grupamento_id, militarSelecionado?.subgrupamento_id, militarSelecionado?.subgrupamento_tipo]);
+    grupamento_id:
+      militarSelecionado?.grupamento_id ||
+      formData.grupamento_id ||
+      acesso?.grupamento_id ||
+      user?.grupamento_id ||
+      '',
+    subgrupamento_id:
+      militarSelecionado?.subgrupamento_id ||
+      formData.subgrupamento_id ||
+      acesso?.subgrupamento_id ||
+      user?.subgrupamento_id ||
+      '',
+    subgrupamento_tipo:
+      militarSelecionado?.subgrupamento_tipo ||
+      formData.subgrupamento_tipo ||
+      acesso?.subgrupamento_tipo ||
+      user?.subgrupamento_tipo ||
+      '',
+    unidade_id:
+      militarSelecionado?.unidade_id ||
+      formData.unidade_id ||
+      '',
+    setor_id:
+      militarSelecionado?.grupamento_id ||
+      formData.grupamento_id ||
+      acesso?.grupamento_id ||
+      user?.grupamento_id ||
+      '',
+    subsetor_id:
+      militarSelecionado?.subgrupamento_id ||
+      formData.subgrupamento_id ||
+      acesso?.subgrupamento_id ||
+      user?.subgrupamento_id ||
+      '',
+    tipo_subgrupamento:
+      militarSelecionado?.subgrupamento_tipo ||
+      formData.subgrupamento_tipo ||
+      acesso?.subgrupamento_tipo ||
+      user?.subgrupamento_tipo ||
+      '',
+    user_email: user?.email || '',
+  }), [
+    militarSelecionado?.grupamento_id,
+    militarSelecionado?.subgrupamento_id,
+    militarSelecionado?.subgrupamento_tipo,
+    militarSelecionado?.unidade_id,
+    formData.grupamento_id,
+    formData.subgrupamento_id,
+    formData.subgrupamento_tipo,
+    formData.unidade_id,
+    acesso?.grupamento_id,
+    acesso?.subgrupamento_id,
+    acesso?.subgrupamento_tipo,
+    user?.grupamento_id,
+    user?.subgrupamento_id,
+    user?.subgrupamento_tipo,
+    user?.email,
+  ]);
 
   const templateAtivoSelecionado = useMemo(() => {
     if (!formData.tipo_registro || !moduloAtual) return null;
@@ -276,9 +373,9 @@ export default function CadastrarRegistroRP() {
   }, [formData.tipo_registro, moduloAtual, templatesAtivos, contextoTemplate]);
 
   const templateObrigatorioAusente = useMemo(() => {
-    if (isEditing || !formData.tipo_registro) return false;
+    if (!formData.tipo_registro) return false;
     return tipoExigeTemplate(formData.tipo_registro) && !templateAtivoSelecionado;
-  }, [isEditing, formData.tipo_registro, templateAtivoSelecionado]);
+  }, [formData.tipo_registro, templateAtivoSelecionado]);
 
   const conflitoTemplateSelecionado = useMemo(() => {
     if (!formData.tipo_registro) {
@@ -334,6 +431,40 @@ export default function CadastrarRegistroRP() {
     if (d.missao_descricao) entries.push(['Missão', d.missao_descricao]);
     setOriginalActEntries(entries);
   }, [registroEdicao]);
+
+  useEffect(() => {
+    setTextoEditadoManualmente(false);
+  }, [formData.tipo_registro, formData.militar_id, templateAtivoSelecionado?.id]);
+
+  useEffect(() => {
+    if (!templateAtivoSelecionado?.template) return;
+    if (!formData.tipo_registro || !moduloAtual) return;
+
+    if (textoEditadoManualmente && formData.texto_publicacao) return;
+
+    const textoGerado = aplicarTemplate(
+      templateAtivoSelecionado.template,
+      montarVariaveisTemplateRP({
+        formData,
+        militar: militarSelecionado,
+        user,
+      }),
+    );
+
+    setFormData((prev) => {
+      if (prev.texto_publicacao === textoGerado) return prev;
+      return { ...prev, texto_publicacao: textoGerado };
+    });
+  }, [
+    templateAtivoSelecionado?.id,
+    templateAtivoSelecionado?.template,
+    formData,
+    formData.tipo_registro,
+    moduloAtual,
+    militarSelecionado,
+    textoEditadoManualmente,
+    user,
+  ]);
 
   const handleChange = (name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -469,7 +600,7 @@ export default function CadastrarRegistroRP() {
       contextoTemplate,
     );
     const templateObrigatorioAusenteNoSubmit =
-      !isEditing && tipoExigeTemplate(formData.tipo_registro) && !templateAtivoNoSubmit;
+      tipoExigeTemplate(formData.tipo_registro) && !templateAtivoNoSubmit;
 
     const conflitoTemplateNoSubmit = getConflitoTemplatePorTipo(formData.tipo_registro, templatesAtivos);
 
@@ -863,7 +994,10 @@ export default function CadastrarRegistroRP() {
                   <Label className="text-sm font-medium text-slate-700">Texto de Publicação</Label>
                   <Textarea
                     value={formData.texto_publicacao || ''}
-                    onChange={e => handleChange('texto_publicacao', e.target.value)}
+                    onChange={e => {
+                      setTextoEditadoManualmente(true);
+                      handleChange('texto_publicacao', e.target.value);
+                    }}
                     className="mt-1.5"
                     rows={4}
                     placeholder="Texto gerado para o BG..."
