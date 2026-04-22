@@ -1,19 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ArrowLeft,
-  Ban,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Medal,
-  Search,
-  ShieldAlert,
-  ShieldCheck,
-  ShieldX,
-  Users,
-} from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Medal, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -21,51 +9,48 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from '@/components/ui/use-toast';
 import {
   TIPOS_FIXOS_MEDALHA_TEMPO,
-  apurarListaMilitaresDomPedroII,
   apurarListaMilitaresTempoServico,
   criarIndicacaoAutomatica,
+  filtrarIndicacoesTempoResetaveis,
   garantirCatalogoFixoMedalhaTempo,
+  normalizarStatusMedalha,
+  obterEstadoCelulaTempoServico,
   obterTipoMedalhaPorCodigo,
+  resolverCodigoTipoMedalha,
 } from '@/services/medalhasTempoServicoService';
 
-const situacaoBadgeConfig = {
-  SEM_DIREITO: {
-    label: 'Sem direito',
-    className: 'bg-slate-100 text-slate-700 border-slate-200',
-  },
-  ELEGIVEL: {
-    label: 'Elegível',
-    className: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  },
-  JA_CONTEMPLADO: {
-    label: 'Já contemplado',
-    className: 'bg-blue-100 text-blue-800 border-blue-200',
-  },
-  IMPEDIDO: {
-    label: 'Impedido',
-    className: 'bg-amber-100 text-amber-800 border-amber-200',
-  },
-  INCONSISTENTE: {
-    label: 'Inconsistente',
-    className: 'bg-rose-100 text-rose-800 border-rose-200',
-  },
-};
+const CODIGOS_TEMPO = ['TEMPO_10', 'TEMPO_20', 'TEMPO_30', 'TEMPO_40'];
+const LABEL_POR_CODIGO = { TEMPO_10: '10 anos', TEMPO_20: '20 anos', TEMPO_30: '30 anos', TEMPO_40: '40 anos' };
 
-const resumoConfig = [
-  { key: 'ELEGIVEL', label: 'Elegíveis', icon: ShieldCheck, color: 'text-emerald-700' },
-  { key: 'JA_CONTEMPLADO', label: 'Já contemplados', icon: Medal, color: 'text-blue-700' },
-  { key: 'SEM_DIREITO', label: 'Sem direito', icon: ShieldX, color: 'text-slate-700' },
-  { key: 'INCONSISTENTE', label: 'Inconsistentes', icon: ShieldAlert, color: 'text-rose-700' },
-  { key: 'IMPEDIDO', label: 'Impedidos', icon: Ban, color: 'text-amber-700' },
-];
+function hojeISO() {
+  return new Date().toISOString().split('T')[0];
+}
 
-function formatSituacao(situacao) {
-  return situacaoBadgeConfig[situacao] || situacaoBadgeConfig.SEM_DIREITO;
+function normalizarRegistroConcessao(registro, payload) {
+  return {
+    ...registro,
+    ...payload,
+    status: 'CONCEDIDA',
+    data_concessao: payload.data_concessao,
+    numero_publicacao: payload.numero_publicacao,
+    doems_numero: payload.numero_publicacao,
+  };
 }
 
 export default function ApuracaoMedalhasTempoServico() {
@@ -76,11 +61,9 @@ export default function ApuracaoMedalhasTempoServico() {
   const hasMedalhasAccess = canAccessModule('medalhas');
 
   const [search, setSearch] = useState('');
-  const [modoApuracao, setModoApuracao] = useState('TEMPO_SERVICO');
-  const [situacaoFilter, setSituacaoFilter] = useState('TODOS');
-  const [faixaFilter, setFaixaFilter] = useState('TODAS');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
-  const [expandedRows, setExpandedRows] = useState({});
+  const [concederDialog, setConcederDialog] = useState({ open: false, medalha: null, data: hojeISO(), doems: '' });
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   useQuery({
     queryKey: ['tipos-medalha-fixos-sync-apuracao'],
@@ -117,59 +100,34 @@ export default function ApuracaoMedalhasTempoServico() {
   const tiposMedalha = tiposMedalhaQuery.data || [];
   const impedimentos = impedimentosQuery.data || [];
 
-  const indicarMutation = useMutation({
-    mutationFn: async (item) => {
-      let tipo = obterTipoMedalhaPorCodigo(item.medalha_devida_codigo, tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO);
+  const tiposCatalogo = tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO;
 
-      if (!tipo?.id) {
-        await garantirCatalogoFixoMedalhaTempo(base44);
-        const tiposAtualizados = await base44.entities.TipoMedalha.list('nome');
-        tipo = obterTipoMedalhaPorCodigo(item.medalha_devida_codigo, tiposAtualizados);
+  const registrosTempo = useMemo(() => medalhas.filter((item) => CODIGOS_TEMPO.includes(resolverCodigoTipoMedalha(item))), [medalhas]);
+
+  const registroPorMilitarCodigo = useMemo(() => {
+    const mapa = new Map();
+    registrosTempo.forEach((registro) => {
+      const codigo = resolverCodigoTipoMedalha(registro);
+      const militarId = registro?.militar_id;
+      if (!codigo || !militarId) return;
+      const chave = `${militarId}:${codigo}`;
+      const atual = mapa.get(chave);
+      const statusAtual = normalizarStatusMedalha(atual?.status);
+      const statusNovo = normalizarStatusMedalha(registro?.status);
+      const prioridade = (status) => (status === 'CONCEDIDA' ? 2 : status === 'INDICADA' ? 1 : 0);
+      if (!atual || prioridade(statusNovo) > prioridade(statusAtual)) {
+        mapa.set(chave, registro);
       }
+    });
+    return mapa;
+  }, [registrosTempo]);
 
-      if (!tipo?.id) {
-        throw new Error(`Tipo da medalha ${item.medalha_devida_codigo} não encontrado no catálogo.`);
-      }
-
-      const payload = criarIndicacaoAutomatica({
-        militar: item.militar,
-        medalhaDevida: item.medalha_devida_codigo,
-        tipoMedalha: tipo,
-      });
-      return base44.entities.Medalha.create(payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-registros'] });
-      queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-tipos'] });
-      queryClient.invalidateQueries({ queryKey: ['medalhas'] });
-      toast({ title: 'Indicação criada', description: 'A medalha foi indicada com status INDICADA.' });
-    },
-    onError: (error) => {
-      toast({ title: 'Erro ao indicar', description: error.message, variant: 'destructive' });
-    },
-  });
-
-  const apuracoes = useMemo(
-    () => (modoApuracao === 'DOM_PEDRO_II'
-      ? apurarListaMilitaresDomPedroII({
-        militares,
-        medalhas,
-        impedimentos,
-        tiposMedalha: tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO,
-      })
-      : apurarListaMilitaresTempoServico({
-        militares,
-        medalhas,
-        impedimentos,
-        tiposMedalha: tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO,
-      })),
-    [militares, medalhas, tiposMedalha, impedimentos, modoApuracao],
-  );
-
-  const totaisResumo = useMemo(() => apuracoes.reduce((acc, item) => {
-    acc[item.situacao] = (acc[item.situacao] || 0) + 1;
-    return acc;
-  }, {}), [apuracoes]);
+  const apuracoes = useMemo(() => apurarListaMilitaresTempoServico({
+    militares,
+    medalhas,
+    impedimentos,
+    tiposMedalha: tiposCatalogo,
+  }), [militares, medalhas, impedimentos, tiposCatalogo]);
 
   const unidadesDisponiveis = useMemo(
     () => [...new Set(apuracoes.map((item) => item.militar?.lotacao || item.militar?.unidade).filter(Boolean))],
@@ -180,260 +138,262 @@ export default function ApuracaoMedalhasTempoServico() {
     const militar = item.militar || {};
     const nome = `${militar.posto_graduacao || ''} ${militar.nome_completo || ''}`.toLowerCase();
     const termo = search.toLowerCase();
-
-    const matchSearch = !termo
-      || nome.includes(termo)
-      || String(militar.matricula || '').toLowerCase().includes(termo);
-
-    const matchSituacao = situacaoFilter === 'TODOS' || item.situacao === situacaoFilter;
-    const matchFaixa = faixaFilter === 'TODAS' || item.medalha_devida_codigo === faixaFilter;
     const unidade = militar.lotacao || militar.unidade;
-    const matchUnidade = unidadeFilter === 'TODAS' || unidade === unidadeFilter;
+    return (!termo || nome.includes(termo) || String(militar.matricula || '').toLowerCase().includes(termo))
+      && (unidadeFilter === 'TODAS' || unidade === unidadeFilter);
+  }), [apuracoes, search, unidadeFilter]);
 
-    return matchSearch && matchSituacao && matchFaixa && matchUnidade;
-  }), [apuracoes, faixaFilter, search, situacaoFilter, unidadeFilter]);
+  const totais = useMemo(() => {
+    const indicados = registrosTempo.filter((m) => normalizarStatusMedalha(m.status) === 'INDICADA').length;
+    const contemplados = registrosTempo.filter((m) => normalizarStatusMedalha(m.status) === 'CONCEDIDA').length;
+    const elegiveis = apuracoes.filter((item) => item.situacao === 'ELEGIVEL').length;
+    return { indicados, contemplados, elegiveis };
+  }, [apuracoes, registrosTempo]);
 
-  const hasActiveFilters = Boolean(search.trim())
-    || situacaoFilter !== 'TODOS'
-    || faixaFilter !== 'TODAS'
-    || unidadeFilter !== 'TODAS';
+  const refreshQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-registros'] });
+    queryClient.invalidateQueries({ queryKey: ['medalhas'] });
+    queryClient.invalidateQueries({ queryKey: ['ver-medalhas'] });
+  };
 
-  const isLoadingData = militaresQuery.isLoading
-    || medalhasQuery.isLoading
-    || tiposMedalhaQuery.isLoading
-    || impedimentosQuery.isLoading;
+  const indicarMutation = useMutation({
+    mutationFn: async ({ item, codigo }) => {
+      let tipo = obterTipoMedalhaPorCodigo(codigo, tiposCatalogo);
+      if (!tipo?.id) {
+        await garantirCatalogoFixoMedalhaTempo(base44);
+        const tiposAtualizados = await base44.entities.TipoMedalha.list('nome');
+        tipo = obterTipoMedalhaPorCodigo(codigo, tiposAtualizados);
+      }
+      if (!tipo?.id) throw new Error(`Tipo ${codigo} não encontrado.`);
 
-  const semElegiveis = apuracoes.length > 0 && (totaisResumo.ELEGIVEL || 0) === 0;
+      const existente = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
+      if (existente?.id && normalizarStatusMedalha(existente.status) !== 'CONCEDIDA') {
+        return base44.entities.Medalha.update(existente.id, { status: 'INDICADA', data_indicacao: hojeISO() });
+      }
 
-  const handleExpandRow = (militarId) => {
-    setExpandedRows((current) => ({
-      ...current,
-      [militarId]: !current[militarId],
-    }));
+      const payload = criarIndicacaoAutomatica({ militar: item.militar, medalhaDevida: codigo, tipoMedalha: tipo });
+      return base44.entities.Medalha.create(payload);
+    },
+    onSuccess: () => {
+      refreshQueries();
+      toast({ title: 'Indicação registrada', description: 'Status atualizado para INDICADA.' });
+    },
+    onError: (error) => toast({ title: 'Erro ao indicar', description: error.message, variant: 'destructive' }),
+  });
+
+  const concederMutation = useMutation({
+    mutationFn: async ({ medalhaId, data_concessao, numero_publicacao }) => base44.entities.Medalha.update(
+      medalhaId,
+      normalizarRegistroConcessao({}, { data_concessao, numero_publicacao }),
+    ),
+    onSuccess: () => {
+      refreshQueries();
+      setConcederDialog({ open: false, medalha: null, data: hojeISO(), doems: '' });
+      toast({ title: 'Concessão registrada', description: 'Medalha marcada como CONCEDIDA.' });
+    },
+    onError: (error) => toast({ title: 'Erro ao conceder', description: error.message, variant: 'destructive' }),
+  });
+
+  const resetIndicacoesMutation = useMutation({
+    mutationFn: async () => {
+      const pendentes = filtrarIndicacoesTempoResetaveis(registrosTempo);
+      await Promise.all(pendentes.map((m) => base44.entities.Medalha.update(m.id, {
+        status: 'CANCELADA',
+        observacoes: `${m.observacoes ? `${m.observacoes}\n` : ''}[RESET] Indicação resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
+      })));
+      return pendentes.length;
+    },
+    onSuccess: (quantidade) => {
+      refreshQueries();
+      setResetDialogOpen(false);
+      toast({ title: 'Reset concluído', description: `${quantidade} indicação(ões) foram resetadas.` });
+    },
+    onError: (error) => toast({ title: 'Erro no reset', description: error.message, variant: 'destructive' }),
+  });
+
+  const getCellState = (item, codigo) => {
+    const registro = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
+    const type = obterEstadoCelulaTempoServico({
+      apuracao: item,
+      codigoFaixa: codigo,
+      registroMedalha: registro,
+      impedimentos,
+    });
+    if (type === 'CONTEMPLADO') return { label: 'Contemplado', type, registro };
+    if (type === 'INDICADO') return { label: 'Indicado', type, registro };
+    if (type === 'IMPEDIDO') return { label: 'Impedido', type, registro: null };
+    if (type === 'INDICAR') return { label: 'Indicar', type, registro: null };
+    return { label: 'Inabilitado', type: 'INABILITADO', registro: null };
   };
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
 
+  const isLoadingData = militaresQuery.isLoading || medalhasQuery.isLoading || tiposMedalhaQuery.isLoading || impedimentosQuery.isLoading;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-5">
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('Medalhas'))}>
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <div className="rounded-xl bg-slate-100 p-2 mt-0.5">
-                <Medal className="w-6 h-6 text-[#1e3a5f]" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-[#1e3a5f]">Apuração de Medalhas</h1>
-                <p className="text-sm text-slate-600 mt-1">
-                  {modoApuracao === 'DOM_PEDRO_II'
-                    ? 'Apuração institucional da medalha Dom Pedro II.'
-                    : 'Apuração institucional de medalhas por tempo de serviço.'}
-                </p>
-              </div>
+      <div className="max-w-[1500px] mx-auto px-4 py-8 space-y-5">
+        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('Medalhas'))}><ArrowLeft className="w-4 h-4" /></Button>
+            <div className="rounded-xl bg-slate-100 p-2 mt-0.5"><Medal className="w-6 h-6 text-[#1e3a5f]" /></div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-[#1e3a5f]">Apuração de Tempo de Serviço</h1>
+              <p className="text-sm text-slate-600 mt-1">Tabela operacional por militar para indicação e concessão das faixas de 10, 20, 30 e 40 anos.</p>
             </div>
-            <Badge className="bg-slate-100 text-slate-700 border-slate-200">
-              <Users className="w-3.5 h-3.5 mr-1" />
-              {apuracoesFiltradas.length} na listagem
-            </Badge>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}>Dom Pedro II</Button>
+            <Button variant="outline" onClick={() => setResetDialogOpen(true)}><RefreshCw className="w-4 h-4 mr-2" />Resetar indicações</Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {resumoConfig.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div key={card.key} className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-                  <Icon className={`w-4 h-4 ${card.color}`} />
-                </div>
-                <p className="text-2xl leading-tight font-semibold text-slate-800 mt-2">{totaisResumo[card.key] || 0}</p>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[{ label: 'Elegíveis', value: totais.elegiveis }, { label: 'Indicados', value: totais.indicados }, { label: 'Contemplados', value: totais.contemplados }].map((card) => (
+            <div key={card.label} className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+              <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
+              <p className="text-2xl leading-tight font-semibold text-slate-800 mt-2">{card.value}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-            <div className="relative lg:col-span-4">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar por nome ou matrícula"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className="lg:col-span-3">
-              <Select value={modoApuracao} onValueChange={setModoApuracao}>
-                <SelectTrigger><SelectValue placeholder="Tipo de apuração" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TEMPO_SERVICO">Tempo de serviço</SelectItem>
-                  <SelectItem value="DOM_PEDRO_II">Dom Pedro II</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="lg:col-span-3">
-              <Select value={situacaoFilter} onValueChange={setSituacaoFilter}>
-                <SelectTrigger><SelectValue placeholder="Situação" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TODOS">Todas situações</SelectItem>
-                  <SelectItem value="ELEGIVEL">Elegíveis</SelectItem>
-                  <SelectItem value="INCONSISTENTE">Inconsistentes</SelectItem>
-                  <SelectItem value="IMPEDIDO">Impedidos</SelectItem>
-                  <SelectItem value="JA_CONTEMPLADO">Já contemplados</SelectItem>
-                  <SelectItem value="SEM_DIREITO">Sem direito</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="lg:col-span-2">
-              <Select value={faixaFilter} onValueChange={setFaixaFilter}>
-                <SelectTrigger><SelectValue placeholder="Medalha devida" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TODAS">Todas faixas</SelectItem>
-                  {modoApuracao === 'DOM_PEDRO_II' ? (
-                    <SelectItem value="DOM_PEDRO_II">Dom Pedro II</SelectItem>
-                  ) : (
-                    <>
-                      <SelectItem value="TEMPO_10">10 anos</SelectItem>
-                      <SelectItem value="TEMPO_20">20 anos</SelectItem>
-                      <SelectItem value="TEMPO_30">30 anos</SelectItem>
-                      <SelectItem value="TEMPO_40">40 anos</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="lg:col-span-3">
-              <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
-                <SelectTrigger><SelectValue placeholder="Unidade" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TODAS">Todas unidades</SelectItem>
-                  {unidadesDisponiveis.map((unidade) => (
-                    <SelectItem key={unidade} value={unidade}>{unidade}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="relative md:col-span-3">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input className="pl-9" placeholder="Buscar por nome ou matrícula" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="md:col-span-2">
+            <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
+              <SelectTrigger><SelectValue placeholder="Unidade" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODAS">Todas unidades</SelectItem>
+                {unidadesDisponiveis.map((unidade) => <SelectItem key={unidade} value={unidade}>{unidade}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-3 md:p-4 shadow-sm space-y-3">
-          {isLoadingData && (
-            <div className="space-y-2 animate-pulse">
-              <div className="h-16 bg-slate-100 rounded-lg" />
-              <div className="h-16 bg-slate-100 rounded-lg" />
-              <div className="h-16 bg-slate-100 rounded-lg" />
-            </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm overflow-x-auto">
+          {isLoadingData ? (
+            <div className="space-y-2 animate-pulse"><div className="h-16 bg-slate-100 rounded-lg" /><div className="h-16 bg-slate-100 rounded-lg" /></div>
+          ) : (
+            <table className="w-full min-w-[1100px] text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b">
+                  <th className="py-3 px-2">Militar</th>
+                  <th className="py-3 px-2">Tempo</th>
+                  {CODIGOS_TEMPO.map((codigo) => <th key={codigo} className="py-3 px-2 text-center">{LABEL_POR_CODIGO[codigo]}</th>)}
+                  <th className="py-3 px-2">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {apuracoesFiltradas.map((item) => {
+                  const militar = item.militar || {};
+                  const unidade = militar.lotacao || militar.unidade || 'Unidade não informada';
+                  const linhaImpedida = item.situacao === 'IMPEDIDO';
+                  return (
+                    <tr key={item.militar_id} className={`border-b last:border-0 ${linhaImpedida ? 'bg-amber-50/50' : ''}`}>
+                      <td className="py-3 px-2 align-top">
+                        <p className="font-semibold text-slate-800">{militar.posto_graduacao} {militar.nome_completo}</p>
+                        <p className="text-xs text-slate-500">Mat: {militar.matricula || '—'}</p>
+                        <p className="text-xs text-slate-500">{unidade}</p>
+                      </td>
+                      <td className="py-3 px-2 align-top">
+                        <p className="font-medium text-slate-700">{item.tempo_servico_anos ?? '—'} anos</p>
+                        {linhaImpedida && <Badge className="mt-1 bg-amber-100 text-amber-800 border-amber-200"><ShieldAlert className="w-3 h-3 mr-1" />Impedido</Badge>}
+                      </td>
+                      {CODIGOS_TEMPO.map((codigo) => {
+                        const cell = getCellState(item, codigo);
+                        return (
+                          <td key={codigo} className="py-3 px-2 align-top text-center">
+                            {cell.type === 'INDICAR' ? (
+                              <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={indicarMutation.isPending} onClick={() => indicarMutation.mutate({ item, codigo })}>
+                                <CheckCircle2 className="w-4 h-4 mr-1" />Indicar
+                              </Button>
+                            ) : cell.type === 'INDICADO' ? (
+                              <div className="space-y-1">
+                                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Indicado</Badge>
+                                <div>
+                                  <Button size="sm" variant="outline" onClick={() => setConcederDialog({ open: true, medalha: cell.registro, data: hojeISO(), doems: '' })}>Conceder</Button>
+                                </div>
+                              </div>
+                            ) : cell.type === 'CONTEMPLADO' ? (
+                              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Contemplado</Badge>
+                            ) : cell.type === 'IMPEDIDO' ? (
+                              <Badge className="bg-amber-100 text-amber-800 border-amber-200">Impedido</Badge>
+                            ) : (
+                              <span className="text-slate-400">Inabilitado</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="py-3 px-2 align-top">
+                        <Button size="sm" variant="outline" onClick={() => navigate(`${createPageUrl('VerMilitar')}?id=${item.militar_id}&tab=medalhas`)}>Perfil &gt; Medalhas</Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
-
-          {!isLoadingData && apuracoesFiltradas.map((item) => {
-            const situacaoInfo = formatSituacao(item.situacao);
-            const militar = item.militar || {};
-            const unidade = militar.lotacao || militar.unidade || 'Unidade não informada';
-            const isExpanded = expandedRows[item.militar_id];
-            const impedimentoAtivo = impedimentos.find((imp) => (
-              imp.militar_id === item.militar_id
-              && imp.ativo !== false
-              && (!imp.tipo_medalha_codigo || imp.tipo_medalha_codigo === item.medalha_devida_codigo)
-            ));
-
-            return (
-              <div key={item.militar_id} className="rounded-xl border border-slate-200 bg-slate-50/40">
-                <div className="px-4 py-3 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                  <div className="md:col-span-4 min-w-0">
-                    <p className="font-semibold text-slate-800 truncate">{militar.posto_graduacao} {militar.nome_completo}</p>
-                    <p className="text-xs text-slate-500">Mat: {militar.matricula || '—'}</p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">{unidade}</p>
-                  </div>
-
-                  <div className="md:col-span-3 text-sm text-slate-700 space-y-1">
-                    <p><span className="text-slate-500">Tempo:</span> {item.tempo_servico_anos ?? '—'} anos</p>
-                    <p><span className="text-slate-500">Maior:</span> {item.maior_medalha_recebida_codigo || '—'}</p>
-                    <p><span className="text-slate-500">Devida:</span> {item.medalha_devida_codigo || '—'}</p>
-                  </div>
-
-                  <div className="md:col-span-2 flex md:justify-center">
-                    <Badge className={`${situacaoInfo.className} border`}>{situacaoInfo.label}</Badge>
-                  </div>
-
-                  <div className="md:col-span-3 flex items-center justify-start md:justify-end gap-2 flex-wrap">
-                    {item.situacao === 'ELEGIVEL' && (
-                      <Button
-                        size="sm"
-                        className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                        disabled={indicarMutation.isPending}
-                        onClick={() => indicarMutation.mutate(item)}
-                      >
-                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                        Indicar
-                      </Button>
-                    )}
-
-                    {item.situacao !== 'ELEGIVEL' && (
-                      <Button size="sm" variant="outline" disabled>
-                        Indicação indisponível
-                      </Button>
-                    )}
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(`${createPageUrl('VerMilitar')}?id=${item.militar_id}&tab=medalhas`)}
-                    >
-                      Gerenciar impedimento
-                    </Button>
-
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      onClick={() => handleExpandRow(item.militar_id)}
-                      title={isExpanded ? 'Ocultar detalhes' : 'Exibir detalhes'}
-                    >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="px-4 pb-3">
-                    <div className="rounded-lg bg-white border border-slate-200 p-3 text-xs text-slate-600 grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <p><span className="text-slate-500">Inclusão:</span> {militar.created_date ? new Date(militar.created_date).toLocaleDateString('pt-BR') : '—'}</p>
-                      <p><span className="text-slate-500">Tempo (dias):</span> {item.tempo_servico_dias ?? '—'}</p>
-                      <p><span className="text-slate-500">Motivo inconsistente:</span> {item.motivo || '—'}</p>
-                      <p><span className="text-slate-500">Motivo impedimento:</span> {impedimentoAtivo?.motivo || '—'}</p>
-                      <p className="md:col-span-2"><span className="text-slate-500">Histórico resumido:</span> {item.maior_medalha_recebida_codigo ? `Já recebeu ${item.maior_medalha_recebida_codigo}` : 'Sem medalhas de tempo registradas'}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
 
           {!isLoadingData && apuracoesFiltradas.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-              <p className="text-slate-700 font-medium">Nenhum militar encontrado para os filtros selecionados.</p>
-              <p className="text-sm text-slate-500 mt-1">
-                {hasActiveFilters
-                  ? 'Ajuste os filtros para ampliar os resultados da apuração.'
-                  : 'Ainda não há dados suficientes para exibir a apuração.'}
-              </p>
-            </div>
-          )}
-
-          {!isLoadingData && apuracoesFiltradas.length > 0 && semElegiveis && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Nenhum militar está elegível para indicação no cenário atual da apuração.
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center mt-3">
+              <Users className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+              <p className="text-slate-700 font-medium">Nenhum militar encontrado para os filtros informados.</p>
             </div>
           )}
         </div>
       </div>
+
+      <Dialog open={concederDialog.open} onOpenChange={(open) => setConcederDialog((curr) => ({ ...curr, open }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Marcar medalha como concedida</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm text-slate-600">Data da concessão</p>
+              <Input type="date" value={concederDialog.data} onChange={(e) => setConcederDialog((curr) => ({ ...curr, data: e.target.value }))} />
+            </div>
+            <div>
+              <p className="text-sm text-slate-600">Número do DOEMS</p>
+              <Input value={concederDialog.doems} onChange={(e) => setConcederDialog((curr) => ({ ...curr, doems: e.target.value }))} placeholder="Ex.: 12345" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConcederDialog({ open: false, medalha: null, data: hojeISO(), doems: '' })}>Cancelar</Button>
+            <Button
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+              disabled={!concederDialog.data || !concederDialog.doems || concederMutation.isPending}
+              onClick={() => concederMutation.mutate({
+                medalhaId: concederDialog.medalha?.id,
+                data_concessao: concederDialog.data,
+                numero_publicacao: concederDialog.doems,
+              })}
+            >
+              Confirmar concessão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar indicações pendentes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação remove o status INDICADA de todas as medalhas de tempo ainda não concedidas.
+              Medalhas já CONCEDIDA não serão alteradas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => resetIndicacoesMutation.mutate()} className="bg-red-600 hover:bg-red-700">Confirmar reset</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

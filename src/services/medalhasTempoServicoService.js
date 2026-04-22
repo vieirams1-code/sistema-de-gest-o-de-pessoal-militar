@@ -72,6 +72,7 @@ const STATUS_MAP = new Map([
 const STATUS_CONSIDERADOS_CONCESSAO = new Set(['CONCEDIDA']);
 
 const CODIGOS_TEMPO_AUTOMATICO = ['TEMPO_10', 'TEMPO_20', 'TEMPO_30', 'TEMPO_40'];
+export const CODIGOS_MEDALHA_TEMPO_SERVICO = [...CODIGOS_TEMPO_AUTOMATICO];
 
 function normalizarTexto(valor) {
   return String(valor || '')
@@ -374,6 +375,37 @@ export function apurarListaMilitaresTempoServico({
       referencia,
     }),
   }));
+}
+
+export function filtrarIndicacoesTempoResetaveis(medalhas = []) {
+  return medalhas.filter((registro) => (
+    CODIGOS_TEMPO_AUTOMATICO.includes(resolverCodigoTipoMedalha(registro))
+    && normalizarStatusMedalha(registro.status) === 'INDICADA'
+  ));
+}
+
+export function obterEstadoCelulaTempoServico({
+  apuracao,
+  codigoFaixa,
+  registroMedalha,
+  impedimentos = [],
+  referencia = new Date(),
+}) {
+  const statusRegistro = normalizarStatusMedalha(registroMedalha?.status);
+  if (statusRegistro === 'CONCEDIDA') return 'CONTEMPLADO';
+  if (statusRegistro === 'INDICADA') return 'INDICADO';
+
+  const impedido = temImpedimentoAplicavel({
+    impedimentos,
+    militarId: apuracao?.militar_id,
+    medalhaDevidaCodigo: codigoFaixa,
+    referencia,
+  });
+  if (impedido) return 'IMPEDIDO';
+
+  if (apuracao?.medalha_devida_codigo === codigoFaixa && apuracao?.situacao === 'ELEGIVEL') return 'INDICAR';
+  if (apuracao?.medalha_devida_codigo === codigoFaixa && apuracao?.situacao === 'JA_CONTEMPLADO') return 'CONTEMPLADO';
+  return 'INABILITADO';
 }
 
 function obterMaiorMedalhaDomPedroRecebida(medalhas, tipoIndexado) {
