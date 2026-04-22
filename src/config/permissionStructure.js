@@ -44,7 +44,18 @@ export const permissionStructure = [
     category: 'Operações e Recursos',
     modules: [
       { key: 'acesso_armamentos', label: 'Armamentos', actions: [] },
-      { key: 'acesso_medalhas', label: 'Medalhas', actions: [] },
+      {
+        key: 'acesso_medalhas',
+        label: 'Medalhas',
+        actions: [
+          { key: 'perm_indicar_medalhas', label: 'Indicar Medalhas', sensitive: true },
+          { key: 'perm_conceder_medalhas', label: 'Conceder Medalhas', sensitive: true },
+          { key: 'perm_resetar_indicacoes_medalhas', label: 'Resetar Indicações de Medalhas', sensitive: true },
+          { key: 'perm_gerir_impedimentos_medalha', label: 'Gerir Impedimentos de Medalha', sensitive: true },
+          { key: 'perm_gerir_dom_pedro_ii', label: 'Gerir Fluxo Dom Pedro II', sensitive: true },
+          { key: 'perm_exportar_medalhas', label: 'Exportar Medalhas', sensitive: true }
+        ]
+      },
       {
         key: 'acesso_quadro_operacional',
         label: 'Quadro Operacional',

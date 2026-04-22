@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { normalizarStatusMedalha, obterTipoMedalhaPorCodigo, resolverCodigoTipoMedalha } from '@/services/medalhasTempoServicoService';
+import { ACOES_MEDALHAS } from '@/services/medalhasAcessoService';
 
 const statusColors = {
   INDICADA: 'bg-yellow-100 text-yellow-700',
@@ -37,8 +38,10 @@ function formatDate(d) {
 export default function Medalhas() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, getMilitarScopeFilters, canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
+  const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
+  const podeGerirDomPedro = canAccessAction(ACOES_MEDALHAS.DOM_PEDRO);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -70,7 +73,10 @@ export default function Medalhas() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Medalha.delete(id),
+    mutationFn: (id) => {
+      if (!podeIndicar) throw new Error('Sem permissão para excluir indicação.');
+      return base44.entities.Medalha.delete(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['medalhas'] });
       setDeleteDialog({ open: false, id: null });
@@ -120,25 +126,29 @@ export default function Medalhas() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              onClick={() => navigate(createPageUrl('CadastrarMedalha'))}
-              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Nova Indicação
-            </Button>
+            {podeIndicar && (
+              <Button
+                onClick={() => navigate(createPageUrl('CadastrarMedalha'))}
+                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Nova Indicação
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => navigate(createPageUrl('ApuracaoMedalhasTempoServico'))}
             >
               Apuração de Tempo
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}
-            >
-              Dom Pedro II
-            </Button>
+            {podeGerirDomPedro && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}
+              >
+                Dom Pedro II
+              </Button>
+            )}
           </div>
         </div>
 
@@ -258,24 +268,26 @@ export default function Medalhas() {
                       <p className="text-sm text-slate-500 mt-2">{medalha.observacoes}</p>
                     )}
                   </div>
-                  <div className="flex gap-2 ml-4">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate(createPageUrl('CadastrarMedalha') + `?id=${medalha.id}`)}
-                      className="text-[#1e3a5f] hover:text-[#2d4a6f]"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteDialog({ open: true, id: medalha.id })}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  {podeIndicar && (
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(createPageUrl('CadastrarMedalha') + `?id=${medalha.id}`)}
+                        className="text-[#1e3a5f] hover:text-[#2d4a6f]"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteDialog({ open: true, id: medalha.id })}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
