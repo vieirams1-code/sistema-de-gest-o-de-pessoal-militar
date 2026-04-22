@@ -63,6 +63,7 @@ import CadastrarPunicao from './pages/CadastrarPunicao';
 import ClassificacaoPendentesLegado from './pages/ClassificacaoPendentesLegado';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
+import CreditosExtraordinariosFerias from './pages/CreditosExtraordinariosFerias';
 import Configuracoes from './pages/Configuracoes';
 import DetalheComportamento from './pages/DetalheComportamento';
 import EditarJISO from './pages/EditarJISO';
@@ -116,6 +117,7 @@ export const PAGES = {
     "ClassificacaoPendentesLegado": ClassificacaoPendentesLegado,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "ConciliacaoBoletim": ConciliacaoBoletim,
+    "CreditosExtraordinariosFerias": CreditosExtraordinariosFerias,
     "Configuracoes": Configuracoes,
     "DetalheComportamento": DetalheComportamento,
     "EditarJISO": EditarJISO,

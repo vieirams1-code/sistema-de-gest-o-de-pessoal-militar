@@ -6,6 +6,9 @@ import {
   calcularTotaisGozoComCreditos,
   validarCreditosSelecionadosParaGozo,
   formatarTipoCreditoExtra,
+  filtrarCreditosExtraFerias,
+  prepararAtualizacaoCreditoExtraFerias,
+  prepararCancelamentoCreditoExtraFerias,
 } from './creditoExtraFeriasRules.js';
 
 export {
@@ -15,6 +18,9 @@ export {
   calcularTotaisGozoComCreditos,
   validarCreditosSelecionadosParaGozo,
   formatarTipoCreditoExtra,
+  filtrarCreditosExtraFerias,
+  prepararAtualizacaoCreditoExtraFerias,
+  prepararCancelamentoCreditoExtraFerias,
 };
 
 export async function vincularCreditosAoGozo({ creditosSelecionados = [], gozoFeriasId }) {
@@ -37,7 +43,7 @@ export async function liberarCreditosDoGozo({ gozoFeriasId, idsCreditos = null }
     // eslint-disable-next-line no-await-in-loop
     await base44.entities.CreditoExtraFerias.update(credito.id, {
       status: STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
-      gozo_ferias_id: null,
+      gozo_ferias_id: '',
     });
   }
 }
