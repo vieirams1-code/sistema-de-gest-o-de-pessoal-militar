@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Medal, Search } from 'lucide-react';
+import { ArrowLeft, Download, Medal, Search } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -13,9 +13,17 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from '@/components/ui/use-toast';
+import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
+import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import { criarIndicacaoAutomatica, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha, resolverCodigoTipoMedalha, resolverOuGarantirTipoMedalha } from '@/services/medalhasTempoServicoService';
 
 function hojeISO() { return new Date().toISOString().split('T')[0]; }
+function formatarData(valor) {
+  if (!valor) return '';
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return valor;
+  return data.toLocaleDateString('pt-BR');
+}
 
 export default function IndicacoesDomPedroII() {
   const navigate = useNavigate();
@@ -28,7 +36,9 @@ export default function IndicacoesDomPedroII() {
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
   const [postoFilter, setPostoFilter] = useState('TODOS');
   const [statusFilter, setStatusFilter] = useState('TODOS');
+  const [medalhaFilter, setMedalhaFilter] = useState('TODAS');
   const [concederDialog, setConcederDialog] = useState({ open: false, medalha: null, data: hojeISO(), doems: '' });
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   useQuery({
     queryKey: ['tipos-medalha-fixos-sync-dompedro'],
@@ -78,11 +88,54 @@ export default function IndicacoesDomPedroII() {
     const status = normalizarStatusMedalha(registro?.status) || 'SEM_INDICACAO';
     const termo = search.toLowerCase();
     const unidade = m.lotacao || m.unidade;
+    const medalhaCodigo = registro ? resolverCodigoTipoMedalha(registro) : 'SEM_INDICACAO';
     return (!termo || `${m.nome_completo || ''} ${m.matricula || ''}`.toLowerCase().includes(termo))
       && (unidadeFilter === 'TODAS' || unidade === unidadeFilter)
       && (postoFilter === 'TODOS' || m.posto_graduacao === postoFilter)
-      && (statusFilter === 'TODOS' || status === statusFilter);
-  }), [militares, registroPorMilitar, search, unidadeFilter, postoFilter, statusFilter]);
+      && (statusFilter === 'TODOS' || status === statusFilter)
+      && (medalhaFilter === 'TODAS' || medalhaCodigo === medalhaFilter);
+  }), [militares, registroPorMilitar, search, unidadeFilter, postoFilter, statusFilter, medalhaFilter]);
+
+  const exportRows = useMemo(() => rows.flatMap((militar) => {
+    const registro = registroPorMilitar.get(militar.id);
+    if (!registro) return [];
+    if (normalizarStatusMedalha(registro.status) !== 'INDICADA') return [];
+    if (registro.origem_registro && registro.origem_registro !== 'INDICACAO_MANUAL_DOM_PEDRO_II') return [];
+    return [{
+      militar,
+      registro,
+      medalhaLabel: 'Medalha Dom Pedro II',
+    }];
+  }), [rows, registroPorMilitar]);
+
+  const camposExportacao = [
+    { key: 'nome', group: 'Dados do militar', label: 'Nome', getValue: (row) => row.militar?.nome_completo || '' },
+    { key: 'nome_guerra', group: 'Dados do militar', label: 'Nome de guerra', getValue: (row) => row.militar?.nome_guerra || '' },
+    { key: 'matricula', group: 'Dados do militar', label: 'Matrícula', getValue: (row) => row.militar?.matricula || '' },
+    { key: 'posto', group: 'Dados do militar', label: 'Posto/Graduação', getValue: (row) => row.militar?.posto_graduacao || '' },
+    { key: 'unidade', group: 'Dados do militar', label: 'Unidade', getValue: (row) => row.militar?.lotacao || row.militar?.unidade || '' },
+    { key: 'medalha', group: 'Dados da indicação', label: 'Medalha', getValue: (row) => row.medalhaLabel },
+    { key: 'status', group: 'Dados da indicação', label: 'Status', getValue: (row) => normalizarStatusMedalha(row.registro?.status) || '' },
+    { key: 'data_indicacao', group: 'Dados da indicação', label: 'Data da indicação', getValue: (row) => formatarData(row.registro?.data_indicacao) },
+    { key: 'data_concessao', group: 'Dados da indicação', label: 'Data da concessão', getValue: (row) => formatarData(row.registro?.data_concessao) },
+    { key: 'doems', group: 'Dados da indicação', label: 'Número do DOEMS', getValue: (row) => row.registro?.numero_publicacao || row.registro?.doems_numero || '' },
+    { key: 'observacoes', group: 'Dados da indicação', label: 'Observações', getValue: (row) => row.registro?.observacoes || '' },
+  ];
+  const camposPadrao = ['nome', 'matricula', 'posto', 'unidade', 'medalha', 'status', 'data_indicacao'];
+
+  const onConfirmarExportacao = (camposSelecionados) => {
+    if (!exportRows.length) {
+      toast({ title: 'Sem indicados para exportar', description: 'Não há indicações manuais da Dom Pedro II no contexto atual.' });
+      return;
+    }
+    exportarIndicadosParaExcel({
+      camposSelecionados,
+      registros: exportRows,
+      nomeArquivo: `indicados_dom_pedro_ii_${hojeISO()}.xlsx`,
+    });
+    setExportModalOpen(false);
+    toast({ title: 'Exportação concluída', description: `${exportRows.length} indicado(s) exportado(s) em Excel.` });
+  };
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['dompedro-medalhas'] });
@@ -134,15 +187,29 @@ export default function IndicacoesDomPedroII() {
               <p className="text-sm text-slate-600">Fluxo manual separado para indicação e concessão da medalha Dom Pedro II.</p>
             </div>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (!exportRows.length) {
+                toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
+                return;
+              }
+              setExportModalOpen(true);
+            }}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exportar indicados
+          </Button>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-6 gap-3">
           <div className="relative md:col-span-2">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <Input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome ou matrícula" />
           </div>
           <Select value={unidadeFilter} onValueChange={setUnidadeFilter}><SelectTrigger><SelectValue placeholder="Unidade" /></SelectTrigger><SelectContent><SelectItem value="TODAS">Todas unidades</SelectItem>{unidades.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select>
           <Select value={postoFilter} onValueChange={setPostoFilter}><SelectTrigger><SelectValue placeholder="Posto/Graduação" /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos postos</SelectItem>{postos.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>
+          <Select value={medalhaFilter} onValueChange={setMedalhaFilter}><SelectTrigger><SelectValue placeholder="Tipo/Faixa" /></SelectTrigger><SelectContent><SelectItem value="TODAS">Todas medalhas</SelectItem><SelectItem value="DOM_PEDRO_II">Dom Pedro II</SelectItem><SelectItem value="SEM_INDICACAO">Sem indicação</SelectItem></SelectContent></Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos status</SelectItem><SelectItem value="SEM_INDICACAO">Sem indicação</SelectItem><SelectItem value="INDICADA">Indicada</SelectItem><SelectItem value="CONCEDIDA">Concedida</SelectItem></SelectContent></Select>
         </div>
 
@@ -183,6 +250,14 @@ export default function IndicacoesDomPedroII() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ExportarIndicadosModal
+        open={exportModalOpen}
+        onOpenChange={setExportModalOpen}
+        campos={camposExportacao}
+        defaultSelecionados={camposPadrao}
+        onConfirm={onConfirmarExportacao}
+      />
     </div>
   );
 }
