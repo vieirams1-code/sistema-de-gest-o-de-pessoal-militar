@@ -297,6 +297,7 @@ export default function Publicacoes() {
   const navigate = useNavigate();
   const [abaOrigemAtiva, setAbaOrigemAtiva] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [exibirPublicados, setExibirPublicados] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
@@ -450,7 +451,9 @@ export default function Publicacoes() {
 
   const registrosDaAbaAtiva = useMemo(() => (abaOrigemAtiva === 'all' ? todosRegistros : todosRegistros.filter((registro) => registro.origem_tipo === abaOrigemAtiva)), [todosRegistros, abaOrigemAtiva]);
   const filteredRegistros = useMemo(() => registrosDaAbaAtiva.filter((r) => {
-    const statusReferencia = statusFilter === 'Inconsistente' ? r.status_calculado : obterStatusCanonicoPublicacao(r);
+    const statusCanonico = obterStatusCanonicoPublicacao(r);
+    const statusReferencia = statusFilter === 'Inconsistente' ? r.status_calculado : statusCanonico;
+    if (!exibirPublicados && statusCanonico === STATUS_PUBLICACAO.PUBLICADO) return false;
     const matchesStatus = statusFilter === 'all' || statusReferencia === statusFilter;
     const termo = searchTerm.toLowerCase().trim();
     const matchesSearch =
@@ -466,7 +469,7 @@ export default function Publicacoes() {
       containsTerm(r.tipo_display, termo) ||
       containsTerm(r.grupo_display, termo);
     return matchesStatus && matchesSearch;
-  }), [registrosDaAbaAtiva, statusFilter, searchTerm]);
+  }), [registrosDaAbaAtiva, statusFilter, searchTerm, exibirPublicados]);
 
   const statsOrigem = useMemo(() => calcularMetricasPublicacao(registrosDaAbaAtiva, {
     getStatusCanonico: obterStatusCanonicoPublicacao,
@@ -588,7 +591,7 @@ export default function Publicacoes() {
         </section>
 
         <section className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
-          <div className="grid gap-4 lg:grid-cols-[1.25fr,0.75fr,1fr]">
+          <div className="grid gap-4 lg:grid-cols-4">
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Busca</label>
               <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input placeholder="Buscar por militar, matrícula, tipo, nota ou número do BG" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-11 rounded-xl border-slate-200 pl-9" /></div>
@@ -596,6 +599,25 @@ export default function Publicacoes() {
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-11 rounded-xl border-slate-200"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos Status</SelectItem><SelectItem value="Aguardando Nota">Aguardando Nota</SelectItem><SelectItem value="Aguardando Publicação">Aguardando Publicação</SelectItem><SelectItem value="Publicado">Publicado</SelectItem><SelectItem value="Inconsistente">Inconsistente</SelectItem></SelectContent></Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Exibição</label>
+              <Button
+                type="button"
+                variant="outline"
+                className={`h-11 w-full justify-start rounded-xl border-slate-200 ${exibirPublicados ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                onClick={() => {
+                  setExibirPublicados((valorAtual) => {
+                    const proximo = !valorAtual;
+                    if (!proximo && statusFilter === STATUS_PUBLICACAO.PUBLICADO) setStatusFilter('all');
+                    return proximo;
+                  });
+                }}
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                {exibirPublicados ? 'Ocultar publicados' : 'Exibir publicados'}
+              </Button>
+              <p className="text-xs text-slate-500">Por padrão, a lista mostra apenas registros aguardando nota/publicação.</p>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Origem</label>
