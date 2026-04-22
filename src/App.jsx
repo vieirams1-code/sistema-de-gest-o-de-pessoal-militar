@@ -51,6 +51,7 @@ const moduleGuardByPage = {
   FichaMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
   CadastrarFerias: { moduleKey: 'ferias', moduleName: 'Férias' },
   PeriodosAquisitivos: { moduleKey: 'ferias', moduleName: 'Férias' },
+  CreditosExtraordinariosFerias: { moduleKey: 'ferias', moduleName: 'Férias' },
   CadastrarRegistroLivro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   Livro: { moduleKey: 'livro', moduleName: 'Livro de Registros' },
   RP: { moduleKey: 'livro', moduleName: 'Registro de Publicações' },

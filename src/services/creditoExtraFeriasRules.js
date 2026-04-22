@@ -27,7 +27,7 @@ export function criarPayloadCreditoExtraFerias(input = {}, militar = {}) {
     data_boletim: input.data_boletim || '',
     observacoes: input.observacoes || '',
     status: input.status || STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
-    gozo_ferias_id: input.gozo_ferias_id || null,
+    gozo_ferias_id: input.gozo_ferias_id || '',
   };
 }
 
@@ -74,4 +74,50 @@ export function formatarTipoCreditoExtra(tipo) {
     OUTRO: 'Outro',
   };
   return mapa[tipo] || tipo || '—';
+}
+
+
+export function filtrarCreditosExtraFerias(creditos = [], filtros = {}, militarById = new Map()) {
+  const termoUnidade = String(filtros?.unidade || '').trim().toLowerCase();
+  const dataInicio = filtros?.data_inicio || '';
+  const dataFim = filtros?.data_fim || '';
+
+  return (creditos || []).filter((credito) => {
+    if (filtros?.militar_id && credito?.militar_id !== filtros.militar_id) return false;
+    if (filtros?.tipo_credito && credito?.tipo_credito !== filtros.tipo_credito) return false;
+    if (filtros?.status && credito?.status !== filtros.status) return false;
+
+    if (dataInicio && String(credito?.data_referencia || '') < dataInicio) return false;
+    if (dataFim && String(credito?.data_referencia || '') > dataFim) return false;
+
+    if (termoUnidade) {
+      const militar = militarById instanceof Map ? militarById.get(credito?.militar_id) : null;
+      const unidadeMilitar = String(militar?.unidade || militar?.lotacao || '').toLowerCase();
+      if (!unidadeMilitar.includes(termoUnidade)) return false;
+    }
+
+    return true;
+  });
+}
+
+
+export function prepararAtualizacaoCreditoExtraFerias(creditoAtual = {}, input = {}) {
+  return {
+    ...creditoAtual,
+    ...input,
+    quantidade_dias: Number(input.quantidade_dias ?? creditoAtual.quantidade_dias ?? 0),
+    gozo_ferias_id: input.gozo_ferias_id ?? creditoAtual.gozo_ferias_id ?? '',
+  };
+}
+
+export function prepararCancelamentoCreditoExtraFerias(creditoAtual = {}, observacaoCancelamento = '') {
+  const observacoesAtuais = String(creditoAtual?.observacoes || '').trim();
+  const obsCancelamento = String(observacaoCancelamento || '').trim();
+  const observacoes = [observacoesAtuais, obsCancelamento].filter(Boolean).join(' | ');
+
+  return {
+    ...creditoAtual,
+    status: STATUS_CREDITO_EXTRA_FERIAS.CANCELADO,
+    observacoes,
+  };
 }

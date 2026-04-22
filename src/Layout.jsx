@@ -65,6 +65,7 @@ const menuGroups = [
     title: 'Férias',
     items: [
       { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias' },
+      { name: 'Créditos Extraordinários', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, moduleKey: 'ferias' },
     ],
   },
   {
