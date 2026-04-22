@@ -15,9 +15,10 @@ import { CalendarDays } from 'lucide-react';
 import {
   TIPOS_CREDITO_EXTRA_FERIAS,
   STATUS_CREDITO_EXTRA_FERIAS,
-  criarPayloadCreditoExtraFerias,
   formatarTipoCreditoExtra,
   filtrarCreditosExtraFerias,
+  listarCreditosExtraFerias,
+  salvarCreditoExtraFerias,
 } from '@/services/creditoExtraFeriasService';
 
 const initialForm = {
@@ -77,7 +78,7 @@ export default function CreditosExtraordinariosFerias() {
 
   const { data: creditos = [], isLoading } = useQuery({
     queryKey: ['creditos-extra-ferias'],
-    queryFn: () => base44.entities.CreditoExtraFerias.list('-data_referencia'),
+    queryFn: () => listarCreditosExtraFerias('-data_referencia'),
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
 
@@ -91,22 +92,22 @@ export default function CreditosExtraordinariosFerias() {
       const militar = militarById.get(form.militar_id);
       if (!militar) throw new Error('Selecione um militar para salvar o crédito extraordinário.');
 
-      const payload = criarPayloadCreditoExtraFerias(form, {
-        id: militar.id,
-        nome_completo: militar.nome_completo,
-        posto_grad: militar.posto_graduacao,
-        matricula: militar.matricula,
+      return salvarCreditoExtraFerias({
+        form,
+        militar: {
+          id: militar.id,
+          nome_completo: militar.nome_completo,
+          posto_grad: militar.posto_graduacao,
+          matricula: militar.matricula,
+        },
       });
-
-      if (form.id) {
-        return base44.entities.CreditoExtraFerias.update(form.id, payload);
-      }
-
-      return base44.entities.CreditoExtraFerias.create(payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
-      toast({ title: form.id ? 'Crédito atualizado com sucesso' : 'Crédito cadastrado com sucesso' });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      toast({
+        title: form.id ? 'Crédito atualizado com sucesso' : 'Crédito cadastrado com sucesso',
+        description: 'Listagem atualizada automaticamente.',
+      });
       setForm(initialForm);
     },
     onError: (error) => {

@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
-import { ImportacaoMilitares, ImportacaoAlteracoesLegado, PunicaoDisciplinar, ImpedimentoMedalha } from '@/api/entities'
+import { ImportacaoMilitares, ImportacaoAlteracoesLegado, PunicaoDisciplinar, ImpedimentoMedalha, CreditoExtraFerias } from '@/api/entities'
 import { base44 } from '@/api/base44Client'
 
 
@@ -11,10 +11,12 @@ void ImportacaoMilitares;
 void ImportacaoAlteracoesLegado;
 void PunicaoDisciplinar;
 void ImpedimentoMedalha;
+void CreditoExtraFerias;
 void base44.entities.ImportacaoMilitares;
 void base44.entities.ImportacaoAlteracoesLegado;
 void base44.entities.PunicaoDisciplinar;
 void base44.entities.ImpedimentoMedalha;
+void base44.entities.CreditoExtraFerias;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   // <React.StrictMode>
