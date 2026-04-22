@@ -61,6 +61,8 @@ export default function ApuracaoMedalhasTempoServico() {
 
   const [search, setSearch] = useState('');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
+  const [postoFilter, setPostoFilter] = useState('TODOS');
+  const [faixaFilter, setFaixaFilter] = useState('TODAS');
   const [concederDialog, setConcederDialog] = useState({ open: false, medalha: null, data: hojeISO(), doems: '' });
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
@@ -132,15 +134,23 @@ export default function ApuracaoMedalhasTempoServico() {
     () => [...new Set(apuracoes.map((item) => item.militar?.lotacao || item.militar?.unidade).filter(Boolean))],
     [apuracoes],
   );
+  const postosDisponiveis = useMemo(
+    () => [...new Set(apuracoes.map((item) => item.militar?.posto_graduacao).filter(Boolean))],
+    [apuracoes],
+  );
 
   const apuracoesFiltradas = useMemo(() => apuracoes.filter((item) => {
     const militar = item.militar || {};
     const nome = `${militar.posto_graduacao || ''} ${militar.nome_completo || ''}`.toLowerCase();
     const termo = search.toLowerCase();
     const unidade = militar.lotacao || militar.unidade;
+    const posto = militar.posto_graduacao;
+    const faixaDevida = item.medalha_devida_codigo;
     return (!termo || nome.includes(termo) || String(militar.matricula || '').toLowerCase().includes(termo))
-      && (unidadeFilter === 'TODAS' || unidade === unidadeFilter);
-  }), [apuracoes, search, unidadeFilter]);
+      && (unidadeFilter === 'TODAS' || unidade === unidadeFilter)
+      && (postoFilter === 'TODOS' || posto === postoFilter)
+      && (faixaFilter === 'TODAS' || faixaDevida === faixaFilter);
+  }), [apuracoes, search, unidadeFilter, postoFilter, faixaFilter]);
 
   const totais = useMemo(() => {
     const indicados = registrosTempo.filter((m) => normalizarStatusMedalha(m.status) === 'INDICADA').length;
@@ -251,11 +261,11 @@ export default function ApuracaoMedalhasTempoServico() {
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-3">
-          <div className="relative md:col-span-3">
+          <div className="relative md:col-span-2">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <Input className="pl-9" placeholder="Buscar por nome ou matrícula" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <div className="md:col-span-2">
+          <div>
             <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
               <SelectTrigger><SelectValue placeholder="Unidade" /></SelectTrigger>
               <SelectContent>
@@ -264,6 +274,20 @@ export default function ApuracaoMedalhasTempoServico() {
               </SelectContent>
             </Select>
           </div>
+          <Select value={postoFilter} onValueChange={setPostoFilter}>
+            <SelectTrigger><SelectValue placeholder="Posto/Graduação" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODOS">Todos postos</SelectItem>
+              {postosDisponiveis.map((posto) => <SelectItem key={posto} value={posto}>{posto}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={faixaFilter} onValueChange={setFaixaFilter}>
+            <SelectTrigger><SelectValue placeholder="Faixa devida" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODAS">Todas faixas</SelectItem>
+              {CODIGOS_TEMPO.map((codigo) => <SelectItem key={codigo} value={codigo}>{LABEL_POR_CODIGO[codigo]}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm overflow-x-auto">

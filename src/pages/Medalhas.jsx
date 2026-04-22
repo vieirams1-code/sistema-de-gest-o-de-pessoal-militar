@@ -42,6 +42,9 @@ export default function Medalhas() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [tipoFilter, setTipoFilter] = useState('TODOS');
+  const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
+  const [postoFilter, setPostoFilter] = useState('TODOS');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
   const { data: medalhas = [], isLoading } = useQuery({
@@ -84,6 +87,10 @@ export default function Medalhas() {
     };
   });
 
+  const tiposDisponiveis = [...new Set(medalhasExibicao.map((item) => item.tipo_medalha_exibicao).filter(Boolean))];
+  const unidadesDisponiveis = [...new Set(medalhasExibicao.map((item) => item.militar_unidade).filter(Boolean))];
+  const postosDisponiveis = [...new Set(medalhasExibicao.map((item) => item.militar_posto).filter(Boolean))];
+
   const filteredMedalhas = medalhasExibicao.filter(m => {
     const matchSearch =
       m.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -92,7 +99,10 @@ export default function Medalhas() {
       m.tipo_medalha_codigo_normalizado?.toLowerCase().includes(searchTerm.toLowerCase());
     const normalizado = normalizarStatusMedalha(m.status);
     const matchStatus = statusFilter === 'all' || normalizado === statusFilter;
-    return matchSearch && matchStatus;
+    const matchTipo = tipoFilter === 'TODOS' || m.tipo_medalha_exibicao === tipoFilter;
+    const matchUnidade = unidadeFilter === 'TODAS' || m.militar_unidade === unidadeFilter;
+    const matchPosto = postoFilter === 'TODOS' || m.militar_posto === postoFilter;
+    return matchSearch && matchStatus && matchTipo && matchUnidade && matchPosto;
   });
 
   if (loadingUser || !isAccessResolved) return null;
@@ -155,8 +165,8 @@ export default function Medalhas() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
                 placeholder="Buscar por militar, matrícula ou tipo de medalha..."
@@ -166,7 +176,7 @@ export default function Medalhas() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40 h-10 border-slate-200">
+              <SelectTrigger className="h-10 border-slate-200">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -174,6 +184,33 @@ export default function Medalhas() {
                 <SelectItem value="INDICADA">Indicada</SelectItem>
                 <SelectItem value="CONCEDIDA">Concedida</SelectItem>
                 <SelectItem value="CANCELADA">Cancelada</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={tipoFilter} onValueChange={setTipoFilter}>
+              <SelectTrigger className="h-10 border-slate-200">
+                <SelectValue placeholder="Tipo de medalha" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODOS">Todos os tipos</SelectItem>
+                {tiposDisponiveis.map((tipo) => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
+              <SelectTrigger className="h-10 border-slate-200">
+                <SelectValue placeholder="Unidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODAS">Todas unidades</SelectItem>
+                {unidadesDisponiveis.map((unidade) => <SelectItem key={unidade} value={unidade}>{unidade}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={postoFilter} onValueChange={setPostoFilter}>
+              <SelectTrigger className="h-10 border-slate-200">
+                <SelectValue placeholder="Posto/Graduação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODOS">Todos postos</SelectItem>
+                {postosDisponiveis.map((posto) => <SelectItem key={posto} value={posto}>{posto}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -188,7 +225,9 @@ export default function Medalhas() {
             <Medal className="w-16 h-16 mx-auto text-slate-300 mb-4" />
             <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhuma medalha encontrada</h3>
             <p className="text-slate-500">
-              {searchTerm || statusFilter !== 'all' ? 'Tente ajustar os filtros' : 'Comece indicando a primeira medalha'}
+              {searchTerm || statusFilter !== 'all' || tipoFilter !== 'TODOS' || unidadeFilter !== 'TODAS' || postoFilter !== 'TODOS'
+                ? 'Tente ajustar os filtros'
+                : 'Comece indicando a primeira medalha'}
             </p>
           </div>
         ) : (
