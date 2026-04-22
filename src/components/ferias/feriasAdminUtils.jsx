@@ -1,6 +1,7 @@
 import { format, addDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import { reconciliarCadeiaFerias } from './reconciliacaoCadeiaFerias';
+import { liberarCreditosDoGozo } from '@/services/creditoExtraFeriasService';
 
 /**
  * Tipos de eventos que representam operações na cadeia de férias.
@@ -254,6 +255,14 @@ export async function executarExclusaoAdminCadeia({
   });
 
   await reconciliarCadeiaFerias({ feriasId: ferias.id, ferias: feriasFresh });
+
+  const eventosRemanescentes = await base44.entities.RegistroLivro.filter({ ferias_id: ferias.id });
+  const possuiInicioValido = eventosRemanescentes.some((evento) =>
+    evento.tipo_registro === TIPOS_EVENTO_FERIAS.SAIDA || evento.tipo_registro === TIPOS_EVENTO_FERIAS.NOVA_SAIDA
+  );
+  if (!possuiInicioValido) {
+    await liberarCreditosDoGozo({ gozoFeriasId: ferias.id });
+  }
 
   queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
   queryClient.invalidateQueries({ queryKey: ['registros-livro'] });

@@ -60,6 +60,7 @@ import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/ferias
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
+import { liberarCreditosDoGozo } from '@/services/creditoExtraFeriasService';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -373,6 +374,7 @@ export default function Ferias() {
   const deleteMutation = useMutation({
     mutationFn: async (params) => {
       const { feriasId, periodoId, periodoRef, militarId } = params;
+      await liberarCreditosDoGozo({ gozoFeriasId: feriasId });
       await base44.entities.Ferias.delete(feriasId);
       await sincronizarPeriodoAquisitivoDaFerias({
         periodoAquisitivoId: periodoId,

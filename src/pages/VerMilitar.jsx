@@ -33,6 +33,12 @@ import {
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { apurarMedalhaTempoServicoMilitar, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  criarPayloadCreditoExtraFerias,
+  formatarTipoCreditoExtra,
+  STATUS_CREDITO_EXTRA_FERIAS,
+  TIPOS_CREDITO_EXTRA_FERIAS,
+} from '@/services/creditoExtraFeriasService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -115,6 +121,15 @@ export default function VerMilitar() {
     motivo: '',
     observacoes: '',
   });
+  const [creditoExtraForm, setCreditoExtraForm] = useState({
+    tipo_credito: TIPOS_CREDITO_EXTRA_FERIAS.OUTRO,
+    quantidade_dias: 1,
+    data_referencia: new Date().toISOString().slice(0, 10),
+    origem_documental: '',
+    numero_boletim: '',
+    data_boletim: '',
+    observacoes: '',
+  });
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
@@ -186,6 +201,11 @@ export default function VerMilitar() {
     queryKey: ['ver-periodos', id],
     queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }, '-inicio_aquisitivo'),
     enabled: !!id && isAccessResolved && canViewMilitar
+  });
+  const { data: creditosExtraFerias = [] } = useQuery({
+    queryKey: ['ver-creditos-extra-ferias', id],
+    queryFn: () => base44.entities.CreditoExtraFerias.filter({ militar_id: id }, '-data_referencia'),
+    enabled: !!id && isAccessResolved && canViewMilitar,
   });
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
@@ -271,6 +291,32 @@ export default function VerMilitar() {
       queryClient.invalidateQueries({ queryKey: ['ver-impedimentos-medalha', id] });
       queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
       toast({ title: 'Impedimento removido' });
+    },
+  });
+  const criarCreditoExtraMutation = useMutation({
+    mutationFn: async () => {
+      if (!militar) throw new Error('Militar não carregado.');
+      const payload = criarPayloadCreditoExtraFerias(
+        creditoExtraForm,
+        {
+          id: militar.id,
+          nome_completo: militar.nome_completo,
+          posto_grad: militar.posto_graduacao,
+          matricula: militar.matricula,
+        },
+      );
+      return base44.entities.CreditoExtraFerias.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ver-creditos-extra-ferias', id] });
+      toast({ title: 'Crédito extraordinário cadastrado' });
+      setCreditoExtraForm((atual) => ({
+        ...atual,
+        origem_documental: '',
+        numero_boletim: '',
+        data_boletim: '',
+        observacoes: '',
+      }));
     },
   });
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
@@ -663,6 +709,105 @@ export default function VerMilitar() {
                   ))}
                 </>
               )}
+
+              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-slate-700">Créditos Extraordinários de Férias</h4>
+                  <Badge variant="outline">{creditosExtraFerias.length} registro(s)</Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Tipo</Label>
+                    <select
+                      className="mt-1.5 w-full border border-slate-200 rounded-md px-3 py-2 text-sm"
+                      value={creditoExtraForm.tipo_credito}
+                      onChange={(event) => setCreditoExtraForm((atual) => ({ ...atual, tipo_credito: event.target.value }))}
+                    >
+                      {Object.values(TIPOS_CREDITO_EXTRA_FERIAS).map((tipo) => (
+                        <option key={tipo} value={tipo}>{formatarTipoCreditoExtra(tipo)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Quantidade de dias</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={creditoExtraForm.quantidade_dias}
+                      onChange={(event) => setCreditoExtraForm((atual) => ({ ...atual, quantidade_dias: Number(event.target.value || 0) }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Data de referência</Label>
+                    <Input
+                      type="date"
+                      value={creditoExtraForm.data_referencia}
+                      onChange={(event) => setCreditoExtraForm((atual) => ({ ...atual, data_referencia: event.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Origem documental</Label>
+                    <Input
+                      value={creditoExtraForm.origem_documental}
+                      onChange={(event) => setCreditoExtraForm((atual) => ({ ...atual, origem_documental: event.target.value }))}
+                      placeholder="Ex.: Doação de sangue HPM"
+                    />
+                  </div>
+                  <div>
+                    <Label>Número boletim</Label>
+                    <Input
+                      value={creditoExtraForm.numero_boletim}
+                      onChange={(event) => setCreditoExtraForm((atual) => ({ ...atual, numero_boletim: event.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Data boletim</Label>
+                    <Input
+                      type="date"
+                      value={creditoExtraForm.data_boletim}
+                      onChange={(event) => setCreditoExtraForm((atual) => ({ ...atual, data_boletim: event.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Observações</Label>
+                  <Input
+                    value={creditoExtraForm.observacoes}
+                    onChange={(event) => setCreditoExtraForm((atual) => ({ ...atual, observacoes: event.target.value }))}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  disabled={criarCreditoExtraMutation.isPending || Number(creditoExtraForm.quantidade_dias || 0) <= 0}
+                  onClick={() => criarCreditoExtraMutation.mutate()}
+                >
+                  Cadastrar crédito
+                </Button>
+
+                <div className="space-y-2">
+                  {creditosExtraFerias.length === 0 ? (
+                    <p className="text-sm text-slate-500">Nenhum crédito extraordinário cadastrado.</p>
+                  ) : creditosExtraFerias.map((credito) => (
+                    <div key={credito.id} className="rounded-lg border border-slate-200 p-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-800">
+                          {formatarTipoCreditoExtra(credito.tipo_credito)} · {credito.quantidade_dias}d
+                        </span>
+                        <Badge className={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}>
+                          {credito.status}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Referência: {formatDate(credito.data_referencia) || '—'} · Doc: {credito.origem_documental || '—'} · BG: {credito.numero_boletim || '—'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Gozo vinculado: {credito.gozo_ferias_id || 'Não vinculado'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </TabsContent>
 

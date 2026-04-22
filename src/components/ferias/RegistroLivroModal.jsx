@@ -32,6 +32,14 @@ import {
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
+import {
+  calcularTotaisGozoComCreditos,
+  formatarTipoCreditoExtra,
+  liberarCreditosDoGozo,
+  validarCreditosSelecionadosParaGozo,
+  vincularCreditosAoGozo,
+  STATUS_CREDITO_EXTRA_FERIAS,
+} from '@/services/creditoExtraFeriasService';
 
 const NOMES_OPERACIONAIS = {
   'Saída Férias': 'Início',
@@ -283,6 +291,7 @@ export default function RegistroLivroModal({
   const [textoPublicacao, setTextoPublicacao] = useState('');
   const [saving, setSaving] = useState(false);
   const [templateError, setTemplateError] = useState(null);
+  const [creditosSelecionadosIds, setCreditosSelecionadosIds] = useState([]);
 
   const { data: templates = [] } = useQuery({
     queryKey: ['templates-texto'],
@@ -318,6 +327,15 @@ export default function RegistroLivroModal({
     enabled: open && !!ferias?.militar_id,
   });
 
+  const { data: creditosExtra = [] } = useQuery({
+    queryKey: ['creditos-extra-ferias-modal', ferias?.militar_id],
+    queryFn: async () => {
+      if (!ferias?.militar_id) return [];
+      return base44.entities.CreditoExtraFerias.filter({ militar_id: ferias.militar_id }, '-data_referencia');
+    },
+    enabled: open && !!ferias?.militar_id,
+  });
+
   const dataLimiteGozo = useMemo(() => {
     if (!ferias) return null;
 
@@ -348,7 +366,20 @@ export default function RegistroLivroModal({
     setObservacoes('');
     setTextoPublicacao('');
     setTemplateError(null);
+    setCreditosSelecionadosIds([]);
   }, [open, ferias, tipoInicial]);
+
+  useEffect(() => {
+    if (!open || !ferias?.id || tipoRegistro !== 'Saída Férias') return;
+
+    const idsVinculados = (creditosExtra || [])
+      .filter((credito) => credito.gozo_ferias_id === ferias.id && credito.status !== STATUS_CREDITO_EXTRA_FERIAS.CANCELADO)
+      .map((credito) => credito.id);
+
+    if (idsVinculados.length > 0) {
+      setCreditosSelecionadosIds(idsVinculados);
+    }
+  }, [open, ferias, tipoRegistro, creditosExtra]);
 
   const cadeiaOperacional = useMemo(() => {
     if (!ferias) return [];
@@ -362,17 +393,25 @@ export default function RegistroLivroModal({
   const resumo = useMemo(() => {
     if (!ferias || !dataRegistro) return null;
 
-    const baseDias = Number(ferias.dias || 0);
+    const baseDias = Number(ferias.dias_base ?? ferias.dias ?? 0);
+    const creditosSelecionados = (creditosExtra || []).filter((credito) => creditosSelecionadosIds.includes(credito.id));
+    const totaisGozo = calcularTotaisGozoComCreditos({
+      diasBase: baseDias,
+      creditos: creditosSelecionados,
+    });
     const dataRef = parseDate(dataRegistro);
 
     if (tipoRegistro === 'Saída Férias') {
-      const novoFim = toDateOnlyString(addDays(dataRef, Math.max(baseDias - 1, 0)));
-      const novoRetorno = toDateOnlyString(addDays(dataRef, baseDias));
+      const novoFim = toDateOnlyString(addDays(dataRef, Math.max(totaisGozo.dias_totais_gozo - 1, 0)));
+      const novoRetorno = toDateOnlyString(addDays(dataRef, totaisGozo.dias_totais_gozo));
 
       return {
         titulo: 'Resumo do Início',
         inicio: dataRegistro,
-        dias: baseDias,
+        dias: totaisGozo.dias_totais_gozo,
+        diasBase: totaisGozo.dias_base_gozo,
+        diasExtras: totaisGozo.dias_extras_creditos,
+        creditosSelecionados,
         fim: novoFim,
         retorno: novoRetorno,
       };
@@ -424,7 +463,7 @@ export default function RegistroLivroModal({
     }
 
     return null;
-  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia]);
+  }, [ferias, dataRegistro, tipoRegistro, registrosDaFerias, estadoAtualCadeia, creditosExtra, creditosSelecionadosIds]);
 
   const erroCronologia = useMemo(() => {
     return validarCronologia({
@@ -527,7 +566,40 @@ export default function RegistroLivroModal({
       } else if (tipoRegistro === 'Nova Saída / Retomada' && resumo) {
         registroPayload.dias = Number(resumo.saldo || 0);
       } else if (tipoRegistro === 'Saída Férias' && resumo) {
+        const creditosValidados = validarCreditosSelecionadosParaGozo({
+          creditos: creditosExtra,
+          idsSelecionados: creditosSelecionadosIds,
+          militarId: ferias.militar_id,
+          gozoFeriasId: ferias.id,
+        });
+        const totaisGozo = calcularTotaisGozoComCreditos({
+          diasBase: Number(ferias.dias_base ?? ferias.dias ?? 0),
+          creditos: creditosValidados,
+        });
+
         registroPayload.dias = Number(resumo.dias || ferias.dias || 0);
+        registroPayload.dias_base_gozo = totaisGozo.dias_base_gozo;
+        registroPayload.dias_extras_creditos = totaisGozo.dias_extras_creditos;
+        registroPayload.dias_totais_gozo = totaisGozo.dias_totais_gozo;
+        registroPayload.creditos_extra_ids = creditosValidados.map((credito) => credito.id);
+        registroPayload.creditos_extra_resumo = creditosValidados
+          .map((credito) => `${formatarTipoCreditoExtra(credito.tipo_credito)} (+${credito.quantidade_dias}d)`)
+          .join(', ');
+
+        if (creditosValidados.length > 0) {
+          await vincularCreditosAoGozo({
+            gozoFeriasId: ferias.id,
+            creditosSelecionados: creditosValidados,
+          });
+        } else {
+          await liberarCreditosDoGozo({ gozoFeriasId: ferias.id });
+        }
+
+        await base44.entities.Ferias.update(ferias.id, {
+          dias_base_gozo: totaisGozo.dias_base_gozo,
+          dias_extras_creditos: totaisGozo.dias_extras_creditos,
+          dias_totais_gozo: totaisGozo.dias_totais_gozo,
+        });
       }
 
       await base44.entities.RegistroLivro.create(registroPayload);
@@ -541,6 +613,7 @@ export default function RegistroLivroModal({
       queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
       queryClient.invalidateQueries({ queryKey: ['registros-livro-ferias-modal', ferias.id] });
       queryClient.invalidateQueries({ queryKey: ['ferias-militar-modal', ferias.militar_id] });
+      queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias-modal', ferias.militar_id] });
 
       onClose();
     } catch (error) {
@@ -575,9 +648,49 @@ export default function RegistroLivroModal({
               {ferias.militar_nome}
             </div>
             <div className="text-sm text-slate-500 mt-1">
-              Base: {ferias.dias || 0}d | Período: {ferias.periodo_aquisitivo_ref || '—'}
+              Base: {ferias.dias_base ?? ferias.dias ?? 0}d | Período: {ferias.periodo_aquisitivo_ref || '—'}
             </div>
           </div>
+
+          {tipoRegistro === 'Saída Férias' && (
+            <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-700">Dias adicionais vinculáveis</h4>
+                <p className="text-xs text-slate-500">Selecione créditos extraordinários disponíveis para este gozo.</p>
+              </div>
+              <div className="space-y-2 max-h-44 overflow-y-auto">
+                {creditosExtra.length === 0 && (
+                  <p className="text-xs text-slate-500">Nenhum crédito extraordinário cadastrado para este militar.</p>
+                )}
+                {creditosExtra.map((credito) => {
+                  const selecionado = creditosSelecionadosIds.includes(credito.id);
+                  const bloqueado =
+                    credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO ||
+                    (credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO && credito.gozo_ferias_id !== ferias.id);
+
+                  return (
+                    <label key={credito.id} className={`flex items-start gap-2 rounded-md border p-2 ${bloqueado ? 'opacity-60 bg-slate-50' : 'bg-white'}`}>
+                      <input
+                        type="checkbox"
+                        disabled={bloqueado}
+                        checked={selecionado}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setCreditosSelecionadosIds((atual) => (
+                            checked ? [...new Set([...atual, credito.id])] : atual.filter((id) => id !== credito.id)
+                          ));
+                        }}
+                      />
+                      <span className="text-xs text-slate-700">
+                        <strong>{formatarTipoCreditoExtra(credito.tipo_credito)}</strong> (+{credito.quantidade_dias}d)
+                        {' · '}Status: {credito.status}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {cadeiaOperacional.length > 0 && (
             <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -636,13 +749,18 @@ export default function RegistroLivroModal({
                     <div className="font-semibold">{formatDateBR(resumo.inicio)}</div>
                   </div>
                   <div>
+                    <div className="text-cyan-700">Dias (base + extra)</div>
+                    <div className="font-semibold">{resumo.diasBase}d + {resumo.diasExtras}d = {resumo.dias}d</div>
+                  </div>
+                  <div>
                     <div className="text-cyan-700">Novo fim</div>
                     <div className="font-semibold">{formatDateBR(resumo.fim)}</div>
                   </div>
-                  <div>
-                    <div className="text-cyan-700">Novo retorno</div>
-                    <div className="font-semibold">{formatDateBR(resumo.retorno)}</div>
-                  </div>
+                </div>
+              )}
+              {tipoRegistro === 'Saída Férias' && (
+                <div className="mt-3 text-xs text-cyan-800">
+                  Retorno previsto: <strong>{formatDateBR(resumo.retorno)}</strong>
                 </div>
               )}
 

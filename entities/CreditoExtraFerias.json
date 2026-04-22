@@ -1,0 +1,21 @@
+{
+  "name": "CreditoExtraFerias",
+  "type": "object",
+  "title": "Crédito Extraordinário de Férias",
+  "description": "Créditos extraordinários vinculáveis ao gozo de férias sem alterar o saldo-base do período aquisitivo.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "militar_nome": { "type": "string", "default": "" },
+    "militar_posto": { "type": "string", "default": "" },
+    "militar_matricula": { "type": "string", "default": "" },
+    "tipo_credito": { "type": "string", "default": "OUTRO" },
+    "quantidade_dias": { "type": "integer", "default": 0 },
+    "data_referencia": { "type": "date", "default": "" },
+    "origem_documental": { "type": "string", "default": "" },
+    "numero_boletim": { "type": "string", "default": "" },
+    "data_boletim": { "type": "date", "default": "" },
+    "observacoes": { "type": "string", "default": "" },
+    "status": { "type": "string", "default": "DISPONIVEL" },
+    "gozo_ferias_id": { "type": "string", "default": "" }
+  }
+}
