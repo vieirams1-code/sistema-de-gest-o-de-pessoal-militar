@@ -848,8 +848,30 @@ function assertHistoricoEntity() {
   return entity;
 }
 
+async function atualizarHistoricoComDiagnostico(entity, historicoId, payload, contexto, avisosHistorico) {
+  if (!entity || !historicoId) {
+    const mensagem = `[ImportacaoMilitares] Histórico indisponível ao ${contexto}.`;
+    console.error(mensagem, { historicoId, payload });
+    avisosHistorico.push(mensagem);
+    return null;
+  }
+
+  try {
+    return await entity.update(historicoId, payload);
+  } catch (error) {
+    const mensagemErro = String(error?.message || '');
+    if (mensagemErro.includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
+      throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+    }
+    const mensagem = `[ImportacaoMilitares] Falha ao ${contexto} no histórico (${historicoId}): ${error?.message || 'erro desconhecido.'}`;
+    console.error(mensagem, { payload, error });
+    avisosHistorico.push(mensagem);
+    return null;
+  }
+}
+
 export async function salvarAnaliseHistorico(analise, usuario) {
-  const historicoEntity = getHistoricoImportacaoEntity();
+  const historicoEntity = assertHistoricoEntity();
   const payload = {
     nome_arquivo: analise.arquivo.nome,
     tipo_arquivo: analise.arquivo.tipo,
@@ -867,12 +889,6 @@ export async function salvarAnaliseHistorico(analise, usuario) {
     observacoes: '',
   };
 
-  if (!historicoEntity) {
-    // Fallback: entidade indisponível no runtime — retorna objeto simulado sem persistência
-    console.warn('[ImportacaoMilitares] Entidade não disponível no runtime. Histórico NÃO foi salvo.');
-    return { id: null, _historicoNaoSalvo: true, ...payload };
-  }
-
   try {
     return await historicoEntity.create(payload);
   } catch (error) {
@@ -885,21 +901,29 @@ export async function salvarAnaliseHistorico(analise, usuario) {
 
 export async function importarAnalise({ analise, incluirAlertas, historicoId, usuario }) {
   const historicoEntity = getHistoricoImportacaoEntity();
-  const historicoDisponivel = !!historicoEntity && !!historicoId;
+  const avisosHistorico = [];
+  let historicoIdEfetivo = historicoId;
 
-  if (historicoDisponivel) {
-    try {
-      await historicoEntity.update(historicoId, {
-        status_importacao: 'Importando',
-        importar_linhas_com_alerta: incluirAlertas,
-      });
-    } catch (error) {
-      if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
-        throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
-      }
-      throw error;
-    }
+  if (!historicoIdEfetivo) {
+    const historicoCriado = await salvarAnaliseHistorico(analise, usuario);
+    historicoIdEfetivo = historicoCriado?.id;
   }
+
+  if (!historicoIdEfetivo) {
+    throw new Error('Não foi possível determinar o registro de histórico da importação.');
+  }
+  const historicoDisponivel = !!historicoEntity && !!historicoIdEfetivo;
+
+  await atualizarHistoricoComDiagnostico(
+    historicoEntity,
+    historicoIdEfetivo,
+    {
+      status_importacao: 'Importando',
+      importar_linhas_com_alerta: incluirAlertas,
+    },
+    'marcar status IMPORTANDO',
+    avisosHistorico,
+  );
 
   const podeImportar = (linha) => linha.status === STATUS_LINHA.APTO || (incluirAlertas && linha.status === STATUS_LINHA.APTO_COM_ALERTA);
   const elegiveis = analise.linhas.filter(podeImportar);
@@ -971,8 +995,10 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       },
     });
 
-    if (historicoDisponivel) {
-      await historicoEntity.update(historicoId, {
+    await atualizarHistoricoComDiagnostico(
+      historicoEntity,
+      historicoIdEfetivo,
+      {
         importado_por: usuario?.email || '',
         importado_por_nome: usuario?.full_name || usuario?.name || '',
         total_importadas: totalImportadas,
@@ -980,13 +1006,18 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
         status_importacao: statusImportacao,
         importar_linhas_com_alerta: incluirAlertas,
         relatorio_json: JSON.stringify(relatorio, null, 2),
-      });
-    }
+        observacoes: `Tipo: Migração de Militares | Processadas: ${analise.resumo.total_linhas} | Importadas: ${totalImportadas} | Erros/Não importadas: ${totalNaoImportadas}`,
+      },
+      'finalizar histórico',
+      avisosHistorico,
+    );
 
     return {
       statusImportacao,
       totalImportadas,
       totalNaoImportadas,
+      historicoId: historicoIdEfetivo,
+      avisosHistorico,
       idsCriados,
       naoImportadas,
       relatorio,
@@ -994,14 +1025,15 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
   } catch (error) {
     if (historicoDisponivel) {
       try {
-        await historicoEntity.update(historicoId, {
+        await historicoEntity.update(historicoIdEfetivo, {
           status_importacao: 'Falhou',
           observacoes: error?.message || 'Falha ao importar lote.',
         });
       } catch (updateError) {
-        if (String(updateError?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
-          console.warn('[ImportacaoMilitares] Não foi possível atualizar status de falha no histórico.');
-        }
+        const mensagemErro = String(updateError?.message || '');
+        if (mensagemErro.includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
+        const mensagem = `[ImportacaoMilitares] Não foi possível atualizar status de falha no histórico (${historicoIdEfetivo}): ${updateError?.message || 'erro desconhecido.'}`;
+        console.error(mensagem);
       }
     }
     if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {

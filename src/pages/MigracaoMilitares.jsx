@@ -96,8 +96,18 @@ export default function MigracaoMilitares() {
         historicoId: historicoIdAtual,
         usuario,
       });
+      if (resultado?.historicoId && resultado.historicoId !== historicoId) {
+        setHistoricoId(resultado.historicoId);
+      }
       setResultadoImportacao(resultado);
-      toast({ title: 'Importação finalizada', description: `Foram importados ${resultado.totalImportadas} registros.` });
+      const avisoHistorico = Array.isArray(resultado?.avisosHistorico) && resultado.avisosHistorico.length > 0;
+      toast({
+        title: avisoHistorico ? 'Importação finalizada com alerta' : 'Importação finalizada',
+        description: avisoHistorico
+          ? `Foram importados ${resultado.totalImportadas} registros, porém houve problema ao sincronizar o histórico. Consulte o console/log para diagnóstico.`
+          : `Foram importados ${resultado.totalImportadas} registros.`,
+        variant: avisoHistorico ? 'destructive' : 'default',
+      });
     } catch (error) {
       const mensagem = String(error?.message || '').includes('Entity schema ImportacaoMilitares not found in app')
         ? ERRO_ENTIDADE_HISTORICO
