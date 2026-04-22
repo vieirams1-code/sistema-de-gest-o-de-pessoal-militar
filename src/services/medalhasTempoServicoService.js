@@ -419,6 +419,13 @@ export function filtrarIndicacoesTempoResetaveis(medalhas = []) {
   ));
 }
 
+export function filtrarIndicacoesDomPedroResetaveis(medalhas = []) {
+  return medalhas.filter((registro) => (
+    resolverCodigoTipoMedalha(registro) === 'DOM_PEDRO_II'
+    && normalizarStatusMedalha(registro.status) === 'INDICADA'
+  ));
+}
+
 export function obterEstadoCelulaTempoServico({
   apuracao,
   codigoFaixa,
