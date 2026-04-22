@@ -13,6 +13,7 @@ import {
   deduplicarTiposMedalha,
   filtrarIndicacoesTempoResetaveis,
   isImpedimentoAtivo,
+  indicarMedalhaPorCodigo,
   normalizarStatusMedalha,
   obterEstadoCelulaTempoServico,
   obterTipoMedalhaPorCodigo,
@@ -446,4 +447,82 @@ test('resolverOuGarantirTipoMedalha resolve código legado textual e garante cri
   assert.equal(tipo?.codigo, 'TEMPO_10');
   assert.equal(tipo?.id, 'tipo-TEMPO_10');
   assert.equal(tiposPersistidos.some((item) => item.codigo === 'TEMPO_10'), true);
+});
+
+test('indicarMedalhaPorCodigo resolve TEMPO_10 para tipo_medalha_id e cria medalha INDICADA', async () => {
+  const tiposPersistidos = [];
+  const medalhasCriadas = [];
+  const base44Mock = {
+    entities: {
+      TipoMedalha: {
+        list: async () => tiposPersistidos,
+        create: async (payload) => {
+          const criado = { id: `tipo-${payload.codigo}`, ...payload };
+          tiposPersistidos.push(criado);
+          return criado;
+        },
+        update: async (id, payload) => ({ id, ...payload }),
+      },
+      Medalha: {
+        create: async (payload) => {
+          medalhasCriadas.push(payload);
+          return { id: 'med-1', ...payload };
+        },
+        update: async () => {
+          throw new Error('Não deveria atualizar quando não há registro existente');
+        },
+      },
+    },
+  };
+
+  const resultado = await indicarMedalhaPorCodigo(base44Mock, {
+    militar: { id: 'm40', nome_completo: 'Militar Teste', posto_graduacao: 'CB', matricula: '123' },
+    codigoMedalha: 'TEMPO_10',
+    tiposMedalha: [],
+    dataIndicacao: '2026-04-22',
+  });
+
+  assert.equal(resultado.status, 'INDICADA');
+  assert.equal(resultado.tipo_medalha_id, 'tipo-TEMPO_10');
+  assert.equal(resultado.tipo_medalha_codigo, 'TEMPO_10');
+  assert.equal(medalhasCriadas.length, 1);
+});
+
+test('indicarMedalhaPorCodigo aceita nome legado e atualiza registro existente com tipo_medalha_id', async () => {
+  const tiposPersistidos = [{ id: 'tipo-TEMPO_20', codigo: 'TEMPO_20', nome: 'Medalha de Tempo de Serviço - 20 anos' }];
+  const atualizacoes = [];
+  const base44Mock = {
+    entities: {
+      TipoMedalha: {
+        list: async () => tiposPersistidos,
+        create: async () => {
+          throw new Error('Não deveria criar tipo quando já existe');
+        },
+        update: async () => {
+          throw new Error('Não deveria reconciliar catálogo nesse cenário');
+        },
+      },
+      Medalha: {
+        create: async () => {
+          throw new Error('Não deveria criar nova medalha quando já existe registro');
+        },
+        update: async (id, payload) => {
+          atualizacoes.push({ id, payload });
+          return { id, ...payload };
+        },
+      },
+    },
+  };
+
+  const resultado = await indicarMedalhaPorCodigo(base44Mock, {
+    militar: { id: 'm41', nome_completo: 'Militar Teste 2' },
+    codigoMedalha: 'Medalha de Tempo de Serviço - 20 anos',
+    tiposMedalha: tiposPersistidos,
+    registroExistente: { id: 'medalha-existente', status: 'CANCELADA' },
+    dataIndicacao: '2026-04-22',
+  });
+
+  assert.equal(resultado.status, 'INDICADA');
+  assert.equal(resultado.tipo_medalha_id, 'tipo-TEMPO_20');
+  assert.equal(atualizacoes.length, 1);
 });

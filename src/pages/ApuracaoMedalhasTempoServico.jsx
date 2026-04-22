@@ -26,12 +26,11 @@ import { useToast } from '@/components/ui/use-toast';
 import {
   TIPOS_FIXOS_MEDALHA_TEMPO,
   apurarListaMilitaresTempoServico,
-  criarIndicacaoAutomatica,
   filtrarIndicacoesTempoResetaveis,
   garantirCatalogoFixoMedalhaTempo,
+  indicarMedalhaPorCodigo,
   normalizarStatusMedalha,
   obterEstadoCelulaTempoServico,
-  resolverOuGarantirTipoMedalha,
   resolverCodigoTipoMedalha,
 } from '@/services/medalhasTempoServicoService';
 
@@ -158,16 +157,14 @@ export default function ApuracaoMedalhasTempoServico() {
 
   const indicarMutation = useMutation({
     mutationFn: async ({ item, codigo }) => {
-      const tipo = await resolverOuGarantirTipoMedalha(base44, codigo, tiposCatalogo);
-      if (!tipo?.id) throw new Error(`Tipo ${codigo} não encontrado.`);
-
       const existente = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
-      if (existente?.id && normalizarStatusMedalha(existente.status) !== 'CONCEDIDA') {
-        return base44.entities.Medalha.update(existente.id, { status: 'INDICADA', data_indicacao: hojeISO() });
-      }
-
-      const payload = criarIndicacaoAutomatica({ militar: item.militar, medalhaDevida: codigo, tipoMedalha: tipo });
-      return base44.entities.Medalha.create(payload);
+      return indicarMedalhaPorCodigo(base44, {
+        militar: item.militar,
+        codigoMedalha: codigo,
+        tiposMedalha: tiposCatalogo,
+        registroExistente: existente,
+        dataIndicacao: hojeISO(),
+      });
     },
     onSuccess: () => {
       refreshQueries();

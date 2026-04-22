@@ -557,3 +557,46 @@ export async function resolverOuGarantirTipoMedalha(base44Client, codigoOuNome, 
   tipo = obterTipoMedalhaPorCodigo(codigoResolvido, tiposAtualizados);
   return tipo || null;
 }
+
+export async function indicarMedalhaPorCodigo(base44Client, {
+  militar,
+  codigoMedalha,
+  tiposMedalha = [],
+  registroExistente = null,
+  dataIndicacao = new Date().toISOString().split('T')[0],
+  origemRegistro = 'APURACAO_TEMPO_SERVICO',
+  observacoes = 'Indicação automática gerada na apuração de medalhas.',
+}) {
+  const codigoResolvido = resolverCodigoTipoMedalha(codigoMedalha);
+  if (!codigoResolvido) {
+    throw new Error(`Código de medalha inválido: ${codigoMedalha}`);
+  }
+
+  const tipoMedalha = await resolverOuGarantirTipoMedalha(base44Client, codigoResolvido, tiposMedalha);
+  if (!tipoMedalha?.id) {
+    throw new Error(`Tipo ${codigoResolvido} não encontrado após garantir catálogo.`);
+  }
+
+  if (registroExistente?.id && normalizarStatusMedalha(registroExistente.status) !== 'CONCEDIDA') {
+    return base44Client.entities.Medalha.update(registroExistente.id, {
+      status: 'INDICADA',
+      data_indicacao: dataIndicacao,
+      tipo_medalha_id: tipoMedalha.id,
+      tipo_medalha_codigo: tipoMedalha.codigo || codigoResolvido,
+      tipo_medalha_nome: tipoMedalha.nome,
+    });
+  }
+
+  const payload = criarIndicacaoAutomatica({
+    militar,
+    medalhaDevida: tipoMedalha.codigo || codigoResolvido,
+    tipoMedalha,
+  });
+
+  return base44Client.entities.Medalha.create({
+    ...payload,
+    origem_registro: origemRegistro,
+    observacoes,
+    data_indicacao: dataIndicacao,
+  });
+}
