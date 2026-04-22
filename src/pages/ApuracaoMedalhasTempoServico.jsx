@@ -26,6 +26,17 @@ import { useToast } from '@/components/ui/use-toast';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import {
+  ACOES_APURACAO,
+  ACOES_MEDALHAS,
+  adicionarAuditoriaMedalha,
+  listarImpedimentosEscopo,
+  listarMedalhasEscopo,
+  listarMilitaresEscopo,
+  temAlgumaPermissaoMedalhas,
+  validarMilitarDentroEscopo,
+  validarPermissaoAcaoMedalhas,
+} from '@/services/medalhasAcessoService';
+import {
   TIPOS_FIXOS_MEDALHA_TEMPO,
   apurarListaMilitaresTempoServico,
   filtrarIndicacoesTempoResetaveis,
@@ -65,8 +76,13 @@ export default function ApuracaoMedalhasTempoServico() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
+  const hasApuracaoAccess = temAlgumaPermissaoMedalhas(canAccessAction, ACOES_APURACAO);
+  const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
+  const podeConceder = canAccessAction(ACOES_MEDALHAS.CONCEDER);
+  const podeResetar = canAccessAction(ACOES_MEDALHAS.RESETAR);
+  const podeExportar = canAccessAction(ACOES_MEDALHAS.EXPORTAR);
 
   const [search, setSearch] = useState('');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
@@ -85,14 +101,17 @@ export default function ApuracaoMedalhasTempoServico() {
 
   const militaresQuery = useQuery({
     queryKey: ['apuracao-medalhas-militares'],
-    queryFn: () => base44.entities.Militar.list('nome_completo'),
-    enabled: isAccessResolved && hasMedalhasAccess,
+    queryFn: () => listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters }),
+    enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
   });
 
   const medalhasQuery = useQuery({
     queryKey: ['apuracao-medalhas-registros'],
-    queryFn: () => base44.entities.Medalha.list('-created_date'),
-    enabled: isAccessResolved && hasMedalhasAccess,
+    queryFn: async () => {
+      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
+      return listarMedalhasEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+    },
+    enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
   });
 
   const tiposMedalhaQuery = useQuery({
@@ -103,8 +122,11 @@ export default function ApuracaoMedalhasTempoServico() {
 
   const impedimentosQuery = useQuery({
     queryKey: ['apuracao-medalhas-impedimentos'],
-    queryFn: () => base44.entities.ImpedimentoMedalha.list('-created_date'),
-    enabled: isAccessResolved && hasMedalhasAccess,
+    queryFn: async () => {
+      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
+      return listarImpedimentosEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+    },
+    enabled: isAccessResolved && hasMedalhasAccess && hasApuracaoAccess,
   });
 
   const militares = militaresQuery.data || [];
@@ -113,6 +135,7 @@ export default function ApuracaoMedalhasTempoServico() {
   const impedimentos = impedimentosQuery.data || [];
 
   const tiposCatalogo = tiposMedalha.length ? tiposMedalha : TIPOS_FIXOS_MEDALHA_TEMPO;
+  const militarIdsEscopo = useMemo(() => new Set(militares.map((m) => m.id).filter(Boolean)), [militares]);
 
   const registrosTempo = useMemo(() => medalhas.filter((item) => CODIGOS_TEMPO.includes(resolverCodigoTipoMedalha(item))), [medalhas]);
 
@@ -240,6 +263,12 @@ export default function ApuracaoMedalhasTempoServico() {
 
   const indicarMutation = useMutation({
     mutationFn: async ({ item, codigo }) => {
+      validarPermissaoAcaoMedalhas({
+        canAccessAction,
+        acao: ACOES_MEDALHAS.INDICAR,
+        mensagem: 'Sem permissão para indicar medalhas.',
+      });
+      validarMilitarDentroEscopo({ isAdmin, militarId: item?.militar_id, militarIdsEscopo });
       const existente = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
       return indicarMedalhaPorCodigo(base44, {
         militar: item.militar,
@@ -257,10 +286,21 @@ export default function ApuracaoMedalhasTempoServico() {
   });
 
   const concederMutation = useMutation({
-    mutationFn: async ({ medalhaId, data_concessao, numero_publicacao }) => base44.entities.Medalha.update(
-      medalhaId,
-      normalizarRegistroConcessao({}, { data_concessao, numero_publicacao }),
-    ),
+    mutationFn: async ({ medalhaId, data_concessao, numero_publicacao, militarId }) => {
+      validarPermissaoAcaoMedalhas({
+        canAccessAction,
+        acao: ACOES_MEDALHAS.CONCEDER,
+        mensagem: 'Sem permissão para conceder medalhas.',
+      });
+      validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscopo });
+      return base44.entities.Medalha.update(
+        medalhaId,
+        adicionarAuditoriaMedalha(
+          normalizarRegistroConcessao({}, { data_concessao, numero_publicacao }),
+          { userEmail, acao: 'concessao' },
+        ),
+      );
+    },
     onSuccess: () => {
       refreshQueries();
       setConcederDialog({ open: false, medalha: null, data: hojeISO(), doems: '' });
@@ -271,12 +311,18 @@ export default function ApuracaoMedalhasTempoServico() {
 
   const resetIndicacoesMutation = useMutation({
     mutationFn: async () => {
+      validarPermissaoAcaoMedalhas({
+        canAccessAction,
+        acao: ACOES_MEDALHAS.RESETAR,
+        mensagem: 'Sem permissão para resetar indicações.',
+      });
       const pendentes = filtrarIndicacoesTempoResetaveis(registrosTempo);
-      await Promise.all(pendentes.map((m) => base44.entities.Medalha.update(m.id, {
+      const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
+      await Promise.all(pendentesEscopo.map((m) => base44.entities.Medalha.update(m.id, adicionarAuditoriaMedalha({
         status: 'CANCELADA',
         observacoes: `${m.observacoes ? `${m.observacoes}\n` : ''}[RESET] Indicação resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
-      })));
-      return pendentes.length;
+      }, { userEmail, acao: 'reset' }))));
+      return pendentesEscopo.length;
     },
     onSuccess: (quantidade) => {
       refreshQueries();
@@ -288,6 +334,7 @@ export default function ApuracaoMedalhasTempoServico() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+  if (!hasApuracaoAccess) return <AccessDenied modulo="Apuração de Medalhas" />;
 
   const isLoadingData = militaresQuery.isLoading || medalhasQuery.isLoading || tiposMedalhaQuery.isLoading || impedimentosQuery.isLoading;
 
@@ -304,21 +351,23 @@ export default function ApuracaoMedalhasTempoServico() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (!exportRows.length) {
-                  toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
-                  return;
-                }
-                setExportModalOpen(true);
-              }}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Exportar indicados
-            </Button>
-            <Button variant="outline" onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}>Dom Pedro II</Button>
-            <Button variant="outline" onClick={() => setResetDialogOpen(true)}><RefreshCw className="w-4 h-4 mr-2" />Resetar indicações</Button>
+            {podeExportar && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!exportRows.length) {
+                    toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
+                    return;
+                  }
+                  setExportModalOpen(true);
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exportar indicados
+              </Button>
+            )}
+            {canAccessAction(ACOES_MEDALHAS.DOM_PEDRO) && <Button variant="outline" onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}>Dom Pedro II</Button>}
+            {podeResetar && <Button variant="outline" onClick={() => setResetDialogOpen(true)}><RefreshCw className="w-4 h-4 mr-2" />Resetar indicações</Button>}
           </div>
         </div>
 
@@ -404,16 +453,18 @@ export default function ApuracaoMedalhasTempoServico() {
                         const cell = getCellState(item, codigo);
                         return (
                           <td key={codigo} className="py-3 px-2 align-top text-center">
-                            {cell.type === 'INDICAR' ? (
+                            {cell.type === 'INDICAR' && podeIndicar ? (
                               <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={indicarMutation.isPending} onClick={() => indicarMutation.mutate({ item, codigo })}>
                                 <CheckCircle2 className="w-4 h-4 mr-1" />Indicar
                               </Button>
                             ) : cell.type === 'INDICADO' ? (
                               <div className="space-y-1">
                                 <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Indicado</Badge>
-                                <div>
+                                {podeConceder && (
+                                  <div>
                                   <Button size="sm" variant="outline" onClick={() => setConcederDialog({ open: true, medalha: cell.registro, data: hojeISO(), doems: '' })}>Conceder</Button>
-                                </div>
+                                  </div>
+                                )}
                               </div>
                             ) : cell.type === 'CONTEMPLADO' ? (
                               <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Contemplado</Badge>
@@ -466,6 +517,7 @@ export default function ApuracaoMedalhasTempoServico() {
               disabled={!concederDialog.data || !concederDialog.doems || concederMutation.isPending}
               onClick={() => concederMutation.mutate({
                 medalhaId: concederDialog.medalha?.id,
+                militarId: concederDialog.medalha?.militar_id,
                 data_concessao: concederDialog.data,
                 numero_publicacao: concederDialog.doems,
               })}
@@ -476,7 +528,7 @@ export default function ApuracaoMedalhasTempoServico() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+      <AlertDialog open={resetDialogOpen && podeResetar} onOpenChange={setResetDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Resetar indicações pendentes?</AlertDialogTitle>
@@ -492,13 +544,15 @@ export default function ApuracaoMedalhasTempoServico() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ExportarIndicadosModal
-        open={exportModalOpen}
-        onOpenChange={setExportModalOpen}
-        campos={camposExportacao}
-        defaultSelecionados={camposPadrao}
-        onConfirm={onConfirmarExportacao}
-      />
+      {podeExportar && (
+        <ExportarIndicadosModal
+          open={exportModalOpen}
+          onOpenChange={setExportModalOpen}
+          campos={camposExportacao}
+          defaultSelecionados={camposPadrao}
+          onConfirm={onConfirmarExportacao}
+        />
+      )}
     </div>
   );
 }

@@ -32,6 +32,7 @@ import {
 } from '@/config/perfilMilitarRegistrosConfig';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { apurarMedalhaTempoServicoMilitar, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
+import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas } from '@/services/medalhasAcessoService';
 import { useToast } from '@/components/ui/use-toast';
 import {
   criarPayloadCreditoExtraFerias,
@@ -113,7 +114,8 @@ export default function VerMilitar() {
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const selectedTab = searchParams.get('tab') || 'comportamento';
-  const { isAdmin, hasAccess, hasSelfAccess, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, hasAccess, hasSelfAccess, canAccessAction, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [impedimentoForm, setImpedimentoForm] = useState({
     data_inicio: new Date().toISOString().split('T')[0],
@@ -264,16 +266,19 @@ export default function VerMilitar() {
   );
 
   const criarImpedimentoMutation = useMutation({
-    mutationFn: async () => base44.entities.ImpedimentoMedalha.create({
-      militar_id: id,
-      ativo: true,
-      data_inicio: impedimentoForm.data_inicio || new Date().toISOString().split('T')[0],
-      data_fim: impedimentoForm.data_fim || '',
-      motivo: impedimentoForm.motivo,
-      observacoes: impedimentoForm.observacoes,
-      tipo_medalha_codigo: '',
-      tipo_medalha_id: '',
-    }),
+    mutationFn: async () => {
+      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.IMPEDIMENTOS, mensagem: 'Sem permissão para gerir impedimentos de medalha.' });
+      return base44.entities.ImpedimentoMedalha.create(adicionarAuditoriaMedalha({
+        militar_id: id,
+        ativo: true,
+        data_inicio: impedimentoForm.data_inicio || new Date().toISOString().split('T')[0],
+        data_fim: impedimentoForm.data_fim || '',
+        motivo: impedimentoForm.motivo,
+        observacoes: impedimentoForm.observacoes,
+        tipo_medalha_codigo: '',
+        tipo_medalha_id: '',
+      }, { userEmail }));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ver-impedimentos-medalha', id] });
       queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
@@ -283,10 +288,13 @@ export default function VerMilitar() {
   });
 
   const removerImpedimentoMutation = useMutation({
-    mutationFn: async (impedimentoId) => base44.entities.ImpedimentoMedalha.update(impedimentoId, {
-      ativo: false,
-      data_fim: new Date().toISOString().split('T')[0],
-    }),
+    mutationFn: async (impedimentoId) => {
+      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.IMPEDIMENTOS, mensagem: 'Sem permissão para gerir impedimentos de medalha.' });
+      return base44.entities.ImpedimentoMedalha.update(impedimentoId, adicionarAuditoriaMedalha({
+        ativo: false,
+        data_fim: new Date().toISOString().split('T')[0],
+      }, { userEmail }));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ver-impedimentos-medalha', id] });
       queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
@@ -868,7 +876,7 @@ export default function VerMilitar() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={removerImpedimentoMutation.isPending}
+                      disabled={!podeGerirImpedimentosMedalha || removerImpedimentoMutation.isPending}
                       onClick={() => removerImpedimentoMutation.mutate(impedimentoAtivoGeral.id)}
                     >
                       Remover impedimento
@@ -910,7 +918,7 @@ export default function VerMilitar() {
                       <Button
                         size="sm"
                         className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                        disabled={criarImpedimentoMutation.isPending || !impedimentoForm.motivo.trim()}
+                        disabled={!podeGerirImpedimentosMedalha || criarImpedimentoMutation.isPending || !impedimentoForm.motivo.trim()}
                         onClick={() => criarImpedimentoMutation.mutate()}
                       >
                         Ativar impedimento geral

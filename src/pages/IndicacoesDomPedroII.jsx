@@ -26,6 +26,14 @@ import { useToast } from '@/components/ui/use-toast';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import {
+  ACOES_MEDALHAS,
+  adicionarAuditoriaMedalha,
+  listarMedalhasEscopo,
+  listarMilitaresEscopo,
+  validarMilitarDentroEscopo,
+  validarPermissaoAcaoMedalhas,
+} from '@/services/medalhasAcessoService';
+import {
   criarIndicacaoAutomatica,
   filtrarIndicacoesDomPedroResetaveis,
   garantirCatalogoFixoMedalhaTempo,
@@ -46,8 +54,12 @@ export default function IndicacoesDomPedroII() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
+  const hasDomPedroAccess = canAccessAction(ACOES_MEDALHAS.DOM_PEDRO);
+  const podeConceder = canAccessAction(ACOES_MEDALHAS.CONCEDER);
+  const podeResetar = canAccessAction(ACOES_MEDALHAS.RESETAR);
+  const podeExportar = canAccessAction(ACOES_MEDALHAS.EXPORTAR);
 
   const [search, setSearch] = useState('');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
@@ -66,13 +78,16 @@ export default function IndicacoesDomPedroII() {
 
   const militaresQuery = useQuery({
     queryKey: ['dompedro-militares'],
-    queryFn: () => base44.entities.Militar.list('nome_completo'),
-    enabled: isAccessResolved && hasMedalhasAccess,
+    queryFn: () => listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters }),
+    enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
   });
   const medalhasQuery = useQuery({
     queryKey: ['dompedro-medalhas'],
-    queryFn: () => base44.entities.Medalha.list('-created_date'),
-    enabled: isAccessResolved && hasMedalhasAccess,
+    queryFn: async () => {
+      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
+      return listarMedalhasEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+    },
+    enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
   });
   const tiposQuery = useQuery({
     queryKey: ['dompedro-tipos'],
@@ -83,6 +98,7 @@ export default function IndicacoesDomPedroII() {
   const militares = militaresQuery.data || [];
   const medalhas = medalhasQuery.data || [];
   const tipos = tiposQuery.data || [];
+  const militarIdsEscopo = useMemo(() => new Set(militares.map((m) => m.id).filter(Boolean)), [militares]);
 
   const domPedroRegistros = useMemo(() => medalhas.filter((m) => resolverCodigoTipoMedalha(m) === 'DOM_PEDRO_II'), [medalhas]);
 
@@ -162,27 +178,33 @@ export default function IndicacoesDomPedroII() {
 
   const indicarMutation = useMutation({
     mutationFn: async (militar) => {
+      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.DOM_PEDRO, mensagem: 'Sem permissão para indicar Dom Pedro II.' });
+      validarMilitarDentroEscopo({ isAdmin, militarId: militar?.id, militarIdsEscopo });
       const existente = registroPorMilitar.get(militar.id);
       if (existente?.id && normalizarStatusMedalha(existente.status) !== 'CONCEDIDA') {
-        return base44.entities.Medalha.update(existente.id, { status: 'INDICADA', data_indicacao: hojeISO() });
+        return base44.entities.Medalha.update(existente.id, adicionarAuditoriaMedalha({ status: 'INDICADA', data_indicacao: hojeISO() }, { userEmail, acao: 'indicacao' }));
       }
       const tipo = await resolverOuGarantirTipoMedalha(base44, 'DOM_PEDRO_II', tipos);
       if (!tipo?.id) throw new Error('Tipo DOM_PEDRO_II não encontrado.');
       const payload = criarIndicacaoAutomatica({ militar, medalhaDevida: 'DOM_PEDRO_II', tipoMedalha: tipo });
       payload.origem_registro = 'INDICACAO_MANUAL_DOM_PEDRO_II';
       payload.observacoes = 'Fluxo manual Dom Pedro II.';
-      return base44.entities.Medalha.create(payload);
+      return base44.entities.Medalha.create(adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
     },
     onSuccess: () => { refresh(); toast({ title: 'Indicação registrada para Dom Pedro II.' }); },
   });
 
   const concederMutation = useMutation({
-    mutationFn: ({ medalhaId, data_concessao, numero_publicacao }) => base44.entities.Medalha.update(medalhaId, {
-      status: 'CONCEDIDA',
-      data_concessao,
-      numero_publicacao,
-      doems_numero: numero_publicacao,
-    }),
+    mutationFn: ({ medalhaId, militarId, data_concessao, numero_publicacao }) => {
+      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.CONCEDER, mensagem: 'Sem permissão para conceder medalhas.' });
+      validarMilitarDentroEscopo({ isAdmin, militarId, militarIdsEscopo });
+      return base44.entities.Medalha.update(medalhaId, adicionarAuditoriaMedalha({
+        status: 'CONCEDIDA',
+        data_concessao,
+        numero_publicacao,
+        doems_numero: numero_publicacao,
+      }, { userEmail, acao: 'concessao' }));
+    },
     onSuccess: () => {
       refresh();
       setConcederDialog({ open: false, medalha: null, data: hojeISO(), doems: '' });
@@ -192,12 +214,14 @@ export default function IndicacoesDomPedroII() {
 
   const resetIndicacoesMutation = useMutation({
     mutationFn: async () => {
+      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.RESETAR, mensagem: 'Sem permissão para resetar indicações.' });
       const pendentes = filtrarIndicacoesDomPedroResetaveis(domPedroRegistros);
-      await Promise.all(pendentes.map((registro) => base44.entities.Medalha.update(registro.id, {
+      const pendentesEscopo = pendentes.filter((m) => isAdmin || militarIdsEscopo.has(m.militar_id));
+      await Promise.all(pendentesEscopo.map((registro) => base44.entities.Medalha.update(registro.id, adicionarAuditoriaMedalha({
         status: 'CANCELADA',
         observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação Dom Pedro II resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
-      })));
-      return pendentes.length;
+      }, { userEmail, acao: 'reset' }))));
+      return pendentesEscopo.length;
     },
     onSuccess: (quantidade) => {
       refresh();
@@ -209,6 +233,7 @@ export default function IndicacoesDomPedroII() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+  if (!hasDomPedroAccess) return <AccessDenied modulo="Dom Pedro II" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100">
@@ -223,7 +248,7 @@ export default function IndicacoesDomPedroII() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
+            {podeExportar && <Button
               variant="outline"
               onClick={() => {
                 if (!exportRows.length) {
@@ -235,10 +260,10 @@ export default function IndicacoesDomPedroII() {
             >
               <Download className="w-4 h-4 mr-2" />
               Exportar indicados
-            </Button>
-            <Button variant="outline" onClick={() => setResetDialogOpen(true)}>
+            </Button>}
+            {podeResetar && <Button variant="outline" onClick={() => setResetDialogOpen(true)}>
               Resetar indicados
-            </Button>
+            </Button>}
           </div>
         </div>
 
@@ -267,7 +292,7 @@ export default function IndicacoesDomPedroII() {
                     <td className="py-3 px-2">{status === 'CONCEDIDA' ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Concedida</Badge> : status === 'INDICADA' ? <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Indicada</Badge> : <span className="text-slate-500">Sem indicação</span>}</td>
                     <td className="py-3 px-2 flex gap-2">
                       {status !== 'CONCEDIDA' && <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={() => indicarMutation.mutate(militar)}>Indicar</Button>}
-                      {status === 'INDICADA' && <Button size="sm" variant="outline" onClick={() => setConcederDialog({ open: true, medalha: registro, data: hojeISO(), doems: '' })}>Conceder</Button>}
+                      {status === 'INDICADA' && podeConceder && <Button size="sm" variant="outline" onClick={() => setConcederDialog({ open: true, medalha: registro, data: hojeISO(), doems: '' })}>Conceder</Button>}
                     </td>
                   </tr>
                 );
@@ -286,12 +311,12 @@ export default function IndicacoesDomPedroII() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConcederDialog({ open: false, medalha: null, data: hojeISO(), doems: '' })}>Cancelar</Button>
-            <Button disabled={!concederDialog.data || !concederDialog.doems} onClick={() => concederMutation.mutate({ medalhaId: concederDialog.medalha?.id, data_concessao: concederDialog.data, numero_publicacao: concederDialog.doems })}>Confirmar</Button>
+            <Button disabled={!concederDialog.data || !concederDialog.doems} onClick={() => concederMutation.mutate({ medalhaId: concederDialog.medalha?.id, militarId: concederDialog.medalha?.militar_id, data_concessao: concederDialog.data, numero_publicacao: concederDialog.doems })}>Confirmar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+      <AlertDialog open={resetDialogOpen && podeResetar} onOpenChange={setResetDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Resetar indicações pendentes de Dom Pedro II?</AlertDialogTitle>
@@ -309,13 +334,15 @@ export default function IndicacoesDomPedroII() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ExportarIndicadosModal
-        open={exportModalOpen}
-        onOpenChange={setExportModalOpen}
-        campos={camposExportacao}
-        defaultSelecionados={camposPadrao}
-        onConfirm={onConfirmarExportacao}
-      />
+      {podeExportar && (
+        <ExportarIndicadosModal
+          open={exportModalOpen}
+          onOpenChange={setExportModalOpen}
+          campos={camposExportacao}
+          defaultSelecionados={camposPadrao}
+          onConfirm={onConfirmarExportacao}
+        />
+      )}
     </div>
   );
 }

@@ -13,12 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
 import { deduplicarTiposMedalha, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
+import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas } from '@/services/medalhasAcessoService';
 
 export default function CadastrarMedalha() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
+  const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
 
   const [searchParams] = useSearchParams();
   const medalhaId = searchParams.get('id');
@@ -93,6 +95,11 @@ export default function CadastrarMedalha() {
     setLoading(true);
 
     try {
+      validarPermissaoAcaoMedalhas({
+        canAccessAction,
+        acao: ACOES_MEDALHAS.INDICAR,
+        mensagem: 'Sem permissão para registrar indicação de medalha.',
+      });
       const payload = {
         ...formData,
         status: normalizarStatusMedalha(formData.status) || 'INDICADA',
@@ -101,9 +108,9 @@ export default function CadastrarMedalha() {
         documento_referencia: formData.doems_numero ? `DOEMS ${formData.doems_numero}` : '',
       };
       if (medalhaId) {
-        await base44.entities.Medalha.update(medalhaId, payload);
+        await base44.entities.Medalha.update(medalhaId, adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
       } else {
-        await base44.entities.Medalha.create(payload);
+        await base44.entities.Medalha.create(adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
       }
       queryClient.invalidateQueries({ queryKey: ['medalhas'] });
       navigate(createPageUrl('Medalhas'));
@@ -116,6 +123,7 @@ export default function CadastrarMedalha() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
+  if (!podeIndicar) return <AccessDenied modulo="Indicação de Medalhas" />;
 
   if (loadingMedalha) {
     return (
