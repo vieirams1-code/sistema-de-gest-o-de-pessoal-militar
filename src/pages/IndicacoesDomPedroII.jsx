@@ -9,13 +9,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from '@/components/ui/use-toast';
 import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
 import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
-import { criarIndicacaoAutomatica, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha, resolverCodigoTipoMedalha, resolverOuGarantirTipoMedalha } from '@/services/medalhasTempoServicoService';
+import {
+  criarIndicacaoAutomatica,
+  filtrarIndicacoesDomPedroResetaveis,
+  garantirCatalogoFixoMedalhaTempo,
+  normalizarStatusMedalha,
+  resolverCodigoTipoMedalha,
+  resolverOuGarantirTipoMedalha,
+} from '@/services/medalhasTempoServicoService';
 
 function hojeISO() { return new Date().toISOString().split('T')[0]; }
 function formatarData(valor) {
@@ -38,6 +55,7 @@ export default function IndicacoesDomPedroII() {
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [medalhaFilter, setMedalhaFilter] = useState('TODAS');
   const [concederDialog, setConcederDialog] = useState({ open: false, medalha: null, data: hojeISO(), doems: '' });
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
   useQuery({
@@ -172,6 +190,23 @@ export default function IndicacoesDomPedroII() {
     },
   });
 
+  const resetIndicacoesMutation = useMutation({
+    mutationFn: async () => {
+      const pendentes = filtrarIndicacoesDomPedroResetaveis(domPedroRegistros);
+      await Promise.all(pendentes.map((registro) => base44.entities.Medalha.update(registro.id, {
+        status: 'CANCELADA',
+        observacoes: `${registro.observacoes ? `${registro.observacoes}\n` : ''}[RESET] Indicação Dom Pedro II resetada administrativamente em ${new Date().toLocaleDateString('pt-BR')}.`,
+      })));
+      return pendentes.length;
+    },
+    onSuccess: (quantidade) => {
+      refresh();
+      setResetDialogOpen(false);
+      toast({ title: 'Reset concluído', description: `${quantidade} indicação(ões) de Dom Pedro II foram resetadas.` });
+    },
+    onError: (error) => toast({ title: 'Erro no reset', description: error.message, variant: 'destructive' }),
+  });
+
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
 
@@ -187,19 +222,24 @@ export default function IndicacoesDomPedroII() {
               <p className="text-sm text-slate-600">Fluxo manual separado para indicação e concessão da medalha Dom Pedro II.</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (!exportRows.length) {
-                toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
-                return;
-              }
-              setExportModalOpen(true);
-            }}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Exportar indicados
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!exportRows.length) {
+                  toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
+                  return;
+                }
+                setExportModalOpen(true);
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Exportar indicados
+            </Button>
+            <Button variant="outline" onClick={() => setResetDialogOpen(true)}>
+              Resetar indicados
+            </Button>
+          </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -250,6 +290,24 @@ export default function IndicacoesDomPedroII() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar indicações pendentes de Dom Pedro II?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação reseta apenas registros com status INDICADA da medalha Dom Pedro II.
+              Registros com status CONCEDIDA não serão alterados e o histórico será preservado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => resetIndicacoesMutation.mutate()} className="bg-red-600 hover:bg-red-700">
+              Confirmar reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ExportarIndicadosModal
         open={exportModalOpen}

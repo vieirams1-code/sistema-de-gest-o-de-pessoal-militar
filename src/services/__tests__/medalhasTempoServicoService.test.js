@@ -12,6 +12,7 @@ import {
   criarIndicacaoAutomatica,
   deduplicarTiposMedalha,
   filtrarIndicacoesTempoResetaveis,
+  filtrarIndicacoesDomPedroResetaveis,
   isImpedimentoAtivo,
   indicarMedalhaPorCodigo,
   normalizarStatusMedalha,
@@ -380,6 +381,17 @@ test('reset geral considera somente indicações de medalhas de tempo', () => {
     { id: '3', tipo_medalha_codigo: 'DOM_PEDRO_II', status: 'INDICADA' },
   ]);
   assert.deepEqual(resultado.map((item) => item.id), ['1']);
+});
+
+test('reset Dom Pedro II considera apenas indicações pendentes INDICADA', () => {
+  const resultado = filtrarIndicacoesDomPedroResetaveis([
+    { id: '1', tipo_medalha_codigo: 'DOM_PEDRO_II', status: 'INDICADA' },
+    { id: '2', tipo_medalha_codigo: 'DOM_PEDRO_II', status: 'CONCEDIDA' },
+    { id: '3', tipo_medalha_codigo: 'TEMPO_30', status: 'INDICADA' },
+    { id: '4', tipo_medalha_nome: 'Medalha Dom Pedro II', status: 'indicado' },
+  ]);
+
+  assert.deepEqual(resultado.map((item) => item.id), ['1', '4']);
 });
 
 test('garantirCatalogoFixoMedalhaTempo é idempotente e reconcilia tipo legado sem duplicar', async () => {
