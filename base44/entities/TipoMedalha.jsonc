@@ -1,0 +1,47 @@
+{
+  "name": "TipoMedalha",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome da medalha"
+    },
+    "codigo": {
+      "type": "string",
+      "description": "C\u00f3digo t\u00e9cnico can\u00f4nico do tipo de medalha (ex: TEMPO_10, DOM_PEDRO_II)"
+    },
+    "categoria": {
+      "type": "string",
+      "description": "Categoria da medalha (ex: TEMPO_SERVICO, DOM_PEDRO_II)"
+    },
+    "ordem_hierarquica": {
+      "type": "number",
+      "description": "Ordem para ranking de preced\u00eancia entre tipos de medalha"
+    },
+    "anos_minimos": {
+      "type": "number",
+      "description": "Anos m\u00ednimos de servi\u00e7o para elegibilidade (null para Dom Pedro II)"
+    },
+    "automatico_na_apuracao": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se este tipo \u00e9 inclu\u00eddo automaticamente na apura\u00e7\u00e3o de tempo de servi\u00e7o"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o da medalha"
+    },
+    "imagem_url": {
+      "type": "string",
+      "description": "URL da imagem da medalha"
+    },
+    "ativa": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se o tipo de medalha est\u00e1 ativo"
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}
