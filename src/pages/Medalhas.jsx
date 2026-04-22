@@ -109,19 +109,27 @@ export default function Medalhas() {
               <p className="text-slate-500">Controle de indicações e concessões</p>
             </div>
           </div>
-          <Button
-            onClick={() => navigate(createPageUrl('CadastrarMedalha'))}
-            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Nova Indicação
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate(createPageUrl('ApuracaoMedalhasTempoServico'))}
-          >
-            Apuração de Medalhas
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => navigate(createPageUrl('CadastrarMedalha'))}
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Nova Indicação
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate(createPageUrl('ApuracaoMedalhasTempoServico'))}
+            >
+              Apuração de Tempo
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}
+            >
+              Dom Pedro II
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}

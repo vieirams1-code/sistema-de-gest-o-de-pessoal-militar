@@ -11,8 +11,10 @@ import {
   calcularAnosTempoServico,
   criarIndicacaoAutomatica,
   deduplicarTiposMedalha,
+  filtrarIndicacoesTempoResetaveis,
   isImpedimentoAtivo,
   normalizarStatusMedalha,
+  obterEstadoCelulaTempoServico,
   obterTipoMedalhaPorCodigo,
   obterCodigoFaixaPorAnos,
   resolverCodigoTipoMedalha,
@@ -342,4 +344,37 @@ test('normaliza status da medalha para fluxo indicada > concedida > cancelada', 
   assert.equal(normalizarStatusMedalha('Concedido'), 'CONCEDIDA');
   assert.equal(normalizarStatusMedalha('PUBLICADO'), 'CONCEDIDA');
   assert.equal(normalizarStatusMedalha('Negado'), 'CANCELADA');
+});
+
+test('estado de célula retorna INDICAR para faixa habilitada e CONTEMPLADO para concedida', () => {
+  const base = { militar_id: 'm30', medalha_devida_codigo: 'TEMPO_20', situacao: 'ELEGIVEL' };
+  assert.equal(obterEstadoCelulaTempoServico({ apuracao: base, codigoFaixa: 'TEMPO_20' }), 'INDICAR');
+  assert.equal(obterEstadoCelulaTempoServico({
+    apuracao: { ...base, situacao: 'JA_CONTEMPLADO' },
+    codigoFaixa: 'TEMPO_20',
+    registroMedalha: { status: 'CONCEDIDA' },
+  }), 'CONTEMPLADO');
+});
+
+test('estado de célula respeita medalha indicada e impedimento ativo', () => {
+  assert.equal(obterEstadoCelulaTempoServico({
+    apuracao: { militar_id: 'm31', medalha_devida_codigo: 'TEMPO_20', situacao: 'ELEGIVEL' },
+    codigoFaixa: 'TEMPO_20',
+    registroMedalha: { status: 'INDICADA' },
+  }), 'INDICADO');
+
+  assert.equal(obterEstadoCelulaTempoServico({
+    apuracao: { militar_id: 'm31', medalha_devida_codigo: 'TEMPO_20', situacao: 'ELEGIVEL' },
+    codigoFaixa: 'TEMPO_20',
+    impedimentos: [{ militar_id: 'm31', ativo: true, tipo_medalha_codigo: 'TEMPO_20' }],
+  }), 'IMPEDIDO');
+});
+
+test('reset geral considera somente indicações de medalhas de tempo', () => {
+  const resultado = filtrarIndicacoesTempoResetaveis([
+    { id: '1', tipo_medalha_codigo: 'TEMPO_20', status: 'INDICADA' },
+    { id: '2', tipo_medalha_codigo: 'TEMPO_20', status: 'CONCEDIDA' },
+    { id: '3', tipo_medalha_codigo: 'DOM_PEDRO_II', status: 'INDICADA' },
+  ]);
+  assert.deepEqual(resultado.map((item) => item.id), ['1']);
 });
