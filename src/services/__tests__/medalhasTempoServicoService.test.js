@@ -17,7 +17,9 @@ import {
   obterEstadoCelulaTempoServico,
   obterTipoMedalhaPorCodigo,
   obterCodigoFaixaPorAnos,
+  garantirCatalogoFixoMedalhaTempo,
   resolverCodigoTipoMedalha,
+  resolverOuGarantirTipoMedalha,
   temImpedimentoAplicavel,
 } from '../medalhasTempoServicoService.js';
 
@@ -377,4 +379,71 @@ test('reset geral considera somente indicações de medalhas de tempo', () => {
     { id: '3', tipo_medalha_codigo: 'DOM_PEDRO_II', status: 'INDICADA' },
   ]);
   assert.deepEqual(resultado.map((item) => item.id), ['1']);
+});
+
+test('garantirCatalogoFixoMedalhaTempo é idempotente e reconcilia tipo legado sem duplicar', async () => {
+  const tiposPersistidos = [{
+    id: 'legado20',
+    codigo: '',
+    nome: 'Medalha de Tempo de Serviço - 20 anos',
+    categoria: '',
+    ordem_hierarquica: null,
+    anos_minimos: null,
+    ativo: null,
+  }];
+
+  const base44Mock = {
+    entities: {
+      TipoMedalha: {
+        list: async () => tiposPersistidos,
+        create: async (payload) => {
+          const criado = { id: `novo-${tiposPersistidos.length + 1}`, ...payload };
+          tiposPersistidos.push(criado);
+          return criado;
+        },
+        update: async (id, payload) => {
+          const idx = tiposPersistidos.findIndex((item) => item.id === id);
+          tiposPersistidos[idx] = { ...tiposPersistidos[idx], ...payload };
+          return tiposPersistidos[idx];
+        },
+      },
+    },
+  };
+
+  const primeira = await garantirCatalogoFixoMedalhaTempo(base44Mock);
+  const segunda = await garantirCatalogoFixoMedalhaTempo(base44Mock);
+
+  assert.equal(primeira.created, 4);
+  assert.equal(primeira.updated, 1);
+  assert.equal(segunda.created, 0);
+  assert.equal(segunda.updated <= 1, true);
+  assert.equal(tiposPersistidos.length, 5);
+  assert.equal(tiposPersistidos.find((item) => item.id === 'legado20').codigo, 'TEMPO_20');
+});
+
+test('resolverOuGarantirTipoMedalha resolve código legado textual e garante criação automática', async () => {
+  const tiposPersistidos = [];
+  const base44Mock = {
+    entities: {
+      TipoMedalha: {
+        list: async () => tiposPersistidos,
+        create: async (payload) => {
+          const criado = { id: `tipo-${payload.codigo}`, ...payload };
+          tiposPersistidos.push(criado);
+          return criado;
+        },
+        update: async (id, payload) => {
+          const idx = tiposPersistidos.findIndex((item) => item.id === id);
+          tiposPersistidos[idx] = { ...tiposPersistidos[idx], ...payload };
+          return tiposPersistidos[idx];
+        },
+      },
+    },
+  };
+
+  const tipo = await resolverOuGarantirTipoMedalha(base44Mock, 'Medalha de Tempo de Serviço - 10 anos', []);
+
+  assert.equal(tipo?.codigo, 'TEMPO_10');
+  assert.equal(tipo?.id, 'tipo-TEMPO_10');
+  assert.equal(tiposPersistidos.some((item) => item.codigo === 'TEMPO_10'), true);
 });

@@ -31,7 +31,7 @@ import {
   garantirCatalogoFixoMedalhaTempo,
   normalizarStatusMedalha,
   obterEstadoCelulaTempoServico,
-  obterTipoMedalhaPorCodigo,
+  resolverOuGarantirTipoMedalha,
   resolverCodigoTipoMedalha,
 } from '@/services/medalhasTempoServicoService';
 
@@ -158,12 +158,7 @@ export default function ApuracaoMedalhasTempoServico() {
 
   const indicarMutation = useMutation({
     mutationFn: async ({ item, codigo }) => {
-      let tipo = obterTipoMedalhaPorCodigo(codigo, tiposCatalogo);
-      if (!tipo?.id) {
-        await garantirCatalogoFixoMedalhaTempo(base44);
-        const tiposAtualizados = await base44.entities.TipoMedalha.list('nome');
-        tipo = obterTipoMedalhaPorCodigo(codigo, tiposAtualizados);
-      }
+      const tipo = await resolverOuGarantirTipoMedalha(base44, codigo, tiposCatalogo);
       if (!tipo?.id) throw new Error(`Tipo ${codigo} não encontrado.`);
 
       const existente = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
