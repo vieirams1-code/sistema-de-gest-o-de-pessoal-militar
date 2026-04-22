@@ -620,6 +620,23 @@ export default function FamiliaFeriasPanel({ ferias, registrosLivro, onClose, mo
                               </>
                             )}
 
+                          {evento.tipo_registro === 'Saída Férias' &&
+                            (evento.dias_base_gozo != null || evento.dias_extras_creditos != null) && (
+                              <>
+                                <span className="text-slate-400">Composição gozo</span>
+                                <span className="text-slate-700 font-medium">
+                                  {Number(evento.dias_base_gozo || 0)}d base + {Number(evento.dias_extras_creditos || 0)}d extra = {Number(evento.dias_totais_gozo || evento.dias || 0)}d
+                                </span>
+                              </>
+                            )}
+
+                          {evento.tipo_registro === 'Saída Férias' && evento.creditos_extra_resumo && (
+                            <>
+                              <span className="text-slate-400">Créditos vinculados</span>
+                              <span className="text-slate-700 font-medium">{evento.creditos_extra_resumo}</span>
+                            </>
+                          )}
+
                           {evento.tipo_registro === 'Interrupção de Férias' && (
                             <>
                               <span className="text-slate-400">Dias no momento</span>
