@@ -5,6 +5,8 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
@@ -60,6 +62,13 @@ import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/ferias
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
+import {
+  liberarCreditosDoGozo,
+  criarPayloadCreditoExtraFerias,
+  formatarTipoCreditoExtra,
+  STATUS_CREDITO_EXTRA_FERIAS,
+  TIPOS_CREDITO_EXTRA_FERIAS,
+} from '@/services/creditoExtraFeriasService';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -292,6 +301,19 @@ export default function Ferias() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [modoAdmin, setModoAdmin] = useState(false);
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
+  const [creditosPanelOpen, setCreditosPanelOpen] = useState(false);
+  const [creditoEditingId, setCreditoEditingId] = useState(null);
+  const [creditoForm, setCreditoForm] = useState({
+    militar_id: '',
+    tipo_credito: TIPOS_CREDITO_EXTRA_FERIAS.OUTRO,
+    quantidade_dias: 1,
+    data_referencia: new Date().toISOString().slice(0, 10),
+    origem_documental: '',
+    numero_boletim: '',
+    data_boletim: '',
+    observacoes: '',
+    status: STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
+  });
 
   const { data: ferias = [], isLoading } = useQuery({
     queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
@@ -370,9 +392,94 @@ export default function Ferias() {
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
 
+  const { data: militaresAcessiveis = [] } = useQuery({
+    queryKey: ['militares-ferias-creditos', isAdmin, modoAcesso, userEmail],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Militar.list('nome_completo');
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+      const militarQueries = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter))
+      );
+      const ids = new Set();
+      const merged = [];
+      for (const militar of militarQueries.flat()) {
+        if (!militar?.id || ids.has(militar.id)) continue;
+        ids.add(militar.id);
+        merged.push(militar);
+      }
+      return merged.sort((a, b) => String(a.nome_completo || '').localeCompare(String(b.nome_completo || '')));
+    },
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
+
+  const { data: creditosExtra = [], isLoading: loadingCreditos } = useQuery({
+    queryKey: ['creditos-extra-ferias', isAdmin, modoAcesso, userEmail],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.CreditoExtraFerias.list('-data_referencia');
+      const militarScopeFilters = getMilitarScopeFilters();
+      if (!militarScopeFilters.length) return [];
+      const militarQueries = await Promise.all(
+        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter))
+      );
+      const militarIds = [...new Set(militarQueries.flat().map((m) => m.id).filter(Boolean))];
+      const creditosByMilitar = await Promise.all(
+        militarIds.map((militarId) => base44.entities.CreditoExtraFerias.filter({ militar_id: militarId }, '-data_referencia'))
+      );
+      return creditosByMilitar.flat();
+    },
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
+
+  const resetCreditoForm = () => {
+    setCreditoEditingId(null);
+    setCreditoForm({
+      militar_id: '',
+      tipo_credito: TIPOS_CREDITO_EXTRA_FERIAS.OUTRO,
+      quantidade_dias: 1,
+      data_referencia: new Date().toISOString().slice(0, 10),
+      origem_documental: '',
+      numero_boletim: '',
+      data_boletim: '',
+      observacoes: '',
+      status: STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
+    });
+  };
+
+  const upsertCreditoMutation = useMutation({
+    mutationFn: async () => {
+      const militar = militaresAcessiveis.find((item) => item.id === creditoForm.militar_id);
+      if (!militar) throw new Error('Selecione um militar válido.');
+      const payload = criarPayloadCreditoExtraFerias(creditoForm, militar);
+      if (Number(payload.quantidade_dias || 0) <= 0) throw new Error('Quantidade de dias deve ser maior que zero.');
+      if (creditoEditingId) {
+        return base44.entities.CreditoExtraFerias.update(creditoEditingId, payload);
+      }
+      return base44.entities.CreditoExtraFerias.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['ver-creditos-extra-ferias'] });
+      resetCreditoForm();
+      alert('Crédito extraordinário salvo com sucesso.');
+    },
+    onError: (error) => {
+      alert(error?.message || 'Falha ao salvar crédito extraordinário.');
+    },
+  });
+
+  const atualizarStatusCreditoMutation = useMutation({
+    mutationFn: async ({ id, status }) => base44.entities.CreditoExtraFerias.update(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['ver-creditos-extra-ferias'] });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (params) => {
       const { feriasId, periodoId, periodoRef, militarId } = params;
+      await liberarCreditosDoGozo({ gozoFeriasId: feriasId });
       await base44.entities.Ferias.delete(feriasId);
       await sincronizarPeriodoAquisitivoDaFerias({
         periodoAquisitivoId: periodoId,
@@ -577,6 +684,16 @@ export default function Ferias() {
               Nova Férias
             </Button>
           </div>
+        </div>
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            className="border-[#1e3a5f]/30 text-[#1e3a5f] hover:bg-[#1e3a5f]/5"
+            onClick={() => setCreditosPanelOpen(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Créditos Extraordinários
+          </Button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -1064,6 +1181,210 @@ export default function Ferias() {
         ferias={registroLivroModal.ferias}
         tipoInicial={registroLivroModal.tipo}
       />
+
+      <Dialog open={creditosPanelOpen} onOpenChange={(open) => {
+        setCreditosPanelOpen(open);
+        if (!open) resetCreditoForm();
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Créditos Extraordinários de Férias</DialogTitle>
+            <DialogDescription>
+              Cadastro, atualização e gerenciamento de créditos extraordinários sem alterar o saldo-base do período aquisitivo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Militar</Label>
+              <Select
+                value={creditoForm.militar_id}
+                onValueChange={(value) => setCreditoForm((atual) => ({ ...atual, militar_id: value }))}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue placeholder="Selecione o militar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {militaresAcessiveis.map((militar) => (
+                    <SelectItem key={militar.id} value={militar.id}>
+                      {militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}{militar.nome_completo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Tipo de crédito</Label>
+              <Select
+                value={creditoForm.tipo_credito}
+                onValueChange={(value) => setCreditoForm((atual) => ({ ...atual, tipo_credito: value }))}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(TIPOS_CREDITO_EXTRA_FERIAS).map((tipo) => (
+                    <SelectItem key={tipo} value={tipo}>{formatarTipoCreditoExtra(tipo)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Quantidade de dias</Label>
+              <Input
+                className="mt-1.5"
+                type="number"
+                min={1}
+                value={creditoForm.quantidade_dias}
+                onChange={(event) => setCreditoForm((atual) => ({ ...atual, quantidade_dias: Number(event.target.value || 0) }))}
+              />
+            </div>
+
+            <div>
+              <Label>Data de referência</Label>
+              <Input
+                className="mt-1.5"
+                type="date"
+                value={creditoForm.data_referencia}
+                onChange={(event) => setCreditoForm((atual) => ({ ...atual, data_referencia: event.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label>Origem documental</Label>
+              <Input
+                className="mt-1.5"
+                value={creditoForm.origem_documental}
+                onChange={(event) => setCreditoForm((atual) => ({ ...atual, origem_documental: event.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label>Número do boletim</Label>
+              <Input
+                className="mt-1.5"
+                value={creditoForm.numero_boletim}
+                onChange={(event) => setCreditoForm((atual) => ({ ...atual, numero_boletim: event.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label>Data do boletim</Label>
+              <Input
+                className="mt-1.5"
+                type="date"
+                value={creditoForm.data_boletim}
+                onChange={(event) => setCreditoForm((atual) => ({ ...atual, data_boletim: event.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={creditoForm.status}
+                onValueChange={(value) => setCreditoForm((atual) => ({ ...atual, status: value }))}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(STATUS_CREDITO_EXTRA_FERIAS).map((status) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label>Observações</Label>
+            <Textarea
+              className="mt-1.5"
+              value={creditoForm.observacoes}
+              onChange={(event) => setCreditoForm((atual) => ({ ...atual, observacoes: event.target.value }))}
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={resetCreditoForm}>Limpar</Button>
+            <Button
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+              onClick={() => upsertCreditoMutation.mutate()}
+              disabled={upsertCreditoMutation.isPending}
+            >
+              {creditoEditingId ? 'Atualizar crédito' : 'Gerar crédito'}
+            </Button>
+          </div>
+
+          <div className="border rounded-lg">
+            <div className="px-4 py-3 border-b bg-slate-50 text-sm font-semibold text-slate-700">
+              Créditos cadastrados
+            </div>
+            <div className="divide-y">
+              {loadingCreditos && <p className="px-4 py-3 text-sm text-slate-500">Carregando créditos...</p>}
+              {!loadingCreditos && creditosExtra.length === 0 && (
+                <p className="px-4 py-3 text-sm text-slate-500">Nenhum crédito extraordinário cadastrado.</p>
+              )}
+              {creditosExtra.map((credito) => (
+                <div key={credito.id} className="px-4 py-3 flex items-start justify-between gap-3">
+                  <div className="text-sm">
+                    <p className="font-medium text-slate-800">
+                      {credito.militar_nome} — {formatarTipoCreditoExtra(credito.tipo_credito)} (+{credito.quantidade_dias}d)
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Referência: {credito.data_referencia || '—'} · Documento: {credito.origem_documental || '—'} · BG: {credito.numero_boletim || '—'}
+                    </p>
+                    <p className="text-xs text-slate-500">Status: {credito.status} · Gozo: {credito.gozo_ferias_id || 'não vinculado'}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setCreditoEditingId(credito.id);
+                        setCreditoForm({
+                          militar_id: credito.militar_id || '',
+                          tipo_credito: credito.tipo_credito || TIPOS_CREDITO_EXTRA_FERIAS.OUTRO,
+                          quantidade_dias: Number(credito.quantidade_dias || 1),
+                          data_referencia: credito.data_referencia || '',
+                          origem_documental: credito.origem_documental || '',
+                          numero_boletim: credito.numero_boletim || '',
+                          data_boletim: credito.data_boletim || '',
+                          observacoes: credito.observacoes || '',
+                          status: credito.status || STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
+                        });
+                      }}
+                    >
+                      Editar
+                    </Button>
+                    {credito.status !== STATUS_CREDITO_EXTRA_FERIAS.CANCELADO ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={atualizarStatusCreditoMutation.isPending}
+                        onClick={() => atualizarStatusCreditoMutation.mutate({ id: credito.id, status: STATUS_CREDITO_EXTRA_FERIAS.CANCELADO })}
+                      >
+                        Cancelar
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={atualizarStatusCreditoMutation.isPending}
+                        onClick={() => atualizarStatusCreditoMutation.mutate({ id: credito.id, status: STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL })}
+                      >
+                        Reativar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={editDataModal.open}
