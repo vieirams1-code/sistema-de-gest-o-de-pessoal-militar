@@ -1,0 +1,21 @@
+{
+  "name": "CreditoExtraFerias",
+  "type": "object",
+  "description": "Créditos extraordinários vinculáveis ao gozo de férias sem alterar o saldo-base do período aquisitivo.",
+  "properties": {
+    "militar_id": { "type": "string", "description": "ID do militar vinculado." },
+    "militar_nome": { "type": "string", "description": "Nome completo do militar no momento do cadastro." },
+    "militar_posto": { "type": "string", "description": "Posto/graduação snapshot para auditoria." },
+    "militar_matricula": { "type": "string", "description": "Matrícula snapshot para auditoria." },
+    "tipo_credito": { "type": "string", "description": "Tipo operacional do crédito extraordinário." },
+    "quantidade_dias": { "type": "integer", "default": 0, "description": "Quantidade de dias extraordinários concedidos." },
+    "data_referencia": { "type": "string", "format": "date", "description": "Data de referência do direito ao crédito." },
+    "origem_documental": { "type": "string", "description": "Documento de origem/justificativa." },
+    "numero_boletim": { "type": "string", "description": "Número do boletim de publicação." },
+    "data_boletim": { "type": "string", "format": "date", "description": "Data do boletim de publicação." },
+    "observacoes": { "type": "string", "description": "Observações complementares do cadastro." },
+    "status": { "type": "string", "default": "DISPONIVEL", "description": "Status operacional do crédito." },
+    "gozo_ferias_id": { "type": "string", "default": "", "description": "Gozo de férias ao qual o crédito foi vinculado." }
+  },
+  "required": ["militar_id", "tipo_credito", "quantidade_dias", "data_referencia", "status"]
+}

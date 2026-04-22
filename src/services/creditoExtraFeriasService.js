@@ -11,6 +11,21 @@ import {
   prepararCancelamentoCreditoExtraFerias,
 } from './creditoExtraFeriasRules.js';
 
+
+export async function listarCreditosExtraFerias(orderBy = '-data_referencia') {
+  return base44.entities.CreditoExtraFerias.list(orderBy);
+}
+
+export async function salvarCreditoExtraFerias({ form, militar }) {
+  const payload = criarPayloadCreditoExtraFerias(form, militar);
+
+  if (form?.id) {
+    return base44.entities.CreditoExtraFerias.update(form.id, payload);
+  }
+
+  return base44.entities.CreditoExtraFerias.create(payload);
+}
+
 export {
   TIPOS_CREDITO_EXTRA_FERIAS,
   STATUS_CREDITO_EXTRA_FERIAS,
