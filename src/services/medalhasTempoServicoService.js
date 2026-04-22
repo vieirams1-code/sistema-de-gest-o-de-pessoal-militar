@@ -73,6 +73,9 @@ const STATUS_CONSIDERADOS_CONCESSAO = new Set(['CONCEDIDA']);
 
 const CODIGOS_TEMPO_AUTOMATICO = ['TEMPO_10', 'TEMPO_20', 'TEMPO_30', 'TEMPO_40'];
 export const CODIGOS_MEDALHA_TEMPO_SERVICO = [...CODIGOS_TEMPO_AUTOMATICO];
+const CODIGO_POR_NOME_LEGADO = new Map(
+  TIPOS_FIXOS_MEDALHA_TEMPO.map((tipo) => [normalizarTexto(tipo.nome), tipo.codigo]),
+);
 
 function normalizarTexto(valor) {
   return String(valor || '')
@@ -112,6 +115,8 @@ function normalizarCodigo(valor) {
 function mapearCodigoTempoPorTexto(valor) {
   const texto = normalizarTexto(valor);
   if (!texto) return null;
+  const porCatalogoLegado = CODIGO_POR_NOME_LEGADO.get(texto);
+  if (porCatalogoLegado) return porCatalogoLegado;
 
   if (texto.includes('dom pedro ii') || texto.includes('dom pedro 2')) return 'DOM_PEDRO_II';
   if (!texto.includes('tempo') || !texto.includes('servico')) return null;
@@ -253,9 +258,39 @@ function resolverTipoMedalha(registro, tipoIndexado) {
 
 export function obterTipoMedalhaPorCodigo(codigo, tiposMedalha = []) {
   const tipoIndexado = indexarTipos(tiposMedalha);
-  const codigoNormalizado = normalizarCodigo(codigo);
+  const codigoNormalizado = resolverCodigoTipoMedalha(codigo);
   if (!codigoNormalizado) return null;
   return tipoIndexado.porCodigo.get(codigoNormalizado) || null;
+}
+
+function deveAtualizarCampo(atual, proximo) {
+  return (atual === undefined || atual === null || atual === '') && proximo !== undefined;
+}
+
+function gerarPatchTipoMedalha(tipoAtual = {}, tipoFixo = {}) {
+  const patch = {};
+  if (normalizarCodigo(tipoAtual.codigo) !== normalizarCodigo(tipoFixo.codigo)) patch.codigo = tipoFixo.codigo;
+  if (deveAtualizarCampo(tipoAtual.nome, tipoFixo.nome)) patch.nome = tipoFixo.nome;
+  if (deveAtualizarCampo(tipoAtual.categoria, tipoFixo.categoria)) patch.categoria = tipoFixo.categoria;
+  if (deveAtualizarCampo(tipoAtual.ordem_hierarquica, tipoFixo.ordem_hierarquica)) patch.ordem_hierarquica = tipoFixo.ordem_hierarquica;
+  if (deveAtualizarCampo(tipoAtual.anos_minimos, tipoFixo.anos_minimos)) patch.anos_minimos = tipoFixo.anos_minimos;
+  if (deveAtualizarCampo(tipoAtual.ativo, tipoFixo.ativo)) patch.ativo = tipoFixo.ativo;
+  if (deveAtualizarCampo(tipoAtual.ativa, tipoFixo.ativa)) patch.ativa = tipoFixo.ativa;
+  if (deveAtualizarCampo(tipoAtual.automatico_na_apuracao, tipoFixo.automatico_na_apuracao)) {
+    patch.automatico_na_apuracao = tipoFixo.automatico_na_apuracao;
+  }
+  return patch;
+}
+
+function localizarTipoExistente(tipoFixo, tipos = []) {
+  const codigo = normalizarCodigo(tipoFixo.codigo);
+  const nome = normalizarTexto(tipoFixo.nome);
+
+  return tipos.find((item) => (
+    normalizarCodigo(item?.codigo) === codigo
+    || normalizarTexto(item?.nome) === nome
+    || mapearCodigoTempoPorTexto(item?.nome) === codigo
+  )) || null;
 }
 
 function obterOrdemHierarquicaRegistro(registro, tipoIndexado) {
@@ -487,12 +522,38 @@ export function apurarListaMilitaresDomPedroII({
 }
 
 export async function garantirCatalogoFixoMedalhaTempo(base44Client) {
-  const existentes = await base44Client.entities.TipoMedalha.list('-created_date');
-  const codigosExistentes = new Set(existentes.map((item) => normalizarCodigo(item.codigo)).filter(Boolean));
+  const existentes = [...(await base44Client.entities.TipoMedalha.list('-created_date'))];
+  let created = 0;
+  let updated = 0;
 
-  const pendentes = TIPOS_FIXOS_MEDALHA_TEMPO.filter((tipo) => !codigosExistentes.has(normalizarCodigo(tipo.codigo)));
-  if (!pendentes.length) return { created: 0 };
+  for (const tipoFixo of TIPOS_FIXOS_MEDALHA_TEMPO) {
+    const existente = localizarTipoExistente(tipoFixo, existentes);
+    if (!existente?.id) {
+      const criado = await base44Client.entities.TipoMedalha.create(tipoFixo);
+      existentes.push(criado || tipoFixo);
+      created += 1;
+      continue;
+    }
 
-  await Promise.all(pendentes.map((tipo) => base44Client.entities.TipoMedalha.create(tipo)));
-  return { created: pendentes.length };
+    const patch = gerarPatchTipoMedalha(existente, tipoFixo);
+    if (!Object.keys(patch).length) continue;
+    await base44Client.entities.TipoMedalha.update(existente.id, patch);
+    Object.assign(existente, patch);
+    updated += 1;
+  }
+
+  return { created, updated };
+}
+
+export async function resolverOuGarantirTipoMedalha(base44Client, codigoOuNome, tiposMedalha = []) {
+  const codigoResolvido = resolverCodigoTipoMedalha(codigoOuNome);
+  if (!codigoResolvido) return null;
+
+  let tipo = obterTipoMedalhaPorCodigo(codigoResolvido, tiposMedalha);
+  if (tipo?.id) return tipo;
+
+  await garantirCatalogoFixoMedalhaTempo(base44Client);
+  const tiposAtualizados = await base44Client.entities.TipoMedalha.list('nome');
+  tipo = obterTipoMedalhaPorCodigo(codigoResolvido, tiposAtualizados);
+  return tipo || null;
 }

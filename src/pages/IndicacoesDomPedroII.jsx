@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from '@/components/ui/use-toast';
-import { criarIndicacaoAutomatica, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha, obterTipoMedalhaPorCodigo, resolverCodigoTipoMedalha } from '@/services/medalhasTempoServicoService';
+import { criarIndicacaoAutomatica, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha, resolverCodigoTipoMedalha, resolverOuGarantirTipoMedalha } from '@/services/medalhasTempoServicoService';
 
 function hojeISO() { return new Date().toISOString().split('T')[0]; }
 
@@ -95,11 +95,8 @@ export default function IndicacoesDomPedroII() {
       if (existente?.id && normalizarStatusMedalha(existente.status) !== 'CONCEDIDA') {
         return base44.entities.Medalha.update(existente.id, { status: 'INDICADA', data_indicacao: hojeISO() });
       }
-      let tipo = obterTipoMedalhaPorCodigo('DOM_PEDRO_II', tipos);
-      if (!tipo?.id) {
-        await garantirCatalogoFixoMedalhaTempo(base44);
-        tipo = obterTipoMedalhaPorCodigo('DOM_PEDRO_II', await base44.entities.TipoMedalha.list('nome'));
-      }
+      const tipo = await resolverOuGarantirTipoMedalha(base44, 'DOM_PEDRO_II', tipos);
+      if (!tipo?.id) throw new Error('Tipo DOM_PEDRO_II não encontrado.');
       const payload = criarIndicacaoAutomatica({ militar, medalhaDevida: 'DOM_PEDRO_II', tipoMedalha: tipo });
       payload.origem_registro = 'INDICACAO_MANUAL_DOM_PEDRO_II';
       payload.observacoes = 'Fluxo manual Dom Pedro II.';
