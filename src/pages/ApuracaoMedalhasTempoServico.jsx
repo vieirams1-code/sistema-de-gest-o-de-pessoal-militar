@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CheckCircle2, Medal, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, Medal, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
 
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -23,6 +23,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from '@/components/ui/use-toast';
+import ExportarIndicadosModal from '@/components/medalhas/ExportarIndicadosModal';
+import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import {
   TIPOS_FIXOS_MEDALHA_TEMPO,
   apurarListaMilitaresTempoServico,
@@ -52,6 +54,13 @@ function normalizarRegistroConcessao(registro, payload) {
   };
 }
 
+function formatarData(valor) {
+  if (!valor) return '';
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return valor;
+  return data.toLocaleDateString('pt-BR');
+}
+
 export default function ApuracaoMedalhasTempoServico() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -62,9 +71,11 @@ export default function ApuracaoMedalhasTempoServico() {
   const [search, setSearch] = useState('');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
   const [postoFilter, setPostoFilter] = useState('TODOS');
+  const [statusFilter, setStatusFilter] = useState('TODOS');
   const [faixaFilter, setFaixaFilter] = useState('TODAS');
   const [concederDialog, setConcederDialog] = useState({ open: false, medalha: null, data: hojeISO(), doems: '' });
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   useQuery({
     queryKey: ['tipos-medalha-fixos-sync-apuracao'],
@@ -146,11 +157,73 @@ export default function ApuracaoMedalhasTempoServico() {
     const unidade = militar.lotacao || militar.unidade;
     const posto = militar.posto_graduacao;
     const faixaDevida = item.medalha_devida_codigo;
+    const situacao = item.situacao || 'NAO_ELEGIVEL';
     return (!termo || nome.includes(termo) || String(militar.matricula || '').toLowerCase().includes(termo))
       && (unidadeFilter === 'TODAS' || unidade === unidadeFilter)
       && (postoFilter === 'TODOS' || posto === postoFilter)
+      && (statusFilter === 'TODOS' || situacao === statusFilter)
       && (faixaFilter === 'TODAS' || faixaDevida === faixaFilter);
-  }), [apuracoes, search, unidadeFilter, postoFilter, faixaFilter]);
+  }), [apuracoes, search, unidadeFilter, postoFilter, statusFilter, faixaFilter]);
+
+  const getCellState = (item, codigo) => {
+    const registro = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
+    const type = obterEstadoCelulaTempoServico({
+      apuracao: item,
+      codigoFaixa: codigo,
+      registroMedalha: registro,
+      impedimentos,
+    });
+    if (type === 'CONTEMPLADO') return { label: 'Contemplado', type, registro };
+    if (type === 'INDICADO') return { label: 'Indicado', type, registro };
+    if (type === 'IMPEDIDO') return { label: 'Impedido', type, registro: null };
+    if (type === 'INDICAR') return { label: 'Indicar', type, registro: null };
+    return { label: 'Inabilitado', type: 'INABILITADO', registro: null };
+  };
+
+  const exportRows = useMemo(() => apuracoesFiltradas.flatMap((item) => {
+    const militar = item.militar || {};
+    return CODIGOS_TEMPO.map((codigo) => {
+      const cell = getCellState(item, codigo);
+      if (cell.type !== 'INDICADO') return null;
+      return {
+        militar,
+        registro: cell.registro,
+        faixaCodigo: codigo,
+        faixaLabel: LABEL_POR_CODIGO[codigo],
+        tempoServicoAnos: item.tempo_servico_anos,
+      };
+    }).filter(Boolean);
+  }), [apuracoesFiltradas, registroPorMilitarCodigo, impedimentos]);
+
+  const camposExportacao = [
+    { key: 'nome', group: 'Dados do militar', label: 'Nome', getValue: (row) => row.militar?.nome_completo || '' },
+    { key: 'nome_guerra', group: 'Dados do militar', label: 'Nome de guerra', getValue: (row) => row.militar?.nome_guerra || '' },
+    { key: 'matricula', group: 'Dados do militar', label: 'Matrícula', getValue: (row) => row.militar?.matricula || '' },
+    { key: 'posto', group: 'Dados do militar', label: 'Posto/Graduação', getValue: (row) => row.militar?.posto_graduacao || '' },
+    { key: 'unidade', group: 'Dados do militar', label: 'Unidade', getValue: (row) => row.militar?.lotacao || row.militar?.unidade || '' },
+    { key: 'tempo_servico', group: 'Dados do militar', label: 'Tempo de serviço (anos)', getValue: (row) => row.tempoServicoAnos ?? '' },
+    { key: 'medalha', group: 'Dados da indicação', label: 'Medalha', getValue: (row) => `Medalha de Tempo de Serviço - ${row.faixaLabel}` },
+    { key: 'status', group: 'Dados da indicação', label: 'Status', getValue: (row) => normalizarStatusMedalha(row.registro?.status) || '' },
+    { key: 'data_indicacao', group: 'Dados da indicação', label: 'Data da indicação', getValue: (row) => formatarData(row.registro?.data_indicacao) },
+    { key: 'data_concessao', group: 'Dados da indicação', label: 'Data da concessão', getValue: (row) => formatarData(row.registro?.data_concessao) },
+    { key: 'doems', group: 'Dados da indicação', label: 'Número do DOEMS', getValue: (row) => row.registro?.numero_publicacao || row.registro?.doems_numero || '' },
+    { key: 'observacoes', group: 'Dados da indicação', label: 'Observações', getValue: (row) => row.registro?.observacoes || '' },
+  ];
+  const camposPadrao = ['nome', 'matricula', 'posto', 'unidade', 'tempo_servico', 'medalha', 'status', 'data_indicacao'];
+
+  const onConfirmarExportacao = (camposSelecionados) => {
+    if (!exportRows.length) {
+      toast({ title: 'Sem indicados para exportar', description: 'Ajuste os filtros para visualizar indicações pendentes e tente novamente.' });
+      return;
+    }
+    exportarIndicadosParaExcel({
+      camposSelecionados,
+      registros: exportRows,
+      nomeArquivo: `indicados_medalhas_tempo_${hojeISO()}.xlsx`,
+    });
+    setExportModalOpen(false);
+    toast({ title: 'Exportação concluída', description: `${exportRows.length} indicado(s) exportado(s) em Excel.` });
+  };
 
   const totais = useMemo(() => {
     const indicados = registrosTempo.filter((m) => normalizarStatusMedalha(m.status) === 'INDICADA').length;
@@ -213,21 +286,6 @@ export default function ApuracaoMedalhasTempoServico() {
     onError: (error) => toast({ title: 'Erro no reset', description: error.message, variant: 'destructive' }),
   });
 
-  const getCellState = (item, codigo) => {
-    const registro = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
-    const type = obterEstadoCelulaTempoServico({
-      apuracao: item,
-      codigoFaixa: codigo,
-      registroMedalha: registro,
-      impedimentos,
-    });
-    if (type === 'CONTEMPLADO') return { label: 'Contemplado', type, registro };
-    if (type === 'INDICADO') return { label: 'Indicado', type, registro };
-    if (type === 'IMPEDIDO') return { label: 'Impedido', type, registro: null };
-    if (type === 'INDICAR') return { label: 'Indicar', type, registro: null };
-    return { label: 'Inabilitado', type: 'INABILITADO', registro: null };
-  };
-
   if (loadingUser || !isAccessResolved) return null;
   if (!hasMedalhasAccess) return <AccessDenied modulo="Medalhas" />;
 
@@ -246,6 +304,19 @@ export default function ApuracaoMedalhasTempoServico() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!exportRows.length) {
+                  toast({ title: 'Sem indicados para exportar', description: 'Não há registros indicados no contexto atual.' });
+                  return;
+                }
+                setExportModalOpen(true);
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Exportar indicados
+            </Button>
             <Button variant="outline" onClick={() => navigate(createPageUrl('IndicacoesDomPedroII'))}>Dom Pedro II</Button>
             <Button variant="outline" onClick={() => setResetDialogOpen(true)}><RefreshCw className="w-4 h-4 mr-2" />Resetar indicações</Button>
           </div>
@@ -260,7 +331,7 @@ export default function ApuracaoMedalhasTempoServico() {
           ))}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-6 gap-3">
           <div className="relative md:col-span-2">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <Input className="pl-9" placeholder="Buscar por nome ou matrícula" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -279,6 +350,16 @@ export default function ApuracaoMedalhasTempoServico() {
             <SelectContent>
               <SelectItem value="TODOS">Todos postos</SelectItem>
               {postosDisponiveis.map((posto) => <SelectItem key={posto} value={posto}>{posto}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger><SelectValue placeholder="Status/Situação" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODOS">Todas situações</SelectItem>
+              <SelectItem value="ELEGIVEL">Elegível</SelectItem>
+              <SelectItem value="JA_CONTEMPLADO">Já contemplado</SelectItem>
+              <SelectItem value="IMPEDIDO">Impedido</SelectItem>
+              <SelectItem value="NAO_ELEGIVEL">Não elegível</SelectItem>
             </SelectContent>
           </Select>
           <Select value={faixaFilter} onValueChange={setFaixaFilter}>
@@ -410,6 +491,14 @@ export default function ApuracaoMedalhasTempoServico() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ExportarIndicadosModal
+        open={exportModalOpen}
+        onOpenChange={setExportModalOpen}
+        campos={camposExportacao}
+        defaultSelecionados={camposPadrao}
+        onConfirm={onConfirmarExportacao}
+      />
     </div>
   );
 }
