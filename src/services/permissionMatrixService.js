@@ -27,6 +27,10 @@ const aliasByCanonical = canonicalPermissionKeys.reduce((acc, key) => {
     aliases.push(key.replace(/^perm_/, ''));
   }
 
+  if (key.startsWith('acesso_')) {
+    aliases.push(key.replace(/^acesso_/, ''));
+  }
+
   if (key === 'perm_gerir_dom_pedro_ii') {
     aliases.push('perm_gerir_fluxo_dom_pedro_ii', 'gerir_fluxo_dom_pedro_ii');
   }
