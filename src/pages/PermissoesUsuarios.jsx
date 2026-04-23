@@ -14,7 +14,6 @@ import {
   buildPermissionPayload,
   buildPermissionsFromSource,
   canonicalPermissionKeys,
-  computePermissionOverrides,
   mergeUserOverridesWithMatrix,
   resolveProfilePermissions,
   resolveUserPermissions,
@@ -232,16 +231,12 @@ export default function PermissoesUsuarios() {
       const militarMatriculaAtual = militarVinculado?.matricula_atual || militarVinculado?.matricula || '';
       const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
 
-      const canonicalProfilePermissions = resolveProfilePermissions({
-        profileSource: selectedProfileSource || perfilSelected || {},
-      }).permissions;
-      const profilePermissions = loadedProfilePermissions || canonicalProfilePermissions;
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
       const permissionPayload = buildPermissionPayload(normalizedPermissions);
-      const legacyOverrides = selectedProfileId === '_nenhum'
-        ? {}
-        : computePermissionOverrides(normalizedPermissions, profilePermissions);
-      const permissionOverrides = mergeUserOverridesWithMatrix(legacyOverrides, normalizedPermissions);
+      const permissionOverrides = mergeUserOverridesWithMatrix(
+        selectedUser?.permissoes_override,
+        normalizedPermissions
+      );
 
       const baseData = {
         nome_usuario: userNomeUsuario,
