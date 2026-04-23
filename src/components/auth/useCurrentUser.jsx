@@ -4,7 +4,6 @@ import {
   buildPermissionsFromSource,
   isAdminRecoveryPermission,
   resolveUserPermissionsWithSnapshots,
-  upsertUserSnapshot,
 } from '@/services/permissionMatrixService';
 
 const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
@@ -101,22 +100,11 @@ export function useCurrentUser() {
     queryKey: ['resolvedPermissions', acesso?.id, perfilAcesso?.id],
     enabled: !!acesso,
     queryFn: async () => {
-      const resolved = await resolveUserPermissionsWithSnapshots({
+      return resolveUserPermissionsWithSnapshots({
         base44,
         userSource: acesso,
         profileSource: perfilAcesso || {},
       });
-
-      if (!resolved.userSnapshot && acesso?.id) {
-        await upsertUserSnapshot({
-          base44,
-          usuarioAcessoId: acesso.id,
-          userId: acesso.user_id || acesso.user_email || '',
-          matrizPermissoes: resolved.permissions,
-        });
-      }
-
-      return resolved;
     },
     staleTime: 0,
   });

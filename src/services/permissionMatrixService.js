@@ -49,6 +49,7 @@ export const nestedMatrixKeys = [
 export const SNAPSHOT_VERSION = 1;
 export const SNAPSHOT_PROFILE_ENTITY = 'PerfilPermissaoSnapshot';
 export const SNAPSHOT_USER_ENTITY = 'UsuarioPermissaoSnapshot';
+export const SNAPSHOT_RUNTIME_ENABLED = false;
 export const ADMIN_RECOVERY_MODULE_KEYS = ['acesso_militares'];
 export const ADMIN_RECOVERY_ACTION_KEYS = ['perm_gerir_permissoes'];
 
@@ -209,7 +210,15 @@ export const isAdminRecoveryPermission = (permissionKey, type = 'action') => {
   return ADMIN_RECOVERY_ACTION_KEYS.includes(normalized);
 };
 
-const getSnapshotEntity = (base44, entityName) => base44?.entities?.[entityName] || null;
+const getSnapshotEntity = (base44, entityName) => {
+  if (!SNAPSHOT_RUNTIME_ENABLED || !base44?.entities || !entityName) return null;
+
+  try {
+    return base44.entities[entityName] || null;
+  } catch {
+    return null;
+  }
+};
 
 const findLatestSnapshot = (records = []) => {
   if (!Array.isArray(records) || records.length === 0) return null;
@@ -251,6 +260,13 @@ export const resolveProfilePermissionsWithSnapshot = async ({
   profileSource = {},
   fallbackSource = {},
 }) => {
+  if (!SNAPSHOT_RUNTIME_ENABLED) {
+    return {
+      permissions: buildPermissionsFromSource(profileSource, fallbackSource),
+      snapshot: null,
+    };
+  }
+
   const snapshot = await getProfileSnapshot(base44, profileSource?.id);
   const snapshotIsValid = isValidPermissionSnapshot(snapshot);
   const snapshotPermissions = buildPermissionsFromSource(parseSnapshotMatrix(snapshot));
@@ -268,6 +284,20 @@ export const resolveUserPermissionsWithSnapshots = async ({
   fallbackProfile = {},
   fallbackUser = {},
 }) => {
+  if (!SNAPSHOT_RUNTIME_ENABLED) {
+    const profilePermissions = buildPermissionsFromSource(profileSource, fallbackProfile);
+    return {
+      permissions: mergeProfileAndUserPermissions({
+        profilePermissions,
+        userPermissions: userSource,
+        userOverrides: userSource?.permissoes_override || fallbackUser || {},
+      }),
+      profilePermissions,
+      userSnapshot: null,
+      profileSnapshot: null,
+    };
+  }
+
   const [profileSnapshot, userSnapshot] = await Promise.all([
     getProfileSnapshot(base44, profileSource?.id),
     getUserSnapshot(base44, userSource?.id, userSource?.user_id || userSource?.user_email || null),
@@ -309,6 +339,7 @@ export const upsertProfileSnapshot = async ({
   updatedBy = '',
   versao = SNAPSHOT_VERSION,
 }) => {
+  if (!SNAPSHOT_RUNTIME_ENABLED) return null;
   const entity = getSnapshotEntity(base44, SNAPSHOT_PROFILE_ENTITY);
   if (!entity || !perfilId) return null;
 
@@ -334,6 +365,7 @@ export const upsertUserSnapshot = async ({
   updatedBy = '',
   versao = SNAPSHOT_VERSION,
 }) => {
+  if (!SNAPSHOT_RUNTIME_ENABLED) return null;
   const entity = getSnapshotEntity(base44, SNAPSHOT_USER_ENTITY);
   if (!entity || (!usuarioAcessoId && !userId)) return null;
 
