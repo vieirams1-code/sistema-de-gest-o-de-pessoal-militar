@@ -14,10 +14,11 @@ import {
   analisarArquivoMigracaoAlteracoesLegado,
   atualizarMilitarLinhaAnalise,
   atualizarTipoPublicacaoLinhaAnalise,
-  atualizarDestinoLinhaAnalise,
   atualizarMotivoDestinoLinhaAnalise,
+  executarAcaoRegistroMigracaoAlteracoesLegado,
   exportarRelatorioMigracaoAlteracoesLegado,
   importarAnaliseAlteracoesLegado,
+  persistirEstadoAnaliseHistoricoAlteracoesLegado,
   salvarAnaliseHistoricoAlteracoesLegado,
 } from '@/services/migracaoAlteracoesLegadoService';
 
@@ -68,6 +69,7 @@ export default function MigracaoAlteracoesLegado() {
   const [avisoHistorico, setAvisoHistorico] = useState('');
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
   const [militares, setMilitares] = useState([]);
+  const [salvandoTipoLinhaNumero, setSalvandoTipoLinhaNumero] = useState(null);
 
   const linhasFiltradas = useMemo(() => {
     if (!analise) return [];
@@ -182,22 +184,54 @@ export default function MigracaoAlteracoesLegado() {
     setAnalise(proxima);
   };
 
-  const handleAjusteTipoPublicacao = (linha, tipoPublicacao) => {
+  const handleAjusteTipoPublicacao = async (linha, tipoPublicacao) => {
     if (!analise) return;
     const proxima = atualizarTipoPublicacaoLinhaAnalise(analise, linha.linhaNumero, tipoPublicacao);
     setAnalise(proxima);
-  };
-
-  const handleAjusteDestinoFinal = (linha, destinoFinal) => {
-    if (!analise) return;
-    const proxima = atualizarDestinoLinhaAnalise(analise, linha.linhaNumero, destinoFinal);
-    setAnalise(proxima);
+    setSalvandoTipoLinhaNumero(linha.linhaNumero);
+    try {
+      await persistirEstadoAnaliseHistoricoAlteracoesLegado(historicoId, proxima);
+      toast({ title: 'Tipo salvo', description: 'Classificação atualizada automaticamente para este registro.' });
+    } catch (error) {
+      toast({
+        title: 'Falha ao salvar tipo',
+        description: error?.message || 'Não foi possível persistir o tipo no backend.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSalvandoTipoLinhaNumero(null);
+    }
   };
 
   const handleAjusteMotivoDestino = (linha, motivoDestino) => {
     if (!analise) return;
     const proxima = atualizarMotivoDestinoLinhaAnalise(analise, linha.linhaNumero, motivoDestino);
     setAnalise(proxima);
+  };
+
+  const handleAcaoRegistro = async (linha, acao) => {
+    if (!analise) return;
+    try {
+      setCarregando(true);
+      const usuario = await base44.auth.me();
+      const resultado = await executarAcaoRegistroMigracaoAlteracoesLegado({
+        analise,
+        linhaNumero: linha.linhaNumero,
+        acao,
+        historicoId,
+        usuario,
+      });
+      setAnalise(resultado.analiseAtualizada);
+      toast({ title: 'Registro atualizado', description: resultado.mensagem });
+    } catch (error) {
+      toast({
+        title: 'Falha ao processar registro',
+        description: error?.message || 'Não foi possível executar a ação do registro.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const reiniciarFluxo = () => {
@@ -305,8 +339,11 @@ export default function MigracaoAlteracoesLegado() {
               tiposPublicacaoValidos={analise.tipos_publicacao_validos || []}
               onSelecionarMilitar={handleAjusteMilitar}
               onSelecionarTipoPublicacao={handleAjusteTipoPublicacao}
-              onSelecionarDestinoFinal={handleAjusteDestinoFinal}
               onAlterarMotivoDestino={handleAjusteMotivoDestino}
+              onImportarRegistro={(linha) => handleAcaoRegistro(linha, 'IMPORTAR')}
+              onEnviarParaRevisaoRegistro={(linha) => handleAcaoRegistro(linha, 'REVISAR')}
+              onIgnorarRegistro={(linha) => handleAcaoRegistro(linha, 'IGNORAR')}
+              salvandoTipoLinhaNumero={salvandoTipoLinhaNumero}
             />
 
             <div className="flex flex-wrap gap-2">

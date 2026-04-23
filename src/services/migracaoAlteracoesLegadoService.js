@@ -1071,6 +1071,15 @@ export async function salvarAnaliseHistoricoAlteracoesLegado(analise, usuario) {
   return historico;
 }
 
+export async function persistirEstadoAnaliseHistoricoAlteracoesLegado(historicoId, analise) {
+  if (!historicoId || !analise) return null;
+  return atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+    ...analise.resumo,
+    ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
+    relatorio_json: JSON.stringify({ analise }),
+  });
+}
+
 
 function linhaTemSomenteRevisaoTipo(linha) {
   const revisoes = linha.revisoes || [];
@@ -1189,6 +1198,48 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     totalNaoImportadas: resultado.totalNaoImportadas,
     registrosJaImportados: resultado.jaImportadas,
     relatorio,
+  };
+}
+
+export async function executarAcaoRegistroMigracaoAlteracoesLegado({
+  analise,
+  linhaNumero,
+  acao,
+  historicoId,
+  usuario,
+}) {
+  if (!analise?.linhas?.length) throw new Error('Análise inválida para executar ação por registro.');
+  const linhaAtual = analise.linhas.find((linha) => linha.linhaNumero === linhaNumero);
+  if (!linhaAtual) throw new Error('Registro não encontrado na análise atual.');
+
+  let analiseAtualizada = analise;
+  if (acao === 'IMPORTAR') {
+    if (!linhaAtual.transformado?.tipo_publicacao_confirmado) {
+      throw new Error('Selecione e salve um tipo antes de importar o registro.');
+    }
+    analiseAtualizada = atualizarDestinoLinhaAnalise(analise, linhaNumero, DESTINO_FINAL.IMPORTAR);
+    const loteUnitario = { ...analiseAtualizada, linhas: analiseAtualizada.linhas.filter((linha) => linha.linhaNumero === linhaNumero) };
+    await importarAnaliseAlteracoesLegado({
+      analise: loteUnitario,
+      incluirAlertas: true,
+      incluirPendentesClassificacao: false,
+      historicoId,
+      usuario,
+    });
+  } else if (acao === 'REVISAR') {
+    analiseAtualizada = atualizarDestinoLinhaAnalise(analise, linhaNumero, DESTINO_FINAL.PENDENTE_CLASSIFICACAO);
+  } else if (acao === 'IGNORAR') {
+    analiseAtualizada = atualizarDestinoLinhaAnalise(analise, linhaNumero, DESTINO_FINAL.IGNORAR);
+  } else {
+    throw new Error('Ação de registro não suportada.');
+  }
+
+  await persistirEstadoAnaliseHistoricoAlteracoesLegado(historicoId, analiseAtualizada);
+  return {
+    analiseAtualizada,
+    mensagem: acao === 'IMPORTAR'
+      ? 'Registro importado com sucesso.'
+      : (acao === 'REVISAR' ? 'Registro enviado para revisão.' : 'Registro marcado como ignorado.'),
   };
 }
 

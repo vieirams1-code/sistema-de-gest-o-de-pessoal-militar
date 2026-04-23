@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronsUpDown, FileText, UserRound } from 'lucide-react';
+import { Check, ChevronsUpDown, UserRound } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { construirSugestaoSistema } from '@/components/migracao-alteracoes-legado/sugestaoSistemaHelper';
 
 const statusLabel = {
   APTO: 'Apto',
@@ -28,13 +27,6 @@ const statusClass = {
   ERRO: 'bg-rose-100 text-rose-800 border-rose-200',
 };
 
-const destinosFinais = [
-  'IMPORTAR',
-  'PENDENTE_CLASSIFICACAO',
-  'IGNORAR',
-  'EXCLUIDO_DO_LOTE',
-];
-
 function labelMilitar(m) {
   return `${m.posto_graduacao ? `${m.posto_graduacao} ` : ''}${m.nome_completo || m.nome_guerra || ''} ${m.matricula ? `(${m.matricula})` : ''}`.trim();
 }
@@ -45,8 +37,11 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
   tiposPublicacaoValidos = [],
   onSelecionarMilitar,
   onSelecionarTipoPublicacao,
-  onSelecionarDestinoFinal,
   onAlterarMotivoDestino,
+  onImportarRegistro,
+  onEnviarParaRevisaoRegistro,
+  onIgnorarRegistro,
+  salvandoTipoLinhaNumero,
 }) {
   const [linhaSelecionadaNumero, setLinhaSelecionadaNumero] = useState(null);
   const [autocompleteAberto, setAutocompleteAberto] = useState(false);
@@ -78,14 +73,15 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
 
   const destinoFinal = linhaSelecionada?.transformado.destino_final || 'IMPORTAR';
   const exigeMotivo = destinoFinal === 'IGNORAR' || destinoFinal === 'EXCLUIDO_DO_LOTE';
-  const sugestoes = construirSugestaoSistema(linhaSelecionada, tiposPublicacaoValidos);
+  const tipoConfirmado = linhaSelecionada?.transformado?.tipo_publicacao_confirmado || '';
+  const salvandoTipoAtual = salvandoTipoLinhaNumero === linhaSelecionada?.linhaNumero;
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[25rem,1fr] gap-4">
       <section className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
           <h3 className="text-sm font-semibold text-slate-700">Registros legados</h3>
-          <p className="text-xs text-slate-500">Selecione um item para revisar os detalhes e classificar.</p>
+          <p className="text-xs text-slate-500">Selecione um item para revisar os detalhes e decidir a ação final.</p>
         </div>
         <div className="max-h-[68vh] overflow-y-auto p-3 space-y-2">
           {linhas.map((linha) => {
@@ -171,83 +167,54 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
               </div>
             </div>
 
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-              <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Sugestão do sistema</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge className="bg-indigo-700 text-white">{sugestoes.principal.tipo}</Badge>
-                <span className="text-sm font-semibold text-indigo-700">{sugestoes.principal.confianca}% de confiança</span>
-              </div>
-              {sugestoes.secundarias.length > 0 && (
-                <div className="mt-2 text-xs text-indigo-900 space-y-1">
-                  {sugestoes.secundarias.map((item) => (
-                    <p key={item.tipo}>{item.tipo} — {item.confianca}%</p>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600">Pesquisar tipo do sistema</Label>
-                <Popover open={autocompleteAberto} onOpenChange={setAutocompleteAberto}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                      {linhaSelecionada.transformado.tipo_publicacao_confirmado || 'Selecione o tipo'}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Pesquisar tipo..." />
-                      <CommandList>
-                        <CommandEmpty>Nenhum tipo encontrado.</CommandEmpty>
-                        <CommandGroup className="max-h-60 overflow-auto">
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-600">Pesquisar tipo do sistema</Label>
+              <Popover open={autocompleteAberto} onOpenChange={setAutocompleteAberto}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                    {linhaSelecionada.transformado.tipo_publicacao_confirmado || 'Selecione o tipo'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar tipo..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum tipo encontrado.</CommandEmpty>
+                      <CommandGroup className="max-h-60 overflow-auto">
+                        <CommandItem
+                          value="Pendente de classificação"
+                          onSelect={() => {
+                            onSelecionarTipoPublicacao?.(linhaSelecionada, '');
+                            setAutocompleteAberto(false);
+                          }}
+                        >
+                          <Check className={cn('mr-2 h-4 w-4', !linhaSelecionada.transformado.tipo_publicacao_confirmado ? 'opacity-100' : 'opacity-0')} />
+                          Pendente de classificação
+                        </CommandItem>
+                        {tiposPublicacaoValidos.map((tipo) => (
                           <CommandItem
-                            value="Pendente de classificação"
+                            key={tipo}
+                            value={tipo}
                             onSelect={() => {
-                              onSelecionarTipoPublicacao?.(linhaSelecionada, '');
+                              onSelecionarTipoPublicacao?.(linhaSelecionada, tipo);
                               setAutocompleteAberto(false);
                             }}
                           >
-                            <Check className={cn('mr-2 h-4 w-4', !linhaSelecionada.transformado.tipo_publicacao_confirmado ? 'opacity-100' : 'opacity-0')} />
-                            Pendente de classificação
+                            <Check className={cn('mr-2 h-4 w-4', linhaSelecionada.transformado.tipo_publicacao_confirmado === tipo ? 'opacity-100' : 'opacity-0')} />
+                            {tipo}
                           </CommandItem>
-                          {tiposPublicacaoValidos.map((tipo) => (
-                            <CommandItem
-                              key={tipo}
-                              value={tipo}
-                              onSelect={() => {
-                                onSelecionarTipoPublicacao?.(linhaSelecionada, tipo);
-                                setAutocompleteAberto(false);
-                              }}
-                            >
-                              <Check className={cn('mr-2 h-4 w-4', linhaSelecionada.transformado.tipo_publicacao_confirmado === tipo ? 'opacity-100' : 'opacity-0')} />
-                              {tipo}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs text-slate-600">Destino final</Label>
-                <Select
-                  value={destinoFinal}
-                  onValueChange={(valor) => onSelecionarDestinoFinal?.(linhaSelecionada, valor)}
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Selecione o destino final" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {destinosFinais.map((destino) => (
-                      <SelectItem key={destino} value={destino}>{destino}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {salvandoTipoAtual ? (
+                <p className="text-[11px] text-slate-500">Salvando tipo...</p>
+              ) : (
+                <p className="text-[11px] text-emerald-700">{tipoConfirmado ? 'Tipo salvo automaticamente.' : 'Sem tipo confirmado.'}</p>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -263,21 +230,25 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
             <div className="mt-auto border-t border-slate-200 pt-3 flex flex-wrap gap-2">
               <Button
                 type="button"
-                className="bg-indigo-600 hover:bg-indigo-700"
-                onClick={() => {
-                  const tipoPrincipal = sugestoes.principal.tipo === 'Sem sugestão' ? '' : sugestoes.principal.tipo;
-                  if (tipoPrincipal) onSelecionarTipoPublicacao?.(linhaSelecionada, tipoPrincipal);
-                }}
+                className="bg-emerald-700 hover:bg-emerald-800"
+                disabled={!tipoConfirmado || salvandoTipoAtual}
+                onClick={() => onImportarRegistro?.(linhaSelecionada)}
               >
-                <FileText className="w-4 h-4 mr-2" /> Marcar tipo
-              </Button>
-              <Button type="button" className="bg-emerald-700 hover:bg-emerald-800" onClick={() => onSelecionarDestinoFinal?.(linhaSelecionada, 'IMPORTAR')}>
                 <Check className="w-4 h-4 mr-2" /> Importar
               </Button>
-              <Button type="button" variant="outline" onClick={() => onSelecionarDestinoFinal?.(linhaSelecionada, 'PENDENTE_CLASSIFICACAO')}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onEnviarParaRevisaoRegistro?.(linhaSelecionada)}
+              >
                 <UserRound className="w-4 h-4 mr-2" /> Enviar para revisão
               </Button>
-              <Button type="button" variant="outline" className="text-rose-700 border-rose-200 hover:text-rose-800" onClick={() => onSelecionarDestinoFinal?.(linhaSelecionada, 'IGNORAR')}>
+              <Button
+                type="button"
+                variant="outline"
+                className="text-rose-700 border-rose-200 hover:text-rose-800"
+                onClick={() => onIgnorarRegistro?.(linhaSelecionada)}
+              >
                 Ignorar
               </Button>
             </div>
