@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  isAdminRecoveryPermission,
   buildPermissionPayload,
   buildPermissionsFromSource,
   computePermissionOverrides,
   getPermissionMismatches,
   getProfileSnapshot,
   getUserSnapshot,
+  isValidPermissionSnapshot,
   mergeProfileAndUserPermissions,
   nestedMatrixKeys,
   resolveProfilePermissionsWithSnapshot,
@@ -259,4 +261,56 @@ test('merge perfil + usuário via snapshot respeita prioridade usuário > perfil
 
   const snapByUser = await getUserSnapshot(base44, 'ua_2', 'user_2');
   assert.equal(snapByUser.usuario_acesso_id, 'ua_2');
+});
+
+test('isValidPermissionSnapshot só aceita snapshot com matriz canônica consistente', () => {
+  assert.equal(isValidPermissionSnapshot(null), false);
+  assert.equal(isValidPermissionSnapshot({}), false);
+  assert.equal(isValidPermissionSnapshot({ matriz_permissoes: {} }), false);
+  assert.equal(isValidPermissionSnapshot({ matriz_permissoes: { qualquer_coisa: true } }), false);
+  assert.equal(isValidPermissionSnapshot({ matriz_permissoes: { acesso_militares: true } }), true);
+});
+
+test('ignora snapshot de usuário vazio e usa fallback legado', async () => {
+  const base44 = createMockBase44();
+  await base44.entities.UsuarioPermissaoSnapshot.create({
+    usuario_acesso_id: 'ua_legacy',
+    user_id: 'user_legacy',
+    matriz_permissoes: {},
+    updated_at: new Date().toISOString(),
+  });
+
+  const resolved = await resolveUserPermissionsWithSnapshots({
+    base44,
+    userSource: { id: 'ua_legacy', user_id: 'user_legacy', acesso_militares: true },
+    profileSource: {},
+  });
+
+  assert.equal(resolved.userSnapshot, null);
+  assert.equal(resolved.permissions.acesso_militares, true);
+});
+
+test('ignora snapshot de perfil incompleto e usa fallback legado do perfil', async () => {
+  const base44 = createMockBase44();
+  await base44.entities.PerfilPermissaoSnapshot.create({
+    perfil_id: 'perfil_incompleto',
+    matriz_permissoes: { metadado: 'sem_chaves_canônicas' },
+    updated_at: new Date().toISOString(),
+  });
+
+  const resolved = await resolveProfilePermissionsWithSnapshot({
+    base44,
+    profileSource: { id: 'perfil_incompleto', acesso_militares: true },
+  });
+
+  assert.equal(resolved.snapshot, null);
+  assert.equal(resolved.permissions.acesso_militares, true);
+});
+
+test('modo de recuperação admin mantém acesso mínimo crítico', () => {
+  assert.equal(isAdminRecoveryPermission('acesso_militares', 'module'), true);
+  assert.equal(isAdminRecoveryPermission('militares', 'module'), true);
+  assert.equal(isAdminRecoveryPermission('perm_gerir_permissoes', 'action'), true);
+  assert.equal(isAdminRecoveryPermission('gerir_permissoes', 'action'), true);
+  assert.equal(isAdminRecoveryPermission('perm_gerir_templates', 'action'), false);
 });

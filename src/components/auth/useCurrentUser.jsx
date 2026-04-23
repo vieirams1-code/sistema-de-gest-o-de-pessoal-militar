@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import {
   buildPermissionsFromSource,
+  isAdminRecoveryPermission,
   resolveUserPermissionsWithSnapshots,
   upsertUserSnapshot,
 } from '@/services/permissionMatrixService';
@@ -189,6 +190,7 @@ export function useCurrentUser() {
     if (acesso) {
       const campo = `acesso_${modulo}`;
       const resolvedValue = normalizedResolvedPermissions[campo];
+      if (isAdmin && isAdminRecoveryPermission(campo, 'module')) return true;
       if (isAdmin) return resolvedValue !== false;
       return resolvedValue === true;
     }
@@ -204,6 +206,7 @@ export function useCurrentUser() {
     if (acesso) {
       const campo = `perm_${acao}`;
       const resolvedValue = normalizedResolvedPermissions[campo];
+      if (isAdmin && isAdminRecoveryPermission(campo, 'action')) return true;
       if (isAdmin) return resolvedValue !== false;
       return resolvedValue === true;
     }
