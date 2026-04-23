@@ -5,6 +5,7 @@ import {
   buildPermissionPayload,
   buildPermissionsFromSource,
   computePermissionOverrides,
+  getPermissionMismatches,
   mergeProfileAndUserPermissions,
 } from '../permissionMatrixService.js';
 
@@ -38,6 +39,7 @@ test('payload de persistência inclui aliases legados para manter compatibilidad
   assert.equal(payload.gerir_dom_pedro_ii, true);
   assert.equal(payload.perm_gerir_fluxo_dom_pedro_ii, true);
   assert.equal(payload.gerir_fluxo_dom_pedro_ii, true);
+  assert.equal(payload.matriz_permissoes.perm_indicar_medalhas, true);
 });
 
 test('merge aplica perfil base e sobrescreve com override explícito do usuário', () => {
@@ -78,4 +80,26 @@ test('calcula diff determinístico entre perfil base e permissões finais do usu
     perm_conceder_medalhas: false,
     perm_resetar_indicacoes_medalhas: true,
   });
+});
+
+
+test('normaliza permissões a partir de matriz_permissoes aninhada', () => {
+  const normalized = buildPermissionsFromSource({
+    matriz_permissoes: {
+      acesso_folha_alteracoes: true,
+      perm_exportar_medalhas: true,
+    },
+  });
+
+  assert.equal(normalized.acesso_folha_alteracoes, true);
+  assert.equal(normalized.perm_exportar_medalhas, true);
+});
+
+test('detecta divergências entre esperado e recarregado para evitar falso sucesso', () => {
+  const mismatches = getPermissionMismatches(
+    { acesso_folha_alteracoes: true, acesso_militares: true },
+    { acesso_militares: true, acesso_folha_alteracoes: false }
+  );
+
+  assert.deepEqual(mismatches, ['acesso_folha_alteracoes']);
 });
