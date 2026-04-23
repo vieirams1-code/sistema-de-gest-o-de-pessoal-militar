@@ -12,8 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Pencil, User, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send, Activity, AlertTriangle, Briefcase
-} from 'lucide-react';
+  Shield, Award, Send, Activity, AlertTriangle, Briefcase } from
+'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
@@ -24,20 +24,20 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import {
   criarChavePendenciaComportamento,
-  obterHistoricoComportamentoMilitar,
-} from '@/services/justicaDisciplinaService';
+  obterHistoricoComportamentoMilitar } from
+'@/services/justicaDisciplinaService';
 import {
   filtrarRegistrosSistema,
-  getMensagemRegistrosSistemaPerfilMilitar,
-} from '@/config/perfilMilitarRegistrosConfig';
+  getMensagemRegistrosSistemaPerfilMilitar } from
+'@/config/perfilMilitarRegistrosConfig';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { apurarMedalhaTempoServicoMilitar, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
 import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas } from '@/services/medalhasAcessoService';
 import { useToast } from '@/components/ui/use-toast';
 import {
   formatarTipoCreditoExtra,
-  STATUS_CREDITO_EXTRA_FERIAS,
-} from '@/services/creditoExtraFeriasService';
+  STATUS_CREDITO_EXTRA_FERIAS } from
+'@/services/creditoExtraFeriasService';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -46,17 +46,17 @@ const COMPORTAMENTO_LEVEL = {
   BOM: 3,
   ÓTIMO: 4,
   OTIMO: 4,
-  EXCEPCIONAL: 5,
+  EXCEPCIONAL: 5
 };
 
-const normalizarPosto = (valor) => String(valor || '')
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/[º°]/g, '')
-  .replace(/[-_]/g, ' ')
-  .replace(/\s+/g, ' ')
-  .trim()
-  .toLowerCase();
+const normalizarPosto = (valor) => String(valor || '').
+normalize('NFD').
+replace(/[\u0300-\u036f]/g, '').
+replace(/[º°]/g, '').
+replace(/[-_]/g, ' ').
+replace(/\s+/g, ' ').
+trim().
+toLowerCase();
 
 const isOficial = (postoGraduacao) => POSTOS_OFICIAIS.has(normalizarPosto(postoGraduacao));
 
@@ -74,8 +74,8 @@ function InfoItem({ label, value, icon: Icon }) {
         <p className="text-xs text-slate-500">{label}</p>
         <p className="text-sm font-medium text-slate-700">{value}</p>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 function Section({ title, icon: Icon, children }) {
@@ -88,21 +88,21 @@ function Section({ title, icon: Icon, children }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">{children}</CardContent>
-    </Card>
-  );
+    </Card>);
+
 }
 
 function formatDate(date) {
   if (!date) return null;
-  try { return format(new Date(date + 'T00:00:00'), "dd/MM/yyyy"); } catch { return date; }
+  try {return format(new Date(date + 'T00:00:00'), "dd/MM/yyyy");} catch {return date;}
 }
 
 function AvisoRegistrosSistema({ mensagemRegistrosSistema }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <p className="text-xs text-slate-600">{mensagemRegistrosSistema}</p>
-    </div>
-  );
+    </div>);
+
 }
 
 export default function VerMilitar() {
@@ -119,12 +119,12 @@ export default function VerMilitar() {
     data_inicio: new Date().toISOString().split('T')[0],
     data_fim: '',
     motivo: '',
-    observacoes: '',
+    observacoes: ''
   });
 
   const { data: militar, isLoading } = useQuery({
     queryKey: ['militar', id],
-    queryFn: async () => { const list = await base44.entities.Militar.filter({ id }); return list[0] || null; },
+    queryFn: async () => {const list = await base44.entities.Militar.filter({ id });return list[0] || null;},
     enabled: !!id && isAccessResolved
   });
   const { data: matriculasMilitar = [] } = useQuery({
@@ -145,14 +145,14 @@ export default function VerMilitar() {
       const list = await base44.entities.Militar.filter({ id: militar.merged_into_id });
       return list[0] || null;
     },
-    enabled: Boolean(militar?.merged_into_id),
+    enabled: Boolean(militar?.merged_into_id)
   });
 
-  const canViewMilitar = militar ? (hasAccess(militar) || hasSelfAccess(militar)) : false;
+  const canViewMilitar = militar ? hasAccess(militar) || hasSelfAccess(militar) : false;
   const comportamentoElegivel = militar ? !isOficial(militar.posto_graduacao) : false;
-  const tabInicial = comportamentoElegivel
-    ? selectedTab
-    : (selectedTab === 'comportamento' ? 'dados' : selectedTab);
+  const tabInicial = comportamentoElegivel ?
+  selectedTab :
+  selectedTab === 'comportamento' ? 'dados' : selectedTab;
 
   const { data: ferias = [] } = useQuery({
     queryKey: ['ver-ferias', id],
@@ -174,12 +174,12 @@ export default function VerMilitar() {
   const { data: tiposMedalha = [] } = useQuery({
     queryKey: ['ver-tipos-medalha'],
     queryFn: () => base44.entities.TipoMedalha.list('nome'),
-    enabled: !!id && isAccessResolved && canViewMilitar,
+    enabled: !!id && isAccessResolved && canViewMilitar
   });
   const { data: impedimentosMedalha = [] } = useQuery({
     queryKey: ['ver-impedimentos-medalha', id],
     queryFn: () => base44.entities.ImpedimentoMedalha.filter({ militar_id: id }, '-created_date'),
-    enabled: !!id && isAccessResolved && canViewMilitar,
+    enabled: !!id && isAccessResolved && canViewMilitar
   });
 
   const { data: armamentos = [] } = useQuery({
@@ -196,7 +196,7 @@ export default function VerMilitar() {
   const { data: creditosExtraFerias = [] } = useQuery({
     queryKey: ['ver-creditos-extra-ferias', id],
     queryFn: () => base44.entities.CreditoExtraFerias.filter({ militar_id: id }, '-data_referencia'),
-    enabled: !!id && isAccessResolved && canViewMilitar,
+    enabled: !!id && isAccessResolved && canViewMilitar
   });
   const { data: historicoComportamento = [] } = useQuery({
     queryKey: ['ver-historico-comportamento', id],
@@ -206,7 +206,7 @@ export default function VerMilitar() {
       console.log('[HIST] resultado query:', {
         militar_id: militarIdHistorico,
         quantidade: Array.isArray(historico) ? historico.length : 0,
-        registros: historico,
+        registros: historico
       });
       return historico;
     },
@@ -247,11 +247,11 @@ export default function VerMilitar() {
   const apuracaoTempoServico = React.useMemo(() => apurarMedalhaTempoServicoMilitar({
     militar,
     medalhas: medalhasSistema,
-    tiposMedalha,
+    tiposMedalha
   }), [medalhasSistema, militar, tiposMedalha]);
   const impedimentoAtivoGeral = React.useMemo(
     () => impedimentosMedalha.find((item) => item.ativo !== false && !item.tipo_medalha_codigo && !item.tipo_medalha_id),
-    [impedimentosMedalha],
+    [impedimentosMedalha]
   );
 
   const criarImpedimentoMutation = useMutation({
@@ -265,7 +265,7 @@ export default function VerMilitar() {
         motivo: impedimentoForm.motivo,
         observacoes: impedimentoForm.observacoes,
         tipo_medalha_codigo: '',
-        tipo_medalha_id: '',
+        tipo_medalha_id: ''
       }, { userEmail }));
     },
     onSuccess: () => {
@@ -273,7 +273,7 @@ export default function VerMilitar() {
       queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
       toast({ title: 'Impedimento geral ativado para medalhas' });
       setImpedimentoForm((atual) => ({ ...atual, motivo: '', observacoes: '' }));
-    },
+    }
   });
 
   const removerImpedimentoMutation = useMutation({
@@ -281,14 +281,14 @@ export default function VerMilitar() {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.IMPEDIMENTOS, mensagem: 'Sem permissão para gerir impedimentos de medalha.' });
       return base44.entities.ImpedimentoMedalha.update(impedimentoId, adicionarAuditoriaMedalha({
         ativo: false,
-        data_fim: new Date().toISOString().split('T')[0],
+        data_fim: new Date().toISOString().split('T')[0]
       }, { userEmail }));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ver-impedimentos-medalha', id] });
       queryClient.invalidateQueries({ queryKey: ['apuracao-medalhas-impedimentos'] });
       toast({ title: 'Impedimento removido' });
-    },
+    }
   });
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
   const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
@@ -303,14 +303,14 @@ export default function VerMilitar() {
   const avaliacaoComportamento = React.useMemo(() => {
     if (!militar) return null;
     return calcularComportamento(punicoesSistema, militar.posto_graduacao, new Date(), {
-      dataInclusaoMilitar: militar.data_inclusao,
+      dataInclusaoMilitar: militar.data_inclusao
     });
   }, [militar, punicoesSistema]);
 
   const proximaMelhoria = React.useMemo(() => {
     if (!militar) return null;
     return calcularProximaMelhoria(punicoesSistema, militar.posto_graduacao, new Date(), {
-      dataInclusaoMilitar: militar.data_inclusao,
+      dataInclusaoMilitar: militar.data_inclusao
     });
   }, [militar, punicoesSistema]);
 
@@ -319,7 +319,7 @@ export default function VerMilitar() {
     if (!ultima) return null;
     return {
       tipo: ultima.tipo_punicao || ultima.tipo || 'Punição disciplinar',
-      data: ultima.data_inicio_cumprimento || ultima.data_inicio || ultima.created_date || '',
+      data: ultima.data_inicio_cumprimento || ultima.data_inicio || ultima.created_date || ''
     };
   }, [punicoesSistema]);
 
@@ -330,7 +330,7 @@ export default function VerMilitar() {
     return {
       year,
       level: toChartLevel(evento?.comportamento_novo),
-      desc: evento?.motivo_mudanca || evento?.motivo_mudanca_resolvido || evento?.observacoes || 'Alteração de comportamento registrada.',
+      desc: evento?.motivo_mudanca || evento?.motivo_mudanca_resolvido || evento?.observacoes || 'Alteração de comportamento registrada.'
     };
   }).filter((item) => Number.isFinite(item.year)), [historicoComportamentoSistema]);
 
@@ -338,8 +338,8 @@ export default function VerMilitar() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+      </div>);
+
   }
 
   if (!militar) {
@@ -347,10 +347,10 @@ export default function VerMilitar() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-slate-500 mb-4">Militar não encontrado</p>
-          <Button onClick={() => navigate(createPageUrl('Militares'))}>Voltar</Button>
+          <Button onClick={() => navigate(createPageUrl('Militares'))} className="bg-primary text-primary-foreground px-4 py-2 text-sm font-medium text-left rounded-lg inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 shadow hover:bg-primary/90 h-9">Voltar</Button>
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   if (!canViewMilitar) {
@@ -360,8 +360,8 @@ export default function VerMilitar() {
           <p className="text-slate-500 mb-4">Acesso negado para este militar.</p>
           <Button onClick={() => navigate(createPageUrl('Home'))}>Ir para Home</Button>
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   const statusColors = { 'Ativo': 'bg-emerald-100 text-emerald-700', 'Inativo': 'bg-slate-100 text-slate-700' };
@@ -386,13 +386,13 @@ export default function VerMilitar() {
             <Button variant="outline" onClick={() => setShowSolicitacao(true)}>
               <Send className="w-4 h-4 mr-2" />Solicitar Correção
             </Button>
-            {isAdmin && (
-              <>
+            {isAdmin &&
+            <>
                 <Button onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                   <Pencil className="w-4 h-4 mr-2" />Editar
                 </Button>
               </>
-            )}
+            }
           </div>
         </div>
 
@@ -400,15 +400,15 @@ export default function VerMilitar() {
         <div className="space-y-2 mb-4">
           <AlertasContrato militarId={id} />
           <TempoServico militar={militar} />
-          {militarMesclado && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          {militarMesclado &&
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Cadastro mesclado</p>
               <p>
                 Este militar foi mesclado e deve ser usado apenas para consulta histórica.
                 {militarDestinoMerge?.id ? ` Registro destino: ${militarDestinoMerge.nome_completo || militarDestinoMerge.nome_guerra} (${militarDestinoMerge.matricula || 'sem matrícula'}).` : ''}
               </p>
             </div>
-          )}
+          }
         </div>
 
         {/* Profile Header */}
@@ -416,13 +416,13 @@ export default function VerMilitar() {
           <div className="bg-gradient-to-r from-[#1e3a5f] to-[#2d4a6f] p-6 text-white">
             <div className="flex flex-col md:flex-row gap-6 items-start">
               <div className="w-28 h-36 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
-                {militar.foto ? (
-                  <img src={militar.foto} alt={militar.nome_completo} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
+                {militar.foto ?
+                <img src={militar.foto} alt={militar.nome_completo} className="w-full h-full object-cover" /> :
+
+                <div className="w-full h-full flex items-center justify-center">
                     <User className="w-12 h-12 text-white/50" />
                   </div>
-                )}
+                }
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -442,11 +442,11 @@ export default function VerMilitar() {
                   {militar.lotacao && <span>Lotação: {militar.lotacao}</span>}
                   {militar.funcao && <span>Função: {militar.funcao}</span>}
                 </div>
-                {militar.comportamento && comportamentoElegivel && (
-                  <div className="mt-2">
+                {militar.comportamento && comportamentoElegivel &&
+                <div className="mt-2">
                     <Badge className="bg-white/20 text-white border border-white/30">Comportamento: {militar.comportamento}</Badge>
                   </div>
-                )}
+                }
               </div>
             </div>
           </div>
@@ -455,9 +455,9 @@ export default function VerMilitar() {
         {/* Tabs */}
         <Tabs defaultValue={tabInicial}>
           <TabsList className="w-full flex-wrap h-auto gap-1 mb-6">
-            {comportamentoElegivel && (
-              <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
-            )}
+            {comportamentoElegivel &&
+            <TabsTrigger value="comportamento"><Activity className="w-4 h-4 mr-1" />Comportamento</TabsTrigger>
+            }
             <TabsTrigger value="dados"><User className="w-4 h-4 mr-1" />Dados Pessoais</TabsTrigger>
             <TabsTrigger value="ferias"><Calendar className="w-4 h-4 mr-1" />Férias</TabsTrigger>
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
@@ -480,19 +480,19 @@ export default function VerMilitar() {
                     <InfoItem label="Data de Inclusão" value={formatDate(militar.data_inclusao)} icon={Calendar} />
                     {militar.destino && <InfoItem label="Destino/Cedência" value={militar.destino} />}
                   </div>
-                  {!!militarEnriquecido?.matriculas_historico?.length && (
-                    <div className="mt-3 space-y-2">
+                  {!!militarEnriquecido?.matriculas_historico?.length &&
+                  <div className="mt-3 space-y-2">
                       <p className="text-xs text-slate-500">Histórico de matrículas</p>
-                      {militarEnriquecido.matriculas_historico.map((mat) => (
-                        <div key={mat.id || `${mat.matricula}-${mat.data_inicio}`} className={`rounded-md border px-3 py-2 text-xs ${mat.is_atual ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                      {militarEnriquecido.matriculas_historico.map((mat) =>
+                    <div key={mat.id || `${mat.matricula}-${mat.data_inicio}`} className={`rounded-md border px-3 py-2 text-xs ${mat.is_atual ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
                           <p className="font-semibold text-slate-700">{mat.matricula_formatada || mat.matricula} {mat.is_atual ? '(Atual)' : ''}</p>
                           <p className="text-slate-500">
                             Tipo: {mat.tipo_matricula || '—'} • Situação: {mat.situacao || '—'} • Início: {formatDate(mat.data_inicio) || '—'} • Fim: {formatDate(mat.data_fim) || '—'}
                           </p>
                         </div>
-                      ))}
+                    )}
                     </div>
-                  )}
+                  }
                 </Section>
                 <Section title="Dados Pessoais" icon={User}>
                   <div className="grid grid-cols-2 gap-x-4">
@@ -544,21 +544,21 @@ export default function VerMilitar() {
                   <InfoItem label="Cidade/UF" value={militar.cidade ? `${militar.cidade}/${militar.uf}` : null} />
                 </div>
               </Section>
-              {militar.habilidades?.length > 0 && (
+              {militar.habilidades?.length > 0 &&
                 <Section title="Habilidades" icon={GraduationCap}>
                   <div className="flex flex-wrap gap-2">
-                    {militar.habilidades.map((h, i) => (
-                      <Badge key={i} className="bg-[#1e3a5f]/10 text-[#1e3a5f]">{h}</Badge>
-                    ))}
+                    {militar.habilidades.map((h, i) =>
+                    <Badge key={i} className="bg-[#1e3a5f]/10 text-[#1e3a5f]">{h}</Badge>
+                    )}
                   </div>
                 </Section>
-              )}
+                }
               </div>
             </div>
           </TabsContent>
 
-          {comportamentoElegivel && (
-            <TabsContent value="comportamento">
+          {comportamentoElegivel &&
+          <TabsContent value="comportamento">
               <div className="space-y-6">
                 <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
                 <Section title="Situação Atual do Comportamento" icon={Activity}>
@@ -574,74 +574,74 @@ export default function VerMilitar() {
                     <div className="rounded-lg border p-3">
                       <p className="text-slate-500">Próxima melhoria</p>
                       <p className="font-semibold">
-                        {avaliacaoComportamento?.inconsistente_para_calculo
-                          ? 'Bloqueada por inconsistência'
-                          : (proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—')}
+                        {avaliacaoComportamento?.inconsistente_para_calculo ?
+                      'Bloqueada por inconsistência' :
+                      proximaMelhoria?.data ? `${proximaMelhoria.data} (${proximaMelhoria.comportamento_futuro})` : '—'}
                       </p>
                     </div>
                   </div>
-                  {avaliacaoComportamento?.inconsistente_para_calculo && (
-                    <p className="mt-3 text-xs text-red-600">
+                  {avaliacaoComportamento?.inconsistente_para_calculo &&
+                <p className="mt-3 text-xs text-red-600">
                       Não foi possível calcular comportamento: {(avaliacaoComportamento?.inconsistencias || []).map((item) => item.labelCampo).join(', ')}.
                     </p>
-                  )}
-                  {avaliacaoComportamento?.fundamento && (
-                    <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
-                  )}
+                }
+                  {avaliacaoComportamento?.fundamento &&
+                <p className="mt-3 text-xs text-slate-600">{avaliacaoComportamento.fundamento}</p>
+                }
                 </Section>
 
                 <Section title="Pendências de Comportamento" icon={AlertTriangle}>
-                  {pendenciasComportamentoSistema.length === 0 ? (
-                    <p className="text-sm text-slate-500">Sem pendências de comportamento no momento.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {pendenciasComportamentoSistema.map((pendencia) => (
-                        <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  {pendenciasComportamentoSistema.length === 0 ?
+                <p className="text-sm text-slate-500">Sem pendências de comportamento no momento.</p> :
+
+                <div className="space-y-3">
+                      {pendenciasComportamentoSistema.map((pendencia) =>
+                  <div key={pendencia.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                           <p className="text-sm font-semibold text-amber-900">
-                            {(pendencia.comportamento_atual || militar.comportamento || '—')} → {(pendencia.comportamento_sugerido || avaliacaoComportamento?.comportamento || militar.comportamento || '—')}
+                            {pendencia.comportamento_atual || militar.comportamento || '—'} → {pendencia.comportamento_sugerido || avaliacaoComportamento?.comportamento || militar.comportamento || '—'}
                           </p>
                           <p className="text-xs text-amber-800 mt-1">
-                            {ultimaPunicaoPorMilitar
-                              ? `Última punição: ${ultimaPunicaoPorMilitar.tipo} (${formatDate(ultimaPunicaoPorMilitar.data) || ultimaPunicaoPorMilitar.data})`
-                              : 'Sem punições registradas'}
+                            {ultimaPunicaoPorMilitar ?
+                      `Última punição: ${ultimaPunicaoPorMilitar.tipo} (${formatDate(ultimaPunicaoPorMilitar.data) || ultimaPunicaoPorMilitar.data})` :
+                      'Sem punições registradas'}
                           </p>
                         </div>
-                      ))}
-                    </div>
                   )}
+                    </div>
+                }
                 </Section>
 
                 <Section title="Linha do Tempo do Comportamento">
                   <div className="flex flex-col gap-4">
                     <HistoricoComportamentoChart
-                      data={historicoChartData}
-                      title="Evolução anual do comportamento"
-                      height={220}
-                    />
+                    data={historicoChartData}
+                    title="Evolução anual do comportamento"
+                    height={220} />
+                  
                     <ComportamentoTimeline eventos={historicoComportamentoSistema} />
                   </div>
                 </Section>
 
                 <Section title="Informações Disciplinares Relacionadas" icon={Shield}>
-                  {punicoesSistema.length === 0 ? (
-                    <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {punicoesSistema.slice(0, 5).map((punicao) => (
-                        <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
+                  {punicoesSistema.length === 0 ?
+                <p className="text-sm text-slate-500">Nenhuma punição disciplinar cadastrada.</p> :
+
+                <div className="space-y-2">
+                      {punicoesSistema.slice(0, 5).map((punicao) =>
+                  <div key={punicao.id} className="rounded-lg border border-slate-200 p-3">
                           <p className="text-sm font-medium text-slate-800">{punicao.tipo_punicao || punicao.tipo || 'Punição'}</p>
                           <p className="text-xs text-slate-500">
                             Início: {formatDate(punicao.data_inicio_cumprimento || punicao.data_inicio)} ·
                             Término: {formatDate(punicao.data_fim_cumprimento || punicao.data_termino)}
                           </p>
                         </div>
-                      ))}
-                    </div>
                   )}
+                    </div>
+                }
                 </Section>
               </div>
             </TabsContent>
-          )}
+          }
 
           {/* Férias */}
           <TabsContent value="ferias">
@@ -650,16 +650,16 @@ export default function VerMilitar() {
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-slate-700">Períodos Aquisitivos e Férias</h3>
               </div>
-              {periodosSistema.length === 0 && feriasSistema.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+              {periodosSistema.length === 0 && feriasSistema.length === 0 ?
+              <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Calendar className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum registro de férias</p>
                   <p className="text-xs text-slate-400 mt-2">{mensagemRegistrosSistema}</p>
-                </div>
-              ) : (
-                <>
-                  {periodosSistema.filter(p => p.status !== 'Inativo').map(p => (
-                    <div key={p.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                </div> :
+
+              <>
+                  {periodosSistema.filter((p) => p.status !== 'Inativo').map((p) =>
+                <div key={p.id} className="bg-white rounded-xl border border-slate-200 p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold text-slate-800">{p.ano_referencia}</span>
                         <Badge className={p.status === 'Gozado' ? 'bg-green-100 text-green-700' : p.status === 'Vencido' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}>
@@ -669,17 +669,17 @@ export default function VerMilitar() {
                       <p className="text-xs text-slate-500">
                         {formatDate(p.inicio_aquisitivo)} a {formatDate(p.fim_aquisitivo)} · Limite: {formatDate(p.data_limite_gozo)} · {p.dias_gozados || 0}/{p.dias_direito || 30} dias gozados
                       </p>
-                      {feriasSistema.filter(f => f.periodo_aquisitivo_id === p.id).map(f => (
-                        <div key={f.id} className="mt-2 ml-4 p-2 bg-slate-50 rounded-lg text-xs">
+                      {feriasSistema.filter((f) => f.periodo_aquisitivo_id === p.id).map((f) =>
+                  <div key={f.id} className="mt-2 ml-4 p-2 bg-slate-50 rounded-lg text-xs">
                           <span className="font-medium">Fração: {f.dias} dias</span> — {formatDate(f.data_inicio)} a {formatDate(f.data_fim)}
                           {f.fracionamento && <span className="text-slate-500 ml-2">({f.fracionamento})</span>}
                           <Badge className="ml-2 text-xs" variant="outline">{f.status}</Badge>
                         </div>
-                      ))}
+                  )}
                     </div>
-                  ))}
+                )}
                 </>
-              )}
+              }
 
               <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
                 <div className="flex items-center justify-between">
@@ -693,10 +693,10 @@ export default function VerMilitar() {
                 </div>
 
                 <div className="space-y-2">
-                  {creditosExtraFerias.length === 0 ? (
-                    <p className="text-sm text-slate-500">Nenhum crédito extraordinário cadastrado.</p>
-                  ) : creditosExtraFerias.slice(0, 5).map((credito) => (
-                    <div key={credito.id} className="rounded-lg border border-slate-200 p-3 text-sm">
+                  {creditosExtraFerias.length === 0 ?
+                  <p className="text-sm text-slate-500">Nenhum crédito extraordinário cadastrado.</p> :
+                  creditosExtraFerias.slice(0, 5).map((credito) =>
+                  <div key={credito.id} className="rounded-lg border border-slate-200 p-3 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-slate-800">
                           {formatarTipoCreditoExtra(credito.tipo_credito)} · {credito.quantidade_dias}d
@@ -712,7 +712,7 @@ export default function VerMilitar() {
                         Gozo vinculado: {credito.gozo_ferias_id || 'Não vinculado'}
                       </p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
@@ -722,14 +722,14 @@ export default function VerMilitar() {
           <TabsContent value="atestados">
             <div className="space-y-3">
               <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
-              {atestadosSistema.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+              {atestadosSistema.length === 0 ?
+              <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum atestado registrado</p>
                   <p className="text-xs text-slate-400 mt-2">{mensagemRegistrosSistema}</p>
-                </div>
-              ) : atestadosSistema.map(a => (
-                <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                </div> :
+              atestadosSistema.map((a) =>
+              <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-medium text-slate-800">{a.tipo_afastamento}</span>
@@ -741,7 +741,7 @@ export default function VerMilitar() {
                     {formatDate(a.data_inicio)} — {a.dias} dias — Dr(a). {a.medico || '—'}
                   </p>
                 </div>
-              ))}
+              )}
             </div>
           </TabsContent>
 
@@ -767,73 +767,73 @@ export default function VerMilitar() {
                     {impedimentoAtivoGeral ? 'Ativo' : 'Inativo'}
                   </Badge>
                 </div>
-                {impedimentoAtivoGeral ? (
-                  <div className="space-y-2">
+                {impedimentoAtivoGeral ?
+                <div className="space-y-2">
                     <p className="text-xs text-slate-600">Início: {formatDate(impedimentoAtivoGeral.data_inicio) || '—'} · Fim: {formatDate(impedimentoAtivoGeral.data_fim) || '—'}</p>
                     <p className="text-xs text-slate-600">Motivo: {impedimentoAtivoGeral.motivo || '—'}</p>
                     <p className="text-xs text-slate-600">Observações: {impedimentoAtivoGeral.observacoes || '—'}</p>
                     <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!podeGerirImpedimentosMedalha || removerImpedimentoMutation.isPending}
-                      onClick={() => removerImpedimentoMutation.mutate(impedimentoAtivoGeral.id)}
-                    >
+                    size="sm"
+                    variant="outline"
+                    disabled={!podeGerirImpedimentosMedalha || removerImpedimentoMutation.isPending}
+                    onClick={() => removerImpedimentoMutation.mutate(impedimentoAtivoGeral.id)}>
+                    
                       Remover impedimento
                     </Button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  </div> :
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <Label>Data início</Label>
                       <Input
-                        type="date"
-                        value={impedimentoForm.data_inicio}
-                        onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, data_inicio: event.target.value }))}
-                      />
+                      type="date"
+                      value={impedimentoForm.data_inicio}
+                      onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, data_inicio: event.target.value }))} />
+                    
                     </div>
                     <div>
                       <Label>Data fim (opcional)</Label>
                       <Input
-                        type="date"
-                        value={impedimentoForm.data_fim}
-                        onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, data_fim: event.target.value }))}
-                      />
+                      type="date"
+                      value={impedimentoForm.data_fim}
+                      onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, data_fim: event.target.value }))} />
+                    
                     </div>
                     <div>
                       <Label>Motivo</Label>
                       <Input
-                        value={impedimentoForm.motivo}
-                        onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, motivo: event.target.value }))}
-                      />
+                      value={impedimentoForm.motivo}
+                      onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, motivo: event.target.value }))} />
+                    
                     </div>
                     <div>
                       <Label>Observações</Label>
                       <Input
-                        value={impedimentoForm.observacoes}
-                        onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, observacoes: event.target.value }))}
-                      />
+                      value={impedimentoForm.observacoes}
+                      onChange={(event) => setImpedimentoForm((atual) => ({ ...atual, observacoes: event.target.value }))} />
+                    
                     </div>
                     <div className="md:col-span-2">
                       <Button
-                        size="sm"
-                        className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
-                        disabled={!podeGerirImpedimentosMedalha || criarImpedimentoMutation.isPending || !impedimentoForm.motivo.trim()}
-                        onClick={() => criarImpedimentoMutation.mutate()}
-                      >
+                      size="sm"
+                      className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+                      disabled={!podeGerirImpedimentosMedalha || criarImpedimentoMutation.isPending || !impedimentoForm.motivo.trim()}
+                      onClick={() => criarImpedimentoMutation.mutate()}>
+                      
                         Ativar impedimento geral
                       </Button>
                     </div>
                   </div>
-                )}
+                }
               </div>
-              {medalhasConcedidasSistema.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+              {medalhasConcedidasSistema.length === 0 ?
+              <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Award className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhuma medalha registrada</p>
                   <p className="text-xs text-slate-400 mt-2">{mensagemRegistrosSistema}</p>
-                </div>
-              ) : medalhasConcedidasSistema.map(m => (
-                <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                </div> :
+              medalhasConcedidasSistema.map((m) =>
+              <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-800">{m.tipo_medalha_nome}</span>
                     <Badge className={medalhaStatusColor[m.status] || ''}>{m.status}</Badge>
@@ -843,7 +843,7 @@ export default function VerMilitar() {
                     {m.documento_referencia && ` · ${m.documento_referencia}`}
                   </p>
                 </div>
-              ))}
+              )}
             </div>
           </TabsContent>
 
@@ -851,14 +851,14 @@ export default function VerMilitar() {
           <TabsContent value="armamentos">
             <div className="space-y-3">
               <AvisoRegistrosSistema mensagemRegistrosSistema={mensagemRegistrosSistema} />
-              {armamentosSistema.length === 0 ? (
-                <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
+              {armamentosSistema.length === 0 ?
+              <div className="bg-white rounded-xl p-8 text-center border border-slate-200">
                   <Shield className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500">Nenhum armamento registrado</p>
                   <p className="text-xs text-slate-400 mt-2">{mensagemRegistrosSistema}</p>
-                </div>
-              ) : armamentosSistema.map(a => (
-                <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                </div> :
+              armamentosSistema.map((a) =>
+              <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-800">{a.tipo} — {a.marca || ''} {a.calibre}</span>
                     <Badge className={armStatusColor[a.status] || ''}>{a.status}</Badge>
@@ -868,20 +868,20 @@ export default function VerMilitar() {
                     {a.data_expedicao ? ` · Expedição: ${formatDate(a.data_expedicao)}` : ''}
                   </p>
                 </div>
-              ))}
+              )}
             </div>
           </TabsContent>
 
         </Tabs>
       </div>
 
-      {showSolicitacao && (
-        <SolicitarAtualizacaoModal
-          militar={militar}
-          onClose={() => setShowSolicitacao(false)}
-          onSaved={() => setShowSolicitacao(false)}
-        />
-      )}
-    </div>
-  );
+      {showSolicitacao &&
+      <SolicitarAtualizacaoModal
+        militar={militar}
+        onClose={() => setShowSolicitacao(false)}
+        onSaved={() => setShowSolicitacao(false)} />
+
+      }
+    </div>);
+
 }
