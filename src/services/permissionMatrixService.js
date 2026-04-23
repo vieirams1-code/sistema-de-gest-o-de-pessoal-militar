@@ -247,12 +247,17 @@ export const resolveUserPermissions = ({
     profileSource,
     fallbackSource: fallbackProfile,
   }).permissions;
+  const userExplicitMatrix = isObjectRecord(userSource?.matriz_permissoes_usuario)
+    ? sanitizePermissionsMatrix(userSource.matriz_permissoes_usuario)
+    : null;
   const userMatrixFromOverrides = extractUserMatrixFromOverrides(userSource?.permissoes_override);
   const hasUserLegacyMatrix = hasValidMatrixContent(userSource);
   const fallbackPermissions = buildPermissionsFromSource(fallbackProfile);
   const profilePermissionsWithFallback = buildPermissionsFromSource(profilePermissions, fallbackPermissions);
 
-  const userPermissions = userMatrixFromOverrides
+  const userPermissions = userExplicitMatrix
+    ? buildPermissionsFromSource(userExplicitMatrix, profilePermissionsWithFallback)
+    : userMatrixFromOverrides
     ? buildPermissionsFromSource(userMatrixFromOverrides, profilePermissionsWithFallback)
     : hasUserLegacyMatrix
       ? buildPermissionsFromSource(userSource, profilePermissionsWithFallback)
