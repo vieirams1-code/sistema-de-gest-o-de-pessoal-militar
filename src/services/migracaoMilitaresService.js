@@ -701,6 +701,91 @@ function normalizarDataCanonica(valor, erros) {
   return canonical;
 }
 
+function removerMensagensReavaliaveis(lista = [], termos = []) {
+  const termosNormalizados = termos.map((termo) => normalizarChave(termo));
+  return (lista || []).filter((mensagem) => {
+    const textoNormalizado = normalizarChave(mensagem);
+    return !termosNormalizados.some((termo) => textoNormalizado.includes(termo));
+  });
+}
+
+async function reavaliarCamposPreImportacao({ linhaAtual = {}, transformado = {} }) {
+  const erros = [];
+  const alertas = [];
+
+  if (!normalizarNomeEssencial(transformado.nome_completo)) {
+    erros.push('Nome completo obrigatório para importação.');
+  }
+
+  const nomeGuerra = normalizarNomeEssencial(transformado.nome_guerra);
+  if (transformado?.exigir_nome_guerra && !nomeGuerra) {
+    erros.push('Nome de guerra obrigatório para importação conforme regra do cadastro.');
+  }
+  if (nomeGuerra && nomeGuerra.length < 2) {
+    erros.push('Nome de guerra inválido. Informe ao menos 2 caracteres.');
+  }
+
+  const matriculaOriginal = limparTexto(transformado.matricula);
+  const matriculaNormalizada = normalizarMatricula(matriculaOriginal);
+  if (!matriculaNormalizada) {
+    erros.push('Matrícula ausente. Linha bloqueada para importação.');
+    transformado.matricula = '';
+  } else {
+    transformado.matricula = formatarMatriculaPadrao(matriculaNormalizada);
+    if (matriculaOriginal && matriculaOriginal !== transformado.matricula) {
+      alertas.push('Matrícula ajustada automaticamente para o padrão 000.000-000.');
+    }
+    try {
+      await validarMatriculaDisponivel(transformado.matricula);
+    } catch (error) {
+      erros.push(error?.message || 'Matrícula inválida para importação.');
+    }
+  }
+
+  const cpfDigits = somenteNumeros(transformado.cpf);
+  if (!cpfDigits) {
+    transformado.cpf = '';
+  } else if (!validarCPF(cpfDigits)) {
+    erros.push('CPF inválido para importação.');
+    transformado.cpf = '';
+  } else {
+    const cpfNorm = normalizarCpfIdentidade(cpfDigits);
+    transformado.cpf = `${cpfNorm.slice(0, 3)}.${cpfNorm.slice(3, 6)}.${cpfNorm.slice(6, 9)}-${cpfNorm.slice(9)}`;
+  }
+
+  transformado.data_inclusao = normalizarDataCanonica(transformado.data_inclusao, erros) || '';
+
+  const cpfAtual = transformado.cpf;
+  let duplicidadeForte = null;
+  if (cpfAtual || transformado.nome_completo) {
+    duplicidadeForte = await localizarDuplicidadeForte({
+      cpf: cpfAtual,
+      nomeCanonico: transformado.nome_completo,
+      dataNascimento: transformado.data_nascimento,
+    });
+    if (duplicidadeForte) {
+      alertas.push('Possível duplicidade identificada por CPF e/ou nome + data de nascimento. Encaminhar para revisão.');
+    }
+  }
+
+  const errosNormalizados = dedupeMensagens(erros);
+  const alertasNormalizados = dedupeMensagens(alertas);
+  const duplicadoMatricula = errosNormalizados.some((mensagem) => String(mensagem).toLowerCase().includes('matrícula já cadastrada'));
+  const status = definirStatusLinha(errosNormalizados, alertasNormalizados, duplicadoMatricula || Boolean(duplicidadeForte));
+
+  return {
+    linhaAtualizada: {
+      ...linhaAtual,
+      transformado,
+      erros: errosNormalizados,
+      alertas: alertasNormalizados,
+      status,
+    },
+    erros: errosNormalizados,
+    alertas: alertasNormalizados,
+  };
+}
+
 export async function corrigirLinhaPreImportacao({
   analise,
   linhaNumero,
@@ -719,18 +804,6 @@ export async function corrigirLinhaPreImportacao({
   const linhaAtual = analise.linhas[idxLinha];
   const transformadoBase = { ...(linhaAtual.transformado || {}) };
   const transformado = { ...transformadoBase };
-  const erros = (linhaAtual.erros || []).filter((mensagem) => (
-    !mensagem.includes('Nome completo')
-    && !mensagem.includes('Nome de guerra')
-    && !mensagem.includes('Matrícula')
-    && !mensagem.includes('CPF')
-    && !mensagem.includes('Data de inclusão')
-  ));
-  const alertas = (linhaAtual.alertas || []).filter((mensagem) => (
-    !mensagem.includes('Matrícula')
-    && !mensagem.includes('CPF')
-    && !mensagem.includes('Nome de guerra')
-  ));
   const alteracoes = [];
   const alteracoesDetalhadas = [];
 
@@ -748,7 +821,6 @@ export async function corrigirLinhaPreImportacao({
     const valorAnterior = transformado.nome_completo || '';
     const nomeCompleto = normalizarNomeEssencial(campos.nome_completo);
     transformado.nome_completo = nomeCompleto;
-    if (!nomeCompleto) erros.push('Nome completo obrigatório para importação.');
     registrarAlteracaoCampo('nome_completo', valorAnterior, nomeCompleto);
   }
 
@@ -756,80 +828,46 @@ export async function corrigirLinhaPreImportacao({
     const valorAnterior = transformado.nome_guerra || '';
     const nomeGuerra = normalizarNomeEssencial(campos.nome_guerra);
     transformado.nome_guerra = nomeGuerra;
-    if (transformado?.exigir_nome_guerra && !nomeGuerra) {
-      erros.push('Nome de guerra obrigatório para importação conforme regra do cadastro.');
-    }
-    if (nomeGuerra && nomeGuerra.length < 2) {
-      erros.push('Nome de guerra inválido. Informe ao menos 2 caracteres.');
-    }
     registrarAlteracaoCampo('nome_guerra', valorAnterior, nomeGuerra);
   }
 
   if (Object.prototype.hasOwnProperty.call(campos, 'matricula')) {
     const valorAnterior = transformado.matricula || '';
-    const matriculaDigitada = limparTexto(campos.matricula);
-    const matriculaNormalizada = normalizarMatricula(matriculaDigitada);
-    if (!matriculaNormalizada) {
-      erros.push('Matrícula ausente. Linha bloqueada para importação.');
-      transformado.matricula = '';
-    } else {
-      transformado.matricula = formatarMatriculaPadrao(matriculaNormalizada);
-      if (matriculaDigitada !== transformado.matricula) {
-        alertas.push('Matrícula ajustada automaticamente para o padrão 000.000-000.');
-      }
-      try {
-        await validarMatriculaDisponivel(transformado.matricula);
-      } catch (error) {
-        erros.push(error?.message || 'Matrícula inválida para importação.');
-      }
-    }
+    transformado.matricula = limparTexto(campos.matricula);
     registrarAlteracaoCampo('matricula', valorAnterior, transformado.matricula || '');
   }
 
   if (Object.prototype.hasOwnProperty.call(campos, 'cpf')) {
     const valorAnterior = transformado.cpf || '';
-    const cpfDigits = somenteNumeros(campos.cpf);
-    if (!cpfDigits) {
-      transformado.cpf = '';
-    } else if (!validarCPF(cpfDigits)) {
-      erros.push('CPF inválido para importação.');
-      transformado.cpf = '';
-    } else {
-      const cpfNorm = normalizarCpfIdentidade(cpfDigits);
-      transformado.cpf = `${cpfNorm.slice(0, 3)}.${cpfNorm.slice(3, 6)}.${cpfNorm.slice(6, 9)}-${cpfNorm.slice(9)}`;
-    }
+    transformado.cpf = limparTexto(campos.cpf);
     registrarAlteracaoCampo('cpf', valorAnterior, transformado.cpf || '');
   }
 
   if (Object.prototype.hasOwnProperty.call(campos, 'data_inclusao')) {
     const valorAnterior = transformado.data_inclusao || '';
-    const dataCanonica = normalizarDataCanonica(campos.data_inclusao, erros);
-    transformado.data_inclusao = dataCanonica || '';
+    transformado.data_inclusao = limparTexto(campos.data_inclusao);
     registrarAlteracaoCampo('data_inclusao', valorAnterior, transformado.data_inclusao || '');
   }
 
-  const cpfAtual = transformado.cpf;
-  if (cpfAtual || transformado.nome_completo) {
-    const duplicidadeForte = await localizarDuplicidadeForte({
-      cpf: cpfAtual,
-      nomeCanonico: transformado.nome_completo,
-      dataNascimento: transformado.data_nascimento,
-    });
-    if (duplicidadeForte) {
-      alertas.push('Possível duplicidade identificada por CPF e/ou nome + data de nascimento. Encaminhar para revisão.');
-    }
-  }
+  const { linhaAtualizada: linhaReavaliada } = await reavaliarCamposPreImportacao({
+    linhaAtual,
+    transformado,
+  });
 
-  const errosNormalizados = dedupeMensagens(erros);
-  const alertasNormalizados = dedupeMensagens(alertas);
-  const duplicadoMatricula = errosNormalizados.some((mensagem) => String(mensagem).toLowerCase().includes('matrícula já cadastrada'));
+  const errosPreservados = removerMensagensReavaliaveis(linhaAtual.erros, ['nome completo', 'nome de guerra', 'matricula', 'cpf', 'data de inclusao']);
+  const alertasPreservados = removerMensagensReavaliaveis(linhaAtual.alertas, ['nome de guerra', 'matricula', 'cpf', 'data de inclusao', 'duplicidade']);
+  const errosNormalizados = dedupeMensagens([...(errosPreservados || []), ...(linhaReavaliada.erros || [])]);
+  const alertasNormalizados = dedupeMensagens([...(alertasPreservados || []), ...(linhaReavaliada.alertas || [])]);
 
   const linhaAtualizada = {
-    ...linhaAtual,
-    transformado,
+    ...linhaReavaliada,
     erros: errosNormalizados,
     alertas: alertasNormalizados,
-    status: definirStatusLinha(errosNormalizados, alertasNormalizados, duplicadoMatricula),
+    status: definirStatusLinha(
+      errosNormalizados,
+      alertasNormalizados,
+      linhaReavaliada.status === STATUS_LINHA.DUPLICADO,
+    ),
     correcao_pre_importacao: {
       corrigido_por: usuario?.email || '',
       corrigido_por_nome: usuario?.full_name || usuario?.name || '',
