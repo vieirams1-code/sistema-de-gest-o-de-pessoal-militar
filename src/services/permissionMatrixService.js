@@ -223,17 +223,6 @@ export const buildPermissionPayload = (source = {}, { includeLegacy = true } = {
   return payload;
 };
 
-export const computePermissionOverrides = (effectivePermissions = {}, baseProfilePermissions = {}) => {
-  return canonicalPermissionKeys.reduce((acc, key) => {
-    const effective = toBooleanPermission(effectivePermissions[key]);
-    const base = toBooleanPermission(baseProfilePermissions[key]);
-    if (effective !== base) {
-      acc[key] = effective;
-    }
-    return acc;
-  }, {});
-};
-
 export const getPermissionMismatches = (expectedPermissions = {}, persistedSource = {}) => {
   const expected = buildPermissionsFromSource(expectedPermissions);
   const persisted = buildPermissionsFromSource(persistedSource);
@@ -253,23 +242,21 @@ export const resolveUserPermissions = ({
   userSource = {},
   profileSource = {},
   fallbackProfile = {},
-  fallbackUser = {},
 }) => {
   const profilePermissions = resolveProfilePermissions({
     profileSource,
     fallbackSource: fallbackProfile,
   }).permissions;
-
-  const fallbackGeneralPermissions = buildPermissionsFromSource(fallbackUser, fallbackProfile);
-  const profilePermissionsWithFallback = buildPermissionsFromSource(profilePermissions, fallbackGeneralPermissions);
-  const hasUserLegacyMatrix = hasValidMatrixContent(userSource);
   const userMatrixFromOverrides = extractUserMatrixFromOverrides(userSource?.permissoes_override);
-  const userLegacyPermissions = hasUserLegacyMatrix
-    ? buildPermissionsFromSource(userSource, profilePermissionsWithFallback)
-    : profilePermissionsWithFallback;
+  const hasUserLegacyMatrix = hasValidMatrixContent(userSource);
+  const fallbackPermissions = buildPermissionsFromSource(fallbackProfile);
+  const profilePermissionsWithFallback = buildPermissionsFromSource(profilePermissions, fallbackPermissions);
+
   const userPermissions = userMatrixFromOverrides
-    ? buildPermissionsFromSource(userMatrixFromOverrides, userLegacyPermissions)
-    : userLegacyPermissions;
+    ? buildPermissionsFromSource(userMatrixFromOverrides, profilePermissionsWithFallback)
+    : hasUserLegacyMatrix
+      ? buildPermissionsFromSource(userSource, profilePermissionsWithFallback)
+      : profilePermissionsWithFallback;
 
   return {
     permissions: userPermissions,
