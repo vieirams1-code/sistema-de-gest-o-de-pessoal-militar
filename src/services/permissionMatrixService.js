@@ -39,7 +39,7 @@ const aliasByCanonical = canonicalPermissionKeys.reduce((acc, key) => {
   return acc;
 }, {});
 
-const nestedMatrixKeys = [
+export const nestedMatrixKeys = [
   'matriz_permissoes',
   'permission_matrix',
   'permissions_matrix',
@@ -116,7 +116,10 @@ export const buildPermissionPayload = (source = {}) => {
     return acc;
   }, {});
 
-  payload.matriz_permissoes = normalized;
+  nestedMatrixKeys.forEach((matrixKey) => {
+    payload[matrixKey] = normalized;
+  });
+
   return payload;
 };
 
