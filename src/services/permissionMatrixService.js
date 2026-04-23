@@ -35,23 +35,64 @@ const aliasByCanonical = canonicalPermissionKeys.reduce((acc, key) => {
   return acc;
 }, {});
 
+const nestedMatrixKeys = [
+  'matriz_permissoes',
+  'permission_matrix',
+  'permissions_matrix',
+  'permissions',
+  'permissoes',
+];
+
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
-const getPermissionFromSource = (source = {}, key) => {
-  if (hasOwn(source, key)) return toBooleanPermission(source[key]);
+const collectPermissionSources = (source = {}) => {
+  const sources = [source];
+
+  nestedMatrixKeys.forEach((nestedKey) => {
+    const nested = source?.[nestedKey];
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      sources.push(nested);
+    }
+  });
+
+  return sources;
+};
+
+const getPermissionFromCandidate = (candidate = {}, key) => {
+  if (hasOwn(candidate, key)) return toBooleanPermission(candidate[key]);
 
   const aliases = aliasByCanonical[key] || [];
   for (const alias of aliases) {
-    if (hasOwn(source, alias)) return toBooleanPermission(source[alias]);
+    if (hasOwn(candidate, alias)) return toBooleanPermission(candidate[alias]);
+  }
+
+  return null;
+};
+
+const getPermissionFromSource = (source = {}, key) => {
+  const sources = collectPermissionSources(source);
+
+  for (const candidate of sources) {
+    const value = getPermissionFromCandidate(candidate, key);
+    if (value !== null) return value;
   }
 
   return false;
 };
 
+const hasPermissionInSource = (source = {}, key) => {
+  const aliases = aliasByCanonical[key] || [];
+
+  return collectPermissionSources(source).some((candidate) =>
+    hasOwn(candidate, key) || aliases.some((alias) => hasOwn(candidate, alias))
+  );
+};
+
 export const buildPermissionsFromSource = (source = {}, fallback = {}) => {
   return canonicalPermissionKeys.reduce((acc, key) => {
-    const hasPrimaryOrAlias = hasOwn(source, key) || (aliasByCanonical[key] || []).some((alias) => hasOwn(source, alias));
-    const value = hasPrimaryOrAlias ? getPermissionFromSource(source, key) : getPermissionFromSource(fallback, key);
+    const value = hasPermissionInSource(source, key)
+      ? getPermissionFromSource(source, key)
+      : getPermissionFromSource(fallback, key);
     acc[key] = toBooleanPermission(value);
     return acc;
   }, {});
@@ -60,7 +101,7 @@ export const buildPermissionsFromSource = (source = {}, fallback = {}) => {
 export const buildPermissionPayload = (source = {}) => {
   const normalized = buildPermissionsFromSource(source);
 
-  return canonicalPermissionKeys.reduce((acc, key) => {
+  const payload = canonicalPermissionKeys.reduce((acc, key) => {
     const value = normalized[key] === true;
     acc[key] = value;
 
@@ -70,6 +111,9 @@ export const buildPermissionPayload = (source = {}) => {
 
     return acc;
   }, {});
+
+  payload.matriz_permissoes = normalized;
+  return payload;
 };
 
 export const computePermissionOverrides = (effectivePermissions = {}, baseProfilePermissions = {}) => {
@@ -83,6 +127,13 @@ export const computePermissionOverrides = (effectivePermissions = {}, baseProfil
   }, {});
 };
 
+export const getPermissionMismatches = (expectedPermissions = {}, persistedSource = {}) => {
+  const expected = buildPermissionsFromSource(expectedPermissions);
+  const persisted = buildPermissionsFromSource(persistedSource);
+
+  return canonicalPermissionKeys.filter((key) => expected[key] !== persisted[key]);
+};
+
 export const mergeProfileAndUserPermissions = ({
   profilePermissions = {},
   userPermissions = {},
@@ -94,10 +145,10 @@ export const mergeProfileAndUserPermissions = ({
   const explicitOverrides = buildPermissionsFromSource(userOverrides);
 
   canonicalPermissionKeys.forEach((key) => {
-    const hasLegacyValue = hasOwn(userPermissions, key) || (aliasByCanonical[key] || []).some((alias) => hasOwn(userPermissions, alias));
+    const hasLegacyValue = hasPermissionInSource(userPermissions, key);
     if (hasLegacyValue) merged[key] = legacyUser[key];
 
-    const hasOverrideValue = hasOwn(userOverrides, key) || (aliasByCanonical[key] || []).some((alias) => hasOwn(userOverrides, alias));
+    const hasOverrideValue = hasPermissionInSource(userOverrides, key);
     if (hasOverrideValue) merged[key] = explicitOverrides[key];
   });
 

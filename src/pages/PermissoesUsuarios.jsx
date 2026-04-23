@@ -15,6 +15,7 @@ import {
   buildPermissionsFromSource,
   canonicalPermissionKeys,
   computePermissionOverrides,
+  getPermissionMismatches,
   mergeProfileAndUserPermissions,
 } from '@/services/permissionMatrixService';
 
@@ -233,6 +234,7 @@ export default function PermissoesUsuarios() {
         perfil_id: perfilSelected ? perfilSelected.id : '',
         perfil_nome: perfilSelected ? perfilSelected.nome_perfil : '',
         permissoes_override: permissionOverrides,
+        matriz_permissoes: normalizedPermissions,
         ...permissionPayload
       };
 
@@ -273,12 +275,17 @@ export default function PermissoesUsuarios() {
         userPermissions: reloadedRecord,
         userOverrides: reloadedRecord.permissoes_override || {},
       });
+      const reloadedMismatches = getPermissionMismatches(normalizedPermissions, reloadedPermissions);
+      if (reloadedMismatches.length > 0) {
+        throw new Error(`Falha ao persistir permissões: ${reloadedMismatches.join(', ')}`);
+      }
+
       setUserPermissions(reloadedPermissions);
       setSelectedUser(reloadedRecord);
 
       queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
-    } catch {
-      alert('Erro ao salvar permissão no Base44.');
+    } catch (error) {
+      alert(error?.message || 'Erro ao salvar permissão no Base44.');
     } finally {
       setSavingUser(false);
     }

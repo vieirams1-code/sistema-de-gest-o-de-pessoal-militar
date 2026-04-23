@@ -8,7 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
-import { buildPermissionPayload, buildPermissionsFromSource } from '@/services/permissionMatrixService';
+import {
+  buildPermissionPayload,
+  buildPermissionsFromSource,
+  getPermissionMismatches,
+} from '@/services/permissionMatrixService';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,19 +47,42 @@ export default function PerfisPermissao() {
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
   });
 
+  const ensurePersistedProfilePermissions = (expectedPermissions, persistedPerfil) => {
+    const mismatches = getPermissionMismatches(expectedPermissions, persistedPerfil || {});
+    if (mismatches.length > 0) {
+      throw new Error(`Falha de persistência de permissões: ${mismatches.join(', ')}`);
+    }
+  };
+
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.PerfilPermissao.create(data),
+    mutationFn: async (data) => {
+      const saved = await base44.entities.PerfilPermissao.create(data);
+      const reloaded = await base44.entities.PerfilPermissao.get(saved.id);
+      ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
+      return reloaded;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
       closeForm();
     },
+    onError: (error) => {
+      alert(error?.message || 'Erro ao salvar perfil de permissão.');
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.PerfilPermissao.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      await base44.entities.PerfilPermissao.update(id, data);
+      const reloaded = await base44.entities.PerfilPermissao.get(id);
+      ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
+      return reloaded;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
       closeForm();
+    },
+    onError: (error) => {
+      alert(error?.message || 'Erro ao atualizar perfil de permissão.');
     },
   });
 
@@ -108,9 +135,11 @@ export default function PerfisPermissao() {
       alert('Ação negada: você não tem permissão para salvar perfis de permissão.');
       return;
     }
+    const normalizedPermissions = buildPermissionsFromSource(formData);
     const payload = {
       ...formData,
-      ...buildPermissionPayload(formData),
+      ...buildPermissionPayload(normalizedPermissions),
+      matriz_permissoes: normalizedPermissions,
     };
 
     if (editingId) {
