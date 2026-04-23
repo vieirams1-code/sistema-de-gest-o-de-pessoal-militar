@@ -16,7 +16,8 @@ import {
   canonicalPermissionKeys,
   computePermissionOverrides,
   getPermissionMismatches,
-  mergeProfileAndUserPermissions,
+  resolveUserPermissionsWithSnapshots,
+  upsertUserSnapshot,
 } from '@/services/permissionMatrixService';
 
 const initialPermissions = canonicalPermissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {});
@@ -162,14 +163,22 @@ export default function PermissoesUsuarios() {
     const perfilId = fullAcesso.perfil_id || '';
     setSelectedProfileId(perfilId || '_nenhum');
     const perfilCompleto = await getProfileWithPermissions(perfilId);
-    setLoadedProfilePermissions(perfilCompleto ? buildPermissionsFromSource(perfilCompleto) : null);
-
-    const mergedPermissions = mergeProfileAndUserPermissions({
-      profilePermissions: perfilCompleto || {},
-      userPermissions: fullAcesso,
-      userOverrides: fullAcesso.permissoes_override || {},
+    const resolved = await resolveUserPermissionsWithSnapshots({
+      base44,
+      userSource: fullAcesso,
+      profileSource: perfilCompleto || {},
     });
-    setUserPermissions(mergedPermissions);
+    setLoadedProfilePermissions(resolved.profilePermissions || null);
+    setUserPermissions(resolved.permissions);
+
+    if (!resolved.userSnapshot && fullAcesso?.id) {
+      await upsertUserSnapshot({
+        base44,
+        usuarioAcessoId: fullAcesso.id,
+        userId: fullAcesso.user_id || fullAcesso.user_email || '',
+        matrizPermissoes: resolved.permissions,
+      });
+    }
     setActiveEditTab('dados');
   };
 
@@ -269,12 +278,20 @@ export default function PermissoesUsuarios() {
         ? await base44.entities.UsuarioAcesso.create(dataToSave)
         : await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
 
-      const reloadedRecord = await base44.entities.UsuarioAcesso.get(savedRecord.id || selectedUser.id);
-      const reloadedPermissions = mergeProfileAndUserPermissions({
-        profilePermissions,
-        userPermissions: reloadedRecord,
-        userOverrides: reloadedRecord.permissoes_override || {},
+      const resolvedRecordId = savedRecord.id || selectedUser.id;
+      await upsertUserSnapshot({
+        base44,
+        usuarioAcessoId: resolvedRecordId,
+        userId: dataToSave.user_id || dataToSave.user_email || '',
+        matrizPermissoes: normalizedPermissions,
       });
+      const reloadedRecord = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
+      const reloadedResolved = await resolveUserPermissionsWithSnapshots({
+        base44,
+        userSource: reloadedRecord,
+        profileSource: perfilSelected || {},
+      });
+      const reloadedPermissions = reloadedResolved.permissions;
       const reloadedMismatches = getPermissionMismatches(normalizedPermissions, reloadedPermissions);
       if (reloadedMismatches.length > 0) {
         throw new Error(`Falha ao persistir permissões: ${reloadedMismatches.join(', ')}`);

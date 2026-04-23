@@ -12,6 +12,8 @@ import {
   buildPermissionPayload,
   buildPermissionsFromSource,
   getPermissionMismatches,
+  resolveProfilePermissionsWithSnapshot,
+  upsertProfileSnapshot,
 } from '@/services/permissionMatrixService';
 import {
   AlertDialog,
@@ -47,8 +49,12 @@ export default function PerfisPermissao() {
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
   });
 
-  const ensurePersistedProfilePermissions = (expectedPermissions, persistedPerfil) => {
-    const mismatches = getPermissionMismatches(expectedPermissions, persistedPerfil || {});
+  const ensurePersistedProfilePermissions = async (expectedPermissions, persistedPerfil) => {
+    const { permissions: persistedResolved } = await resolveProfilePermissionsWithSnapshot({
+      base44,
+      profileSource: persistedPerfil || {},
+    });
+    const mismatches = getPermissionMismatches(expectedPermissions, persistedResolved || {});
     if (mismatches.length > 0) {
       throw new Error(`Falha de persistência de permissões: ${mismatches.join(', ')}`);
     }
@@ -57,8 +63,14 @@ export default function PerfisPermissao() {
   const createMutation = useMutation({
     mutationFn: async (data) => {
       const saved = await base44.entities.PerfilPermissao.create(data);
+      await upsertProfileSnapshot({
+        base44,
+        perfilId: saved.id,
+        matrizPermissoes: data.matriz_permissoes || data,
+        updatedBy: data.updated_by || '',
+      });
       const reloaded = await base44.entities.PerfilPermissao.get(saved.id);
-      ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
+      await ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
       return reloaded;
     },
     onSuccess: () => {
@@ -73,8 +85,14 @@ export default function PerfisPermissao() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       await base44.entities.PerfilPermissao.update(id, data);
+      await upsertProfileSnapshot({
+        base44,
+        perfilId: id,
+        matrizPermissoes: data.matriz_permissoes || data,
+        updatedBy: data.updated_by || '',
+      });
       const reloaded = await base44.entities.PerfilPermissao.get(id);
-      ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
+      await ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
       return reloaded;
     },
     onSuccess: () => {
@@ -113,11 +131,23 @@ export default function PerfisPermissao() {
       // fallback para registro parcial da listagem
     }
 
+    const { permissions: resolvedPermissions, snapshot } = await resolveProfilePermissionsWithSnapshot({
+      base44,
+      profileSource: fullPerfil,
+    });
+    if (!snapshot && fullPerfil?.id) {
+      await upsertProfileSnapshot({
+        base44,
+        perfilId: fullPerfil.id,
+        matrizPermissoes: resolvedPermissions,
+      });
+    }
+
     setFormData({
       nome_perfil: fullPerfil.nome_perfil || '',
       descricao: fullPerfil.descricao || '',
       ativo: fullPerfil.ativo !== false,
-      ...buildPermissionsFromSource(fullPerfil)
+      ...buildPermissionsFromSource(resolvedPermissions)
     });
     setEditingId(fullPerfil.id);
     setShowForm(true);

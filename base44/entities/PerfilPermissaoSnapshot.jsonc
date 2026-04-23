@@ -1,0 +1,11 @@
+{
+  "name": "PerfilPermissaoSnapshot",
+  "type": "object",
+  "properties": {
+    "perfil_id": { "type": "string", "description": "ID do PerfilPermissao vinculado" },
+    "matriz_permissoes": { "type": "object", "description": "Matriz canônica de permissões normalizada" },
+    "versao": { "type": "number", "default": 1, "description": "Versão do schema do snapshot" },
+    "updated_by": { "type": "string", "description": "Identificador do operador que atualizou" },
+    "updated_at": { "type": "datetime", "description": "Timestamp ISO da atualização do snapshot" }
+  }
+}
