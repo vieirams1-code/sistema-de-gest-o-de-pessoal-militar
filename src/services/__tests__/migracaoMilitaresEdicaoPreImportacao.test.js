@@ -95,6 +95,8 @@ test('permite edição pré-importação dos 5 campos e reclassifica status', as
   assert.equal(linhaAtualizada.transformado.data_inclusao, '2020-01-10');
   assert.equal(linhaAtualizada.status, 'APTO');
   assert.equal(analiseAtualizada.resumo.total_aptas, 1);
+  assert.deepEqual(linhaAtualizada.correcao_pre_importacao.campos_alterados.sort(), ['cpf', 'data_inclusao', 'matricula', 'nome_completo', 'nome_guerra'].sort());
+  assert.equal(linhaAtualizada.correcao_pre_importacao.alteracoes_detalhadas.length, 5);
 });
 
 test('aplica validações de matrícula, CPF e data de inclusão na correção', async () => {
@@ -150,6 +152,16 @@ test('persiste correção no histórico e restaura após recarregar', async () =
   const restaurado = await carregarAnaliseHistorico(historico.id);
   assert.equal(restaurado.linhas[0].transformado.nome_completo, 'Maria Souza');
   assert.match(ImportacaoMilitares._rows[0].observacoes, /Correção pré-importação linha 2/);
+
+  await persistirCorrecaoPreImportacaoHistorico({
+    historicoId: historico.id,
+    analise: analiseAtualizada,
+    usuario,
+    linhaNumero: 2,
+    alteracoes: ['nome_guerra'],
+  });
+  const trilhas = String(ImportacaoMilitares._rows[0].observacoes || '').split('\n').filter(Boolean);
+  assert.equal(trilhas.length, 2);
 });
 
 test('importação final utiliza dados corrigidos', async () => {

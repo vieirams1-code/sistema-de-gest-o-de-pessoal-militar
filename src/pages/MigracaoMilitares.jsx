@@ -171,9 +171,19 @@ export default function MigracaoMilitares() {
       });
       setAnalise(analiseAtualizada);
       setLinhaSelecionada(linhaAtualizada);
-      if (historicoId) {
+      let historicoIdAtual = historicoId;
+      if (!historicoIdAtual) {
+        const historicoCriado = await salvarAnaliseHistorico(analiseAtualizada, usuario);
+        historicoIdAtual = historicoCriado?.id || null;
+        if (historicoIdAtual) {
+          setHistoricoId(historicoIdAtual);
+          sessionStorage.setItem(STORAGE_KEY, historicoIdAtual);
+        }
+      }
+
+      if (historicoIdAtual) {
         await persistirCorrecaoPreImportacaoHistorico({
-          historicoId,
+          historicoId: historicoIdAtual,
           analise: analiseAtualizada,
           usuario,
           linhaNumero,
