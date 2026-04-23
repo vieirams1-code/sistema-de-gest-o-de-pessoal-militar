@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Database, Download, RefreshCcw, ShieldAlert, Search } from 'lucide-react';
+import { Database, Download, RefreshCcw, Search, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { useToast } from '@/components/ui/use-toast';
@@ -30,6 +31,14 @@ const filtros = [
   { id: 'ERRO', label: 'Erros' },
 ];
 
+const filtrosDestino = [
+  { id: 'TODOS', label: 'Todos os destinos' },
+  { id: 'IMPORTAR', label: 'IMPORTAR' },
+  { id: 'PENDENTE_CLASSIFICACAO', label: 'PENDENTE_CLASSIFICACAO' },
+  { id: 'IGNORAR', label: 'IGNORAR' },
+  { id: 'EXCLUIDO_DO_LOTE', label: 'EXCLUIDO_DO_LOTE' },
+];
+
 function filtrarBusca(linha, termo) {
   if (!termo) return true;
   const alvo = [
@@ -54,6 +63,7 @@ export default function MigracaoAlteracoesLegado() {
   const [historicoDisponivel, setHistoricoDisponivel] = useState(true);
   const [carregando, setCarregando] = useState(false);
   const [filtro, setFiltro] = useState('TODOS');
+  const [filtroDestino, setFiltroDestino] = useState('TODOS');
   const [busca, setBusca] = useState('');
   const [avisoHistorico, setAvisoHistorico] = useState('');
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
@@ -63,9 +73,11 @@ export default function MigracaoAlteracoesLegado() {
     if (!analise) return [];
     return analise.linhas.filter((linha) => {
       const statusValido = filtro === 'TODOS' ? true : linha.status === filtro;
-      return statusValido && filtrarBusca(linha, busca.trim());
+      const destinoLinha = linha.transformado?.destino_final || 'IMPORTAR';
+      const destinoValido = filtroDestino === 'TODOS' ? true : destinoLinha === filtroDestino;
+      return statusValido && destinoValido && filtrarBusca(linha, busca.trim());
     });
-  }, [analise, filtro, busca]);
+  }, [analise, filtro, filtroDestino, busca]);
 
   const podeImportar = !!analise && !carregando;
 
@@ -163,7 +175,6 @@ export default function MigracaoAlteracoesLegado() {
     setAnalise(proxima);
   };
 
-
   const handleAjusteDestinoFinal = (linha, destinoFinal) => {
     if (!analise) return;
     const proxima = atualizarDestinoLinhaAnalise(analise, linha.linhaNumero, destinoFinal);
@@ -184,6 +195,7 @@ export default function MigracaoAlteracoesLegado() {
     setResultadoImportacao(null);
     setBusca('');
     setFiltro('TODOS');
+    setFiltroDestino('TODOS');
   };
 
   if (isLoading || !isAccessResolved) return null;
@@ -198,7 +210,7 @@ export default function MigracaoAlteracoesLegado() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-[#1e3a5f]">Migração de Alterações Legado</h1>
-            <p className="text-sm text-slate-500">Módulo administrativo para análise e importação de publicações históricas para PublicacaoExOfficio.</p>
+            <p className="text-sm text-slate-500">Tela administrativa para revisar, classificar e importar alterações legadas no padrão do SGP Militar.</p>
           </div>
         </div>
 
@@ -223,15 +235,8 @@ export default function MigracaoAlteracoesLegado() {
           <div className="space-y-4">
             <ResumoMigracaoAlteracoesLegadoCards resumo={analise.resumo} />
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {filtros.map((item) => (
-                  <Button key={item.id} size="sm" variant={filtro === item.id ? 'default' : 'outline'} onClick={() => setFiltro(item.id)}>
-                    {item.label}
-                  </Button>
-                ))}
-              </div>
-              <div className="relative md:max-w-md">
+            <div className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-1 lg:grid-cols-[1.3fr,220px,240px,auto] gap-3 items-end">
+              <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <Input
                   placeholder="Buscar por militar, matrícula, matéria, nota ou BG"
@@ -240,6 +245,38 @@ export default function MigracaoAlteracoesLegado() {
                   className="pl-9"
                 />
               </div>
+
+              <div>
+                <p className="text-xs text-slate-500 mb-1">Status</p>
+                <Select value={filtro} onValueChange={setFiltro}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrar status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filtros.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 mb-1">Destino final</p>
+                <Select value={filtroDestino} onValueChange={setFiltroDestino}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrar destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filtrosDestino.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button variant="outline" onClick={() => setAnalise((valorAtual) => ({ ...valorAtual }))}>
+                <RefreshCcw className="w-4 h-4 mr-2" /> Atualizar
+              </Button>
             </div>
 
             {!historicoDisponivel && (
