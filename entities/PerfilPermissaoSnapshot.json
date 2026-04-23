@@ -1,0 +1,13 @@
+{
+  "name": "PerfilPermissaoSnapshot",
+  "type": "object",
+  "title": "Snapshot de Permissões de Perfil",
+  "description": "Armazena matriz canônica de permissões por perfil para evitar dependência de campos nativos instáveis.",
+  "properties": {
+    "perfil_id": { "type": "string", "default": "" },
+    "matriz_permissoes": { "type": "object", "default": {} },
+    "versao": { "type": "number", "default": 1 },
+    "updated_by": { "type": "string", "default": "" },
+    "updated_at": { "type": "datetime", "default": "" }
+  }
+}

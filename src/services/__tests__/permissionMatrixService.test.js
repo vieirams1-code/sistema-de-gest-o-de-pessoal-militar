@@ -6,8 +6,14 @@ import {
   buildPermissionsFromSource,
   computePermissionOverrides,
   getPermissionMismatches,
+  getProfileSnapshot,
+  getUserSnapshot,
   mergeProfileAndUserPermissions,
   nestedMatrixKeys,
+  resolveProfilePermissionsWithSnapshot,
+  resolveUserPermissionsWithSnapshots,
+  upsertProfileSnapshot,
+  upsertUserSnapshot,
 } from '../permissionMatrixService.js';
 
 test('normaliza chaves granulares de medalhas com e sem prefixo perm_', () => {
@@ -134,4 +140,123 @@ test('detecta divergências entre esperado e recarregado usando fonte aninhada',
   );
 
   assert.deepEqual(mismatches, ['acesso_folha_alteracoes']);
+});
+
+const createMockBase44 = () => {
+  const profileSnapshots = [];
+  const userSnapshots = [];
+  let idCounter = 1;
+
+  const createEntityApi = (store) => ({
+    async filter(where = {}) {
+      return store.filter((item) => Object.entries(where).every(([key, value]) => item[key] === value));
+    },
+    async create(payload) {
+      const item = { id: `snap_${idCounter++}`, ...payload };
+      store.push(item);
+      return item;
+    },
+    async update(id, payload) {
+      const idx = store.findIndex((item) => item.id === id);
+      if (idx < 0) throw new Error('snapshot not found');
+      store[idx] = { ...store[idx], ...payload };
+      return store[idx];
+    },
+  });
+
+  return {
+    entities: {
+      PerfilPermissaoSnapshot: createEntityApi(profileSnapshots),
+      UsuarioPermissaoSnapshot: createEntityApi(userSnapshots),
+    },
+  };
+};
+
+test('cria e lê snapshot de perfil como fonte prioritária', async () => {
+  const base44 = createMockBase44();
+  await upsertProfileSnapshot({
+    base44,
+    perfilId: 'perfil_1',
+    matrizPermissoes: { acesso_folha_alteracoes: true, perm_indicar_medalhas: true },
+    updatedBy: 'tester',
+  });
+
+  const snap = await getProfileSnapshot(base44, 'perfil_1');
+  assert.equal(snap.perfil_id, 'perfil_1');
+
+  const resolved = await resolveProfilePermissionsWithSnapshot({
+    base44,
+    profileSource: { id: 'perfil_1', acesso_folha_alteracoes: false, perm_indicar_medalhas: false },
+  });
+
+  assert.equal(resolved.permissions.acesso_folha_alteracoes, true);
+  assert.equal(resolved.permissions.perm_indicar_medalhas, true);
+});
+
+test('save mantém snapshot como fonte de verdade para chaves instáveis', async () => {
+  const base44 = createMockBase44();
+  await upsertUserSnapshot({
+    base44,
+    usuarioAcessoId: 'ua_1',
+    userId: 'militar@pm.rj',
+    matrizPermissoes: {
+      acesso_folha_alteracoes: true,
+      perm_indicar_medalhas: true,
+      perm_conceder_medalhas: true,
+      perm_resetar_indicacoes_medalhas: true,
+      perm_gerir_impedimentos_medalha: true,
+      perm_gerir_dom_pedro_ii: true,
+      perm_exportar_medalhas: true,
+      perm_reset_operacional: true,
+    },
+  });
+
+  const resolved = await resolveUserPermissionsWithSnapshots({
+    base44,
+    userSource: { id: 'ua_1', acesso_folha_alteracoes: false },
+    profileSource: {},
+  });
+
+  assert.equal(resolved.permissions.acesso_folha_alteracoes, true);
+  assert.equal(resolved.permissions.perm_indicar_medalhas, true);
+  assert.equal(resolved.permissions.perm_conceder_medalhas, true);
+  assert.equal(resolved.permissions.perm_resetar_indicacoes_medalhas, true);
+  assert.equal(resolved.permissions.perm_gerir_impedimentos_medalha, true);
+  assert.equal(resolved.permissions.perm_gerir_dom_pedro_ii, true);
+  assert.equal(resolved.permissions.perm_exportar_medalhas, true);
+  assert.equal(resolved.permissions.perm_reset_operacional, true);
+});
+
+test('merge perfil + usuário via snapshot respeita prioridade usuário > perfil > fallback', async () => {
+  const base44 = createMockBase44();
+  await upsertProfileSnapshot({
+    base44,
+    perfilId: 'perfil_2',
+    matrizPermissoes: {
+      acesso_folha_alteracoes: true,
+      perm_indicar_medalhas: false,
+      perm_exportar_medalhas: false,
+    },
+  });
+  await upsertUserSnapshot({
+    base44,
+    usuarioAcessoId: 'ua_2',
+    userId: 'user_2',
+    matrizPermissoes: {
+      perm_indicar_medalhas: true,
+    },
+  });
+
+  const merged = await resolveUserPermissionsWithSnapshots({
+    base44,
+    userSource: { id: 'ua_2', user_id: 'user_2', perm_indicar_medalhas: false, perm_exportar_medalhas: true },
+    profileSource: { id: 'perfil_2' },
+  });
+
+  assert.equal(merged.permissions.perm_indicar_medalhas, true);
+  assert.equal(merged.permissions.acesso_folha_alteracoes, false);
+  assert.equal(merged.permissions.perm_exportar_medalhas, false);
+
+  const snapByUser = await getUserSnapshot(base44, 'ua_2', 'user_2');
+  assert.equal(snapByUser.usuario_acesso_id, 'ua_2');
 });

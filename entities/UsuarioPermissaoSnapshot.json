@@ -1,0 +1,14 @@
+{
+  "name": "UsuarioPermissaoSnapshot",
+  "type": "object",
+  "title": "Snapshot de Permissões de Usuário",
+  "description": "Armazena matriz canônica efetiva de permissões por usuário para reduzir acoplamento ao contrato nativo do Base44.",
+  "properties": {
+    "usuario_acesso_id": { "type": "string", "default": "" },
+    "user_id": { "type": "string", "default": "" },
+    "matriz_permissoes": { "type": "object", "default": {} },
+    "versao": { "type": "number", "default": 1 },
+    "updated_by": { "type": "string", "default": "" },
+    "updated_at": { "type": "datetime", "default": "" }
+  }
+}

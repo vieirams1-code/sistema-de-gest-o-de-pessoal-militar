@@ -46,6 +46,10 @@ export const nestedMatrixKeys = [
   'permissoes',
 ];
 
+export const SNAPSHOT_VERSION = 1;
+export const SNAPSHOT_PROFILE_ENTITY = 'PerfilPermissaoSnapshot';
+export const SNAPSHOT_USER_ENTITY = 'UsuarioPermissaoSnapshot';
+
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
 const isObjectRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -166,4 +170,161 @@ export const mergeProfileAndUserPermissions = ({
   });
 
   return merged;
+};
+
+const parseSnapshotMatrix = (snapshot) => {
+  if (!snapshot) return {};
+  const matrix = snapshot.matriz_permissoes;
+  if (isObjectRecord(matrix)) return matrix;
+
+  if (typeof matrix === 'string') {
+    try {
+      const parsed = JSON.parse(matrix);
+      return isObjectRecord(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  return {};
+};
+
+const getSnapshotEntity = (base44, entityName) => base44?.entities?.[entityName] || null;
+
+const findLatestSnapshot = (records = []) => {
+  if (!Array.isArray(records) || records.length === 0) return null;
+  return [...records].sort((a, b) => {
+    const aUpdated = new Date(a?.updated_at || a?.updatedAt || a?.created_at || 0).getTime();
+    const bUpdated = new Date(b?.updated_at || b?.updatedAt || b?.created_at || 0).getTime();
+    return bUpdated - aUpdated;
+  })[0];
+};
+
+export const getProfileSnapshot = async (base44, perfilId) => {
+  if (!perfilId) return null;
+  const entity = getSnapshotEntity(base44, SNAPSHOT_PROFILE_ENTITY);
+  if (!entity?.filter) return null;
+  const records = await entity.filter({ perfil_id: perfilId });
+  return findLatestSnapshot(records);
+};
+
+export const getUserSnapshot = async (base44, usuarioAcessoId, userId = null) => {
+  const entity = getSnapshotEntity(base44, SNAPSHOT_USER_ENTITY);
+  if (!entity?.filter) return null;
+
+  if (usuarioAcessoId) {
+    const byAcesso = await entity.filter({ usuario_acesso_id: usuarioAcessoId });
+    const found = findLatestSnapshot(byAcesso);
+    if (found) return found;
+  }
+
+  if (userId) {
+    const byUser = await entity.filter({ user_id: userId });
+    return findLatestSnapshot(byUser);
+  }
+
+  return null;
+};
+
+export const resolveProfilePermissionsWithSnapshot = async ({
+  base44,
+  profileSource = {},
+  fallbackSource = {},
+}) => {
+  const snapshot = await getProfileSnapshot(base44, profileSource?.id);
+  const snapshotPermissions = buildPermissionsFromSource(parseSnapshotMatrix(snapshot));
+  const legacyPermissions = buildPermissionsFromSource(profileSource, fallbackSource);
+  return {
+    permissions: snapshot ? snapshotPermissions : legacyPermissions,
+    snapshot,
+  };
+};
+
+export const resolveUserPermissionsWithSnapshots = async ({
+  base44,
+  userSource = {},
+  profileSource = {},
+  fallbackProfile = {},
+  fallbackUser = {},
+}) => {
+  const [profileSnapshot, userSnapshot] = await Promise.all([
+    getProfileSnapshot(base44, profileSource?.id),
+    getUserSnapshot(base44, userSource?.id, userSource?.user_id || userSource?.user_email || null),
+  ]);
+
+  const profileFromSnapshot = buildPermissionsFromSource(parseSnapshotMatrix(profileSnapshot));
+  const profileLegacy = buildPermissionsFromSource(profileSource, fallbackProfile);
+  const profilePermissions = profileSnapshot ? profileFromSnapshot : profileLegacy;
+
+  if (userSnapshot) {
+    return {
+      permissions: buildPermissionsFromSource(parseSnapshotMatrix(userSnapshot)),
+      profilePermissions,
+      userSnapshot,
+      profileSnapshot,
+    };
+  }
+
+  return {
+    permissions: mergeProfileAndUserPermissions({
+      profilePermissions,
+      userPermissions: userSource,
+      userOverrides: userSource?.permissoes_override || fallbackUser || {},
+    }),
+    profilePermissions,
+    userSnapshot: null,
+    profileSnapshot,
+  };
+};
+
+const serializeMatrix = (normalizedPermissions = {}) => ({ ...buildPermissionsFromSource(normalizedPermissions) });
+
+export const upsertProfileSnapshot = async ({
+  base44,
+  perfilId,
+  matrizPermissoes,
+  updatedBy = '',
+  versao = SNAPSHOT_VERSION,
+}) => {
+  const entity = getSnapshotEntity(base44, SNAPSHOT_PROFILE_ENTITY);
+  if (!entity || !perfilId) return null;
+
+  const payload = {
+    perfil_id: perfilId,
+    matriz_permissoes: serializeMatrix(matrizPermissoes),
+    versao,
+    updated_by: updatedBy || '',
+    updated_at: new Date().toISOString(),
+  };
+
+  const current = await getProfileSnapshot(base44, perfilId);
+  if (current?.id && entity.update) return entity.update(current.id, payload);
+  if (entity.create) return entity.create(payload);
+  return null;
+};
+
+export const upsertUserSnapshot = async ({
+  base44,
+  usuarioAcessoId,
+  userId = '',
+  matrizPermissoes,
+  updatedBy = '',
+  versao = SNAPSHOT_VERSION,
+}) => {
+  const entity = getSnapshotEntity(base44, SNAPSHOT_USER_ENTITY);
+  if (!entity || (!usuarioAcessoId && !userId)) return null;
+
+  const payload = {
+    usuario_acesso_id: usuarioAcessoId || '',
+    user_id: userId || '',
+    matriz_permissoes: serializeMatrix(matrizPermissoes),
+    versao,
+    updated_by: updatedBy || '',
+    updated_at: new Date().toISOString(),
+  };
+
+  const current = await getUserSnapshot(base44, usuarioAcessoId, userId);
+  if (current?.id && entity.update) return entity.update(current.id, payload);
+  if (entity.create) return entity.create(payload);
+  return null;
 };

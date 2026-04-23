@@ -1,0 +1,12 @@
+{
+  "name": "UsuarioPermissaoSnapshot",
+  "type": "object",
+  "properties": {
+    "usuario_acesso_id": { "type": "string", "description": "ID do UsuarioAcesso vinculado" },
+    "user_id": { "type": "string", "description": "ID ou e-mail canônico do usuário" },
+    "matriz_permissoes": { "type": "object", "description": "Matriz canônica efetiva de permissões" },
+    "versao": { "type": "number", "default": 1, "description": "Versão do schema do snapshot" },
+    "updated_by": { "type": "string", "description": "Identificador do operador que atualizou" },
+    "updated_at": { "type": "datetime", "description": "Timestamp ISO da atualização do snapshot" }
+  }
+}

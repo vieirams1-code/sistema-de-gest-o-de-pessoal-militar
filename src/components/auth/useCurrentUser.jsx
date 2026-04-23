@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { buildPermissionsFromSource, mergeProfileAndUserPermissions } from '@/services/permissionMatrixService';
+import {
+  buildPermissionsFromSource,
+  resolveUserPermissionsWithSnapshots,
+  upsertUserSnapshot,
+} from '@/services/permissionMatrixService';
 
 const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
@@ -92,13 +96,31 @@ export function useCurrentUser() {
     staleTime: 60 * 1000,
   });
 
-  const resolvedPermissionMatrix = acesso
-    ? mergeProfileAndUserPermissions({
-      profilePermissions: perfilAcesso || {},
-      userPermissions: acesso,
-      userOverrides: acesso.permissoes_override || {},
-    })
-    : {};
+  const { data: resolvedPermissionsData } = useQuery({
+    queryKey: ['resolvedPermissions', acesso?.id, perfilAcesso?.id],
+    enabled: !!acesso,
+    queryFn: async () => {
+      const resolved = await resolveUserPermissionsWithSnapshots({
+        base44,
+        userSource: acesso,
+        profileSource: perfilAcesso || {},
+      });
+
+      if (!resolved.userSnapshot && acesso?.id) {
+        await upsertUserSnapshot({
+          base44,
+          usuarioAcessoId: acesso.id,
+          userId: acesso.user_id || acesso.user_email || '',
+          matrizPermissoes: resolved.permissions,
+        });
+      }
+
+      return resolved;
+    },
+    staleTime: 0,
+  });
+
+  const resolvedPermissionMatrix = resolvedPermissionsData?.permissions || {};
   const normalizedResolvedPermissions = buildPermissionsFromSource(resolvedPermissionMatrix);
   const resolvedTipoAcesso = normalizeAccessMode(acesso?.tipo_acesso) || 'proprio';
   const isSelfRestrictedScope = resolvedTipoAcesso === 'proprio';
