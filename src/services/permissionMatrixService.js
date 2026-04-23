@@ -242,6 +242,7 @@ export const resolveUserPermissions = ({
   userSource = {},
   profileSource = {},
   fallbackProfile = {},
+  preferProfilePermissions = false,
 }) => {
   const profilePermissions = resolveProfilePermissions({
     profileSource,
@@ -254,6 +255,14 @@ export const resolveUserPermissions = ({
   const hasUserLegacyMatrix = hasValidMatrixContent(userSource);
   const fallbackPermissions = buildPermissionsFromSource(fallbackProfile);
   const profilePermissionsWithFallback = buildPermissionsFromSource(profilePermissions, fallbackPermissions);
+
+  if (preferProfilePermissions) {
+    return {
+      permissions: profilePermissionsWithFallback,
+      profilePermissions,
+      source: 'perfil',
+    };
+  }
 
   const userPermissions = userExplicitMatrix
     ? buildPermissionsFromSource(userExplicitMatrix, profilePermissionsWithFallback)
