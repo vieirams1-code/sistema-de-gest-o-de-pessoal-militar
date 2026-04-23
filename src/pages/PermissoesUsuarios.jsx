@@ -55,6 +55,7 @@ export default function PermissoesUsuarios() {
   const [selectedCategory, setSelectedCategory] = useState(permissionStructure[0]?.category || '');
   const [activeEditTab, setActiveEditTab] = useState('dados');
   const [loadedProfilePermissions, setLoadedProfilePermissions] = useState(null);
+  const [selectedProfileSource, setSelectedProfileSource] = useState(null);
 
 
   // Queries — só executam após resolução do acesso e confirmação de permissão
@@ -85,9 +86,9 @@ export default function PermissoesUsuarios() {
   }, [selectedProfileId, perfis]);
   const previewProfilePermissions = useMemo(() => {
     if (!selectedProfilePreview) return null;
-    if (loadedProfilePermissions) return loadedProfilePermissions;
-    return resolveProfilePermissions({ profileSource: selectedProfilePreview }).permissions;
-  }, [selectedProfilePreview, loadedProfilePermissions]);
+    const profileSource = selectedProfileSource || selectedProfilePreview;
+    return resolveProfilePermissions({ profileSource }).permissions;
+  }, [selectedProfilePreview, selectedProfileSource]);
 
   const grupamentos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Grupamento'), [subgrupamentos]);
   const subgrupamentosFilhos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId), [subgrupamentos, userGrupamentoId]);
@@ -168,9 +169,11 @@ export default function PermissoesUsuarios() {
     const perfilId = fullAcesso.perfil_id || '';
     setSelectedProfileId(perfilId || '_nenhum');
     const perfilCompleto = await getProfileWithPermissions(perfilId);
+    const profileSource = perfilCompleto || null;
+    setSelectedProfileSource(profileSource);
     const resolved = await resolveUserPermissions({
       userSource: fullAcesso,
-      profileSource: perfilCompleto || {},
+      profileSource: profileSource || {},
     });
     setLoadedProfilePermissions(resolved.profilePermissions || null);
     setUserPermissions(resolved.permissions);
@@ -192,16 +195,19 @@ export default function PermissoesUsuarios() {
     setSelectedProfileId('_nenhum');
     setUserPermissions(initialPermissions);
     setLoadedProfilePermissions(null);
+    setSelectedProfileSource(null);
     setActiveEditTab('dados');
   };
 
   const aplicarPerfil = async () => {
     if (!selectedProfilePreview) return;
 
-    const perfilCompleto = await getProfileWithPermissions(selectedProfilePreview.id);
+    const perfilCompleto = selectedProfileSource || await getProfileWithPermissions(selectedProfilePreview.id);
+    const profileSource = perfilCompleto || selectedProfilePreview;
     const profilePermissions = resolveProfilePermissions({
-      profileSource: perfilCompleto || selectedProfilePreview,
+      profileSource,
     }).permissions;
+    setSelectedProfileSource(profileSource);
     setLoadedProfilePermissions(profilePermissions);
     setUserPermissions(profilePermissions);
   };
@@ -226,7 +232,10 @@ export default function PermissoesUsuarios() {
       const militarMatriculaAtual = militarVinculado?.matricula_atual || militarVinculado?.matricula || '';
       const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
 
-      const profilePermissions = loadedProfilePermissions || {};
+      const canonicalProfilePermissions = resolveProfilePermissions({
+        profileSource: selectedProfileSource || perfilSelected || {},
+      }).permissions;
+      const profilePermissions = loadedProfilePermissions || canonicalProfilePermissions;
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
       const permissionPayload = buildPermissionPayload(normalizedPermissions);
       const legacyOverrides = selectedProfileId === '_nenhum'
@@ -280,7 +289,7 @@ export default function PermissoesUsuarios() {
       const reloadedRecord = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
       const resolvedReloaded = await resolveUserPermissions({
         userSource: reloadedRecord,
-        profileSource: perfilSelected || {},
+        profileSource: selectedProfileSource || perfilSelected || {},
       });
       const reloadedPermissions = resolvedReloaded.permissions;
       setUserPermissions(reloadedPermissions);
@@ -609,9 +618,11 @@ export default function PermissoesUsuarios() {
                             setSelectedProfileId(v);
                             if (v === '_nenhum') {
                               setLoadedProfilePermissions(null);
+                              setSelectedProfileSource(null);
                               return;
                             }
                             const perfilCompleto = await getProfileWithPermissions(v);
+                            setSelectedProfileSource(perfilCompleto || null);
                             setLoadedProfilePermissions(
                               perfilCompleto
                                 ? resolveProfilePermissions({ profileSource: perfilCompleto }).permissions

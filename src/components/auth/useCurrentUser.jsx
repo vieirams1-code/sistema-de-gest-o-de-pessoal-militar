@@ -100,19 +100,29 @@ export function useCurrentUser() {
   });
 
   const acesso = usuarioAcessoList?.[0] || null;
+
+  const { data: acessoCompleto, isLoading: loadingAcessoCompleto } = useQuery({
+    queryKey: ['usuarioAcessoCompleto', acesso?.id],
+    queryFn: () => base44.entities.UsuarioAcesso.get(acesso.id),
+    enabled: !!acesso?.id,
+    staleTime: 0,
+  });
+
+  const acessoResolvido = acessoCompleto || acesso;
+
   const { data: perfilAcesso } = useQuery({
-    queryKey: ['perfilPermissao', acesso?.perfil_id],
-    queryFn: () => base44.entities.PerfilPermissao.get(acesso.perfil_id),
-    enabled: !!acesso?.perfil_id,
+    queryKey: ['perfilPermissao', acessoResolvido?.perfil_id],
+    queryFn: () => base44.entities.PerfilPermissao.get(acessoResolvido.perfil_id),
+    enabled: !!acessoResolvido?.perfil_id,
     staleTime: 60 * 1000,
   });
 
   const { data: resolvedPermissionsData } = useQuery({
-    queryKey: ['resolvedPermissions', acesso?.id, perfilAcesso?.id],
-    enabled: !!acesso,
+    queryKey: ['resolvedPermissions', acessoResolvido?.id, perfilAcesso?.id],
+    enabled: !!acessoResolvido,
     queryFn: async () => {
       return resolveUserPermissions({
-        userSource: acesso,
+        userSource: acessoResolvido,
         profileSource: perfilAcesso || {},
       });
     },
@@ -121,20 +131,20 @@ export function useCurrentUser() {
 
   const resolvedPermissionMatrix = resolvedPermissionsData?.permissions || {};
   const normalizedResolvedPermissions = buildPermissionsFromSource(resolvedPermissionMatrix);
-  const resolvedTipoAcesso = normalizeAccessMode(acesso?.tipo_acesso) || 'proprio';
+  const resolvedTipoAcesso = normalizeAccessMode(acessoResolvido?.tipo_acesso) || 'proprio';
   const isSelfRestrictedScope = resolvedTipoAcesso === 'proprio';
 
   // Resolve as propriedades explicitamente usando UsuarioAcesso.
   // Em modo de impersonação, não herdar permissões do admin original (fail-closed).
-  const isAdmin = acesso
+  const isAdmin = acessoResolvido
     ? resolvedTipoAcesso === 'admin'
     : (!impersonationContext.isImpersonating && (user?.role === 'admin' || user?.isAdmin === true));
 
-  const subgrupamentoId = acesso
-    ? (isSelfRestrictedScope ? null : (acesso.subgrupamento_id || acesso.grupamento_id || null))
+  const subgrupamentoId = acessoResolvido
+    ? (isSelfRestrictedScope ? null : (acessoResolvido.subgrupamento_id || acessoResolvido.grupamento_id || null))
     : (!impersonationContext.isImpersonating ? (user?.subgrupamento_id || null) : null);
 
-  const subgrupamentoTipo = acesso
+  const subgrupamentoTipo = acessoResolvido
     ? (isSelfRestrictedScope ? null
       : (resolvedTipoAcesso === 'setor' ? 'Grupamento' :
        resolvedTipoAcesso === 'subsetor' ? 'Subgrupamento' :
@@ -142,12 +152,12 @@ export function useCurrentUser() {
     : (!impersonationContext.isImpersonating ? (user?.subgrupamento_tipo || null) : null);
 
   const userEmail = accessLookupEmail || null;
-  const linkedMilitarId = acesso ? (acesso.militar_id || null) : (!impersonationContext.isImpersonating ? (user?.militar_id || null) : null);
-  const linkedMilitarEmail = acesso ? (acesso.militar_email || null) : (!impersonationContext.isImpersonating ? (user?.militar_email || null) : null);
+  const linkedMilitarId = acessoResolvido ? (acessoResolvido.militar_id || null) : (!impersonationContext.isImpersonating ? (user?.militar_id || null) : null);
+  const linkedMilitarEmail = acessoResolvido ? (acessoResolvido.militar_email || null) : (!impersonationContext.isImpersonating ? (user?.militar_email || null) : null);
 
   // Modo de acesso: 'admin', 'setor', 'subsetor', 'unidade', 'proprio'
   let modoAcesso = 'proprio';
-  if (acesso) {
+  if (acessoResolvido) {
     modoAcesso = resolvedTipoAcesso;
   } else if (!impersonationContext.isImpersonating) {
     if (isAdmin) modoAcesso = 'admin';
@@ -169,8 +179,8 @@ export function useCurrentUser() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isLoading = loadingAuth || loadingAcesso || (requiresUnidades && loadingUnidades);
-  const isAccessResolved = !accessLookupEmail || (!loadingAcesso && fetchedAcesso && (!requiresUnidades || (!loadingUnidades && fetchedUnidades)));
+  const isLoading = loadingAuth || loadingAcesso || loadingAcessoCompleto || (requiresUnidades && loadingUnidades);
+  const isAccessResolved = !accessLookupEmail || (!loadingAcesso && !loadingAcessoCompleto && fetchedAcesso && (!requiresUnidades || (!loadingUnidades && fetchedUnidades)));
 
   const getAccessModeFromUser = (targetUser, targetAcesso = null) => {
     if (targetAcesso) return normalizeAccessMode(targetAcesso.tipo_acesso) || 'proprio';
@@ -185,7 +195,7 @@ export function useCurrentUser() {
   const canAccessModule = (modulo) => {
     if (accessLookupEmail && !isAccessResolved) return false;
 
-    if (acesso) {
+    if (acessoResolvido) {
       const campo = `acesso_${modulo}`;
       const resolvedValue = normalizedResolvedPermissions[campo];
       if (isAdmin && (isAdminRecoveryPermission(campo, 'module') || ADMIN_ALWAYS_ALLOWED_MODULES.has(campo))) return true;
@@ -201,7 +211,7 @@ export function useCurrentUser() {
   const canAccessAction = (acao) => {
     if (accessLookupEmail && !isAccessResolved) return false;
 
-    if (acesso) {
+    if (acessoResolvido) {
       const campo = `perm_${acao}`;
       const resolvedValue = normalizedResolvedPermissions[campo];
       if (isAdmin && (isAdminRecoveryPermission(campo, 'action') || ADMIN_ALWAYS_ALLOWED_ACTIONS.has(campo))) return true;
@@ -292,14 +302,14 @@ export function useCurrentUser() {
     isImpersonating: impersonationContext.isImpersonating,
     baseEmail: impersonationContext.baseEmail,
     effectiveEmail: accessLookupEmail,
-    hasAcessoRecord: Boolean(acesso),
+    hasAcessoRecord: Boolean(acessoResolvido),
     modoAcesso,
     isAdmin,
   };
 
   return {
     user,
-    acesso,
+    acesso: acessoResolvido,
     isAdmin,
     isLoading,
     isAccessResolved,
