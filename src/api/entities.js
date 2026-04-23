@@ -10,3 +10,5 @@ export const CreditoExtraFerias = base44.entities.CreditoExtraFerias;
 
 // auth sdk:
 export const User = base44.auth;
+
+export const ResetOperacionalLog = base44.entities.ResetOperacionalLog;
