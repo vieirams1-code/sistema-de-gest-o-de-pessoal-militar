@@ -49,6 +49,8 @@ export const nestedMatrixKeys = [
 export const SNAPSHOT_VERSION = 1;
 export const SNAPSHOT_PROFILE_ENTITY = 'PerfilPermissaoSnapshot';
 export const SNAPSHOT_USER_ENTITY = 'UsuarioPermissaoSnapshot';
+export const ADMIN_RECOVERY_MODULE_KEYS = ['acesso_militares'];
+export const ADMIN_RECOVERY_ACTION_KEYS = ['perm_gerir_permissoes'];
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
@@ -189,6 +191,24 @@ const parseSnapshotMatrix = (snapshot) => {
   return {};
 };
 
+export const isValidPermissionSnapshot = (snapshot) => {
+  if (!snapshot) return false;
+  const matrix = parseSnapshotMatrix(snapshot);
+  if (!isObjectRecord(matrix)) return false;
+
+  return canonicalPermissionKeys.some((key) => sourceHasPermissionValue(matrix, key));
+};
+
+export const isAdminRecoveryPermission = (permissionKey, type = 'action') => {
+  if (!permissionKey || typeof permissionKey !== 'string') return false;
+  const normalized = permissionKey.startsWith('acesso_') || permissionKey.startsWith('perm_')
+    ? permissionKey
+    : (type === 'module' ? `acesso_${permissionKey}` : `perm_${permissionKey}`);
+
+  if (type === 'module') return ADMIN_RECOVERY_MODULE_KEYS.includes(normalized);
+  return ADMIN_RECOVERY_ACTION_KEYS.includes(normalized);
+};
+
 const getSnapshotEntity = (base44, entityName) => base44?.entities?.[entityName] || null;
 
 const findLatestSnapshot = (records = []) => {
@@ -232,11 +252,12 @@ export const resolveProfilePermissionsWithSnapshot = async ({
   fallbackSource = {},
 }) => {
   const snapshot = await getProfileSnapshot(base44, profileSource?.id);
+  const snapshotIsValid = isValidPermissionSnapshot(snapshot);
   const snapshotPermissions = buildPermissionsFromSource(parseSnapshotMatrix(snapshot));
   const legacyPermissions = buildPermissionsFromSource(profileSource, fallbackSource);
   return {
-    permissions: snapshot ? snapshotPermissions : legacyPermissions,
-    snapshot,
+    permissions: snapshotIsValid ? snapshotPermissions : legacyPermissions,
+    snapshot: snapshotIsValid ? snapshot : null,
   };
 };
 
@@ -252,16 +273,18 @@ export const resolveUserPermissionsWithSnapshots = async ({
     getUserSnapshot(base44, userSource?.id, userSource?.user_id || userSource?.user_email || null),
   ]);
 
+  const profileSnapshotIsValid = isValidPermissionSnapshot(profileSnapshot);
+  const userSnapshotIsValid = isValidPermissionSnapshot(userSnapshot);
   const profileFromSnapshot = buildPermissionsFromSource(parseSnapshotMatrix(profileSnapshot));
   const profileLegacy = buildPermissionsFromSource(profileSource, fallbackProfile);
-  const profilePermissions = profileSnapshot ? profileFromSnapshot : profileLegacy;
+  const profilePermissions = profileSnapshotIsValid ? profileFromSnapshot : profileLegacy;
 
-  if (userSnapshot) {
+  if (userSnapshotIsValid) {
     return {
       permissions: buildPermissionsFromSource(parseSnapshotMatrix(userSnapshot)),
       profilePermissions,
       userSnapshot,
-      profileSnapshot,
+      profileSnapshot: profileSnapshotIsValid ? profileSnapshot : null,
     };
   }
 
@@ -273,7 +296,7 @@ export const resolveUserPermissionsWithSnapshots = async ({
     }),
     profilePermissions,
     userSnapshot: null,
-    profileSnapshot,
+    profileSnapshot: profileSnapshotIsValid ? profileSnapshot : null,
   };
 };
 
