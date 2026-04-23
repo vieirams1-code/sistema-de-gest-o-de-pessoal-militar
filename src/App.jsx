@@ -22,6 +22,8 @@ const adminOnlyPages = new Set([
   'Subgrupamentos',
   'HistoricoImportacoesMilitares',
   'MigracaoAlteracoesLegado',
+  'RevisaoDuplicidadesMilitar',
+  'ClassificacaoPendentesLegado',
 ]);
 
 

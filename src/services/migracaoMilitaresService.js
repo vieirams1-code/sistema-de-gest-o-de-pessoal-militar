@@ -13,6 +13,7 @@ export const STATUS_LINHA = {
 const REGRA_VERSAO = 'v1.1.0';
 const HISTORICO_ENTITY_NAME = 'ImportacaoMilitares';
 const HISTORICO_ENTITY_ERROR_MESSAGE = 'Falha ao acessar o histórico de importação de militares. Verifique se a entidade ImportacaoMilitares está publicada no app.';
+let migracaoClientOverride = null;
 
 const POSTO_MAP = {
   CEL: 'Coronel',
@@ -65,6 +66,14 @@ const ETNIA_MAP = {
 
 const UF_VALIDAS = new Set(['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']);
 const CNH_CATEGORIAS = new Set(['A', 'B', 'C', 'D', 'E']);
+
+function getMigracaoClient() {
+  return migracaoClientOverride || base44;
+}
+
+export function __setMigracaoMilitaresClientForTests(client) {
+  migracaoClientOverride = client || null;
+}
 
 const HEADER_ALIAS = {
   nome_completo: ['nome_completo', 'nome', 'nome militar'],
@@ -701,7 +710,7 @@ export async function analisarArquivoMigracao(file) {
 
   const cabecalho = dadosCsv[0];
   const headerMap = mapHeaders(cabecalho);
-  const militaresExistentes = await base44.entities.Militar.list();
+  const militaresExistentes = await getMigracaoClient().entities.Militar.list();
   const matriculasExistentes = new Set((militaresExistentes || []).map((m) => normalizarMatricula(m?.matricula)));
 
   const linhas = dadosCsv.slice(1).map((cells, idx) => {
@@ -835,7 +844,7 @@ function relatorioFromAnalise(analise, extras = {}) {
 }
 
 function getHistoricoImportacaoEntity() {
-  const entity = base44?.entities?.[HISTORICO_ENTITY_NAME];
+  const entity = getMigracaoClient()?.entities?.[HISTORICO_ENTITY_NAME];
   if (!entity?.create || !entity?.update) {
     return null;
   }
@@ -852,8 +861,7 @@ async function atualizarHistoricoComDiagnostico(entity, historicoId, payload, co
   if (!entity || !historicoId) {
     const mensagem = `[ImportacaoMilitares] Histórico indisponível ao ${contexto}.`;
     console.error(mensagem, { historicoId, payload });
-    avisosHistorico.push(mensagem);
-    return null;
+    throw new Error(mensagem);
   }
 
   try {
@@ -866,7 +874,7 @@ async function atualizarHistoricoComDiagnostico(entity, historicoId, payload, co
     const mensagem = `[ImportacaoMilitares] Falha ao ${contexto} no histórico (${historicoId}): ${error?.message || 'erro desconhecido.'}`;
     console.error(mensagem, { payload, error });
     avisosHistorico.push(mensagem);
-    return null;
+    throw new Error(mensagem);
   }
 }
 
@@ -912,18 +920,34 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
   if (!historicoIdEfetivo) {
     throw new Error('Não foi possível determinar o registro de histórico da importação.');
   }
-  const historicoDisponivel = !!historicoEntity && !!historicoIdEfetivo;
-
-  await atualizarHistoricoComDiagnostico(
-    historicoEntity,
-    historicoIdEfetivo,
-    {
-      status_importacao: 'Importando',
-      importar_linhas_com_alerta: incluirAlertas,
-    },
-    'marcar status IMPORTANDO',
-    avisosHistorico,
-  );
+  try {
+    await atualizarHistoricoComDiagnostico(
+      historicoEntity,
+      historicoIdEfetivo,
+      {
+        status_importacao: 'Importando',
+        importar_linhas_com_alerta: incluirAlertas,
+      },
+      'marcar status IMPORTANDO',
+      avisosHistorico,
+    );
+  } catch (error) {
+    const mensagem = `[ImportacaoMilitares] Registro de histórico ${historicoIdEfetivo} indisponível para atualização. Será criado novo lote para preservar auditoria.`;
+    console.warn(mensagem, { erro: error?.message || error });
+    avisosHistorico.push(mensagem);
+    const historicoCriado = await salvarAnaliseHistorico(analise, usuario);
+    historicoIdEfetivo = historicoCriado?.id;
+    await atualizarHistoricoComDiagnostico(
+      historicoEntity,
+      historicoIdEfetivo,
+      {
+        status_importacao: 'Importando',
+        importar_linhas_com_alerta: incluirAlertas,
+      },
+      'marcar status IMPORTANDO em lote recriado',
+      avisosHistorico,
+    );
+  }
 
   const podeImportar = (linha) => linha.status === STATUS_LINHA.APTO || (incluirAlertas && linha.status === STATUS_LINHA.APTO_COM_ALERTA);
   const elegiveis = analise.linhas.filter(podeImportar);
@@ -934,7 +958,7 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
     for (const linha of elegiveis) {
       const { matricula, posto_graduacao, data_inclusao } = linha.transformado;
 
-      const duplicidade = await base44.entities.Militar.filter({ matricula });
+      const duplicidade = await getMigracaoClient().entities.Militar.filter({ matricula });
       if (duplicidade.length > 0) {
         await registrarPossivelDuplicidade({
           militarExistenteId: duplicidade[0]?.id || '',
@@ -1023,18 +1047,19 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       relatorio,
     };
   } catch (error) {
-    if (historicoDisponivel) {
-      try {
-        await historicoEntity.update(historicoIdEfetivo, {
+    try {
+      await atualizarHistoricoComDiagnostico(
+        historicoEntity,
+        historicoIdEfetivo,
+        {
           status_importacao: 'Falhou',
           observacoes: error?.message || 'Falha ao importar lote.',
-        });
-      } catch (updateError) {
-        const mensagemErro = String(updateError?.message || '');
-        if (mensagemErro.includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
-        const mensagem = `[ImportacaoMilitares] Não foi possível atualizar status de falha no histórico (${historicoIdEfetivo}): ${updateError?.message || 'erro desconhecido.'}`;
-        console.error(mensagem);
-      }
+        },
+        'registrar falha da importação',
+        avisosHistorico,
+      );
+    } catch (updateError) {
+      console.error('[ImportacaoMilitares] Não foi possível registrar falha no histórico.', updateError);
     }
     if (String(error?.message || '').includes(`Entity schema ${HISTORICO_ENTITY_NAME} not found in app`)) {
       throw new Error(HISTORICO_ENTITY_ERROR_MESSAGE);
