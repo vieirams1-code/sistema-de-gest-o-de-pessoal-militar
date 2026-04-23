@@ -190,7 +190,13 @@ export default function MigracaoMilitares() {
           alteracoes,
         });
       }
-      toast({ title: 'Correção salva', description: 'Registro legado atualizado e reavaliado com sucesso.' });
+      const aptoParaImportacao = linhaAtualizada?.status === 'APTO' || linhaAtualizada?.status === 'APTO_COM_ALERTA';
+      toast({
+        title: 'Correção salva',
+        description: aptoParaImportacao
+          ? 'Correção salva. Registro agora está apto para importação.'
+          : 'Correção salva, mas ainda há pendências.',
+      });
     } catch (error) {
       toast({
         title: 'Falha ao salvar correção',

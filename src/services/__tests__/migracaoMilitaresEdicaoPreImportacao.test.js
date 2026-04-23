@@ -95,8 +95,28 @@ test('permite edição pré-importação dos 5 campos e reclassifica status', as
   assert.equal(linhaAtualizada.transformado.data_inclusao, '2020-01-10');
   assert.equal(linhaAtualizada.status, 'APTO');
   assert.equal(analiseAtualizada.resumo.total_aptas, 1);
+  assert.equal(analiseAtualizada.resumo.total_erros, 0);
   assert.deepEqual(linhaAtualizada.correcao_pre_importacao.campos_alterados.sort(), ['cpf', 'data_inclusao', 'matricula', 'nome_completo', 'nome_guerra'].sort());
   assert.equal(linhaAtualizada.correcao_pre_importacao.alteracoes_detalhadas.length, 5);
+});
+
+test('mantém pendência quando correção é parcial', async () => {
+  setupClients();
+
+  const { analiseAtualizada, linhaAtualizada } = await corrigirLinhaPreImportacao({
+    analise: analiseBase(),
+    linhaNumero: 2,
+    campos: {
+      nome_completo: 'João da Silva',
+      nome_guerra: 'Silva',
+    },
+    usuario: { email: 'admin@sgp' },
+  });
+
+  assert.equal(linhaAtualizada.status, 'ERRO');
+  assert.ok(linhaAtualizada.erros.some((erro) => erro.includes('Matrícula ausente')));
+  assert.equal(analiseAtualizada.resumo.total_erros, 1);
+  assert.equal(analiseAtualizada.resumo.total_aptas, 0);
 });
 
 test('aplica validações de matrícula, CPF e data de inclusão na correção', async () => {
@@ -151,6 +171,7 @@ test('persiste correção no histórico e restaura após recarregar', async () =
 
   const restaurado = await carregarAnaliseHistorico(historico.id);
   assert.equal(restaurado.linhas[0].transformado.nome_completo, 'Maria Souza');
+  assert.equal(restaurado.linhas[0].status, 'APTO');
   assert.match(ImportacaoMilitares._rows[0].observacoes, /Correção pré-importação linha 2/);
 
   await persistirCorrecaoPreImportacaoHistorico({
