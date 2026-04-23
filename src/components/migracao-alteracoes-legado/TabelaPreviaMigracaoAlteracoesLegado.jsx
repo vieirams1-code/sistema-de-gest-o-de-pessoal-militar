@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronsUpDown, FileText, UserRound } from 'lucide-react';
+import { Check, ChevronsUpDown, UserRound } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { construirSugestaoSistema } from '@/components/migracao-alteracoes-legado/sugestaoSistemaHelper';
 
 const statusLabel = {
   APTO: 'Apto',
@@ -78,8 +77,6 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
 
   const destinoFinal = linhaSelecionada?.transformado.destino_final || 'IMPORTAR';
   const exigeMotivo = destinoFinal === 'IGNORAR' || destinoFinal === 'EXCLUIDO_DO_LOTE';
-  const sugestoes = construirSugestaoSistema(linhaSelecionada, tiposPublicacaoValidos);
-
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[25rem,1fr] gap-4">
       <section className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -164,29 +161,14 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
 
             <div className="space-y-1">
               <Label className="text-xs text-slate-600">Trecho do texto legado</Label>
-              <div className="border border-slate-200 rounded-lg bg-white p-3 min-h-36 max-h-56 overflow-y-auto">
+              <div className="border border-slate-200 rounded-lg bg-white p-3 min-h-40 max-h-64 overflow-y-auto">
                 <p className="text-sm whitespace-pre-wrap break-words leading-relaxed text-slate-700">
                   {linhaSelecionada.transformado.conteudo_trecho_legado || 'Sem trecho legado informado na planilha.'}
                 </p>
               </div>
             </div>
 
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-              <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Sugestão do sistema</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge className="bg-indigo-700 text-white">{sugestoes.principal.tipo}</Badge>
-                <span className="text-sm font-semibold text-indigo-700">{sugestoes.principal.confianca}% de confiança</span>
-              </div>
-              {sugestoes.secundarias.length > 0 && (
-                <div className="mt-2 text-xs text-indigo-900 space-y-1">
-                  {sugestoes.secundarias.map((item) => (
-                    <p key={item.tipo}>{item.tipo} — {item.confianca}%</p>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr),minmax(0,1fr)] gap-3">
               <div className="space-y-1">
                 <Label className="text-xs text-slate-600">Pesquisar tipo do sistema</Label>
                 <Popover open={autocompleteAberto} onOpenChange={setAutocompleteAberto}>
@@ -261,16 +243,6 @@ export default function TabelaPreviaMigracaoAlteracoesLegado({
             </div>
 
             <div className="mt-auto border-t border-slate-200 pt-3 flex flex-wrap gap-2">
-              <Button
-                type="button"
-                className="bg-indigo-600 hover:bg-indigo-700"
-                onClick={() => {
-                  const tipoPrincipal = sugestoes.principal.tipo === 'Sem sugestão' ? '' : sugestoes.principal.tipo;
-                  if (tipoPrincipal) onSelecionarTipoPublicacao?.(linhaSelecionada, tipoPrincipal);
-                }}
-              >
-                <FileText className="w-4 h-4 mr-2" /> Marcar tipo
-              </Button>
               <Button type="button" className="bg-emerald-700 hover:bg-emerald-800" onClick={() => onSelecionarDestinoFinal?.(linhaSelecionada, 'IMPORTAR')}>
                 <Check className="w-4 h-4 mr-2" /> Importar
               </Button>
