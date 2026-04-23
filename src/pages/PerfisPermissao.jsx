@@ -10,6 +10,9 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
 import {
   buildPermissionPayload,
+  extractProfileMatrixFromDescription,
+  mergeProfileDescriptionWithMatrix,
+  resolveProfilePermissions,
   buildPermissionsFromSource,
 } from '@/services/permissionMatrixService';
 import {
@@ -96,11 +99,12 @@ export default function PerfisPermissao() {
       // fallback para registro parcial da listagem
     }
 
-    const resolvedPermissions = buildPermissionsFromSource(fullPerfil);
+    const resolvedPermissions = resolveProfilePermissions({ profileSource: fullPerfil }).permissions;
+    const profileDescriptionData = extractProfileMatrixFromDescription(fullPerfil.descricao);
 
     setFormData({
       nome_perfil: fullPerfil.nome_perfil || '',
-      descricao: fullPerfil.descricao || '',
+      descricao: profileDescriptionData.cleanDescricao || '',
       ativo: fullPerfil.ativo !== false,
       ...resolvedPermissions,
     });
@@ -121,8 +125,10 @@ export default function PerfisPermissao() {
       return;
     }
     const normalizedPermissions = buildPermissionsFromSource(formData);
+    const descricaoComMatriz = mergeProfileDescriptionWithMatrix(formData.descricao, normalizedPermissions);
     const payload = {
       ...formData,
+      descricao: descricaoComMatriz,
       ...buildPermissionPayload(normalizedPermissions),
     };
 
@@ -306,7 +312,8 @@ export default function PerfisPermissao() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {perfis.map(p => {
-                  const perfilPermissions = buildPermissionsFromSource(p);
+                  const perfilPermissions = resolveProfilePermissions({ profileSource: p }).permissions;
+                  const { cleanDescricao } = extractProfileMatrixFromDescription(p.descricao);
                   const modsAcessiveis = modulosList.filter(m => perfilPermissions[m.key]).length;
                   const actsAcessiveis = acoesSensiveis.filter(a => perfilPermissions[a.key]).length;
 
@@ -317,7 +324,7 @@ export default function PerfisPermissao() {
                           <h3 className="font-bold text-slate-800 text-lg">{p.nome_perfil}</h3>
                           {!p.ativo && <Badge variant="destructive" className="text-[10px] uppercase">Inativo</Badge>}
                         </div>
-                        {p.descricao && <p className="text-sm text-slate-500 mb-2 truncate">{p.descricao}</p>}
+                        {cleanDescricao && <p className="text-sm text-slate-500 mb-2 truncate">{cleanDescricao}</p>}
                         
                         <div className="flex gap-2 text-xs font-medium">
                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{modsAcessiveis} {modsAcessiveis === 1 ? 'módulo' : 'módulos'}</Badge>
