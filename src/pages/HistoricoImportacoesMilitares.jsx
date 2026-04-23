@@ -13,19 +13,16 @@ import {
   filtrarLotesHistorico,
   listarHistoricoImportacoesMilitares,
   montarResumoHistorico,
+  STATUS_LOTE_OPTIONS,
 } from '@/services/historicoImportacoesMilitaresService';
 
 const FILTROS_INICIAIS = {
-  arquivo: '',
+  busca: '',
   inicio: '',
   fim: '',
-  comPendencias: false,
-  comErro: false,
-  somenteConcluida: false,
-  somenteAnalise: false,
-  comRevisar: false,
-  comLinhasErro: false,
-  comAlerta: false,
+  tipoImportacao: 'TODOS',
+  status: 'TODOS',
+  executor: 'TODOS',
 };
 
 const TEXTO_CONFIRMACAO_EXCLUSAO = `Deseja excluir este lote do histórico de importação?\nEsta ação remove apenas o registro do histórico e não apaga os militares já importados.`;
@@ -94,6 +91,8 @@ export default function HistoricoImportacoesMilitares() {
     }
   };
 
+  const tiposImportacao = useMemo(() => [...new Set(lotes.map((item) => item.tipoImportacao).filter(Boolean))], [lotes]);
+  const executores = useMemo(() => [...new Set(lotes.map((item) => item.importadoPor).filter(Boolean))], [lotes]);
   const lotesFiltrados = useMemo(() => filtrarLotesHistorico(lotes, filtros), [lotes, filtros]);
   const resumo = useMemo(() => montarResumoHistorico(lotesFiltrados), [lotesFiltrados]);
 
@@ -101,20 +100,20 @@ export default function HistoricoImportacoesMilitares() {
   if (!isAdmin) return <AccessDenied modulo="Histórico de Importações" />;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto space-y-5">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
               <History className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-[#1e3a5f]">Histórico de Importações</h1>
-              <p className="text-sm text-slate-500">Visão operacional para conferência de lotes de Migração de Militares.</p>
+              <h1 className="text-3xl font-bold text-[#1e3a5f]">Histórico de Importações</h1>
+              <p className="text-sm text-slate-500">Acompanhe lotes processados, status, executores e resultados por importação.</p>
             </div>
           </div>
           <Button variant="outline" onClick={carregar} disabled={carregando}>
-            <RefreshCcw className="w-4 h-4 mr-2" /> Atualizar
+            <RefreshCcw className="w-4 h-4 mr-2" /> Atualizar listagem
           </Button>
         </div>
 
@@ -124,6 +123,9 @@ export default function HistoricoImportacoesMilitares() {
           filtros={filtros}
           onChangeFiltros={(patch) => setFiltros((prev) => ({ ...prev, ...patch }))}
           onLimpar={() => setFiltros(FILTROS_INICIAIS)}
+          tiposImportacao={tiposImportacao}
+          executores={executores}
+          statusOptions={STATUS_LOTE_OPTIONS}
         />
 
         {carregando ? (

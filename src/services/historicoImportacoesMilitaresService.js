@@ -16,7 +16,19 @@ const STATUS_LOTE_LABEL = {
   PARCIAL: 'Importação parcial',
   CONCLUIDA: 'Importação concluída',
   FALHA: 'Importação com falha',
+  EM_PROCESSAMENTO: 'Importação em processamento',
+  CANCELADA: 'Importação cancelada',
 };
+
+export const STATUS_LOTE_OPTIONS = [
+  'TODOS',
+  STATUS_LOTE_LABEL.CONCLUIDA,
+  STATUS_LOTE_LABEL.PARCIAL,
+  STATUS_LOTE_LABEL.FALHA,
+  STATUS_LOTE_LABEL.SOMENTE_ANALISE,
+  STATUS_LOTE_LABEL.EM_PROCESSAMENTO,
+  STATUS_LOTE_LABEL.CANCELADA,
+];
 
 const STATUS_BADGE_CLASS = {
   APTO: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -26,6 +38,17 @@ const STATUS_BADGE_CLASS = {
   ERRO: 'bg-rose-100 text-rose-800 border-rose-200',
   DUPLICADO: 'bg-slate-100 text-slate-700 border-slate-200',
 };
+
+export const STATUS_GERAL_BADGE_CLASS = {
+  [STATUS_LOTE_LABEL.CONCLUIDA]: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  [STATUS_LOTE_LABEL.PARCIAL]: 'bg-amber-100 text-amber-800 border-amber-200',
+  [STATUS_LOTE_LABEL.FALHA]: 'bg-rose-100 text-rose-800 border-rose-200',
+  [STATUS_LOTE_LABEL.SOMENTE_ANALISE]: 'bg-slate-100 text-slate-700 border-slate-200',
+  [STATUS_LOTE_LABEL.EM_PROCESSAMENTO]: 'bg-sky-100 text-sky-800 border-sky-200',
+  [STATUS_LOTE_LABEL.CANCELADA]: 'bg-zinc-200 text-zinc-800 border-zinc-300',
+};
+
+export const STATUS_GERAL_LABEL = STATUS_LOTE_LABEL;
 
 function toArray(valor) {
   if (Array.isArray(valor)) return valor;
@@ -196,6 +219,8 @@ function calcularResumoDasLinhas(linhas) {
 function inferirStatusLote({ statusImportacao, totalImportadas, totalLinhas, totalErros }) {
   const status = String(statusImportacao || '').toLowerCase();
 
+  if (status.includes('cancel')) return STATUS_LOTE_LABEL.CANCELADA;
+  if (status.includes('importando') || status.includes('process')) return STATUS_LOTE_LABEL.EM_PROCESSAMENTO;
   if (status.includes('falh')) return STATUS_LOTE_LABEL.FALHA;
   if (status.includes('parcial')) return STATUS_LOTE_LABEL.PARCIAL;
   if (status.includes('importado') && totalImportadas > 0 && totalImportadas >= totalLinhas) return STATUS_LOTE_LABEL.CONCLUIDA;
@@ -231,6 +256,8 @@ function normalizarLote(item) {
   const totalImportadas = toNumber(item?.total_importadas, item?.totalImportadas, resumoLinhas.total_importadas);
 
   const statusImportacao = pickFirstString(item?.status_importacao, item?.statusImportacao, 'Analisado');
+  const tipoImportacao = pickFirstString(item?.tipo_importacao, relatorio?.tipo_importacao, 'Migração de militares');
+  const referencia = pickFirstString(item?.referencia_lote, relatorio?.referencia_lote, relatorio?.arquivo?.hash, item?.hash_arquivo);
 
   return {
     id: item?.id,
@@ -238,6 +265,8 @@ function normalizarLote(item) {
     nomeArquivo: pickFirstString(item?.nome_arquivo, relatorio?.arquivo?.nome, 'Arquivo sem nome'),
     importadoPor: pickFirstString(item?.importado_por_nome, item?.importado_por),
     statusImportacao,
+    tipoImportacao,
+    referencia,
     statusGeral: inferirStatusLote({ statusImportacao, totalImportadas, totalLinhas, totalErros }),
     resumo: {
       total_linhas: totalLinhas,
@@ -300,21 +329,23 @@ export async function excluirHistoricoImportacaoMilitares(loteId) {
 }
 
 export function filtrarLotesHistorico(lotes, filtros) {
-  const termo = String(filtros?.arquivo || '').trim().toLowerCase();
+  const termo = String(filtros?.busca || '').trim().toLowerCase();
 
   return (lotes || []).filter((lote) => {
-    if (termo && !String(lote.nomeArquivo || '').toLowerCase().includes(termo)) return false;
+    if (termo) {
+      const textoBusca = [
+        lote.nomeArquivo,
+        lote.referencia,
+        lote.observacoes,
+        lote.importadoPor,
+      ].map((v) => String(v || '').toLowerCase()).join(' ');
+      if (!textoBusca.includes(termo)) return false;
+    }
+
     if ((filtros?.inicio || filtros?.fim) && !isDateInRange(lote.dataHora, filtros?.inicio, filtros?.fim)) return false;
-
-    const pendencias = lote.resumo.total_revisar + lote.resumo.total_erros;
-
-    if (filtros?.comPendencias && pendencias <= 0) return false;
-    if (filtros?.comErro && lote.resumo.total_erros <= 0) return false;
-    if (filtros?.somenteConcluida && lote.statusGeral !== STATUS_LOTE_LABEL.CONCLUIDA) return false;
-    if (filtros?.somenteAnalise && lote.statusGeral !== STATUS_LOTE_LABEL.SOMENTE_ANALISE) return false;
-    if (filtros?.comRevisar && lote.resumo.total_revisar <= 0) return false;
-    if (filtros?.comLinhasErro && lote.resumo.total_erros <= 0) return false;
-    if (filtros?.comAlerta && lote.resumo.total_aptas_com_alerta <= 0) return false;
+    if (filtros?.tipoImportacao && filtros.tipoImportacao !== 'TODOS' && lote.tipoImportacao !== filtros.tipoImportacao) return false;
+    if (filtros?.status && filtros.status !== 'TODOS' && lote.statusGeral !== filtros.status) return false;
+    if (filtros?.executor && filtros.executor !== 'TODOS' && lote.importadoPor !== filtros.executor) return false;
 
     return true;
   });
@@ -326,22 +357,25 @@ export function montarResumoHistorico(lotes) {
   const acumulado = lotes.reduce((acc, lote) => {
     acc.totalLinhas += lote.resumo.total_linhas;
     acc.totalImportadas += lote.resumo.total_importadas;
-    acc.totalPendencias += lote.resumo.total_revisar + lote.resumo.total_erros;
-    acc.totalAlertas += lote.resumo.total_aptas_com_alerta;
+    acc.totalConcluidas += lote.statusGeral === STATUS_LOTE_LABEL.CONCLUIDA ? 1 : 0;
+    acc.totalParciais += lote.statusGeral === STATUS_LOTE_LABEL.PARCIAL ? 1 : 0;
+    acc.totalComErro += lote.statusGeral === STATUS_LOTE_LABEL.FALHA ? 1 : 0;
     return acc;
   }, {
     totalLinhas: 0,
     totalImportadas: 0,
-    totalPendencias: 0,
-    totalAlertas: 0,
+    totalConcluidas: 0,
+    totalParciais: 0,
+    totalComErro: 0,
   });
 
   return {
     totalLotes,
     totalLinhas: acumulado.totalLinhas,
     totalImportadas: acumulado.totalImportadas,
-    totalPendencias: acumulado.totalPendencias,
-    totalAlertas: acumulado.totalAlertas,
+    totalConcluidas: acumulado.totalConcluidas,
+    totalParciais: acumulado.totalParciais,
+    totalComErro: acumulado.totalComErro,
     ultimoLote: lotes[0] || null,
   };
 }
@@ -358,44 +392,46 @@ export function exportarCsvHistoricoHumano(lote) {
   const headers = [
     'status',
     'nome',
-    'matricula_atual',
-    'matricula_historica',
+    'matricula',
     'posto',
     'cpf',
     'telefone',
+    'importada',
     'principal_motivo',
     'alertas',
     'erros',
+    'pendencias_revisao',
     'observacoes',
-    'importada',
   ];
 
   const linhas = (lote?.linhas || []).map((linha) => [
     linha.status,
     linha.nome,
-    linha.matricula_atual || linha.matricula || '',
-    linha.matricula_historica || '',
+    linha.matricula,
     linha.posto,
     linha.cpf,
     linha.telefone,
+    linha.importada ? 'SIM' : 'NAO',
     linha.principalMotivo,
     linha.alertas.join(' | '),
     linha.erros.join(' | '),
+    linha.pendencias_revisao.join(' | '),
     linha.observacoes.join(' | '),
-    linha.importada ? 'Sim' : 'Não',
   ]);
 
-  const csv = [headers, ...linhas].map((colunas) => colunas.map(escapeCsv).join(',')).join('\n');
+  const csv = [headers, ...linhas]
+    .map((colunas) => colunas.map(escapeCsv).join(','))
+    .join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `historico-importacao-militares-${lote?.nomeArquivo || 'lote'}.csv`;
+  link.download = `historico_importacao_${(lote?.nomeArquivo || 'lote').replace(/\s+/g, '_')}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-export { STATUS_LOTE_LABEL, STATUS_BADGE_CLASS, STATUS_LINHA };
+export { STATUS_BADGE_CLASS };

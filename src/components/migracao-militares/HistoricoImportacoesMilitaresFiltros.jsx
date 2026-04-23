@@ -1,52 +1,85 @@
 import React from 'react';
+import { Search, FilterX } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
-function FiltroSwitch({ id, label, checked, onChange }) {
+export default function HistoricoImportacoesMilitaresFiltros({
+  filtros,
+  onChangeFiltros,
+  onLimpar,
+  tiposImportacao = [],
+  executores = [],
+  statusOptions = [],
+}) {
   return (
-    <label htmlFor={id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 bg-white">
-      <span className="text-sm text-slate-700">{label}</span>
-      <Switch id={id} checked={checked} onCheckedChange={onChange} />
-    </label>
-  );
-}
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-700">Filtros operacionais</h2>
+        <Button type="button" variant="ghost" size="sm" onClick={onLimpar} className="text-slate-600">
+          <FilterX className="w-4 h-4 mr-1" /> Limpar filtros
+        </Button>
+      </div>
 
-export default function HistoricoImportacoesMilitaresFiltros({ filtros, onChangeFiltros, onLimpar }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="md:col-span-1">
-          <label className="text-xs text-slate-500">Arquivo</label>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+        <div className="xl:col-span-2 relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <Input
-            placeholder="Buscar por nome do arquivo"
-            value={filtros.arquivo}
-            onChange={(event) => onChangeFiltros({ arquivo: event.target.value })}
+            placeholder="Buscar por lote, referência, observação ou executor"
+            value={filtros.busca}
+            onChange={(event) => onChangeFiltros({ busca: event.target.value })}
+            className="pl-9"
           />
         </div>
+
         <div>
-          <label className="text-xs text-slate-500">Período de</label>
+          <label className="text-xs text-slate-500 mb-1 block">Tipo de importação</label>
+          <Select value={filtros.tipoImportacao} onValueChange={(value) => onChangeFiltros({ tipoImportacao: value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos os tipos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODOS">Todos os tipos</SelectItem>
+              {tiposImportacao.map((tipo) => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block">Status</label>
+          <Select value={filtros.status} onValueChange={(value) => onChangeFiltros({ status: value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos status" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((status) => <SelectItem key={status} value={status}>{status === 'TODOS' ? 'Todos status' : status}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block">Executor</label>
+          <Select value={filtros.executor} onValueChange={(value) => onChangeFiltros({ executor: value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos executores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TODOS">Todos executores</SelectItem>
+              {executores.map((executor) => <SelectItem key={executor} value={executor}>{executor}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block">Data inicial</label>
           <Input type="date" value={filtros.inicio} onChange={(event) => onChangeFiltros({ inicio: event.target.value })} />
         </div>
         <div>
-          <label className="text-xs text-slate-500">Até</label>
+          <label className="text-xs text-slate-500 mb-1 block">Data final</label>
           <Input type="date" value={filtros.fim} onChange={(event) => onChangeFiltros({ fim: event.target.value })} />
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-        <FiltroSwitch id="com-pendencias" label="Lote com pendências" checked={filtros.comPendencias} onChange={(v) => onChangeFiltros({ comPendencias: v })} />
-        <FiltroSwitch id="com-erro" label="Lote com erro" checked={filtros.comErro} onChange={(v) => onChangeFiltros({ comErro: v })} />
-        <FiltroSwitch id="concluida" label="Importação concluída" checked={filtros.somenteConcluida} onChange={(v) => onChangeFiltros({ somenteConcluida: v })} />
-        <FiltroSwitch id="analise" label="Somente análise" checked={filtros.somenteAnalise} onChange={(v) => onChangeFiltros({ somenteAnalise: v })} />
-        <FiltroSwitch id="com-revisar" label="Com linhas REVISAR" checked={filtros.comRevisar} onChange={(v) => onChangeFiltros({ comRevisar: v })} />
-        <FiltroSwitch id="com-linhas-erro" label="Com linhas ERRO" checked={filtros.comLinhasErro} onChange={(v) => onChangeFiltros({ comLinhasErro: v })} />
-        <FiltroSwitch id="com-alerta" label="Com APTO_COM_ALERTA" checked={filtros.comAlerta} onChange={(v) => onChangeFiltros({ comAlerta: v })} />
-      </div>
-
-      <div className="flex justify-end">
-        <button type="button" onClick={onLimpar} className="text-sm text-slate-600 hover:text-slate-900 underline underline-offset-2">
-          Limpar filtros
-        </button>
       </div>
     </div>
   );
