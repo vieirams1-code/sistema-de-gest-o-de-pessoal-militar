@@ -997,15 +997,11 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
   let historicoImportando = null;
 
   if (historicoId) {
-    try {
-      historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
-        status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
-        importar_linhas_com_alerta: !!incluirAlertas,
-        importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
-      });
-    } catch (error) {
-      avisosHistorico.push(error?.message || 'Não foi possível atualizar o histórico para status de importação em andamento.');
-    }
+    historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+      status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
+      importar_linhas_com_alerta: !!incluirAlertas,
+      importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
+    });
   }
 
   const importaveis = analise.linhas.filter((linha) => {
@@ -1054,21 +1050,17 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
 
   let historicoFinal = null;
   if (historicoId) {
-    try {
-      historicoFinal = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
-        ...analise.resumo,
-        total_importadas: resultado.totalImportadas,
-        total_nao_importadas: resultado.totalNaoImportadas,
-        ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
-        status_importacao: statusFinal,
-        importar_linhas_com_alerta: !!incluirAlertas,
-        importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
-        relatorio_json: JSON.stringify(relatorio),
-        observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
-      });
-    } catch (error) {
-      avisosHistorico.push(error?.message || 'Não foi possível atualizar o histórico após a importação.');
-    }
+    historicoFinal = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
+      ...analise.resumo,
+      total_importadas: resultado.totalImportadas,
+      total_nao_importadas: resultado.totalNaoImportadas,
+      ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
+      status_importacao: statusFinal,
+      importar_linhas_com_alerta: !!incluirAlertas,
+      importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
+      relatorio_json: JSON.stringify(relatorio),
+      observacoes: resultado.erros.length ? `Importação com ${resultado.erros.length} erro(s) em linhas específicas.` : 'Importação concluída com sucesso.',
+    });
   }
 
   return {

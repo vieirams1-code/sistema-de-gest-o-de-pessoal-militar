@@ -9,7 +9,7 @@ import HistoricoImportacoesMilitaresFiltros from '@/components/migracao-militare
 import HistoricoImportacoesMilitaresLista from '@/components/migracao-militares/HistoricoImportacoesMilitaresLista';
 import DetalheImportacaoMilitaresDrawer from '@/components/migracao-militares/DetalheImportacaoMilitaresDrawer';
 import {
-  excluirHistoricoImportacaoMilitares,
+  excluirHistoricoImportacao,
   filtrarLotesHistorico,
   listarHistoricoImportacoesMilitares,
   montarResumoHistorico,
@@ -67,7 +67,7 @@ export default function HistoricoImportacoesMilitares() {
     setLotesExcluindo((prev) => ({ ...prev, [lote.id]: true }));
 
     try {
-      await excluirHistoricoImportacaoMilitares(lote.id);
+      await excluirHistoricoImportacao(lote);
 
       setLotes((prev) => prev.filter((item) => item.id !== lote.id));
       setLoteSelecionado((prev) => (prev?.id === lote.id ? null : prev));
