@@ -14,7 +14,8 @@ import {
   buildPermissionPayload,
   buildPermissionsFromSource,
   canonicalPermissionKeys,
-  mergeUserOverridesWithMatrix,
+  extractProfileMatrixFromDescription,
+  mergeProfileDescriptionWithMatrix,
   resolveProfilePermissions,
   resolveUserPermissions,
 } from '@/services/permissionMatrixService';
@@ -28,6 +29,14 @@ const normalizeAccessMode = (value) => {
   if (SELF_RESTRICTED_SCOPES.has(normalized)) return 'proprio';
   if (['admin', 'setor', 'subsetor', 'unidade'].includes(normalized)) return normalized;
   return 'proprio';
+};
+
+const isPerfilPersonalizado = (perfil, usuarioId) => {
+  if (!perfil) return false;
+  const isCustom = perfil.is_personalizado === true || Boolean(perfil.usuario_vinculado_id);
+  if (!isCustom) return false;
+  if (!usuarioId) return true;
+  return perfil.usuario_vinculado_id === usuarioId;
 };
 
 export default function PermissoesUsuarios() {
@@ -88,6 +97,19 @@ export default function PermissoesUsuarios() {
     const profileSource = selectedProfileSource || selectedProfilePreview;
     return resolveProfilePermissions({ profileSource }).permissions;
   }, [selectedProfilePreview, selectedProfileSource]);
+  const perfisDisponiveisParaUsuario = useMemo(() => {
+    const usuarioId = selectedUser?.id;
+    return perfis.filter((perfil) => {
+      if (!isPerfilPersonalizado(perfil)) return true;
+      return isPerfilPersonalizado(perfil, usuarioId);
+    });
+  }, [perfis, selectedUser?.id]);
+
+  const currentPerfilSelecionado = useMemo(
+    () => (selectedProfileSource || selectedProfilePreview || null),
+    [selectedProfileSource, selectedProfilePreview]
+  );
+  const currentPerfilCustomizado = isPerfilPersonalizado(currentPerfilSelecionado, selectedUser?.id);
 
   const grupamentos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Grupamento'), [subgrupamentos]);
   const subgrupamentosFilhos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId), [subgrupamentos, userGrupamentoId]);
@@ -173,6 +195,7 @@ export default function PermissoesUsuarios() {
     const resolved = await resolveUserPermissions({
       userSource: fullAcesso,
       profileSource: profileSource || {},
+      preferProfilePermissions: true,
     });
     setLoadedProfilePermissions(resolved.profilePermissions || null);
     setUserPermissions(resolved.permissions);
@@ -233,21 +256,58 @@ export default function PermissoesUsuarios() {
 
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
       const permissionPayload = buildPermissionPayload(normalizedPermissions);
-      const permissionOverrides = mergeUserOverridesWithMatrix(
-        selectedUser?.permissoes_override,
-        normalizedPermissions
+      const effectiveSelectedProfile = selectedProfileSource || perfilSelected || null;
+      const effectiveProfilePermissions = resolveProfilePermissions({
+        profileSource: effectiveSelectedProfile || {},
+      }).permissions;
+      const isPermissionChanged = canonicalPermissionKeys.some(
+        (key) => normalizedPermissions[key] !== effectiveProfilePermissions[key]
       );
+      let perfilIdToPersist = perfilSelected?.id || '';
+      let perfilNomeToPersist = perfilSelected?.nome_perfil || '';
+      let pendingCustomProfileForNewUser = null;
+
+      if (isPermissionChanged) {
+        const customProfileName = `Personalizado - ${userNomeUsuario || userUserEmail}`;
+        const cleanDescricaoOrigem = extractProfileMatrixFromDescription(effectiveSelectedProfile?.descricao || '').cleanDescricao;
+        const origemDescricao = cleanDescricaoOrigem
+          ? `${cleanDescricaoOrigem}\n\nPerfil personalizado para usuário.`
+          : 'Perfil personalizado para usuário.';
+        const customProfilePayload = {
+          nome_perfil: customProfileName,
+          nome: customProfileName,
+          descricao: mergeProfileDescriptionWithMatrix(origemDescricao, normalizedPermissions),
+          is_personalizado: true,
+          usuario_vinculado_id: selectedUser?.id || '',
+          perfil_origem_id: effectiveSelectedProfile?.id || '',
+          ativo: true,
+          ...permissionPayload,
+        };
+
+        if (isNewAcesso) {
+          pendingCustomProfileForNewUser = customProfilePayload;
+        } else {
+          if (isPerfilPersonalizado(effectiveSelectedProfile, selectedUser?.id) && effectiveSelectedProfile?.id) {
+            await base44.entities.PerfilPermissao.update(effectiveSelectedProfile.id, customProfilePayload);
+            perfilIdToPersist = effectiveSelectedProfile.id;
+            perfilNomeToPersist = customProfileName;
+          } else {
+            const createdPersonalizado = await base44.entities.PerfilPermissao.create(customProfilePayload);
+            perfilIdToPersist = createdPersonalizado.id;
+            perfilNomeToPersist = createdPersonalizado.nome_perfil || customProfileName;
+            setSelectedProfileId(perfilIdToPersist);
+            setSelectedProfileSource(createdPersonalizado);
+            setLoadedProfilePermissions(normalizedPermissions);
+          }
+        }
+      }
 
       const baseData = {
         nome_usuario: userNomeUsuario,
         user_email: userUserEmail.trim(),
         ativo: userAtivo,
-        perfil_id: perfilSelected ? perfilSelected.id : '',
-        perfil_nome: perfilSelected ? perfilSelected.nome_perfil : '',
-        permissoes_override: permissionOverrides,
-        matriz_permissoes_usuario: normalizedPermissions,
-        matriz_permissoes: normalizedPermissions,
-        ...permissionPayload
+        perfil_id: perfilIdToPersist,
+        perfil_nome: perfilNomeToPersist,
       };
 
       const normalizedAccessMode = normalizeAccessMode(userAccessMode);
@@ -281,17 +341,34 @@ export default function PermissoesUsuarios() {
         ? await base44.entities.UsuarioAcesso.create(dataToSave)
         : await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
 
+      if (pendingCustomProfileForNewUser && savedRecord?.id) {
+        const createdPersonalizado = await base44.entities.PerfilPermissao.create({
+          ...pendingCustomProfileForNewUser,
+          usuario_vinculado_id: savedRecord.id,
+        });
+        await base44.entities.UsuarioAcesso.update(savedRecord.id, {
+          perfil_id: createdPersonalizado.id,
+          perfil_nome: createdPersonalizado.nome_perfil || pendingCustomProfileForNewUser.nome_perfil,
+        });
+      }
+
       const resolvedRecordId = savedRecord.id || selectedUser.id;
       const reloadedRecord = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
+      const reloadedProfile = await getProfileWithPermissions(reloadedRecord?.perfil_id);
+      setSelectedProfileId(reloadedRecord?.perfil_id || '_nenhum');
+      setSelectedProfileSource(reloadedProfile || null);
+      setLoadedProfilePermissions(reloadedProfile ? resolveProfilePermissions({ profileSource: reloadedProfile }).permissions : null);
       const resolvedReloaded = await resolveUserPermissions({
         userSource: reloadedRecord,
-        profileSource: selectedProfileSource || perfilSelected || {},
+        profileSource: reloadedProfile || {},
+        preferProfilePermissions: true,
       });
       const reloadedPermissions = resolvedReloaded.permissions;
       setUserPermissions(reloadedPermissions);
       setSelectedUser(reloadedRecord);
 
       queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
+      queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
     } catch (error) {
       alert(error?.message || 'Erro ao salvar permissão no Base44.');
     } finally {
@@ -630,8 +707,10 @@ export default function PermissoesUsuarios() {
                           <SelectTrigger><SelectValue placeholder="Escolha um perfil para aplicar" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="_nenhum">— Personalizado / Não aplicar perfil —</SelectItem>
-                            {perfis.map(p => (
-                              <SelectItem key={p.id} value={p.id}>{p.nome_perfil}</SelectItem>
+                            {perfisDisponiveisParaUsuario.map(p => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.nome_perfil}{isPerfilPersonalizado(p) ? ' (Personalizado)' : ''}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -648,6 +727,22 @@ export default function PermissoesUsuarios() {
                     <p className="text-xs text-slate-500 mt-3 flex items-center gap-1">
                       <Info className="w-4 h-4" /> Selecionar um perfil apenas exibe a prévia abaixo. As permissões do formulário só mudam ao clicar em <b>Aplicar Perfil</b>.
                     </p>
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs text-slate-500">Perfil atual</p>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {currentPerfilSelecionado?.nome_perfil || currentPerfilSelecionado?.nome || 'Sem perfil vinculado'}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Badge variant={currentPerfilCustomizado ? 'default' : 'outline'} className={currentPerfilCustomizado ? 'bg-indigo-600' : ''}>
+                          {currentPerfilCustomizado ? 'Personalizado' : 'Padrão'}
+                        </Badge>
+                        {currentPerfilCustomizado && (
+                          <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                            Origem: {currentPerfilSelecionado?.perfil_origem_id || 'não informada'}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
 
                     {selectedProfilePreview && (
                       <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3.5">
