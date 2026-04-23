@@ -734,15 +734,28 @@ export async function corrigirLinhaPreImportacao({
     && !mensagem.includes('Nome de guerra')
   ));
   const alteracoes = [];
+  const alteracoesDetalhadas = [];
+
+  const registrarAlteracaoCampo = (campo, valorAnterior, valorNovo) => {
+    if (valorAnterior === valorNovo) return;
+    alteracoes.push(campo);
+    alteracoesDetalhadas.push({
+      campo,
+      valor_anterior: valorAnterior ?? '',
+      valor_novo: valorNovo ?? '',
+    });
+  };
 
   if (Object.prototype.hasOwnProperty.call(campos, 'nome_completo')) {
+    const valorAnterior = transformado.nome_completo || '';
     const nomeCompleto = normalizarNomeEssencial(campos.nome_completo);
     transformado.nome_completo = nomeCompleto;
     if (!nomeCompleto) erros.push('Nome completo obrigatório para importação.');
-    alteracoes.push('nome_completo');
+    registrarAlteracaoCampo('nome_completo', valorAnterior, nomeCompleto);
   }
 
   if (Object.prototype.hasOwnProperty.call(campos, 'nome_guerra')) {
+    const valorAnterior = transformado.nome_guerra || '';
     const nomeGuerra = normalizarNomeEssencial(campos.nome_guerra);
     transformado.nome_guerra = nomeGuerra;
     if (transformado?.exigir_nome_guerra && !nomeGuerra) {
@@ -751,10 +764,11 @@ export async function corrigirLinhaPreImportacao({
     if (nomeGuerra && nomeGuerra.length < 2) {
       erros.push('Nome de guerra inválido. Informe ao menos 2 caracteres.');
     }
-    alteracoes.push('nome_guerra');
+    registrarAlteracaoCampo('nome_guerra', valorAnterior, nomeGuerra);
   }
 
   if (Object.prototype.hasOwnProperty.call(campos, 'matricula')) {
+    const valorAnterior = transformado.matricula || '';
     const matriculaDigitada = limparTexto(campos.matricula);
     const matriculaNormalizada = normalizarMatricula(matriculaDigitada);
     if (!matriculaNormalizada) {
@@ -771,10 +785,11 @@ export async function corrigirLinhaPreImportacao({
         erros.push(error?.message || 'Matrícula inválida para importação.');
       }
     }
-    alteracoes.push('matricula');
+    registrarAlteracaoCampo('matricula', valorAnterior, transformado.matricula || '');
   }
 
   if (Object.prototype.hasOwnProperty.call(campos, 'cpf')) {
+    const valorAnterior = transformado.cpf || '';
     const cpfDigits = somenteNumeros(campos.cpf);
     if (!cpfDigits) {
       transformado.cpf = '';
@@ -785,13 +800,14 @@ export async function corrigirLinhaPreImportacao({
       const cpfNorm = normalizarCpfIdentidade(cpfDigits);
       transformado.cpf = `${cpfNorm.slice(0, 3)}.${cpfNorm.slice(3, 6)}.${cpfNorm.slice(6, 9)}-${cpfNorm.slice(9)}`;
     }
-    alteracoes.push('cpf');
+    registrarAlteracaoCampo('cpf', valorAnterior, transformado.cpf || '');
   }
 
   if (Object.prototype.hasOwnProperty.call(campos, 'data_inclusao')) {
+    const valorAnterior = transformado.data_inclusao || '';
     const dataCanonica = normalizarDataCanonica(campos.data_inclusao, erros);
     transformado.data_inclusao = dataCanonica || '';
-    alteracoes.push('data_inclusao');
+    registrarAlteracaoCampo('data_inclusao', valorAnterior, transformado.data_inclusao || '');
   }
 
   const cpfAtual = transformado.cpf;
@@ -821,6 +837,7 @@ export async function corrigirLinhaPreImportacao({
       corrigido_por_nome: usuario?.full_name || usuario?.name || '',
       corrigido_em: new Date().toISOString(),
       campos_alterados: dedupeMensagens(alteracoes),
+      alteracoes_detalhadas: alteracoesDetalhadas,
     },
   };
 
@@ -1090,11 +1107,16 @@ export async function persistirCorrecaoPreImportacaoHistorico({
 }) {
   if (!historicoId) return null;
   const historicoEntity = assertHistoricoEntity();
+  const itens = historicoEntity.filter
+    ? await historicoEntity.filter({ id: historicoId })
+    : (historicoEntity.list ? await historicoEntity.list() : []).filter((item) => item?.id === historicoId);
+  const historicoAtual = Array.isArray(itens) ? itens[0] : null;
   const timestamp = new Date().toISOString();
   const trilha = `Correção pré-importação linha ${linhaNumero} por ${usuario?.email || 'sistema'} em ${timestamp} (campos: ${alteracoes.join(', ') || 'N/D'}).`;
+  const observacoesAnteriores = limparTexto(historicoAtual?.observacoes);
   return historicoEntity.update(historicoId, {
     relatorio_json: JSON.stringify(relatorioFromAnalise(analise), null, 2),
-    observacoes: trilha,
+    observacoes: [observacoesAnteriores, trilha].filter(Boolean).join('\n'),
   });
 }
 
