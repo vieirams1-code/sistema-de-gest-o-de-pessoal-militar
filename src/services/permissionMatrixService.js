@@ -39,12 +39,16 @@ const aliasByCanonical = canonicalPermissionKeys.reduce((acc, key) => {
 }, {});
 
 export const nestedMatrixKeys = [
+  '__matrix_v2',
   'matriz_permissoes',
   'permission_matrix',
   'permissions_matrix',
   'permissions',
   'permissoes',
 ];
+
+export const PROFILE_MATRIX_START_MARKER = '[SGP_PERMISSIONS_MATRIX]';
+export const PROFILE_MATRIX_END_MARKER = '[/SGP_PERMISSIONS_MATRIX]';
 
 export const ADMIN_RECOVERY_MODULE_KEYS = [
   'acesso_militares',
@@ -58,6 +62,64 @@ export const ADMIN_RECOVERY_ACTION_KEYS = [
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 const isObjectRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+export const extractProfileMatrixFromDescription = (rawDescricao = '') => {
+  const descricao = typeof rawDescricao === 'string' ? rawDescricao : '';
+  const startIdx = descricao.indexOf(PROFILE_MATRIX_START_MARKER);
+  const endIdx = descricao.indexOf(PROFILE_MATRIX_END_MARKER);
+
+  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+    return { cleanDescricao: descricao.trim(), matrix: null, hasMatrixBlock: false };
+  }
+
+  const before = descricao.slice(0, startIdx).trimEnd();
+  const after = descricao.slice(endIdx + PROFILE_MATRIX_END_MARKER.length).trimStart();
+  const cleanDescricao = [before, after].filter(Boolean).join('\n\n').trim();
+  const jsonRaw = descricao
+    .slice(startIdx + PROFILE_MATRIX_START_MARKER.length, endIdx)
+    .trim();
+
+  if (!jsonRaw) {
+    return { cleanDescricao, matrix: null, hasMatrixBlock: true };
+  }
+
+  try {
+    const parsed = JSON.parse(jsonRaw);
+    if (!isObjectRecord(parsed)) {
+      return { cleanDescricao, matrix: null, hasMatrixBlock: true };
+    }
+
+    return {
+      cleanDescricao,
+      matrix: sanitizePermissionsMatrix(parsed),
+      hasMatrixBlock: true,
+    };
+  } catch {
+    return { cleanDescricao, matrix: null, hasMatrixBlock: true };
+  }
+};
+
+export const mergeProfileDescriptionWithMatrix = (cleanDescricao = '', matrix = {}) => {
+  const sanitizedDescricao = typeof cleanDescricao === 'string' ? cleanDescricao.trim() : '';
+  const sanitizedMatrix = sanitizePermissionsMatrix(matrix);
+  const serialized = JSON.stringify(sanitizedMatrix);
+  const matrixBlock = `${PROFILE_MATRIX_START_MARKER}${serialized}${PROFILE_MATRIX_END_MARKER}`;
+
+  return sanitizedDescricao ? `${sanitizedDescricao}\n\n${matrixBlock}` : matrixBlock;
+};
+
+export const extractUserMatrixFromOverrides = (permissoes_override = {}) => {
+  if (!isObjectRecord(permissoes_override)) return null;
+  const matrix = permissoes_override.__matrix_v2;
+  if (!isObjectRecord(matrix)) return null;
+  return sanitizePermissionsMatrix(matrix);
+};
+
+export const mergeUserOverridesWithMatrix = (existingOverrides = {}, matrix = {}) => {
+  const baseOverrides = isObjectRecord(existingOverrides) ? { ...existingOverrides } : {};
+  baseOverrides.__matrix_v2 = sanitizePermissionsMatrix(matrix);
+  return baseOverrides;
+};
 
 const collectPermissionSources = (source = {}) => {
   const rootSource = isObjectRecord(source) ? source : {};
@@ -89,6 +151,13 @@ const readPermissionFromSource = (source = {}, key) => {
 
   return false;
 };
+
+const sanitizePermissionsMatrix = (source = {}) => (
+  canonicalPermissionKeys.reduce((acc, key) => {
+    acc[key] = readPermissionFromSource(source, key);
+    return acc;
+  }, {})
+);
 
 const sourceHasPermissionValue = (source = {}, key) => {
   const aliases = aliasByCanonical[key] || [];
@@ -169,7 +238,11 @@ export const getPermissionMismatches = (expectedPermissions = {}, persistedSourc
 };
 
 export const resolveProfilePermissions = ({ profileSource = {}, fallbackSource = {} }) => ({
-  permissions: buildPermissionsFromSource(profileSource, fallbackSource),
+  permissions: (() => {
+    const parsedProfileDescription = extractProfileMatrixFromDescription(profileSource?.descricao);
+    if (parsedProfileDescription.matrix) return buildPermissionsFromSource(parsedProfileDescription.matrix);
+    return buildPermissionsFromSource(profileSource, fallbackSource);
+  })(),
 });
 
 export const resolveUserPermissions = ({
@@ -178,30 +251,26 @@ export const resolveUserPermissions = ({
   fallbackProfile = {},
   fallbackUser = {},
 }) => {
-  const profilePermissions = buildPermissionsFromSource(profileSource, fallbackProfile);
+  const profilePermissions = resolveProfilePermissions({
+    profileSource,
+    fallbackSource: fallbackProfile,
+  }).permissions;
 
-  const userPermissions = hasValidMatrixContent(userSource)
-    ? buildPermissionsFromSource(userSource)
-    : buildPermissionsFromSource(fallbackUser, profilePermissions);
+  const userMatrixFromOverrides = extractUserMatrixFromOverrides(userSource?.permissoes_override);
+  const userPermissions = userMatrixFromOverrides
+    ? buildPermissionsFromSource(userMatrixFromOverrides, profilePermissions)
+    : (
+      hasValidMatrixContent(userSource)
+        ? buildPermissionsFromSource(userSource, profilePermissions)
+        : buildPermissionsFromSource(fallbackUser, profilePermissions)
+    );
 
   return {
     permissions: userPermissions,
     profilePermissions,
-    source: hasValidMatrixContent(userSource) ? 'usuario' : 'perfil',
+    source: userMatrixFromOverrides || hasValidMatrixContent(userSource) ? 'usuario' : 'perfil',
   };
 };
-
-export const resolveProfilePermissionsWithSnapshot = async ({
-  profileSource = {},
-  fallbackSource = {},
-}) => resolveProfilePermissions({ profileSource, fallbackSource });
-
-export const resolveUserPermissionsWithSnapshots = async ({
-  userSource = {},
-  profileSource = {},
-  fallbackProfile = {},
-  fallbackUser = {},
-}) => resolveUserPermissions({ userSource, profileSource, fallbackProfile, fallbackUser });
 
 export const isAdminRecoveryPermission = (permissionKey, type = 'action') => {
   if (!permissionKey || typeof permissionKey !== 'string') return false;
@@ -212,6 +281,3 @@ export const isAdminRecoveryPermission = (permissionKey, type = 'action') => {
   if (type === 'module') return ADMIN_RECOVERY_MODULE_KEYS.includes(normalized);
   return ADMIN_RECOVERY_ACTION_KEYS.includes(normalized);
 };
-
-export const upsertProfileSnapshot = async () => null;
-export const upsertUserSnapshot = async () => null;

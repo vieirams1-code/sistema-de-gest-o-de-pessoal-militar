@@ -15,6 +15,8 @@ import {
   buildPermissionsFromSource,
   canonicalPermissionKeys,
   computePermissionOverrides,
+  mergeUserOverridesWithMatrix,
+  resolveProfilePermissions,
   resolveUserPermissions,
 } from '@/services/permissionMatrixService';
 
@@ -192,7 +194,9 @@ export default function PermissoesUsuarios() {
     if (!selectedProfilePreview) return;
 
     const perfilCompleto = await getProfileWithPermissions(selectedProfilePreview.id);
-    const profilePermissions = buildPermissionsFromSource(perfilCompleto || selectedProfilePreview);
+    const profilePermissions = resolveProfilePermissions({
+      profileSource: perfilCompleto || selectedProfilePreview,
+    }).permissions;
     setLoadedProfilePermissions(profilePermissions);
     setUserPermissions(profilePermissions);
   };
@@ -220,9 +224,10 @@ export default function PermissoesUsuarios() {
       const profilePermissions = loadedProfilePermissions || {};
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
       const permissionPayload = buildPermissionPayload(normalizedPermissions);
-      const permissionOverrides = selectedProfileId === '_nenhum'
+      const legacyOverrides = selectedProfileId === '_nenhum'
         ? {}
         : computePermissionOverrides(normalizedPermissions, profilePermissions);
+      const permissionOverrides = mergeUserOverridesWithMatrix(legacyOverrides, normalizedPermissions);
 
       const baseData = {
         nome_usuario: userNomeUsuario,
@@ -268,7 +273,11 @@ export default function PermissoesUsuarios() {
 
       const resolvedRecordId = savedRecord.id || selectedUser.id;
       const reloadedRecord = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
-      const reloadedPermissions = buildPermissionsFromSource(reloadedRecord);
+      const resolvedReloaded = await resolveUserPermissions({
+        userSource: reloadedRecord,
+        profileSource: perfilSelected || {},
+      });
+      const reloadedPermissions = resolvedReloaded.permissions;
       setUserPermissions(reloadedPermissions);
       setSelectedUser(reloadedRecord);
 

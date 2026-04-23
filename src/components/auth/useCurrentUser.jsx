@@ -9,8 +9,16 @@ import {
 const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
 
-const ADMIN_ALWAYS_ALLOWED_MODULES = new Set(['acesso_militares', 'acesso_configuracoes']);
-const ADMIN_ALWAYS_ALLOWED_ACTIONS = new Set(['perm_gerir_permissoes', 'perm_gerir_configuracoes']);
+const ADMIN_ALWAYS_ALLOWED_MODULES = new Set([
+  'acesso_dashboard',
+  'dashboard',
+  'acesso_militares',
+  'acesso_configuracoes',
+]);
+const ADMIN_ALWAYS_ALLOWED_ACTIONS = new Set([
+  'perm_gerir_permissoes',
+  'perm_gerir_configuracoes',
+]);
 
 const normalizeAccessMode = (value) => {
   const normalized = toLowerSafe(value);
