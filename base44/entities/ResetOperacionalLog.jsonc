@@ -1,0 +1,32 @@
+{
+  "name": "ResetOperacionalLog",
+  "type": "object",
+  "title": "Log de Reset Operacional",
+  "description": "Registro de auditoria de preview e execução da rotina de limpeza pré-publicação.",
+  "properties": {
+    "tipo": {
+      "type": "string",
+      "default": "preview"
+    },
+    "executado_por": {
+      "type": "string",
+      "default": ""
+    },
+    "data_execucao": {
+      "type": "date",
+      "default": ""
+    },
+    "total_previsto": {
+      "type": "number",
+      "default": 0
+    },
+    "total_removido": {
+      "type": "number",
+      "default": 0
+    },
+    "resumo_json": {
+      "type": "string",
+      "default": ""
+    }
+  }
+}

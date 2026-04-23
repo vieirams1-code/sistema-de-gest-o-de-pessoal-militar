@@ -85,7 +85,8 @@ export const permissionStructure = [
           { key: 'perm_admin_mode', label: 'Pode Ativar Modo Admin', sensitive: true },
           { key: 'perm_gerir_permissoes', label: 'Gerir Permissões', sensitive: true },
           { key: 'perm_gerir_estrutura', label: 'Gerir Estrutura Org.', sensitive: true },
-          { key: 'perm_gerir_configuracoes', label: 'Gerir Configurações', sensitive: true }
+          { key: 'perm_gerir_configuracoes', label: 'Gerir Configurações', sensitive: true },
+          { key: 'perm_reset_operacional', label: 'Executar Reset Operacional', sensitive: true }
         ]
       }
     ]
