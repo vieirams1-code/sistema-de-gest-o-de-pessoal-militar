@@ -99,7 +99,14 @@ export default function MigracaoAlteracoesLegado() {
       ]);
       setMilitares(listaMilitares);
       setAnalise(resultado);
-      toast({ title: 'Análise concluída', description: 'Prévia da migração de alterações legado gerada com sucesso.' });
+      if (resultado?.lote_ja_processado) {
+        toast({
+          title: 'Lote já processado anteriormente',
+          description: 'Mesmo hash de conteúdo identificado. Estados anteriores serão reaproveitados quando possível.',
+        });
+      } else {
+        toast({ title: 'Análise concluída', description: 'Prévia da migração de alterações legado gerada com sucesso.' });
+      }
 
       try {
         const historico = await salvarAnaliseHistoricoAlteracoesLegado(resultado, usuario);
@@ -142,6 +149,7 @@ export default function MigracaoAlteracoesLegado() {
         usuario,
       });
       setResultadoImportacao(resultado);
+      const totalJaImportadas = resultado?.totalJaImportadas || 0;
 
       const avisoHistoricoIndisponivel = resultado.avisosHistorico?.find((aviso) => aviso.includes('entidade de histórico não está disponível'));
       if (avisoHistoricoIndisponivel) {
@@ -154,7 +162,12 @@ export default function MigracaoAlteracoesLegado() {
           description: resultado.avisosHistorico[0],
         });
       } else {
-        toast({ title: 'Importação finalizada', description: `Foram importadas ${resultado.totalImportadas} publicações legado.` });
+        toast({
+          title: 'Importação finalizada',
+          description: totalJaImportadas > 0
+            ? `Importadas ${resultado.totalImportadas}; ${totalJaImportadas} já existiam e foram reaproveitadas.`
+            : `Foram importadas ${resultado.totalImportadas} publicações legado.`,
+        });
       }
     } catch (error) {
       toast({ title: 'Erro na importação', description: error?.message || 'Falha ao importar lote.', variant: 'destructive' });

@@ -4,10 +4,13 @@
   "properties": {
     "nome_arquivo": { "type": "string" },
     "tipo_arquivo": { "type": "string" },
+    "tamanho_arquivo": { "type": "number", "default": 0 },
     "hash_arquivo": { "type": "string" },
+    "hash_lote": { "type": "string" },
     "data_importacao": { "type": "string", "format": "date-time" },
     "importado_por": { "type": "string" },
     "importado_por_nome": { "type": "string" },
+    "usuario_executor": { "type": "string" },
     "total_linhas": { "type": "number", "default": 0 },
     "total_aptas": { "type": "number", "default": 0 },
     "total_aptas_com_alerta": { "type": "number", "default": 0 },
@@ -20,6 +23,11 @@
     "total_alertas": { "type": "number", "default": 0 },
     "ajustes_manuais": { "type": "number", "default": 0 },
     "status_importacao": {
+      "type": "string",
+      "enum": ["Analisado", "Importando", "Importado", "Importado Parcial", "Falhou"],
+      "default": "Analisado"
+    },
+    "status_lote": {
       "type": "string",
       "enum": ["Analisado", "Importando", "Importado", "Importado Parcial", "Falhou"],
       "default": "Analisado"
