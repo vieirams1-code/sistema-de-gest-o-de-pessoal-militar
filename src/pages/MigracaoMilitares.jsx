@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Database, Download, RefreshCcw, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +12,11 @@ import TabelaPreviaMigracao from '@/components/migracao/TabelaPreviaMigracao';
 import DetalheLinhaMigracao from '@/components/migracao/DetalheLinhaMigracao';
 import {
   analisarArquivoMigracao,
+  carregarAnaliseHistorico,
+  corrigirLinhaPreImportacao,
   exportarRelatorio,
   importarAnalise,
+  persistirCorrecaoPreImportacaoHistorico,
   salvarAnaliseHistorico,
 } from '@/services/migracaoMilitaresService';
 
@@ -26,6 +29,7 @@ const filtros = [
 ];
 
 const ERRO_ENTIDADE_HISTORICO = 'Falha ao acessar o histórico de importação de militares. Verifique se a entidade ImportacaoMilitares está publicada no app.';
+const STORAGE_KEY = 'migracao_militares_historico_id';
 
 export default function MigracaoMilitares() {
   const { isAdmin, isLoading, isAccessResolved } = useCurrentUser();
@@ -39,6 +43,30 @@ export default function MigracaoMilitares() {
   const [busca, setBusca] = useState('');
   const [linhaSelecionada, setLinhaSelecionada] = useState(null);
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
+  const [salvandoCorrecao, setSalvandoCorrecao] = useState(false);
+
+  useEffect(() => {
+    const restaurarDraft = async () => {
+      const historicoSalvo = sessionStorage.getItem(STORAGE_KEY);
+      if (!historicoSalvo || analise || resultadoImportacao) return;
+      try {
+        setCarregando(true);
+        const relatorio = await carregarAnaliseHistorico(historicoSalvo);
+        if (relatorio?.linhas?.length) {
+          setAnalise(relatorio);
+          setHistoricoId(historicoSalvo);
+          toast({ title: 'Rascunho restaurado', description: 'Última análise da migração foi carregada do histórico.' });
+        } else {
+          sessionStorage.removeItem(STORAGE_KEY);
+        }
+      } catch (error) {
+        console.warn('[MigracaoMilitares] Falha ao restaurar análise salva.', error);
+      } finally {
+        setCarregando(false);
+      }
+    };
+    restaurarDraft();
+  }, [analise, resultadoImportacao, toast]);
 
   const linhasFiltradas = useMemo(() => {
     if (!analise) return [];
@@ -64,6 +92,7 @@ export default function MigracaoMilitares() {
       const usuario = await base44.auth.me();
       const historico = await salvarAnaliseHistorico(resultado, usuario);
       setHistoricoId(historico?.id);
+      if (historico?.id) sessionStorage.setItem(STORAGE_KEY, historico.id);
 
       toast({ title: 'Análise concluída', description: 'Prévia gerada com sucesso.' });
     } catch (error) {
@@ -90,6 +119,7 @@ export default function MigracaoMilitares() {
         throw new Error('Não foi possível criar o registro de histórico da importação.');
       }
       if (!historicoId) setHistoricoId(historicoIdAtual);
+      sessionStorage.setItem(STORAGE_KEY, historicoIdAtual);
       const resultado = await importarAnalise({
         analise,
         incluirAlertas,
@@ -125,6 +155,41 @@ export default function MigracaoMilitares() {
     setResultadoImportacao(null);
     setBusca('');
     setFiltro('TODOS');
+    sessionStorage.removeItem(STORAGE_KEY);
+  };
+
+  const handleSalvarCorrecao = async (linhaNumero, camposEditados) => {
+    if (!analise) return;
+    try {
+      setSalvandoCorrecao(true);
+      const usuario = await base44.auth.me();
+      const { analiseAtualizada, linhaAtualizada, alteracoes } = await corrigirLinhaPreImportacao({
+        analise,
+        linhaNumero,
+        campos: camposEditados,
+        usuario,
+      });
+      setAnalise(analiseAtualizada);
+      setLinhaSelecionada(linhaAtualizada);
+      if (historicoId) {
+        await persistirCorrecaoPreImportacaoHistorico({
+          historicoId,
+          analise: analiseAtualizada,
+          usuario,
+          linhaNumero,
+          alteracoes,
+        });
+      }
+      toast({ title: 'Correção salva', description: 'Registro legado atualizado e reavaliado com sucesso.' });
+    } catch (error) {
+      toast({
+        title: 'Falha ao salvar correção',
+        description: error?.message || 'Não foi possível salvar as alterações da linha.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSalvandoCorrecao(false);
+    }
   };
 
   if (isLoading || !isAccessResolved) return null;
@@ -221,7 +286,13 @@ export default function MigracaoMilitares() {
         )}
       </div>
 
-      <DetalheLinhaMigracao linha={linhaSelecionada} open={Boolean(linhaSelecionada)} onOpenChange={(open) => !open && setLinhaSelecionada(null)} />
+      <DetalheLinhaMigracao
+        linha={linhaSelecionada}
+        open={Boolean(linhaSelecionada)}
+        saving={salvandoCorrecao}
+        onSalvarCorrecao={handleSalvarCorrecao}
+        onOpenChange={(open) => !open && setLinhaSelecionada(null)}
+      />
     </div>
   );
 }
