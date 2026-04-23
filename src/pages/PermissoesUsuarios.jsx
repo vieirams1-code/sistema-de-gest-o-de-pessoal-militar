@@ -83,6 +83,11 @@ export default function PermissoesUsuarios() {
     if (selectedProfileId === '_nenhum') return null;
     return perfis.find((p) => p.id === selectedProfileId) || null;
   }, [selectedProfileId, perfis]);
+  const previewProfilePermissions = useMemo(() => {
+    if (!selectedProfilePreview) return null;
+    if (loadedProfilePermissions) return loadedProfilePermissions;
+    return resolveProfilePermissions({ profileSource: selectedProfilePreview }).permissions;
+  }, [selectedProfilePreview, loadedProfilePermissions]);
 
   const grupamentos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Grupamento'), [subgrupamentos]);
   const subgrupamentosFilhos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId), [subgrupamentos, userGrupamentoId]);
@@ -607,7 +612,11 @@ export default function PermissoesUsuarios() {
                               return;
                             }
                             const perfilCompleto = await getProfileWithPermissions(v);
-                            setLoadedProfilePermissions(perfilCompleto ? buildPermissionsFromSource(perfilCompleto) : null);
+                            setLoadedProfilePermissions(
+                              perfilCompleto
+                                ? resolveProfilePermissions({ profileSource: perfilCompleto }).permissions
+                                : null
+                            );
                           }}
                         >
                           <SelectTrigger><SelectValue placeholder="Escolha um perfil para aplicar" /></SelectTrigger>
@@ -646,7 +655,7 @@ export default function PermissoesUsuarios() {
                                 <label key={`preview_mod_${mod.key}`} className="flex items-center gap-2 text-sm text-slate-700">
                                   <input
                                     type="checkbox"
-                                    checked={(loadedProfilePermissions?.[mod.key] ?? selectedProfilePreview[mod.key]) === true}
+                                    checked={previewProfilePermissions?.[mod.key] === true}
                                     readOnly
                                     className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
                                   />
@@ -663,7 +672,7 @@ export default function PermissoesUsuarios() {
                                 <label key={`preview_act_${act.key}`} className="flex items-center gap-2 text-sm text-slate-700">
                                   <input
                                     type="checkbox"
-                                    checked={(loadedProfilePermissions?.[act.key] ?? selectedProfilePreview[act.key]) === true}
+                                    checked={previewProfilePermissions?.[act.key] === true}
                                     readOnly
                                     className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
                                   />
