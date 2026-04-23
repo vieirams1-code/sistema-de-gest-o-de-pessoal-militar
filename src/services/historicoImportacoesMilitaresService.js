@@ -16,6 +16,17 @@ const STATUS_LOTE_LABEL = {
   PARCIAL: 'Importação parcial',
   CONCLUIDA: 'Importação concluída',
   FALHA: 'Importação com falha',
+  CANCELADA: 'Importação cancelada',
+  PENDENTE: 'Importação pendente',
+};
+
+const STATUS_LOTE_BADGE_CLASS = {
+  [STATUS_LOTE_LABEL.CONCLUIDA]: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  [STATUS_LOTE_LABEL.PARCIAL]: 'bg-amber-100 text-amber-800 border-amber-200',
+  [STATUS_LOTE_LABEL.FALHA]: 'bg-rose-100 text-rose-800 border-rose-200',
+  [STATUS_LOTE_LABEL.CANCELADA]: 'bg-slate-200 text-slate-800 border-slate-300',
+  [STATUS_LOTE_LABEL.PENDENTE]: 'bg-blue-100 text-blue-800 border-blue-200',
+  [STATUS_LOTE_LABEL.SOMENTE_ANALISE]: 'bg-indigo-100 text-indigo-800 border-indigo-200',
 };
 
 const STATUS_BADGE_CLASS = {
@@ -196,6 +207,8 @@ function calcularResumoDasLinhas(linhas) {
 function inferirStatusLote({ statusImportacao, totalImportadas, totalLinhas, totalErros }) {
   const status = String(statusImportacao || '').toLowerCase();
 
+  if (status.includes('cancel')) return STATUS_LOTE_LABEL.CANCELADA;
+  if (status.includes('importando') || status.includes('pendente') || status.includes('fila')) return STATUS_LOTE_LABEL.PENDENTE;
   if (status.includes('falh')) return STATUS_LOTE_LABEL.FALHA;
   if (status.includes('parcial')) return STATUS_LOTE_LABEL.PARCIAL;
   if (status.includes('importado') && totalImportadas > 0 && totalImportadas >= totalLinhas) return STATUS_LOTE_LABEL.CONCLUIDA;
@@ -231,11 +244,26 @@ function normalizarLote(item) {
   const totalImportadas = toNumber(item?.total_importadas, item?.totalImportadas, resumoLinhas.total_importadas);
 
   const statusImportacao = pickFirstString(item?.status_importacao, item?.statusImportacao, 'Analisado');
+  const tipoImportacao = pickFirstString(
+    item?.tipo_importacao,
+    item?.tipo,
+    relatorio?.tipo_importacao,
+    relatorio?.tipo,
+    'Migração de Militares',
+  );
+  const referenciaLote = pickFirstString(
+    item?.referencia_lote,
+    relatorio?.referencia_lote,
+    relatorio?.lote_referencia,
+    relatorio?.arquivo?.lote,
+  );
 
   return {
     id: item?.id,
     dataHora: normalizarDataLote(item),
     nomeArquivo: pickFirstString(item?.nome_arquivo, relatorio?.arquivo?.nome, 'Arquivo sem nome'),
+    tipoImportacao,
+    referenciaLote,
     importadoPor: pickFirstString(item?.importado_por_nome, item?.importado_por),
     statusImportacao,
     statusGeral: inferirStatusLote({ statusImportacao, totalImportadas, totalLinhas, totalErros }),
@@ -300,10 +328,26 @@ export async function excluirHistoricoImportacaoMilitares(loteId) {
 }
 
 export function filtrarLotesHistorico(lotes, filtros) {
-  const termo = String(filtros?.arquivo || '').trim().toLowerCase();
+  const termo = String(filtros?.busca || '').trim().toLowerCase();
+  const executor = String(filtros?.executor || '').trim().toLowerCase();
+  const tipoImportacao = String(filtros?.tipoImportacao || '').trim().toLowerCase();
+  const statusGeral = String(filtros?.statusGeral || '').trim();
 
   return (lotes || []).filter((lote) => {
-    if (termo && !String(lote.nomeArquivo || '').toLowerCase().includes(termo)) return false;
+    if (termo) {
+      const haystack = [
+        lote.nomeArquivo,
+        lote.observacoes,
+        lote.referenciaLote,
+        lote.statusImportacao,
+      ].join(' ').toLowerCase();
+
+      if (!haystack.includes(termo)) return false;
+    }
+
+    if (executor && !String(lote.importadoPor || '').toLowerCase().includes(executor)) return false;
+    if (tipoImportacao && !String(lote.tipoImportacao || '').toLowerCase().includes(tipoImportacao)) return false;
+    if (statusGeral && lote.statusGeral !== statusGeral) return false;
     if ((filtros?.inicio || filtros?.fim) && !isDateInRange(lote.dataHora, filtros?.inicio, filtros?.fim)) return false;
 
     const pendencias = lote.resumo.total_revisar + lote.resumo.total_erros;
@@ -328,12 +372,18 @@ export function montarResumoHistorico(lotes) {
     acc.totalImportadas += lote.resumo.total_importadas;
     acc.totalPendencias += lote.resumo.total_revisar + lote.resumo.total_erros;
     acc.totalAlertas += lote.resumo.total_aptas_com_alerta;
+    if (lote.statusGeral === STATUS_LOTE_LABEL.CONCLUIDA) acc.totalConcluidas += 1;
+    if (lote.statusGeral === STATUS_LOTE_LABEL.PARCIAL) acc.totalParciais += 1;
+    if (lote.statusGeral === STATUS_LOTE_LABEL.FALHA) acc.totalComErro += 1;
     return acc;
   }, {
     totalLinhas: 0,
     totalImportadas: 0,
     totalPendencias: 0,
     totalAlertas: 0,
+    totalConcluidas: 0,
+    totalParciais: 0,
+    totalComErro: 0,
   });
 
   return {
@@ -342,7 +392,25 @@ export function montarResumoHistorico(lotes) {
     totalImportadas: acumulado.totalImportadas,
     totalPendencias: acumulado.totalPendencias,
     totalAlertas: acumulado.totalAlertas,
+    totalConcluidas: acumulado.totalConcluidas,
+    totalParciais: acumulado.totalParciais,
+    totalComErro: acumulado.totalComErro,
     ultimoLote: lotes[0] || null,
+  };
+}
+
+export function obterOpcoesFiltrosHistorico(lotes) {
+  const tipos = new Set();
+  const status = new Set();
+
+  (lotes || []).forEach((lote) => {
+    if (lote?.tipoImportacao) tipos.add(lote.tipoImportacao);
+    if (lote?.statusGeral) status.add(lote.statusGeral);
+  });
+
+  return {
+    tiposImportacao: Array.from(tipos).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    statusDisponiveis: Array.from(status).sort((a, b) => a.localeCompare(b, 'pt-BR')),
   };
 }
 
@@ -398,4 +466,4 @@ export function exportarCsvHistoricoHumano(lote) {
   URL.revokeObjectURL(url);
 }
 
-export { STATUS_LOTE_LABEL, STATUS_BADGE_CLASS, STATUS_LINHA };
+export { STATUS_LOTE_LABEL, STATUS_BADGE_CLASS, STATUS_LINHA, STATUS_LOTE_BADGE_CLASS };

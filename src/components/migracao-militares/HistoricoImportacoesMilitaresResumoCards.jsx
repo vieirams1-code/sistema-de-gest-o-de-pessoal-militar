@@ -1,5 +1,5 @@
 import React from 'react';
-import { Archive, AlertTriangle, CheckCircle2, FileStack, ListChecks, Clock3 } from 'lucide-react';
+import { Archive, AlertTriangle, CheckCircle2, Clock3, Layers } from 'lucide-react';
 
 function Card({ titulo, valor, subtitulo, icon: Icon, className = '' }) {
   return (
@@ -27,12 +27,11 @@ function formatarDataHora(valor) {
 
 export default function HistoricoImportacoesMilitaresResumoCards({ resumo }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
       <Card titulo="Total de lotes" valor={resumo.totalLotes} icon={Archive} />
-      <Card titulo="Linhas analisadas" valor={resumo.totalLinhas} icon={ListChecks} />
-      <Card titulo="Linhas importadas" valor={resumo.totalImportadas} icon={CheckCircle2} className="bg-emerald-50/60" />
-      <Card titulo="Pendências" valor={resumo.totalPendencias} icon={AlertTriangle} className="bg-orange-50/60" subtitulo="REVISAR + ERRO" />
-      <Card titulo="Alertas" valor={resumo.totalAlertas} icon={FileStack} subtitulo="Aptas com alerta" className="bg-amber-50/60" />
+      <Card titulo="Concluídas" valor={resumo.totalConcluidas} icon={CheckCircle2} className="bg-emerald-50/60" />
+      <Card titulo="Com erro" valor={resumo.totalComErro} icon={AlertTriangle} className="bg-rose-50/60" />
+      <Card titulo="Parciais" valor={resumo.totalParciais} icon={Layers} className="bg-amber-50/60" />
       <Card
         titulo="Último lote"
         valor={resumo.ultimoLote ? (resumo.ultimoLote.nomeArquivo || 'Sem nome') : '—'}

@@ -13,19 +13,16 @@ import {
   filtrarLotesHistorico,
   listarHistoricoImportacoesMilitares,
   montarResumoHistorico,
+  obterOpcoesFiltrosHistorico,
 } from '@/services/historicoImportacoesMilitaresService';
 
 const FILTROS_INICIAIS = {
-  arquivo: '',
+  busca: '',
+  tipoImportacao: '',
+  statusGeral: '',
+  executor: '',
   inicio: '',
   fim: '',
-  comPendencias: false,
-  comErro: false,
-  somenteConcluida: false,
-  somenteAnalise: false,
-  comRevisar: false,
-  comLinhasErro: false,
-  comAlerta: false,
 };
 
 const TEXTO_CONFIRMACAO_EXCLUSAO = `Deseja excluir este lote do histórico de importação?\nEsta ação remove apenas o registro do histórico e não apaga os militares já importados.`;
@@ -96,6 +93,7 @@ export default function HistoricoImportacoesMilitares() {
 
   const lotesFiltrados = useMemo(() => filtrarLotesHistorico(lotes, filtros), [lotes, filtros]);
   const resumo = useMemo(() => montarResumoHistorico(lotesFiltrados), [lotesFiltrados]);
+  const opcoesFiltros = useMemo(() => obterOpcoesFiltrosHistorico(lotes), [lotes]);
 
   if (isLoading || !isAccessResolved) return null;
   if (!isAdmin) return <AccessDenied modulo="Histórico de Importações" />;
@@ -110,7 +108,7 @@ export default function HistoricoImportacoesMilitares() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-[#1e3a5f]">Histórico de Importações</h1>
-              <p className="text-sm text-slate-500">Visão operacional para conferência de lotes de Migração de Militares.</p>
+              <p className="text-sm text-slate-500">Consulte os lotes processados, resultados de execução e principais ocorrências de cada importação.</p>
             </div>
           </div>
           <Button variant="outline" onClick={carregar} disabled={carregando}>
@@ -122,6 +120,7 @@ export default function HistoricoImportacoesMilitares() {
 
         <HistoricoImportacoesMilitaresFiltros
           filtros={filtros}
+          opcoes={opcoesFiltros}
           onChangeFiltros={(patch) => setFiltros((prev) => ({ ...prev, ...patch }))}
           onLimpar={() => setFiltros(FILTROS_INICIAIS)}
         />
@@ -134,6 +133,7 @@ export default function HistoricoImportacoesMilitares() {
             lotesExcluindo={lotesExcluindo}
             onAbrirDetalhe={setLoteSelecionado}
             onExcluirLote={excluirLote}
+            semResultadosPorFiltro={lotes.length > 0}
           />
         )}
       </div>

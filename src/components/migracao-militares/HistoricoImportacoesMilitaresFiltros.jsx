@@ -1,28 +1,74 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Filter, Search, X } from 'lucide-react';
 
-function FiltroSwitch({ id, label, checked, onChange }) {
-  return (
-    <label htmlFor={id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 bg-white">
-      <span className="text-sm text-slate-700">{label}</span>
-      <Switch id={id} checked={checked} onCheckedChange={onChange} />
-    </label>
-  );
-}
-
-export default function HistoricoImportacoesMilitaresFiltros({ filtros, onChangeFiltros, onLimpar }) {
+export default function HistoricoImportacoesMilitaresFiltros({
+  filtros,
+  onChangeFiltros,
+  onLimpar,
+  opcoes,
+}) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="md:col-span-1">
-          <label className="text-xs text-slate-500">Arquivo</label>
+      <div className="flex items-center gap-2 text-slate-700">
+        <Filter className="w-4 h-4" />
+        <p className="text-sm font-semibold">Filtros operacionais</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+        <div className="xl:col-span-2">
+          <label className="text-xs text-slate-500">Busca textual</label>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Input
+              className="pl-8"
+              placeholder="Arquivo, referência do lote, observação..."
+              value={filtros.busca}
+              onChange={(event) => onChangeFiltros({ busca: event.target.value })}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">Tipo de importação</label>
+          <Select value={filtros.tipoImportacao || 'todos'} onValueChange={(valor) => onChangeFiltros({ tipoImportacao: valor === 'todos' ? '' : valor })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos os tipos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              {(opcoes?.tiposImportacao || []).map((tipo) => (
+                <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">Status final</label>
+          <Select value={filtros.statusGeral || 'todos'} onValueChange={(valor) => onChangeFiltros({ statusGeral: valor === 'todos' ? '' : valor })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos os status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os status</SelectItem>
+              {(opcoes?.statusDisponiveis || []).map((status) => (
+                <SelectItem key={status} value={status}>{status}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">Usuário executor</label>
           <Input
-            placeholder="Buscar por nome do arquivo"
-            value={filtros.arquivo}
-            onChange={(event) => onChangeFiltros({ arquivo: event.target.value })}
+            placeholder="Nome ou e-mail"
+            value={filtros.executor}
+            onChange={(event) => onChangeFiltros({ executor: event.target.value })}
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <label className="text-xs text-slate-500">Período de</label>
           <Input type="date" value={filtros.inicio} onChange={(event) => onChangeFiltros({ inicio: event.target.value })} />
@@ -31,22 +77,11 @@ export default function HistoricoImportacoesMilitaresFiltros({ filtros, onChange
           <label className="text-xs text-slate-500">Até</label>
           <Input type="date" value={filtros.fim} onChange={(event) => onChangeFiltros({ fim: event.target.value })} />
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-        <FiltroSwitch id="com-pendencias" label="Lote com pendências" checked={filtros.comPendencias} onChange={(v) => onChangeFiltros({ comPendencias: v })} />
-        <FiltroSwitch id="com-erro" label="Lote com erro" checked={filtros.comErro} onChange={(v) => onChangeFiltros({ comErro: v })} />
-        <FiltroSwitch id="concluida" label="Importação concluída" checked={filtros.somenteConcluida} onChange={(v) => onChangeFiltros({ somenteConcluida: v })} />
-        <FiltroSwitch id="analise" label="Somente análise" checked={filtros.somenteAnalise} onChange={(v) => onChangeFiltros({ somenteAnalise: v })} />
-        <FiltroSwitch id="com-revisar" label="Com linhas REVISAR" checked={filtros.comRevisar} onChange={(v) => onChangeFiltros({ comRevisar: v })} />
-        <FiltroSwitch id="com-linhas-erro" label="Com linhas ERRO" checked={filtros.comLinhasErro} onChange={(v) => onChangeFiltros({ comLinhasErro: v })} />
-        <FiltroSwitch id="com-alerta" label="Com APTO_COM_ALERTA" checked={filtros.comAlerta} onChange={(v) => onChangeFiltros({ comAlerta: v })} />
-      </div>
-
-      <div className="flex justify-end">
-        <button type="button" onClick={onLimpar} className="text-sm text-slate-600 hover:text-slate-900 underline underline-offset-2">
-          Limpar filtros
-        </button>
+        <div className="flex items-end">
+          <Button type="button" variant="ghost" onClick={onLimpar} className="text-slate-600">
+            <X className="w-4 h-4 mr-2" /> Limpar filtros
+          </Button>
+        </div>
       </div>
     </div>
   );
