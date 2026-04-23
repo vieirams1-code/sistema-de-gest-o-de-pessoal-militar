@@ -1,6 +1,10 @@
 import { base44 } from '@/api/base44Client';
 
 const ENTITY_NAME = 'ImportacaoMilitares';
+const ENTITY_NAME_ALTERACOES = 'ImportacaoAlteracoesLegado';
+const ERROR_MILITARES = 'Falha ao acessar histórico de importações. Entidade ImportacaoMilitares não encontrada.';
+const ERROR_ALTERACOES = 'Falha ao acessar histórico de importações. Entidade ImportacaoAlteracoesLegado não encontrada.';
+let historicoClientOverride = null;
 
 const STATUS_LINHA = {
   APTO: 'APTO',
@@ -249,6 +253,7 @@ function normalizarLote(item) {
     item?.tipo,
     relatorio?.tipo_importacao,
     relatorio?.tipo,
+    item?.origem_historico === ENTITY_NAME_ALTERACOES ? 'Migração de Alterações Legado' : '',
     'Migração de Militares',
   );
   const referenciaLote = pickFirstString(
@@ -260,6 +265,7 @@ function normalizarLote(item) {
 
   return {
     id: item?.id,
+    origem_historico: item?.origem_historico || ENTITY_NAME,
     dataHora: normalizarDataLote(item),
     nomeArquivo: pickFirstString(item?.nome_arquivo, relatorio?.arquivo?.nome, 'Arquivo sem nome'),
     tipoImportacao,
@@ -279,7 +285,7 @@ function normalizarLote(item) {
     },
     linhas,
     observacoes: pickFirstString(item?.observacoes),
-    relatorioRaw: relatorio,
+    relatorioRaw: { ...relatorio, origem_historico: item?.origem_historico || ENTITY_NAME },
   };
 }
 
@@ -306,25 +312,59 @@ function isDateInRange(dateText, inicio, fim) {
 }
 
 export async function listarHistoricoImportacoesMilitares() {
-  const entity = base44?.entities?.[ENTITY_NAME];
-  if (!entity?.list) {
-    throw new Error('Falha ao acessar histórico de importações. Entidade ImportacaoMilitares não encontrada.');
+  const client = historicoClientOverride || base44;
+  const entityMilitares = client?.entities?.[ENTITY_NAME];
+  const entityAlteracoes = client?.entities?.[ENTITY_NAME_ALTERACOES];
+
+  const [resMilitares, resAlteracoes] = await Promise.allSettled([
+    entityMilitares?.list ? entityMilitares.list('-created_date', 1000) : Promise.reject(new Error(ERROR_MILITARES)),
+    entityAlteracoes?.list ? entityAlteracoes.list('-created_date', 1000) : Promise.reject(new Error(ERROR_ALTERACOES)),
+  ]);
+
+  const erros = [resMilitares, resAlteracoes]
+    .filter((resultado) => resultado.status === 'rejected')
+    .map((resultado) => resultado.reason?.message || 'Erro ao consultar histórico de importações.');
+  if (erros.length === 2) {
+    throw new Error(erros[0]);
+  }
+  if (erros.length > 0) {
+    console.error('[HistoricoImportacoes] Uma das fontes de histórico não pôde ser carregada.', erros);
   }
 
-  const lotes = await entity.list('-created_date', 1000);
+  const lotesMilitares = resMilitares.status === 'fulfilled'
+    ? (resMilitares.value || []).map((item) => ({ ...item, origem_historico: ENTITY_NAME }))
+    : [];
+  const lotesAlteracoes = resAlteracoes.status === 'fulfilled'
+    ? (resAlteracoes.value || []).map((item) => ({ ...item, origem_historico: ENTITY_NAME_ALTERACOES }))
+    : [];
 
-  return (lotes || [])
+  return [...lotesMilitares, ...lotesAlteracoes]
     .map(normalizarLote)
     .sort((a, b) => new Date(b.dataHora || 0).getTime() - new Date(a.dataHora || 0).getTime());
 }
 
 export async function excluirHistoricoImportacaoMilitares(loteId) {
-  const entity = base44?.entities?.[ENTITY_NAME];
+  const client = historicoClientOverride || base44;
+  const entity = client?.entities?.[ENTITY_NAME];
   if (!entity?.delete) {
-    throw new Error('Falha ao excluir histórico de importações. Entidade ImportacaoMilitares não encontrada.');
+    throw new Error(ERROR_MILITARES);
   }
 
   return entity.delete(loteId);
+}
+
+export async function excluirHistoricoImportacao(lote) {
+  const client = historicoClientOverride || base44;
+  const entityName = lote?.relatorioRaw?.origem_historico || lote?.origem_historico || ENTITY_NAME;
+  const entity = client?.entities?.[entityName];
+  if (!entity?.delete) {
+    throw new Error(entityName === ENTITY_NAME_ALTERACOES ? ERROR_ALTERACOES : ERROR_MILITARES);
+  }
+  return entity.delete(lote.id);
+}
+
+export function __setHistoricoImportacoesClientForTests(client) {
+  historicoClientOverride = client || null;
 }
 
 export function filtrarLotesHistorico(lotes, filtros) {
