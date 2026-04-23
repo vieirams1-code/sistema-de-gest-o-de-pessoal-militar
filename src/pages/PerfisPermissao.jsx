@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
+import { buildPermissionPayload, buildPermissionsFromSource } from '@/services/permissionMatrixService';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,28 +27,6 @@ const initialForm = {
   ativo: true,
   ...modulosList.reduce((acc, m) => ({ ...acc, [m.key]: false }), {}),
   ...acoesSensiveis.reduce((acc, a) => ({ ...acc, [a.key]: false }), {})
-};
-
-const toBooleanPermission = (value) => {
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') return true;
-    if (normalized === 'false' || normalized === '0' || normalized === '') return false;
-  }
-
-  return value === true || value === 1;
-};
-
-const buildPermissionsFromSource = (source = {}) => {
-  const normalizedPermissions = {};
-
-  Object.keys(initialForm)
-    .filter((key) => key.startsWith('acesso_') || key.startsWith('perm_'))
-    .forEach((key) => {
-      normalizedPermissions[key] = toBooleanPermission(source[key]);
-    });
-
-  return normalizedPermissions;
 };
 
 export default function PerfisPermissao() {
@@ -99,14 +78,21 @@ export default function PerfisPermissao() {
     setShowForm(true);
   };
 
-  const handleEdit = (p) => {
+  const handleEdit = async (p) => {
+    let fullPerfil = p;
+    try {
+      fullPerfil = await base44.entities.PerfilPermissao.get(p.id);
+    } catch {
+      // fallback para registro parcial da listagem
+    }
+
     setFormData({
-      nome_perfil: p.nome_perfil || '',
-      descricao: p.descricao || '',
-      ativo: p.ativo !== false,
-      ...buildPermissionsFromSource(p)
+      nome_perfil: fullPerfil.nome_perfil || '',
+      descricao: fullPerfil.descricao || '',
+      ativo: fullPerfil.ativo !== false,
+      ...buildPermissionsFromSource(fullPerfil)
     });
-    setEditingId(p.id);
+    setEditingId(fullPerfil.id);
     setShowForm(true);
   };
 
@@ -124,7 +110,7 @@ export default function PerfisPermissao() {
     }
     const payload = {
       ...formData,
-      ...buildPermissionsFromSource(formData),
+      ...buildPermissionPayload(formData),
     };
 
     if (editingId) {

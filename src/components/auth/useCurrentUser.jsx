@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { buildPermissionsFromSource, mergeProfileAndUserPermissions } from '@/services/permissionMatrixService';
 
 const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
@@ -84,6 +85,21 @@ export function useCurrentUser() {
   });
 
   const acesso = usuarioAcessoList?.[0] || null;
+  const { data: perfilAcesso } = useQuery({
+    queryKey: ['perfilPermissao', acesso?.perfil_id],
+    queryFn: () => base44.entities.PerfilPermissao.get(acesso.perfil_id),
+    enabled: !!acesso?.perfil_id,
+    staleTime: 60 * 1000,
+  });
+
+  const resolvedPermissionMatrix = acesso
+    ? mergeProfileAndUserPermissions({
+      profilePermissions: perfilAcesso || {},
+      userPermissions: acesso,
+      userOverrides: acesso.permissoes_override || {},
+    })
+    : {};
+  const normalizedResolvedPermissions = buildPermissionsFromSource(resolvedPermissionMatrix);
   const resolvedTipoAcesso = normalizeAccessMode(acesso?.tipo_acesso) || 'proprio';
   const isSelfRestrictedScope = resolvedTipoAcesso === 'proprio';
 
@@ -150,8 +166,9 @@ export function useCurrentUser() {
 
     if (acesso) {
       const campo = `acesso_${modulo}`;
-      if (isAdmin) return acesso[campo] !== false;
-      return acesso[campo] === true;
+      const resolvedValue = normalizedResolvedPermissions[campo];
+      if (isAdmin) return resolvedValue !== false;
+      return resolvedValue === true;
     }
 
     if (impersonationContext.isImpersonating) return false;
@@ -164,8 +181,9 @@ export function useCurrentUser() {
 
     if (acesso) {
       const campo = `perm_${acao}`;
-      if (isAdmin) return acesso[campo] !== false;
-      return acesso[campo] === true;
+      const resolvedValue = normalizedResolvedPermissions[campo];
+      if (isAdmin) return resolvedValue !== false;
+      return resolvedValue === true;
     }
 
     if (impersonationContext.isImpersonating) return false;
