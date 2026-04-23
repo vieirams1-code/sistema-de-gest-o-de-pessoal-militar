@@ -1,7 +1,15 @@
 import { base44 } from '@/api/base44Client';
 import { isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
 import { strFromU8, unzipSync } from 'fflate';
-import { criarMilitarComMatricula, localizarDuplicidadeForte, normalizarMatricula, registrarPossivelDuplicidade } from '@/services/militarIdentidadeService';
+import {
+  criarMilitarComMatricula,
+  formatarMatriculaPadrao,
+  localizarDuplicidadeForte,
+  normalizarMatricula,
+  normalizarCPF as normalizarCpfIdentidade,
+  registrarPossivelDuplicidade,
+  validarMatriculaDisponivel,
+} from '@/services/militarIdentidadeService';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
@@ -675,6 +683,159 @@ function definirStatusLinha(erros, alertas, duplicado) {
   return STATUS_LINHA.APTO;
 }
 
+function dedupeMensagens(lista = []) {
+  return Array.from(new Set((lista || []).filter(Boolean)));
+}
+
+function normalizarNomeEssencial(valor) {
+  return limparTexto(valor).replace(/\s+/g, ' ');
+}
+
+function normalizarDataCanonica(valor, erros) {
+  const data = formatarData(valor, {
+    obrigatoria: true,
+    mensagemErro: 'Data de inclusão inválida ou ausente. Linha bloqueada para importação.',
+    alertas: [],
+    erros,
+  });
+  if (!data) return '';
+  const [dia, mes, ano] = data.split('/');
+  return `${ano}-${mes}-${dia}`;
+}
+
+export async function corrigirLinhaPreImportacao({
+  analise,
+  linhaNumero,
+  campos = {},
+  usuario,
+}) {
+  if (!analise?.linhas?.length) {
+    throw new Error('Análise indisponível para correção.');
+  }
+
+  const idxLinha = analise.linhas.findIndex((linha) => linha.linhaNumero === linhaNumero);
+  if (idxLinha < 0) {
+    throw new Error(`Linha ${linhaNumero} não encontrada na análise.`);
+  }
+
+  const linhaAtual = analise.linhas[idxLinha];
+  const transformadoBase = { ...(linhaAtual.transformado || {}) };
+  const transformado = { ...transformadoBase };
+  const erros = (linhaAtual.erros || []).filter((mensagem) => (
+    !mensagem.includes('Nome completo')
+    && !mensagem.includes('Nome de guerra')
+    && !mensagem.includes('Matrícula')
+    && !mensagem.includes('CPF')
+    && !mensagem.includes('Data de inclusão')
+  ));
+  const alertas = (linhaAtual.alertas || []).filter((mensagem) => (
+    !mensagem.includes('Matrícula')
+    && !mensagem.includes('CPF')
+    && !mensagem.includes('Nome de guerra')
+  ));
+  const alteracoes = [];
+
+  if (Object.prototype.hasOwnProperty.call(campos, 'nome_completo')) {
+    const nomeCompleto = normalizarNomeEssencial(campos.nome_completo);
+    transformado.nome_completo = nomeCompleto;
+    if (!nomeCompleto) erros.push('Nome completo obrigatório para importação.');
+    alteracoes.push('nome_completo');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(campos, 'nome_guerra')) {
+    const nomeGuerra = normalizarNomeEssencial(campos.nome_guerra);
+    transformado.nome_guerra = nomeGuerra;
+    if (transformado?.exigir_nome_guerra && !nomeGuerra) {
+      erros.push('Nome de guerra obrigatório para importação conforme regra do cadastro.');
+    }
+    if (nomeGuerra && nomeGuerra.length < 2) {
+      erros.push('Nome de guerra inválido. Informe ao menos 2 caracteres.');
+    }
+    alteracoes.push('nome_guerra');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(campos, 'matricula')) {
+    const matriculaDigitada = limparTexto(campos.matricula);
+    const matriculaNormalizada = normalizarMatricula(matriculaDigitada);
+    if (!matriculaNormalizada) {
+      erros.push('Matrícula ausente. Linha bloqueada para importação.');
+      transformado.matricula = '';
+    } else {
+      transformado.matricula = formatarMatriculaPadrao(matriculaNormalizada);
+      if (matriculaDigitada !== transformado.matricula) {
+        alertas.push('Matrícula ajustada automaticamente para o padrão 000.000-000.');
+      }
+      try {
+        await validarMatriculaDisponivel(transformado.matricula);
+      } catch (error) {
+        erros.push(error?.message || 'Matrícula inválida para importação.');
+      }
+    }
+    alteracoes.push('matricula');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(campos, 'cpf')) {
+    const cpfDigits = somenteNumeros(campos.cpf);
+    if (!cpfDigits) {
+      transformado.cpf = '';
+    } else if (!validarCPF(cpfDigits)) {
+      erros.push('CPF inválido para importação.');
+      transformado.cpf = '';
+    } else {
+      const cpfNorm = normalizarCpfIdentidade(cpfDigits);
+      transformado.cpf = `${cpfNorm.slice(0, 3)}.${cpfNorm.slice(3, 6)}.${cpfNorm.slice(6, 9)}-${cpfNorm.slice(9)}`;
+    }
+    alteracoes.push('cpf');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(campos, 'data_inclusao')) {
+    const dataCanonica = normalizarDataCanonica(campos.data_inclusao, erros);
+    transformado.data_inclusao = dataCanonica || '';
+    alteracoes.push('data_inclusao');
+  }
+
+  const cpfAtual = transformado.cpf;
+  if (cpfAtual || transformado.nome_completo) {
+    const duplicidadeForte = await localizarDuplicidadeForte({
+      cpf: cpfAtual,
+      nomeCanonico: transformado.nome_completo,
+      dataNascimento: transformado.data_nascimento,
+    });
+    if (duplicidadeForte) {
+      alertas.push('Possível duplicidade identificada por CPF e/ou nome + data de nascimento. Encaminhar para revisão.');
+    }
+  }
+
+  const errosNormalizados = dedupeMensagens(erros);
+  const alertasNormalizados = dedupeMensagens(alertas);
+  const duplicadoMatricula = errosNormalizados.some((mensagem) => String(mensagem).toLowerCase().includes('matrícula já cadastrada'));
+
+  const linhaAtualizada = {
+    ...linhaAtual,
+    transformado,
+    erros: errosNormalizados,
+    alertas: alertasNormalizados,
+    status: definirStatusLinha(errosNormalizados, alertasNormalizados, duplicadoMatricula),
+    correcao_pre_importacao: {
+      corrigido_por: usuario?.email || '',
+      corrigido_por_nome: usuario?.full_name || usuario?.name || '',
+      corrigido_em: new Date().toISOString(),
+      campos_alterados: dedupeMensagens(alteracoes),
+    },
+  };
+
+  const linhas = analise.linhas.map((linha, indice) => (indice === idxLinha ? linhaAtualizada : linha));
+  return {
+    analiseAtualizada: {
+      ...analise,
+      linhas,
+      resumo: obterResumo(linhas),
+    },
+    linhaAtualizada,
+    alteracoes: dedupeMensagens(alteracoes),
+  };
+}
+
 async function gerarHashArquivo(file) {
   const buffer = await file.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -905,6 +1066,36 @@ export async function salvarAnaliseHistorico(analise, usuario) {
     }
     throw error;
   }
+}
+
+export async function carregarAnaliseHistorico(historicoId) {
+  if (!historicoId) return null;
+  const historicoEntity = assertHistoricoEntity();
+  const itens = historicoEntity.filter
+    ? await historicoEntity.filter({ id: historicoId })
+    : (historicoEntity.list ? await historicoEntity.list() : []).filter((item) => item?.id === historicoId);
+  const historico = Array.isArray(itens) ? itens[0] : null;
+  if (!historico?.relatorio_json) return null;
+  const relatorio = JSON.parse(historico.relatorio_json);
+  if (!relatorio?.linhas || !relatorio?.resumo) return null;
+  return relatorio;
+}
+
+export async function persistirCorrecaoPreImportacaoHistorico({
+  historicoId,
+  analise,
+  usuario,
+  linhaNumero,
+  alteracoes = [],
+}) {
+  if (!historicoId) return null;
+  const historicoEntity = assertHistoricoEntity();
+  const timestamp = new Date().toISOString();
+  const trilha = `Correção pré-importação linha ${linhaNumero} por ${usuario?.email || 'sistema'} em ${timestamp} (campos: ${alteracoes.join(', ') || 'N/D'}).`;
+  return historicoEntity.update(historicoId, {
+    relatorio_json: JSON.stringify(relatorioFromAnalise(analise), null, 2),
+    observacoes: trilha,
+  });
 }
 
 export async function importarAnalise({ analise, incluirAlertas, historicoId, usuario }) {
