@@ -15,8 +15,7 @@ import {
   buildPermissionsFromSource,
   canonicalPermissionKeys,
   computePermissionOverrides,
-  getPermissionMismatches,
-  resolveUserPermissionsWithSnapshots,
+  resolveUserPermissions,
 } from '@/services/permissionMatrixService';
 
 const initialPermissions = canonicalPermissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {});
@@ -162,8 +161,7 @@ export default function PermissoesUsuarios() {
     const perfilId = fullAcesso.perfil_id || '';
     setSelectedProfileId(perfilId || '_nenhum');
     const perfilCompleto = await getProfileWithPermissions(perfilId);
-    const resolved = await resolveUserPermissionsWithSnapshots({
-      base44,
+    const resolved = await resolveUserPermissions({
       userSource: fullAcesso,
       profileSource: perfilCompleto || {},
     });
@@ -270,17 +268,7 @@ export default function PermissoesUsuarios() {
 
       const resolvedRecordId = savedRecord.id || selectedUser.id;
       const reloadedRecord = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
-      const reloadedResolved = await resolveUserPermissionsWithSnapshots({
-        base44,
-        userSource: reloadedRecord,
-        profileSource: perfilSelected || {},
-      });
-      const reloadedPermissions = reloadedResolved.permissions;
-      const reloadedMismatches = getPermissionMismatches(normalizedPermissions, reloadedPermissions);
-      if (reloadedMismatches.length > 0) {
-        throw new Error(`Falha ao persistir permissões: ${reloadedMismatches.join(', ')}`);
-      }
-
+      const reloadedPermissions = buildPermissionsFromSource(reloadedRecord);
       setUserPermissions(reloadedPermissions);
       setSelectedUser(reloadedRecord);
 
