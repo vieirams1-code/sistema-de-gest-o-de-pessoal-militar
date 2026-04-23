@@ -40,6 +40,10 @@ test('payload de persistência inclui aliases legados para manter compatibilidad
   assert.equal(payload.perm_gerir_fluxo_dom_pedro_ii, true);
   assert.equal(payload.gerir_fluxo_dom_pedro_ii, true);
   assert.equal(payload.matriz_permissoes.perm_indicar_medalhas, true);
+  assert.equal(payload.permission_matrix.perm_indicar_medalhas, true);
+  assert.equal(payload.permissions_matrix.perm_indicar_medalhas, true);
+  assert.equal(payload.permissions.perm_indicar_medalhas, true);
+  assert.equal(payload.permissoes.perm_indicar_medalhas, true);
 });
 
 test('merge aplica perfil base e sobrescreve com override explícito do usuário', () => {
