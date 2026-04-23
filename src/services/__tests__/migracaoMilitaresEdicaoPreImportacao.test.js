@@ -164,6 +164,27 @@ test('persiste correção no histórico e restaura após recarregar', async () =
   assert.equal(trilhas.length, 2);
 });
 
+
+
+test('rejeita data de inclusão absurda na correção pré-importação', async () => {
+  setupClients();
+
+  const { linhaAtualizada } = await corrigirLinhaPreImportacao({
+    analise: analiseBase(),
+    linhaNumero: 2,
+    campos: {
+      nome_completo: 'Teste',
+      nome_guerra: 'Teste',
+      matricula: '123456789',
+      cpf: '52998224725',
+      data_inclusao: '56771-03-27',
+    },
+    usuario: { email: 'admin@sgp' },
+  });
+
+  assert.equal(linhaAtualizada.transformado.data_inclusao, '');
+  assert.ok(linhaAtualizada.erros.some((erro) => erro.includes('Data de inclusão inválida')));
+});
 test('importação final utiliza dados corrigidos', async () => {
   const { Militar } = setupClients();
   const usuario = { email: 'admin@sgp', full_name: 'Administrador' };
