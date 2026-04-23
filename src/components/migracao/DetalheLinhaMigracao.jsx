@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CalendarIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -8,29 +9,73 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { canonicalDateToBR, canonicalDateToUTCDate, normalizeLegacyDateToCanonical } from '@/utils/dateNormalization';
+
+const CAMPOS_INICIAIS = {
+  nome_completo: '',
+  nome_guerra: '',
+  matricula: '',
+  cpf: '',
+  data_inclusao: '',
+};
 
 export default function DetalheLinhaMigracao({ linha, open, onOpenChange, onSalvarCorrecao, saving = false }) {
-  const [form, setForm] = useState({
-    nome_completo: '',
-    nome_guerra: '',
-    matricula: '',
-    cpf: '',
-    data_inclusao: '',
-  });
+  const [form, setForm] = useState(CAMPOS_INICIAIS);
+  const [erroDataInclusao, setErroDataInclusao] = useState('');
 
   useEffect(() => {
+    const dataCanonical = normalizeLegacyDateToCanonical(linha?.transformado?.data_inclusao || '');
     setForm({
       nome_completo: linha?.transformado?.nome_completo || '',
       nome_guerra: linha?.transformado?.nome_guerra || '',
       matricula: linha?.transformado?.matricula || '',
       cpf: linha?.transformado?.cpf || '',
-      data_inclusao: linha?.transformado?.data_inclusao || '',
+      data_inclusao: canonicalDateToBR(dataCanonical),
     });
+    setErroDataInclusao('');
   }, [linha]);
 
   const handleChange = (campo, valor) => setForm((prev) => ({ ...prev, [campo]: valor }));
-  const handleSalvar = () => onSalvarCorrecao?.(linha.linhaNumero, form);
+
+  const handleDataInclusaoChange = (value) => {
+    handleChange('data_inclusao', value);
+    setErroDataInclusao('');
+  };
+
+  const handleDataInclusaoBlur = () => {
+    if (!form.data_inclusao?.trim()) {
+      setErroDataInclusao('');
+      return;
+    }
+
+    const canonical = normalizeLegacyDateToCanonical(form.data_inclusao);
+    if (!canonical) {
+      setErroDataInclusao('Data inválida. Use o formato dd/mm/aaaa.');
+      return;
+    }
+
+    handleChange('data_inclusao', canonicalDateToBR(canonical));
+  };
+
+  const handleSalvar = () => {
+    const dataCanonical = normalizeLegacyDateToCanonical(form.data_inclusao);
+    if (!dataCanonical) {
+      setErroDataInclusao('Data inválida. Informe uma data real no formato dd/mm/aaaa.');
+      return;
+    }
+
+    onSalvarCorrecao?.(linha.linhaNumero, {
+      ...form,
+      data_inclusao: dataCanonical,
+    });
+  };
+
   if (!linha) return null;
+
+  const dataSelecionada = canonicalDateToUTCDate(form.data_inclusao);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,7 +105,36 @@ export default function DetalheLinhaMigracao({ linha, open, onOpenChange, onSalv
             </div>
             <div className="space-y-1">
               <Label>Data de Inclusão</Label>
-              <Input value={form.data_inclusao} onChange={(event) => handleChange('data_inclusao', event.target.value)} placeholder="dd/mm/aaaa ou aaaa-mm-dd" />
+              <div className="flex gap-2">
+                <Input
+                  value={form.data_inclusao}
+                  onChange={(event) => handleDataInclusaoChange(event.target.value)}
+                  onBlur={handleDataInclusaoBlur}
+                  placeholder="dd/mm/aaaa"
+                  className={cn(erroDataInclusao && 'border-red-500 focus-visible:ring-red-200')}
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="px-3" aria-label="Abrir calendário de data de inclusão">
+                      <CalendarIcon className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={dataSelecionada}
+                      onSelect={(date) => {
+                        if (!date) return;
+                        const canonical = normalizeLegacyDateToCanonical(date);
+                        handleChange('data_inclusao', canonicalDateToBR(canonical));
+                        setErroDataInclusao('');
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {erroDataInclusao && <p className="text-xs text-red-600">{erroDataInclusao}</p>}
             </div>
           </div>
           <div className="flex justify-end">

@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
 import { strFromU8, unzipSync } from 'fflate';
+import { normalizeLegacyDateToCanonical } from '@/utils/dateNormalization';
 import {
   criarMilitarComMatricula,
   formatarMatriculaPadrao,
@@ -692,15 +693,12 @@ function normalizarNomeEssencial(valor) {
 }
 
 function normalizarDataCanonica(valor, erros) {
-  const data = formatarData(valor, {
-    obrigatoria: true,
-    mensagemErro: 'Data de inclusão inválida ou ausente. Linha bloqueada para importação.',
-    alertas: [],
-    erros,
-  });
-  if (!data) return '';
-  const [dia, mes, ano] = data.split('/');
-  return `${ano}-${mes}-${dia}`;
+  const canonical = normalizeLegacyDateToCanonical(valor);
+  if (!canonical) {
+    erros.push('Data de inclusão inválida ou ausente. Linha bloqueada para importação.');
+    return '';
+  }
+  return canonical;
 }
 
 export async function corrigirLinhaPreImportacao({
