@@ -20,22 +20,21 @@ const actionPermissionKeys = permissionStructure.flatMap((group) =>
 
 export const canonicalPermissionKeys = [...modulePermissionKeys, ...actionPermissionKeys];
 
-const aliasByCanonical = canonicalPermissionKeys.reduce((acc, key) => {
+const SPECIAL_ALIASES_BY_KEY = {
+  perm_gerir_dom_pedro_ii: ['perm_gerir_fluxo_dom_pedro_ii', 'gerir_fluxo_dom_pedro_ii'],
+};
+
+const getAliasesForCanonicalKey = (key) => {
   const aliases = [];
 
-  if (key.startsWith('perm_')) {
-    aliases.push(key.replace(/^perm_/, ''));
-  }
+  if (key.startsWith('perm_')) aliases.push(key.replace(/^perm_/, ''));
+  if (key.startsWith('acesso_')) aliases.push(key.replace(/^acesso_/, ''));
 
-  if (key.startsWith('acesso_')) {
-    aliases.push(key.replace(/^acesso_/, ''));
-  }
+  return [...aliases, ...(SPECIAL_ALIASES_BY_KEY[key] || [])];
+};
 
-  if (key === 'perm_gerir_dom_pedro_ii') {
-    aliases.push('perm_gerir_fluxo_dom_pedro_ii', 'gerir_fluxo_dom_pedro_ii');
-  }
-
-  acc[key] = aliases;
+const aliasByCanonical = canonicalPermissionKeys.reduce((acc, key) => {
+  acc[key] = getAliasesForCanonicalKey(key);
   return acc;
 }, {});
 
@@ -49,20 +48,23 @@ export const nestedMatrixKeys = [
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
+const isObjectRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
 const collectPermissionSources = (source = {}) => {
-  const sources = [source];
+  const rootSource = isObjectRecord(source) ? source : {};
+  const sources = [rootSource];
 
   nestedMatrixKeys.forEach((nestedKey) => {
-    const nested = source?.[nestedKey];
-    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-      sources.push(nested);
+    const nestedSource = rootSource[nestedKey];
+    if (isObjectRecord(nestedSource)) {
+      sources.push(nestedSource);
     }
   });
 
   return sources;
 };
 
-const getPermissionFromCandidate = (candidate = {}, key) => {
+const readPermissionFromCandidate = (candidate = {}, key) => {
   if (hasOwn(candidate, key)) return toBooleanPermission(candidate[key]);
 
   const aliases = aliasByCanonical[key] || [];
@@ -73,18 +75,18 @@ const getPermissionFromCandidate = (candidate = {}, key) => {
   return null;
 };
 
-const getPermissionFromSource = (source = {}, key) => {
-  const sources = collectPermissionSources(source);
+const readPermissionFromSource = (source = {}, key) => {
+  const candidates = collectPermissionSources(source);
 
-  for (const candidate of sources) {
-    const value = getPermissionFromCandidate(candidate, key);
+  for (const candidate of candidates) {
+    const value = readPermissionFromCandidate(candidate, key);
     if (value !== null) return value;
   }
 
   return false;
 };
 
-const hasPermissionInSource = (source = {}, key) => {
+const sourceHasPermissionValue = (source = {}, key) => {
   const aliases = aliasByCanonical[key] || [];
 
   return collectPermissionSources(source).some((candidate) =>
@@ -94,19 +96,18 @@ const hasPermissionInSource = (source = {}, key) => {
 
 export const buildPermissionsFromSource = (source = {}, fallback = {}) => {
   return canonicalPermissionKeys.reduce((acc, key) => {
-    const value = hasPermissionInSource(source, key)
-      ? getPermissionFromSource(source, key)
-      : getPermissionFromSource(fallback, key);
+    const value = sourceHasPermissionValue(source, key)
+      ? readPermissionFromSource(source, key)
+      : readPermissionFromSource(fallback, key);
+
     acc[key] = toBooleanPermission(value);
     return acc;
   }, {});
 };
 
-export const buildPermissionPayload = (source = {}) => {
-  const normalized = buildPermissionsFromSource(source);
-
-  const payload = canonicalPermissionKeys.reduce((acc, key) => {
-    const value = normalized[key] === true;
+const buildPermissionAliases = (normalizedPermissions = {}) => {
+  return canonicalPermissionKeys.reduce((acc, key) => {
+    const value = normalizedPermissions[key] === true;
     acc[key] = value;
 
     (aliasByCanonical[key] || []).forEach((alias) => {
@@ -115,9 +116,14 @@ export const buildPermissionPayload = (source = {}) => {
 
     return acc;
   }, {});
+};
+
+export const buildPermissionPayload = (source = {}) => {
+  const normalized = buildPermissionsFromSource(source);
+  const payload = buildPermissionAliases(normalized);
 
   nestedMatrixKeys.forEach((matrixKey) => {
-    payload[matrixKey] = normalized;
+    payload[matrixKey] = { ...normalized };
   });
 
   return payload;
@@ -152,10 +158,10 @@ export const mergeProfileAndUserPermissions = ({
   const explicitOverrides = buildPermissionsFromSource(userOverrides);
 
   canonicalPermissionKeys.forEach((key) => {
-    const hasLegacyValue = hasPermissionInSource(userPermissions, key);
+    const hasLegacyValue = sourceHasPermissionValue(userPermissions, key);
     if (hasLegacyValue) merged[key] = legacyUser[key];
 
-    const hasOverrideValue = hasPermissionInSource(userOverrides, key);
+    const hasOverrideValue = sourceHasPermissionValue(userOverrides, key);
     if (hasOverrideValue) merged[key] = explicitOverrides[key];
   });
 
