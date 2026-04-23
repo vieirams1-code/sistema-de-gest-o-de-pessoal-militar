@@ -94,7 +94,7 @@ export default function ClassificacaoPendentesLegado() {
       <div className="max-w-7xl mx-auto space-y-4">
         <h1 className="text-2xl font-bold text-[#1e3a5f]">Classificação Pendente Legado</h1>
         <p className="text-sm text-slate-500">
-          Lista publicações de origem legado publicadas com tipo <code>LEGADO_NAO_CLASSIFICADO</code> para classificação posterior.
+          Ferramenta administrativa de migração para classificar publicações de origem legado publicadas com tipo <code>LEGADO_NAO_CLASSIFICADO</code>.
         </p>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 flex gap-2">
