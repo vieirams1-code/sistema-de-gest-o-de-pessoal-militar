@@ -39,6 +39,7 @@ const aliasByCanonical = canonicalPermissionKeys.reduce((acc, key) => {
 }, {});
 
 export const nestedMatrixKeys = [
+  'matrix_v2',
   '__matrix_v2',
   'matriz_permissoes',
   'permission_matrix',
@@ -110,14 +111,17 @@ export const mergeProfileDescriptionWithMatrix = (cleanDescricao = '', matrix = 
 
 export const extractUserMatrixFromOverrides = (permissoes_override = {}) => {
   if (!isObjectRecord(permissoes_override)) return null;
-  const matrix = permissoes_override.__matrix_v2;
+  const matrix = permissoes_override.matrix_v2 || permissoes_override.__matrix_v2;
   if (!isObjectRecord(matrix)) return null;
   return sanitizePermissionsMatrix(matrix);
 };
 
-export const mergeUserOverridesWithMatrix = (existingOverrides = {}, matrix = {}) => {
+export const mergeUserOverridesWithMatrix = (existingOverrides = {}, matrix = {}, source = 'usuario') => {
   const baseOverrides = isObjectRecord(existingOverrides) ? { ...existingOverrides } : {};
-  baseOverrides.__matrix_v2 = sanitizePermissionsMatrix(matrix);
+  delete baseOverrides.__matrix_v2;
+  delete baseOverrides.__source;
+  baseOverrides.matrix_v2 = sanitizePermissionsMatrix(matrix);
+  baseOverrides.source = source;
   return baseOverrides;
 };
 
@@ -212,7 +216,7 @@ export const buildPermissionPayload = (source = {}, { includeLegacy = true } = {
 
   Object.assign(payload, buildPermissionAliases(normalized));
   nestedMatrixKeys.forEach((matrixKey) => {
-    if (matrixKey === 'matriz_permissoes') return;
+    if (matrixKey === 'matriz_permissoes' || matrixKey.startsWith('__')) return;
     payload[matrixKey] = { ...normalized };
   });
 
@@ -256,19 +260,21 @@ export const resolveUserPermissions = ({
     fallbackSource: fallbackProfile,
   }).permissions;
 
+  const fallbackGeneralPermissions = buildPermissionsFromSource(fallbackUser, fallbackProfile);
+  const profilePermissionsWithFallback = buildPermissionsFromSource(profilePermissions, fallbackGeneralPermissions);
+  const hasUserLegacyMatrix = hasValidMatrixContent(userSource);
   const userMatrixFromOverrides = extractUserMatrixFromOverrides(userSource?.permissoes_override);
+  const userLegacyPermissions = hasUserLegacyMatrix
+    ? buildPermissionsFromSource(userSource, profilePermissionsWithFallback)
+    : profilePermissionsWithFallback;
   const userPermissions = userMatrixFromOverrides
-    ? buildPermissionsFromSource(userMatrixFromOverrides, profilePermissions)
-    : (
-      hasValidMatrixContent(userSource)
-        ? buildPermissionsFromSource(userSource, profilePermissions)
-        : buildPermissionsFromSource(fallbackUser, profilePermissions)
-    );
+    ? buildPermissionsFromSource(userMatrixFromOverrides, userLegacyPermissions)
+    : userLegacyPermissions;
 
   return {
     permissions: userPermissions,
     profilePermissions,
-    source: userMatrixFromOverrides || hasValidMatrixContent(userSource) ? 'usuario' : 'perfil',
+    source: userMatrixFromOverrides || hasUserLegacyMatrix ? 'usuario' : 'perfil',
   };
 };
 
