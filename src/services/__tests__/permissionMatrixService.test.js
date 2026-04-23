@@ -86,13 +86,25 @@ test('calcula diff determinístico entre perfil base e permissões finais do usu
 test('normaliza permissões a partir de matriz_permissoes aninhada', () => {
   const normalized = buildPermissionsFromSource({
     matriz_permissoes: {
-      acesso_folha_alteracoes: true,
+      folha_alteracoes: true,
       perm_exportar_medalhas: true,
     },
   });
 
   assert.equal(normalized.acesso_folha_alteracoes, true);
   assert.equal(normalized.perm_exportar_medalhas, true);
+});
+
+test('payload inclui alias sem prefixo para módulos acesso_*', () => {
+  const payload = buildPermissionPayload({
+    acesso_folha_alteracoes: true,
+    acesso_militares: true,
+  });
+
+  assert.equal(payload.acesso_folha_alteracoes, true);
+  assert.equal(payload.folha_alteracoes, true);
+  assert.equal(payload.acesso_militares, true);
+  assert.equal(payload.militares, true);
 });
 
 test('detecta divergências entre esperado e recarregado para evitar falso sucesso', () => {
