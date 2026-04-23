@@ -3,11 +3,14 @@ import { base44 } from '@/api/base44Client';
 import {
   buildPermissionsFromSource,
   isAdminRecoveryPermission,
-  resolveUserPermissionsWithSnapshots,
+  resolveUserPermissions,
 } from '@/services/permissionMatrixService';
 
 const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
+
+const ADMIN_ALWAYS_ALLOWED_MODULES = new Set(['acesso_militares', 'acesso_configuracoes']);
+const ADMIN_ALWAYS_ALLOWED_ACTIONS = new Set(['perm_gerir_permissoes', 'perm_gerir_configuracoes']);
 
 const normalizeAccessMode = (value) => {
   const normalized = toLowerSafe(value);
@@ -100,8 +103,7 @@ export function useCurrentUser() {
     queryKey: ['resolvedPermissions', acesso?.id, perfilAcesso?.id],
     enabled: !!acesso,
     queryFn: async () => {
-      return resolveUserPermissionsWithSnapshots({
-        base44,
+      return resolveUserPermissions({
         userSource: acesso,
         profileSource: perfilAcesso || {},
       });
@@ -178,7 +180,7 @@ export function useCurrentUser() {
     if (acesso) {
       const campo = `acesso_${modulo}`;
       const resolvedValue = normalizedResolvedPermissions[campo];
-      if (isAdmin && isAdminRecoveryPermission(campo, 'module')) return true;
+      if (isAdmin && (isAdminRecoveryPermission(campo, 'module') || ADMIN_ALWAYS_ALLOWED_MODULES.has(campo))) return true;
       if (isAdmin) return resolvedValue !== false;
       return resolvedValue === true;
     }
@@ -194,7 +196,7 @@ export function useCurrentUser() {
     if (acesso) {
       const campo = `perm_${acao}`;
       const resolvedValue = normalizedResolvedPermissions[campo];
-      if (isAdmin && isAdminRecoveryPermission(campo, 'action')) return true;
+      if (isAdmin && (isAdminRecoveryPermission(campo, 'action') || ADMIN_ALWAYS_ALLOWED_ACTIONS.has(campo))) return true;
       if (isAdmin) return resolvedValue !== false;
       return resolvedValue === true;
     }

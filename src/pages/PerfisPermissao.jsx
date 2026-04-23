@@ -11,8 +11,6 @@ import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permi
 import {
   buildPermissionPayload,
   buildPermissionsFromSource,
-  getPermissionMismatches,
-  resolveProfilePermissionsWithSnapshot,
 } from '@/services/permissionMatrixService';
 import {
   AlertDialog,
@@ -48,24 +46,9 @@ export default function PerfisPermissao() {
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
   });
 
-  const ensurePersistedProfilePermissions = async (expectedPermissions, persistedPerfil) => {
-    const { permissions: persistedResolved } = await resolveProfilePermissionsWithSnapshot({
-      base44,
-      profileSource: persistedPerfil || {},
-    });
-    const mismatches = getPermissionMismatches(expectedPermissions, persistedResolved || {});
-    if (mismatches.length > 0) {
-      throw new Error(`Falha de persistência de permissões: ${mismatches.join(', ')}`);
-    }
-  };
 
   const createMutation = useMutation({
-    mutationFn: async (data) => {
-      const saved = await base44.entities.PerfilPermissao.create(data);
-      const reloaded = await base44.entities.PerfilPermissao.get(saved.id);
-      await ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
-      return reloaded;
-    },
+    mutationFn: async (data) => base44.entities.PerfilPermissao.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
       closeForm();
@@ -76,12 +59,7 @@ export default function PerfisPermissao() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }) => {
-      await base44.entities.PerfilPermissao.update(id, data);
-      const reloaded = await base44.entities.PerfilPermissao.get(id);
-      await ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
-      return reloaded;
-    },
+    mutationFn: async ({ id, data }) => base44.entities.PerfilPermissao.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
       closeForm();
@@ -118,16 +96,13 @@ export default function PerfisPermissao() {
       // fallback para registro parcial da listagem
     }
 
-    const { permissions: resolvedPermissions } = await resolveProfilePermissionsWithSnapshot({
-      base44,
-      profileSource: fullPerfil,
-    });
+    const resolvedPermissions = buildPermissionsFromSource(fullPerfil);
 
     setFormData({
       nome_perfil: fullPerfil.nome_perfil || '',
       descricao: fullPerfil.descricao || '',
       ativo: fullPerfil.ativo !== false,
-      ...buildPermissionsFromSource(resolvedPermissions)
+      ...resolvedPermissions,
     });
     setEditingId(fullPerfil.id);
     setShowForm(true);
@@ -149,7 +124,6 @@ export default function PerfisPermissao() {
     const payload = {
       ...formData,
       ...buildPermissionPayload(normalizedPermissions),
-      matriz_permissoes: normalizedPermissions,
     };
 
     if (editingId) {
@@ -332,8 +306,9 @@ export default function PerfisPermissao() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {perfis.map(p => {
-                  const modsAcessiveis = modulosList.filter(m => p[m.key]).length;
-                  const actsAcessiveis = acoesSensiveis.filter(a => p[a.key]).length;
+                  const perfilPermissions = buildPermissionsFromSource(p);
+                  const modsAcessiveis = modulosList.filter(m => perfilPermissions[m.key]).length;
+                  const actsAcessiveis = acoesSensiveis.filter(a => perfilPermissions[a.key]).length;
 
                   return (
                     <div key={p.id} className="p-5 flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4 hover:bg-slate-50 transition-colors">

@@ -46,29 +46,26 @@ export const nestedMatrixKeys = [
   'permissoes',
 ];
 
-export const SNAPSHOT_VERSION = 1;
-export const SNAPSHOT_PROFILE_ENTITY = 'PerfilPermissaoSnapshot';
-export const SNAPSHOT_USER_ENTITY = 'UsuarioPermissaoSnapshot';
-export const SNAPSHOT_RUNTIME_ENABLED = false;
-export const ADMIN_RECOVERY_MODULE_KEYS = ['acesso_militares'];
-export const ADMIN_RECOVERY_ACTION_KEYS = ['perm_gerir_permissoes'];
+export const ADMIN_RECOVERY_MODULE_KEYS = [
+  'acesso_militares',
+  'acesso_configuracoes',
+];
+
+export const ADMIN_RECOVERY_ACTION_KEYS = [
+  'perm_gerir_permissoes',
+  'perm_gerir_configuracoes',
+];
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
-
 const isObjectRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 const collectPermissionSources = (source = {}) => {
   const rootSource = isObjectRecord(source) ? source : {};
-  const sources = [rootSource];
+  const matrixSource = nestedMatrixKeys
+    .map((nestedKey) => rootSource[nestedKey])
+    .find((candidate) => isObjectRecord(candidate));
 
-  nestedMatrixKeys.forEach((nestedKey) => {
-    const nestedSource = rootSource[nestedKey];
-    if (isObjectRecord(nestedSource)) {
-      sources.push(nestedSource);
-    }
-  });
-
-  return sources;
+  return matrixSource ? [matrixSource, rootSource] : [rootSource];
 };
 
 const readPermissionFromCandidate = (candidate = {}, key) => {
@@ -101,6 +98,17 @@ const sourceHasPermissionValue = (source = {}, key) => {
   );
 };
 
+export const hasValidMatrixContent = (source = {}) => {
+  if (!isObjectRecord(source)) return false;
+
+  const matrix = nestedMatrixKeys
+    .map((key) => source[key])
+    .find((candidate) => isObjectRecord(candidate));
+
+  if (!matrix) return false;
+  return canonicalPermissionKeys.some((key) => sourceHasPermissionValue(matrix, key));
+};
+
 export const buildPermissionsFromSource = (source = {}, fallback = {}) => {
   return canonicalPermissionKeys.reduce((acc, key) => {
     const value = sourceHasPermissionValue(source, key)
@@ -125,11 +133,17 @@ const buildPermissionAliases = (normalizedPermissions = {}) => {
   }, {});
 };
 
-export const buildPermissionPayload = (source = {}) => {
+export const buildPermissionPayload = (source = {}, { includeLegacy = true } = {}) => {
   const normalized = buildPermissionsFromSource(source);
-  const payload = buildPermissionAliases(normalized);
+  const payload = {
+    matriz_permissoes: { ...normalized },
+  };
 
+  if (!includeLegacy) return payload;
+
+  Object.assign(payload, buildPermissionAliases(normalized));
   nestedMatrixKeys.forEach((matrixKey) => {
+    if (matrixKey === 'matriz_permissoes') return;
     payload[matrixKey] = { ...normalized };
   });
 
@@ -154,51 +168,40 @@ export const getPermissionMismatches = (expectedPermissions = {}, persistedSourc
   return canonicalPermissionKeys.filter((key) => expected[key] !== persisted[key]);
 };
 
-export const mergeProfileAndUserPermissions = ({
-  profilePermissions = {},
-  userPermissions = {},
-  userOverrides = {},
+export const resolveProfilePermissions = ({ profileSource = {}, fallbackSource = {} }) => ({
+  permissions: buildPermissionsFromSource(profileSource, fallbackSource),
+});
+
+export const resolveUserPermissions = ({
+  userSource = {},
+  profileSource = {},
+  fallbackProfile = {},
+  fallbackUser = {},
 }) => {
-  const profile = buildPermissionsFromSource(profilePermissions);
-  const merged = { ...profile };
-  const legacyUser = buildPermissionsFromSource(userPermissions);
-  const explicitOverrides = buildPermissionsFromSource(userOverrides);
+  const profilePermissions = buildPermissionsFromSource(profileSource, fallbackProfile);
 
-  canonicalPermissionKeys.forEach((key) => {
-    const hasLegacyValue = sourceHasPermissionValue(userPermissions, key);
-    if (hasLegacyValue) merged[key] = legacyUser[key];
+  const userPermissions = hasValidMatrixContent(userSource)
+    ? buildPermissionsFromSource(userSource)
+    : buildPermissionsFromSource(fallbackUser, profilePermissions);
 
-    const hasOverrideValue = sourceHasPermissionValue(userOverrides, key);
-    if (hasOverrideValue) merged[key] = explicitOverrides[key];
-  });
-
-  return merged;
+  return {
+    permissions: userPermissions,
+    profilePermissions,
+    source: hasValidMatrixContent(userSource) ? 'usuario' : 'perfil',
+  };
 };
 
-const parseSnapshotMatrix = (snapshot) => {
-  if (!snapshot) return {};
-  const matrix = snapshot.matriz_permissoes;
-  if (isObjectRecord(matrix)) return matrix;
+export const resolveProfilePermissionsWithSnapshot = async ({
+  profileSource = {},
+  fallbackSource = {},
+}) => resolveProfilePermissions({ profileSource, fallbackSource });
 
-  if (typeof matrix === 'string') {
-    try {
-      const parsed = JSON.parse(matrix);
-      return isObjectRecord(parsed) ? parsed : {};
-    } catch {
-      return {};
-    }
-  }
-
-  return {};
-};
-
-export const isValidPermissionSnapshot = (snapshot) => {
-  if (!snapshot) return false;
-  const matrix = parseSnapshotMatrix(snapshot);
-  if (!isObjectRecord(matrix)) return false;
-
-  return canonicalPermissionKeys.some((key) => sourceHasPermissionValue(matrix, key));
-};
+export const resolveUserPermissionsWithSnapshots = async ({
+  userSource = {},
+  profileSource = {},
+  fallbackProfile = {},
+  fallbackUser = {},
+}) => resolveUserPermissions({ userSource, profileSource, fallbackProfile, fallbackUser });
 
 export const isAdminRecoveryPermission = (permissionKey, type = 'action') => {
   if (!permissionKey || typeof permissionKey !== 'string') return false;
@@ -210,176 +213,5 @@ export const isAdminRecoveryPermission = (permissionKey, type = 'action') => {
   return ADMIN_RECOVERY_ACTION_KEYS.includes(normalized);
 };
 
-const getSnapshotEntity = (base44, entityName) => {
-  if (!SNAPSHOT_RUNTIME_ENABLED || !base44?.entities || !entityName) return null;
-
-  try {
-    return base44.entities[entityName] || null;
-  } catch {
-    return null;
-  }
-};
-
-const findLatestSnapshot = (records = []) => {
-  if (!Array.isArray(records) || records.length === 0) return null;
-  return [...records].sort((a, b) => {
-    const aUpdated = new Date(a?.updated_at || a?.updatedAt || a?.created_at || 0).getTime();
-    const bUpdated = new Date(b?.updated_at || b?.updatedAt || b?.created_at || 0).getTime();
-    return bUpdated - aUpdated;
-  })[0];
-};
-
-export const getProfileSnapshot = async (base44, perfilId) => {
-  if (!perfilId) return null;
-  const entity = getSnapshotEntity(base44, SNAPSHOT_PROFILE_ENTITY);
-  if (!entity?.filter) return null;
-  const records = await entity.filter({ perfil_id: perfilId });
-  return findLatestSnapshot(records);
-};
-
-export const getUserSnapshot = async (base44, usuarioAcessoId, userId = null) => {
-  const entity = getSnapshotEntity(base44, SNAPSHOT_USER_ENTITY);
-  if (!entity?.filter) return null;
-
-  if (usuarioAcessoId) {
-    const byAcesso = await entity.filter({ usuario_acesso_id: usuarioAcessoId });
-    const found = findLatestSnapshot(byAcesso);
-    if (found) return found;
-  }
-
-  if (userId) {
-    const byUser = await entity.filter({ user_id: userId });
-    return findLatestSnapshot(byUser);
-  }
-
-  return null;
-};
-
-export const resolveProfilePermissionsWithSnapshot = async ({
-  base44,
-  profileSource = {},
-  fallbackSource = {},
-}) => {
-  if (!SNAPSHOT_RUNTIME_ENABLED) {
-    return {
-      permissions: buildPermissionsFromSource(profileSource, fallbackSource),
-      snapshot: null,
-    };
-  }
-
-  const snapshot = await getProfileSnapshot(base44, profileSource?.id);
-  const snapshotIsValid = isValidPermissionSnapshot(snapshot);
-  const snapshotPermissions = buildPermissionsFromSource(parseSnapshotMatrix(snapshot));
-  const legacyPermissions = buildPermissionsFromSource(profileSource, fallbackSource);
-  return {
-    permissions: snapshotIsValid ? snapshotPermissions : legacyPermissions,
-    snapshot: snapshotIsValid ? snapshot : null,
-  };
-};
-
-export const resolveUserPermissionsWithSnapshots = async ({
-  base44,
-  userSource = {},
-  profileSource = {},
-  fallbackProfile = {},
-  fallbackUser = {},
-}) => {
-  if (!SNAPSHOT_RUNTIME_ENABLED) {
-    const profilePermissions = buildPermissionsFromSource(profileSource, fallbackProfile);
-    return {
-      permissions: mergeProfileAndUserPermissions({
-        profilePermissions,
-        userPermissions: userSource,
-        userOverrides: userSource?.permissoes_override || fallbackUser || {},
-      }),
-      profilePermissions,
-      userSnapshot: null,
-      profileSnapshot: null,
-    };
-  }
-
-  const [profileSnapshot, userSnapshot] = await Promise.all([
-    getProfileSnapshot(base44, profileSource?.id),
-    getUserSnapshot(base44, userSource?.id, userSource?.user_id || userSource?.user_email || null),
-  ]);
-
-  const profileSnapshotIsValid = isValidPermissionSnapshot(profileSnapshot);
-  const userSnapshotIsValid = isValidPermissionSnapshot(userSnapshot);
-  const profileFromSnapshot = buildPermissionsFromSource(parseSnapshotMatrix(profileSnapshot));
-  const profileLegacy = buildPermissionsFromSource(profileSource, fallbackProfile);
-  const profilePermissions = profileSnapshotIsValid ? profileFromSnapshot : profileLegacy;
-
-  if (userSnapshotIsValid) {
-    return {
-      permissions: buildPermissionsFromSource(parseSnapshotMatrix(userSnapshot)),
-      profilePermissions,
-      userSnapshot,
-      profileSnapshot: profileSnapshotIsValid ? profileSnapshot : null,
-    };
-  }
-
-  return {
-    permissions: mergeProfileAndUserPermissions({
-      profilePermissions,
-      userPermissions: userSource,
-      userOverrides: userSource?.permissoes_override || fallbackUser || {},
-    }),
-    profilePermissions,
-    userSnapshot: null,
-    profileSnapshot: profileSnapshotIsValid ? profileSnapshot : null,
-  };
-};
-
-const serializeMatrix = (normalizedPermissions = {}) => ({ ...buildPermissionsFromSource(normalizedPermissions) });
-
-export const upsertProfileSnapshot = async ({
-  base44,
-  perfilId,
-  matrizPermissoes,
-  updatedBy = '',
-  versao = SNAPSHOT_VERSION,
-}) => {
-  if (!SNAPSHOT_RUNTIME_ENABLED) return null;
-  const entity = getSnapshotEntity(base44, SNAPSHOT_PROFILE_ENTITY);
-  if (!entity || !perfilId) return null;
-
-  const payload = {
-    perfil_id: perfilId,
-    matriz_permissoes: serializeMatrix(matrizPermissoes),
-    versao,
-    updated_by: updatedBy || '',
-    updated_at: new Date().toISOString(),
-  };
-
-  const current = await getProfileSnapshot(base44, perfilId);
-  if (current?.id && entity.update) return entity.update(current.id, payload);
-  if (entity.create) return entity.create(payload);
-  return null;
-};
-
-export const upsertUserSnapshot = async ({
-  base44,
-  usuarioAcessoId,
-  userId = '',
-  matrizPermissoes,
-  updatedBy = '',
-  versao = SNAPSHOT_VERSION,
-}) => {
-  if (!SNAPSHOT_RUNTIME_ENABLED) return null;
-  const entity = getSnapshotEntity(base44, SNAPSHOT_USER_ENTITY);
-  if (!entity || (!usuarioAcessoId && !userId)) return null;
-
-  const payload = {
-    usuario_acesso_id: usuarioAcessoId || '',
-    user_id: userId || '',
-    matriz_permissoes: serializeMatrix(matrizPermissoes),
-    versao,
-    updated_by: updatedBy || '',
-    updated_at: new Date().toISOString(),
-  };
-
-  const current = await getUserSnapshot(base44, usuarioAcessoId, userId);
-  if (current?.id && entity.update) return entity.update(current.id, payload);
-  if (entity.create) return entity.create(payload);
-  return null;
-};
+export const upsertProfileSnapshot = async () => null;
+export const upsertUserSnapshot = async () => null;
