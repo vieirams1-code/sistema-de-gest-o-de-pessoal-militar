@@ -245,6 +245,7 @@ export default function PermissoesUsuarios() {
         perfil_id: perfilSelected ? perfilSelected.id : '',
         perfil_nome: perfilSelected ? perfilSelected.nome_perfil : '',
         permissoes_override: permissionOverrides,
+        matriz_permissoes_usuario: normalizedPermissions,
         matriz_permissoes: normalizedPermissions,
         ...permissionPayload
       };
@@ -614,6 +615,7 @@ export default function PermissoesUsuarios() {
                             if (v === '_nenhum') {
                               setLoadedProfilePermissions(null);
                               setSelectedProfileSource(null);
+                              setUserPermissions((prev) => buildPermissionsFromSource(prev));
                               return;
                             }
                             const perfilCompleto = await getProfileWithPermissions(v);
