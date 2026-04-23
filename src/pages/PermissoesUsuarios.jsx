@@ -10,11 +10,15 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
+import {
+  buildPermissionPayload,
+  buildPermissionsFromSource,
+  canonicalPermissionKeys,
+  computePermissionOverrides,
+  mergeProfileAndUserPermissions,
+} from '@/services/permissionMatrixService';
 
-const initialPermissions = {
-  ...modulosList.reduce((acc, m) => ({ ...acc, [m.key]: false }), {}),
-  ...acoesSensiveis.reduce((acc, a) => ({ ...acc, [a.key]: false }), {})
-};
+const initialPermissions = canonicalPermissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {});
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
 
 const normalizeAccessMode = (value) => {
@@ -23,26 +27,6 @@ const normalizeAccessMode = (value) => {
   if (SELF_RESTRICTED_SCOPES.has(normalized)) return 'proprio';
   if (['admin', 'setor', 'subsetor', 'unidade'].includes(normalized)) return normalized;
   return 'proprio';
-};
-
-const toBooleanPermission = (value) => {
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true' || normalized === '1') return true;
-    if (normalized === 'false' || normalized === '0' || normalized === '') return false;
-  }
-
-  return value === true || value === 1;
-};
-
-const buildPermissionsFromSource = (source = {}) => {
-  const normalizedPermissions = {};
-
-  Object.keys(initialPermissions).forEach((key) => {
-    normalizedPermissions[key] = toBooleanPermission(source[key]);
-  });
-
-  return normalizedPermissions;
 };
 
 export default function PermissoesUsuarios() {
@@ -68,6 +52,7 @@ export default function PermissoesUsuarios() {
   const [userSearch, setUserSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(permissionStructure[0]?.category || '');
   const [activeEditTab, setActiveEditTab] = useState('dados');
+  const [loadedProfilePermissions, setLoadedProfilePermissions] = useState(null);
 
 
   // Queries — só executam após resolução do acesso e confirmação de permissão
@@ -127,6 +112,16 @@ export default function PermissoesUsuarios() {
     return <AccessDenied modulo="Permissões de Usuários" />;
   }
 
+  const getProfileWithPermissions = async (profileId) => {
+    if (!profileId) return null;
+    try {
+      const perfilCompleto = await base44.entities.PerfilPermissao.get(profileId);
+      return perfilCompleto;
+    } catch {
+      return perfis.find((p) => p.id === profileId) || null;
+    }
+  };
+
   const handleSelectAcesso = async (acesso) => {
     let fullAcesso = acesso;
     try {
@@ -163,9 +158,17 @@ export default function PermissoesUsuarios() {
     setUserGrupamentoId(gId);
     setUserSubgrupamentoId(sId);
     setUserUnidadeId(uId);
-    setSelectedProfileId(fullAcesso.perfil_id || '_nenhum');
+    const perfilId = fullAcesso.perfil_id || '';
+    setSelectedProfileId(perfilId || '_nenhum');
+    const perfilCompleto = await getProfileWithPermissions(perfilId);
+    setLoadedProfilePermissions(perfilCompleto ? buildPermissionsFromSource(perfilCompleto) : null);
 
-    setUserPermissions(buildPermissionsFromSource(fullAcesso));
+    const mergedPermissions = mergeProfileAndUserPermissions({
+      profilePermissions: perfilCompleto || {},
+      userPermissions: fullAcesso,
+      userOverrides: fullAcesso.permissoes_override || {},
+    });
+    setUserPermissions(mergedPermissions);
     setActiveEditTab('dados');
   };
 
@@ -183,21 +186,17 @@ export default function PermissoesUsuarios() {
     setUserUnidadeId('');
     setSelectedProfileId('_nenhum');
     setUserPermissions(initialPermissions);
+    setLoadedProfilePermissions(null);
     setActiveEditTab('dados');
   };
 
-  const aplicarPerfil = () => {
+  const aplicarPerfil = async () => {
     if (!selectedProfilePreview) return;
 
-    const newPerms = { ...userPermissions };
-    modulosList.forEach((m) => {
-      newPerms[m.key] = toBooleanPermission(selectedProfilePreview[m.key]);
-    });
-    acoesSensiveis.forEach((a) => {
-      newPerms[a.key] = toBooleanPermission(selectedProfilePreview[a.key]);
-    });
-
-    setUserPermissions(newPerms);
+    const perfilCompleto = await getProfileWithPermissions(selectedProfilePreview.id);
+    const profilePermissions = buildPermissionsFromSource(perfilCompleto || selectedProfilePreview);
+    setLoadedProfilePermissions(profilePermissions);
+    setUserPermissions(profilePermissions);
   };
 
   const handleSaveUserScope = async () => {
@@ -220,7 +219,12 @@ export default function PermissoesUsuarios() {
       const militarMatriculaAtual = militarVinculado?.matricula_atual || militarVinculado?.matricula || '';
       const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
 
+      const profilePermissions = loadedProfilePermissions || {};
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
+      const permissionPayload = buildPermissionPayload(normalizedPermissions);
+      const permissionOverrides = selectedProfileId === '_nenhum'
+        ? {}
+        : computePermissionOverrides(normalizedPermissions, profilePermissions);
 
       const baseData = {
         nome_usuario: userNomeUsuario,
@@ -228,7 +232,8 @@ export default function PermissoesUsuarios() {
         ativo: userAtivo,
         perfil_id: perfilSelected ? perfilSelected.id : '',
         perfil_nome: perfilSelected ? perfilSelected.nome_perfil : '',
-        ...normalizedPermissions
+        permissoes_override: permissionOverrides,
+        ...permissionPayload
       };
 
       const normalizedAccessMode = normalizeAccessMode(userAccessMode);
@@ -258,14 +263,20 @@ export default function PermissoesUsuarios() {
 
       const dataToSave = { ...baseData, ...roleData };
 
-      if (isNewAcesso) {
-        await base44.entities.UsuarioAcesso.create(dataToSave);
-      } else {
-        await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
-      }
+      const savedRecord = isNewAcesso
+        ? await base44.entities.UsuarioAcesso.create(dataToSave)
+        : await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
+
+      const reloadedRecord = await base44.entities.UsuarioAcesso.get(savedRecord.id || selectedUser.id);
+      const reloadedPermissions = mergeProfileAndUserPermissions({
+        profilePermissions,
+        userPermissions: reloadedRecord,
+        userOverrides: reloadedRecord.permissoes_override || {},
+      });
+      setUserPermissions(reloadedPermissions);
+      setSelectedUser(reloadedRecord);
 
       queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
-      setSelectedUser(null);
     } catch {
       alert('Erro ao salvar permissão no Base44.');
     } finally {
@@ -582,7 +593,18 @@ export default function PermissoesUsuarios() {
                     <div className="flex flex-col sm:flex-row gap-4 items-end bg-white p-3.5 rounded-lg border border-slate-200">
                       <div className="flex-1 w-full">
                         <label className="text-sm font-semibold text-slate-700 block mb-1.5">Carregar permissões de um Perfil existente</label>
-                        <Select value={selectedProfileId} onValueChange={(v) => setSelectedProfileId(v)}>
+                        <Select
+                          value={selectedProfileId}
+                          onValueChange={async (v) => {
+                            setSelectedProfileId(v);
+                            if (v === '_nenhum') {
+                              setLoadedProfilePermissions(null);
+                              return;
+                            }
+                            const perfilCompleto = await getProfileWithPermissions(v);
+                            setLoadedProfilePermissions(perfilCompleto ? buildPermissionsFromSource(perfilCompleto) : null);
+                          }}
+                        >
                           <SelectTrigger><SelectValue placeholder="Escolha um perfil para aplicar" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="_nenhum">— Personalizado / Não aplicar perfil —</SelectItem>
@@ -619,7 +641,7 @@ export default function PermissoesUsuarios() {
                                 <label key={`preview_mod_${mod.key}`} className="flex items-center gap-2 text-sm text-slate-700">
                                   <input
                                     type="checkbox"
-                                    checked={selectedProfilePreview[mod.key] === true}
+                                    checked={(loadedProfilePermissions?.[mod.key] ?? selectedProfilePreview[mod.key]) === true}
                                     readOnly
                                     className="rounded border-slate-300 w-4 h-4 text-blue-600 pointer-events-none"
                                   />
@@ -636,7 +658,7 @@ export default function PermissoesUsuarios() {
                                 <label key={`preview_act_${act.key}`} className="flex items-center gap-2 text-sm text-slate-700">
                                   <input
                                     type="checkbox"
-                                    checked={selectedProfilePreview[act.key] === true}
+                                    checked={(loadedProfilePermissions?.[act.key] ?? selectedProfilePreview[act.key]) === true}
                                     readOnly
                                     className="rounded border-orange-300 w-4 h-4 text-orange-600 pointer-events-none"
                                   />
@@ -686,7 +708,7 @@ export default function PermissoesUsuarios() {
                         </div>
                         {activeCategoryGroup?.modules.map((mod) => {
                               const isModuleEnabled = userPermissions[mod.key] === true;
-                              const moduleOverride = selectedProfilePreview && (selectedProfilePreview[mod.key] === true) !== isModuleEnabled;
+                              const moduleOverride = loadedProfilePermissions && (loadedProfilePermissions[mod.key] === true) !== isModuleEnabled;
                               return (
                                 <div key={mod.key} className={`rounded-xl border shadow-sm ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
                                   <div
@@ -714,7 +736,7 @@ export default function PermissoesUsuarios() {
                                       <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-2 border-t border-blue-100 pt-3">
                                         {mod.actions.map((act) => {
                                           const isActionEnabled = userPermissions[act.key] === true;
-                                          const actionOverride = selectedProfilePreview && (selectedProfilePreview[act.key] === true) !== isActionEnabled;
+                                          const actionOverride = loadedProfilePermissions && (loadedProfilePermissions[act.key] === true) !== isActionEnabled;
                                           return (
                                             <div
                                               key={act.key}
