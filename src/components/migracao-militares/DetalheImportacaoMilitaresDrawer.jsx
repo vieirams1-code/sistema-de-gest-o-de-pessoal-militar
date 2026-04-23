@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import TabelaLinhasImportacaoMilitares from './TabelaLinhasImportacaoMilitares';
-import { exportarCsvHistoricoHumano, STATUS_BADGE_CLASS } from '@/services/historicoImportacoesMilitaresService';
+import { exportarCsvHistoricoHumano, STATUS_BADGE_CLASS, STATUS_LOTE_BADGE_CLASS } from '@/services/historicoImportacoesMilitaresService';
 
 function Bloco({ titulo, itens, vazio = 'Sem informações.' }) {
   const lista = Array.isArray(itens) ? itens : [];
@@ -94,9 +94,19 @@ export default function DetalheImportacaoMilitaresDrawer({ open, onOpenChange, l
             <SheetHeader>
               <SheetTitle className="text-[#1e3a5f]">Detalhe do lote: {lote.nomeArquivo}</SheetTitle>
               <SheetDescription>
-                Status geral: <span className="font-medium">{lote.statusGeral}</span>
+                <span className="inline-flex items-center gap-2">
+                  Status geral:
+                  <Badge className={STATUS_LOTE_BADGE_CLASS[lote.statusGeral] || 'bg-slate-100 text-slate-700'}>{lote.statusGeral}</Badge>
+                </span>
               </SheetDescription>
             </SheetHeader>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
+              <p><span className="font-semibold">Tipo:</span> {lote.tipoImportacao || 'Não informado'}</p>
+              <p><span className="font-semibold">Executor:</span> {lote.importadoPor || 'Não informado'}</p>
+              <p><span className="font-semibold">Referência:</span> {lote.referenciaLote || 'Não informada'}</p>
+              <p><span className="font-semibold">Observações:</span> {lote.observacoes || 'Sem observações.'}</p>
+            </div>
 
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => exportarCsvHistoricoHumano(lote)}>
