@@ -2,6 +2,7 @@ import { base44 } from '@/api/base44Client';
 import { strFromU8, unzipSync } from 'fflate';
 import { atualizarHistoricoImportacaoAlteracoesLegado, criarHistoricoImportacaoAlteracoesLegado } from '@/services/importacaoAlteracoesLegadoService';
 import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
+import { gerarChaveOrigemLinhaDeterministica, gerarHashLotePorTabelaDeterministico } from '@/services/migracaoAlteracoesLegadoIdempotencia';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
@@ -78,6 +79,10 @@ function limparTexto(valor) {
   return String(valor ?? '').trim();
 }
 
+function compactarEspacos(valor) {
+  return limparTexto(valor).replace(/\s+/g, ' ');
+}
+
 function normalizarChave(valor) {
   return limparTexto(valor)
     .normalize('NFD')
@@ -87,7 +92,7 @@ function normalizarChave(valor) {
 }
 
 function normalizarTextoComparacao(valor) {
-  return limparTexto(valor)
+  return compactarEspacos(valor)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
@@ -364,6 +369,17 @@ function construirChaveDuplicidade(transformado) {
   ].join('|');
 }
 
+export async function gerarChaveOrigemLinha(transformado = {}) {
+  if (!transformado?.data_publicacao && transformado?.data_bg) {
+    return gerarChaveOrigemLinhaDeterministica({ ...transformado, data_publicacao: transformado.data_bg });
+  }
+  return gerarChaveOrigemLinhaDeterministica(transformado);
+}
+
+export async function gerarHashLotePorTabela(tabela = []) {
+  return gerarHashLotePorTabelaDeterministico(tabela);
+}
+
 function mapLinhaOriginal(headers, row) {
   const original = {};
   headers.forEach((header, index) => {
@@ -524,6 +540,29 @@ function criarHashArquivo(file) {
   return [file?.name || 'arquivo', file?.size || 0, file?.lastModified || 0].join(':');
 }
 
+function extrairLinhasHistorico(registro = {}) {
+  try {
+    const relatorio = JSON.parse(registro?.relatorio_json || '{}');
+    if (Array.isArray(relatorio?.analise?.linhas)) return relatorio.analise.linhas;
+    if (Array.isArray(relatorio?.linhas)) return relatorio.linhas;
+  } catch {
+    return [];
+  }
+  return [];
+}
+
+function construirIndiceHistoricoPorChave(historicos = []) {
+  const indice = new Map();
+  historicos.forEach((registro) => {
+    extrairLinhasHistorico(registro).forEach((linha) => {
+      const chave = linha?.chave_origem || linha?.transformado?.chave_origem || linha?.transformado?.hash_linha;
+      if (!chave || indice.has(chave)) return;
+      indice.set(chave, linha);
+    });
+  });
+  return indice;
+}
+
 function gerarResumo(linhas) {
   return linhas.reduce((acc, linha) => {
     acc.total_linhas += 1;
@@ -554,6 +593,7 @@ function gerarResumo(linhas) {
 export async function analisarArquivoMigracaoAlteracoesLegado(file) {
   const tabela = await lerArquivoComoTabela(file);
   if (!tabela.length) throw new Error('Arquivo sem conteúdo válido para análise.');
+  const hashLote = await gerarHashLotePorTabela(tabela);
 
   const [header, ...rows] = tabela;
   const colunas = detectarColunas(header);
@@ -564,10 +604,11 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
     throw new Error(`Cabeçalhos obrigatórios ausentes na planilha: ${ausentes.join(', ')}.`);
   }
 
-  const [militares, publicacoesLegadoExistentes, tiposPublicacaoCustom] = await Promise.all([
+  const [militares, publicacoesLegadoExistentes, tiposPublicacaoCustom, historicosExistentes] = await Promise.all([
     base44.entities.Militar.list('-created_date', 10000),
     base44.entities.PublicacaoExOfficio.filter({ importado_legado: true }, '-created_date'),
     base44.entities.TipoPublicacaoCustom.list('-created_date').catch(() => []),
+    base44.entities.ImportacaoAlteracoesLegado?.list?.('-created_date', 500).catch(() => []),
   ]);
   const tiposValidosMap = resolverTiposPublicacaoValidos(tiposPublicacaoCustom);
   const tiposPublicacaoValidos = Array.from(new Set(Array.from(tiposValidosMap.values()))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -581,9 +622,16 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
     data_bg: item.data_bg,
     tipo_bg_legado: item.tipo_bg_legado,
   })));
+  const publicacoesPorChaveOrigem = new Map(publicacoesLegadoExistentes.map((item) => {
+    const chave = item.chave_origem_legado || item.hash_linha_legado || null;
+    if (chave) return [chave, item];
+    return [null, null];
+  }).filter(([chave]) => Boolean(chave)));
+  const indiceHistorico = construirIndiceHistoricoPorChave(historicosExistentes || []);
+  const loteJaImportado = (historicosExistentes || []).find((item) => (item.hash_lote || item.hash_arquivo) === hashLote);
 
   const duplicidadeArquivo = new Map();
-  const linhas = rows.map((row, index) => {
+  const linhas = await Promise.all(rows.map(async (row, index) => {
     const linhaNumero = index + 2;
     const original = mapLinhaOriginal(header, row);
     const transformado = mapCamposTransformados(row, colunas);
@@ -652,6 +700,34 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
     }
 
     const chave = construirChaveDuplicidade(transformado);
+    const chaveOrigem = await gerarChaveOrigemLinha(transformado);
+    transformado.chave_origem = chaveOrigem;
+    transformado.hash_linha = chaveOrigem;
+    transformado.hash_lote = hashLote;
+
+    const publicacaoExistente = publicacoesPorChaveOrigem.get(chaveOrigem);
+    if (publicacaoExistente?.id) {
+      revisoes.push('Registro legado já importado anteriormente; importação final será idempotente.');
+      transformado.ja_importado = true;
+      transformado.publicacao_legado_existente_id = publicacaoExistente.id;
+      transformado.destino_final = DESTINO_FINAL.IMPORTAR;
+    }
+
+    const estadoAnterior = indiceHistorico.get(chaveOrigem);
+    if (estadoAnterior?.transformado) {
+      const anterior = estadoAnterior.transformado;
+      if (anterior.tipo_publicacao_confirmado) transformado.tipo_publicacao_confirmado = anterior.tipo_publicacao_confirmado;
+      if (anterior.destino_final) transformado.destino_final = resolverDestinoFinal(anterior.destino_final, transformado.destino_final || DESTINO_FINAL.IMPORTAR);
+      if (anterior.motivo_destino && !transformado.motivo_destino) transformado.motivo_destino = anterior.motivo_destino;
+      if (anterior.militar_id && !transformado.militar_id) {
+        transformado.militar_id = anterior.militar_id;
+        transformado.militar_nome = anterior.militar_nome || transformado.militar_nome;
+        transformado.militar_matricula = anterior.militar_matricula || transformado.militar_matricula;
+      }
+      revisoes.push('Estado anterior reaproveitado automaticamente com base na chave de origem.');
+      transformado.reaproveitado_historico = true;
+      transformado.historico_origem_linha = estadoAnterior?.linhaNumero || null;
+    }
     if (duplicidadeExistente.has(chave)) revisoes.push('Suspeita de duplicidade contra registros legado já importados.');
     const prev = duplicidadeArquivo.get(chave) || 0;
     duplicidadeArquivo.set(chave, prev + 1);
@@ -675,6 +751,7 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
     return {
       linhaNumero,
       chave_duplicidade: chave,
+      chave_origem: chaveOrigem,
       status: STATUS_LINHA.APTO,
       original,
       transformado,
@@ -684,7 +761,7 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
       observacoes: [],
       ajustes_manuais: [],
     };
-  });
+  }));
 
   linhas.forEach((linha) => {
     if ((duplicidadeArquivo.get(linha.chave_duplicidade) || 0) > 1) {
@@ -703,7 +780,10 @@ export async function analisarArquivoMigracaoAlteracoesLegado(file) {
       tipo: file?.type || 'application/octet-stream',
       tamanho: file?.size || 0,
       hash: criarHashArquivo(file),
+      hash_lote: hashLote,
     },
+    lote_ja_processado: Boolean(loteJaImportado?.id),
+    lote_original_id: loteJaImportado?.id || null,
     versao_regra_migracao: REGRA_VERSAO,
     tipo_publicacao_neutro: TIPO_NEUTRO_LEGADO,
     tipos_publicacao_validos: tiposPublicacaoValidos,
@@ -933,6 +1013,9 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
     importado_por_legado_id: usuario?.id || usuario?.email || '',
     importado_por_legado_nome: usuario?.full_name || usuario?.name || usuario?.email || '',
     importado_em_legado: new Date().toISOString(),
+    chave_origem_legado: t.chave_origem || linha.chave_origem || '',
+    hash_linha_legado: t.hash_linha || linha.chave_origem || '',
+    hash_lote_legado: t.hash_lote || '',
     tipo_publicacao_original_legado: t.tipo_publicacao,
     tipo_publicacao_sugerido: t.tipo_publicacao_sugerido || '',
     tipo_publicacao_confirmado: t.tipo_publicacao_confirmado || '',
@@ -962,15 +1045,19 @@ function buildPayloadPublicacaoLegado(linha, historicoId, usuario) {
 export async function salvarAnaliseHistoricoAlteracoesLegado(analise, usuario) {
   const payload = {
     nome_arquivo: analise.arquivo.nome,
+    tamanho_arquivo: analise.arquivo.tamanho || 0,
     tipo_arquivo: analise.arquivo.tipo,
     hash_arquivo: analise.arquivo.hash,
+    hash_lote: analise.arquivo.hash_lote || analise.arquivo.hash,
     data_importacao: new Date().toISOString(),
     importado_por: usuario?.email || usuario?.id || 'desconhecido',
     importado_por_nome: usuario?.full_name || usuario?.name || usuario?.email || 'Desconhecido',
+    usuario_executor: usuario?.email || usuario?.id || 'desconhecido',
     ...analise.resumo,
     total_importadas: 0,
     total_nao_importadas: analise.resumo.total_linhas,
     status_importacao: STATUS_IMPORTACAO.ANALISADO,
+    status_lote: STATUS_IMPORTACAO.ANALISADO,
     importar_linhas_com_alerta: false,
     versao_regra_migracao: analise.versao_regra_migracao || REGRA_VERSAO,
     relatorio_json: JSON.stringify({ analise }),
@@ -999,6 +1086,7 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
   if (historicoId) {
     historicoImportando = await atualizarHistoricoImportacaoAlteracoesLegado(historicoId, {
       status_importacao: STATUS_IMPORTACAO.IMPORTANDO,
+      status_lote: STATUS_IMPORTACAO.IMPORTANDO,
       importar_linhas_com_alerta: !!incluirAlertas,
       importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
     });
@@ -1019,16 +1107,33 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     totalNaoImportadas: naoImportadas.length,
     erros: [],
     idsPublicacoes: [],
+    jaImportadas: [],
+    linhasProcessadas: [],
   };
+
+  const chavesImportaveis = Array.from(new Set(importaveis.map((linha) => linha.chave_origem || linha.transformado?.chave_origem).filter(Boolean)));
+  const publicacoesJaImportadas = await base44.entities.PublicacaoExOfficio
+    .filter({ importado_legado: true }, '-created_date')
+    .then((itens) => itens.filter((item) => chavesImportaveis.includes(item.chave_origem_legado || item.hash_linha_legado)));
+  const publicacoesPorChave = new Map(publicacoesJaImportadas.map((item) => [item.chave_origem_legado || item.hash_linha_legado, item]));
 
   for (const linha of importaveis) {
     try {
+      const chaveOrigem = linha.chave_origem || linha.transformado?.chave_origem;
+      const existente = publicacoesPorChave.get(chaveOrigem);
+      if (existente?.id) {
+        resultado.jaImportadas.push({ linhaNumero: linha.linhaNumero, chave_origem: chaveOrigem, publicacaoId: existente.id, mensagem: 'Registro já importado anteriormente.' });
+        resultado.linhasProcessadas.push({ linhaNumero: linha.linhaNumero, chave_origem: chaveOrigem, estado_operacional: 'IMPORTADO', reaproveitado: true, publicacaoId: existente.id });
+        continue;
+      }
       const payload = buildPayloadPublicacaoLegado(linha, historicoId, usuario);
       const criado = await base44.entities.PublicacaoExOfficio.create(payload);
       resultado.totalImportadas += 1;
       resultado.idsPublicacoes.push(criado.id);
+      resultado.linhasProcessadas.push({ linhaNumero: linha.linhaNumero, chave_origem: payload.chave_origem_legado, estado_operacional: 'IMPORTADO', reaproveitado: false, publicacaoId: criado.id });
     } catch (error) {
       resultado.erros.push({ linhaNumero: linha.linhaNumero, mensagem: error?.message || 'Falha ao criar publicação legado.' });
+      resultado.linhasProcessadas.push({ linhaNumero: linha.linhaNumero, chave_origem: linha.chave_origem || linha.transformado?.chave_origem || '', estado_operacional: 'ERRO', reaproveitado: false });
     }
   }
 
@@ -1045,6 +1150,16 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     incluirAlertas,
     incluirPendentesClassificacao,
     historicoId,
+    jaImportadas: resultado.jaImportadas,
+    linhas: analise.linhas.map((linha) => ({
+      linhaNumero: linha.linhaNumero,
+      status: linha.status,
+      chave_origem: linha.chave_origem || linha.transformado?.chave_origem || '',
+      hash_lote: analise?.arquivo?.hash_lote || '',
+      origem_lote_id: historicoId || null,
+      transformado: linha.transformado,
+    })),
+    linhasProcessadas: resultado.linhasProcessadas,
     finalizadoEm: new Date().toISOString(),
   };
 
@@ -1056,6 +1171,7 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
       total_nao_importadas: resultado.totalNaoImportadas,
       ajustes_manuais: analise.linhas.reduce((acc, linha) => acc + (linha.ajustes_manuais?.length || 0), 0),
       status_importacao: statusFinal,
+      status_lote: statusFinal,
       importar_linhas_com_alerta: !!incluirAlertas,
       importar_linhas_pendentes_classificacao: !!incluirPendentesClassificacao,
       relatorio_json: JSON.stringify(relatorio),
@@ -1069,7 +1185,9 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
     avisosHistorico,
     statusImportacao: statusFinal,
     totalImportadas: resultado.totalImportadas,
+    totalJaImportadas: resultado.jaImportadas.length,
     totalNaoImportadas: resultado.totalNaoImportadas,
+    registrosJaImportados: resultado.jaImportadas,
     relatorio,
   };
 }
