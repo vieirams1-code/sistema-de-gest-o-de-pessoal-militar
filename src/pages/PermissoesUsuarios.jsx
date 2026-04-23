@@ -17,7 +17,6 @@ import {
   computePermissionOverrides,
   getPermissionMismatches,
   resolveUserPermissionsWithSnapshots,
-  upsertUserSnapshot,
 } from '@/services/permissionMatrixService';
 
 const initialPermissions = canonicalPermissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {});
@@ -170,15 +169,6 @@ export default function PermissoesUsuarios() {
     });
     setLoadedProfilePermissions(resolved.profilePermissions || null);
     setUserPermissions(resolved.permissions);
-
-    if (!resolved.userSnapshot && fullAcesso?.id) {
-      await upsertUserSnapshot({
-        base44,
-        usuarioAcessoId: fullAcesso.id,
-        userId: fullAcesso.user_id || fullAcesso.user_email || '',
-        matrizPermissoes: resolved.permissions,
-      });
-    }
     setActiveEditTab('dados');
   };
 
@@ -279,12 +269,6 @@ export default function PermissoesUsuarios() {
         : await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
 
       const resolvedRecordId = savedRecord.id || selectedUser.id;
-      await upsertUserSnapshot({
-        base44,
-        usuarioAcessoId: resolvedRecordId,
-        userId: dataToSave.user_id || dataToSave.user_email || '',
-        matrizPermissoes: normalizedPermissions,
-      });
       const reloadedRecord = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
       const reloadedResolved = await resolveUserPermissionsWithSnapshots({
         base44,

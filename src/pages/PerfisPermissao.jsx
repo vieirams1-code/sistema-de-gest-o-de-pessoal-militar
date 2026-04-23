@@ -13,7 +13,6 @@ import {
   buildPermissionsFromSource,
   getPermissionMismatches,
   resolveProfilePermissionsWithSnapshot,
-  upsertProfileSnapshot,
 } from '@/services/permissionMatrixService';
 import {
   AlertDialog,
@@ -63,12 +62,6 @@ export default function PerfisPermissao() {
   const createMutation = useMutation({
     mutationFn: async (data) => {
       const saved = await base44.entities.PerfilPermissao.create(data);
-      await upsertProfileSnapshot({
-        base44,
-        perfilId: saved.id,
-        matrizPermissoes: data.matriz_permissoes || data,
-        updatedBy: data.updated_by || '',
-      });
       const reloaded = await base44.entities.PerfilPermissao.get(saved.id);
       await ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
       return reloaded;
@@ -85,12 +78,6 @@ export default function PerfisPermissao() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       await base44.entities.PerfilPermissao.update(id, data);
-      await upsertProfileSnapshot({
-        base44,
-        perfilId: id,
-        matrizPermissoes: data.matriz_permissoes || data,
-        updatedBy: data.updated_by || '',
-      });
       const reloaded = await base44.entities.PerfilPermissao.get(id);
       await ensurePersistedProfilePermissions(data.matriz_permissoes || data, reloaded);
       return reloaded;
@@ -131,17 +118,10 @@ export default function PerfisPermissao() {
       // fallback para registro parcial da listagem
     }
 
-    const { permissions: resolvedPermissions, snapshot } = await resolveProfilePermissionsWithSnapshot({
+    const { permissions: resolvedPermissions } = await resolveProfilePermissionsWithSnapshot({
       base44,
       profileSource: fullPerfil,
     });
-    if (!snapshot && fullPerfil?.id) {
-      await upsertProfileSnapshot({
-        base44,
-        perfilId: fullPerfil.id,
-        matrizPermissoes: resolvedPermissions,
-      });
-    }
 
     setFormData({
       nome_perfil: fullPerfil.nome_perfil || '',
