@@ -24,9 +24,12 @@ import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 export default function Punicoes() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
+  const canAdicionarPunicoes = canAccessAction('adicionar_punicoes');
+  const canEditarPunicoes = canAccessAction('editar_punicoes');
+  const canExcluirPunicoes = canAccessAction('excluir_punicoes');
   let entity = null;
   try { entity = getPunicaoEntity(); } catch (_) {}
 
@@ -43,6 +46,11 @@ export default function Punicoes() {
       setDeleteDialog({ open: false, id: null });
     }
   });
+
+  const openDeleteDialog = (id) => {
+    if (!canExcluirPunicoes) return;
+    setDeleteDialog({ open: true, id });
+  };
 
   const filteredPunicoes = punicoes.filter(p =>
     p.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -66,7 +74,11 @@ export default function Punicoes() {
               <p className="text-slate-500">Registro disciplinar próprio (sem origem no Livro/RP)</p>
             </div>
           </div>
-          <Button onClick={() => navigate(createPageUrl('CadastrarPunicao'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+          <Button
+            onClick={() => canAdicionarPunicoes && navigate(createPageUrl('CadastrarPunicao'))}
+            disabled={!canAdicionarPunicoes}
+            className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+          >
             <Plus className="w-5 h-5 mr-2" />
             Nova Punição
           </Button>
@@ -98,8 +110,12 @@ export default function Punicoes() {
                     {punicao.created_date && <p className="text-xs text-slate-400 mt-1">Lançada em {format(new Date(punicao.created_date), 'dd/MM/yyyy HH:mm')}</p>}
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('CadastrarPunicao') + `?id=${punicao.id}`)} className="text-[#1e3a5f]"><Edit className="w-4 h-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteDialog({ open: true, id: punicao.id })} className="text-red-600"><Trash2 className="w-4 h-4" /></Button>
+                    {canEditarPunicoes && (
+                      <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('CadastrarPunicao') + `?id=${punicao.id}`)} className="text-[#1e3a5f]"><Edit className="w-4 h-4" /></Button>
+                    )}
+                    {canExcluirPunicoes && (
+                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(punicao.id)} className="text-red-600"><Trash2 className="w-4 h-4" /></Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -115,7 +131,7 @@ export default function Punicoes() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => deleteMutation.mutate(deleteDialog.id)} className="bg-red-600 hover:bg-red-700">Excluir</AlertDialogAction>
+              <AlertDialogAction onClick={() => canExcluirPunicoes && deleteMutation.mutate(deleteDialog.id)} className="bg-red-600 hover:bg-red-700">Excluir</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
