@@ -19,6 +19,7 @@ const ADMIN_ALWAYS_ALLOWED_ACTIONS = new Set([
   'perm_gerir_permissoes',
   'perm_gerir_configuracoes',
 ]);
+const ADMIN_RECOVERY_ROLES = new Set(['superadmin', 'developer', 'desenvolvedor']);
 
 const normalizeAccessMode = (value) => {
   const normalized = toLowerSafe(value);
@@ -89,6 +90,10 @@ export function useCurrentUser() {
 
   const impersonationContext = resolveImpersonationContext(user);
   const accessLookupEmail = impersonationContext.effectiveEmail;
+  const normalizedUserRole = toLowerSafe(user?.role);
+  const isPrivilegedRecoveryUser = (
+    normalizedUserRole && ADMIN_RECOVERY_ROLES.has(normalizedUserRole)
+  ) || user?.isSuperAdmin === true || user?.isDeveloper === true;
 
   const { data: usuarioAcessoList, isLoading: loadingAcesso, isFetched: fetchedAcesso } = useQuery({
     queryKey: ['usuarioAcesso', accessLookupEmail, impersonationContext.isImpersonating],
@@ -199,8 +204,8 @@ export function useCurrentUser() {
     if (acessoResolvido) {
       const campo = `acesso_${modulo}`;
       const resolvedValue = normalizedResolvedPermissions[campo];
-      if (isAdmin && (isAdminRecoveryPermission(campo, 'module') || ADMIN_ALWAYS_ALLOWED_MODULES.has(campo))) return true;
-      if (isAdmin) return resolvedValue !== false;
+      if (isAdmin && isPrivilegedRecoveryUser && (isAdminRecoveryPermission(campo, 'module') || ADMIN_ALWAYS_ALLOWED_MODULES.has(campo))) return true;
+      if (isAdmin) return resolvedValue === true;
       return resolvedValue === true;
     }
 
@@ -215,8 +220,8 @@ export function useCurrentUser() {
     if (acessoResolvido) {
       const campo = `perm_${acao}`;
       const resolvedValue = normalizedResolvedPermissions[campo];
-      if (isAdmin && (isAdminRecoveryPermission(campo, 'action') || ADMIN_ALWAYS_ALLOWED_ACTIONS.has(campo))) return true;
-      if (isAdmin) return resolvedValue !== false;
+      if (isAdmin && isPrivilegedRecoveryUser && (isAdminRecoveryPermission(campo, 'action') || ADMIN_ALWAYS_ALLOWED_ACTIONS.has(campo))) return true;
+      if (isAdmin) return resolvedValue === true;
       return resolvedValue === true;
     }
 

@@ -2,14 +2,34 @@ import React from 'react';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
-export default function RequireModuleAccess({ children, moduleKey, moduleName }) {
-  const { canAccessModule, isLoading, isAccessResolved } = useCurrentUser();
+export default function RequireModuleAccess({
+  children,
+  moduleKey,
+  moduleKeys = [],
+  actionKey,
+  actionKeys = [],
+  moduleName,
+}) {
+  const { canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
 
   if (isLoading || !isAccessResolved) {
     return null;
   }
 
-  if (!canAccessModule(moduleKey)) {
+  const normalizedModuleKeys = [
+    ...(moduleKey ? [moduleKey] : []),
+    ...moduleKeys,
+  ];
+  const normalizedActionKeys = [
+    ...(actionKey ? [actionKey] : []),
+    ...actionKeys,
+  ];
+
+  const hasModuleAccess = normalizedModuleKeys.some((key) => canAccessModule(key));
+  const hasActionAccess = normalizedActionKeys.some((key) => canAccessAction(key));
+  const hasExplicitRule = normalizedModuleKeys.length > 0 || normalizedActionKeys.length > 0;
+
+  if (hasExplicitRule && !hasModuleAccess && !hasActionAccess) {
     return <AccessDenied modulo={moduleName} />;
   }
 
