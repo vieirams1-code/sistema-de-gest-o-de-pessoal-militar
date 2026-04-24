@@ -26,7 +26,7 @@ export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast, dismiss } = useToast();
   const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
-  const hasMilitaresAccess = canAccessModule('militares');
+  const hasLotacaoAccess = canAccessModule('lotacao_militares');
 
   const [searchMilitar, setSearchMilitar] = useState('');
   const [selectedMilitares, setSelectedMilitares] = useState([]);
@@ -41,7 +41,7 @@ export default function LotacaoMilitares() {
   const { data: matriculas = [], isLoading: loadingMatriculas } = useQuery({
     queryKey: ['lotacao-matriculas-militar'],
     queryFn: () => base44.entities.MatriculaMilitar.list('-created_date', 10000),
-    enabled: hasMilitaresAccess,
+    enabled: hasLotacaoAccess,
   });
   
   const { data: estruturaRaw = [], isLoading: loadingEstrutura } = useQuery({
@@ -163,7 +163,7 @@ export default function LotacaoMilitares() {
   };
 
   if (loadingUser || !isAccessResolved) return null;
-  if (!hasMilitaresAccess) return <AccessDenied modulo="Efetivo" />;
+  if (!hasLotacaoAccess) return <AccessDenied modulo="Lotação de Militares" />;
 
   // Acesso à página: gerir_estrutura (ação correta para mover lotação) ou gerir_permissoes (acesso legado)
   const canAccess = canAccessAction('gerir_estrutura') || canAccessAction('gerir_permissoes');

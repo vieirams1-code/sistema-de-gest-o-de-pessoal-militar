@@ -48,7 +48,7 @@ export default function Punicoes() {
     p.militar_nome?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Justiça e Disciplina" />;
+  if (!loadingUser && isAccessResolved && !canAccessModule('punicoes')) return <AccessDenied modulo="Lançamento de Punições" />;
 
   const getImpactoComportamento = (punicao) => {
     const r = calcularComportamento([punicao], punicao.posto_graduacao);

@@ -574,8 +574,8 @@ export default function FolhaAlteracoes() {
     return militaresOrdenados.filter((militar) => militarCorrespondeBusca(militar, termo));
   }, [buscaSignatario, militaresOrdenados]);
 
-  if (!loadingUser && isAccessResolved && !canAccessModule('militares')) {
-    return <AccessDenied modulo="Efetivo" />;
+  if (!loadingUser && isAccessResolved && !canAccessModule('folha_alteracoes')) {
+    return <AccessDenied modulo="Folha de Alterações" />;
   }
 
   return (

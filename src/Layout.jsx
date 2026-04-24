@@ -45,14 +45,14 @@ const menuGroups = [
     items: [
       { name: 'Efetivo', page: 'Militares', icon: Users, viewPermission: 'visualizar_militares' },
       { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
-      { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_militares' },
+      { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
     ],
   },
   {
     title: 'Justiça e Disciplina',
     items: [
-      { name: 'Controle de Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, viewPermission: 'visualizar_militares' },
-      { name: 'Lançamento de Punições', page: 'Punicoes', icon: Shield, viewPermission: 'visualizar_militares' },
+      { name: 'Controle de Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, viewPermission: 'visualizar_controle_comportamento' },
+      { name: 'Lançamento de Punições', page: 'Punicoes', icon: Shield, viewPermission: 'visualizar_punicoes' },
     ],
   },
   {
@@ -78,9 +78,9 @@ const menuGroups = [
   {
     title: 'Publicações e RP',
     items: [
-      { name: 'RP', page: 'RP', icon: BookMarked, viewPermission: 'visualizar_livro' },
-      { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_publicacoes' },
-      { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_publicacoes' },
+      { name: 'RP', page: 'RP', icon: BookMarked, viewPermission: 'visualizar_rp' },
+      { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_controle_publicacoes' },
+      { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_conciliacao_boletim' },
     ],
   },
   {
@@ -120,13 +120,13 @@ const adminMenuGroup = {
       name: 'Estrutura Organizacional',
       page: 'EstruturaOrganizacional',
       icon: GitBranch,
-      anyOf: [{ type: 'module', key: 'estrutura_organizacional' }, { type: 'action', key: 'gerir_estrutura_organizacional' }],
+      viewPermission: 'visualizar_estrutura_organizacional',
     },
     {
       name: 'Lotação de Militares',
       page: 'LotacaoMilitares',
       icon: Building2,
-      anyOf: [{ type: 'module', key: 'lotacao_militares' }, { type: 'action', key: 'gerir_lotacao_militares' }],
+      viewPermission: 'visualizar_lotacao_militares',
     },
     {
       name: 'Migração',

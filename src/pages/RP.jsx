@@ -44,7 +44,7 @@ function formatOperationalSummary({ inconsistentes = 0, aguardandoPublicacao = 0
 export default function RP() {
   const { canAccessModule, isAccessResolved, isLoading: loadingUser, isAdmin, getMilitarScopeFilters } = useCurrentUser();
 
-  const hasAccess = canAccessModule('livro') || canAccessModule('publicacoes');
+  const hasAccess = canAccessModule('rp');
 
   const { data: registrosBrutos = [], isLoading } = useQuery({
     queryKey: ['registro-rp-lista', isAdmin],

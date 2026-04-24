@@ -302,7 +302,7 @@ export default function Publicacoes() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
   const { user, isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
-  const hasPublicacoesAccess = canAccessModule('publicacoes');
+  const hasPublicacoesAccess = canAccessModule('controle_publicacoes');
   const canCriarPublicacoes = canAccessAction('adicionar_publicacoes') || canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({

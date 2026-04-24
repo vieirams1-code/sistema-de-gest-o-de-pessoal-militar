@@ -37,7 +37,7 @@ export default function CadastrarPunicao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
-  const hasMilitaresAccess = canAccessModule('militares');
+  const hasPunicoesAccess = canAccessModule('punicoes');
 
   const [searchParams] = useSearchParams();
   const punicaoId = searchParams.get('id');
@@ -268,7 +268,7 @@ export default function CadastrarPunicao() {
   const necessitaDias = TIPOS_COM_CUMPRIMENTO.has(formData.tipo_punicao);
 
   if (loadingUser || !isAccessResolved) return null;
-  if (!hasMilitaresAccess) return <AccessDenied modulo="Justiça e Disciplina" />;
+  if (!hasPunicoesAccess) return <AccessDenied modulo="Lançamento de Punições" />;
 
   if (entityError) {
     return (
