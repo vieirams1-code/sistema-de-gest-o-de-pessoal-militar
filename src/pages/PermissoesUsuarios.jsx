@@ -14,8 +14,9 @@ import {
   buildPermissionPayload,
   buildPermissionsFromSource,
   canonicalPermissionKeys,
-  extractProfileMatrixFromDescription,
-  mergeProfileDescriptionWithMatrix,
+  isLegacyCustomProfile,
+  isBasePermissionProfile,
+  mergeUserOverridesWithMatrix,
   resolveProfilePermissions,
   resolveUserPermissions,
 } from '@/services/permissionMatrixService';
@@ -29,14 +30,6 @@ const normalizeAccessMode = (value) => {
   if (SELF_RESTRICTED_SCOPES.has(normalized)) return 'proprio';
   if (['admin', 'setor', 'subsetor', 'unidade'].includes(normalized)) return normalized;
   return 'proprio';
-};
-
-const isPerfilPersonalizado = (perfil, usuarioId) => {
-  if (!perfil) return false;
-  const isCustom = perfil.is_personalizado === true || Boolean(perfil.usuario_vinculado_id);
-  if (!isCustom) return false;
-  if (!usuarioId) return true;
-  return perfil.usuario_vinculado_id === usuarioId;
 };
 
 export default function PermissoesUsuarios() {
@@ -90,7 +83,7 @@ export default function PermissoesUsuarios() {
 
   const selectedProfilePreview = useMemo(() => {
     if (selectedProfileId === '_nenhum') return null;
-    return perfis.find((p) => p.id === selectedProfileId) || null;
+    return perfis.find((p) => p.id === selectedProfileId && isBasePermissionProfile(p)) || null;
   }, [selectedProfileId, perfis]);
   const previewProfilePermissions = useMemo(() => {
     if (!selectedProfilePreview) return null;
@@ -98,18 +91,14 @@ export default function PermissoesUsuarios() {
     return resolveProfilePermissions({ profileSource }).permissions;
   }, [selectedProfilePreview, selectedProfileSource]);
   const perfisDisponiveisParaUsuario = useMemo(() => {
-    const usuarioId = selectedUser?.id;
-    return perfis.filter((perfil) => {
-      if (!isPerfilPersonalizado(perfil)) return true;
-      return isPerfilPersonalizado(perfil, usuarioId);
-    });
-  }, [perfis, selectedUser?.id]);
+    return perfis.filter((perfil) => isBasePermissionProfile(perfil));
+  }, [perfis]);
 
   const currentPerfilSelecionado = useMemo(
     () => (selectedProfileSource || selectedProfilePreview || null),
     [selectedProfileSource, selectedProfilePreview]
   );
-  const currentPerfilCustomizado = isPerfilPersonalizado(currentPerfilSelecionado, selectedUser?.id);
+  const currentPerfilCustomizado = isLegacyCustomProfile(currentPerfilSelecionado);
 
   const grupamentos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Grupamento'), [subgrupamentos]);
   const subgrupamentosFilhos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId), [subgrupamentos, userGrupamentoId]);
@@ -151,52 +140,6 @@ export default function PermissoesUsuarios() {
     }
   };
 
-  const getCustomProfilesByUserId = async (usuarioId) => {
-    if (!usuarioId) return [];
-
-    const perfisLocais = perfis.filter(
-      (perfil) => perfil?.is_personalizado === true && perfil?.usuario_vinculado_id === usuarioId
-    );
-
-    try {
-      const perfisRemotos = await base44.entities.PerfilPermissao.filter({
-        is_personalizado: true,
-        usuario_vinculado_id: usuarioId,
-      }, 'created_date');
-      if (Array.isArray(perfisRemotos) && perfisRemotos.length > 0) return perfisRemotos;
-    } catch {
-      // fallback para cache local quando o filtro remoto falhar
-    }
-
-    return perfisLocais;
-  };
-
-  const upsertCustomProfileForUser = async ({ usuarioId, customProfilePayload }) => {
-    if (!usuarioId) return null;
-
-    const customProfiles = await getCustomProfilesByUserId(usuarioId);
-    const [primaryProfile, ...duplicateProfiles] = customProfiles;
-
-    if (primaryProfile?.id) {
-      const updated = await base44.entities.PerfilPermissao.update(primaryProfile.id, customProfilePayload);
-
-      if (duplicateProfiles.length > 0) {
-        await Promise.all(
-          duplicateProfiles
-            .filter((perfil) => perfil?.id)
-            .map((perfil) => base44.entities.PerfilPermissao.update(perfil.id, {
-              usuario_vinculado_id: '',
-              ativo: false,
-            }))
-        );
-      }
-
-      return updated || { ...primaryProfile, ...customProfilePayload };
-    }
-
-    return base44.entities.PerfilPermissao.create(customProfilePayload);
-  };
-
   const handleSelectAcesso = async (acesso) => {
     let fullAcesso = acesso;
     try {
@@ -233,17 +176,25 @@ export default function PermissoesUsuarios() {
     setUserGrupamentoId(gId);
     setUserSubgrupamentoId(sId);
     setUserUnidadeId(uId);
-    const perfilId = fullAcesso.perfil_id || '';
-    setSelectedProfileId(perfilId || '_nenhum');
-    const perfilCompleto = await getProfileWithPermissions(perfilId);
+    const perfilIdOriginal = fullAcesso.perfil_id || '';
+    const perfilCompleto = await getProfileWithPermissions(perfilIdOriginal);
     const profileSource = perfilCompleto || null;
+    const isLegacyPerfil = isLegacyCustomProfile(profileSource);
+    const perfilBaseVinculadoId = isLegacyPerfil
+      ? (profileSource?.perfil_origem_id || '')
+      : perfilIdOriginal;
+    setSelectedProfileId(perfilBaseVinculadoId || '_nenhum');
     setSelectedProfileSource(profileSource);
+    setLoadedProfilePermissions(
+      profileSource
+        ? resolveProfilePermissions({ profileSource }).permissions
+        : null
+    );
     const resolved = await resolveUserPermissions({
       userSource: fullAcesso,
       profileSource: profileSource || {},
-      preferProfilePermissions: true,
+      preferProfilePermissions: false,
     });
-    setLoadedProfilePermissions(resolved.profilePermissions || null);
     setUserPermissions(resolved.permissions);
     setActiveEditTab('dados');
   };
@@ -302,50 +253,29 @@ export default function PermissoesUsuarios() {
 
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
       const permissionPayload = buildPermissionPayload(normalizedPermissions);
-      const effectiveSelectedProfile = selectedProfileSource || perfilSelected || null;
-      const effectiveProfilePermissions = resolveProfilePermissions({
-        profileSource: effectiveSelectedProfile || {},
-      }).permissions;
-      const isPermissionChanged = canonicalPermissionKeys.some(
-        (key) => normalizedPermissions[key] !== effectiveProfilePermissions[key]
-      );
-      let perfilIdToPersist = perfilSelected?.id || '';
-      let perfilNomeToPersist = perfilSelected?.nome_perfil || '';
-      let pendingCustomProfileForNewUser = null;
-      let createdOrUpdatedCustomProfile = null;
+      const selectedBaseProfile = perfisDisponiveisParaUsuario.find((p) => p.id === perfilSelected?.id) || null;
+      const selectedBaseProfileByState = perfisDisponiveisParaUsuario.find((p) => p.id === selectedProfileId) || null;
+      const effectiveBaseProfile = selectedBaseProfile || selectedBaseProfileByState || null;
+      let perfilIdToPersist = effectiveBaseProfile?.id || '';
+      let perfilNomeToPersist = effectiveBaseProfile?.nome_perfil || '';
 
-      if (isPermissionChanged) {
-        const customProfileName = `Personalizado - ${userNomeUsuario || userUserEmail}`;
-        const cleanDescricaoOrigem = extractProfileMatrixFromDescription(effectiveSelectedProfile?.descricao || '').cleanDescricao;
-        const origemDescricao = cleanDescricaoOrigem
-          ? `${cleanDescricaoOrigem}\n\nPerfil personalizado para usuário.`
-          : 'Perfil personalizado para usuário.';
-        const customProfilePayload = {
-          nome_perfil: customProfileName,
-          nome: customProfileName,
-          descricao: mergeProfileDescriptionWithMatrix(origemDescricao, normalizedPermissions),
-          is_personalizado: true,
-          usuario_vinculado_id: selectedUser?.id || '',
-          perfil_origem_id: effectiveSelectedProfile?.id || '',
-          ativo: true,
-          ...permissionPayload,
-        };
-
-        if (isNewAcesso) {
-          pendingCustomProfileForNewUser = customProfilePayload;
-        } else {
-          createdOrUpdatedCustomProfile = await upsertCustomProfileForUser({
-            usuarioId: selectedUser?.id,
-            customProfilePayload,
-          });
-
-          perfilIdToPersist = createdOrUpdatedCustomProfile?.id || effectiveSelectedProfile?.id || perfilIdToPersist;
-          perfilNomeToPersist = createdOrUpdatedCustomProfile?.nome_perfil || customProfileName;
-          setSelectedProfileId(perfilIdToPersist);
-          setSelectedProfileSource(createdOrUpdatedCustomProfile || effectiveSelectedProfile || null);
-          setLoadedProfilePermissions(normalizedPermissions);
+      if (!perfilIdToPersist && isLegacyCustomProfile(selectedProfileSource)) {
+        const perfilOrigemId = selectedProfileSource?.perfil_origem_id || '';
+        const perfilOrigem = perfisDisponiveisParaUsuario.find((p) => p.id === perfilOrigemId) || null;
+        if (perfilOrigem?.id) {
+          perfilIdToPersist = perfilOrigem.id;
+          perfilNomeToPersist = perfilOrigem.nome_perfil || '';
+        } else if (selectedProfileSource?.id) {
+          perfilIdToPersist = selectedProfileSource.id;
+          perfilNomeToPersist = selectedProfileSource.nome_perfil || '';
         }
       }
+
+      const permissoesOverride = mergeUserOverridesWithMatrix(
+        selectedUser?.permissoes_override,
+        normalizedPermissions,
+        'usuario'
+      );
 
       const baseData = {
         nome_usuario: userNomeUsuario,
@@ -380,25 +310,16 @@ export default function PermissoesUsuarios() {
         };
       }
 
-      const dataToSave = { ...baseData, ...roleData };
+      const dataToSave = {
+        ...baseData,
+        ...roleData,
+        ...permissionPayload,
+        permissoes_override: permissoesOverride,
+      };
 
       const savedRecord = isNewAcesso
         ? await base44.entities.UsuarioAcesso.create(dataToSave)
         : await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
-
-      if (pendingCustomProfileForNewUser && savedRecord?.id) {
-        const createdPersonalizado = await upsertCustomProfileForUser({
-          usuarioId: savedRecord.id,
-          customProfilePayload: {
-          ...pendingCustomProfileForNewUser,
-          usuario_vinculado_id: savedRecord.id,
-          },
-        });
-        await base44.entities.UsuarioAcesso.update(savedRecord.id, {
-          perfil_id: createdPersonalizado.id,
-          perfil_nome: createdPersonalizado.nome_perfil || pendingCustomProfileForNewUser.nome_perfil,
-        });
-      }
 
       const resolvedRecordId = savedRecord.id || selectedUser.id;
       const reloadedRecord = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
@@ -409,14 +330,13 @@ export default function PermissoesUsuarios() {
       const resolvedReloaded = await resolveUserPermissions({
         userSource: reloadedRecord,
         profileSource: reloadedProfile || {},
-        preferProfilePermissions: true,
+        preferProfilePermissions: false,
       });
       const reloadedPermissions = resolvedReloaded.permissions;
       setUserPermissions(reloadedPermissions);
       setSelectedUser(reloadedRecord);
 
       queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
-      queryClient.invalidateQueries({ queryKey: ['perfisPermissao'] });
     } catch (error) {
       alert(error?.message || 'Erro ao salvar permissão no Base44.');
     } finally {
@@ -754,11 +674,9 @@ export default function PermissoesUsuarios() {
                         >
                           <SelectTrigger><SelectValue placeholder="Escolha um perfil para aplicar" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="_nenhum">— Personalizado / Não aplicar perfil —</SelectItem>
+                            <SelectItem value="_nenhum">— Sem perfil base —</SelectItem>
                             {perfisDisponiveisParaUsuario.map(p => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.nome_perfil}{isPerfilPersonalizado(p) ? ' (Personalizado)' : ''}
-                              </SelectItem>
+                              <SelectItem key={p.id} value={p.id}>{p.nome_perfil}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -782,7 +700,7 @@ export default function PermissoesUsuarios() {
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Badge variant={currentPerfilCustomizado ? 'default' : 'outline'} className={currentPerfilCustomizado ? 'bg-indigo-600' : ''}>
-                          {currentPerfilCustomizado ? 'Personalizado' : 'Padrão'}
+                          {currentPerfilCustomizado ? 'Legado personalizado' : 'Base'}
                         </Badge>
                         {currentPerfilCustomizado && (
                           <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
