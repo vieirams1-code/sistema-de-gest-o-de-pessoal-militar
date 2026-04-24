@@ -71,7 +71,7 @@ export default function RevisaoDuplicidadesMilitar() {
     },
   });
 
-  if (!loadingUser && isAccessResolved && (!canAccessModule('migracao') || !canAccessAction('revisar_duplicidades'))) {
+  if (!loadingUser && isAccessResolved && (!canAccessModule('migracao_alteracoes_legado') || !canAccessAction('revisar_duplicidades'))) {
     return <AccessDenied modulo="Revisão de Duplicidades (Admin)" />;
   }
 

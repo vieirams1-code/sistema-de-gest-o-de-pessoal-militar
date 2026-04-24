@@ -96,7 +96,7 @@ export default function HistoricoImportacoesMilitares() {
   const opcoesFiltros = useMemo(() => obterOpcoesFiltrosHistorico(lotes), [lotes]);
 
   if (isLoading || !isAccessResolved) return null;
-  if (!canAccessModule('migracao') || !canAccessAction('ver_historico_importacoes')) return <AccessDenied modulo="Histórico de Importações" />;
+  if (!canAccessModule('migracao_militares') || !canAccessAction('ver_historico_importacoes')) return <AccessDenied modulo="Histórico de Importações" />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">

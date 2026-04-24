@@ -212,7 +212,7 @@ export default function MigracaoAlteracoesLegado() {
   };
 
   if (isLoading || !isAccessResolved) return null;
-  if (!canAccessModule('migracao') || !canAccessAction('migrar_alteracoes_legado')) return <AccessDenied modulo="Migração de Alterações Legado" />;
+  if (!canAccessModule('migracao_alteracoes_legado') || !canAccessAction('migrar_alteracoes_legado')) return <AccessDenied modulo="Migração de Alterações Legado" />;
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6">

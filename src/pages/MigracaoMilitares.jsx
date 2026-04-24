@@ -209,7 +209,7 @@ export default function MigracaoMilitares() {
   };
 
   if (isLoading || !isAccessResolved) return null;
-  if (!canAccessModule('migracao') || !canAccessAction('importar_militares')) return <AccessDenied modulo="Migração de Militares" />;
+  if (!canAccessModule('migracao_militares') || !canAccessAction('importar_militares')) return <AccessDenied modulo="Migração de Militares" />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
