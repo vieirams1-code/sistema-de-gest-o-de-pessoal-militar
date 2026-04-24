@@ -492,7 +492,7 @@ export default function ConciliacaoBoletim() {
   const [erroVinculo, setErroVinculo] = useState('');
   
   const { isAdmin, getMilitarScopeFilters, canAccessModule, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
-  const hasAccess = canAccessModule('publicacoes');
+  const hasAccess = canAccessModule('conciliacao_boletim');
 
   const { data: registrosLivro = [], isLoading: isLoadingLivro } = useQuery({
     queryKey: ['conciliacao-registros-livro'],

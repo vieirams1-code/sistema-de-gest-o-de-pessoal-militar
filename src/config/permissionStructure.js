@@ -39,6 +39,27 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_registros_militar',
+        label: 'Registros do Militar',
+        actions: [
+          { key: 'perm_visualizar_registros_militar', label: 'Visualizar Registros do Militar' }
+        ]
+      },
+      {
+        key: 'acesso_controle_comportamento',
+        label: 'Controle de Comportamento',
+        actions: [
+          { key: 'perm_visualizar_controle_comportamento', label: 'Visualizar Controle de Comportamento' }
+        ]
+      },
+      {
+        key: 'acesso_punicoes',
+        label: 'Lançamento de Punições',
+        actions: [
+          { key: 'perm_visualizar_punicoes', label: 'Visualizar Lançamento de Punições' }
+        ]
+      },
+      {
         key: 'acesso_ferias',
         label: 'Férias',
         actions: [
@@ -58,6 +79,13 @@ export const permissionStructure = [
           { key: 'perm_adicionar_livro', label: 'Adicionar Livro' },
           { key: 'perm_editar_livro', label: 'Editar Livro' },
           { key: 'perm_excluir_livro', label: 'Excluir Livro', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_rp',
+        label: 'RP',
+        actions: [
+          { key: 'perm_visualizar_rp', label: 'Visualizar RP' }
         ]
       },
       {
@@ -91,6 +119,20 @@ export const permissionStructure = [
           { key: 'perm_publicar_homologacao', label: 'Publicar Homologação', sensitive: true },
           { key: 'perm_gerir_jiso', label: 'Gerir JISO', sensitive: true },
           { key: 'perm_registrar_decisao_jiso', label: 'Registrar Decisão JISO', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_controle_publicacoes',
+        label: 'Controle de Publicações',
+        actions: [
+          { key: 'perm_visualizar_controle_publicacoes', label: 'Visualizar Controle de Publicações' }
+        ]
+      },
+      {
+        key: 'acesso_conciliacao_boletim',
+        label: 'Conciliação com Boletim',
+        actions: [
+          { key: 'perm_visualizar_conciliacao_boletim', label: 'Visualizar Conciliação com Boletim' }
         ]
       }
     ]
@@ -184,6 +226,7 @@ export const permissionStructure = [
         key: 'acesso_estrutura_organizacional',
         label: 'Estrutura Organizacional',
         actions: [
+          { key: 'perm_visualizar_estrutura_organizacional', label: 'Visualizar Estrutura Organizacional' },
           { key: 'perm_gerir_estrutura_organizacional', label: 'Gerir Estrutura Organizacional', sensitive: true },
           { key: 'perm_gerir_estrutura', label: 'Gerir Estrutura Org. (Legado)', sensitive: true }
         ]
@@ -192,6 +235,7 @@ export const permissionStructure = [
         key: 'acesso_lotacao_militares',
         label: 'Lotação de Militares',
         actions: [
+          { key: 'perm_visualizar_lotacao_militares', label: 'Visualizar Lotação de Militares' },
           { key: 'perm_gerir_lotacao_militares', label: 'Gerir Lotação de Militares', sensitive: true }
         ]
       }

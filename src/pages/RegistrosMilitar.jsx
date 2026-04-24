@@ -144,31 +144,31 @@ export default function RegistrosMilitar() {
   const [expandedRegistroId, setExpandedRegistroId] = useState(null);
   const [tipoEdicao, setTipoEdicao] = useState({});
 
-  const canAccessMilitares = canAccessModule('militares');
+  const canAccessRegistrosMilitar = canAccessModule('registros_militar');
   const canManageAdminActions = isAdmin && canAccessAction('admin_mode');
 
   const { data: militares = [], isLoading: loadingMilitares } = useQuery({
     queryKey: ['registros-militar-militares'],
     queryFn: () => base44.entities.Militar.list('-created_date', 10000),
-    enabled: isAccessResolved && canAccessMilitares,
+    enabled: isAccessResolved && canAccessRegistrosMilitar,
   });
 
   const { data: matriculas = [] } = useQuery({
     queryKey: ['registros-militar-matriculas'],
     queryFn: () => base44.entities.MatriculaMilitar.list('-created_date', 10000),
-    enabled: isAccessResolved && canAccessMilitares,
+    enabled: isAccessResolved && canAccessRegistrosMilitar,
   });
 
   const { data: registros = [], isLoading: loadingRegistros } = useQuery({
     queryKey: ['registros-militar-registros'],
     queryFn: listarRegistrosMilitar,
-    enabled: isAccessResolved && canAccessMilitares,
+    enabled: isAccessResolved && canAccessRegistrosMilitar,
   });
 
   const { data: tiposCustom = [] } = useQuery({
     queryKey: ['tipos-publicacao-custom'],
     queryFn: () => base44.entities.TipoPublicacaoCustom.list(),
-    enabled: isAccessResolved && canAccessMilitares,
+    enabled: isAccessResolved && canAccessRegistrosMilitar,
   });
 
   const tiposValidos = useMemo(() => getTiposRPFiltrados({ tiposCustom }), [tiposCustom]);
@@ -439,7 +439,7 @@ export default function RegistrosMilitar() {
     return <div className="p-6">Carregando...</div>;
   }
 
-  if (!canAccessMilitares) {
+  if (!canAccessRegistrosMilitar) {
     return <AccessDenied modulo="Registros do Militar" />;
   }
 

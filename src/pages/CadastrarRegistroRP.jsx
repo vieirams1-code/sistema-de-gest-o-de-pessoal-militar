@@ -109,7 +109,7 @@ export default function CadastrarRegistroRP() {
   const isEditing = !!registroId;
 
   const { canAccessModule, canAccessAction, isAccessResolved, isLoading: loadingUser, user } = useCurrentUser();
-  const hasAccess = canAccessModule('livro') || canAccessModule('publicacoes');
+  const hasAccess = canAccessModule('rp');
   const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
   const canPublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
 
