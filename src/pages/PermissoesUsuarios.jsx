@@ -11,7 +11,6 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 import {
-  buildPermissionPayload,
   buildPermissionsFromSource,
   canonicalPermissionKeys,
   isLegacyCustomProfile,
@@ -57,6 +56,8 @@ export default function PermissoesUsuarios() {
   const [activeEditTab, setActiveEditTab] = useState('dados');
   const [loadedProfilePermissions, setLoadedProfilePermissions] = useState(null);
   const [selectedProfileSource, setSelectedProfileSource] = useState(null);
+  const [appliedProfileState, setAppliedProfileState] = useState({ id: '', nome: '' });
+  const [technicalWarning, setTechnicalWarning] = useState('');
 
 
   // Queries — só executam após resolução do acesso e confirmação de permissão
@@ -176,26 +177,64 @@ export default function PermissoesUsuarios() {
     setUserGrupamentoId(gId);
     setUserSubgrupamentoId(sId);
     setUserUnidadeId(uId);
-    const perfilIdOriginal = fullAcesso.perfil_id || '';
+    setTechnicalWarning('');
+    let perfilIdOriginal = fullAcesso.perfil_id || '';
+    let perfilNomeOriginal = fullAcesso.perfil_nome || '';
     const perfilCompleto = await getProfileWithPermissions(perfilIdOriginal);
-    const profileSource = perfilCompleto || null;
-    const isLegacyPerfil = isLegacyCustomProfile(profileSource);
-    const perfilBaseVinculadoId = isLegacyPerfil
-      ? (profileSource?.perfil_origem_id || '')
-      : perfilIdOriginal;
-    setSelectedProfileId(perfilBaseVinculadoId || '_nenhum');
-    setSelectedProfileSource(profileSource);
+    let profileSource = perfilCompleto || null;
+    let resolvedUserSource = fullAcesso;
+    const hasUserOverrideMatrix = Boolean(fullAcesso?.permissoes_override?.matrix_v2)
+      && Object.keys(fullAcesso?.permissoes_override?.matrix_v2 || {}).length > 0;
+
+    if (isLegacyCustomProfile(profileSource)) {
+      const legacyMatrix = resolveProfilePermissions({ profileSource }).permissions;
+      const perfilOrigemId = profileSource?.perfil_origem_id || '';
+      const perfilOrigem = perfilOrigemId ? await getProfileWithPermissions(perfilOrigemId) : null;
+      const perfilBaseDestino = isBasePermissionProfile(perfilOrigem) ? perfilOrigem : null;
+      const migratedOverrides = mergeUserOverridesWithMatrix(
+        fullAcesso?.permissoes_override,
+        legacyMatrix,
+        'user_override'
+      );
+
+      const migrationData = {
+        permissoes_override: migratedOverrides,
+      };
+
+      if (perfilBaseDestino?.id) {
+        migrationData.perfil_id = perfilBaseDestino.id;
+        migrationData.perfil_nome = perfilBaseDestino.nome_perfil || '';
+        perfilIdOriginal = perfilBaseDestino.id;
+        perfilNomeOriginal = perfilBaseDestino.nome_perfil || '';
+      } else {
+        setTechnicalWarning(`Perfil legado sem perfil_origem_id válido (${profileSource?.id || 'sem id'}).`);
+      }
+
+      if (!hasUserOverrideMatrix || migrationData.perfil_id) {
+        resolvedUserSource = await base44.entities.UsuarioAcesso.update(fullAcesso.id, migrationData);
+      }
+
+      profileSource = perfilBaseDestino || null;
+    }
+
+    setSelectedProfileId((isBasePermissionProfile(profileSource) ? profileSource?.id : perfilIdOriginal) || '_nenhum');
+    setAppliedProfileState({
+      id: (isBasePermissionProfile(profileSource) ? profileSource?.id : perfilIdOriginal) || '',
+      nome: (isBasePermissionProfile(profileSource) ? profileSource?.nome_perfil : perfilNomeOriginal) || '',
+    });
+    setSelectedProfileSource(isBasePermissionProfile(profileSource) ? profileSource : null);
     setLoadedProfilePermissions(
-      profileSource
+      isBasePermissionProfile(profileSource)
         ? resolveProfilePermissions({ profileSource }).permissions
         : null
     );
     const resolved = await resolveUserPermissions({
-      userSource: fullAcesso,
-      profileSource: profileSource || {},
+      userSource: resolvedUserSource,
+      profileSource: isBasePermissionProfile(profileSource) ? profileSource : {},
       preferProfilePermissions: false,
     });
     setUserPermissions(resolved.permissions);
+    setSelectedUser(resolvedUserSource);
     setActiveEditTab('dados');
   };
 
@@ -212,9 +251,11 @@ export default function PermissoesUsuarios() {
     setUserSubgrupamentoId('');
     setUserUnidadeId('');
     setSelectedProfileId('_nenhum');
+    setAppliedProfileState({ id: '', nome: '' });
     setUserPermissions(initialPermissions);
     setLoadedProfilePermissions(null);
     setSelectedProfileSource(null);
+    setTechnicalWarning('');
     setActiveEditTab('dados');
   };
 
@@ -229,6 +270,10 @@ export default function PermissoesUsuarios() {
     setSelectedProfileSource(profileSource);
     setLoadedProfilePermissions(profilePermissions);
     setUserPermissions(profilePermissions);
+    setAppliedProfileState({
+      id: selectedProfilePreview.id,
+      nome: selectedProfilePreview.nome_perfil || '',
+    });
   };
 
   const handleSaveUserScope = async () => {
@@ -245,36 +290,18 @@ export default function PermissoesUsuarios() {
       const grupamento = grupamentos.find(g => g.id === userGrupamentoId);
       const sub = subgrupamentos.find(s => s.id === userSubgrupamentoId);
       const uni = subgrupamentos.find(s => s.id === userUnidadeId);
-      const perfilSelected = selectedProfilePreview;
-
       const militarVinculado = militares.find((m) => m.id === userMilitarId);
       const militarMatriculaAtual = militarVinculado?.matricula_atual || militarVinculado?.matricula || '';
       const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
 
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
-      const permissionPayload = buildPermissionPayload(normalizedPermissions);
-      const selectedBaseProfile = perfisDisponiveisParaUsuario.find((p) => p.id === perfilSelected?.id) || null;
-      const selectedBaseProfileByState = perfisDisponiveisParaUsuario.find((p) => p.id === selectedProfileId) || null;
-      const effectiveBaseProfile = selectedBaseProfile || selectedBaseProfileByState || null;
-      let perfilIdToPersist = effectiveBaseProfile?.id || '';
-      let perfilNomeToPersist = effectiveBaseProfile?.nome_perfil || '';
-
-      if (!perfilIdToPersist && isLegacyCustomProfile(selectedProfileSource)) {
-        const perfilOrigemId = selectedProfileSource?.perfil_origem_id || '';
-        const perfilOrigem = perfisDisponiveisParaUsuario.find((p) => p.id === perfilOrigemId) || null;
-        if (perfilOrigem?.id) {
-          perfilIdToPersist = perfilOrigem.id;
-          perfilNomeToPersist = perfilOrigem.nome_perfil || '';
-        } else if (selectedProfileSource?.id) {
-          perfilIdToPersist = selectedProfileSource.id;
-          perfilNomeToPersist = selectedProfileSource.nome_perfil || '';
-        }
-      }
+      const perfilIdToPersist = appliedProfileState.id || selectedUser?.perfil_id || '';
+      const perfilNomeToPersist = appliedProfileState.nome || selectedUser?.perfil_nome || '';
 
       const permissoesOverride = mergeUserOverridesWithMatrix(
         selectedUser?.permissoes_override,
         normalizedPermissions,
-        'usuario'
+        'user_override'
       );
 
       const baseData = {
@@ -313,7 +340,6 @@ export default function PermissoesUsuarios() {
       const dataToSave = {
         ...baseData,
         ...roleData,
-        ...permissionPayload,
         permissoes_override: permissoesOverride,
       };
 
@@ -324,12 +350,17 @@ export default function PermissoesUsuarios() {
       const resolvedRecordId = savedRecord.id || selectedUser.id;
       const reloadedRecord = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
       const reloadedProfile = await getProfileWithPermissions(reloadedRecord?.perfil_id);
+      const reloadedBaseProfile = isBasePermissionProfile(reloadedProfile) ? reloadedProfile : null;
       setSelectedProfileId(reloadedRecord?.perfil_id || '_nenhum');
-      setSelectedProfileSource(reloadedProfile || null);
-      setLoadedProfilePermissions(reloadedProfile ? resolveProfilePermissions({ profileSource: reloadedProfile }).permissions : null);
+      setAppliedProfileState({
+        id: reloadedRecord?.perfil_id || '',
+        nome: reloadedRecord?.perfil_nome || reloadedBaseProfile?.nome_perfil || '',
+      });
+      setSelectedProfileSource(reloadedBaseProfile || null);
+      setLoadedProfilePermissions(reloadedBaseProfile ? resolveProfilePermissions({ profileSource: reloadedBaseProfile }).permissions : null);
       const resolvedReloaded = await resolveUserPermissions({
         userSource: reloadedRecord,
-        profileSource: reloadedProfile || {},
+        profileSource: reloadedBaseProfile || {},
         preferProfilePermissions: false,
       });
       const reloadedPermissions = resolvedReloaded.permissions;
@@ -693,6 +724,11 @@ export default function PermissoesUsuarios() {
                     <p className="text-xs text-slate-500 mt-3 flex items-center gap-1">
                       <Info className="w-4 h-4" /> Selecionar um perfil apenas exibe a prévia abaixo. As permissões do formulário só mudam ao clicar em <b>Aplicar Perfil</b>.
                     </p>
+                    {technicalWarning && (
+                      <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+                        <BadgeAlert className="w-4 h-4" /> Aviso técnico: {technicalWarning}
+                      </p>
+                    )}
                     <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <p className="text-xs text-slate-500">Perfil atual</p>
                       <p className="text-sm font-semibold text-slate-800">
