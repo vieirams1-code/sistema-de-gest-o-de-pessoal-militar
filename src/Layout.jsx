@@ -137,7 +137,7 @@ const adminMenuGroup = {
         { type: 'module', key: 'migracao_alteracoes_legado' },
       ],
       children: [
-        { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, moduleKey: 'migracao_militares', actionKey: 'importar_militares' },
+        { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, moduleKey: 'migracao_militares', actionKey: 'visualizar_importacao_militares' },
         { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, moduleKey: 'migracao_militares', actionKey: 'ver_historico_importacoes' },
         { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, moduleKey: 'migracao_alteracoes_legado', actionKey: 'migrar_alteracoes_legado' },
       ],

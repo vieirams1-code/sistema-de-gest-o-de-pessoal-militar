@@ -22,7 +22,8 @@ const CAMPOS_INICIAIS = {
   data_inclusao: '',
 };
 
-export default function DetalheLinhaMigracao({ linha, open, onOpenChange, onSalvarCorrecao, saving = false }) {
+export default function DetalheLinhaMigracao({ linha, open, onOpenChange, onSalvarCorrecao, saving = false, modo = 'IMPORTAR' }) {
+  const isConferencia = modo === 'CONFERIR';
   const [form, setForm] = useState(CAMPOS_INICIAIS);
   const [erroDataInclusao, setErroDataInclusao] = useState('');
 
@@ -84,6 +85,32 @@ export default function DetalheLinhaMigracao({ linha, open, onOpenChange, onSalv
           <DialogTitle>Detalhes da linha {linha.linhaNumero}</DialogTitle>
         </DialogHeader>
 
+        {isConferencia && (
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
+            <section className="bg-slate-50 rounded-lg p-3">
+              <h3 className="font-semibold mb-2">Dados da planilha</h3>
+              <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(linha.dados_planilha || {}, null, 2)}</pre>
+            </section>
+            <section className="bg-indigo-50 rounded-lg p-3">
+              <h3 className="font-semibold mb-2">Militar encontrado</h3>
+              <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(linha.militar_encontrado || {}, null, 2)}</pre>
+            </section>
+            <section className="bg-amber-50 rounded-lg p-3">
+              <h3 className="font-semibold mb-2">Campo de match</h3>
+              <p>{linha.campo_match || '—'}</p>
+            </section>
+            <section className="bg-rose-50 rounded-lg p-3">
+              <h3 className="font-semibold mb-2">Divergências</h3>
+              {!linha.divergencias?.length ? <p>Nenhuma divergência.</p> : <ul className="list-disc pl-5">{linha.divergencias.map((d) => <li key={d}>{d}</li>)}</ul>}
+            </section>
+            <section className="bg-slate-100 rounded-lg p-3 md:col-span-2">
+              <h3 className="font-semibold mb-2">Observações</h3>
+              {!linha.observacoes?.length ? <p>Sem observações.</p> : <ul className="list-disc pl-5">{linha.observacoes.map((o) => <li key={o}>{o}</li>)}</ul>}
+            </section>
+          </div>
+        )}
+
+        {!isConferencia && (
         <section className="border border-slate-200 rounded-lg p-4 bg-white space-y-3">
           <h3 className="font-semibold text-sm">Correção pré-importação</h3>
           <div className="grid md:grid-cols-2 gap-3">
@@ -141,7 +168,9 @@ export default function DetalheLinhaMigracao({ linha, open, onOpenChange, onSalv
             <Button onClick={handleSalvar} disabled={saving}>{saving ? 'Salvando...' : 'Salvar correção'}</Button>
           </div>
         </section>
+        )}
 
+        {!isConferencia && (
         <div className="grid md:grid-cols-2 gap-4 text-sm">
           <section className="bg-slate-50 rounded-lg p-3">
             <h3 className="font-semibold mb-2">Dados originais</h3>
@@ -160,6 +189,7 @@ export default function DetalheLinhaMigracao({ linha, open, onOpenChange, onSalv
             {linha.erros.length === 0 ? <p>Nenhum erro.</p> : <ul className="list-disc pl-5">{linha.erros.map((e) => <li key={e}>{e}</li>)}</ul>}
           </section>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

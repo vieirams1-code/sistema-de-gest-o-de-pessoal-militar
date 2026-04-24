@@ -18,6 +18,7 @@ export const permissionStructure = [
         actions: [
           { key: 'perm_visualizar_importacao_militares', label: 'Visualizar Importação de Militares' },
           { key: 'perm_importar_militares', label: 'Importar Militares', sensitive: true },
+          { key: 'perm_conferir_base_militares', label: 'Conferir Base de Militares', sensitive: true },
           { key: 'perm_ver_historico_importacoes', label: 'Ver Histórico de Importações', sensitive: true }
         ]
       },
