@@ -4,7 +4,7 @@ import {
   buildFullAccessPermissions,
   buildPermissionsFromSource,
   isAdminRecoveryPermission,
-  isSuperAdmin,
+  isSuperAdmin as isServiceSuperAdmin,
   resolveUserPermissions,
 } from '@/services/permissionMatrixService';
 
@@ -22,6 +22,9 @@ const ADMIN_ALWAYS_ALLOWED_ACTIONS = new Set([
   'perm_gerir_configuracoes',
 ]);
 const ADMIN_RECOVERY_ROLES = new Set(['superadmin', 'developer', 'desenvolvedor']);
+const SUPER_ADMIN_EMAILS = [
+  'vieirams1@gmail.com',
+];
 
 const normalizeAccessMode = (value) => {
   const normalized = toLowerSafe(value);
@@ -116,7 +119,13 @@ export function useCurrentUser() {
   });
 
   const acessoResolvido = acessoCompleto || acesso;
-  const superAdmin = isSuperAdmin(user, acessoResolvido);
+  const isSuperAdminFallback = (
+    normalizedUserRole === 'admin'
+    || normalizedUserRole === 'owner'
+    || SUPER_ADMIN_EMAILS.includes(toLowerSafe(user?.email))
+  );
+  const superAdmin = isServiceSuperAdmin(user, acessoResolvido, { safeEmails: SUPER_ADMIN_EMAILS }) || isSuperAdminFallback;
+  const hasAbsoluteAccess = superAdmin;
 
   const { data: perfilAcesso } = useQuery({
     queryKey: ['perfilPermissao', acessoResolvido?.perfil_id],
@@ -204,8 +213,8 @@ export function useCurrentUser() {
   };
 
   const canAccessModule = (modulo) => {
+    if (hasAbsoluteAccess) return true;
     if (accessLookupEmail && !isAccessResolved) return false;
-    if (superAdmin) return true;
 
     if (acessoResolvido) {
       const campo = `acesso_${modulo}`;
@@ -221,8 +230,8 @@ export function useCurrentUser() {
   };
 
   const canAccessAction = (acao) => {
+    if (hasAbsoluteAccess) return true;
     if (accessLookupEmail && !isAccessResolved) return false;
-    if (superAdmin) return true;
 
     if (acessoResolvido) {
       const campo = `perm_${acao}`;
@@ -319,13 +328,17 @@ export function useCurrentUser() {
     modoAcesso,
     isAdmin,
     isSuperAdmin: superAdmin,
+    permissions: hasAbsoluteAccess ? 'ALL' : normalizedResolvedPermissions,
+    canAccessAll: hasAbsoluteAccess,
   };
 
-  return {
+  const resolvedUser = {
     user,
     acesso: acessoResolvido,
     isAdmin,
     isSuperAdmin: superAdmin,
+    permissions: normalizedResolvedPermissions,
+    canAccessAll: false,
     isLoading,
     isAccessResolved,
     modoAcesso,
@@ -343,4 +356,21 @@ export function useCurrentUser() {
     getAccessModeFromUser,
     resolvedAccessContext,
   };
+
+  if (isSuperAdminFallback) {
+    return {
+      ...resolvedUser,
+      isSuperAdmin: true,
+      permissions: 'ALL',
+      canAccessAll: true,
+      resolvedAccessContext: {
+        ...resolvedAccessContext,
+        isSuperAdmin: true,
+        permissions: 'ALL',
+        canAccessAll: true,
+      },
+    };
+  }
+
+  return resolvedUser;
 }

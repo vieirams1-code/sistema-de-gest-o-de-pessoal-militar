@@ -10,10 +10,14 @@ export default function RequireModuleAccess({
   actionKeys = [],
   moduleName,
 }) {
-  const { canAccessModule, canAccessAction, isLoading, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading, isAccessResolved, permissions, canAccessAll } = useCurrentUser();
 
   if (isLoading || !isAccessResolved) {
     return null;
+  }
+
+  if (canAccessAll || permissions === 'ALL') {
+    return children;
   }
 
   const normalizedModuleKeys = [

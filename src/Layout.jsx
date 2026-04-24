@@ -148,7 +148,8 @@ const adminMenuGroup = {
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState([]);
-  const { isAdmin, canAccessModule, canAccessAction } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction, permissions, canAccessAll } = useCurrentUser();
+  const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
   const temPermissao = (actionKey) => canAccessAction(actionKey);
   useVerificacaoComportamentoDiaria({ enabled: canAccessModule('militares') || isAdmin });
 
@@ -162,6 +163,8 @@ export default function Layout({ children, currentPageName }) {
 
   // Filtra itens de menu por permissão de módulo
   const filterItemsByPermission = (items) => {
+    if (hasAbsoluteAccess) return items;
+
     return items.filter((item) => {
       if (item.adminOnly && !isAdmin) return false;
       if (item.viewPermission && !temPermissao(item.viewPermission)) return false;
