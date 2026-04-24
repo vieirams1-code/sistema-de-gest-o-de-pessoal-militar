@@ -20,6 +20,54 @@ const actionPermissionKeys = permissionStructure.flatMap((group) =>
 
 export const canonicalPermissionKeys = [...modulePermissionKeys, ...actionPermissionKeys];
 
+const SUPERADMIN_EMAILS_RAW = (
+  import.meta?.env?.VITE_SUPERADMIN_EMAILS
+  || import.meta?.env?.VITE_SGP_SUPERADMIN_EMAILS
+  || ''
+);
+
+const parseSuperAdminEmails = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
+      .filter(Boolean);
+  }
+
+  if (typeof value !== 'string') return [];
+  return value
+    .split(/[;,\s]+/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+};
+
+export const configuredSuperAdminEmails = [...new Set(parseSuperAdminEmails(SUPERADMIN_EMAILS_RAW))];
+
+export const buildFullAccessPermissions = () => (
+  canonicalPermissionKeys.reduce((acc, key) => {
+    acc[key] = true;
+    return acc;
+  }, {})
+);
+
+export const isSuperAdmin = (user = null, usuarioAcesso = null, options = {}) => {
+  const safeEmails = new Set([
+    ...configuredSuperAdminEmails,
+    ...parseSuperAdminEmails(options?.safeEmails),
+  ]);
+
+  const normalizedUserEmail = (user?.email || '').trim().toLowerCase();
+  const normalizedAcessoEmail = (usuarioAcesso?.user_email || '').trim().toLowerCase();
+  const normalizedRole = (user?.role || '').toString().trim().toLowerCase();
+  const normalizedAcessoRole = (usuarioAcesso?.role || '').toString().trim().toLowerCase();
+
+  if (user?.isSuperAdmin === true || user?.superadmin === true || usuarioAcesso?.superadmin === true) return true;
+  if (normalizedRole === 'owner' || normalizedRole === 'superadmin') return true;
+  if (normalizedAcessoRole === 'owner' || normalizedAcessoRole === 'superadmin') return true;
+  if (safeEmails.has(normalizedUserEmail) || safeEmails.has(normalizedAcessoEmail)) return true;
+
+  return false;
+};
+
 const SPECIAL_ALIASES_BY_KEY = {
   perm_gerir_dom_pedro_ii: ['perm_gerir_fluxo_dom_pedro_ii', 'gerir_fluxo_dom_pedro_ii'],
 };
@@ -270,6 +318,14 @@ export const resolveUserPermissions = ({
   const hasUserLegacyMatrix = hasValidMatrixContent(userSource);
   const fallbackPermissions = buildPermissionsFromSource(fallbackProfile);
   const profilePermissionsWithFallback = buildPermissionsFromSource(profilePermissions, fallbackPermissions);
+
+  if (isSuperAdmin(userSource, userSource)) {
+    return {
+      permissions: buildFullAccessPermissions(),
+      profilePermissions: buildFullAccessPermissions(),
+      source: 'superadmin',
+    };
+  }
 
   if (preferProfilePermissions) {
     return {
