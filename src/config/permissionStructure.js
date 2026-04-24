@@ -13,19 +13,23 @@ export const permissionStructure = [
         ]
       },
       {
-        key: 'acesso_migracao',
-        label: 'Migração',
+        key: 'acesso_migracao_militares',
+        label: 'Migração de Militares',
         actions: [
-          { key: 'perm_visualizar_migracao', label: 'Visualizar Migração' },
-          { key: 'perm_adicionar_migracao', label: 'Adicionar Migração', sensitive: true },
-          { key: 'perm_editar_migracao', label: 'Editar Migração', sensitive: true },
-          { key: 'perm_excluir_migracao', label: 'Excluir Migração', sensitive: true },
+          { key: 'perm_visualizar_importacao_militares', label: 'Visualizar Importação de Militares' },
           { key: 'perm_importar_militares', label: 'Importar Militares', sensitive: true },
-          { key: 'perm_ver_historico_importacoes', label: 'Ver Histórico de Importações', sensitive: true },
-          { key: 'perm_migrar_alteracoes_legado', label: 'Migrar Alterações Legado', sensitive: true },
-          { key: 'perm_classificar_legado', label: 'Classificar Pendências Legado', sensitive: true },
-          { key: 'perm_revisar_duplicidades', label: 'Revisar Duplicidades', sensitive: true },
-          { key: 'perm_reset_operacional', label: 'Executar Reset Operacional', sensitive: true }
+          { key: 'perm_ver_historico_importacoes', label: 'Ver Histórico de Importações', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_migracao_alteracoes_legado',
+        label: 'Migração de Alterações Legado',
+        actions: [
+          { key: 'perm_visualizar_migracao_legado', label: 'Visualizar Migração Legado' },
+          { key: 'perm_adicionar_migracao_legado', label: 'Adicionar Migração Legado', sensitive: true },
+          { key: 'perm_editar_migracao_legado', label: 'Editar Migração Legado', sensitive: true },
+          { key: 'perm_excluir_migracao_legado', label: 'Excluir Migração Legado', sensitive: true },
+          { key: 'perm_migrar_alteracoes_legado', label: 'Migrar Alterações Legado', sensitive: true }
         ]
       },
       {
@@ -198,6 +202,13 @@ export const permissionStructure = [
         actions: [
           { key: 'perm_admin_mode', label: 'Pode Ativar Modo Admin', sensitive: true },
           { key: 'perm_gerir_configuracoes', label: 'Gerir Configurações', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_operacoes_administrativas',
+        label: 'Operações Administrativas',
+        actions: [
+          { key: 'perm_reset_operacional', label: 'Executar Reset Operacional', sensitive: true }
         ]
       },
       {

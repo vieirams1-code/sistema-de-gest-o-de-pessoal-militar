@@ -66,11 +66,11 @@ const moduleGuardByPage = {
   Publicacoes: { moduleKey: 'controle_publicacoes', moduleName: 'Controle de Publicações' },
   CadastrarPublicacao: { moduleKey: 'controle_publicacoes', moduleName: 'Controle de Publicações' },
   ConciliacaoBoletim: { moduleKey: 'conciliacao_boletim', moduleName: 'Conciliação com Boletim' },
-  MigracaoMilitares: { moduleKeys: ['migracao'], moduleName: 'Migração' },
-  HistoricoImportacoesMilitares: { moduleKeys: ['migracao'], actionKeys: ['ver_historico_importacoes'], moduleName: 'Migração' },
-  MigracaoAlteracoesLegado: { moduleKeys: ['migracao'], actionKeys: ['migrar_alteracoes_legado'], moduleName: 'Migração' },
-  ClassificacaoPendentesLegado: { moduleKeys: ['migracao'], actionKeys: ['classificar_legado'], moduleName: 'Migração' },
-  RevisaoDuplicidadesMilitar: { moduleKeys: ['migracao'], actionKeys: ['revisar_duplicidades'], moduleName: 'Migração' },
+  MigracaoMilitares: { moduleKeys: ['migracao_militares'], actionKeys: ['visualizar_importacao_militares'], moduleName: 'Migração de Militares' },
+  HistoricoImportacoesMilitares: { moduleKeys: ['migracao_militares'], actionKeys: ['ver_historico_importacoes'], moduleName: 'Migração de Militares' },
+  MigracaoAlteracoesLegado: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['visualizar_migracao_legado'], moduleName: 'Migração de Alterações Legado' },
+  ClassificacaoPendentesLegado: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['classificar_legado'], moduleName: 'Migração de Alterações Legado' },
+  RevisaoDuplicidadesMilitar: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['revisar_duplicidades'], moduleName: 'Migração de Alterações Legado' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {

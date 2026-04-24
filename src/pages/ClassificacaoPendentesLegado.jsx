@@ -13,7 +13,7 @@ import {
 
 export default function ClassificacaoPendentesLegado() {
   const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
-  const hasMigrationAccess = canAccessModule('migracao');
+  const hasMigrationAccess = canAccessModule('migracao_alteracoes_legado');
   const canClassificarLegado = canAccessAction('classificar_legado');
   const { toast } = useToast();
   const [carregando, setCarregando] = useState(false);
