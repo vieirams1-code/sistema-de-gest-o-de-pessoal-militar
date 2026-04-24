@@ -1,6 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
-import { strFromU8, unzipSync } from 'fflate';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { normalizeLegacyDateToCanonical } from '@/utils/dateNormalization';
 import {
   criarMilitarComMatricula,
@@ -8,6 +8,7 @@ import {
   localizarDuplicidadeForte,
   normalizarMatricula,
   normalizarCPF as normalizarCpfIdentidade,
+  normalizarNomeCanonico,
   registrarPossivelDuplicidade,
   validarMatriculaDisponivel,
 } from '@/services/militarIdentidadeService';
@@ -17,6 +18,15 @@ export const STATUS_LINHA = {
   APTO_COM_ALERTA: 'APTO_COM_ALERTA',
   DUPLICADO: 'DUPLICADO',
   ERRO: 'ERRO',
+};
+
+export const STATUS_CONFERENCIA = {
+  ENCONTRADO_POR_CPF: 'ENCONTRADO_POR_CPF',
+  ENCONTRADO_POR_MATRICULA: 'ENCONTRADO_POR_MATRICULA',
+  ENCONTRADO_POR_NOME: 'ENCONTRADO_POR_NOME',
+  ENCONTRADO_MULTIPLO: 'ENCONTRADO_MULTIPLO',
+  NAO_ENCONTRADO: 'NAO_ENCONTRADO',
+  DIVERGENTE: 'DIVERGENTE',
 };
 
 const REGRA_VERSAO = 'v1.1.0';
@@ -1315,6 +1325,307 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
     }
     throw error;
   }
+}
+
+function compararCamposConferencia(planilha = {}, base = {}) {
+  const divergencias = [];
+  const nomePlanilha = limparTexto(planilha.nome_completo);
+  const nomeBase = limparTexto(base.nome_completo);
+  const matriculaPlanilha = normalizarMatricula(planilha.matricula);
+  const matriculaBase = normalizarMatricula(base.matricula);
+  const cpfPlanilha = normalizarCpfIdentidade(planilha.cpf);
+  const cpfBase = normalizarCpfIdentidade(base.cpf);
+
+  if (nomePlanilha && nomeBase && normalizarNomeCanonico(nomePlanilha) !== normalizarNomeCanonico(nomeBase)) {
+    divergencias.push('nome diferente');
+  }
+  if (matriculaPlanilha && matriculaBase && matriculaPlanilha !== matriculaBase) {
+    divergencias.push('matrícula diferente');
+  }
+  if (cpfPlanilha && cpfBase && cpfPlanilha !== cpfBase) {
+    divergencias.push('CPF diferente');
+  }
+  if (limparTexto(planilha.data_inclusao) && limparTexto(base.data_inclusao) && limparTexto(planilha.data_inclusao) !== limparTexto(base.data_inclusao)) {
+    divergencias.push('data de inclusão diferente');
+  }
+  if (limparTexto(planilha.posto_graduacao) && limparTexto(base.posto_graduacao) && normalizarChave(planilha.posto_graduacao) !== normalizarChave(base.posto_graduacao)) {
+    divergencias.push('posto/graduação diferente');
+  }
+  if (limparTexto(planilha.nome_guerra) && limparTexto(base.nome_guerra) && normalizarChave(planilha.nome_guerra) !== normalizarChave(base.nome_guerra)) {
+    divergencias.push('nome de guerra diferente');
+  }
+
+  return divergencias;
+}
+
+function montarResumoConferencia(linhas = []) {
+  return linhas.reduce((acc, linha) => {
+    acc.total_linhas += 1;
+    if (linha.status_conferencia === STATUS_CONFERENCIA.ENCONTRADO_POR_CPF) acc.encontrados_por_cpf += 1;
+    if (linha.status_conferencia === STATUS_CONFERENCIA.ENCONTRADO_POR_MATRICULA) acc.encontrados_por_matricula += 1;
+    if (linha.status_conferencia === STATUS_CONFERENCIA.ENCONTRADO_POR_NOME) acc.encontrados_por_nome += 1;
+    if (linha.status_conferencia === STATUS_CONFERENCIA.NAO_ENCONTRADO) acc.nao_encontrados += 1;
+    if (linha.status_conferencia === STATUS_CONFERENCIA.DIVERGENTE) acc.divergentes += 1;
+    if (linha.status_conferencia === STATUS_CONFERENCIA.ENCONTRADO_MULTIPLO || linha.possivel_duplicidade === true) acc.possiveis_duplicidades += 1;
+    return acc;
+  }, {
+    total_linhas: 0,
+    encontrados_por_cpf: 0,
+    encontrados_por_matricula: 0,
+    encontrados_por_nome: 0,
+    nao_encontrados: 0,
+    divergentes: 0,
+    possiveis_duplicidades: 0,
+  });
+}
+
+export async function conferirBaseMilitares(file) {
+  const dados = await lerArquivoComoTabela(file);
+  if (dados.length < 2) throw new Error('Arquivo sem conteúdo válido para conferência.');
+
+  const cabecalho = dados[0];
+  const headerMap = mapHeaders(cabecalho);
+  const militaresExistentes = await getMigracaoClient().entities.Militar.list();
+
+  const indexCpf = new Map();
+  const indexMatricula = new Map();
+  const indexNome = new Map();
+
+  (militaresExistentes || []).forEach((militar) => {
+    const cpfNorm = normalizarCpfIdentidade(militar?.cpf);
+    const matriculaNorm = normalizarMatricula(militar?.matricula);
+    const nomeNorm = normalizarNomeCanonico(militar?.nome_completo || militar?.nome_canonico);
+
+    if (cpfNorm) {
+      const itens = indexCpf.get(cpfNorm) || [];
+      itens.push(militar);
+      indexCpf.set(cpfNorm, itens);
+    }
+    if (matriculaNorm) {
+      const itens = indexMatricula.get(matriculaNorm) || [];
+      itens.push(militar);
+      indexMatricula.set(matriculaNorm, itens);
+    }
+    if (nomeNorm) {
+      const itens = indexNome.get(nomeNorm) || [];
+      itens.push(militar);
+      indexNome.set(nomeNorm, itens);
+    }
+  });
+
+  const linhas = dados.slice(1).map((cells, idx) => {
+    const planilha = {
+      nome_completo: valorLinha(cells, headerMap, 'nome_completo'),
+      nome_guerra: valorLinha(cells, headerMap, 'nome_guerra'),
+      matricula: formatarMatricula(valorLinha(cells, headerMap, 'matricula'), [], []),
+      cpf: normalizarCPF(valorLinha(cells, headerMap, 'cpf'), []),
+      data_inclusao: formatarData(valorLinha(cells, headerMap, 'data_inclusao'), { alertas: [], erros: [], obrigatoria: false }),
+      posto_graduacao: mapPostoGraduacao(valorLinha(cells, headerMap, 'posto_graduacao'), []),
+    };
+
+    const cpfNorm = normalizarCpfIdentidade(planilha.cpf);
+    const matriculaNorm = normalizarMatricula(planilha.matricula);
+    const nomeNorm = normalizarNomeCanonico(planilha.nome_completo);
+
+    const encontradosCpf = cpfNorm ? (indexCpf.get(cpfNorm) || []) : [];
+    const encontradosMatricula = matriculaNorm ? (indexMatricula.get(matriculaNorm) || []) : [];
+    const encontradosNome = nomeNorm ? (indexNome.get(nomeNorm) || []) : [];
+
+    const candidatos = [...new Map(
+      [...encontradosCpf, ...encontradosMatricula, ...encontradosNome].map((item) => [item.id, item]),
+    ).values()];
+
+    let status = STATUS_CONFERENCIA.NAO_ENCONTRADO;
+    let campoMatch = '';
+    const observacoes = [];
+    const divergencias = [];
+
+    if (candidatos.length > 1) {
+      status = STATUS_CONFERENCIA.ENCONTRADO_MULTIPLO;
+      campoMatch = 'MULTIPLO';
+      observacoes.push('Mais de um militar encontrado para os critérios informados.');
+    } else if (candidatos.length === 1) {
+      const encontrado = candidatos[0];
+      const matchCpf = cpfNorm && normalizarCpfIdentidade(encontrado.cpf) === cpfNorm;
+      const matchMatricula = matriculaNorm && normalizarMatricula(encontrado.matricula) === matriculaNorm;
+      const matchNome = nomeNorm && normalizarNomeCanonico(encontrado.nome_completo || encontrado.nome_canonico) === nomeNorm;
+
+      if (matchCpf && matchMatricula && matchNome) {
+        status = STATUS_CONFERENCIA.ENCONTRADO_MULTIPLO;
+        campoMatch = 'CPF+MATRICULA+NOME';
+      } else if (matchCpf && matchMatricula) {
+        status = STATUS_CONFERENCIA.ENCONTRADO_MULTIPLO;
+        campoMatch = 'CPF+MATRICULA';
+      } else if (matchCpf) {
+        status = STATUS_CONFERENCIA.ENCONTRADO_POR_CPF;
+        campoMatch = 'CPF';
+      } else if (matchMatricula) {
+        status = STATUS_CONFERENCIA.ENCONTRADO_POR_MATRICULA;
+        campoMatch = 'MATRICULA';
+      } else if (matchNome) {
+        status = STATUS_CONFERENCIA.ENCONTRADO_POR_NOME;
+        campoMatch = 'NOME';
+        observacoes.push('Correspondência encontrada somente por nome. Exige atenção.');
+      }
+
+      divergencias.push(...compararCamposConferencia(planilha, encontrado));
+
+      if ((matchCpf && matriculaNorm && !matchMatricula) || (matchMatricula && cpfNorm && !matchCpf) || divergencias.length > 0) {
+        status = STATUS_CONFERENCIA.DIVERGENTE;
+      }
+    }
+
+    const militarEncontrado = candidatos.length === 1 ? candidatos[0] : null;
+    if (!militarEncontrado && status === STATUS_CONFERENCIA.NAO_ENCONTRADO && nomeNorm && encontradosNome.length > 0) {
+      observacoes.push('Nome coincide com mais de um registro existente. Verificar possível duplicidade.');
+    }
+
+    return {
+      linhaNumero: idx + 2,
+      original: Object.fromEntries(cabecalho.map((h, hIdx) => [h, cells[hIdx] || ''])),
+      dados_planilha: planilha,
+      status_conferencia: status,
+      campo_match: campoMatch,
+      divergencias: dedupeMensagens(divergencias),
+      observacoes: dedupeMensagens(observacoes),
+      militar_encontrado: militarEncontrado ? {
+        id: militarEncontrado.id,
+        nome_completo: militarEncontrado.nome_completo || '',
+        nome_guerra: militarEncontrado.nome_guerra || '',
+        matricula: militarEncontrado.matricula || '',
+        cpf: militarEncontrado.cpf || '',
+        data_inclusao: militarEncontrado.data_inclusao || '',
+        posto_graduacao: militarEncontrado.posto_graduacao || '',
+      } : null,
+      possivel_duplicidade: candidatos.length > 1 || status === STATUS_CONFERENCIA.ENCONTRADO_POR_NOME,
+    };
+  });
+
+  return {
+    arquivo: {
+      nome: file.name,
+      tipo: file.type || 'text/csv',
+      hash: await gerarHashArquivo(file),
+      data_conferencia: new Date().toISOString(),
+    },
+    resumo: montarResumoConferencia(linhas),
+    linhas,
+    versao_regra_migracao: REGRA_VERSAO,
+    modo: 'CONFERENCIA_BASE',
+  };
+}
+
+function colunaExcel(indice) {
+  let valor = indice + 1;
+  let coluna = '';
+  while (valor > 0) {
+    const resto = (valor - 1) % 26;
+    coluna = String.fromCharCode(65 + resto) + coluna;
+    valor = Math.floor((valor - 1) / 26);
+  }
+  return coluna;
+}
+
+function escaparXml(valor = '') {
+  return String(valor ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function montarSheetXml(headers, rows) {
+  const linhasXml = [headers, ...rows].map((row, rowIndex) => {
+    const rowNum = rowIndex + 1;
+    const celulas = row.map((value, cellIndex) => {
+      const ref = `${colunaExcel(cellIndex)}${rowNum}`;
+      return `<c r="${ref}" t="inlineStr"><is><t>${escaparXml(value)}</t></is></c>`;
+    }).join('');
+    return `<row r="${rowNum}">${celulas}</row>`;
+  }).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${linhasXml}</sheetData></worksheet>`;
+}
+
+export function exportarConferenciaBaseExcel(conferencia = {}, nomeArquivo = 'conferencia-base-militares.xlsx') {
+  const headers = [
+    'Linha',
+    'Status Conferência',
+    'Campo Match',
+    'Nome Planilha',
+    'Nome Guerra Planilha',
+    'Matrícula Planilha',
+    'CPF Planilha',
+    'Data Inclusão Planilha',
+    'Posto/Graduação Planilha',
+    'Militar Encontrado ID',
+    'Nome Base',
+    'Nome Guerra Base',
+    'Matrícula Base',
+    'CPF Base',
+    'Data Inclusão Base',
+    'Posto/Graduação Base',
+    'Campos Divergentes',
+    'Observações',
+  ];
+
+  const rows = (conferencia?.linhas || []).map((linha) => [
+    linha.linhaNumero,
+    linha.status_conferencia || '',
+    linha.campo_match || '',
+    linha.dados_planilha?.nome_completo || '',
+    linha.dados_planilha?.nome_guerra || '',
+    linha.dados_planilha?.matricula || '',
+    linha.dados_planilha?.cpf || '',
+    linha.dados_planilha?.data_inclusao || '',
+    linha.dados_planilha?.posto_graduacao || '',
+    linha.militar_encontrado?.id || '',
+    linha.militar_encontrado?.nome_completo || '',
+    linha.militar_encontrado?.nome_guerra || '',
+    linha.militar_encontrado?.matricula || '',
+    linha.militar_encontrado?.cpf || '',
+    linha.militar_encontrado?.data_inclusao || '',
+    linha.militar_encontrado?.posto_graduacao || '',
+    (linha.divergencias || []).join('; '),
+    (linha.observacoes || []).join('; '),
+  ]);
+
+  const sheetXml = montarSheetXml(headers, rows);
+  const arquivos = {
+    '[Content_Types].xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`),
+    '_rels/.rels': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`),
+    'xl/workbook.xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="Conferencia" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`),
+    'xl/_rels/workbook.xml.rels': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`),
+    'xl/worksheets/sheet1.xml': strToU8(sheetXml),
+  };
+
+  const zipped = zipSync(arquivos, { level: 0 });
+  const blob = new Blob([zipped], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo.endsWith('.xlsx') ? nomeArquivo : `${nomeArquivo}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export function exportarRelatorio(relatorio, nomeArquivo = 'relatorio-migracao-militares.json') {

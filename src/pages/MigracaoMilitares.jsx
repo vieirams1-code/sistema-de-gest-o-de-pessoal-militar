@@ -13,23 +13,19 @@ import DetalheLinhaMigracao from '@/components/migracao/DetalheLinhaMigracao';
 import {
   analisarArquivoMigracao,
   carregarAnaliseHistorico,
+  conferirBaseMilitares,
   corrigirLinhaPreImportacao,
+  exportarConferenciaBaseExcel,
   exportarRelatorio,
   importarAnalise,
   persistirCorrecaoPreImportacaoHistorico,
   salvarAnaliseHistorico,
 } from '@/services/migracaoMilitaresService';
 
-const filtros = [
-  { id: 'TODOS', label: 'Todos' },
-  { id: 'APTO', label: 'Aptos' },
-  { id: 'APTO_COM_ALERTA', label: 'Aptos com alerta' },
-  { id: 'DUPLICADO', label: 'Duplicados' },
-  { id: 'ERRO', label: 'Erros' },
-];
-
 const ERRO_ENTIDADE_HISTORICO = 'Falha ao acessar o histórico de importação de militares. Verifique se a entidade ImportacaoMilitares está publicada no app.';
 const STORAGE_KEY = 'migracao_militares_historico_id';
+const MODO_IMPORTAR = 'IMPORTAR';
+const MODO_CONFERIR = 'CONFERIR';
 
 export default function MigracaoMilitares() {
   const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
@@ -44,6 +40,35 @@ export default function MigracaoMilitares() {
   const [linhaSelecionada, setLinhaSelecionada] = useState(null);
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
   const [salvandoCorrecao, setSalvandoCorrecao] = useState(false);
+  const [modo, setModo] = useState(MODO_IMPORTAR);
+  const podeImportar = canAccessAction('importar_militares');
+  const podeConferir = canAccessAction('conferir_base_militares');
+
+  const filtros = useMemo(() => (
+    modo === MODO_CONFERIR
+      ? [
+        { id: 'TODOS', label: 'Todos' },
+        { id: 'ENCONTRADO_POR_CPF', label: 'Por CPF' },
+        { id: 'ENCONTRADO_POR_MATRICULA', label: 'Por Matrícula' },
+        { id: 'ENCONTRADO_POR_NOME', label: 'Por Nome' },
+        { id: 'ENCONTRADO_MULTIPLO', label: 'Múltiplos' },
+        { id: 'DIVERGENTE', label: 'Divergentes' },
+        { id: 'NAO_ENCONTRADO', label: 'Não encontrados' },
+      ]
+      : [
+        { id: 'TODOS', label: 'Todos' },
+        { id: 'APTO', label: 'Aptos' },
+        { id: 'APTO_COM_ALERTA', label: 'Aptos com alerta' },
+        { id: 'DUPLICADO', label: 'Duplicados' },
+        { id: 'ERRO', label: 'Erros' },
+      ]
+  ), [modo]);
+
+  useEffect(() => {
+    if (!podeImportar && podeConferir && modo !== MODO_CONFERIR) {
+      setModo(MODO_CONFERIR);
+    }
+  }, [modo, podeConferir, podeImportar]);
 
   useEffect(() => {
     const restaurarDraft = async () => {
@@ -70,31 +95,35 @@ export default function MigracaoMilitares() {
 
   const linhasFiltradas = useMemo(() => {
     if (!analise) return [];
-    const termo = busca.trim().toLowerCase();
+      const termo = busca.trim().toLowerCase();
     return analise.linhas.filter((linha) => {
-      const matchStatus = filtro === 'TODOS' ? true : linha.status === filtro;
+      const status = modo === MODO_CONFERIR ? linha.status_conferencia : linha.status;
+      const matchStatus = filtro === 'TODOS' ? true : status === filtro;
       const matchBusca = !termo
         ? true
-        : (linha.transformado.nome_completo || '').toLowerCase().includes(termo)
-          || (linha.transformado.matricula || '').toLowerCase().includes(termo);
+        : (linha.transformado?.nome_completo || linha.dados_planilha?.nome_completo || '').toLowerCase().includes(termo)
+          || (linha.transformado?.matricula || linha.dados_planilha?.matricula || '').toLowerCase().includes(termo);
       return matchStatus && matchBusca;
     });
-  }, [analise, filtro, busca]);
+  }, [analise, filtro, busca, modo]);
 
   const handleAnalisar = async () => {
     if (!arquivo) return;
     try {
       setCarregando(true);
-      const resultado = await analisarArquivoMigracao(arquivo);
+      const resultado = modo === MODO_CONFERIR
+        ? await conferirBaseMilitares(arquivo)
+        : await analisarArquivoMigracao(arquivo);
       setAnalise(resultado);
       setResultadoImportacao(null);
+      if (modo === MODO_IMPORTAR) {
+        const usuario = await base44.auth.me();
+        const historico = await salvarAnaliseHistorico(resultado, usuario);
+        setHistoricoId(historico?.id);
+        if (historico?.id) sessionStorage.setItem(STORAGE_KEY, historico.id);
+      }
 
-      const usuario = await base44.auth.me();
-      const historico = await salvarAnaliseHistorico(resultado, usuario);
-      setHistoricoId(historico?.id);
-      if (historico?.id) sessionStorage.setItem(STORAGE_KEY, historico.id);
-
-      toast({ title: 'Análise concluída', description: 'Prévia gerada com sucesso.' });
+      toast({ title: 'Análise concluída', description: modo === MODO_CONFERIR ? 'Conferência gerada com sucesso.' : 'Prévia gerada com sucesso.' });
     } catch (error) {
       const mensagem = String(error?.message || '').includes('Entity schema ImportacaoMilitares not found in app')
         ? ERRO_ENTIDADE_HISTORICO
@@ -209,7 +238,7 @@ export default function MigracaoMilitares() {
   };
 
   if (isLoading || !isAccessResolved) return null;
-  if (!canAccessModule('migracao_militares') || !canAccessAction('importar_militares')) return <AccessDenied modulo="Migração de Militares" />;
+  if (!canAccessModule('migracao_militares') || (!podeImportar && !podeConferir)) return <AccessDenied modulo="Migração de Militares" />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -226,6 +255,13 @@ export default function MigracaoMilitares() {
 
         {!analise && !resultadoImportacao && (
           <>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <p className="text-sm font-semibold text-slate-700 mb-2">Ação</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant={modo === MODO_IMPORTAR ? 'default' : 'outline'} disabled={!podeImportar} onClick={() => setModo(MODO_IMPORTAR)}>Importar Militares</Button>
+                <Button variant={modo === MODO_CONFERIR ? 'default' : 'outline'} disabled={!podeConferir} onClick={() => setModo(MODO_CONFERIR)}>Conferir Base</Button>
+              </div>
+            </div>
             <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 text-sm">
               <p className="font-semibold mb-2 flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Regras desta primeira versão</p>
               <ul className="list-disc pl-6 space-y-1">
@@ -247,7 +283,7 @@ export default function MigracaoMilitares() {
 
         {analise && !resultadoImportacao && (
           <div className="space-y-4">
-            <ResumoMigracaoCards resumo={analise.resumo} />
+            <ResumoMigracaoCards resumo={analise.resumo} modo={modo} />
 
             <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
               <div className="flex flex-wrap gap-2">
@@ -263,21 +299,34 @@ export default function MigracaoMilitares() {
                 ))}
               </div>
               <Input
-                placeholder="Buscar por nome ou matrícula"
+                placeholder={modo === MODO_CONFERIR ? 'Buscar por nome ou matrícula da planilha' : 'Buscar por nome ou matrícula'}
                 value={busca}
                 onChange={(event) => setBusca(event.target.value)}
                 className="md:max-w-sm"
               />
             </div>
 
-            <TabelaPreviaMigracao linhas={linhasFiltradas} onSelectLinha={setLinhaSelecionada} />
+            <TabelaPreviaMigracao linhas={linhasFiltradas} onSelectLinha={setLinhaSelecionada} modo={modo} />
 
             <div className="flex flex-wrap gap-2">
-              <Button disabled={carregando} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
-              <Button disabled={carregando} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true)}>Importar aptas e aptas com alerta</Button>
-              <Button variant="outline" onClick={() => exportarRelatorio({ ...analise, estado: 'Analise' }, `relatorio-analise-${analise.arquivo.nome}.json`)}>
-                <Download className="w-4 h-4 mr-2" /> Exportar relatório
-              </Button>
+              {modo === MODO_IMPORTAR ? (
+                <>
+                  <Button disabled={carregando} className="bg-emerald-700 hover:bg-emerald-800" onClick={() => handleImportar(false)}>Importar linhas aptas</Button>
+                  <Button disabled={carregando} className="bg-amber-600 hover:bg-amber-700" onClick={() => handleImportar(true)}>Importar aptas e aptas com alerta</Button>
+                  <Button variant="outline" onClick={() => exportarRelatorio({ ...analise, estado: 'Analise' }, `relatorio-analise-${analise.arquivo.nome}.json`)}>
+                    <Download className="w-4 h-4 mr-2" /> Exportar relatório
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => exportarConferenciaBaseExcel(analise, `conferencia-base-${analise.arquivo.nome}.xlsx`)}>
+                    <Download className="w-4 h-4 mr-2" /> Exportar conferência (Excel)
+                  </Button>
+                  <Button variant="outline" onClick={() => exportarRelatorio({ ...analise, estado: 'ConferenciaBase' }, `relatorio-conferencia-${analise.arquivo.nome}.json`)}>
+                    <Download className="w-4 h-4 mr-2" /> Exportar relatório (JSON)
+                  </Button>
+                </>
+              )}
               <Button variant="outline" onClick={reiniciarFluxo}><RefreshCcw className="w-4 h-4 mr-2" /> Nova análise</Button>
             </div>
           </div>
@@ -306,6 +355,7 @@ export default function MigracaoMilitares() {
         linha={linhaSelecionada}
         open={Boolean(linhaSelecionada)}
         saving={salvandoCorrecao}
+        modo={modo}
         onSalvarCorrecao={handleSalvarCorrecao}
         onOpenChange={(open) => !open && setLinhaSelecionada(null)}
       />
