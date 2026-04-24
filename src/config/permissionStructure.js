@@ -2,12 +2,36 @@ export const permissionStructure = [
   {
     category: 'Gestão de Pessoal',
     modules: [
-      { key: 'acesso_militares', label: 'Militares', actions: [] },
+      {
+        key: 'acesso_militares',
+        label: 'Militares',
+        actions: [
+          { key: 'perm_visualizar_militares', label: 'Visualizar Militares' },
+          { key: 'perm_adicionar_militares', label: 'Adicionar Militares' },
+          { key: 'perm_editar_militares', label: 'Editar Militares' },
+          { key: 'perm_excluir_militares', label: 'Excluir Militares', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_migracao',
+        label: 'Migração',
+        actions: [
+          { key: 'perm_importar_militares', label: 'Importar Militares', sensitive: true },
+          { key: 'perm_ver_historico_importacoes', label: 'Ver Histórico de Importações', sensitive: true },
+          { key: 'perm_migrar_alteracoes_legado', label: 'Migrar Alterações Legado', sensitive: true },
+          { key: 'perm_classificar_legado', label: 'Classificar Pendências Legado', sensitive: true },
+          { key: 'perm_revisar_duplicidades', label: 'Revisar Duplicidades', sensitive: true },
+          { key: 'perm_reset_operacional', label: 'Executar Reset Operacional', sensitive: true }
+        ]
+      },
       { key: 'acesso_folha_alteracoes', label: 'Folha de Alterações', actions: [] },
       {
         key: 'acesso_ferias',
         label: 'Férias',
         actions: [
+          { key: 'perm_visualizar_ferias', label: 'Visualizar Férias' },
+          { key: 'perm_adicionar_ferias', label: 'Adicionar Férias' },
+          { key: 'perm_editar_ferias', label: 'Editar Férias' },
           { key: 'perm_gerir_cadeia_ferias', label: 'Gerir Cadeia de Férias', sensitive: true },
           { key: 'perm_excluir_ferias', label: 'Excluir Férias', sensitive: true },
           { key: 'perm_recalcular_ferias', label: 'Recalcular Férias', sensitive: true }
@@ -17,7 +41,12 @@ export const permissionStructure = [
       {
         key: 'acesso_atestados',
         label: 'Atestados',
-        actions: [{ key: 'perm_excluir_atestado', label: 'Excluir Atestado', sensitive: true }]
+        actions: [
+          { key: 'perm_visualizar_atestados', label: 'Visualizar Atestados' },
+          { key: 'perm_adicionar_atestados', label: 'Adicionar Atestado' },
+          { key: 'perm_editar_atestados', label: 'Editar Atestado' },
+          { key: 'perm_excluir_atestado', label: 'Excluir Atestado', sensitive: true }
+        ]
       }
     ]
   },
@@ -29,6 +58,8 @@ export const permissionStructure = [
         label: 'Publicações',
         actions: [
           { key: 'perm_editar_publicacoes', label: 'Editar Publicações', sensitive: true },
+          { key: 'perm_adicionar_publicacoes', label: 'Adicionar Publicações', sensitive: true },
+          { key: 'perm_excluir_publicacoes', label: 'Excluir Publicações', sensitive: true },
           { key: 'perm_publicar_bg', label: 'Publicar em BG', sensitive: true },
           { key: 'perm_tornar_sem_efeito_publicacao', label: 'Tornar s/ Efeito Pub.', sensitive: true },
           { key: 'perm_apostilar_publicacao', label: 'Apostilar Pub.', sensitive: true },
@@ -43,7 +74,16 @@ export const permissionStructure = [
   {
     category: 'Operações e Recursos',
     modules: [
-      { key: 'acesso_armamentos', label: 'Armamentos', actions: [] },
+      {
+        key: 'acesso_armamentos',
+        label: 'Armamentos',
+        actions: [
+          { key: 'perm_visualizar_armamentos', label: 'Visualizar Armamentos' },
+          { key: 'perm_adicionar_armamentos', label: 'Adicionar Armamentos' },
+          { key: 'perm_editar_armamentos', label: 'Editar Armamentos' },
+          { key: 'perm_excluir_armamentos', label: 'Excluir Armamentos', sensitive: true }
+        ]
+      },
       {
         key: 'acesso_medalhas',
         label: 'Medalhas',
@@ -85,8 +125,7 @@ export const permissionStructure = [
           { key: 'perm_admin_mode', label: 'Pode Ativar Modo Admin', sensitive: true },
           { key: 'perm_gerir_permissoes', label: 'Gerir Permissões', sensitive: true },
           { key: 'perm_gerir_estrutura', label: 'Gerir Estrutura Org.', sensitive: true },
-          { key: 'perm_gerir_configuracoes', label: 'Gerir Configurações', sensitive: true },
-          { key: 'perm_reset_operacional', label: 'Executar Reset Operacional', sensitive: true }
+          { key: 'perm_gerir_configuracoes', label: 'Gerir Configurações', sensitive: true }
         ]
       }
     ]

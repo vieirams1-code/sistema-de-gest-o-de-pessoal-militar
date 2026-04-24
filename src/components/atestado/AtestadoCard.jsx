@@ -56,7 +56,7 @@ const statusColors = {
   'Prorrogado': 'bg-blue-100 text-blue-700 border-blue-200'
 };
 
-export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
+export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEdit = true, canDelete = true }) {
   const queryClient = useQueryClient();
   const { canAccessAction } = useCurrentUser();
   const [editingJiso, setEditingJiso] = useState(false);
@@ -402,20 +402,22 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                 <Eye className="w-4 h-4 mr-2" />
                 Visualizar
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  if (hasPublicacaoVinculada) {
-                    alert(mensagemBloqueioPublicacao);
-                    return;
-                  }
-                  onEdit(atestado);
-                }}
-                disabled={hasPublicacaoVinculada}
-                title={hasPublicacaoVinculada ? 'Edição bloqueada: há publicação/nota vinculada.' : ''}
-              >
-                <Pencil className="w-4 h-4 mr-2" />
-                {hasPublicacaoVinculada ? 'Editar (bloqueado por publicação vinculada)' : 'Editar'}
-              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (hasPublicacaoVinculada) {
+                      alert(mensagemBloqueioPublicacao);
+                      return;
+                    }
+                    onEdit(atestado);
+                  }}
+                  disabled={hasPublicacaoVinculada}
+                  title={hasPublicacaoVinculada ? 'Edição bloqueada: há publicação/nota vinculada.' : ''}
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  {hasPublicacaoVinculada ? 'Editar (bloqueado por publicação vinculada)' : 'Editar'}
+                </DropdownMenuItem>
+              )}
               {atestado.arquivo_atestado && (
                 <DropdownMenuItem onClick={() => window.open(atestado.arquivo_atestado, '_blank')}>
                   <Download className="w-4 h-4 mr-2 text-slate-600" />
@@ -484,21 +486,23 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView }) {
                   </DropdownMenuItem>
                 </>
               )}
-              <DropdownMenuItem
-                onClick={() => {
-                  if (hasPublicacaoVinculada) {
-                    alert(mensagemBloqueioPublicacao);
-                    return;
-                  }
-                  onDelete(atestado);
-                }}
-                disabled={hasPublicacaoVinculada}
-                title={hasPublicacaoVinculada ? 'Exclusão bloqueada: há publicação/nota vinculada.' : ''}
-                className="text-red-600 focus:text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                {hasPublicacaoVinculada ? 'Excluir (bloqueado por publicação vinculada)' : 'Excluir'}
-              </DropdownMenuItem>
+              {canDelete && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (hasPublicacaoVinculada) {
+                      alert(mensagemBloqueioPublicacao);
+                      return;
+                    }
+                    onDelete(atestado);
+                  }}
+                  disabled={hasPublicacaoVinculada}
+                  title={hasPublicacaoVinculada ? 'Exclusão bloqueada: há publicação/nota vinculada.' : ''}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {hasPublicacaoVinculada ? 'Excluir (bloqueado por publicação vinculada)' : 'Excluir'}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

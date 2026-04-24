@@ -41,6 +41,7 @@ export default function Militares() {
     linkedMilitarEmail,
     hasSelfAccess,
     canAccessModule,
+    canAccessAction,
     getMilitarScopeFilters,
     isLoading: loadingUser,
     isAccessResolved,
@@ -138,10 +139,18 @@ export default function Militares() {
   ];
 
   const handleEdit = (militar) => {
+    if (!canAccessAction('editar_militares')) {
+      alert('Ação negada: você não tem permissão para editar militares.');
+      return;
+    }
     navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`);
   };
 
   const handleDelete = (militar) => {
+    if (!canAccessAction('excluir_militares')) {
+      alert('Ação negada: você não tem permissão para excluir militares.');
+      return;
+    }
     setMilitarToDelete(militar);
     setDeleteDialogOpen(true);
   };
@@ -179,13 +188,15 @@ export default function Militares() {
             <p className="text-slate-500">Gerenciamento de pessoal da unidade</p>
           </div>
           <div className="flex gap-3">
-            <Button
-              onClick={() => navigate(createPageUrl('CadastrarMilitar'))}
-              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Novo Militar
-            </Button>
+            {canAccessAction('adicionar_militares') && (
+              <Button
+                onClick={() => navigate(createPageUrl('CadastrarMilitar'))}
+                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Novo Militar
+              </Button>
+            )}
           </div>
         </div>
 
@@ -384,13 +395,15 @@ export default function Militares() {
                       : 'space-y-3'
                   }>
                     {militaresAgrupados[posto].map((militar) => (
-                      <MilitarCard
-                        key={militar.id}
-                        militar={militar}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        onView={handleView}
-                      />
+                <MilitarCard
+                  key={militar.id}
+                  militar={militar}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onView={handleView}
+                  canEdit={canAccessAction('editar_militares')}
+                  canDelete={canAccessAction('excluir_militares')}
+                />
                     ))}
                   </div>
                 </div>

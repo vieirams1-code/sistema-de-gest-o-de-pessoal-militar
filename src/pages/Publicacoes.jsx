@@ -303,7 +303,7 @@ export default function Publicacoes() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const { user, isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
   const hasPublicacoesAccess = canAccessModule('publicacoes');
-  const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
+  const canCriarPublicacoes = canAccessAction('adicionar_publicacoes') || canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
     queryKey: ['registros-livro'],
@@ -522,7 +522,7 @@ export default function Publicacoes() {
   };
 
   const handleDelete = (id, tipo) => {
-    if (!canAccessAction('admin_mode') || !modoAdmin) return alert('Ação restrita. Exige permissão de administração e modo admin ativo.');
+    if ((!canAccessAction('excluir_publicacoes') && !canAccessAction('admin_mode')) || !modoAdmin) return alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
     const registro = todosRegistros.find((r) => r.id === id);
     if (!registro) return;
     if (tipo === 'atestado') return alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
@@ -573,8 +573,8 @@ export default function Publicacoes() {
                 <Button
                   asChild
                   variant="outline"
-                  disabled={!canGerirPublicacoes}
-                  title={!canGerirPublicacoes ? 'Ação negada: você não tem permissão para criar publicação.' : ''}
+                  disabled={!canCriarPublicacoes}
+                  title={!canCriarPublicacoes ? 'Ação negada: você não tem permissão para criar publicação.' : ''}
                 >
                   <button onClick={() => navigate(createPageUrl('CadastrarPublicacao'))}><Plus className="mr-2 h-4 w-4" />Nova publicação</button>
                 </Button>

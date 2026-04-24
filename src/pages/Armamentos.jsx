@@ -47,7 +47,8 @@ const formatDate = (value) => {
 export default function Armamentos() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule, getMilitarScopeFilters, isAccessResolved } = useCurrentUser();
+  const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved } = useCurrentUser();
+  const canAdicionarArmamentos = canAccessAction('adicionar_armamentos');
 
   const { data: armamentos = [], isLoading } = useQuery({
     queryKey: ['armamentos', isAdmin],
@@ -159,13 +160,15 @@ export default function Armamentos() {
             </div>
           </div>
 
-          <Button
-            onClick={() => navigate(createPageUrl('CadastrarArmamento'))}
-            className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm text-sm"
-          >
-            <Plus size={18} />
-            Novo Registro
-          </Button>
+          {canAdicionarArmamentos && (
+            <Button
+              onClick={() => navigate(createPageUrl('CadastrarArmamento'))}
+              className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm text-sm"
+            >
+              <Plus size={18} />
+              Novo Registro
+            </Button>
+          )}
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
