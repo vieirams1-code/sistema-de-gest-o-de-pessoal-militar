@@ -36,7 +36,7 @@ const postoAbreviado = {
 
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
-export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
+export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit = true, canDelete = true }) {
   const { hasAccess, hasSelfAccess } = useCurrentUser();
   const canAccess = hasAccess(militar) || hasSelfAccess(militar);
   return (
@@ -94,14 +94,18 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView }) {
                     Alterações Anteriores
                    </DropdownMenuItem>
                  )}
-                 <DropdownMenuItem onClick={() => onEdit(militar)}>
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Editar
-                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => onDelete(militar)} className="text-red-600">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir
-                 </DropdownMenuItem>
+                 {canEdit && (
+                  <DropdownMenuItem onClick={() => onEdit(militar)}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Editar
+                  </DropdownMenuItem>
+                 )}
+                 {canDelete && (
+                  <DropdownMenuItem onClick={() => onDelete(militar)} className="text-red-600">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir
+                  </DropdownMenuItem>
+                 )}
                 </DropdownMenuContent>
               </DropdownMenu>)}
             </div>

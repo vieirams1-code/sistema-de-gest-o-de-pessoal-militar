@@ -20,10 +20,6 @@ const adminOnlyPages = new Set([
   // de uma action key específica na arquitetura (ex: gerir_solicitacoes_atualizacao).
   'SolicitacoesAtualizacao',
   'Subgrupamentos',
-  'HistoricoImportacoesMilitares',
-  'MigracaoAlteracoesLegado',
-  'RevisaoDuplicidadesMilitar',
-  'ClassificacaoPendentesLegado',
 ]);
 
 
@@ -67,6 +63,11 @@ const moduleGuardByPage = {
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   Configuracoes: { moduleKey: 'configuracoes', moduleName: 'Configurações' },
   ConciliacaoBoletim: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
+  MigracaoMilitares: { moduleKey: 'migracao', moduleName: 'Migração' },
+  HistoricoImportacoesMilitares: { moduleKey: 'migracao', moduleName: 'Migração' },
+  MigracaoAlteracoesLegado: { moduleKey: 'migracao', moduleName: 'Migração' },
+  ClassificacaoPendentesLegado: { moduleKey: 'migracao', moduleName: 'Migração' },
+  RevisaoDuplicidadesMilitar: { moduleKey: 'migracao', moduleName: 'Migração' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {

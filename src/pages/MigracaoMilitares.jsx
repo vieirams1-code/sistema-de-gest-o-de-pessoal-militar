@@ -32,7 +32,7 @@ const ERRO_ENTIDADE_HISTORICO = 'Falha ao acessar o histórico de importação d
 const STORAGE_KEY = 'migracao_militares_historico_id';
 
 export default function MigracaoMilitares() {
-  const { isAdmin, isLoading, isAccessResolved } = useCurrentUser();
+  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
   const { toast } = useToast();
 
   const [arquivo, setArquivo] = useState(null);
@@ -209,7 +209,7 @@ export default function MigracaoMilitares() {
   };
 
   if (isLoading || !isAccessResolved) return null;
-  if (!isAdmin) return <AccessDenied modulo="Migração de Militares" />;
+  if (!canAccessModule('migracao') || !canAccessAction('importar_militares')) return <AccessDenied modulo="Migração de Militares" />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">

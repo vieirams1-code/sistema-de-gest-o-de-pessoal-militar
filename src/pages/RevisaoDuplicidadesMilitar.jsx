@@ -33,7 +33,7 @@ function parseJsonSafe(texto) {
 }
 
 export default function RevisaoDuplicidadesMilitar() {
-  const { user, isAdmin, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { user, isLoading: loadingUser, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -71,7 +71,7 @@ export default function RevisaoDuplicidadesMilitar() {
     },
   });
 
-  if (!loadingUser && isAccessResolved && !isAdmin) {
+  if (!loadingUser && isAccessResolved && (!canAccessModule('migracao') || !canAccessAction('revisar_duplicidades'))) {
     return <AccessDenied modulo="Revisão de Duplicidades (Admin)" />;
   }
 

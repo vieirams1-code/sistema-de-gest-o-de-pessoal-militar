@@ -12,7 +12,9 @@ import {
 } from '@/services/migracaoAlteracoesLegadoService';
 
 export default function ClassificacaoPendentesLegado() {
-  const { isAdmin, isLoading, isAccessResolved } = useCurrentUser();
+  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
+  const hasMigrationAccess = canAccessModule('migracao');
+  const canClassificarLegado = canAccessAction('classificar_legado');
   const { toast } = useToast();
   const [carregando, setCarregando] = useState(false);
   const [salvandoId, setSalvandoId] = useState('');
@@ -46,8 +48,8 @@ export default function ClassificacaoPendentesLegado() {
   };
 
   useEffect(() => {
-    if (isAccessResolved && isAdmin) carregarDados();
-  }, [isAccessResolved, isAdmin]);
+    if (isAccessResolved && hasMigrationAccess && canClassificarLegado) carregarDados();
+  }, [isAccessResolved, hasMigrationAccess, canClassificarLegado]);
 
   const linhasFiltradas = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
@@ -87,7 +89,7 @@ export default function ClassificacaoPendentesLegado() {
   };
 
   if (isLoading || !isAccessResolved) return null;
-  if (!isAdmin) return <AccessDenied modulo="Classificação Pendente Legado" />;
+  if (!hasMigrationAccess || !canClassificarLegado) return <AccessDenied modulo="Classificação Pendente Legado" />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">

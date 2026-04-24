@@ -60,6 +60,9 @@ export default function Atestados() {
   const queryClient = useQueryClient();
   const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAtestadosAccess = canAccessModule('atestados');
+  const canAdicionarAtestado = canAccessAction('adicionar_atestados');
+  const canEditarAtestado = canAccessAction('editar_atestados');
+  const canExcluirAtestado = canAccessAction('excluir_atestado');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoAfastamentoFilter, setTipoAfastamentoFilter] = useState('all');
@@ -148,6 +151,10 @@ export default function Atestados() {
   const finalizados = applyFilters(atestados.filter((atestado) => !isAtestadoVigente(atestado, hoje)));
 
   const handleEdit = async (atestado) => {
+    if (!canEditarAtestado) {
+      alert('Ação negada: você não tem permissão para editar atestados.');
+      return;
+    }
     const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
     const possuiPublicacaoVinculada = publicacoesMilitar.some(
       (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
@@ -162,7 +169,7 @@ export default function Atestados() {
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
   const confirmDelete = async () => {
     if (!atestadoToDelete) return;
-    if (!canAccessAction('excluir_atestado')) {
+    if (!canExcluirAtestado) {
       alert('Ação negada: você não tem permissão para excluir atestados.');
       setDeleteDialogOpen(false);
       return;
@@ -209,9 +216,11 @@ export default function Atestados() {
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Atestados Médicos</h1>
             <p className="text-slate-500">Controle de afastamentos e atestados</p>
           </div>
-          <Button onClick={() => navigate(createPageUrl('CadastrarAtestado'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-            <Plus className="w-5 h-5 mr-2" />Novo Atestado
-          </Button>
+          {canAdicionarAtestado && (
+            <Button onClick={() => navigate(createPageUrl('CadastrarAtestado'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+              <Plus className="w-5 h-5 mr-2" />Novo Atestado
+            </Button>
+          )}
         </div>
 
         {/* Stats */}
@@ -319,7 +328,7 @@ export default function Atestados() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {vigentes.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
+                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
                 )
@@ -349,7 +358,7 @@ export default function Atestados() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {finalizados.map(a => (
-                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
+                      <AtestadoCard key={a.id} atestado={a} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} canEdit={canEditarAtestado} canDelete={canExcluirAtestado} />
                     ))}
                   </div>
                 )

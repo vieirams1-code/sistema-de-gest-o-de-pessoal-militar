@@ -28,7 +28,7 @@ const FILTROS_INICIAIS = {
 const TEXTO_CONFIRMACAO_EXCLUSAO = `Deseja excluir este lote do histórico de importação?\nEsta ação remove apenas o registro do histórico e não apaga os militares já importados.`;
 
 export default function HistoricoImportacoesMilitares() {
-  const { isAdmin, isLoading, isAccessResolved } = useCurrentUser();
+  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
   const { toast } = useToast();
 
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
@@ -96,7 +96,7 @@ export default function HistoricoImportacoesMilitares() {
   const opcoesFiltros = useMemo(() => obterOpcoesFiltrosHistorico(lotes), [lotes]);
 
   if (isLoading || !isAccessResolved) return null;
-  if (!isAdmin) return <AccessDenied modulo="Histórico de Importações" />;
+  if (!canAccessModule('migracao') || !canAccessAction('ver_historico_importacoes')) return <AccessDenied modulo="Histórico de Importações" />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">

@@ -54,7 +54,7 @@ function filtrarBusca(linha, termo) {
 }
 
 export default function MigracaoAlteracoesLegado() {
-  const { isAdmin, isLoading, isAccessResolved } = useCurrentUser();
+  const { isLoading, isAccessResolved, canAccessModule, canAccessAction } = useCurrentUser();
   const { toast } = useToast();
 
   const [arquivo, setArquivo] = useState(null);
@@ -212,7 +212,7 @@ export default function MigracaoAlteracoesLegado() {
   };
 
   if (isLoading || !isAccessResolved) return null;
-  if (!isAdmin) return <AccessDenied modulo="Migração de Alterações Legado" />;
+  if (!canAccessModule('migracao') || !canAccessAction('migrar_alteracoes_legado')) return <AccessDenied modulo="Migração de Alterações Legado" />;
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6">
