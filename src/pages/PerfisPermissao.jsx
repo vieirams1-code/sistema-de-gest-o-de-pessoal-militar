@@ -49,11 +49,19 @@ export default function PerfisPermissao() {
     queryKey: ['perfisPermissao'],
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
   });
+  const { data: acessosUsuarios = [] } = useQuery({
+    queryKey: ['usuariosAcesso'],
+    queryFn: () => base44.entities.UsuarioAcesso.list(),
+  });
   const perfisBase = useMemo(
     () => perfis.filter((perfil) => !isLegacyCustomProfile(perfil)),
     [perfis]
   );
-  const perfisLegadosOcultos = Math.max(perfis.length - perfisBase.length, 0);
+  const perfisPersonalizados = useMemo(
+    () => perfis.filter((perfil) => isLegacyCustomProfile(perfil)),
+    [perfis]
+  );
+  const perfisLegadosOcultos = perfisPersonalizados.length;
 
 
   const createMutation = useMutation({
@@ -153,6 +161,13 @@ export default function PerfisPermissao() {
       return;
     }
     if (deleteDialog.id) {
+      const perfilSelecionado = perfis.find((perfil) => perfil.id === deleteDialog.id);
+      const estaVinculado = acessosUsuarios.some((acesso) => acesso.perfil_id === deleteDialog.id);
+      if (isLegacyCustomProfile(perfilSelecionado) || estaVinculado) {
+        alert('Exclusão bloqueada: perfil personalizado/vinculado a usuário não pode ser removido manualmente.');
+        setDeleteDialog({ open: false, id: null });
+        return;
+      }
       deleteMutation.mutate(deleteDialog.id);
     }
   };
@@ -318,8 +333,11 @@ export default function PerfisPermissao() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {perfisLegadosOcultos > 0 && (
-                  <div className="p-4 bg-amber-50 text-amber-800 text-sm border-b border-amber-100">
-                    Perfis personalizados legados ocultados: {perfisLegadosOcultos}.
+                  <div className="p-4 bg-amber-50 text-amber-800 text-sm border-b border-amber-100 space-y-2">
+                    <p>Perfis personalizados ocultados da lista principal: {perfisLegadosOcultos}.</p>
+                    <p className="text-xs">
+                      Seção "Perfis personalizados" é exclusiva para diagnóstico; esses perfis não podem ser aplicados manualmente em outros usuários.
+                    </p>
                   </div>
                 )}
                 {perfisBase.map(p => {
@@ -327,6 +345,7 @@ export default function PerfisPermissao() {
                   const { cleanDescricao } = extractProfileMatrixFromDescription(p.descricao);
                   const modsAcessiveis = modulosList.filter(m => perfilPermissions[m.key]).length;
                   const actsAcessiveis = acoesSensiveis.filter(a => perfilPermissions[a.key]).length;
+                  const perfilVinculado = acessosUsuarios.some((acesso) => acesso.perfil_id === p.id);
 
                   return (
                     <div key={p.id} className="p-5 flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4 hover:bg-slate-50 transition-colors">
@@ -346,7 +365,14 @@ export default function PerfisPermissao() {
                         <Button variant="outline" size="sm" className="w-full sm:w-auto bg-white" onClick={() => handleEdit(p)}>
                           <Pencil className="w-4 h-4 mr-1 sm:mr-0" /> <span className="sm:hidden">Editar</span>
                         </Button>
-                        <Button variant="outline" size="sm" className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 bg-white" onClick={() => setDeleteDialog({ open: true, id: p.id })}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={perfilVinculado}
+                          title={perfilVinculado ? 'Perfil vinculado a usuário: exclusão desabilitada.' : ''}
+                          className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 bg-white disabled:text-slate-400"
+                          onClick={() => setDeleteDialog({ open: true, id: p.id })}
+                        >
                           <Trash2 className="w-4 h-4 mr-1 sm:mr-0" /> <span className="sm:hidden">Excluir</span>
                         </Button>
                       </div>
@@ -355,6 +381,26 @@ export default function PerfisPermissao() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {!showForm && perfisPersonalizados.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+            <div className="p-4 border-b border-slate-100">
+              <h2 className="text-base font-bold text-[#1e3a5f]">Perfis personalizados</h2>
+              <p className="text-xs text-slate-500">Exibidos apenas para auditoria; aplicação manual bloqueada.</p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {perfisPersonalizados.slice(0, 20).map((perfil) => (
+                <div key={perfil.id} className="p-4 text-sm flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-700">{perfil.nome_perfil || 'Perfil personalizado'}</p>
+                    <p className="text-xs text-slate-500">Usuário vinculado: {perfil.usuario_vinculado_id || 'não informado'}</p>
+                  </div>
+                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">Exclusivo</Badge>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

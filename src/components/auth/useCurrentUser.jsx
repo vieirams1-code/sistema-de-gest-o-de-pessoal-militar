@@ -129,7 +129,7 @@ export function useCurrentUser() {
       return resolveUserPermissions({
         userSource: acessoResolvido,
         profileSource: perfilAcesso || {},
-        preferProfilePermissions: false,
+        preferProfilePermissions: true,
       });
     },
     staleTime: 0,
