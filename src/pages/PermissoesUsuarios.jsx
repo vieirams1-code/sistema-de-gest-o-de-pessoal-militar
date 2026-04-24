@@ -14,6 +14,7 @@ import {
   buildPermissionPayload,
   buildPermissionsFromSource,
   canonicalPermissionKeys,
+  getPermissionMismatches,
   isLegacyCustomProfile,
   isBasePermissionProfile,
   mergeProfileDescriptionWithMatrix,
@@ -33,6 +34,12 @@ const normalizeAccessMode = (value) => {
 };
 
 const CUSTOM_PROFILE_DESCRIPTION = 'Perfil personalizado para usuário.';
+
+const resolveBaseProfileIdFromSource = (profileSource) => {
+  if (!profileSource) return '';
+  if (isBasePermissionProfile(profileSource)) return profileSource.id || '';
+  return profileSource.perfil_origem_id || '';
+};
 
 const markProfileAsLegacy = async (profile) => {
   if (!profile?.id) return;
@@ -159,6 +166,10 @@ export default function PermissoesUsuarios() {
   };
 
   const handleSelectAcesso = async (acesso) => {
+    if (!acesso?.id) {
+      alert('Registro de usuário inválido: ID não encontrado.');
+      return;
+    }
     let fullAcesso = acesso;
     try {
       // O list() pode não retornar todos os campos booleanos de permissão;
@@ -242,9 +253,14 @@ export default function PermissoesUsuarios() {
   };
 
   const aplicarPerfil = async () => {
-    if (!selectedProfilePreview) return;
+    if (!selectedProfilePreview?.id) {
+      alert('Perfil base inválido: selecione um perfil válido antes de aplicar.');
+      return;
+    }
 
-    const perfilCompleto = selectedProfileSource || await getProfileWithPermissions(selectedProfilePreview.id);
+    const perfilCompleto = selectedProfileSource?.id === selectedProfilePreview.id
+      ? selectedProfileSource
+      : await getProfileWithPermissions(selectedProfilePreview.id);
     const profileSource = perfilCompleto || selectedProfilePreview;
     const profilePermissions = resolveProfilePermissions({
       profileSource,
@@ -287,11 +303,21 @@ export default function PermissoesUsuarios() {
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
       const perfilBaseId = selectedProfileId !== '_nenhum'
         ? selectedProfileId
-        : (isBasePermissionProfile(selectedProfileSource) ? selectedProfileSource?.id : (appliedProfileState.id || ''));
+        : (resolveBaseProfileIdFromSource(selectedProfileSource) || appliedProfileState.id || '');
       const perfilBaseSelecionado = perfilBaseId
         ? (perfis.find((perfil) => perfil.id === perfilBaseId) || await getProfileWithPermissions(perfilBaseId))
         : null;
-      const perfilOrigemId = isBasePermissionProfile(perfilBaseSelecionado) ? perfilBaseSelecionado.id : '';
+      if (perfilBaseId && !perfilBaseSelecionado?.id) {
+        throw new Error('Perfil base selecionado é inválido ou não foi encontrado. Recarregue e selecione novamente.');
+      }
+      if (perfilBaseSelecionado && !isBasePermissionProfile(perfilBaseSelecionado)) {
+        throw new Error('Apenas perfis base podem ser aplicados diretamente ao usuário.');
+      }
+      const perfilOrigemId = perfilBaseSelecionado?.id || '';
+      const perfilBasePermissions = perfilBaseSelecionado
+        ? resolveProfilePermissions({ profileSource: perfilBaseSelecionado }).permissions
+        : initialPermissions;
+      const possuiAjusteManual = getPermissionMismatches(normalizedPermissions, perfilBasePermissions).length > 0;
 
       const baseData = {
         nome_usuario: userNomeUsuario,
@@ -346,55 +372,78 @@ export default function PermissoesUsuarios() {
         throw new Error('Não foi possível identificar o ID do usuário para vincular o perfil personalizado.');
       }
 
-      const perfisPersonalizadosRemotos = await base44.entities.PerfilPermissao.filter({
-        usuario_vinculado_id: usuarioVinculadoId,
-        is_personalizado: true,
-      }, '-updated_date');
-      const perfisPersonalizadosDoUsuario = (perfisPersonalizadosRemotos || perfis)
-        .filter((perfil) => String(perfil.usuario_vinculado_id || '') === String(usuarioVinculadoId))
-        .sort((a, b) => new Date(b.updated_date || b.created_date || 0).getTime() - new Date(a.updated_date || a.created_date || 0).getTime());
-
       const perfilAtualDoUsuario = reloadedAccess?.perfil_id
         ? (await getProfileWithPermissions(reloadedAccess.perfil_id))
         : null;
+      const perfilAtualEhCustomDoUsuario = isLegacyCustomProfile(perfilAtualDoUsuario)
+        && String(perfilAtualDoUsuario?.usuario_vinculado_id || '') === String(usuarioVinculadoId);
 
-      let perfilPersonalizadoSelecionado = perfisPersonalizadosDoUsuario.find((perfil) => perfil.id === perfilAtualDoUsuario?.id)
-        || perfisPersonalizadosDoUsuario[0]
-        || null;
+      let perfilFinal = perfilAtualDoUsuario;
+      let reloadedRecord = reloadedAccess;
 
-      const payloadPerfilPersonalizado = {
-        nome_perfil: `Personalizado - ${userNomeUsuario || reloadedAccess?.nome_usuario || reloadedAccess?.user_email || 'Usuário'}`,
-        descricao: mergeProfileDescriptionWithMatrix(CUSTOM_PROFILE_DESCRIPTION, normalizedPermissions),
-        is_personalizado: true,
-        usuario_vinculado_id: usuarioVinculadoId,
-        perfil_origem_id: perfilOrigemId || perfilAtualDoUsuario?.perfil_origem_id || null,
-        ativo: true,
-        ...buildPermissionPayload(normalizedPermissions),
-      };
+      if (possuiAjusteManual) {
+        const perfisPersonalizadosRemotos = await base44.entities.PerfilPermissao.filter({
+          usuario_vinculado_id: usuarioVinculadoId,
+          is_personalizado: true,
+        }, '-updated_date');
+        const perfisPersonalizadosDoUsuario = (perfisPersonalizadosRemotos || perfis)
+          .filter((perfil) => String(perfil.usuario_vinculado_id || '') === String(usuarioVinculadoId))
+          .sort((a, b) => new Date(b.updated_date || b.created_date || 0).getTime() - new Date(a.updated_date || a.created_date || 0).getTime());
 
-      if (perfilPersonalizadoSelecionado?.id) {
-        perfilPersonalizadoSelecionado = await base44.entities.PerfilPermissao.update(
-          perfilPersonalizadoSelecionado.id,
-          payloadPerfilPersonalizado
-        );
+        let perfilPersonalizadoSelecionado = perfilAtualEhCustomDoUsuario
+          ? perfilAtualDoUsuario
+          : (perfisPersonalizadosDoUsuario[0] || null);
+
+        const payloadPerfilPersonalizado = {
+          nome_perfil: `Personalizado - ${userNomeUsuario || reloadedAccess?.nome_usuario || reloadedAccess?.user_email || 'Usuário'}`,
+          descricao: mergeProfileDescriptionWithMatrix(CUSTOM_PROFILE_DESCRIPTION, normalizedPermissions),
+          is_personalizado: true,
+          usuario_vinculado_id: usuarioVinculadoId,
+          perfil_origem_id: perfilOrigemId || resolveBaseProfileIdFromSource(perfilAtualDoUsuario) || null,
+          ativo: true,
+          ...buildPermissionPayload(normalizedPermissions),
+        };
+
+        if (perfilPersonalizadoSelecionado?.id) {
+          perfilPersonalizadoSelecionado = await base44.entities.PerfilPermissao.update(
+            perfilPersonalizadoSelecionado.id,
+            payloadPerfilPersonalizado
+          );
+        } else {
+          perfilPersonalizadoSelecionado = await base44.entities.PerfilPermissao.create(payloadPerfilPersonalizado);
+        }
+        if (!perfilPersonalizadoSelecionado?.id) {
+          throw new Error('Falha ao criar/atualizar perfil personalizado do usuário.');
+        }
+
+        const perfisDuplicados = perfisPersonalizadosDoUsuario
+          .filter((perfil) => perfil.id && perfil.id !== perfilPersonalizadoSelecionado.id);
+        for (const perfilDuplicado of perfisDuplicados) {
+          await markProfileAsLegacy(perfilDuplicado);
+        }
+
+        reloadedRecord = await base44.entities.UsuarioAcesso.update(resolvedRecordId, {
+          perfil_id: perfilPersonalizadoSelecionado.id,
+          perfil_nome: perfilPersonalizadoSelecionado.nome_perfil || payloadPerfilPersonalizado.nome_perfil,
+        });
+        perfilFinal = perfilPersonalizadoSelecionado;
       } else {
-        perfilPersonalizadoSelecionado = await base44.entities.PerfilPermissao.create(payloadPerfilPersonalizado);
+        if (perfilAtualEhCustomDoUsuario && perfilAtualDoUsuario?.id) {
+          await markProfileAsLegacy(perfilAtualDoUsuario);
+        }
+        reloadedRecord = await base44.entities.UsuarioAcesso.update(resolvedRecordId, {
+          perfil_id: perfilOrigemId || '',
+          perfil_nome: perfilBaseSelecionado?.nome_perfil || '',
+        });
+        perfilFinal = perfilBaseSelecionado || null;
       }
 
-      const perfisDuplicados = perfisPersonalizadosDoUsuario
-        .filter((perfil) => perfil.id !== perfilPersonalizadoSelecionado.id);
-      for (const perfilDuplicado of perfisDuplicados) {
-        await markProfileAsLegacy(perfilDuplicado);
-      }
-
-      const reloadedRecord = await base44.entities.UsuarioAcesso.update(resolvedRecordId, {
-        perfil_id: perfilPersonalizadoSelecionado.id,
-        perfil_nome: perfilPersonalizadoSelecionado.nome_perfil || payloadPerfilPersonalizado.nome_perfil,
-      });
-
-      const reloadedProfile = await getProfileWithPermissions(reloadedRecord?.perfil_id);
-      const reloadedBaseProfile = reloadedProfile?.perfil_origem_id
-        ? await getProfileWithPermissions(reloadedProfile.perfil_origem_id)
+      const reloadedProfile = perfilFinal?.id
+        ? (await getProfileWithPermissions(perfilFinal.id))
+        : null;
+      const reloadedBaseProfileId = resolveBaseProfileIdFromSource(reloadedProfile) || perfilOrigemId || '';
+      const reloadedBaseProfile = reloadedBaseProfileId
+        ? await getProfileWithPermissions(reloadedBaseProfileId)
         : null;
       setSelectedProfileId(reloadedBaseProfile?.id || '_nenhum');
       setAppliedProfileState({
