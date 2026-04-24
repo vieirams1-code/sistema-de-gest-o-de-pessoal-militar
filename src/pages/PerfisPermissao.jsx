@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   mergeProfileDescriptionWithMatrix,
   resolveProfilePermissions,
   buildPermissionsFromSource,
+  isLegacyCustomProfile,
 } from '@/services/permissionMatrixService';
 import {
   AlertDialog,
@@ -48,6 +49,11 @@ export default function PerfisPermissao() {
     queryKey: ['perfisPermissao'],
     queryFn: () => base44.entities.PerfilPermissao.list('nome_perfil'),
   });
+  const perfisBase = useMemo(
+    () => perfis.filter((perfil) => !isLegacyCustomProfile(perfil)),
+    [perfis]
+  );
+  const perfisLegadosOcultos = Math.max(perfis.length - perfisBase.length, 0);
 
 
   const createMutation = useMutation({
@@ -302,7 +308,7 @@ export default function PerfisPermissao() {
               <div className="flex justify-center p-12">
                 <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
               </div>
-            ) : perfis.length === 0 ? (
+            ) : perfisBase.length === 0 ? (
               <div className="text-center py-16 px-4">
                 <Shield className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-slate-900 mb-1">Nenhum perfil encontrado</h3>
@@ -311,7 +317,12 @@ export default function PerfisPermissao() {
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {perfis.map(p => {
+                {perfisLegadosOcultos > 0 && (
+                  <div className="p-4 bg-amber-50 text-amber-800 text-sm border-b border-amber-100">
+                    Perfis personalizados legados ocultados: {perfisLegadosOcultos}.
+                  </div>
+                )}
+                {perfisBase.map(p => {
                   const perfilPermissions = resolveProfilePermissions({ profileSource: p }).permissions;
                   const { cleanDescricao } = extractProfileMatrixFromDescription(p.descricao);
                   const modsAcessiveis = modulosList.filter(m => perfilPermissions[m.key]).length;

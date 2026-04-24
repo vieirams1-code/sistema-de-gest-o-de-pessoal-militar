@@ -64,6 +64,21 @@ export const ADMIN_RECOVERY_ACTION_KEYS = [
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 const isObjectRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+export const isLegacyCustomProfile = (profile = {}) => {
+  if (!isObjectRecord(profile)) return false;
+  const nomePerfil = typeof profile.nome_perfil === 'string' ? profile.nome_perfil.trim() : '';
+  const tipo = typeof profile.tipo === 'string' ? profile.tipo.trim().toLowerCase() : '';
+
+  return (
+    nomePerfil.toLowerCase().startsWith('personalizado -')
+    || profile.is_personalizado === true
+    || Boolean(profile.usuario_vinculado_id)
+    || tipo === 'custom'
+  );
+};
+
+export const isBasePermissionProfile = (profile = {}) => !isLegacyCustomProfile(profile);
+
 export const extractProfileMatrixFromDescription = (rawDescricao = '') => {
   const descricao = typeof rawDescricao === 'string' ? rawDescricao : '';
   const startIdx = descricao.indexOf(PROFILE_MATRIX_START_MARKER);
@@ -264,18 +279,18 @@ export const resolveUserPermissions = ({
     };
   }
 
-  const userPermissions = userExplicitMatrix
-    ? buildPermissionsFromSource(userExplicitMatrix, profilePermissionsWithFallback)
-    : userMatrixFromOverrides
+  const userPermissions = userMatrixFromOverrides
     ? buildPermissionsFromSource(userMatrixFromOverrides, profilePermissionsWithFallback)
-    : hasUserLegacyMatrix
-      ? buildPermissionsFromSource(userSource, profilePermissionsWithFallback)
-      : profilePermissionsWithFallback;
+    : userExplicitMatrix
+      ? buildPermissionsFromSource(userExplicitMatrix, profilePermissionsWithFallback)
+      : hasUserLegacyMatrix
+        ? buildPermissionsFromSource(userSource, profilePermissionsWithFallback)
+        : profilePermissionsWithFallback;
 
   return {
     permissions: userPermissions,
     profilePermissions,
-    source: userMatrixFromOverrides || hasUserLegacyMatrix ? 'usuario' : 'perfil',
+    source: userMatrixFromOverrides || userExplicitMatrix || hasUserLegacyMatrix ? 'usuario' : 'perfil',
   };
 };
 
