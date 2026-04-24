@@ -11,10 +11,12 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { permissionStructure, modulosList, acoesSensiveis } from '@/config/permissionStructure';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 import {
+  buildFullAccessPermissions,
   buildPermissionPayload,
   buildPermissionsFromSource,
   canonicalPermissionKeys,
   getPermissionMismatches,
+  isSuperAdmin,
   isLegacyCustomProfile,
   isBasePermissionProfile,
   mergeProfileDescriptionWithMatrix,
@@ -23,6 +25,7 @@ import {
 } from '@/services/permissionMatrixService';
 
 const initialPermissions = canonicalPermissionKeys.reduce((acc, key) => ({ ...acc, [key]: false }), {});
+const fullAccessPermissions = buildFullAccessPermissions();
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
 
 const normalizeAccessMode = (value) => {
@@ -131,6 +134,10 @@ export default function PermissoesUsuarios() {
     [selectedProfileSource, selectedProfilePreview]
   );
   const currentPerfilCustomizado = isLegacyCustomProfile(currentPerfilSelecionado);
+  const selectedUserIsSuperAdmin = useMemo(
+    () => isSuperAdmin(null, selectedUser),
+    [selectedUser]
+  );
 
   const grupamentos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Grupamento'), [subgrupamentos]);
   const subgrupamentosFilhos = useMemo(() => subgrupamentos.filter(s => s.tipo === 'Subgrupamento' && s.grupamento_id === userGrupamentoId), [subgrupamentos, userGrupamentoId]);
@@ -239,8 +246,11 @@ export default function PermissoesUsuarios() {
       profileSource: profileSource || {},
       preferProfilePermissions: true,
     });
-    setUserPermissions(resolved.permissions);
+    setUserPermissions(isSuperAdmin(null, resolvedUserSource) ? fullAccessPermissions : resolved.permissions);
     setSelectedUser(resolvedUserSource);
+    if (isSuperAdmin(null, resolvedUserSource)) {
+      setTechnicalWarning('Superadmin detectado: permissões totais forçadas e perfil restrito ignorado.');
+    }
     setActiveEditTab('dados');
   };
 
@@ -266,6 +276,13 @@ export default function PermissoesUsuarios() {
   };
 
   const aplicarPerfil = async () => {
+    if (selectedUserIsSuperAdmin) {
+      setUserPermissions(fullAccessPermissions);
+      setLoadedProfilePermissions(fullAccessPermissions);
+      setTechnicalWarning('Perfil não aplicado: usuários superadmin sempre mantêm permissões totais.');
+      return;
+    }
+
     if (!selectedProfilePreview?.id) {
       alert('Perfil base inválido: selecione um perfil válido antes de aplicar.');
       return;
@@ -313,7 +330,10 @@ export default function PermissoesUsuarios() {
       const militarMatriculaAtual = militarVinculado?.matricula_atual || militarVinculado?.matricula || '';
       const militarEmailVinculado = militarVinculado?.email || militarVinculado?.email_particular || militarVinculado?.email_funcional || userMilitarEmail || userUserEmail || '';
 
-      const normalizedPermissions = buildPermissionsFromSource(userPermissions);
+      const targetIsSuperAdmin = isSuperAdmin(null, selectedUser);
+      const normalizedPermissions = targetIsSuperAdmin
+        ? fullAccessPermissions
+        : buildPermissionsFromSource(userPermissions);
       const perfilBaseId = selectedProfileId !== '_nenhum'
         ? selectedProfileId
         : (resolveBaseProfileIdFromSource(selectedProfileSource) || appliedProfileState.id || '');
@@ -330,12 +350,13 @@ export default function PermissoesUsuarios() {
       const perfilBasePermissions = perfilBaseSelecionado
         ? resolveProfilePermissions({ profileSource: perfilBaseSelecionado }).permissions
         : initialPermissions;
-      const possuiAjusteManual = getPermissionMismatches(normalizedPermissions, perfilBasePermissions).length > 0;
+      const possuiAjusteManual = targetIsSuperAdmin
+        || getPermissionMismatches(normalizedPermissions, perfilBasePermissions).length > 0;
 
       const baseData = {
         nome_usuario: userNomeUsuario,
         user_email: userUserEmail.trim(),
-        ativo: userAtivo,
+        ativo: targetIsSuperAdmin ? true : userAtivo,
         perfil_id: perfilOrigemId || '',
         perfil_nome: perfilBaseSelecionado?.nome_perfil || appliedProfileState.nome || '',
       };
@@ -343,7 +364,7 @@ export default function PermissoesUsuarios() {
       const normalizedAccessMode = normalizeAccessMode(userAccessMode);
 
       let roleData = {};
-      if (normalizedAccessMode === 'admin') {
+      if (targetIsSuperAdmin || normalizedAccessMode === 'admin') {
         roleData = { tipo_acesso: 'admin', grupamento_id: '', grupamento_nome: '', subgrupamento_id: '', subgrupamento_nome: '', subgrupamento_tipo: null, militar_id: '', militar_email: '', militar_matricula: '' };
       } else if (normalizedAccessMode === 'subsetor' && sub) {
         roleData = { tipo_acesso: 'subsetor', grupamento_id: grupamento?.id || '', grupamento_nome: grupamento?.nome || '', subgrupamento_id: sub.id, subgrupamento_nome: sub.nome, subgrupamento_tipo: 'Subgrupamento', militar_id: '', militar_email: '', militar_matricula: '' };
@@ -471,8 +492,11 @@ export default function PermissoesUsuarios() {
         preferProfilePermissions: true,
       });
       const reloadedPermissions = resolvedReloaded.permissions;
-      setUserPermissions(reloadedPermissions);
+      setUserPermissions(targetIsSuperAdmin ? fullAccessPermissions : reloadedPermissions);
       setSelectedUser(reloadedRecord);
+      if (targetIsSuperAdmin) {
+        setTechnicalWarning('Superadmin protegido: alterações críticas foram preservadas com acesso total.');
+      }
 
       queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
     } catch (error) {
@@ -498,6 +522,10 @@ export default function PermissoesUsuarios() {
     if (!targetAcesso?.id) return;
     if (!canManageAccessLifecycle) {
       alert('Você não possui permissão para alterar o status de acesso de usuários.');
+      return;
+    }
+    if (isSuperAdmin(null, targetAcesso)) {
+      alert('Operação bloqueada: contas superadmin não podem ser desativadas/arquivadas.');
       return;
     }
     if (isSelfAccessRecord(targetAcesso)) {
@@ -532,6 +560,10 @@ export default function PermissoesUsuarios() {
     if (!targetAcesso?.id) return;
     if (!canHardDeleteAccess) {
       alert('Você não possui a permissão excluir_usuarios_acesso para exclusão definitiva.');
+      return;
+    }
+    if (isSuperAdmin(null, targetAcesso)) {
+      alert('Operação bloqueada: contas superadmin não podem ser excluídas.');
       return;
     }
     if (isSelfAccessRecord(targetAcesso)) {
@@ -571,10 +603,10 @@ export default function PermissoesUsuarios() {
   };
 
   const isSaveDisabled = savingUser
-    || (userAccessMode === 'setor' && !userGrupamentoId)
-    || (userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId))
-    || (userAccessMode === 'unidade' && (!userGrupamentoId || !userSubgrupamentoId || !userUnidadeId))
-    || (userAccessMode === 'proprio' && !userMilitarId);
+    || (!selectedUserIsSuperAdmin && userAccessMode === 'setor' && !userGrupamentoId)
+    || (!selectedUserIsSuperAdmin && userAccessMode === 'subsetor' && (!userGrupamentoId || !userSubgrupamentoId))
+    || (!selectedUserIsSuperAdmin && userAccessMode === 'unidade' && (!userGrupamentoId || !userSubgrupamentoId || !userUnidadeId))
+    || (!selectedUserIsSuperAdmin && userAccessMode === 'proprio' && !userMilitarId);
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 lg:p-6">
@@ -677,7 +709,7 @@ export default function PermissoesUsuarios() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleSetAccessActiveState(selectedUser, false)}
-                            disabled={isSelfAccessRecord(selectedUser)}
+                            disabled={isSelfAccessRecord(selectedUser) || selectedUserIsSuperAdmin}
                             className="rounded-lg border-amber-200 text-amber-700 hover:bg-amber-50"
                           >
                             <UserX className="w-4 h-4 mr-2" />
@@ -700,7 +732,7 @@ export default function PermissoesUsuarios() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleHardDeleteAccess(selectedUser)}
-                          disabled={isSelfAccessRecord(selectedUser)}
+                          disabled={isSelfAccessRecord(selectedUser) || selectedUserIsSuperAdmin}
                           className="rounded-lg border-red-200 text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
@@ -920,6 +952,9 @@ export default function PermissoesUsuarios() {
                         <Select
                           value={selectedProfileId}
                           onValueChange={async (v) => {
+                            if (selectedUserIsSuperAdmin) {
+                              setTechnicalWarning('Conta superadmin: seleção de perfil não altera permissões totais.');
+                            }
                             setSelectedProfileId(v);
                             if (v === '_nenhum') {
                               setLoadedProfilePermissions(null);
@@ -948,7 +983,7 @@ export default function PermissoesUsuarios() {
                       <Button 
                         variant="secondary" 
                         onClick={aplicarPerfil}
-                        disabled={selectedProfileId === '_nenhum'}
+                        disabled={selectedProfileId === '_nenhum' || selectedUserIsSuperAdmin}
                         className="w-full sm:w-auto shrink-0 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                       >
                         <Settings2 className="w-4 h-4 mr-2" /> Aplicar Perfil
@@ -960,6 +995,11 @@ export default function PermissoesUsuarios() {
                     {technicalWarning && (
                       <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
                         <BadgeAlert className="w-4 h-4" /> Aviso técnico: {technicalWarning}
+                      </p>
+                    )}
+                    {selectedUserIsSuperAdmin && (
+                      <p className="text-xs text-red-700 mt-2 flex items-center gap-1">
+                        <BadgeAlert className="w-4 h-4" /> Conta protegida como superadmin: perfil restrito, desativação e exclusão são bloqueados.
                       </p>
                     )}
                     <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -1065,7 +1105,13 @@ export default function PermissoesUsuarios() {
                                 <div key={mod.key} className={`rounded-xl border shadow-sm ${isModuleEnabled ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200 bg-white'}`}>
                                   <div
                                     className="p-3 flex flex-wrap items-center gap-2.5 justify-between cursor-pointer"
-                                    onClick={() => setUserPermissions((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }))}
+                                    onClick={() => {
+                                      if (selectedUserIsSuperAdmin) {
+                                        setTechnicalWarning('Conta superadmin: matriz permanece com acesso total.');
+                                        return;
+                                      }
+                                      setUserPermissions((prev) => ({ ...prev, [mod.key]: !prev[mod.key] }));
+                                    }}
                                   >
                                     <div className="flex items-center gap-3">
                                       <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isModuleEnabled ? 'bg-[#1e3a5f]' : 'bg-slate-300'}`}>
@@ -1093,7 +1139,13 @@ export default function PermissoesUsuarios() {
                                             <div
                                               key={act.key}
                                               className={`flex items-start justify-between gap-3 p-2.5 rounded-lg border cursor-pointer ${isActionEnabled ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'} ${act.sensitive ? 'ring-1 ring-orange-100' : ''}`}
-                                              onClick={() => setUserPermissions((prev) => ({ ...prev, [act.key]: !prev[act.key] }))}
+                                              onClick={() => {
+                                              if (selectedUserIsSuperAdmin) {
+                                                setTechnicalWarning('Conta superadmin: ações sensíveis permanecem ativas.');
+                                                return;
+                                              }
+                                              setUserPermissions((prev) => ({ ...prev, [act.key]: !prev[act.key] }));
+                                            }}
                                             >
                                               <div className="flex items-start gap-2 min-w-0">
                                                 <input

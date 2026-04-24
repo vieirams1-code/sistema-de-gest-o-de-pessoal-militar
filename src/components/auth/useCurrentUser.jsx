@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import {
+  buildFullAccessPermissions,
   buildPermissionsFromSource,
   isAdminRecoveryPermission,
+  isSuperAdmin,
   resolveUserPermissions,
 } from '@/services/permissionMatrixService';
 
@@ -114,6 +116,7 @@ export function useCurrentUser() {
   });
 
   const acessoResolvido = acessoCompleto || acesso;
+  const superAdmin = isSuperAdmin(user, acessoResolvido);
 
   const { data: perfilAcesso } = useQuery({
     queryKey: ['perfilPermissao', acessoResolvido?.perfil_id],
@@ -136,15 +139,17 @@ export function useCurrentUser() {
   });
 
   const resolvedPermissionMatrix = resolvedPermissionsData?.permissions || {};
-  const normalizedResolvedPermissions = buildPermissionsFromSource(resolvedPermissionMatrix);
+  const normalizedResolvedPermissions = superAdmin
+    ? buildFullAccessPermissions()
+    : buildPermissionsFromSource(resolvedPermissionMatrix);
   const resolvedTipoAcesso = normalizeAccessMode(acessoResolvido?.tipo_acesso) || 'proprio';
   const isSelfRestrictedScope = resolvedTipoAcesso === 'proprio';
 
   // Resolve as propriedades explicitamente usando UsuarioAcesso.
   // Em modo de impersonação, não herdar permissões do admin original (fail-closed).
   const isAdmin = acessoResolvido
-    ? resolvedTipoAcesso === 'admin'
-    : (!impersonationContext.isImpersonating && (user?.role === 'admin' || user?.isAdmin === true));
+    ? (superAdmin || resolvedTipoAcesso === 'admin')
+    : (superAdmin || (!impersonationContext.isImpersonating && (user?.role === 'admin' || user?.isAdmin === true)));
 
   const subgrupamentoId = acessoResolvido
     ? (isSelfRestrictedScope ? null : (acessoResolvido.subgrupamento_id || acessoResolvido.grupamento_id || null))
@@ -164,7 +169,7 @@ export function useCurrentUser() {
   // Modo de acesso: 'admin', 'setor', 'subsetor', 'unidade', 'proprio'
   let modoAcesso = 'proprio';
   if (acessoResolvido) {
-    modoAcesso = resolvedTipoAcesso;
+    modoAcesso = superAdmin ? 'admin' : resolvedTipoAcesso;
   } else if (!impersonationContext.isImpersonating) {
     if (isAdmin) modoAcesso = 'admin';
     else if (subgrupamentoId) {
@@ -200,6 +205,7 @@ export function useCurrentUser() {
 
   const canAccessModule = (modulo) => {
     if (accessLookupEmail && !isAccessResolved) return false;
+    if (superAdmin) return true;
 
     if (acessoResolvido) {
       const campo = `acesso_${modulo}`;
@@ -216,6 +222,7 @@ export function useCurrentUser() {
 
   const canAccessAction = (acao) => {
     if (accessLookupEmail && !isAccessResolved) return false;
+    if (superAdmin) return true;
 
     if (acessoResolvido) {
       const campo = `perm_${acao}`;
@@ -311,12 +318,14 @@ export function useCurrentUser() {
     hasAcessoRecord: Boolean(acessoResolvido),
     modoAcesso,
     isAdmin,
+    isSuperAdmin: superAdmin,
   };
 
   return {
     user,
     acesso: acessoResolvido,
     isAdmin,
+    isSuperAdmin: superAdmin,
     isLoading,
     isAccessResolved,
     modoAcesso,
