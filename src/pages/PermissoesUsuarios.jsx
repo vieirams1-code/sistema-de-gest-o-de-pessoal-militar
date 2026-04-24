@@ -259,13 +259,21 @@ export default function PermissoesUsuarios() {
   };
 
   const handleSaveUserScope = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser && !isNewAcesso) {
+      alert('Selecione um usuário antes de salvar as permissões.');
+      return;
+    }
     // Revalidação explícita no handler — não depende só da UI
     if (!canAccessAction('gerir_permissoes')) {
       alert('Ação negada: você não tem permissão para gerenciar permissões de usuários.');
       return;
     }
     if (!userUserEmail) { alert('E-mail do Usuário é obrigatório.'); return; }
+    const existingUserId = !isNewAcesso ? selectedUser?.id : null;
+    if (!isNewAcesso && !existingUserId) {
+      alert('Não foi possível identificar o usuário selecionado. Recarregue e tente novamente.');
+      return;
+    }
 
     setSavingUser(true);
     try {
@@ -279,7 +287,7 @@ export default function PermissoesUsuarios() {
       const normalizedPermissions = buildPermissionsFromSource(userPermissions);
       const perfilBaseId = selectedProfileId !== '_nenhum'
         ? selectedProfileId
-        : (isBasePermissionProfile(selectedProfileSource) ? selectedProfileSource.id : (appliedProfileState.id || ''));
+        : (isBasePermissionProfile(selectedProfileSource) ? selectedProfileSource?.id : (appliedProfileState.id || ''));
       const perfilBaseSelecionado = perfilBaseId
         ? (perfis.find((perfil) => perfil.id === perfilBaseId) || await getProfileWithPermissions(perfilBaseId))
         : null;
@@ -326,17 +334,24 @@ export default function PermissoesUsuarios() {
 
       const savedAccess = isNewAcesso
         ? await base44.entities.UsuarioAcesso.create(dataToSave)
-        : await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
+        : await base44.entities.UsuarioAcesso.update(existingUserId, dataToSave);
 
-      const resolvedRecordId = savedAccess.id || selectedUser.id;
+      const resolvedRecordId = savedAccess?.id || existingUserId;
+      if (!resolvedRecordId) {
+        throw new Error('Não foi possível determinar o usuário salvo para concluir a vinculação de perfil.');
+      }
       const reloadedAccess = await base44.entities.UsuarioAcesso.get(resolvedRecordId);
       const usuarioVinculadoId = reloadedAccess?.id;
+      if (!usuarioVinculadoId) {
+        throw new Error('Não foi possível identificar o ID do usuário para vincular o perfil personalizado.');
+      }
 
-      const perfisPersonalizadosDoUsuario = perfis
-        .filter((perfil) =>
-          isLegacyCustomProfile(perfil)
-          && String(perfil.usuario_vinculado_id || '') === String(usuarioVinculadoId || '')
-        )
+      const perfisPersonalizadosRemotos = await base44.entities.PerfilPermissao.filter({
+        usuario_vinculado_id: usuarioVinculadoId,
+        is_personalizado: true,
+      }, '-updated_date');
+      const perfisPersonalizadosDoUsuario = (perfisPersonalizadosRemotos || perfis)
+        .filter((perfil) => String(perfil.usuario_vinculado_id || '') === String(usuarioVinculadoId))
         .sort((a, b) => new Date(b.updated_date || b.created_date || 0).getTime() - new Date(a.updated_date || a.created_date || 0).getTime());
 
       const perfilAtualDoUsuario = reloadedAccess?.perfil_id
@@ -352,7 +367,7 @@ export default function PermissoesUsuarios() {
         descricao: mergeProfileDescriptionWithMatrix(CUSTOM_PROFILE_DESCRIPTION, normalizedPermissions),
         is_personalizado: true,
         usuario_vinculado_id: usuarioVinculadoId,
-        perfil_origem_id: perfilOrigemId || perfilAtualDoUsuario?.perfil_origem_id || '',
+        perfil_origem_id: perfilOrigemId || perfilAtualDoUsuario?.perfil_origem_id || null,
         ativo: true,
         ...buildPermissionPayload(normalizedPermissions),
       };
