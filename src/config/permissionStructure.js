@@ -232,6 +232,7 @@ export const permissionStructure = [
         label: 'Permissões de Usuários',
         actions: [
           { key: 'perm_gerir_permissoes_usuarios', label: 'Gerir Permissões de Usuários', sensitive: true },
+          { key: 'perm_excluir_usuarios_acesso', label: 'Excluir Usuários de Acesso', sensitive: true },
           { key: 'perm_gerir_permissoes', label: 'Gerir Permissões (Legado)', sensitive: true }
         ]
       },

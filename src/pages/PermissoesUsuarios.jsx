@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Plus, Shield, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert, Search } from 'lucide-react';
+import { Users, Shield, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert, Search, UserX, UserCheck, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -57,8 +57,14 @@ const markProfileAsLegacy = async (profile) => {
 
 export default function PermissoesUsuarios() {
   const queryClient = useQueryClient();
-  const { canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved, userEmail, acesso: acessoLogado } = useCurrentUser();
   const hasAccess = !loadingUser && isAccessResolved && canAccessAction('gerir_permissoes');
+  const canManageAccessLifecycle = hasAccess && (
+    canAccessAction('gerir_permissoes_usuarios')
+    || canAccessAction('gerir_permissoes')
+    || canAccessAction('excluir_usuarios_acesso')
+  );
+  const canHardDeleteAccess = hasAccess && canAccessAction('excluir_usuarios_acesso');
 
   const [selectedUser, setSelectedUser] = useState(null);
   const [isNewAcesso, setIsNewAcesso] = useState(false);
@@ -76,6 +82,7 @@ export default function PermissoesUsuarios() {
   const [selectedProfileId, setSelectedProfileId] = useState('_nenhum');
   const [savingUser, setSavingUser] = useState(false);
   const [userSearch, setUserSearch] = useState('');
+  const [showInactiveArchived, setShowInactiveArchived] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(permissionStructure[0]?.category || '');
   const [activeEditTab, setActiveEditTab] = useState('dados');
   const [loadedProfilePermissions, setLoadedProfilePermissions] = useState(null);
@@ -133,18 +140,24 @@ export default function PermissoesUsuarios() {
     return [...militares].sort((a, b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
   }, [militares]);
 
+  const visibleAcessos = useMemo(() => (
+    showInactiveArchived
+      ? acessos
+      : acessos.filter((u) => u.ativo !== false)
+  ), [acessos, showInactiveArchived]);
+
   const filteredAcessos = useMemo(() => {
     const query = userSearch.trim().toLowerCase();
-    if (!query) return acessos;
+    if (!query) return visibleAcessos;
 
-    return acessos.filter((u) => {
+    return visibleAcessos.filter((u) => {
       const nome = (u.nome_usuario || '').toLowerCase();
       const email = (u.user_email || '').toLowerCase();
       const perfil = (u.perfil_nome || '').toLowerCase();
       const tipo = (u.tipo_acesso || '').toLowerCase();
       return nome.includes(query) || email.includes(query) || perfil.includes(query) || tipo.includes(query);
     });
-  }, [acessos, userSearch]);
+  }, [visibleAcessos, userSearch]);
 
   const activeCategoryGroup = useMemo(() => {
     return permissionStructure.find((item) => item.category === selectedCategory) || permissionStructure[0];
@@ -469,6 +482,87 @@ export default function PermissoesUsuarios() {
     }
   };
 
+  const isSelfAccessRecord = (acesso) => {
+    if (!acesso) return false;
+    const emailAtual = (userEmail || '').trim().toLowerCase();
+    const emailAcesso = (acesso.user_email || '').trim().toLowerCase();
+    if (acessoLogado?.id && acesso.id && String(acessoLogado.id) === String(acesso.id)) return true;
+    return !!emailAtual && !!emailAcesso && emailAtual === emailAcesso;
+  };
+
+  const refreshAcessosAfterLifecycleAction = () => {
+    queryClient.invalidateQueries({ queryKey: ['usuariosAcesso'] });
+  };
+
+  const handleSetAccessActiveState = async (targetAcesso, shouldBeActive) => {
+    if (!targetAcesso?.id) return;
+    if (!canManageAccessLifecycle) {
+      alert('Você não possui permissão para alterar o status de acesso de usuários.');
+      return;
+    }
+    if (isSelfAccessRecord(targetAcesso)) {
+      alert('Operação bloqueada: não é permitido desativar ou arquivar o próprio usuário logado.');
+      return;
+    }
+    const acao = shouldBeActive ? 'reativar' : 'desativar/arquivar';
+    const confirmado = window.confirm(`Confirma ${acao} o acesso de "${targetAcesso.nome_usuario || targetAcesso.user_email}"?`);
+    if (!confirmado) return;
+
+    try {
+      const updated = await base44.entities.UsuarioAcesso.update(targetAcesso.id, { ativo: shouldBeActive });
+      refreshAcessosAfterLifecycleAction();
+      const mensagem = shouldBeActive
+        ? 'Acesso reativado com sucesso. O usuário voltou para a lista principal.'
+        : 'Acesso desativado/arquivado com sucesso. O usuário foi ocultado da lista principal.';
+      alert(mensagem);
+      if (!shouldBeActive && selectedUser?.id === targetAcesso.id) {
+        setSelectedUser(updated || { ...targetAcesso, ativo: false });
+        setUserAtivo(false);
+        if (!showInactiveArchived) setSelectedUser(null);
+      } else if (shouldBeActive && selectedUser?.id === targetAcesso.id) {
+        setSelectedUser(updated || { ...targetAcesso, ativo: true });
+        setUserAtivo(true);
+      }
+    } catch (error) {
+      alert(error?.message || 'Não foi possível atualizar o status de acesso do usuário.');
+    }
+  };
+
+  const handleHardDeleteAccess = async (targetAcesso) => {
+    if (!targetAcesso?.id) return;
+    if (!canHardDeleteAccess) {
+      alert('Você não possui a permissão excluir_usuarios_acesso para exclusão definitiva.');
+      return;
+    }
+    if (isSelfAccessRecord(targetAcesso)) {
+      alert('Operação bloqueada: não é permitido excluir definitivamente o próprio usuário logado.');
+      return;
+    }
+    if (targetAcesso.ativo !== false) {
+      alert('Por segurança, desative/arquive o usuário antes da exclusão definitiva.');
+      return;
+    }
+    if (targetAcesso.militar_id) {
+      alert('Exclusão definitiva bloqueada: há vínculo com militar. Mantenha o registro arquivado para preservar histórico.');
+      return;
+    }
+    const confirmado = window.confirm(
+      `Excluir DEFINITIVAMENTE "${targetAcesso.nome_usuario || targetAcesso.user_email}"?\n\nEsta ação não pode ser desfeita.`
+    );
+    if (!confirmado) return;
+
+    try {
+      await base44.entities.UsuarioAcesso.delete(targetAcesso.id);
+      if (selectedUser?.id === targetAcesso.id) {
+        setSelectedUser(null);
+      }
+      refreshAcessosAfterLifecycleAction();
+      alert('Usuário de acesso excluído definitivamente com sucesso.');
+    } catch (error) {
+      alert(error?.message || 'Não foi possível excluir definitivamente o usuário de acesso.');
+    }
+  };
+
   const getTipoBadge = (u) => {
     if (u.tipo_acesso === 'admin') return <Badge className="bg-emerald-100 text-emerald-800">Admin</Badge>;
     if (u.tipo_acesso === 'unidade') return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">{u.subgrupamento_nome}</Badge>;
@@ -513,7 +607,16 @@ export default function PermissoesUsuarios() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-3.5 lg:p-4 border-b border-slate-200 bg-white">
                 <h2 className="font-semibold text-slate-900">Usuários</h2>
-                <p className="text-xs text-slate-500 mb-3">{acessos.length} registros</p>
+                <p className="text-xs text-slate-500 mb-2">{visibleAcessos.length} registros {showInactiveArchived ? '(incluindo inativos/arquivados)' : 'ativos'}</p>
+                <label className="mb-3 flex items-center gap-2 text-xs font-medium text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={showInactiveArchived}
+                    onChange={(e) => setShowInactiveArchived(e.target.checked)}
+                    className="rounded border-slate-300 text-[#1e3a5f]"
+                  />
+                  Mostrar inativos/arquivados
+                </label>
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <Input
@@ -567,7 +670,43 @@ export default function PermissoesUsuarios() {
                       <h2 className="font-bold text-[#1e3a5f] text-lg lg:text-xl">Editando: {userNomeUsuario || userUserEmail || 'Novo Usuário'}</h2>
                       <p className="text-sm text-slate-500">Ajuste o escopo organizacional, perfil base e permissões por categoria.</p>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                      {!!selectedUser?.id && canManageAccessLifecycle && (
+                        userAtivo ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSetAccessActiveState(selectedUser, false)}
+                            disabled={isSelfAccessRecord(selectedUser)}
+                            className="rounded-lg border-amber-200 text-amber-700 hover:bg-amber-50"
+                          >
+                            <UserX className="w-4 h-4 mr-2" />
+                            Desativar/Arquivar
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSetAccessActiveState(selectedUser, true)}
+                            className="rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                          >
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Reativar
+                          </Button>
+                        )
+                      )}
+                      {!!selectedUser?.id && canHardDeleteAccess && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleHardDeleteAccess(selectedUser)}
+                          disabled={isSelfAccessRecord(selectedUser)}
+                          className="rounded-lg border-red-200 text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Excluir Definitivo
+                        </Button>
+                      )}
                       <Button variant="outline" size="sm" onClick={() => setSelectedUser(null)} className="rounded-lg">Cancelar</Button>
                     <Button 
                       size="sm"
