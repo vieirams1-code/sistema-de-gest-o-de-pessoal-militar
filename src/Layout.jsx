@@ -37,57 +37,57 @@ const menuGroups = [
   {
     title: 'Principal',
     items: [
-      { name: 'Dashboard', page: 'Home', icon: Home, moduleKey: 'militares' },
+      { name: 'Dashboard', page: 'Home', icon: Home, viewPermission: 'visualizar_militares' },
     ],
   },
   {
     title: 'Pessoal',
     items: [
-      { name: 'Efetivo', page: 'Militares', icon: Users, moduleKey: 'militares' },
-      { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, moduleKey: 'folha_alteracoes' },
-      { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText, moduleKey: 'militares' },
+      { name: 'Efetivo', page: 'Militares', icon: Users, viewPermission: 'visualizar_militares' },
+      { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
+      { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_militares' },
     ],
   },
   {
     title: 'Justiça e Disciplina',
     items: [
-      { name: 'Controle de Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, moduleKey: 'militares' },
-      { name: 'Lançamento de Punições', page: 'Punicoes', icon: Shield, moduleKey: 'militares' },
+      { name: 'Controle de Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, viewPermission: 'visualizar_militares' },
+      { name: 'Lançamento de Punições', page: 'Punicoes', icon: Shield, viewPermission: 'visualizar_militares' },
     ],
   },
   {
     title: 'Atestados',
     items: [
-      { name: 'Atestados', page: 'Atestados', icon: HeartPulse, moduleKey: 'atestados' },
+      { name: 'Atestados', page: 'Atestados', icon: HeartPulse, viewPermission: 'visualizar_atestados' },
     ],
   },
   {
     title: 'Férias',
     items: [
-      { name: 'Férias', page: 'Ferias', icon: CalendarDays, moduleKey: 'ferias' },
-      { name: 'Créditos Extraordinários', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, moduleKey: 'ferias' },
+      { name: 'Férias', page: 'Ferias', icon: CalendarDays, viewPermission: 'visualizar_ferias' },
+      { name: 'Créditos Extraordinários', page: 'CreditosExtraordinariosFerias', icon: CalendarDays, viewPermission: 'visualizar_ferias' },
     ],
   },
   {
     title: 'Operações',
     items: [
-      { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban, moduleKey: 'quadro_operacional' },
-      { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock, moduleKey: 'quadro_operacional' },
+      { name: 'Quadro Operacional', page: 'QuadroOperacional', icon: FolderKanban, viewPermission: 'visualizar_quadro_operacional' },
+      { name: 'Ações Operacionais', page: 'AgendaAcoesOperacionais', icon: CalendarClock, viewPermission: 'visualizar_quadro_operacional' },
     ],
   },
   {
     title: 'Publicações e RP',
     items: [
-      { name: 'RP', page: 'RP', icon: BookMarked, moduleKey: 'livro' },
-      { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, moduleKey: 'publicacoes' },
-      { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, moduleKey: 'publicacoes' },
+      { name: 'RP', page: 'RP', icon: BookMarked, viewPermission: 'visualizar_livro' },
+      { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_publicacoes' },
+      { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_publicacoes' },
     ],
   },
   {
     title: 'Patrimônio e Reconhecimento',
     items: [
-      { name: 'Armamentos', page: 'Armamentos', icon: Sword, moduleKey: 'armamentos' },
-      { name: 'Medalhas', page: 'Medalhas', icon: Medal, moduleKey: 'medalhas' },
+      { name: 'Armamentos', page: 'Armamentos', icon: Sword, viewPermission: 'visualizar_armamentos' },
+      { name: 'Medalhas', page: 'Medalhas', icon: Medal, viewPermission: 'visualizar_medalhas' },
     ],
   }
 ];
@@ -106,13 +106,13 @@ const adminMenuGroup = {
       name: 'Migração',
       page: 'MigracaoMilitares',
       icon: FileUp,
-      moduleKey: 'migracao',
+      viewPermission: 'visualizar_migracao',
       children: [
-        { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, actionKey: 'importar_militares' },
-        { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, actionKey: 'ver_historico_importacoes' },
-        { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, actionKey: 'migrar_alteracoes_legado' },
-        { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: FileSpreadsheet, actionKey: 'classificar_legado' },
-        { name: 'Revisão de Duplicidades', page: 'RevisaoDuplicidadesMilitar', icon: Shield, actionKey: 'revisar_duplicidades' },
+        { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, viewPermission: 'visualizar_migracao', actionKey: 'importar_militares' },
+        { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, viewPermission: 'visualizar_migracao', actionKey: 'ver_historico_importacoes' },
+        { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, viewPermission: 'visualizar_migracao', actionKey: 'migrar_alteracoes_legado' },
+        { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: FileSpreadsheet, viewPermission: 'visualizar_migracao', actionKey: 'classificar_legado' },
+        { name: 'Revisão de Duplicidades', page: 'RevisaoDuplicidadesMilitar', icon: Shield, viewPermission: 'visualizar_migracao', actionKey: 'revisar_duplicidades' },
       ],
     },
   ],
@@ -122,6 +122,7 @@ export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState([]);
   const { isAdmin, canAccessModule, canAccessAction } = useCurrentUser();
+  const temPermissao = (actionKey) => canAccessAction(actionKey);
   useVerificacaoComportamentoDiaria({ enabled: canAccessModule('militares') || isAdmin });
 
   const toggleExpanded = (itemName) => {
@@ -136,6 +137,7 @@ export default function Layout({ children, currentPageName }) {
   const filterItemsByPermission = (items) => {
     return items.filter((item) => {
       if (item.adminOnly && !isAdmin) return false;
+      if (item.viewPermission && !temPermissao(item.viewPermission)) return false;
       if (item.actionKey && !canAccessAction(item.actionKey)) return false;
       if (item.moduleKey && !canAccessModule(item.moduleKey)) return false;
       return true;
@@ -144,6 +146,7 @@ export default function Layout({ children, currentPageName }) {
 
       const visibleChildren = item.children.filter((child) => {
         if (child.adminOnly && !isAdmin) return false;
+        if (child.viewPermission && !temPermissao(child.viewPermission)) return false;
         if (child.actionKey && !canAccessAction(child.actionKey)) return false;
         return true;
       });

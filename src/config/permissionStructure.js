@@ -16,6 +16,10 @@ export const permissionStructure = [
         key: 'acesso_migracao',
         label: 'Migração',
         actions: [
+          { key: 'perm_visualizar_migracao', label: 'Visualizar Migração' },
+          { key: 'perm_adicionar_migracao', label: 'Adicionar Migração', sensitive: true },
+          { key: 'perm_editar_migracao', label: 'Editar Migração', sensitive: true },
+          { key: 'perm_excluir_migracao', label: 'Excluir Migração', sensitive: true },
           { key: 'perm_importar_militares', label: 'Importar Militares', sensitive: true },
           { key: 'perm_ver_historico_importacoes', label: 'Ver Histórico de Importações', sensitive: true },
           { key: 'perm_migrar_alteracoes_legado', label: 'Migrar Alterações Legado', sensitive: true },
@@ -24,7 +28,16 @@ export const permissionStructure = [
           { key: 'perm_reset_operacional', label: 'Executar Reset Operacional', sensitive: true }
         ]
       },
-      { key: 'acesso_folha_alteracoes', label: 'Folha de Alterações', actions: [] },
+      {
+        key: 'acesso_folha_alteracoes',
+        label: 'Folha de Alterações',
+        actions: [
+          { key: 'perm_visualizar_folha_alteracoes', label: 'Visualizar Folha de Alterações' },
+          { key: 'perm_adicionar_folha_alteracoes', label: 'Adicionar Folha de Alterações' },
+          { key: 'perm_editar_folha_alteracoes', label: 'Editar Folha de Alterações' },
+          { key: 'perm_excluir_folha_alteracoes', label: 'Excluir Folha de Alterações', sensitive: true }
+        ]
+      },
       {
         key: 'acesso_ferias',
         label: 'Férias',
@@ -37,7 +50,16 @@ export const permissionStructure = [
           { key: 'perm_recalcular_ferias', label: 'Recalcular Férias', sensitive: true }
         ]
       },
-      { key: 'acesso_livro', label: 'Livro', actions: [] },
+      {
+        key: 'acesso_livro',
+        label: 'Livro',
+        actions: [
+          { key: 'perm_visualizar_livro', label: 'Visualizar Livro' },
+          { key: 'perm_adicionar_livro', label: 'Adicionar Livro' },
+          { key: 'perm_editar_livro', label: 'Editar Livro' },
+          { key: 'perm_excluir_livro', label: 'Excluir Livro', sensitive: true }
+        ]
+      },
       {
         key: 'acesso_atestados',
         label: 'Atestados',
@@ -45,6 +67,7 @@ export const permissionStructure = [
           { key: 'perm_visualizar_atestados', label: 'Visualizar Atestados' },
           { key: 'perm_adicionar_atestados', label: 'Adicionar Atestado' },
           { key: 'perm_editar_atestados', label: 'Editar Atestado' },
+          { key: 'perm_excluir_atestados', label: 'Excluir Atestados', sensitive: true },
           { key: 'perm_excluir_atestado', label: 'Excluir Atestado', sensitive: true }
         ]
       }
@@ -57,6 +80,7 @@ export const permissionStructure = [
         key: 'acesso_publicacoes',
         label: 'Publicações',
         actions: [
+          { key: 'perm_visualizar_publicacoes', label: 'Visualizar Publicações' },
           { key: 'perm_editar_publicacoes', label: 'Editar Publicações', sensitive: true },
           { key: 'perm_adicionar_publicacoes', label: 'Adicionar Publicações', sensitive: true },
           { key: 'perm_excluir_publicacoes', label: 'Excluir Publicações', sensitive: true },
@@ -88,6 +112,10 @@ export const permissionStructure = [
         key: 'acesso_medalhas',
         label: 'Medalhas',
         actions: [
+          { key: 'perm_visualizar_medalhas', label: 'Visualizar Medalhas' },
+          { key: 'perm_adicionar_medalhas', label: 'Adicionar Medalhas', sensitive: true },
+          { key: 'perm_editar_medalhas', label: 'Editar Medalhas', sensitive: true },
+          { key: 'perm_excluir_medalhas', label: 'Excluir Medalhas', sensitive: true },
           { key: 'perm_indicar_medalhas', label: 'Indicar Medalhas', sensitive: true },
           { key: 'perm_conceder_medalhas', label: 'Conceder Medalhas', sensitive: true },
           { key: 'perm_resetar_indicacoes_medalhas', label: 'Resetar Indicações de Medalhas', sensitive: true },
@@ -100,6 +128,10 @@ export const permissionStructure = [
         key: 'acesso_quadro_operacional',
         label: 'Quadro Operacional',
         actions: [
+          { key: 'perm_visualizar_quadro_operacional', label: 'Visualizar Quadro Operacional' },
+          { key: 'perm_adicionar_quadro_operacional', label: 'Adicionar Quadro Operacional', sensitive: true },
+          { key: 'perm_editar_quadro_operacional', label: 'Editar Quadro Operacional', sensitive: true },
+          { key: 'perm_excluir_quadro_operacional', label: 'Excluir Quadro Operacional', sensitive: true },
           { key: 'perm_gerir_quadro', label: 'Gerir Quadro Op.', sensitive: true },
           { key: 'perm_mover_card', label: 'Mover Card', sensitive: true },
           { key: 'perm_gerir_colunas', label: 'Gerir Colunas Quadro', sensitive: true },

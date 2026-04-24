@@ -151,6 +151,52 @@ export default function PermissoesUsuarios() {
     }
   };
 
+  const getCustomProfilesByUserId = async (usuarioId) => {
+    if (!usuarioId) return [];
+
+    const perfisLocais = perfis.filter(
+      (perfil) => perfil?.is_personalizado === true && perfil?.usuario_vinculado_id === usuarioId
+    );
+
+    try {
+      const perfisRemotos = await base44.entities.PerfilPermissao.filter({
+        is_personalizado: true,
+        usuario_vinculado_id: usuarioId,
+      }, 'created_date');
+      if (Array.isArray(perfisRemotos) && perfisRemotos.length > 0) return perfisRemotos;
+    } catch {
+      // fallback para cache local quando o filtro remoto falhar
+    }
+
+    return perfisLocais;
+  };
+
+  const upsertCustomProfileForUser = async ({ usuarioId, customProfilePayload }) => {
+    if (!usuarioId) return null;
+
+    const customProfiles = await getCustomProfilesByUserId(usuarioId);
+    const [primaryProfile, ...duplicateProfiles] = customProfiles;
+
+    if (primaryProfile?.id) {
+      const updated = await base44.entities.PerfilPermissao.update(primaryProfile.id, customProfilePayload);
+
+      if (duplicateProfiles.length > 0) {
+        await Promise.all(
+          duplicateProfiles
+            .filter((perfil) => perfil?.id)
+            .map((perfil) => base44.entities.PerfilPermissao.update(perfil.id, {
+              usuario_vinculado_id: '',
+              ativo: false,
+            }))
+        );
+      }
+
+      return updated || { ...primaryProfile, ...customProfilePayload };
+    }
+
+    return base44.entities.PerfilPermissao.create(customProfilePayload);
+  };
+
   const handleSelectAcesso = async (acesso) => {
     let fullAcesso = acesso;
     try {
@@ -266,6 +312,7 @@ export default function PermissoesUsuarios() {
       let perfilIdToPersist = perfilSelected?.id || '';
       let perfilNomeToPersist = perfilSelected?.nome_perfil || '';
       let pendingCustomProfileForNewUser = null;
+      let createdOrUpdatedCustomProfile = null;
 
       if (isPermissionChanged) {
         const customProfileName = `Personalizado - ${userNomeUsuario || userUserEmail}`;
@@ -287,18 +334,16 @@ export default function PermissoesUsuarios() {
         if (isNewAcesso) {
           pendingCustomProfileForNewUser = customProfilePayload;
         } else {
-          if (isPerfilPersonalizado(effectiveSelectedProfile, selectedUser?.id) && effectiveSelectedProfile?.id) {
-            await base44.entities.PerfilPermissao.update(effectiveSelectedProfile.id, customProfilePayload);
-            perfilIdToPersist = effectiveSelectedProfile.id;
-            perfilNomeToPersist = customProfileName;
-          } else {
-            const createdPersonalizado = await base44.entities.PerfilPermissao.create(customProfilePayload);
-            perfilIdToPersist = createdPersonalizado.id;
-            perfilNomeToPersist = createdPersonalizado.nome_perfil || customProfileName;
-            setSelectedProfileId(perfilIdToPersist);
-            setSelectedProfileSource(createdPersonalizado);
-            setLoadedProfilePermissions(normalizedPermissions);
-          }
+          createdOrUpdatedCustomProfile = await upsertCustomProfileForUser({
+            usuarioId: selectedUser?.id,
+            customProfilePayload,
+          });
+
+          perfilIdToPersist = createdOrUpdatedCustomProfile?.id || effectiveSelectedProfile?.id || perfilIdToPersist;
+          perfilNomeToPersist = createdOrUpdatedCustomProfile?.nome_perfil || customProfileName;
+          setSelectedProfileId(perfilIdToPersist);
+          setSelectedProfileSource(createdOrUpdatedCustomProfile || effectiveSelectedProfile || null);
+          setLoadedProfilePermissions(normalizedPermissions);
         }
       }
 
@@ -342,9 +387,12 @@ export default function PermissoesUsuarios() {
         : await base44.entities.UsuarioAcesso.update(selectedUser.id, dataToSave);
 
       if (pendingCustomProfileForNewUser && savedRecord?.id) {
-        const createdPersonalizado = await base44.entities.PerfilPermissao.create({
+        const createdPersonalizado = await upsertCustomProfileForUser({
+          usuarioId: savedRecord.id,
+          customProfilePayload: {
           ...pendingCustomProfileForNewUser,
           usuario_vinculado_id: savedRecord.id,
+          },
         });
         await base44.entities.UsuarioAcesso.update(savedRecord.id, {
           perfil_id: createdPersonalizado.id,
