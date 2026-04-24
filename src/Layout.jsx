@@ -97,22 +97,48 @@ const adminMenuGroup = {
   title: 'ADMIN',
   items: [
     { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
-    { name: 'Adições e Personalizações', page: 'Configuracoes', icon: Wrench, tab: 'adicoes', actionKey: 'gerir_configuracoes' },
-    { name: 'Permissões de Usuários', page: 'PermissoesUsuarios', icon: Users, actionKey: 'gerir_permissoes' },
-    { name: 'Perfis de Permissão', page: 'PerfisPermissao', icon: Shield, actionKey: 'gerir_permissoes' },
-    { name: 'Estrutura Organizacional', page: 'EstruturaOrganizacional', icon: GitBranch, actionKey: 'gerir_estrutura' },
-    { name: 'Lotação de Militares', page: 'LotacaoMilitares', icon: Building2, actionKey: 'gerir_estrutura' },
+    {
+      name: 'Adições e Personalizações',
+      page: 'Configuracoes',
+      icon: Wrench,
+      tab: 'adicoes',
+      anyOf: [{ type: 'module', key: 'adicoes_personalizacoes' }, { type: 'action', key: 'gerir_adicoes_personalizacoes' }],
+    },
+    {
+      name: 'Permissões de Usuários',
+      page: 'PermissoesUsuarios',
+      icon: Users,
+      anyOf: [{ type: 'module', key: 'permissoes_usuarios' }, { type: 'action', key: 'gerir_permissoes_usuarios' }],
+    },
+    {
+      name: 'Perfis de Permissão',
+      page: 'PerfisPermissao',
+      icon: Shield,
+      anyOf: [{ type: 'module', key: 'perfis_permissao' }, { type: 'action', key: 'gerir_perfis_permissao' }],
+    },
+    {
+      name: 'Estrutura Organizacional',
+      page: 'EstruturaOrganizacional',
+      icon: GitBranch,
+      anyOf: [{ type: 'module', key: 'estrutura_organizacional' }, { type: 'action', key: 'gerir_estrutura_organizacional' }],
+    },
+    {
+      name: 'Lotação de Militares',
+      page: 'LotacaoMilitares',
+      icon: Building2,
+      anyOf: [{ type: 'module', key: 'lotacao_militares' }, { type: 'action', key: 'gerir_lotacao_militares' }],
+    },
     {
       name: 'Migração',
       page: 'MigracaoMilitares',
       icon: FileUp,
-      viewPermission: 'visualizar_migracao',
+      moduleKey: 'migracao',
       children: [
-        { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, viewPermission: 'visualizar_migracao', actionKey: 'importar_militares' },
-        { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, viewPermission: 'visualizar_migracao', actionKey: 'ver_historico_importacoes' },
-        { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, viewPermission: 'visualizar_migracao', actionKey: 'migrar_alteracoes_legado' },
-        { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: FileSpreadsheet, viewPermission: 'visualizar_migracao', actionKey: 'classificar_legado' },
-        { name: 'Revisão de Duplicidades', page: 'RevisaoDuplicidadesMilitar', icon: Shield, viewPermission: 'visualizar_migracao', actionKey: 'revisar_duplicidades' },
+        { name: 'Migração de Militares', page: 'MigracaoMilitares', icon: FileUp, moduleKey: 'migracao', actionKey: 'importar_militares' },
+        { name: 'Histórico de Importações', page: 'HistoricoImportacoesMilitares', icon: History, moduleKey: 'migracao', actionKey: 'ver_historico_importacoes' },
+        { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, moduleKey: 'migracao', actionKey: 'migrar_alteracoes_legado' },
+        { name: 'Classificação Pendentes Legado', page: 'ClassificacaoPendentesLegado', icon: FileSpreadsheet, moduleKey: 'migracao', actionKey: 'classificar_legado' },
+        { name: 'Revisão de Duplicidades', page: 'RevisaoDuplicidadesMilitar', icon: Shield, moduleKey: 'migracao', actionKey: 'revisar_duplicidades' },
       ],
     },
   ],
@@ -140,6 +166,14 @@ export default function Layout({ children, currentPageName }) {
       if (item.viewPermission && !temPermissao(item.viewPermission)) return false;
       if (item.actionKey && !canAccessAction(item.actionKey)) return false;
       if (item.moduleKey && !canAccessModule(item.moduleKey)) return false;
+      if (item.anyOf?.length) {
+        const hasAnyPermission = item.anyOf.some((permission) => (
+          permission.type === 'module'
+            ? canAccessModule(permission.key)
+            : canAccessAction(permission.key)
+        ));
+        if (!hasAnyPermission) return false;
+      }
       return true;
     }).map((item) => {
       if (!item.children?.length) return item;
@@ -148,6 +182,7 @@ export default function Layout({ children, currentPageName }) {
         if (child.adminOnly && !isAdmin) return false;
         if (child.viewPermission && !temPermissao(child.viewPermission)) return false;
         if (child.actionKey && !canAccessAction(child.actionKey)) return false;
+        if (child.moduleKey && !canAccessModule(child.moduleKey)) return false;
         return true;
       });
       

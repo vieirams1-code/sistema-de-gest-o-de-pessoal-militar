@@ -155,9 +155,44 @@ export const permissionStructure = [
         label: 'Configurações',
         actions: [
           { key: 'perm_admin_mode', label: 'Pode Ativar Modo Admin', sensitive: true },
-          { key: 'perm_gerir_permissoes', label: 'Gerir Permissões', sensitive: true },
-          { key: 'perm_gerir_estrutura', label: 'Gerir Estrutura Org.', sensitive: true },
           { key: 'perm_gerir_configuracoes', label: 'Gerir Configurações', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_adicoes_personalizacoes',
+        label: 'Adições e Personalizações',
+        actions: [
+          { key: 'perm_gerir_adicoes_personalizacoes', label: 'Gerir Adições e Personalizações', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_permissoes_usuarios',
+        label: 'Permissões de Usuários',
+        actions: [
+          { key: 'perm_gerir_permissoes_usuarios', label: 'Gerir Permissões de Usuários', sensitive: true },
+          { key: 'perm_gerir_permissoes', label: 'Gerir Permissões (Legado)', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_perfis_permissao',
+        label: 'Perfis de Permissão',
+        actions: [
+          { key: 'perm_gerir_perfis_permissao', label: 'Gerir Perfis de Permissão', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_estrutura_organizacional',
+        label: 'Estrutura Organizacional',
+        actions: [
+          { key: 'perm_gerir_estrutura_organizacional', label: 'Gerir Estrutura Organizacional', sensitive: true },
+          { key: 'perm_gerir_estrutura', label: 'Gerir Estrutura Org. (Legado)', sensitive: true }
+        ]
+      },
+      {
+        key: 'acesso_lotacao_militares',
+        label: 'Lotação de Militares',
+        actions: [
+          { key: 'perm_gerir_lotacao_militares', label: 'Gerir Lotação de Militares', sensitive: true }
         ]
       }
     ]

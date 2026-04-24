@@ -42,8 +42,8 @@ const moduleGuardByPage = {
   Publicacoes: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
   QuadroOperacional: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
-  LotacaoMilitares: { moduleKey: 'militares', moduleName: 'Efetivo' },
-  EstruturaOrganizacional: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  LotacaoMilitares: { moduleKeys: ['lotacao_militares'], actionKeys: ['gerir_lotacao_militares'], moduleName: 'Lotação de Militares' },
+  EstruturaOrganizacional: { moduleKeys: ['estrutura_organizacional'], actionKeys: ['gerir_estrutura_organizacional'], moduleName: 'Estrutura Organizacional' },
   CadastrarArmamento: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
   CadastrarMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
   FichaMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
@@ -61,13 +61,15 @@ const moduleGuardByPage = {
   CadastrarPunicao: { moduleKey: 'militares', moduleName: 'Efetivo' },
   RegistrosMilitar: { moduleKey: 'militares', moduleName: 'Registros do Militar' },
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
-  Configuracoes: { moduleKey: 'configuracoes', moduleName: 'Configurações' },
+  Configuracoes: { moduleKeys: ['configuracoes', 'adicoes_personalizacoes'], actionKeys: ['gerir_configuracoes', 'gerir_adicoes_personalizacoes'], moduleName: 'Configurações' },
+  PermissoesUsuarios: { moduleKeys: ['permissoes_usuarios'], actionKeys: ['gerir_permissoes_usuarios'], moduleName: 'Permissões de Usuários' },
+  PerfisPermissao: { moduleKeys: ['perfis_permissao'], actionKeys: ['gerir_perfis_permissao'], moduleName: 'Perfis de Permissão' },
   ConciliacaoBoletim: { moduleKey: 'publicacoes', moduleName: 'Controle de Publicações' },
-  MigracaoMilitares: { moduleKey: 'migracao', moduleName: 'Migração' },
-  HistoricoImportacoesMilitares: { moduleKey: 'migracao', moduleName: 'Migração' },
-  MigracaoAlteracoesLegado: { moduleKey: 'migracao', moduleName: 'Migração' },
-  ClassificacaoPendentesLegado: { moduleKey: 'migracao', moduleName: 'Migração' },
-  RevisaoDuplicidadesMilitar: { moduleKey: 'migracao', moduleName: 'Migração' },
+  MigracaoMilitares: { moduleKeys: ['migracao'], moduleName: 'Migração' },
+  HistoricoImportacoesMilitares: { moduleKeys: ['migracao'], actionKeys: ['ver_historico_importacoes'], moduleName: 'Migração' },
+  MigracaoAlteracoesLegado: { moduleKeys: ['migracao'], actionKeys: ['migrar_alteracoes_legado'], moduleName: 'Migração' },
+  ClassificacaoPendentesLegado: { moduleKeys: ['migracao'], actionKeys: ['classificar_legado'], moduleName: 'Migração' },
+  RevisaoDuplicidadesMilitar: { moduleKeys: ['migracao'], actionKeys: ['revisar_duplicidades'], moduleName: 'Migração' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {
@@ -124,9 +126,15 @@ const AuthenticatedApp = () => {
         const pageModuleGuard = getModuleGuardByPage(path);
 
         if (pageModuleGuard) {
-          const { moduleKey, moduleName } = pageModuleGuard;
+          const { moduleKey, moduleKeys, actionKey, actionKeys, moduleName } = pageModuleGuard;
           pageContent = (
-            <RequireModuleAccess moduleKey={moduleKey} moduleName={moduleName}>
+            <RequireModuleAccess
+              moduleKey={moduleKey}
+              moduleKeys={moduleKeys}
+              actionKey={actionKey}
+              actionKeys={actionKeys}
+              moduleName={moduleName}
+            >
               {pageContent}
             </RequireModuleAccess>
           );
