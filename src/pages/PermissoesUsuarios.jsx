@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, Shield, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert, Search, UserX, UserCheck, Trash2 } from 'lucide-react';
+import { Users, Shield, UserPlus, Building2, UserCircle, Save, Settings2, Info, BadgeAlert, Search, UserX, UserCheck, Trash2, Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
