@@ -145,7 +145,10 @@ export default function RegistrosMilitar() {
   const [tipoEdicao, setTipoEdicao] = useState({});
 
   const canAccessRegistrosMilitar = canAccessModule('registros_militar');
-  const canManageAdminActions = isAdmin && canAccessAction('admin_mode');
+  const canUseAdminMode = isAdmin && canAccessAction('admin_mode');
+  const canEditarRegistros = canUseAdminMode && canAccessAction('editar_registros_militar');
+  const canExcluirRegistros = canUseAdminMode && canAccessAction('excluir_registros_militar');
+  const canManageAdminActions = canEditarRegistros || canExcluirRegistros;
 
   const { data: militares = [], isLoading: loadingMilitares } = useQuery({
     queryKey: ['registros-militar-militares'],
@@ -397,6 +400,7 @@ export default function RegistrosMilitar() {
   });
 
   function handleSalvarTipo(registro) {
+    if (!canEditarRegistros) return;
     const novoTipo = String(tipoEdicao[registro.id] || '').trim();
     if (!novoTipo) {
       toast({
@@ -411,6 +415,7 @@ export default function RegistrosMilitar() {
   }
 
   function handleExcluirRegistro(registro) {
+    if (!canExcluirRegistros) return;
     const mensagem = `Confirma a exclusão do registro de ${registro.militarNome} (${formatarData(registro.dataEvento)})? Esta ação não poderá ser desfeita.`;
     if (!window.confirm(mensagem)) return;
 
@@ -759,28 +764,32 @@ export default function RegistrosMilitar() {
 
                       {canManageAdminActions && (
                         <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setExpandedRegistroId(registro.id);
-                              setTipoEdicao((prev) => ({ ...prev, [registro.id]: prev[registro.id] || registro.tipoRegistro }));
-                            }}
-                          >
-                            <Pencil className="mr-1 h-4 w-4" />
-                            Editar tipo
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleExcluirRegistro(registro)}
-                            disabled={excluirRegistroMutation.isPending}
-                          >
-                            <Trash2 className="mr-1 h-4 w-4" />
-                            Excluir
-                          </Button>
+                          {canEditarRegistros && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setExpandedRegistroId(registro.id);
+                                setTipoEdicao((prev) => ({ ...prev, [registro.id]: prev[registro.id] || registro.tipoRegistro }));
+                              }}
+                            >
+                              <Pencil className="mr-1 h-4 w-4" />
+                              Editar tipo
+                            </Button>
+                          )}
+                          {canExcluirRegistros && (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleExcluirRegistro(registro)}
+                              disabled={excluirRegistroMutation.isPending}
+                            >
+                              <Trash2 className="mr-1 h-4 w-4" />
+                              Excluir
+                            </Button>
+                          )}
                         </>
                       )}
                     </div>
@@ -800,7 +809,7 @@ export default function RegistrosMilitar() {
                           <p><strong>BG:</strong> {registro.numero_bg || '-'}</p>
                         </div>
 
-                        {canManageAdminActions && (
+                        {canEditarRegistros && (
                           <div className="space-y-2 rounded-md border border-red-100 bg-white p-3">
                             <p className="text-xs font-semibold text-slate-700">Ações administrativas</p>
                             <div className="grid gap-2 md:grid-cols-[1fr_auto]">
@@ -842,7 +851,7 @@ export default function RegistrosMilitar() {
 
       {!canManageAdminActions && (
         <p className="text-xs text-slate-500">
-          Modo consulta: ações administrativas (editar tipo / excluir) são exibidas apenas para admin com permissão de modo administrativo.
+          Modo consulta: ações administrativas exigem perfil admin, modo administrativo e permissão específica da ação.
         </p>
       )}
     </div>

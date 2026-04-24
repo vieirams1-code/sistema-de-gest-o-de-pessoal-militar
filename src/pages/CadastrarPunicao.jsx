@@ -36,7 +36,7 @@ const TIPOS_COM_CUMPRIMENTO = new Set(['Detenção', 'Prisão', 'Prisão em Sepa
 export default function CadastrarPunicao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasPunicoesAccess = canAccessModule('punicoes');
 
   const [searchParams] = useSearchParams();
@@ -65,6 +65,10 @@ export default function CadastrarPunicao() {
   });
 
   const [entityError, setEntityError] = useState(null);
+  const canAdicionarPunicoes = canAccessAction('adicionar_punicoes');
+  const canEditarPunicoes = canAccessAction('editar_punicoes');
+  const canExcluirPunicoes = canAccessAction('excluir_punicoes');
+  const canPersistirPunicao = punicaoId ? canEditarPunicoes : canAdicionarPunicoes;
   let entity = null;
   try {
     entity = getPunicaoEntity();
@@ -260,6 +264,7 @@ export default function CadastrarPunicao() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!canPersistirPunicao) return;
     if (isSubmittingRef.current || saveMutation.isPending) return;
     isSubmittingRef.current = true;
     saveMutation.mutate();
@@ -269,6 +274,9 @@ export default function CadastrarPunicao() {
 
   if (loadingUser || !isAccessResolved) return null;
   if (!hasPunicoesAccess) return <AccessDenied modulo="Lançamento de Punições" />;
+  if (!canPersistirPunicao) {
+    return <AccessDenied modulo={punicaoId ? 'Editar Punição Disciplinar' : 'Cadastrar Punição Disciplinar'} />;
+  }
 
   if (entityError) {
     return (
@@ -318,7 +326,8 @@ export default function CadastrarPunicao() {
             {punicaoId && (
               <Button 
                 variant="outline" 
-                onClick={() => setShowDeleteDialog(true)}
+                onClick={() => canExcluirPunicoes && setShowDeleteDialog(true)}
+                disabled={!canExcluirPunicoes}
                 className="text-red-600 border-red-300 hover:bg-red-50"
               >
                 <Trash2 className="w-5 h-5 mr-2" />
@@ -457,7 +466,7 @@ export default function CadastrarPunicao() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => deleteMutation.mutate(punicaoId)} className="bg-red-600 hover:bg-red-700">
+              <AlertDialogAction onClick={() => canExcluirPunicoes && deleteMutation.mutate(punicaoId)} className="bg-red-600 hover:bg-red-700">
                 Excluir
               </AlertDialogAction>
             </AlertDialogFooter>

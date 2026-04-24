@@ -29,6 +29,8 @@ export const permissionStructure = [
           { key: 'perm_adicionar_migracao_legado', label: 'Adicionar Migração Legado', sensitive: true },
           { key: 'perm_editar_migracao_legado', label: 'Editar Migração Legado', sensitive: true },
           { key: 'perm_excluir_migracao_legado', label: 'Excluir Migração Legado', sensitive: true },
+          { key: 'perm_classificar_legado', label: 'Classificar Pendências do Legado', sensitive: true },
+          { key: 'perm_revisar_duplicidades', label: 'Revisar Duplicidades de Militar', sensitive: true },
           { key: 'perm_migrar_alteracoes_legado', label: 'Migrar Alterações Legado', sensitive: true }
         ]
       },
@@ -46,21 +48,28 @@ export const permissionStructure = [
         key: 'acesso_registros_militar',
         label: 'Registros do Militar',
         actions: [
-          { key: 'perm_visualizar_registros_militar', label: 'Visualizar Registros do Militar' }
+          { key: 'perm_visualizar_registros_militar', label: 'Visualizar Registros do Militar' },
+          { key: 'perm_editar_registros_militar', label: 'Editar Registros do Militar', sensitive: true },
+          { key: 'perm_excluir_registros_militar', label: 'Excluir Registros do Militar', sensitive: true }
         ]
       },
       {
         key: 'acesso_controle_comportamento',
         label: 'Controle de Comportamento',
         actions: [
-          { key: 'perm_visualizar_controle_comportamento', label: 'Visualizar Controle de Comportamento' }
+          { key: 'perm_visualizar_controle_comportamento', label: 'Visualizar Controle de Comportamento' },
+          { key: 'perm_gerar_pendencias_comportamento', label: 'Gerar Pendências de Comportamento', sensitive: true },
+          { key: 'perm_aprovar_mudanca_comportamento', label: 'Aprovar Mudança de Comportamento', sensitive: true }
         ]
       },
       {
         key: 'acesso_punicoes',
         label: 'Lançamento de Punições',
         actions: [
-          { key: 'perm_visualizar_punicoes', label: 'Visualizar Lançamento de Punições' }
+          { key: 'perm_visualizar_punicoes', label: 'Visualizar Lançamento de Punições' },
+          { key: 'perm_adicionar_punicoes', label: 'Adicionar Punições', sensitive: true },
+          { key: 'perm_editar_punicoes', label: 'Editar Punições', sensitive: true },
+          { key: 'perm_excluir_punicoes', label: 'Excluir Punições', sensitive: true }
         ]
       },
       {

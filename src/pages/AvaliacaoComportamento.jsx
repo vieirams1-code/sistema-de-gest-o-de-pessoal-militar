@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
+import AccessDenied from '@/components/auth/AccessDenied';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import {
   criarPendenciaComportamentoSemDuplicidade,
@@ -23,6 +25,9 @@ export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { isLoading: loadingUser, isAccessResolved, canAccessAction } = useCurrentUser();
+  const canGerarPendencias = canAccessAction('gerar_pendencias_comportamento');
+  const canAprovarMudanca = canAccessAction('aprovar_mudanca_comportamento');
   const [filtro, setFiltro] = useState('');
   const [aprovacaoModal, setAprovacaoModal] = useState({
     open: false,
@@ -74,6 +79,7 @@ export default function AvaliacaoComportamento() {
   }, [militares, punicoes, filtro, pendencias]);
 
   const aplicarSugestao = async (linha, { gerarPublicacao = false } = {}) => {
+    if (!canAprovarMudanca) return;
     if (!linha.calculado?.comportamento) return;
 
     try {
@@ -188,6 +194,7 @@ export default function AvaliacaoComportamento() {
   };
 
   const gerarPendencias = async () => {
+    if (!canGerarPendencias) return;
     for (const linha of avaliacao.filter((a) => a.divergente && !a.pendenciaExistente && !a.inconsistenteCalculo)) {
       // eslint-disable-next-line no-await-in-loop
       await gerarPendencia(linha);
@@ -196,6 +203,7 @@ export default function AvaliacaoComportamento() {
   };
 
   const abrirModalAprovacao = (linha) => {
+    if (!canAprovarMudanca) return;
     setAprovacaoModal({
       open: true,
       linha,
@@ -210,10 +218,16 @@ export default function AvaliacaoComportamento() {
   };
 
   const confirmarAprovacao = async ({ gerarPublicacao = false } = {}) => {
+    if (!canAprovarMudanca) return;
     if (!aprovacaoModal.linha) return;
     await aplicarSugestao(aprovacaoModal.linha, { gerarPublicacao });
     fecharModalAprovacao();
   };
+
+  if (loadingUser || !isAccessResolved) return null;
+  if (!canGerarPendencias && !canAprovarMudanca) {
+    return <AccessDenied modulo="Avaliação de Comportamento" />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -227,7 +241,7 @@ export default function AvaliacaoComportamento() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={gerarPendencias}>
+            <Button variant="outline" onClick={gerarPendencias} disabled={!canGerarPendencias}>
               <Wand2 className="w-4 h-4 mr-2" />
               Gerar pendências
             </Button>
@@ -281,7 +295,7 @@ export default function AvaliacaoComportamento() {
                       </Button>
                       {linha.divergente && !linha.inconsistenteCalculo ? (
                         <>
-                          <Button size="sm" onClick={() => abrirModalAprovacao(linha)}>
+                          <Button size="sm" onClick={() => abrirModalAprovacao(linha)} disabled={!canAprovarMudanca}>
                             <CheckCircle2 className="w-4 h-4 mr-1" />
                             Aprovar mudança
                           </Button>
@@ -315,11 +329,11 @@ export default function AvaliacaoComportamento() {
           </div>
 
           <DialogFooter className="gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => confirmarAprovacao({ gerarPublicacao: false })}>
+            <Button variant="outline" onClick={() => confirmarAprovacao({ gerarPublicacao: false })} disabled={!canAprovarMudanca}>
               <CheckCircle2 className="w-4 h-4 mr-1" />
               Aprovar sem publicação
             </Button>
-            <Button onClick={() => confirmarAprovacao({ gerarPublicacao: true })}>
+            <Button onClick={() => confirmarAprovacao({ gerarPublicacao: true })} disabled={!canAprovarMudanca}>
               <FileText className="w-4 h-4 mr-1" />
               Aprovar e gerar publicação
             </Button>
