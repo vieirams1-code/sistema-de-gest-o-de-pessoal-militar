@@ -216,10 +216,13 @@ export default function CreditosExtraordinariosFerias() {
       }
       return base44.entities.CreditoExtraFerias.update(credito.id, {
         status: STATUS_CREDITO_EXTRA_FERIAS.CANCELADO,
+        gozo_ferias_id: '',
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias-creditos-extra'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias'] });
       toast({ title: 'Crédito cancelado' });
     },
     onError: (error) => {
@@ -247,6 +250,8 @@ export default function CreditosExtraordinariosFerias() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      await queryClient.invalidateQueries({ queryKey: ['ferias-creditos-extra'] });
+      await queryClient.invalidateQueries({ queryKey: ['ferias'] });
       toast({ title: 'Crédito vinculado ao gozo', description: 'Status atualizado para VINCULADO.' });
       setCreditoVinculoModal(null);
       setGozoSelecionadoId('');
@@ -269,6 +274,8 @@ export default function CreditosExtraordinariosFerias() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      await queryClient.invalidateQueries({ queryKey: ['ferias-creditos-extra'] });
+      await queryClient.invalidateQueries({ queryKey: ['ferias'] });
       toast({ title: 'Vínculo removido', description: 'Crédito retornou para DISPONIVEL.' });
     },
     onError: (error) => {
