@@ -112,6 +112,13 @@ export const permissionStructure = [
           { key: 'perm_excluir_atestados', label: 'Excluir Atestados', sensitive: true },
           { key: 'perm_excluir_atestado', label: 'Excluir Atestado', sensitive: true }
         ]
+      },
+      {
+        key: 'acesso_central_pendencias',
+        label: 'Central de Pendências',
+        actions: [
+          { key: 'perm_visualizar_central_pendencias', label: 'Visualizar Central de Pendências' }
+        ]
       }
     ]
   },
