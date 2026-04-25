@@ -20,6 +20,15 @@ const LIMITE_PADRAO = 1000;
 const STATUS_PUBLICACAO_PENDENTE = ['aguardando publicação', 'aguardando publicacao', 'aguardando nota'];
 const STATUS_ATESTADO_PENDENTE = ['aguardando homologação', 'aguardando homologacao', 'aguardando jiso'];
 
+function parseJsonSafe(value) {
+  if (!value || typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
 const criarPendenciaBase = (dados) => ({
   id: dados.id,
   categoria: dados.categoria,
@@ -229,22 +238,118 @@ function mapLegadoPendencias(publicacoesLegado = [], duplicidades = []) {
     origemLink: '/ClassificacaoPendentesLegado',
   }));
 
-  const pendenciasDuplicidade = (duplicidades || [])
-    .filter((item) => normalizarTexto(item.origem_fluxo) !== 'importacao_legado')
-    .map((item) => criarPendenciaBase({
-      id: `le-dup-${item.id}`,
+  const fluxoLabel = (origemFluxo = '') => {
+    const fluxo = normalizarTexto(origemFluxo);
+    if (fluxo.includes('edicao_manual')) return 'Edição manual';
+    if (fluxo.includes('manual')) return 'Cadastro manual';
+    if (fluxo.includes('importacao') || fluxo.includes('legado')) return 'Legado/Importação';
+    return 'Origem não identificada';
+  };
+
+  const normalizarChaveDuplicidade = (value = '') => String(value || '').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+
+  const apenasDigitos = (value = '') => String(value || '').replace(/\D/g, '');
+
+  const extrairDadosChave = (item = {}) => {
+    const payload = parseJsonSafe(item.payload_novo_cadastro);
+    const snapshot = parseJsonSafe(item.snapshot_comparativo);
+    const militarExistente = snapshot?.militar_existente || {};
+    const militarCandidato = snapshot?.militar_candidato || {};
+
+    const matricula = [
+      payload?.matricula,
+      militarCandidato?.matricula,
+      militarExistente?.matricula,
+    ].map((v) => apenasDigitos(v)).find(Boolean) || '';
+
+    const cpf = [
+      payload?.cpf,
+      militarCandidato?.cpf,
+      militarExistente?.cpf,
+    ].map((v) => apenasDigitos(v)).find((v) => v.length === 11) || '';
+
+    const nomeCompleto = [
+      payload?.nome_completo,
+      payload?.nome_canonico,
+      militarCandidato?.nome_completo,
+      militarExistente?.nome_completo,
+    ].map((v) => normalizarChaveDuplicidade(v)).find(Boolean) || '';
+
+    if (matricula) return { tipo: 'matricula', valor: matricula };
+    if (cpf) return { tipo: 'cpf', valor: cpf };
+    if (nomeCompleto) return { tipo: 'nome completo', valor: nomeCompleto };
+    return { tipo: 'registro sem chave identificável', valor: String(item.id || '') };
+  };
+
+  const formatarMatricula = (digits = '') => {
+    if (!digits) return '';
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}-${digits.slice(6, 9)}`;
+  };
+
+  const formatarCPF = (digits = '') => {
+    if (!digits || digits.length !== 11) return digits;
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+  };
+
+  const formatarChave = ({ tipo, valor }) => {
+    if (tipo === 'matricula') return `${tipo} ${formatarMatricula(valor)}`;
+    if (tipo === 'cpf') return `${tipo} ${formatarCPF(valor)}`;
+    return `${tipo} ${valor}`;
+  };
+
+  const gruposDuplicidade = new Map();
+  (duplicidades || []).forEach((item) => {
+    const chaveLogica = extrairDadosChave(item);
+    const chaveGrupo = `${chaveLogica.tipo}:${chaveLogica.valor}`;
+    if (!gruposDuplicidade.has(chaveGrupo)) {
+      gruposDuplicidade.set(chaveGrupo, {
+        chaveLogica,
+        itens: [],
+        origens: new Map(),
+      });
+    }
+    const grupo = gruposDuplicidade.get(chaveGrupo);
+    grupo.itens.push(item);
+    const origem = fluxoLabel(item.origem_fluxo);
+    grupo.origens.set(origem, (grupo.origens.get(origem) || 0) + 1);
+  });
+
+  const pendenciasDuplicidade = Array.from(gruposDuplicidade.entries()).map(([chaveGrupo, grupo]) => {
+    const ultimoRegistro = grupo.itens.reduce((maisRecente, atual) => {
+      const dataAtual = new Date(atual.created_at || atual.created_date || 0).getTime();
+      const dataMaisRecente = new Date(maisRecente.created_at || maisRecente.created_date || 0).getTime();
+      return dataAtual > dataMaisRecente ? atual : maisRecente;
+    }, grupo.itens[0]);
+
+    const detalhamentoOrigem = Array.from(grupo.origens.entries())
+      .map(([origem, quantidade]) => `${origem}: ${quantidade}`)
+      .join(' • ');
+
+    return criarPendenciaBase({
+      id: `le-dup-agrupado-${chaveGrupo}`,
       categoria: 'Legado/Outros',
       prioridade: 'alta',
       situacao: 'Duplicidade pendente',
-      titulo: item.motivo || 'Possível duplicidade de militar',
-      descricao: montarDescricaoCurta({ situacao: item.status || 'Pendente', detalhe: `Confiança ${item.nivel_confianca ?? 'N/D'}`, dataReferencia: item.created_at || item.created_date }),
-      militar: item.criado_por || '—',
+      titulo: `Conflitos de cadastro para ${formatarChave(grupo.chaveLogica)} (${grupo.itens.length} ocorrências)`,
+      descricao: montarDescricaoCurta({
+        situacao: ultimoRegistro?.status || 'Pendente',
+        detalhe: `Origens: ${detalhamentoOrigem}`,
+        dataReferencia: ultimoRegistro?.created_at || ultimoRegistro?.created_date,
+      }),
+      militar: '—',
       setor: '—',
-      dataReferencia: item.created_at || item.created_date,
+      dataReferencia: ultimoRegistro?.created_at || ultimoRegistro?.created_date,
       origem: 'Revisão de Duplicidades',
       sugestaoAcao: 'Revisar e tratar no módulo de revisão de duplicidades.',
       origemLink: '/RevisaoDuplicidadesMilitar',
-    }));
+    });
+  });
 
   return [...pendenciasClassificacao, ...pendenciasDuplicidade];
 }
