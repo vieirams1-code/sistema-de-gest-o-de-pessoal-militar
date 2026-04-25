@@ -241,3 +241,63 @@ test('importação final utiliza dados corrigidos', async () => {
   assert.equal(Militar._rows[0].cpf, '52998224725');
   assert.equal(Militar._rows[0].data_inclusao, '2022-05-01');
 });
+
+test('bloqueia duplicidade na importação sem criar pendência persistida', async () => {
+  const { Militar, PossivelDuplicidadeMilitar } = setupClients();
+  const usuario = { email: 'admin@sgp', full_name: 'Administrador' };
+
+  await Militar.create({
+    nome_completo: 'Militar Existente',
+    nome_canonico: 'MILITAR EXISTENTE',
+    matricula: '111.222-333',
+    cpf: '12345678901',
+    data_nascimento: '1990-01-01',
+  });
+
+  const analise = {
+    arquivo: { nome: 'duplicado.csv', tipo: 'text/csv', hash: 'hash-dup' },
+    resumo: { total_linhas: 2, total_aptas: 2, total_aptas_com_alerta: 0, total_duplicadas: 0, total_erros: 0 },
+    linhas: [
+      {
+        linhaNumero: 2,
+        status: 'APTO',
+        alertas: [],
+        erros: [],
+        transformado: {
+          nome_completo: 'Mesmo CPF',
+          nome_guerra: 'CPF',
+          matricula: '999.888-777',
+          cpf: '123.456.789-01',
+          data_inclusao: '2022-05-01',
+          posto_graduacao: 'Soldado',
+          data_nascimento: '1990-01-01',
+        },
+      },
+      {
+        linhaNumero: 3,
+        status: 'APTO',
+        alertas: [],
+        erros: [],
+        transformado: {
+          nome_completo: 'Mesma Matricula',
+          nome_guerra: 'MAT',
+          matricula: '111.222-333',
+          cpf: '529.982.247-25',
+          data_inclusao: '2022-05-01',
+          posto_graduacao: 'Soldado',
+          data_nascimento: '1993-06-15',
+        },
+      },
+    ],
+    versao_regra_migracao: 'v1.1.0',
+  };
+
+  const historico = await salvarAnaliseHistorico(analise, usuario);
+  const resultado = await importarAnalise({ analise, incluirAlertas: false, historicoId: historico.id, usuario });
+
+  assert.equal(resultado.totalImportadas, 0);
+  assert.equal(resultado.totalNaoImportadas, 2);
+  assert.equal(PossivelDuplicidadeMilitar._rows.length, 0);
+  assert.ok(resultado.relatorio.importacao.nao_importadas.some((item) => item.motivo === 'Possível duplicidade identificada.'));
+  assert.ok(resultado.relatorio.importacao.nao_importadas.some((item) => item.motivo === 'Matrícula já cadastrada.'));
+});
