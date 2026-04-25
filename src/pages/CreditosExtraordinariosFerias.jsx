@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { createPageUrl } from '@/utils';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, CheckCircle, Link2, PlusCircle, Settings2, Unlink2, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CheckCircle, ChevronDown, ChevronRight, Link2, PlusCircle, Settings2, Unlink2, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +49,7 @@ const STATUS_COLORS = {
   USADO: 'bg-slate-100 text-slate-700 border border-slate-200',
   CANCELADO: 'bg-red-100 text-red-700 border border-red-200',
 };
+const STATUS_GOZO_BLOQUEADO = new Set(['Gozada', 'Concluída', 'Concluida', 'Finalizada']);
 
 function formatDate(v) {
   if (!v) return '—';
@@ -67,6 +68,17 @@ function formatarTipoGozo(gozo) {
   return 'Integral';
 }
 
+function isCreditoBloqueadoPorUso(credito, gozoById) {
+  if (!credito) return false;
+  if (credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO) return true;
+
+  if (!credito.gozo_ferias_id) return false;
+  const gozo = gozoById.get(credito.gozo_ferias_id);
+  if (!gozo) return false;
+
+  return STATUS_GOZO_BLOQUEADO.has(gozo.status);
+}
+
 export default function CreditosExtraordinariosFerias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -82,6 +94,8 @@ export default function CreditosExtraordinariosFerias() {
     data_fim: '',
   });
   const [form, setForm] = useState(initialForm);
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [expandedMilitares, setExpandedMilitares] = useState({});
 
   const [creditoVinculoModal, setCreditoVinculoModal] = useState(null);
   const [gozoSelecionadoId, setGozoSelecionadoId] = useState('');
@@ -164,6 +178,12 @@ export default function CreditosExtraordinariosFerias() {
     mutationFn: async () => {
       const militar = militarById.get(form.militar_id);
       if (!militar) throw new Error('Selecione um militar para salvar o crédito extraordinário.');
+      if (form.id) {
+        const atual = creditos.find((item) => item.id === form.id);
+        if (isCreditoBloqueadoPorUso(atual, gozoById)) {
+          throw new Error('Este crédito já foi efetivamente utilizado e não pode mais ser alterado.');
+        }
+      }
 
       return salvarCreditoExtraFerias({
         form,
@@ -182,6 +202,7 @@ export default function CreditosExtraordinariosFerias() {
         description: 'Listagem atualizada automaticamente.',
       });
       setForm(initialForm);
+      setModalEdicaoAberto(false);
     },
     onError: (error) => {
       toast({ title: 'Falha ao salvar crédito extraordinário', description: error?.message || 'Erro inesperado.' });
@@ -189,9 +210,14 @@ export default function CreditosExtraordinariosFerias() {
   });
 
   const cancelarMutation = useMutation({
-    mutationFn: async (credito) => base44.entities.CreditoExtraFerias.update(credito.id, {
-      status: STATUS_CREDITO_EXTRA_FERIAS.CANCELADO,
-    }),
+    mutationFn: async (credito) => {
+      if (isCreditoBloqueadoPorUso(credito, gozoById)) {
+        throw new Error('Crédito já utilizado não pode ser cancelado.');
+      }
+      return base44.entities.CreditoExtraFerias.update(credito.id, {
+        status: STATUS_CREDITO_EXTRA_FERIAS.CANCELADO,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
       toast({ title: 'Crédito cancelado' });
@@ -203,6 +229,9 @@ export default function CreditosExtraordinariosFerias() {
 
   const vincularGozoMutation = useMutation({
     mutationFn: async ({ credito, gozoFeriasId }) => {
+      if (isCreditoBloqueadoPorUso(credito, gozoById)) {
+        throw new Error('Crédito já utilizado não pode ser alterado.');
+      }
       if (!gozoFeriasId) {
         throw new Error('Selecione um gozo de férias para vincular.');
       }
@@ -229,8 +258,8 @@ export default function CreditosExtraordinariosFerias() {
 
   const removerVinculoMutation = useMutation({
     mutationFn: async (credito) => {
-      if (credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO) {
-        throw new Error('Crédito USADO não pode ter vínculo removido por esta tela.');
+      if (isCreditoBloqueadoPorUso(credito, gozoById)) {
+        throw new Error('Crédito utilizado não pode ter vínculo removido por esta tela.');
       }
 
       return base44.entities.CreditoExtraFerias.update(credito.id, {
@@ -246,6 +275,10 @@ export default function CreditosExtraordinariosFerias() {
       toast({ title: 'Falha ao remover vínculo', description: error?.message || 'Erro inesperado.' });
     },
   });
+
+  const toggleMilitar = (militarId) => {
+    setExpandedMilitares((prev) => ({ ...prev, [militarId]: !prev[militarId] }));
+  };
 
   if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
@@ -371,11 +404,162 @@ export default function CreditosExtraordinariosFerias() {
           </CardContent>
         </Card>
 
+        <div className="flex justify-end">
+          <Button
+            className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+            onClick={() => {
+              setForm(initialForm);
+              setModalEdicaoAberto(true);
+            }}
+          >
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Novo crédito extraordinário
+          </Button>
+        </div>
+
         <Card className="rounded-xl border border-slate-100 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-[#1e3a5f]">{form.id ? 'Editar crédito' : 'Novo crédito extraordinário'}</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-[#1e3a5f]"><Users className="w-4 h-4" /> Créditos cadastrados ({creditosFiltrados.length})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {isLoading ? (
+              <p className="text-sm text-slate-500">Carregando créditos...</p>
+            ) : creditosFiltrados.length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhum crédito encontrado para os filtros atuais.</p>
+            ) : (
+              creditosAgrupadosPorMilitar.map((grupo) => {
+                const isExpanded = expandedMilitares[grupo.militarId] ?? false;
+                const resumo = grupo.itens.reduce((acc, credito) => {
+                  if (credito.status === STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL) acc.disponiveis += 1;
+                  if (credito.status === STATUS_CREDITO_EXTRA_FERIAS.VINCULADO) acc.vinculados += 1;
+                  if (credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO) acc.usados += 1;
+                  return acc;
+                }, { disponiveis: 0, vinculados: 0, usados: 0 });
+
+                return (
+                <div key={grupo.militarId} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                  <button type="button" onClick={() => toggleMilitar(grupo.militarId)} className="w-full px-4 py-4 hover:bg-slate-50 transition-colors">
+                    <div className="grid lg:grid-cols-[minmax(220px,1fr)_minmax(220px,1.3fr)_auto] gap-4 items-center text-left">
+                      <div className="flex items-center gap-3 text-left">
+                        {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-500 shrink-0" /> : <ChevronRight className="w-5 h-5 text-slate-500 shrink-0" />}
+                        <div className="w-10 h-10 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center shrink-0">
+                          <Users className="w-5 h-5 text-[#1e3a5f]" />
+                        </div>
+                        <div>
+                          <p className="text-sm md:text-base font-semibold text-slate-900 leading-tight">
+                            {grupo.itens[0]?.militar_posto ? `${grupo.itens[0].militar_posto} ` : ''}
+                            {grupo.itens[0]?.militar_nome || grupo.militar?.nome_completo || 'Militar não identificado'}
+                          </p>
+                          <p className="text-xs text-slate-500">Mat: {grupo.militar?.matricula || grupo.itens[0]?.militar_matricula || '—'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm text-slate-600">
+                        <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">{grupo.itens.length} crédito(s)</span>
+                        <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">Disponíveis: {resumo.disponiveis}</span>
+                        <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700">Vinculados: {resumo.vinculados}</span>
+                        <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-700">Usados: {resumo.usados}</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                    {grupo.itens.map((credito) => {
+                      const gozoVinculado = credito.gozo_ferias_id ? gozoById.get(credito.gozo_ferias_id) : null;
+                      const podeRemoverVinculo = Boolean(credito.gozo_ferias_id) && credito.status !== STATUS_CREDITO_EXTRA_FERIAS.USADO;
+                      const bloqueadoPorUso = isCreditoBloqueadoPorUso(credito, gozoById);
+
+                      return (
+                        <div key={credito.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-800">{formatarTipoCreditoExtra(credito.tipo_credito)} · {Number(credito.quantidade_dias || 0)} dia(s)</p>
+                              <p className="text-xs text-slate-500 mt-0.5">Ref.: {formatDate(credito.data_referencia)}</p>
+                            </div>
+                            <Badge className={STATUS_COLORS[credito.status] || 'bg-slate-100 text-slate-700 border border-slate-200'}>{credito.status || '—'}</Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-xs text-slate-600">
+                            <p>Boletim/Documento: <strong>{credito.numero_boletim || credito.origem_documental || '—'}</strong></p>
+                            <p>Vínculo com gozo (ID): <strong>{credito.gozo_ferias_id || 'Não vinculado'}</strong></p>
+                            <p>Gozo vinculado: <strong>{gozoVinculado ? `${gozoVinculado.periodo_aquisitivo_ref || 'Sem período'} · início ${formatDate(gozoVinculado.data_inicio)}` : '—'}</strong></p>
+                            <p>Unidade: <strong>{militarById.get(credito.militar_id)?.unidade || '—'}</strong></p>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={bloqueadoPorUso}
+                              onClick={() => {
+                                setForm({ ...initialForm, ...credito, gozo_ferias_id: credito.gozo_ferias_id || '' });
+                                setModalEdicaoAberto(true);
+                              }}
+                            >
+                              Editar
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO || bloqueadoPorUso}
+                              onClick={() => {
+                                setCreditoVinculoModal(credito);
+                                setGozoSelecionadoId(credito.gozo_ferias_id || '');
+                              }}
+                            >
+                              <Link2 className="w-4 h-4 mr-2" />
+                              Vincular gozo
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!podeRemoverVinculo || removerVinculoMutation.isPending || bloqueadoPorUso}
+                              onClick={() => removerVinculoMutation.mutate(credito)}
+                            >
+                              <Unlink2 className="w-4 h-4 mr-2" />
+                              Remover vínculo
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO || bloqueadoPorUso}
+                              onClick={() => cancelarMutation.mutate(credito)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+              })
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={modalEdicaoAberto} onOpenChange={(open) => {
+        setModalEdicaoAberto(open);
+        if (!open) setForm(initialForm);
+      }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{form.id ? 'Gerenciar crédito extraordinário' : 'Novo crédito extraordinário'}</DialogTitle>
+            <DialogDescription>
+              {form.id ? 'Atualize dados cadastrais e status do crédito com segurança.' : 'Cadastre o crédito extraordinário e vincule ao militar correto.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Militar</Label>
@@ -434,105 +618,17 @@ export default function CreditosExtraordinariosFerias() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setForm(initialForm); setModalEdicaoAberto(false); }}>
+                Cancelar
+              </Button>
               <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={salvarMutation.isPending || !form.militar_id || Number(form.quantidade_dias || 0) <= 0} onClick={() => salvarMutation.mutate()}>
-                <PlusCircle className="w-4 h-4 mr-2" />
                 {form.id ? 'Salvar alterações' : 'Cadastrar crédito'}
               </Button>
-              {form.id && <Button variant="outline" onClick={() => setForm(initialForm)}>Cancelar edição</Button>}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl border border-slate-100 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-[#1e3a5f]"><Users className="w-4 h-4" /> Créditos cadastrados ({creditosFiltrados.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <p className="text-sm text-slate-500">Carregando créditos...</p>
-            ) : creditosFiltrados.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhum crédito encontrado para os filtros atuais.</p>
-            ) : (
-              creditosAgrupadosPorMilitar.map((grupo) => (
-                <div key={grupo.militarId} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-3">
-                  <div className="px-1">
-                    <p className="font-semibold text-[#1e3a5f]">
-                      {grupo.itens[0]?.militar_posto ? `${grupo.itens[0].militar_posto} ` : ''}
-                      {grupo.itens[0]?.militar_nome || grupo.militar?.nome_completo || 'Militar não identificado'}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Mat: {grupo.militar?.matricula || grupo.itens[0]?.militar_matricula || '—'} · {grupo.itens.length} crédito(s)
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                    {grupo.itens.map((credito) => {
-                      const gozoVinculado = credito.gozo_ferias_id ? gozoById.get(credito.gozo_ferias_id) : null;
-                      const podeRemoverVinculo = Boolean(credito.gozo_ferias_id) && credito.status !== STATUS_CREDITO_EXTRA_FERIAS.USADO;
-
-                      return (
-                        <div key={credito.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-slate-800">{formatarTipoCreditoExtra(credito.tipo_credito)} · {Number(credito.quantidade_dias || 0)} dia(s)</p>
-                              <p className="text-xs text-slate-500 mt-0.5">Ref.: {formatDate(credito.data_referencia)}</p>
-                            </div>
-                            <Badge className={STATUS_COLORS[credito.status] || 'bg-slate-100 text-slate-700 border border-slate-200'}>{credito.status || '—'}</Badge>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-xs text-slate-600">
-                            <p>Boletim/Documento: <strong>{credito.numero_boletim || credito.origem_documental || '—'}</strong></p>
-                            <p>Vínculo com gozo (ID): <strong>{credito.gozo_ferias_id || 'Não vinculado'}</strong></p>
-                            <p>Gozo vinculado: <strong>{gozoVinculado ? `${gozoVinculado.periodo_aquisitivo_ref || 'Sem período'} · início ${formatDate(gozoVinculado.data_inicio)}` : '—'}</strong></p>
-                            <p>Unidade: <strong>{militarById.get(credito.militar_id)?.unidade || '—'}</strong></p>
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setForm({ ...initialForm, ...credito, gozo_ferias_id: credito.gozo_ferias_id || '' })}>Editar</Button>
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO || credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO}
-                              onClick={() => {
-                                setCreditoVinculoModal(credito);
-                                setGozoSelecionadoId(credito.gozo_ferias_id || '');
-                              }}
-                            >
-                              <Link2 className="w-4 h-4 mr-2" />
-                              Vincular gozo
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!podeRemoverVinculo || removerVinculoMutation.isPending}
-                              onClick={() => removerVinculoMutation.mutate(credito)}
-                            >
-                              <Unlink2 className="w-4 h-4 mr-2" />
-                              Remover vínculo
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO}
-                              onClick={() => cancelarMutation.mutate(credito)}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(creditoVinculoModal)} onOpenChange={(open) => {
         if (!open) {

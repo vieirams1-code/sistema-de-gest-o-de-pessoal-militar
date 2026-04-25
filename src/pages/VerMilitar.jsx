@@ -35,9 +35,10 @@ import { apurarMedalhaTempoServicoMilitar, normalizarStatusMedalha } from '@/ser
 import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas } from '@/services/medalhasAcessoService';
 import { useToast } from '@/components/ui/use-toast';
 import {
-  formatarTipoCreditoExtra,
-  STATUS_CREDITO_EXTRA_FERIAS } from
+  formatarTipoCreditoExtra } from
 '@/services/creditoExtraFeriasService';
+import { getSaldoConsolidadoPeriodo } from '@/components/ferias/periodoSaldoUtils';
+import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularPeriodoAquisitivo';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -292,6 +293,39 @@ export default function VerMilitar() {
   });
   const armamentosSistema = React.useMemo(() => filtrarRegistrosSistema(armamentos), [armamentos]);
   const periodosSistema = React.useMemo(() => filtrarRegistrosSistema(periodos), [periodos]);
+  const periodosFeriasResumo = React.useMemo(() => {
+    return periodosSistema
+      .filter((periodo) => periodo.status !== 'Inativo')
+      .map((periodo) => {
+        const feriasRelacionadas = feriasSistema.filter((f) =>
+          f.periodo_aquisitivo_id === periodo.id || f.periodo_aquisitivo_ref === periodo.ano_referencia
+        );
+        const saldo = getSaldoConsolidadoPeriodo({ periodo, ferias: feriasRelacionadas });
+        const statusRecalculado = calcularStatusPeriodoAquisitivo({
+          periodo,
+          dias_previstos: saldo.dias_previstos,
+          dias_gozados: saldo.dias_gozados,
+          dias_saldo: saldo.dias_saldo,
+        });
+        return { periodo, feriasRelacionadas, saldo, statusRecalculado };
+      });
+  }, [periodosSistema, feriasSistema]);
+  const creditosExtraPorPeriodo = React.useMemo(() => {
+    const gozoById = new Map(feriasSistema.map((item) => [item.id, item]));
+    const mapa = new Map();
+
+    creditosExtraFerias.forEach((credito) => {
+      if (!credito?.gozo_ferias_id) return;
+      const gozo = gozoById.get(credito.gozo_ferias_id);
+      if (!gozo) return;
+      const chave = gozo.periodo_aquisitivo_id || gozo.periodo_aquisitivo_ref;
+      if (!chave) return;
+      if (!mapa.has(chave)) mapa.set(chave, []);
+      mapa.get(chave).push(credito);
+    });
+
+    return mapa;
+  }, [creditosExtraFerias, feriasSistema]);
   const historicoComportamentoSistema = React.useMemo(() => filtrarRegistrosSistema(historicoComportamento), [historicoComportamento]);
   const punicoesSistema = React.useMemo(() => filtrarRegistrosSistema(punicoes), [punicoes]);
   const pendenciasComportamentoSistema = React.useMemo(
@@ -658,63 +692,34 @@ export default function VerMilitar() {
                 </div> :
 
               <>
-                  {periodosSistema.filter((p) => p.status !== 'Inativo').map((p) =>
+                  {periodosFeriasResumo.map(({ periodo: p, feriasRelacionadas, saldo, statusRecalculado }) =>
                 <div key={p.id} className="bg-white rounded-xl border border-slate-200 p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold text-slate-800">{p.ano_referencia}</span>
-                        <Badge className={p.status === 'Gozado' ? 'bg-green-100 text-green-700' : p.status === 'Vencido' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}>
-                          {p.status}
+                        <Badge className={statusRecalculado === 'Gozado' ? 'bg-green-100 text-green-700' : statusRecalculado === 'Vencido' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}>
+                          {statusRecalculado}
                         </Badge>
                       </div>
                       <p className="text-xs text-slate-500">
-                        {formatDate(p.inicio_aquisitivo)} a {formatDate(p.fim_aquisitivo)} · Limite: {formatDate(p.data_limite_gozo)} · {p.dias_gozados || 0}/{p.dias_direito || 30} dias gozados
+                        {formatDate(p.inicio_aquisitivo)} a {formatDate(p.fim_aquisitivo)} · Limite: {formatDate(p.data_limite_gozo)} · {saldo.dias_gozados || 0}/{p.dias_direito || 30} dias gozados
                       </p>
-                      {feriasSistema.filter((f) => f.periodo_aquisitivo_id === p.id).map((f) =>
+                      {feriasRelacionadas.map((f) =>
                   <div key={f.id} className="mt-2 ml-4 p-2 bg-slate-50 rounded-lg text-xs">
                           <span className="font-medium">Fração: {f.dias} dias</span> — {formatDate(f.data_inicio)} a {formatDate(f.data_fim)}
                           {f.fracionamento && <span className="text-slate-500 ml-2">({f.fracionamento})</span>}
                           <Badge className="ml-2 text-xs" variant="outline">{f.status}</Badge>
                         </div>
                   )}
+                      {(creditosExtraPorPeriodo.get(p.id) || creditosExtraPorPeriodo.get(p.ano_referencia) || []).map((credito) => (
+                        <div key={credito.id} className="mt-2 ml-4 p-2 bg-blue-50 rounded-lg text-xs border border-blue-100">
+                          <span className="font-medium">Crédito extra: {Number(credito.quantidade_dias || 0)} dias</span>
+                          <span className="text-slate-600"> — {formatarTipoCreditoExtra(credito.tipo_credito)}</span>
+                        </div>
+                      ))}
                     </div>
                 )}
                 </>
               }
-
-              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-slate-700">Créditos Extraordinários de Férias</h4>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{creditosExtraFerias.length} registro(s)</Badge>
-                    <Button size="sm" variant="outline" onClick={() => navigate(createPageUrl('CreditosExtraordinariosFerias'))}>
-                      Gerenciar créditos
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {creditosExtraFerias.length === 0 ?
-                  <p className="text-sm text-slate-500">Nenhum crédito extraordinário cadastrado.</p> :
-                  creditosExtraFerias.slice(0, 5).map((credito) =>
-                  <div key={credito.id} className="rounded-lg border border-slate-200 p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-slate-800">
-                          {formatarTipoCreditoExtra(credito.tipo_credito)} · {credito.quantidade_dias}d
-                        </span>
-                        <Badge className={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}>
-                          {credito.status}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Referência: {formatDate(credito.data_referencia) || '—'} · Doc: {credito.origem_documental || '—'} · BG: {credito.numero_boletim || '—'}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Gozo vinculado: {credito.gozo_ferias_id || 'Não vinculado'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           </TabsContent>
 
