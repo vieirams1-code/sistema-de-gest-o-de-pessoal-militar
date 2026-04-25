@@ -812,12 +812,12 @@ export default function Ferias() {
                                         <TooltipTrigger asChild>
                                           <span className="text-red-600 font-semibold cursor-help">+{diasExtras}</span>
                                         </TooltipTrigger>
-                                        <TooltipContent className="max-w-[340px] p-3">
-                                          <p className="text-xs font-semibold text-red-600 mb-2">Créditos extraordinários vinculados</p>
+                                        <TooltipContent className="max-w-[340px] p-3 bg-slate-50 border border-slate-200 text-slate-700 shadow-lg">
+                                          <p className="text-xs font-semibold text-[#1e3a5f] mb-2">Créditos extraordinários vinculados</p>
                                           <div className="space-y-1.5">
                                             {creditosDoGozo.map((credito) => (
-                                              <p key={credito.id} className="text-xs text-slate-200">
-                                                <span className="font-medium text-white">+{Number(credito.quantidade_dias || 0)}d</span>
+                                              <p key={credito.id} className="text-xs text-slate-600">
+                                                <span className="font-semibold text-[#1e3a5f]">+{Number(credito.quantidade_dias || 0)}d</span>
                                                 {' · '}
                                                 {formatarTipoCreditoExtra(credito.tipo_credito)}
                                                 {credito.observacoes ? ` — ${credito.observacoes}` : ''}
