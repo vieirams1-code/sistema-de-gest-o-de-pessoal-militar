@@ -8,6 +8,18 @@ import {
   canAccessComunicacoes,
   isComunicacoesFeatureEnabled,
 } from "../../utils/comunicacoes/comunicacoes.access";
+import {
+  COMUNICACOES_ACCESS_PERMISSION,
+  COMUNICACOES_MODULE_KEY,
+} from "../../utils/comunicacoes/comunicacoes.constants";
+
+const DEFAULT_CURRENT_USER = {
+  permissions: [COMUNICACOES_ACCESS_PERMISSION],
+};
+
+const DEFAULT_FEATURE_FLAGS = {
+  [COMUNICACOES_MODULE_KEY]: true,
+};
 
 function InfoScreen({ title, description }) {
   return (
@@ -25,10 +37,10 @@ function InfoScreen({ title, description }) {
 }
 
 export default function ComunicacoesPage({
-  currentUser,
-  featureFlags,
-  currentUserName,
-  currentUserRole,
+  currentUser = DEFAULT_CURRENT_USER,
+  featureFlags = DEFAULT_FEATURE_FLAGS,
+  currentUserName = "Usuário do Sistema",
+  currentUserRole = "Comunicações Internas",
 }) {
   const featureEnabled = isComunicacoesFeatureEnabled(featureFlags);
   const accessGranted = canAccessComunicacoes({ currentUser, featureFlags });

@@ -1,3 +1,1 @@
-import ComunicacoesInternasPage from '@/pages/comunicacoes/ComunicacoesInternasPage';
-
-export default ComunicacoesInternasPage;
+export { default } from './comunicacoes';
