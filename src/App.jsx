@@ -160,6 +160,7 @@ const AuthenticatedApp = () => {
         );
       })}
       {/* Alias e redirecionamento para evitar 404 em acessos legados/manuais */}
+      <Route path="/comunicacoes" element={<Navigate to="/Comunicacoes" replace />} />
       <Route path="/templates" element={<Navigate to="/TemplatesTexto" replace />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
