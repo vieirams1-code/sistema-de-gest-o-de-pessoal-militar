@@ -103,6 +103,13 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_comunicacoes',
+        label: 'Comunicações Internas',
+        actions: [
+          { key: 'perm_acessar_comunicacoes', label: 'Acessar Comunicações Internas' }
+        ]
+      },
+      {
         key: 'acesso_atestados',
         label: 'Atestados',
         actions: [

@@ -66,6 +66,7 @@ const moduleGuardByPage = {
   Publicacoes: { moduleKey: 'controle_publicacoes', moduleName: 'Controle de Publicações' },
   CadastrarPublicacao: { moduleKey: 'controle_publicacoes', moduleName: 'Controle de Publicações' },
   ConciliacaoBoletim: { moduleKey: 'conciliacao_boletim', moduleName: 'Conciliação com Boletim' },
+  Comunicacoes: { actionKey: 'acessar_comunicacoes', moduleName: 'Comunicações Internas' },
   MigracaoMilitares: { moduleKeys: ['migracao_militares'], actionKeys: ['visualizar_importacao_militares'], moduleName: 'Migração de Militares' },
   HistoricoImportacoesMilitares: { moduleKeys: ['migracao_militares'], actionKeys: ['ver_historico_importacoes'], moduleName: 'Migração de Militares' },
   MigracaoAlteracoesLegado: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['visualizar_migracao_legado'], moduleName: 'Migração de Alterações Legado' },

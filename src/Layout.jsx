@@ -26,12 +26,15 @@ import {
   FileSpreadsheet,
   FileUp,
   History,
+  Inbox,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
+import { useAuth } from '@/lib/AuthContext';
+import { isModuloComunicacoesInternasEnabled } from '@/utils/comunicacoes/featureFlags';
 
 const menuGroups = [
   {
@@ -81,6 +84,7 @@ const menuGroups = [
       { name: 'RP', page: 'RP', icon: BookMarked, viewPermission: 'visualizar_rp' },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_controle_publicacoes' },
       { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_conciliacao_boletim' },
+      { name: 'Comunicações Internas', page: 'Comunicacoes', icon: Inbox, actionKey: 'acessar_comunicacoes', featureFlagKey: 'modulo_comunicacoes_internas' },
     ],
   },
   {
@@ -149,6 +153,8 @@ export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState([]);
   const { isAdmin, canAccessModule, canAccessAction, permissions, canAccessAll } = useCurrentUser();
+  const { appPublicSettings } = useAuth();
+  const comunicacoesInternasEnabled = isModuloComunicacoesInternasEnabled(appPublicSettings);
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
   const temPermissao = (actionKey) => canAccessAction(actionKey);
   useVerificacaoComportamentoDiaria({ enabled: canAccessModule('militares') || isAdmin });
@@ -178,6 +184,7 @@ export default function Layout({ children, currentPageName }) {
         ));
         if (!hasAnyPermission) return false;
       }
+      if (item.featureFlagKey === 'modulo_comunicacoes_internas' && !comunicacoesInternasEnabled) return false;
       return true;
     }).map((item) => {
       if (!item.children?.length) return item;
