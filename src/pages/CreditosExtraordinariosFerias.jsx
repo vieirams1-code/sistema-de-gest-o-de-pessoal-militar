@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { createPageUrl } from '@/utils';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, CheckCircle, ChevronDown, ChevronRight, Link2, PlusCircle, Settings2, Trash2, Unlink2, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, CheckCircle, ChevronDown, ChevronRight, ChevronsUpDown, Link2, PlusCircle, Settings2, Trash2, Unlink2, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 import {
   TIPOS_CREDITO_EXTRA_FERIAS,
   STATUS_CREDITO_EXTRA_FERIAS,
@@ -79,6 +82,14 @@ function isCreditoBloqueadoPorUso(credito, gozoById) {
   return STATUS_GOZO_BLOQUEADO.has(gozo.status);
 }
 
+function formatarNomeMilitarPesquisa(militar) {
+  const posto = String(militar?.posto_graduacao || '').trim();
+  const nomeGuerra = String(militar?.nome_guerra || militar?.nome_completo || '').trim();
+  const nomeCompleto = String(militar?.nome_completo || militar?.nome_guerra || '').trim();
+  const prefixo = [posto, nomeGuerra].filter(Boolean).join(' ').trim();
+  return [prefixo, nomeCompleto].filter(Boolean).join(' - ').trim() || 'Militar não identificado';
+}
+
 export default function CreditosExtraordinariosFerias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -99,6 +110,8 @@ export default function CreditosExtraordinariosFerias() {
 
   const [creditoVinculoModal, setCreditoVinculoModal] = useState(null);
   const [gozoSelecionadoId, setGozoSelecionadoId] = useState('');
+  const [militarPopoverOpen, setMilitarPopoverOpen] = useState(false);
+  const [buscaMilitar, setBuscaMilitar] = useState('');
 
   const { data: militares = [] } = useQuery({
     queryKey: ['creditos-extra-ferias-militares'],
@@ -110,6 +123,24 @@ export default function CreditosExtraordinariosFerias() {
     () => new Map(militares.map((militar) => [militar.id, militar])),
     [militares],
   );
+  const militaresFiltradosBusca = useMemo(() => {
+    const termo = String(buscaMilitar || '').trim().toLowerCase();
+    if (!termo) return militares;
+
+    return militares.filter((militar) => {
+      const alvo = [
+        formatarNomeMilitarPesquisa(militar),
+        militar?.matricula,
+        militar?.matricula_atual,
+        militar?.rg,
+        militar?.cpf,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return alvo.includes(termo);
+    });
+  }, [buscaMilitar, militares]);
 
   const { data: gozosFerias = [] } = useQuery({
     queryKey: ['creditos-extra-ferias-gozos'],
@@ -605,13 +636,53 @@ export default function CreditosExtraordinariosFerias() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Militar</Label>
-                <Select value={form.militar_id || 'none'} onValueChange={(v) => setForm((p) => ({ ...p, militar_id: v === 'none' ? '' : v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Selecione</SelectItem>
-                    {militares.map((militar) => <SelectItem key={militar.id} value={militar.id}>{militar.nome_completo}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover open={militarPopoverOpen} onOpenChange={setMilitarPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      <span className="truncate text-left">
+                        {form.militar_id ? formatarNomeMilitarPesquisa(militarById.get(form.militar_id)) : 'Selecione'}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[380px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Buscar por posto/graduação, nome de guerra, nome completo, matrícula, CPF ou RG..."
+                        value={buscaMilitar}
+                        onValueChange={setBuscaMilitar}
+                      />
+                      <CommandEmpty>Nenhum militar encontrado.</CommandEmpty>
+                      <CommandGroup className="max-h-72 overflow-auto">
+                        <CommandItem
+                          value="Selecione"
+                          onSelect={() => {
+                            setForm((p) => ({ ...p, militar_id: '' }));
+                            setMilitarPopoverOpen(false);
+                            setBuscaMilitar('');
+                          }}
+                        >
+                          <Check className={cn('mr-2 h-4 w-4', !form.militar_id ? 'opacity-100' : 'opacity-0')} />
+                          Selecione
+                        </CommandItem>
+                        {militaresFiltradosBusca.map((militar) => (
+                          <CommandItem
+                            key={militar.id}
+                            value={formatarNomeMilitarPesquisa(militar)}
+                            onSelect={() => {
+                              setForm((p) => ({ ...p, militar_id: militar.id }));
+                              setMilitarPopoverOpen(false);
+                              setBuscaMilitar('');
+                            }}
+                          >
+                            <Check className={cn('mr-2 h-4 w-4', form.militar_id === militar.id ? 'opacity-100' : 'opacity-0')} />
+                            <span className="truncate">{formatarNomeMilitarPesquisa(militar)}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-1.5">
