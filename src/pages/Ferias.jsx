@@ -436,7 +436,9 @@ export default function Ferias() {
     const mapa = new Map();
     (creditosExtraFerias || []).forEach((credito) => {
       const gozoId = credito?.gozo_ferias_id;
+      const statusCredito = String(credito?.status || '').toUpperCase();
       if (!gozoId) return;
+      if (!['VINCULADO', 'USADO'].includes(statusCredito)) return;
       if (!mapa.has(gozoId)) mapa.set(gozoId, []);
       mapa.get(gozoId).push(credito);
     });
