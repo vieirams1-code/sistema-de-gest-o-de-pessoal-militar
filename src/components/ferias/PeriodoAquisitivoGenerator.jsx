@@ -66,7 +66,8 @@ export default function PeriodoAquisitivoGenerator() {
   const [open, setOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
-  const [militarSelecionadoId, setMilitarSelecionadoId] = useState('all');
+  const [escopo, setEscopo] = useState('all');
+  const [militarSelecionadoId, setMilitarSelecionadoId] = useState('');
   const queryClient = useQueryClient();
 
   const { data: militares = [] } = useQuery({
@@ -106,7 +107,7 @@ export default function PeriodoAquisitivoGenerator() {
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
-      const militaresAlvo = militarSelecionadoId === 'all'
+      const militaresAlvo = escopo === 'all'
         ? militaresSelecionaveis
         : militaresSelecionaveis.filter((militar) => String(militar.id) === String(militarSelecionadoId));
 
@@ -168,7 +169,7 @@ export default function PeriodoAquisitivoGenerator() {
         setResult({
           success: true,
           count: novosPeriodos.length,
-          message: militarSelecionadoId === 'all'
+          message: escopo === 'all'
             ? `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) com sucesso!`
             : `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) para o militar selecionado.`,
         });
@@ -176,7 +177,7 @@ export default function PeriodoAquisitivoGenerator() {
         setResult({
           success: true,
           count: 0,
-          message: militarSelecionadoId === 'all'
+          message: escopo === 'all'
             ? 'Todos os períodos aquisitivos já estão atualizados.'
             : 'O militar selecionado já está com os períodos aquisitivos atualizados.',
         });
@@ -213,25 +214,39 @@ export default function PeriodoAquisitivoGenerator() {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700">Escopo de geração</p>
-            <Select value={militarSelecionadoId} onValueChange={setMilitarSelecionadoId} disabled={generating}>
+            <Select value={escopo} onValueChange={setEscopo} disabled={generating}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o escopo da geração" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os militares operacionais</SelectItem>
-                {militaresSelecionaveis.map((militar) => (
-                  <SelectItem key={militar.id} value={String(militar.id)}>
-                    {militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}{militar.nome_completo}
-                  </SelectItem>
-                ))}
+                <SelectItem value="individual">Militar específico</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {escopo === 'individual' && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-700">Militar</p>
+              <Select value={militarSelecionadoId} onValueChange={setMilitarSelecionadoId} disabled={generating}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o militar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {militaresSelecionaveis.map((militar) => (
+                    <SelectItem key={militar.id} value={String(militar.id)}>
+                      {militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}{militar.nome_completo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <Alert>
             <Calendar className="w-4 h-4" />
             <AlertDescription>
-              <strong>{militarSelecionadoId === 'all' ? militaresSelecionaveis.length : 1}</strong> militar(es) será(ão) processado(s).
+              <strong>{escopo === 'all' ? militaresSelecionaveis.length : 1}</strong> militar(es) será(ão) processado(s).
               Apenas períodos que ainda não existem serão criados.
             </AlertDescription>
           </Alert>
@@ -256,7 +271,7 @@ export default function PeriodoAquisitivoGenerator() {
 
             <Button
               onClick={handleGenerate}
-              disabled={generating}
+              disabled={generating || (escopo === 'individual' && !militarSelecionadoId)}
               className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
             >
               {generating ? (
