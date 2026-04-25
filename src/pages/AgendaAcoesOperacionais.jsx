@@ -25,6 +25,8 @@ function GrupoAcoes({
   descricao,
   icon: Icon,
   grupos,
+  destaqueContainerClass = '',
+  destaqueHeaderClass = '',
   onOpenCard,
   onToggleConcluida,
   onDelete,
@@ -41,8 +43,8 @@ function GrupoAcoes({
 
 
   return (
-    <section className="bg-white border border-slate-200 rounded-xl shadow-sm">
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+    <section className={`border rounded-xl shadow-sm ${destaqueContainerClass || 'bg-white border-slate-200'}`}>
+      <div className={`px-4 py-3 border-b flex items-center justify-between ${destaqueHeaderClass || 'border-slate-100'}`}>
         <div className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-slate-500" />
           <h2 className="text-sm font-semibold text-slate-800">{titulo}</h2>
@@ -421,6 +423,8 @@ export default function AgendaAcoesOperacionaisPage() {
         descricao="Prazo menor que hoje"
         icon={AlertTriangle}
         grupos={atrasadas}
+        destaqueContainerClass="bg-red-50 border-red-200"
+        destaqueHeaderClass="bg-red-100/70 border-red-200"
         {...propsComunsGrupo}
       />
 
@@ -429,6 +433,8 @@ export default function AgendaAcoesOperacionaisPage() {
         descricao="Prazo do dia"
         icon={Clock3}
         grupos={hoje}
+        destaqueContainerClass="bg-amber-50 border-amber-200"
+        destaqueHeaderClass="bg-amber-100/70 border-amber-200"
         {...propsComunsGrupo}
       />
 
@@ -437,6 +443,8 @@ export default function AgendaAcoesOperacionaisPage() {
         descricao="Sem prazo vencido"
         icon={CalendarClock}
         grupos={proximas}
+        destaqueContainerClass="bg-emerald-50 border-emerald-200"
+        destaqueHeaderClass="bg-emerald-100/70 border-emerald-200"
         {...propsComunsGrupo}
       />
 
