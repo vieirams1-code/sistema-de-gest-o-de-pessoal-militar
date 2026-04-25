@@ -26,3 +26,7 @@ bash ./scripts/publish-github-base44.sh main "feat: minha alteração"
 ```
 
 Após o push, qualquer integração do Base44 conectada a este repositório no GitHub pode consumir/atualizar as alterações publicadas.
+
+## Documentação de produto
+
+- Análise e proposta de simplificação da gestão de períodos aquisitivos: `docs/analise-gestao-periodos-aquisitivos.md`.
