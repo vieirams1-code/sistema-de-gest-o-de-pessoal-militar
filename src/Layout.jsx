@@ -32,6 +32,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
+import SgpThemeModeMount from '@/themes/sgpThemeModes/SgpThemeModeMount';
 const menuGroups = [
   {
     title: 'Principal',
@@ -209,6 +210,7 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SgpThemeModeMount />
       {/* Header Mobile */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#173764] text-white z-40 px-4 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3 min-w-0">

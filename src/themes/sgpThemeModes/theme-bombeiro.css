@@ -1,0 +1,244 @@
+html[data-sgp-theme="bombeiro"] {
+  --sgp-fire-red: #dc2626;
+  --sgp-fire-red-dark: #7f1d1d;
+  --sgp-fire-orange: #f97316;
+  --sgp-fire-yellow: #facc15;
+  --sgp-fire-dark: #111827;
+  --sgp-fire-panel: #1f1717;
+  --sgp-fire-border: rgba(248, 113, 113, 0.48);
+}
+
+html[data-sgp-theme="bombeiro"],
+html[data-sgp-theme="bombeiro"] * {
+  cursor: url("./assets/cursor-extintor.svg") 6 6, auto;
+}
+
+html[data-sgp-theme="bombeiro"] body {
+  background:
+    radial-gradient(circle at top right, rgba(220, 38, 38, 0.28), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.22), transparent 30%),
+    linear-gradient(135deg, #120a0a, #1f1111 42%, #0f172a);
+}
+
+html[data-sgp-theme="bombeiro"] .bg-slate-50 {
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.18), transparent 30%),
+    linear-gradient(135deg, #180f0f, #111827) !important;
+}
+
+html[data-sgp-theme="bombeiro"] aside {
+  background:
+    linear-gradient(180deg, rgba(127, 29, 29, 0.98), rgba(31, 23, 23, 0.98)) !important;
+  border-right: 1px solid rgba(251, 191, 36, 0.28);
+  box-shadow:
+    inset -1px 0 0 rgba(255, 255, 255, 0.08),
+    10px 0 36px rgba(127, 29, 29, 0.36);
+}
+
+html[data-sgp-theme="bombeiro"] aside::before {
+  content: "";
+  display: block;
+  height: 8px;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      #facc15 0 12px,
+      #111827 12px 24px
+    );
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.35);
+}
+
+html[data-sgp-theme="bombeiro"] header,
+html[data-sgp-theme="bombeiro"] main > div.sticky {
+  background:
+    linear-gradient(90deg, rgba(127, 29, 29, 0.96), rgba(30, 41, 59, 0.96)) !important;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.32) !important;
+  box-shadow: 0 10px 26px rgba(127, 29, 29, 0.22);
+}
+
+html[data-sgp-theme="bombeiro"] main {
+  color: #f8fafc;
+}
+
+html[data-sgp-theme="bombeiro"] h1,
+html[data-sgp-theme="bombeiro"] h2,
+html[data-sgp-theme="bombeiro"] h3 {
+  color: #fff7ed;
+  text-shadow: 0 0 14px rgba(248, 113, 113, 0.25);
+}
+
+html[data-sgp-theme="bombeiro"] [class*="bg-white"],
+html[data-sgp-theme="bombeiro"] [class*="Card"],
+html[data-sgp-theme="bombeiro"] [class*="card"] {
+  background:
+    linear-gradient(180deg, rgba(31, 23, 23, 0.94), rgba(15, 23, 42, 0.92)) !important;
+  border-color: var(--sgp-fire-border) !important;
+  color: #f8fafc;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(251, 191, 36, 0.08);
+}
+
+html[data-sgp-theme="bombeiro"] button,
+html[data-sgp-theme="bombeiro"] a[role="button"] {
+  transition: 160ms ease;
+}
+
+html[data-sgp-theme="bombeiro"] button:not(.sgp-theme-toggle__button) {
+  border-color: rgba(248, 113, 113, 0.26);
+}
+
+html[data-sgp-theme="bombeiro"] button:not(.sgp-theme-toggle__button):hover {
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.22),
+    0 0 18px rgba(239, 68, 68, 0.22);
+}
+
+html[data-sgp-theme="bombeiro"] input,
+html[data-sgp-theme="bombeiro"] textarea,
+html[data-sgp-theme="bombeiro"] select {
+  background: rgba(15, 23, 42, 0.86) !important;
+  border-color: rgba(248, 113, 113, 0.36) !important;
+  color: #f8fafc !important;
+}
+
+html[data-sgp-theme="bombeiro"] input::placeholder,
+html[data-sgp-theme="bombeiro"] textarea::placeholder {
+  color: rgba(254, 226, 226, 0.55) !important;
+}
+
+html[data-sgp-theme="bombeiro"] table {
+  background: rgba(15, 23, 42, 0.55);
+  color: #f8fafc;
+}
+
+html[data-sgp-theme="bombeiro"] th {
+  color: #fed7aa !important;
+}
+
+html[data-sgp-theme="bombeiro"] td {
+  border-color: rgba(248, 113, 113, 0.14) !important;
+}
+
+html[data-sgp-theme="bombeiro"] .sgp-theme-toggle {
+  background:
+    linear-gradient(135deg, rgba(17, 24, 39, 0.94), rgba(127, 29, 29, 0.9));
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fff7ed;
+}
+
+html[data-sgp-theme="bombeiro"] .sgp-theme-toggle__title {
+  color: #facc15;
+}
+
+html[data-sgp-theme="bombeiro"] .sgp-theme-toggle__button {
+  color: #fee2e2;
+}
+
+html[data-sgp-theme="bombeiro"] .sgp-theme-toggle__button:hover {
+  background: rgba(248, 113, 113, 0.18);
+  color: #ffffff;
+}
+
+.sgp-bombeiro-decor {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.sgp-bombeiro-siren {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  width: 74px;
+  height: 34px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(251, 191, 36, 0.36);
+  border-radius: 16px 16px 8px 8px;
+  background:
+    radial-gradient(circle at center, rgba(248, 113, 113, 0.95), rgba(153, 27, 27, 0.48) 55%, rgba(15, 23, 42, 0.22));
+  box-shadow:
+    0 0 24px rgba(239, 68, 68, 0.55),
+    0 0 50px rgba(239, 68, 68, 0.25);
+  opacity: 0.82;
+}
+
+.sgp-bombeiro-siren__light {
+  position: absolute;
+  inset: -18px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.22), transparent 62%);
+  animation: sgp-bombeiro-pulse 1.6s ease-in-out infinite;
+}
+
+.sgp-bombeiro-side-glow {
+  position: fixed;
+  top: 18%;
+  bottom: 18%;
+  width: 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, rgba(239, 68, 68, 0.8), transparent);
+  filter: blur(1px);
+  opacity: 0.55;
+}
+
+.sgp-bombeiro-side-glow--left {
+  left: 0;
+}
+
+.sgp-bombeiro-side-glow--right {
+  right: 0;
+}
+
+.sgp-bombeiro-bottom-stripe {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  min-height: 26px;
+  padding: 5px 16px;
+  overflow: hidden;
+  border-top: 1px solid rgba(251, 191, 36, 0.35);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(250, 204, 21, 0.92) 0 16px,
+      rgba(17, 24, 39, 0.96) 16px 32px
+    );
+  box-shadow: 0 -8px 20px rgba(127, 29, 29, 0.34);
+}
+
+.sgp-bombeiro-bottom-stripe span {
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.84);
+  color: #facc15;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@keyframes sgp-bombeiro-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08);
+  }
+}
+
+@media print {
+  html[data-sgp-theme="bombeiro"] *,
+  html[data-sgp-theme="noturno"] * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}

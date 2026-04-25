@@ -1,0 +1,61 @@
+html[data-sgp-theme="noturno"] {
+  color-scheme: dark;
+}
+
+html[data-sgp-theme="noturno"] body {
+  background: #020617;
+}
+
+html[data-sgp-theme="noturno"] .bg-slate-50 {
+  background: #020617 !important;
+}
+
+html[data-sgp-theme="noturno"] aside {
+  background: #0f172a !important;
+  border-right: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+html[data-sgp-theme="noturno"] header,
+html[data-sgp-theme="noturno"] main > div.sticky {
+  background: rgba(15, 23, 42, 0.96) !important;
+  border-bottom-color: rgba(148, 163, 184, 0.16) !important;
+}
+
+html[data-sgp-theme="noturno"] main {
+  color: #e2e8f0;
+}
+
+html[data-sgp-theme="noturno"] [class*="bg-white"],
+html[data-sgp-theme="noturno"] [class*="Card"],
+html[data-sgp-theme="noturno"] [class*="card"] {
+  background: #0f172a !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+  color: #e2e8f0;
+}
+
+html[data-sgp-theme="noturno"] input,
+html[data-sgp-theme="noturno"] textarea,
+html[data-sgp-theme="noturno"] select {
+  background: #020617 !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
+  color: #e2e8f0 !important;
+}
+
+html[data-sgp-theme="noturno"] .sgp-theme-toggle {
+  background: rgba(15, 23, 42, 0.92);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #e2e8f0;
+}
+
+html[data-sgp-theme="noturno"] .sgp-theme-toggle__title {
+  color: #94a3b8;
+}
+
+html[data-sgp-theme="noturno"] .sgp-theme-toggle__button {
+  color: #cbd5e1;
+}
+
+html[data-sgp-theme="noturno"] .sgp-theme-toggle__button:hover {
+  background: rgba(148, 163, 184, 0.14);
+  color: #ffffff;
+}
