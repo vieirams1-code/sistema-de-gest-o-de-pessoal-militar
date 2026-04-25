@@ -162,6 +162,9 @@ function temRegraArt53(punicoesNormalizadas, postoGraduacao) {
 }
 
 function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
+  const podeSerOtimo = elegibilidade?.otimo ?? true;
+  const podeSerExcepcional = elegibilidade?.excepcional ?? true;
+
   if (j1.prisao_equivalente > 2) {
     return {
       comportamento: 'Mau',
@@ -176,14 +179,14 @@ function resolveComportamentoPorJanelas(j1, j2, j4, j8, elegibilidade = {}) {
     };
   }
 
-  if (j8.quantidade === 0) {
+  if (podeSerExcepcional && j8.quantidade === 0) {
     return {
       comportamento: 'Excepcional',
       fundamento: 'Art. 52, alínea a: sem punição válida no período de 8 anos.',
     };
   }
 
-  if (j4.quantidade > 0 && j4.detencao_equivalente <= 1) {
+  if (podeSerOtimo && j4.quantidade > 0 && j4.detencao_equivalente <= 1) {
     return {
       comportamento: 'Ótimo',
       fundamento: 'Art. 52, alínea b: até 1 detenção equivalente no período de 4 anos.',
