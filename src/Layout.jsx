@@ -34,6 +34,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { useAuth } from '@/lib/AuthContext';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
+import { isModuloComunicacoesInternasEnabled } from '@/utils/comunicacoes/featureFlags';
 const menuGroups = [
   {
     title: 'Principal',
@@ -93,6 +94,7 @@ const menuGroups = [
         icon: MessageSquare,
         actionKey: 'acessar_comunicacoes',
         featureFlagKey: 'modulo_comunicacoes_internas',
+        path: '/comunicacoes',
       },
     ],
   },
@@ -339,9 +341,10 @@ export default function Layout({ children, currentPageName }) {
                             <div className="mt-1 ml-5 pl-5 border-l border-white/10 space-y-1">
                               {item.children.map((child) => {
                                 const childActive = currentPageName === child.page && !child.tab;
+                                const baseHref = child.path || createPageUrl(child.page);
                                 const href = child.tab
-                                  ? `${createPageUrl(child.page)}?tab=${child.tab}`
-                                  : createPageUrl(child.page);
+                                  ? `${baseHref}?tab=${child.tab}`
+                                  : baseHref;
                                 const ChildIcon = child.icon;
 
                                 return (
@@ -370,7 +373,7 @@ export default function Layout({ children, currentPageName }) {
                     return (
                       <Link
                         key={item.name}
-                        to={item.tab ? `${createPageUrl(item.page)}?tab=${item.tab}` : createPageUrl(item.page)}
+                        to={item.tab ? `${item.path || createPageUrl(item.page)}?tab=${item.tab}` : (item.path || createPageUrl(item.page))}
                         onClick={() => setSidebarOpen(false)}
                         className={`
                           group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all
