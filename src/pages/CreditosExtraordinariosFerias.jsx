@@ -8,6 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { createPageUrl } from '@/utils';
 import { useNavigate } from 'react-router-dom';
@@ -64,6 +72,8 @@ export default function CreditosExtraordinariosFerias() {
     data_fim: '',
   });
   const [form, setForm] = useState(initialForm);
+  const [creditoVinculoModal, setCreditoVinculoModal] = useState(null);
+  const [gozoSelecionadoId, setGozoSelecionadoId] = useState('');
 
   const { data: militares = [] } = useQuery({
     queryKey: ['creditos-extra-ferias-militares'],
@@ -79,6 +89,12 @@ export default function CreditosExtraordinariosFerias() {
   const { data: creditos = [], isLoading } = useQuery({
     queryKey: ['creditos-extra-ferias'],
     queryFn: () => listarCreditosExtraFerias('-data_referencia'),
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
+
+  const { data: ferias = [] } = useQuery({
+    queryKey: ['creditos-extra-ferias-ferias'],
+    queryFn: () => base44.entities.Ferias.list('-data_inicio'),
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
 
@@ -129,6 +145,67 @@ export default function CreditosExtraordinariosFerias() {
       toast({ title: 'Falha ao cancelar crédito', description: error?.message || 'Erro inesperado.' });
     },
   });
+
+  const vincularGozoMutation = useMutation({
+    mutationFn: async ({ credito, gozoFeriasId }) => {
+      if (!gozoFeriasId) throw new Error('Selecione um gozo de férias para vincular.');
+
+      return base44.entities.CreditoExtraFerias.update(credito.id, {
+        status: STATUS_CREDITO_EXTRA_FERIAS.VINCULADO,
+        gozo_ferias_id: gozoFeriasId,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      toast({
+        title: 'Crédito vinculado ao gozo',
+        description: 'O crédito ficará disponível para uso no registro de Saída Férias desse gozo.',
+      });
+      setCreditoVinculoModal(null);
+      setGozoSelecionadoId('');
+    },
+    onError: (error) => {
+      toast({ title: 'Falha ao vincular crédito', description: error?.message || 'Erro inesperado.' });
+    },
+  });
+
+  const desvincularGozoMutation = useMutation({
+    mutationFn: async (credito) => {
+      if (credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO) {
+        throw new Error('Crédito já utilizado não pode ser desvinculado por esta tela.');
+      }
+
+      return base44.entities.CreditoExtraFerias.update(credito.id, {
+        status: STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
+        gozo_ferias_id: '',
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      toast({ title: 'Vínculo removido', description: 'Crédito retornou para DISPONÍVEL.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Falha ao remover vínculo', description: error?.message || 'Erro inesperado.' });
+    },
+  });
+
+  const feriasById = useMemo(
+    () => new Map((ferias || []).map((item) => [item.id, item])),
+    [ferias],
+  );
+
+  const opcoesGozoDoMilitar = useMemo(() => {
+    if (!creditoVinculoModal?.militar_id) return [];
+
+    return (ferias || [])
+      .filter((item) => item?.militar_id === creditoVinculoModal.militar_id)
+      .sort((a, b) => String(b?.data_inicio || '').localeCompare(String(a?.data_inicio || '')));
+  }, [ferias, creditoVinculoModal]);
+
+  const abrirModalVinculo = (credito) => {
+    setCreditoVinculoModal(credito);
+    setGozoSelecionadoId(credito?.gozo_ferias_id || '');
+  };
 
   if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
@@ -264,12 +341,41 @@ export default function CreditosExtraordinariosFerias() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs text-slate-600">
                   <p>Referência: <strong>{formatDate(credito.data_referencia)}</strong></p>
                   <p>Boletim/Documento: <strong>{credito.numero_boletim || credito.origem_documental || '—'}</strong></p>
-                  <p>Vínculo com gozo: <strong>{credito.gozo_ferias_id || 'Não vinculado'}</strong></p>
+                  <p>
+                    Vínculo com gozo:{' '}
+                    <strong>
+                      {credito.gozo_ferias_id
+                        ? `ID ${credito.gozo_ferias_id}`
+                        : 'Não vinculado'}
+                    </strong>
+                    {credito.gozo_ferias_id && feriasById.get(credito.gozo_ferias_id) && (
+                      <span className="ml-1 text-slate-500">
+                        ({feriasById.get(credito.gozo_ferias_id)?.periodo_aquisitivo_ref || 'Período sem referência'} •
+                        {' '}início {formatDate(feriasById.get(credito.gozo_ferias_id)?.data_inicio)})
+                      </span>
+                    )}
+                  </p>
                   <p>Unidade: <strong>{militarById.get(credito.militar_id)?.unidade || '—'}</strong></p>
                 </div>
 
                 <div className="mt-3 flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => setForm({ ...initialForm, ...credito, gozo_ferias_id: credito.gozo_ferias_id || '' })}>Editar</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO || credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO}
+                    onClick={() => abrirModalVinculo(credito)}
+                  >
+                    {credito.gozo_ferias_id ? 'Alterar vínculo' : 'Vincular a gozo'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!credito.gozo_ferias_id || credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO || desvincularGozoMutation.isPending}
+                    onClick={() => desvincularGozoMutation.mutate(credito)}
+                  >
+                    Remover vínculo
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -284,6 +390,73 @@ export default function CreditosExtraordinariosFerias() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={Boolean(creditoVinculoModal)} onOpenChange={(open) => !open && setCreditoVinculoModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular crédito extraordinário</DialogTitle>
+            <DialogDescription>
+              Selecione o gozo de férias do militar para pré-vincular este crédito.
+              O consumo efetivo acontece no registro de <strong>Saída Férias</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="text-sm text-slate-600">
+              <p>
+                Militar:{' '}
+                <strong>
+                  {creditoVinculoModal?.militar_nome || militarById.get(creditoVinculoModal?.militar_id)?.nome_completo || '—'}
+                </strong>
+              </p>
+              <p>
+                Crédito:{' '}
+                <strong>
+                  {creditoVinculoModal ? formatarTipoCreditoExtra(creditoVinculoModal.tipo_credito) : '—'}
+                  {creditoVinculoModal ? ` (+${Number(creditoVinculoModal.quantidade_dias || 0)}d)` : ''}
+                </strong>
+              </p>
+            </div>
+
+            <div>
+              <Label>Gozo de férias do militar</Label>
+              <select
+                className="mt-1.5 w-full border border-slate-200 rounded-md px-3 py-2 text-sm"
+                value={gozoSelecionadoId}
+                onChange={(e) => setGozoSelecionadoId(e.target.value)}
+              >
+                <option value="">Selecione</option>
+                {opcoesGozoDoMilitar.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {(item.periodo_aquisitivo_ref || 'Período sem referência')}
+                    {' • '}
+                    {formatDate(item.data_inicio)} até {formatDate(item.data_fim)}
+                    {' • '}
+                    {item.status || 'Sem status'}
+                  </option>
+                ))}
+              </select>
+              {opcoesGozoDoMilitar.length === 0 && (
+                <p className="text-xs text-amber-700 mt-2">
+                  Nenhum gozo encontrado para este militar. Cadastre o gozo no módulo de Férias primeiro.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditoVinculoModal(null)} disabled={vincularGozoMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => vincularGozoMutation.mutate({ credito: creditoVinculoModal, gozoFeriasId: gozoSelecionadoId })}
+              disabled={!gozoSelecionadoId || vincularGozoMutation.isPending}
+            >
+              {vincularGozoMutation.isPending ? 'Vinculando...' : 'Confirmar vínculo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

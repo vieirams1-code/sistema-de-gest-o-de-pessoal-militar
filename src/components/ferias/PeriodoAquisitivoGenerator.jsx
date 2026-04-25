@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Zap, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { addYears, addMonths, format } from 'date-fns';
 import {
@@ -65,6 +66,7 @@ export default function PeriodoAquisitivoGenerator() {
   const [open, setOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
+  const [militarSelecionadoId, setMilitarSelecionadoId] = useState('all');
   const queryClient = useQueryClient();
 
   const { data: militares = [] } = useQuery({
@@ -90,6 +92,11 @@ export default function PeriodoAquisitivoGenerator() {
     );
   }, [militares, matriculasMilitar]);
 
+  const militaresSelecionaveis = useMemo(
+    () => [...militaresOperacionais].sort((a, b) => (a?.nome_completo || '').localeCompare(b?.nome_completo || '')),
+    [militaresOperacionais]
+  );
+
   const handleGenerate = async () => {
     setGenerating(true);
     setResult(null);
@@ -99,7 +106,19 @@ export default function PeriodoAquisitivoGenerator() {
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
-      for (const militar of militaresOperacionais) {
+      const militaresAlvo = militarSelecionadoId === 'all'
+        ? militaresSelecionaveis
+        : militaresSelecionaveis.filter((militar) => String(militar.id) === String(militarSelecionadoId));
+
+      if (militaresAlvo.length === 0) {
+        setResult({
+          success: false,
+          message: 'Militar selecionado não encontrado entre os operacionais ativos.',
+        });
+        return;
+      }
+
+      for (const militar of militaresAlvo) {
         if (!militar.data_inclusao) continue;
 
         const dataInclusao = parseDateOnly(militar.data_inclusao);
@@ -149,13 +168,17 @@ export default function PeriodoAquisitivoGenerator() {
         setResult({
           success: true,
           count: novosPeriodos.length,
-          message: `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) com sucesso!`,
+          message: militarSelecionadoId === 'all'
+            ? `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) com sucesso!`
+            : `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) para o militar selecionado.`,
         });
       } else {
         setResult({
           success: true,
           count: 0,
-          message: 'Todos os períodos aquisitivos já estão atualizados.',
+          message: militarSelecionadoId === 'all'
+            ? 'Todos os períodos aquisitivos já estão atualizados.'
+            : 'O militar selecionado já está com os períodos aquisitivos atualizados.',
         });
       }
     } catch (error) {
@@ -182,16 +205,33 @@ export default function PeriodoAquisitivoGenerator() {
         <DialogHeader>
           <DialogTitle>Gerar Períodos Aquisitivos</DialogTitle>
           <DialogDescription>
-            Esta ação irá gerar automaticamente os períodos aquisitivos para todos os militares ativos
-            com base na data de inclusão de cada um.
+            Gere períodos aquisitivos automaticamente para todos os militares operacionais
+            ou apenas para um militar específico, com base na data de inclusão.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700">Escopo de geração</p>
+            <Select value={militarSelecionadoId} onValueChange={setMilitarSelecionadoId} disabled={generating}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o escopo da geração" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os militares operacionais</SelectItem>
+                {militaresSelecionaveis.map((militar) => (
+                  <SelectItem key={militar.id} value={String(militar.id)}>
+                    {militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}{militar.nome_completo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Alert>
             <Calendar className="w-4 h-4" />
             <AlertDescription>
-              <strong>{militaresOperacionais.length}</strong> militares ativos serão processados.
+              <strong>{militarSelecionadoId === 'all' ? militaresSelecionaveis.length : 1}</strong> militar(es) será(ão) processado(s).
               Apenas períodos que ainda não existem serão criados.
             </AlertDescription>
           </Alert>
