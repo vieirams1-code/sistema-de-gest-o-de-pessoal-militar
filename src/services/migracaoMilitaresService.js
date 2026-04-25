@@ -9,7 +9,6 @@ import {
   normalizarMatricula,
   normalizarCPF as normalizarCpfIdentidade,
   normalizarNomeCanonico,
-  registrarPossivelDuplicidade,
   validarMatriculaDisponivel,
 } from '@/services/militarIdentidadeService';
 
@@ -1219,15 +1218,7 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
 
       const duplicidade = await getMigracaoClient().entities.Militar.filter({ matricula });
       if (duplicidade.length > 0) {
-        await registrarPossivelDuplicidade({
-          militarExistenteId: duplicidade[0]?.id || '',
-          payloadNovoCadastro: linha.transformado,
-          motivo: 'Matrícula já cadastrada durante importação.',
-          nivelConfianca: 1,
-          criadoPor: usuario?.email || '',
-          origemFluxo: 'importacao_legado',
-        });
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada. Pendência enviada para revisão humana.' });
+        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada.' });
         continue;
       }
 
@@ -1237,15 +1228,7 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
         dataNascimento: linha.transformado.data_nascimento,
       });
       if (duplicidadeForte) {
-        await registrarPossivelDuplicidade({
-          militarExistenteId: duplicidadeForte.id,
-          payloadNovoCadastro: linha.transformado,
-          motivo: 'Possível duplicidade identificada durante importação por CPF e/ou nome + data de nascimento.',
-          nivelConfianca: 0.95,
-          criadoPor: usuario?.email || '',
-          origemFluxo: 'importacao_legado',
-        });
-        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Possível duplicidade identificada. Pendência enviada para revisão humana.' });
+        naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Possível duplicidade identificada.' });
         continue;
       }
       if (!data_inclusao) {

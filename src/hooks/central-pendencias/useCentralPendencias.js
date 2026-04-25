@@ -229,20 +229,22 @@ function mapLegadoPendencias(publicacoesLegado = [], duplicidades = []) {
     origemLink: '/ClassificacaoPendentesLegado',
   }));
 
-  const pendenciasDuplicidade = (duplicidades || []).map((item) => criarPendenciaBase({
-    id: `le-dup-${item.id}`,
-    categoria: 'Legado/Outros',
-    prioridade: 'alta',
-    situacao: 'Duplicidade pendente',
-    titulo: item.motivo || 'Possível duplicidade de militar',
-    descricao: montarDescricaoCurta({ situacao: item.status || 'Pendente', detalhe: `Confiança ${item.nivel_confianca ?? 'N/D'}`, dataReferencia: item.created_at || item.created_date }),
-    militar: item.criado_por || '—',
-    setor: '—',
-    dataReferencia: item.created_at || item.created_date,
-    origem: 'Revisão de Duplicidades',
-    sugestaoAcao: 'Revisar e tratar no módulo de revisão de duplicidades.',
-    origemLink: '/RevisaoDuplicidadesMilitar',
-  }));
+  const pendenciasDuplicidade = (duplicidades || [])
+    .filter((item) => normalizarTexto(item.origem_fluxo) !== 'importacao_legado')
+    .map((item) => criarPendenciaBase({
+      id: `le-dup-${item.id}`,
+      categoria: 'Legado/Outros',
+      prioridade: 'alta',
+      situacao: 'Duplicidade pendente',
+      titulo: item.motivo || 'Possível duplicidade de militar',
+      descricao: montarDescricaoCurta({ situacao: item.status || 'Pendente', detalhe: `Confiança ${item.nivel_confianca ?? 'N/D'}`, dataReferencia: item.created_at || item.created_date }),
+      militar: item.criado_por || '—',
+      setor: '—',
+      dataReferencia: item.created_at || item.created_date,
+      origem: 'Revisão de Duplicidades',
+      sugestaoAcao: 'Revisar e tratar no módulo de revisão de duplicidades.',
+      origemLink: '/RevisaoDuplicidadesMilitar',
+    }));
 
   return [...pendenciasClassificacao, ...pendenciasDuplicidade];
 }
