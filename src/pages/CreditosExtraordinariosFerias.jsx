@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { formatNomeMilitarTexto } from '@/components/militar/NomeMilitar';
 import {
   TIPOS_CREDITO_EXTRA_FERIAS,
   STATUS_CREDITO_EXTRA_FERIAS,
@@ -83,10 +84,10 @@ function isCreditoBloqueadoPorUso(credito, gozoById) {
 }
 
 function formatarNomeMilitarPesquisa(militar) {
-  const posto = String(militar?.posto_graduacao || '').trim();
   const nomeGuerra = String(militar?.nome_guerra || militar?.nome_completo || '').trim();
   const nomeCompleto = String(militar?.nome_completo || militar?.nome_guerra || '').trim();
-  const prefixo = [posto, nomeGuerra].filter(Boolean).join(' ').trim();
+  const postoNome = formatNomeMilitarTexto(militar?.posto_graduacao, '', nomeGuerra).trim();
+  const prefixo = postoNome || nomeGuerra;
   return [prefixo, nomeCompleto].filter(Boolean).join(' - ').trim() || 'Militar não identificado';
 }
 
@@ -645,7 +646,7 @@ export default function CreditosExtraordinariosFerias() {
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[380px] p-0" align="start">
+                  <PopoverContent className="w-[520px] max-w-[calc(100vw-2rem)] p-0" align="start">
                     <Command shouldFilter={false}>
                       <CommandInput
                         placeholder="Buscar por posto/graduação, nome de guerra, nome completo, matrícula, CPF ou RG..."
@@ -676,7 +677,7 @@ export default function CreditosExtraordinariosFerias() {
                             }}
                           >
                             <Check className={cn('mr-2 h-4 w-4', form.militar_id === militar.id ? 'opacity-100' : 'opacity-0')} />
-                            <span className="truncate">{formatarNomeMilitarPesquisa(militar)}</span>
+                            <span className="whitespace-normal break-words leading-tight py-0.5">{formatarNomeMilitarPesquisa(militar)}</span>
                           </CommandItem>
                         ))}
                       </CommandGroup>
