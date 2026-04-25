@@ -33,6 +33,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { useAuth } from '@/lib/AuthContext';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
+import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
 const menuGroups = [
   {
     title: 'Principal',
