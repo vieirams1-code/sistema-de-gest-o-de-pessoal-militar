@@ -74,7 +74,12 @@ export default function AvaliacaoComportamento() {
           pendenciaExistente,
           inconsistenteCalculo: Boolean(calculado?.inconsistente_para_calculo),
           divergente: (militar.comportamento || 'Bom') !== calculado?.comportamento,
+          temAcaoPendente: (militar.comportamento || 'Bom') !== calculado?.comportamento && !calculado?.inconsistente_para_calculo,
         };
+      })
+      .sort((a, b) => {
+        if (a.temAcaoPendente !== b.temAcaoPendente) return a.temAcaoPendente ? -1 : 1;
+        return String(a.militar?.nome_completo || '').localeCompare(String(b.militar?.nome_completo || ''), 'pt-BR');
       });
   }, [militares, punicoes, filtro, pendencias]);
 
