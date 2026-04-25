@@ -21,9 +21,9 @@ function isPeriodoVencido(periodo) {
 export function calcularStatusPeriodoAquisitivo({ periodo = {}, dias_previstos = 0, dias_gozados = 0, dias_saldo = 0 }) {
   if (periodo?.inativo || periodo?.status === 'Inativo') return 'Inativo';
 
-  if (dias_saldo <= 0) return 'Gozado';
-
   if (dias_previstos > 0 && dias_gozados <= 0) return 'Previsto';
+
+  if (dias_saldo <= 0) return 'Gozado';
 
   if (dias_gozados > 0 && dias_saldo > 0) return 'Parcialmente Gozado';
 
