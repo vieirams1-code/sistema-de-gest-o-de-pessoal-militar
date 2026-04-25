@@ -32,6 +32,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
+import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
 
 const menuGroups = [
   {
@@ -396,6 +397,11 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Conteúdo */}
       <main className="lg:pl-72 pt-16 lg:pt-0 min-h-screen">
+        <div className="sticky top-16 lg:top-0 z-30 border-b border-slate-200 bg-slate-50/95 backdrop-blur px-4 py-3">
+          <div className="max-w-7xl mx-auto">
+            <GlobalMilitarSearch />
+          </div>
+        </div>
         {children}
       </main>
 
