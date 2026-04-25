@@ -1,0 +1,105 @@
+.sgp-theme-toggle {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #0f172a;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(14px);
+}
+
+.sgp-theme-toggle__title {
+  padding-left: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.sgp-theme-toggle__buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sgp-theme-toggle__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: 160ms ease;
+}
+
+.sgp-theme-toggle__button:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+}
+
+.sgp-theme-toggle__button--active {
+  background: #173764;
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(23, 55, 100, 0.28);
+}
+
+.sgp-theme-toggle__button--bombeiro.sgp-theme-toggle__button--active {
+  background: linear-gradient(135deg, #991b1b, #dc2626 45%, #f97316);
+  color: #fff7ed;
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.45),
+    0 0 22px rgba(239, 68, 68, 0.45);
+}
+
+.sgp-theme-toggle__icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+@media (max-width: 760px) {
+  .sgp-theme-toggle {
+    top: 72px;
+    right: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    border-radius: 18px;
+  }
+
+  .sgp-theme-toggle__title {
+    padding: 2px 8px 0;
+    text-align: center;
+  }
+
+  .sgp-theme-toggle__buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sgp-theme-toggle__button {
+    justify-content: center;
+  }
+}
+
+@media print {
+  .sgp-theme-toggle,
+  .sgp-bombeiro-decor {
+    display: none !important;
+  }
+}
