@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { createPageUrl } from '@/utils';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, CheckCircle, ChevronDown, ChevronRight, Link2, PlusCircle, Settings2, Unlink2, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CheckCircle, ChevronDown, ChevronRight, Link2, PlusCircle, Settings2, Trash2, Unlink2, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -227,6 +227,25 @@ export default function CreditosExtraordinariosFerias() {
     },
     onError: (error) => {
       toast({ title: 'Falha ao cancelar crédito', description: error?.message || 'Erro inesperado.' });
+    },
+  });
+
+  const excluirMutation = useMutation({
+    mutationFn: async (credito) => {
+      if (isCreditoBloqueadoPorUso(credito, gozoById)) {
+        throw new Error('Crédito já utilizado não pode ser excluído.');
+      }
+
+      return base44.entities.CreditoExtraFerias.delete(credito.id);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      await queryClient.invalidateQueries({ queryKey: ['ferias-creditos-extra'] });
+      await queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      toast({ title: 'Crédito excluído' });
+    },
+    onError: (error) => {
+      toast({ title: 'Falha ao excluir crédito', description: error?.message || 'Erro inesperado.' });
     },
   });
 
@@ -538,6 +557,22 @@ export default function CreditosExtraordinariosFerias() {
                               onClick={() => cancelarMutation.mutate(credito)}
                             >
                               Cancelar
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={excluirMutation.isPending || bloqueadoPorUso}
+                              onClick={() => {
+                                const confirmado = window.confirm(
+                                  'Deseja excluir permanentemente este crédito extraordinário? Esta ação não pode ser desfeita.',
+                                );
+                                if (!confirmado) return;
+                                excluirMutation.mutate(credito);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Excluir
                             </Button>
                           </div>
                         </div>
