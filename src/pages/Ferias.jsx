@@ -45,6 +45,7 @@ import {
 import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import FamiliaFeriasPanel from '@/components/ferias/FamiliaFeriasPanel';
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +61,7 @@ import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/ferias
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
-import { liberarCreditosDoGozo } from '@/services/creditoExtraFeriasService';
+import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -371,6 +372,12 @@ export default function Ferias() {
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
 
+  const { data: creditosExtraFerias = [] } = useQuery({
+    queryKey: ['ferias-creditos-extra'],
+    queryFn: () => listarCreditosExtraFerias('-data_referencia'),
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (params) => {
       const { feriasId, periodoId, periodoRef, militarId } = params;
@@ -424,6 +431,17 @@ export default function Ferias() {
       a.sortKey.localeCompare(b.sortKey)
     );
   }, [feriasAgrupadas]);
+
+  const creditosPorGozo = useMemo(() => {
+    const mapa = new Map();
+    (creditosExtraFerias || []).forEach((credito) => {
+      const gozoId = credito?.gozo_ferias_id;
+      if (!gozoId) return;
+      if (!mapa.has(gozoId)) mapa.set(gozoId, []);
+      mapa.get(gozoId).push(credito);
+    });
+    return mapa;
+  }, [creditosExtraFerias]);
 
   const editDataError = useMemo(() => {
     return validarEdicaoDataInicio({
@@ -726,6 +744,8 @@ export default function Ferias() {
                             r.ferias_id === f.id &&
                             TIPOS_OPERACIONAIS.includes(r.tipo_registro)
                         );
+                        const creditosDoGozo = creditosPorGozo.get(f.id) || [];
+                        const diasExtras = creditosDoGozo.reduce((acc, credito) => acc + Number(credito?.quantidade_dias || 0), 0);
 
                         const interrupcaoInfo =
                           f.status === 'Interrompida'
@@ -784,7 +804,31 @@ export default function Ferias() {
 
                             <td className="px-4 py-3 text-slate-700">
                               <div className="flex flex-col">
-                                <span>{f.dias}d</span>
+                                <span className="flex items-center gap-1">
+                                  {f.dias}d
+                                  {diasExtras > 0 && (
+                                    <TooltipProvider delayDuration={100}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="text-red-600 font-semibold cursor-help">+{diasExtras}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-[340px] p-3">
+                                          <p className="text-xs font-semibold text-red-600 mb-2">Créditos extraordinários vinculados</p>
+                                          <div className="space-y-1.5">
+                                            {creditosDoGozo.map((credito) => (
+                                              <p key={credito.id} className="text-xs text-slate-200">
+                                                <span className="font-medium text-white">+{Number(credito.quantidade_dias || 0)}d</span>
+                                                {' · '}
+                                                {formatarTipoCreditoExtra(credito.tipo_credito)}
+                                                {credito.observacoes ? ` — ${credito.observacoes}` : ''}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </span>
 
                                 {f.status === 'Interrompida' && interrupcaoInfo?.saldo != null && (
                                   <span className="text-xs text-orange-600 font-medium">

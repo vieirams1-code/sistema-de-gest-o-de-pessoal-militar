@@ -59,6 +59,14 @@ function formatDate(v) {
   }
 }
 
+function formatarTipoGozo(gozo) {
+  const fracao = String(gozo?.fracionamento || '').trim().toLowerCase();
+  if (fracao.includes('1')) return '1ª fração';
+  if (fracao.includes('2')) return '2ª fração';
+  if (fracao.includes('3')) return '3ª fração';
+  return 'Integral';
+}
+
 export default function CreditosExtraordinariosFerias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -130,6 +138,27 @@ export default function CreditosExtraordinariosFerias() {
     vinculados: creditos.filter((credito) => credito.status === STATUS_CREDITO_EXTRA_FERIAS.VINCULADO).length,
     usados: creditos.filter((credito) => credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO).length,
   }), [creditos]);
+
+  const creditosAgrupadosPorMilitar = useMemo(() => {
+    const grupos = new Map();
+    (creditosFiltrados || []).forEach((credito) => {
+      const militarId = credito.militar_id || 'sem-militar';
+      if (!grupos.has(militarId)) grupos.set(militarId, []);
+      grupos.get(militarId).push(credito);
+    });
+
+    return Array.from(grupos.entries())
+      .map(([militarId, itens]) => ({
+        militarId,
+        militar: militarById.get(militarId),
+        itens: itens.sort((a, b) => String(b.data_referencia || '').localeCompare(String(a.data_referencia || ''))),
+      }))
+      .sort((a, b) => {
+        const nomeA = a.itens[0]?.militar_nome || a.militar?.nome_completo || '';
+        const nomeB = b.itens[0]?.militar_nome || b.militar?.nome_completo || '';
+        return nomeA.localeCompare(nomeB, 'pt-BR');
+      });
+  }, [creditosFiltrados, militarById]);
 
   const salvarMutation = useMutation({
     mutationFn: async () => {
@@ -425,69 +454,81 @@ export default function CreditosExtraordinariosFerias() {
             ) : creditosFiltrados.length === 0 ? (
               <p className="text-sm text-slate-500">Nenhum crédito encontrado para os filtros atuais.</p>
             ) : (
-              creditosFiltrados.map((credito) => {
-                const gozoVinculado = credito.gozo_ferias_id ? gozoById.get(credito.gozo_ferias_id) : null;
-                const podeRemoverVinculo = Boolean(credito.gozo_ferias_id) && credito.status !== STATUS_CREDITO_EXTRA_FERIAS.USADO;
-
-                return (
-                  <div key={credito.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-800">
-                          {credito.militar_posto ? `${credito.militar_posto} ` : ''}
-                          {credito.militar_nome || militarById.get(credito.militar_id)?.nome_completo || 'Militar não identificado'}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">{formatarTipoCreditoExtra(credito.tipo_credito)} · {Number(credito.quantidade_dias || 0)} dia(s)</p>
-                      </div>
-                      <Badge className={STATUS_COLORS[credito.status] || 'bg-slate-100 text-slate-700 border border-slate-200'}>{credito.status || '—'}</Badge>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-xs text-slate-600">
-                      <p>Referência crédito: <strong>{formatDate(credito.data_referencia)}</strong></p>
-                      <p>Boletim/Documento: <strong>{credito.numero_boletim || credito.origem_documental || '—'}</strong></p>
-                      <p>Vínculo com gozo (ID): <strong>{credito.gozo_ferias_id || 'Não vinculado'}</strong></p>
-                      <p>Gozo vinculado: <strong>{gozoVinculado ? `${gozoVinculado.periodo_aquisitivo_ref || 'Sem período'} · início ${formatDate(gozoVinculado.data_inicio)}` : '—'}</strong></p>
-                      <p>Unidade: <strong>{militarById.get(credito.militar_id)?.unidade || '—'}</strong></p>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setForm({ ...initialForm, ...credito, gozo_ferias_id: credito.gozo_ferias_id || '' })}>Editar</Button>
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO || credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO}
-                        onClick={() => {
-                          setCreditoVinculoModal(credito);
-                          setGozoSelecionadoId(credito.gozo_ferias_id || '');
-                        }}
-                      >
-                        <Link2 className="w-4 h-4 mr-2" />
-                        Vincular gozo
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!podeRemoverVinculo || removerVinculoMutation.isPending}
-                        onClick={() => removerVinculoMutation.mutate(credito)}
-                      >
-                        <Unlink2 className="w-4 h-4 mr-2" />
-                        Remover vínculo
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO}
-                        onClick={() => cancelarMutation.mutate(credito)}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
+              creditosAgrupadosPorMilitar.map((grupo) => (
+                <div key={grupo.militarId} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-3">
+                  <div className="px-1">
+                    <p className="font-semibold text-[#1e3a5f]">
+                      {grupo.itens[0]?.militar_posto ? `${grupo.itens[0].militar_posto} ` : ''}
+                      {grupo.itens[0]?.militar_nome || grupo.militar?.nome_completo || 'Militar não identificado'}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Mat: {grupo.militar?.matricula || grupo.itens[0]?.militar_matricula || '—'} · {grupo.itens.length} crédito(s)
+                    </p>
                   </div>
-                );
-              })
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                    {grupo.itens.map((credito) => {
+                      const gozoVinculado = credito.gozo_ferias_id ? gozoById.get(credito.gozo_ferias_id) : null;
+                      const podeRemoverVinculo = Boolean(credito.gozo_ferias_id) && credito.status !== STATUS_CREDITO_EXTRA_FERIAS.USADO;
+
+                      return (
+                        <div key={credito.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-800">{formatarTipoCreditoExtra(credito.tipo_credito)} · {Number(credito.quantidade_dias || 0)} dia(s)</p>
+                              <p className="text-xs text-slate-500 mt-0.5">Ref.: {formatDate(credito.data_referencia)}</p>
+                            </div>
+                            <Badge className={STATUS_COLORS[credito.status] || 'bg-slate-100 text-slate-700 border border-slate-200'}>{credito.status || '—'}</Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-xs text-slate-600">
+                            <p>Boletim/Documento: <strong>{credito.numero_boletim || credito.origem_documental || '—'}</strong></p>
+                            <p>Vínculo com gozo (ID): <strong>{credito.gozo_ferias_id || 'Não vinculado'}</strong></p>
+                            <p>Gozo vinculado: <strong>{gozoVinculado ? `${gozoVinculado.periodo_aquisitivo_ref || 'Sem período'} · início ${formatDate(gozoVinculado.data_inicio)}` : '—'}</strong></p>
+                            <p>Unidade: <strong>{militarById.get(credito.militar_id)?.unidade || '—'}</strong></p>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setForm({ ...initialForm, ...credito, gozo_ferias_id: credito.gozo_ferias_id || '' })}>Editar</Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO || credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO}
+                              onClick={() => {
+                                setCreditoVinculoModal(credito);
+                                setGozoSelecionadoId(credito.gozo_ferias_id || '');
+                              }}
+                            >
+                              <Link2 className="w-4 h-4 mr-2" />
+                              Vincular gozo
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!podeRemoverVinculo || removerVinculoMutation.isPending}
+                              onClick={() => removerVinculoMutation.mutate(credito)}
+                            >
+                              <Unlink2 className="w-4 h-4 mr-2" />
+                              Remover vínculo
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO}
+                              onClick={() => cancelarMutation.mutate(credito)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
@@ -528,7 +569,7 @@ export default function CreditosExtraordinariosFerias() {
                   <SelectItem value="none">Selecione</SelectItem>
                   {gozosDoCreditoSelecionado.map((gozo) => (
                     <SelectItem key={gozo.id} value={gozo.id}>
-                      {gozo.periodo_aquisitivo_ref || 'Sem período'} · início {formatDate(gozo.data_inicio)}
+                      {formatarTipoGozo(gozo)} · {gozo.periodo_aquisitivo_ref || 'Sem período'} · início {formatDate(gozo.data_inicio)}
                     </SelectItem>
                   ))}
                 </SelectContent>
