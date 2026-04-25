@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
+import { isModuloComunicacoesInternasEnabled } from '@/utils/comunicacoes/featureFlags';
 
 const { Pages, Layout } = pagesConfig;
 const homeRoute = '/VerMilitar';
@@ -71,6 +72,7 @@ const moduleGuardByPage = {
   MigracaoAlteracoesLegado: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['visualizar_migracao_legado'], moduleName: 'Migração de Alterações Legado' },
   ClassificacaoPendentesLegado: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['classificar_legado'], moduleName: 'Migração de Alterações Legado' },
   RevisaoDuplicidadesMilitar: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['revisar_duplicidades'], moduleName: 'Migração de Alterações Legado' },
+  Comunicacoes: { actionKey: 'acessar_comunicacoes', moduleName: 'Comunicações Internas' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {
@@ -85,7 +87,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   : <>{children}</>;
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, appPublicSettings } = useAuth();
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -114,6 +116,10 @@ const AuthenticatedApp = () => {
         <Navigate to={homeRoute} replace />
       } />
       {Object.entries(Pages).map(([path, Page]) => {
+        if (path === 'Comunicacoes' && !isModuloComunicacoesInternasEnabled(appPublicSettings)) {
+          return null;
+        }
+
         let pageContent = <Page />;
 
         if (adminOnlyPages.has(path)) {

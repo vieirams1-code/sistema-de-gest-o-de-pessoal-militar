@@ -26,12 +26,15 @@ import {
   FileSpreadsheet,
   FileUp,
   History,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
+import { useAuth } from '@/lib/AuthContext';
+import { isModuloComunicacoesInternasEnabled } from '@/utils/comunicacoes/featureFlags';
 
 const menuGroups = [
   {
@@ -81,6 +84,18 @@ const menuGroups = [
       { name: 'RP', page: 'RP', icon: BookMarked, viewPermission: 'visualizar_rp' },
       { name: 'Controle de Publicações', page: 'Publicacoes', icon: Shield, viewPermission: 'visualizar_controle_publicacoes' },
       { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_conciliacao_boletim' },
+    ],
+  },
+  {
+    title: 'Comunicações',
+    items: [
+      {
+        name: 'Comunicações Internas',
+        page: 'Comunicacoes',
+        icon: MessageSquare,
+        actionKey: 'acessar_comunicacoes',
+        featureFlagKey: 'modulo_comunicacoes_internas',
+      },
     ],
   },
   {
@@ -148,6 +163,7 @@ const adminMenuGroup = {
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState([]);
+  const { appPublicSettings } = useAuth();
   const { isAdmin, canAccessModule, canAccessAction, permissions, canAccessAll } = useCurrentUser();
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
   const temPermissao = (actionKey) => canAccessAction(actionKey);
@@ -170,6 +186,7 @@ export default function Layout({ children, currentPageName }) {
       if (item.viewPermission && !temPermissao(item.viewPermission)) return false;
       if (item.actionKey && !canAccessAction(item.actionKey)) return false;
       if (item.moduleKey && !canAccessModule(item.moduleKey)) return false;
+      if (item.featureFlagKey === 'modulo_comunicacoes_internas' && !isModuloComunicacoesInternasEnabled(appPublicSettings)) return false;
       if (item.anyOf?.length) {
         const hasAnyPermission = item.anyOf.some((permission) => (
           permission.type === 'module'
