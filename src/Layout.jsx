@@ -30,8 +30,8 @@ import {
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
-import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { useAuth } from '@/lib/AuthContext';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
 const menuGroups = [
   {
