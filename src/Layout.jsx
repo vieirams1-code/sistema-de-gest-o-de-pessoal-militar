@@ -26,6 +26,7 @@ import {
   FileSpreadsheet,
   FileUp,
   History,
+  CircleAlert,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -38,6 +39,7 @@ const menuGroups = [
     title: 'Principal',
     items: [
       { name: 'Dashboard', page: 'Home', icon: Home, viewPermission: 'visualizar_militares' },
+      { name: 'Central de Pendências', page: 'CentralPendencias', icon: CircleAlert, actionKey: 'visualizar_central_pendencias' },
     ],
   },
   {
