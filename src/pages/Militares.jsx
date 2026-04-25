@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -30,6 +30,7 @@ import { excluirMilitarComDependencias } from '@/services/militarExclusaoService
 
 export default function Militares() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const {
     isAdmin,
@@ -47,7 +48,7 @@ export default function Militares() {
     isAccessResolved,
   } = useCurrentUser();
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
   const [statusFilter, setStatusFilter] = useState('all');
   const [postoFilter, setPostoFilter] = useState('all');
   const [mostrarInativos, setMostrarInativos] = useState(false);

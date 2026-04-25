@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -107,6 +108,7 @@ function getResumoTexto(texto = '', max = 180) {
 
 export default function RegistrosMilitar() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const {
     isAccessResolved,
@@ -117,7 +119,7 @@ export default function RegistrosMilitar() {
     user,
   } = useCurrentUser();
 
-  const [filtroMilitarId, setFiltroMilitarId] = useState('all');
+  const [filtroMilitarId, setFiltroMilitarId] = useState(() => searchParams.get('militar_id') || 'all');
   const [buscaMilitar, setBuscaMilitar] = useState('');
   const [openMilitarPopover, setOpenMilitarPopover] = useState(false);
 
