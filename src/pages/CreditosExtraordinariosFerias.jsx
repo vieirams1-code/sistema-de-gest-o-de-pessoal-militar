@@ -11,7 +11,16 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { createPageUrl } from '@/utils';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CheckCircle, Link2, PlusCircle, Settings2, Unlink2, Users } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   TIPOS_CREDITO_EXTRA_FERIAS,
   STATUS_CREDITO_EXTRA_FERIAS,
@@ -35,10 +44,10 @@ const initialForm = {
 };
 
 const STATUS_COLORS = {
-  DISPONIVEL: 'bg-emerald-100 text-emerald-700',
-  VINCULADO: 'bg-blue-100 text-blue-700',
-  USADO: 'bg-slate-100 text-slate-700',
-  CANCELADO: 'bg-red-100 text-red-700',
+  DISPONIVEL: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  VINCULADO: 'bg-blue-100 text-blue-700 border border-blue-200',
+  USADO: 'bg-slate-100 text-slate-700 border border-slate-200',
+  CANCELADO: 'bg-red-100 text-red-700 border border-red-200',
 };
 
 function formatDate(v) {
@@ -55,15 +64,19 @@ export default function CreditosExtraordinariosFerias() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+
   const [filtros, setFiltros] = useState({
-    militar_id: '',
-    tipo_credito: '',
-    status: '',
+    militar_id: 'all',
+    tipo_credito: 'all',
+    status: 'all',
     unidade: '',
     data_inicio: '',
     data_fim: '',
   });
   const [form, setForm] = useState(initialForm);
+
+  const [creditoVinculoModal, setCreditoVinculoModal] = useState(null);
+  const [gozoSelecionadoId, setGozoSelecionadoId] = useState('');
 
   const { data: militares = [] } = useQuery({
     queryKey: ['creditos-extra-ferias-militares'],
@@ -76,6 +89,17 @@ export default function CreditosExtraordinariosFerias() {
     [militares],
   );
 
+  const { data: gozosFerias = [] } = useQuery({
+    queryKey: ['creditos-extra-ferias-gozos'],
+    queryFn: () => base44.entities.Ferias.list('-data_inicio'),
+    enabled: isAccessResolved && canAccessModule('ferias'),
+  });
+
+  const gozoById = useMemo(
+    () => new Map(gozosFerias.map((gozo) => [gozo.id, gozo])),
+    [gozosFerias],
+  );
+
   const { data: creditos = [], isLoading } = useQuery({
     queryKey: ['creditos-extra-ferias'],
     queryFn: () => listarCreditosExtraFerias('-data_referencia'),
@@ -83,9 +107,29 @@ export default function CreditosExtraordinariosFerias() {
   });
 
   const creditosFiltrados = useMemo(
-    () => filtrarCreditosExtraFerias(creditos, filtros, militarById),
+    () => filtrarCreditosExtraFerias(creditos, {
+      ...filtros,
+      militar_id: filtros.militar_id === 'all' ? '' : filtros.militar_id,
+      tipo_credito: filtros.tipo_credito === 'all' ? '' : filtros.tipo_credito,
+      status: filtros.status === 'all' ? '' : filtros.status,
+    }, militarById),
     [creditos, filtros, militarById],
   );
+
+  const gozosDoCreditoSelecionado = useMemo(() => {
+    if (!creditoVinculoModal?.militar_id) return [];
+
+    return (gozosFerias || [])
+      .filter((gozo) => gozo.militar_id === creditoVinculoModal.militar_id)
+      .sort((a, b) => String(b.data_inicio || '').localeCompare(String(a.data_inicio || '')));
+  }, [creditoVinculoModal, gozosFerias]);
+
+  const stats = useMemo(() => ({
+    total: creditos.length,
+    disponiveis: creditos.filter((credito) => credito.status === STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL).length,
+    vinculados: creditos.filter((credito) => credito.status === STATUS_CREDITO_EXTRA_FERIAS.VINCULADO).length,
+    usados: creditos.filter((credito) => credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO).length,
+  }), [creditos]);
 
   const salvarMutation = useMutation({
     mutationFn: async () => {
@@ -116,11 +160,9 @@ export default function CreditosExtraordinariosFerias() {
   });
 
   const cancelarMutation = useMutation({
-    mutationFn: async (credito) => {
-      return base44.entities.CreditoExtraFerias.update(credito.id, {
-        status: STATUS_CREDITO_EXTRA_FERIAS.CANCELADO,
-      });
-    },
+    mutationFn: async (credito) => base44.entities.CreditoExtraFerias.update(credito.id, {
+      status: STATUS_CREDITO_EXTRA_FERIAS.CANCELADO,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
       toast({ title: 'Crédito cancelado' });
@@ -130,160 +172,390 @@ export default function CreditosExtraordinariosFerias() {
     },
   });
 
+  const vincularGozoMutation = useMutation({
+    mutationFn: async ({ credito, gozoFeriasId }) => {
+      if (!gozoFeriasId) {
+        throw new Error('Selecione um gozo de férias para vincular.');
+      }
+
+      const gozo = gozoById.get(gozoFeriasId);
+      if (!gozo) throw new Error('Gozo selecionado não encontrado. Atualize a página e tente novamente.');
+      if (gozo.militar_id !== credito.militar_id) throw new Error('O gozo deve pertencer ao mesmo militar do crédito.');
+
+      return base44.entities.CreditoExtraFerias.update(credito.id, {
+        gozo_ferias_id: gozoFeriasId,
+        status: STATUS_CREDITO_EXTRA_FERIAS.VINCULADO,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      toast({ title: 'Crédito vinculado ao gozo', description: 'Status atualizado para VINCULADO.' });
+      setCreditoVinculoModal(null);
+      setGozoSelecionadoId('');
+    },
+    onError: (error) => {
+      toast({ title: 'Falha ao vincular crédito', description: error?.message || 'Erro inesperado.' });
+    },
+  });
+
+  const removerVinculoMutation = useMutation({
+    mutationFn: async (credito) => {
+      if (credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO) {
+        throw new Error('Crédito USADO não pode ter vínculo removido por esta tela.');
+      }
+
+      return base44.entities.CreditoExtraFerias.update(credito.id, {
+        gozo_ferias_id: '',
+        status: STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
+      toast({ title: 'Vínculo removido', description: 'Crédito retornou para DISPONIVEL.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Falha ao remover vínculo', description: error?.message || 'Erro inesperado.' });
+    },
+  });
+
   if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-[#1e3a5f]">Créditos Extraordinários</h1>
-          <p className="text-slate-600 mt-1">Gestão operacional de créditos extraordinários vinculáveis ao gozo.</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('Ferias'))} className="hover:bg-slate-200">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-[#1e3a5f]">Créditos Extraordinários</h1>
+              <p className="text-slate-500">Gestão completa de créditos extras vinculáveis ao gozo de férias</p>
+            </div>
+          </div>
+
+          <Button variant="outline" onClick={() => navigate(createPageUrl('Ferias'))}>
+            Voltar para Férias
+          </Button>
         </div>
-        <Button variant="outline" onClick={() => navigate(createPageUrl('Ferias'))}>Voltar para Férias</Button>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center">
+                <CalendarDays className="w-5 h-5 text-[#1e3a5f]" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-[#1e3a5f]">{stats.total}</p>
+                <p className="text-xs text-slate-500">Total</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-emerald-600">{stats.disponiveis}</p>
+                <p className="text-xs text-slate-500">Disponíveis</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Link2 className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-blue-600">{stats.vinculados}</p>
+                <p className="text-xs text-slate-500">Vinculados</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Settings2 className="w-5 h-5 text-slate-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-700">{stats.usados}</p>
+                <p className="text-xs text-slate-500">Usados</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Card className="rounded-xl border border-slate-100 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-[#1e3a5f]">Filtros</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label>Militar</Label>
+              <Select value={filtros.militar_id} onValueChange={(v) => setFiltros((p) => ({ ...p, militar_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {militares.map((militar) => <SelectItem key={militar.id} value={militar.id}>{militar.nome_completo}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Tipo de crédito</Label>
+              <Select value={filtros.tipo_credito} onValueChange={(v) => setFiltros((p) => ({ ...p, tipo_credito: v }))}>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {Object.values(TIPOS_CREDITO_EXTRA_FERIAS).map((tipo) => <SelectItem key={tipo} value={tipo}>{formatarTipoCreditoExtra(tipo)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={filtros.status} onValueChange={(v) => setFiltros((p) => ({ ...p, status: v }))}>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {Object.values(STATUS_CREDITO_EXTRA_FERIAS).map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Unidade</Label>
+              <Input value={filtros.unidade} onChange={(e) => setFiltros((p) => ({ ...p, unidade: e.target.value }))} placeholder="Ex.: 1º BPM" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data inicial</Label>
+              <Input type="date" value={filtros.data_inicio} onChange={(e) => setFiltros((p) => ({ ...p, data_inicio: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data final</Label>
+              <Input type="date" value={filtros.data_fim} onChange={(e) => setFiltros((p) => ({ ...p, data_fim: e.target.value }))} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border border-slate-100 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-[#1e3a5f]">{form.id ? 'Editar crédito' : 'Novo crédito extraordinário'}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label>Militar</Label>
+                <Select value={form.militar_id || 'none'} onValueChange={(v) => setForm((p) => ({ ...p, militar_id: v === 'none' ? '' : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Selecione</SelectItem>
+                    {militares.map((militar) => <SelectItem key={militar.id} value={militar.id}>{militar.nome_completo}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Tipo</Label>
+                <Select value={form.tipo_credito} onValueChange={(v) => setForm((p) => ({ ...p, tipo_credito: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.values(TIPOS_CREDITO_EXTRA_FERIAS).map((tipo) => <SelectItem key={tipo} value={tipo}>{formatarTipoCreditoExtra(tipo)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.values(STATUS_CREDITO_EXTRA_FERIAS).map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Quantidade de dias</Label>
+                <Input type="number" min={1} value={form.quantidade_dias} onChange={(e) => setForm((p) => ({ ...p, quantidade_dias: Number(e.target.value || 0) }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data referência</Label>
+                <Input type="date" value={form.data_referencia} onChange={(e) => setForm((p) => ({ ...p, data_referencia: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data boletim</Label>
+                <Input type="date" value={form.data_boletim} onChange={(e) => setForm((p) => ({ ...p, data_boletim: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Origem documental</Label>
+                <Input value={form.origem_documental} onChange={(e) => setForm((p) => ({ ...p, origem_documental: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Número boletim</Label>
+                <Input value={form.numero_boletim} onChange={(e) => setForm((p) => ({ ...p, numero_boletim: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5 md:col-span-3">
+                <Label>Observações</Label>
+                <Input value={form.observacoes} onChange={(e) => setForm((p) => ({ ...p, observacoes: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" disabled={salvarMutation.isPending || !form.militar_id || Number(form.quantidade_dias || 0) <= 0} onClick={() => salvarMutation.mutate()}>
+                <PlusCircle className="w-4 h-4 mr-2" />
+                {form.id ? 'Salvar alterações' : 'Cadastrar crédito'}
+              </Button>
+              {form.id && <Button variant="outline" onClick={() => setForm(initialForm)}>Cancelar edição</Button>}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border border-slate-100 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-[#1e3a5f]"><Users className="w-4 h-4" /> Créditos cadastrados ({creditosFiltrados.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {isLoading ? (
+              <p className="text-sm text-slate-500">Carregando créditos...</p>
+            ) : creditosFiltrados.length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhum crédito encontrado para os filtros atuais.</p>
+            ) : (
+              creditosFiltrados.map((credito) => {
+                const gozoVinculado = credito.gozo_ferias_id ? gozoById.get(credito.gozo_ferias_id) : null;
+                const podeRemoverVinculo = Boolean(credito.gozo_ferias_id) && credito.status !== STATUS_CREDITO_EXTRA_FERIAS.USADO;
+
+                return (
+                  <div key={credito.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-800">
+                          {credito.militar_posto ? `${credito.militar_posto} ` : ''}
+                          {credito.militar_nome || militarById.get(credito.militar_id)?.nome_completo || 'Militar não identificado'}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">{formatarTipoCreditoExtra(credito.tipo_credito)} · {Number(credito.quantidade_dias || 0)} dia(s)</p>
+                      </div>
+                      <Badge className={STATUS_COLORS[credito.status] || 'bg-slate-100 text-slate-700 border border-slate-200'}>{credito.status || '—'}</Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-xs text-slate-600">
+                      <p>Referência crédito: <strong>{formatDate(credito.data_referencia)}</strong></p>
+                      <p>Boletim/Documento: <strong>{credito.numero_boletim || credito.origem_documental || '—'}</strong></p>
+                      <p>Vínculo com gozo (ID): <strong>{credito.gozo_ferias_id || 'Não vinculado'}</strong></p>
+                      <p>Gozo vinculado: <strong>{gozoVinculado ? `${gozoVinculado.periodo_aquisitivo_ref || 'Sem período'} · início ${formatDate(gozoVinculado.data_inicio)}` : '—'}</strong></p>
+                      <p>Unidade: <strong>{militarById.get(credito.militar_id)?.unidade || '—'}</strong></p>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setForm({ ...initialForm, ...credito, gozo_ferias_id: credito.gozo_ferias_id || '' })}>Editar</Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO || credito.status === STATUS_CREDITO_EXTRA_FERIAS.USADO}
+                        onClick={() => {
+                          setCreditoVinculoModal(credito);
+                          setGozoSelecionadoId(credito.gozo_ferias_id || '');
+                        }}
+                      >
+                        <Link2 className="w-4 h-4 mr-2" />
+                        Vincular gozo
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!podeRemoverVinculo || removerVinculoMutation.isPending}
+                        onClick={() => removerVinculoMutation.mutate(credito)}
+                      >
+                        <Unlink2 className="w-4 h-4 mr-2" />
+                        Remover vínculo
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO}
+                        onClick={() => cancelarMutation.mutate(credito)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Filtros</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <Label>Militar</Label>
-            <select className="mt-1.5 w-full border border-slate-200 rounded-md px-3 py-2 text-sm" value={filtros.militar_id} onChange={(e) => setFiltros((p) => ({ ...p, militar_id: e.target.value }))}>
-              <option value="">Todos</option>
-              {militares.map((militar) => <option key={militar.id} value={militar.id}>{militar.nome_completo}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>Tipo de crédito</Label>
-            <select className="mt-1.5 w-full border border-slate-200 rounded-md px-3 py-2 text-sm" value={filtros.tipo_credito} onChange={(e) => setFiltros((p) => ({ ...p, tipo_credito: e.target.value }))}>
-              <option value="">Todos</option>
-              {Object.values(TIPOS_CREDITO_EXTRA_FERIAS).map((tipo) => <option key={tipo} value={tipo}>{formatarTipoCreditoExtra(tipo)}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>Status</Label>
-            <select className="mt-1.5 w-full border border-slate-200 rounded-md px-3 py-2 text-sm" value={filtros.status} onChange={(e) => setFiltros((p) => ({ ...p, status: e.target.value }))}>
-              <option value="">Todos</option>
-              {Object.values(STATUS_CREDITO_EXTRA_FERIAS).map((status) => <option key={status} value={status}>{status}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>Unidade</Label>
-            <Input value={filtros.unidade} onChange={(e) => setFiltros((p) => ({ ...p, unidade: e.target.value }))} placeholder="Ex.: 1º BPM" />
-          </div>
-          <div>
-            <Label>Data inicial</Label>
-            <Input type="date" value={filtros.data_inicio} onChange={(e) => setFiltros((p) => ({ ...p, data_inicio: e.target.value }))} />
-          </div>
-          <div>
-            <Label>Data final</Label>
-            <Input type="date" value={filtros.data_fim} onChange={(e) => setFiltros((p) => ({ ...p, data_fim: e.target.value }))} />
-          </div>
-        </CardContent>
-      </Card>
+      <Dialog open={Boolean(creditoVinculoModal)} onOpenChange={(open) => {
+        if (!open) {
+          setCreditoVinculoModal(null);
+          setGozoSelecionadoId('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular crédito a gozo</DialogTitle>
+            <DialogDescription>
+              Selecione um gozo do mesmo militar para reservar este crédito. O consumo efetivo permanece no fluxo de Saída Férias.
+            </DialogDescription>
+          </DialogHeader>
 
-      <Card>
-        <CardHeader><CardTitle>{form.id ? 'Editar crédito' : 'Novo crédito extraordinário'}</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <Label>Militar</Label>
-              <select className="mt-1.5 w-full border border-slate-200 rounded-md px-3 py-2 text-sm" value={form.militar_id} onChange={(e) => setForm((p) => ({ ...p, militar_id: e.target.value }))}>
-                <option value="">Selecione</option>
-                {militares.map((militar) => <option key={militar.id} value={militar.id}>{militar.nome_completo}</option>)}
-              </select>
+          <div className="space-y-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+              <p className="font-medium text-slate-700">
+                {creditoVinculoModal?.militar_posto ? `${creditoVinculoModal.militar_posto} ` : ''}
+                {creditoVinculoModal?.militar_nome || militarById.get(creditoVinculoModal?.militar_id)?.nome_completo || 'Militar não identificado'}
+              </p>
+              <p className="text-xs text-slate-600 mt-1">
+                {formatarTipoCreditoExtra(creditoVinculoModal?.tipo_credito)} · {Number(creditoVinculoModal?.quantidade_dias || 0)} dia(s)
+              </p>
             </div>
-            <div>
-              <Label>Tipo</Label>
-              <select className="mt-1.5 w-full border border-slate-200 rounded-md px-3 py-2 text-sm" value={form.tipo_credito} onChange={(e) => setForm((p) => ({ ...p, tipo_credito: e.target.value }))}>
-                {Object.values(TIPOS_CREDITO_EXTRA_FERIAS).map((tipo) => <option key={tipo} value={tipo}>{formatarTipoCreditoExtra(tipo)}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <select className="mt-1.5 w-full border border-slate-200 rounded-md px-3 py-2 text-sm" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
-                {Object.values(STATUS_CREDITO_EXTRA_FERIAS).map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label>Quantidade de dias</Label>
-              <Input type="number" min={1} value={form.quantidade_dias} onChange={(e) => setForm((p) => ({ ...p, quantidade_dias: Number(e.target.value || 0) }))} />
-            </div>
-            <div>
-              <Label>Data referência</Label>
-              <Input type="date" value={form.data_referencia} onChange={(e) => setForm((p) => ({ ...p, data_referencia: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Data boletim</Label>
-              <Input type="date" value={form.data_boletim} onChange={(e) => setForm((p) => ({ ...p, data_boletim: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Origem documental</Label>
-              <Input value={form.origem_documental} onChange={(e) => setForm((p) => ({ ...p, origem_documental: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Número boletim</Label>
-              <Input value={form.numero_boletim} onChange={(e) => setForm((p) => ({ ...p, numero_boletim: e.target.value }))} />
-            </div>
-            <div className="md:col-span-3">
-              <Label>Observações</Label>
-              <Input value={form.observacoes} onChange={(e) => setForm((p) => ({ ...p, observacoes: e.target.value }))} />
+
+            <div className="space-y-1.5">
+              <Label>Gozo de férias</Label>
+              <Select value={gozoSelecionadoId || 'none'} onValueChange={(v) => setGozoSelecionadoId(v === 'none' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o gozo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Selecione</SelectItem>
+                  {gozosDoCreditoSelecionado.map((gozo) => (
+                    <SelectItem key={gozo.id} value={gozo.id}>
+                      {gozo.periodo_aquisitivo_ref || 'Sem período'} · início {formatDate(gozo.data_inicio)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {gozosDoCreditoSelecionado.length === 0 && (
+                <p className="text-xs text-amber-700">Não há gozos cadastrados para este militar.</p>
+              )}
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button disabled={salvarMutation.isPending || !form.militar_id || Number(form.quantidade_dias || 0) <= 0} onClick={() => salvarMutation.mutate()}>
-              {form.id ? 'Salvar alterações' : 'Cadastrar crédito'}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setCreditoVinculoModal(null);
+              setGozoSelecionadoId('');
+            }}>
+              Cancelar
             </Button>
-            {form.id && <Button variant="outline" onClick={() => setForm(initialForm)}>Cancelar edição</Button>}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarDays className="w-4 h-4" /> Créditos cadastrados ({creditosFiltrados.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {isLoading ? (
-            <p className="text-sm text-slate-500">Carregando créditos...</p>
-          ) : creditosFiltrados.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum crédito encontrado para os filtros atuais.</p>
-          ) : (
-            creditosFiltrados.map((credito) => (
-              <div key={credito.id} className="rounded-lg border border-slate-200 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-800">
-                      {credito.militar_posto ? `${credito.militar_posto} ` : ''}
-                      {credito.militar_nome || militarById.get(credito.militar_id)?.nome_completo || 'Militar não identificado'}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5">{formatarTipoCreditoExtra(credito.tipo_credito)} · {Number(credito.quantidade_dias || 0)} dia(s)</p>
-                  </div>
-                  <Badge className={STATUS_COLORS[credito.status] || 'bg-slate-100 text-slate-700'}>{credito.status || '—'}</Badge>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs text-slate-600">
-                  <p>Referência: <strong>{formatDate(credito.data_referencia)}</strong></p>
-                  <p>Boletim/Documento: <strong>{credito.numero_boletim || credito.origem_documental || '—'}</strong></p>
-                  <p>Vínculo com gozo: <strong>{credito.gozo_ferias_id || 'Não vinculado'}</strong></p>
-                  <p>Unidade: <strong>{militarById.get(credito.militar_id)?.unidade || '—'}</strong></p>
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setForm({ ...initialForm, ...credito, gozo_ferias_id: credito.gozo_ferias_id || '' })}>Editar</Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={credito.status === STATUS_CREDITO_EXTRA_FERIAS.CANCELADO}
-                    onClick={() => cancelarMutation.mutate(credito)}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+            <Button
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f]"
+              disabled={!gozoSelecionadoId || vincularGozoMutation.isPending}
+              onClick={() => vincularGozoMutation.mutate({ credito: creditoVinculoModal, gozoFeriasId: gozoSelecionadoId })}
+            >
+              Confirmar vínculo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
