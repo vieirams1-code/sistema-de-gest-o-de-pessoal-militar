@@ -143,6 +143,13 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_comunicacoes_internas',
+        label: 'Comunicações Internas',
+        actions: [
+          { key: 'perm_acessar_comunicacoes', label: 'Acessar Comunicações Internas' }
+        ]
+      },
+      {
         key: 'acesso_conciliacao_boletim',
         label: 'Conciliação com Boletim',
         actions: [
