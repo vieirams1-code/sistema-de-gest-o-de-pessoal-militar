@@ -13,12 +13,11 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { PRACAS, calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import {
   criarPendenciaComportamentoSemDuplicidade,
-  garantirImplantacaoHistoricoComportamento,
   getPunicaoEntity,
   obterHistoricoComportamentoMilitar,
-  registrarMarcoHistoricoComportamento,
 } from '@/services/justicaDisciplinaService';
 import { gerarPublicacaoRPAutomaticaPorHistoricoComportamento } from '@/services/comportamentoRPService';
+import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoService';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 
 export default function AvaliacaoComportamento() {
@@ -88,37 +87,44 @@ export default function AvaliacaoComportamento() {
     if (!linha.calculado?.comportamento) return;
 
     try {
-      await base44.entities.Militar.update(linha.militar.id, {
-        comportamento: linha.calculado.comportamento,
+      let pendenciaParaAplicacao = linha.pendenciaExistente;
+      if (!pendenciaParaAplicacao?.id) {
+        const { registro } = await criarPendenciaComportamentoSemDuplicidade({
+          militar_id: linha.militar.id,
+          militar_nome: linha.militar.nome_completo,
+          comportamento_atual: linha.militar.comportamento || 'Bom',
+          comportamento_sugerido: linha.calculado.comportamento,
+          fundamento_legal: linha.calculado.fundamento,
+          detalhes_calculo: JSON.stringify(linha.calculado.detalhes || {}),
+          data_detectada: new Date().toISOString().slice(0, 10),
+          status_pendencia: 'Pendente',
+          confirmado_por: null,
+          data_confirmacao: null,
+        });
+        pendenciaParaAplicacao = registro;
+      }
+
+      if (!pendenciaParaAplicacao?.id) {
+        throw new Error('Não foi possível identificar a pendência de comportamento para aprovação.');
+      }
+
+      const resultadoAplicacao = await aplicarPendenciasComportamentoEmLote({
+        pendencias: [pendenciaParaAplicacao.id],
+        usuarioAtual: { canAccessAction },
       });
 
-      await garantirImplantacaoHistoricoComportamento({
-        militarId: linha.militar.id,
-        comportamentoAtual: linha.militar.comportamento || 'Bom',
-        origemTipo: 'Militar',
-        origemId: linha.militar.id,
-      });
-
-      const marcoCriado = await registrarMarcoHistoricoComportamento({
-        militarId: linha.militar.id,
-        dataVigencia: new Date().toISOString().slice(0, 10),
-        comportamentoAnterior: linha.militar.comportamento || 'Bom',
-        comportamento: linha.calculado.comportamento,
-        motivoMudanca: 'Mudança efetiva de comportamento aprovada na Avaliação de Comportamento.',
-        fundamentoLegal: linha.calculado.fundamento,
-        origemTipo: 'PendenciaComportamento',
-        origemId: linha.pendenciaExistente?.id || '',
-        observacoes: 'Mudança aprovada manualmente na Avaliação de Comportamento.',
-      });
+      if (resultadoAplicacao.totalAplicadas !== 1) {
+        const motivoFalha = resultadoAplicacao.falhas?.[0]?.erro
+          || resultadoAplicacao.falhas?.[0]?.motivo
+          || resultadoAplicacao.ignoradas?.[0]?.motivo
+          || 'Falha ao aplicar pendência de comportamento.';
+        throw new Error(motivoFalha);
+      }
 
       let resultadoRPAutomatico = null;
       if (gerarPublicacao) {
-        let marcoParaPublicacao = marcoCriado;
-
-        if (!marcoParaPublicacao?.id) {
-          const historicoMilitar = await obterHistoricoComportamentoMilitar(linha.militar.id, { ordem: 'desc' });
-          marcoParaPublicacao = historicoMilitar.find((marco) => marco?.comportamento_novo === linha.calculado.comportamento) || null;
-        }
+        const historicoMilitar = await obterHistoricoComportamentoMilitar(linha.militar.id, { ordem: 'desc' });
+        const marcoParaPublicacao = historicoMilitar.find((marco) => marco?.comportamento_novo === linha.calculado.comportamento) || null;
 
         if (!marcoParaPublicacao?.id) {
           throw new Error('Não foi possível localizar o marco histórico para vincular a publicação.');
@@ -148,13 +154,6 @@ export default function AvaliacaoComportamento() {
         if (houveFalhaPublicacao) {
           throw new Error(resultadoRPAutomatico?.motivo || 'Falha ao gerar publicação automática.');
         }
-      }
-
-      if (linha.pendenciaExistente?.id) {
-        await base44.entities.PendenciaComportamento.update(linha.pendenciaExistente.id, {
-          status_pendencia: 'Aplicada',
-          data_confirmacao: new Date().toISOString().slice(0, 10),
-        });
       }
 
       await queryClient.invalidateQueries({ queryKey: ['avaliacao-comportamento-militares'] });
