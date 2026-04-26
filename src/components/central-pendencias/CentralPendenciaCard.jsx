@@ -13,31 +13,10 @@ const PRIORIDADE_CLASSES = {
 
 export default function CentralPendenciaCard({ item }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [resultado, setResultado] = useState(null);
-
-  const podeAprovar = Boolean(item?.id === 'co-consolidado-disciplinar' && item?.podeAprovarEmLoteComportamento);
+  const ehComportamentoConsolidado = item?.id === 'co-consolidado-disciplinar';
 
   const abrirModal = () => {
-    setError('');
-    setResultado(null);
     setModalOpen(true);
-  };
-
-  const confirmarAprovacao = async () => {
-    if (typeof item?.aoAprovarEmLoteComportamento !== 'function') return;
-
-    setLoading(true);
-    setError('');
-    try {
-      const resposta = await item.aoAprovarEmLoteComportamento(item);
-      setResultado(resposta);
-    } catch (e) {
-      setError(e?.message || 'Falha ao aprovar pendências em lote.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -59,9 +38,9 @@ export default function CentralPendenciaCard({ item }) {
       </div>
       <p className="text-xs text-slate-600"><strong>Sugestão:</strong> {item.sugestaoAcao}</p>
       <div className="flex flex-wrap items-center gap-3">
-        {podeAprovar ? (
-          <Button type="button" size="sm" onClick={abrirModal} disabled={loading}>
-            Aprovar em lote
+        {ehComportamentoConsolidado ? (
+          <Button type="button" size="sm" onClick={abrirModal}>
+            Analisar pendências
           </Button>
         ) : null}
 
@@ -76,10 +55,6 @@ export default function CentralPendenciaCard({ item }) {
         open={modalOpen}
         onOpenChange={setModalOpen}
         item={item}
-        loading={loading}
-        error={error}
-        resultado={resultado}
-        onConfirm={confirmarAprovacao}
       />
     </article>
   );

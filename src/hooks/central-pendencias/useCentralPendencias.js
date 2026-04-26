@@ -232,6 +232,22 @@ function mapComportamentoPendencias(registros = []) {
 
   const haDivergencia = pendencias.some((item) => normalizarTexto(item.comportamento_atual) !== normalizarTexto(item.comportamento_sugerido));
 
+  const pendenciasDetalhadas = pendencias.map((item) => ({
+    id: item.id,
+    militarNome: item.militar_nome || item.nome_completo || item.militar_nome_completo || '—',
+    matricula: item.matricula || item.matricula_formatada || item.militar_matricula || '',
+    comportamentoAtual: item.comportamento_atual || '—',
+    comportamentoSugerido: item.comportamento_sugerido || '—',
+    dataReferencia: item.data_referencia || item.data_detectada || item.created_date || '',
+    dataDeteccao: item.data_detectada || item.created_date || '',
+    status: item.status_pendencia || item.status || 'Pendente',
+    origem: item.origem || item.origem_fluxo || 'Avaliação de Comportamento',
+    justificativa: item.justificativa || item.fundamentacao || item.motivo || '',
+    calculoResumo: item.calculo_resumo || item.calculo_json || '',
+    observacoes: item.observacoes || item.observacao || '',
+    divergencia: normalizarTexto(item.comportamento_atual) !== normalizarTexto(item.comportamento_sugerido),
+  }));
+
   return [{
     ...criarPendenciaBase({
       id: 'co-consolidado-disciplinar',
@@ -253,6 +269,7 @@ function mapComportamentoPendencias(registros = []) {
       origemLinkLabel: 'Revisar pendências de comportamento',
     }),
     pendenciasComportamentoIds: pendencias.map((item) => item.id).filter(Boolean),
+    pendenciasComportamento: pendenciasDetalhadas,
     totalPendenciasComportamento: pendencias.length,
     totalMilitaresComportamento: militaresUnicos.size,
   }];
@@ -477,8 +494,6 @@ export default function useCentralPendencias() {
     user,
   } = useCurrentUser();
   const [filtros, setFiltros] = useState({ categoria: 'todas', prioridade: 'todas', situacao: 'todas', texto: '', ordenacao: 'prioridade_desc' });
-  const [aprovacaoEmLoteLoading, setAprovacaoEmLoteLoading] = useState(false);
-
   const query = useQuery({
     queryKey: ['central-pendencias', isAdmin],
     enabled: isAccessResolved,
@@ -516,36 +531,27 @@ export default function useCentralPendencias() {
   });
 
 
-  const aprovarPendenciasComportamentoEmLote = async (item = {}) => {
+  const aplicarPendenciaComportamentoIndividual = async ({ pendenciaId } = {}) => {
     if (!canAccessAction('aprovar_mudanca_comportamento')) {
       throw new Error('Usuário sem permissão para aprovar mudança de comportamento.');
     }
 
-    const pendencias = Array.isArray(item.pendenciasComportamentoIds)
-      ? item.pendenciasComportamentoIds.filter(Boolean)
-      : [];
-
-    if (!pendencias.length) {
-      throw new Error('Nenhuma pendência de comportamento foi encontrada para aprovação em lote.');
+    if (!pendenciaId) {
+      throw new Error('Pendência inválida para aplicação individual.');
     }
 
-    setAprovacaoEmLoteLoading(true);
-    try {
-      const resultado = await aplicarPendenciasComportamentoEmLote({
-        pendencias,
-        usuarioAtual: {
-          ...user,
-          canAccessAction,
-        },
-      });
+    const resultado = await aplicarPendenciasComportamentoEmLote({
+      pendencias: [pendenciaId],
+      usuarioAtual: {
+        ...user,
+        canAccessAction,
+      },
+    });
 
-      await queryClient.invalidateQueries({ queryKey: ['central-pendencias'] });
-      await query.refetch();
+    await queryClient.invalidateQueries({ queryKey: ['central-pendencias'] });
+    await query.refetch();
 
-      return resultado;
-    } finally {
-      setAprovacaoEmLoteLoading(false);
-    }
+    return resultado;
   };
 
   const pendenciasFiltradas = useMemo(() => {
@@ -558,11 +564,11 @@ export default function useCentralPendencias() {
       if (item.id !== 'co-consolidado-disciplinar') return item;
       return {
         ...item,
-        podeAprovarEmLoteComportamento: canAccessAction('aprovar_mudanca_comportamento'),
-        aoAprovarEmLoteComportamento: aprovarPendenciasComportamentoEmLote,
+        podeAplicarComportamentoIndividual: canAccessAction('aprovar_mudanca_comportamento'),
+        aoAplicarPendenciaComportamento: aplicarPendenciaComportamentoIndividual,
       };
     });
-  }, [query.data?.pendencias, filtros, canAccessAction, aprovarPendenciasComportamentoEmLote]);
+  }, [query.data?.pendencias, filtros, canAccessAction]);
 
   const resumo = useMemo(() => {
     const itens = query.data?.pendencias || [];
@@ -586,6 +592,5 @@ export default function useCentralPendencias() {
     setFiltros,
     refetch: query.refetch,
     errosCategorias: query.data?.errosCategorias || [],
-    aprovacaoEmLoteLoading,
   };
 }
