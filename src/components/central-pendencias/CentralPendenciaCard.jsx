@@ -30,7 +30,7 @@ export default function CentralPendenciaCard({ item }) {
       <p className="text-xs text-slate-600"><strong>Sugestão:</strong> {item.sugestaoAcao}</p>
       {item.origemLink ? (
         <Link to={item.origemLink} className="text-xs text-[#1e3a5f] underline">
-          Abrir origem
+          {item.origemLinkLabel || 'Abrir origem'}
         </Link>
       ) : null}
     </article>
