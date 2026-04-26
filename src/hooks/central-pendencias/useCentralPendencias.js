@@ -43,6 +43,8 @@ const criarPendenciaBase = (dados) => ({
   origem: dados.origem || 'Módulo não identificado',
   sugestaoAcao: dados.sugestaoAcao || 'Verificar item no módulo de origem.',
   origemLink: dados.origemLink || '',
+  origemLinkLabel: dados.origemLinkLabel || '',
+  ehHistorico: Boolean(dados.ehHistorico),
 });
 
 async function listarPorEscopo({ entidade, isAdmin, getMilitarScopeFilters, ordem = '-created_date' }) {
@@ -195,31 +197,58 @@ function mapFeriasPendentes(ferias = [], registrosLivro = []) {
 }
 
 function mapComportamentoPendencias(registros = []) {
-  return registros
-    .filter((item) => {
+  const pendencias = registros.filter((item) => {
       const status = normalizarTexto(item.status_pendencia || item.status);
       const divergente = normalizarTexto(item.comportamento_atual) && normalizarTexto(item.comportamento_sugerido)
         && normalizarTexto(item.comportamento_atual) !== normalizarTexto(item.comportamento_sugerido);
       return status.includes('pendente') || status.includes('aguardando') || divergente;
-    })
-    .map((item) => criarPendenciaBase({
-      id: `co-${item.id}`,
-      categoria: 'Comportamento',
-      prioridade: item.comportamento_atual !== item.comportamento_sugerido ? 'alta' : 'media',
-      situacao: item.status_pendencia || item.status || 'Pendente',
-      titulo: 'Pendência disciplinar',
-      descricao: montarDescricaoCurta({
-        situacao: item.status_pendencia || item.status,
-        detalhe: `${item.comportamento_atual || 'N/D'} → ${item.comportamento_sugerido || 'N/D'}`,
-        dataReferencia: item.data_detectada || item.created_date,
-      }),
-      militar: item.militar_nome || '—',
-      setor: item.subgrupamento_nome || '—',
-      dataReferencia: item.data_detectada || item.created_date,
-      origem: 'Controle de Comportamento',
-      sugestaoAcao: 'Validar análise/aprovação no módulo de Avaliação de Comportamento.',
-      origemLink: '/AvaliacaoComportamento',
-    }));
+    });
+
+  if (!pendencias.length) return [];
+
+  const militaresUnicos = new Set(
+    pendencias
+      .map((item) => normalizarTexto(item.militar_nome))
+      .filter(Boolean)
+  );
+
+  const contagemStatus = pendencias.reduce((acc, item) => {
+    const status = (item.status_pendencia || item.status || 'Pendente').trim() || 'Pendente';
+    acc.set(status, (acc.get(status) || 0) + 1);
+    return acc;
+  }, new Map());
+
+  const resumoStatus = Array.from(contagemStatus.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([status, quantidade]) => `${status}: ${quantidade}`)
+    .join(' • ');
+
+  const registroMaisRecente = pendencias.reduce((maisRecente, atual) => {
+    const dataAtual = new Date(atual.data_detectada || atual.created_date || 0).getTime();
+    const dataMaisRecente = new Date(maisRecente.data_detectada || maisRecente.created_date || 0).getTime();
+    return dataAtual > dataMaisRecente ? atual : maisRecente;
+  }, pendencias[0]);
+
+  const haDivergencia = pendencias.some((item) => normalizarTexto(item.comportamento_atual) !== normalizarTexto(item.comportamento_sugerido));
+
+  return [criarPendenciaBase({
+    id: 'co-consolidado-disciplinar',
+    categoria: 'Comportamento',
+    prioridade: haDivergencia ? 'alta' : 'media',
+    situacao: 'Consolidado disciplinar',
+    titulo: `Pendências de comportamento disciplinar (${militaresUnicos.size} militares)`,
+    descricao: montarDescricaoCurta({
+      situacao: `${pendencias.length} pendências semelhantes`,
+      detalhe: resumoStatus,
+      dataReferencia: registroMaisRecente?.data_detectada || registroMaisRecente?.created_date,
+    }),
+    militar: '—',
+    setor: '—',
+    dataReferencia: registroMaisRecente?.data_detectada || registroMaisRecente?.created_date,
+    origem: 'Controle de Comportamento',
+    sugestaoAcao: 'Validar análise/aprovação no módulo de Avaliação de Comportamento.',
+    origemLink: '/AvaliacaoComportamento',
+  })];
 }
 
 function mapLegadoPendencias(publicacoesLegado = [], duplicidades = []) {
@@ -405,30 +434,25 @@ function mapLegadoPendencias(publicacoesLegado = [], duplicidades = []) {
     }, duplicidadesImportacaoLegado[0]);
 
     const dataMaisRecente = formatarDataPtBr(registroMaisRecente?.created_at || registroMaisRecente?.created_date);
-    const detalhePartes = [
-      `${totalOcorrencias} ocorrências`,
-      descricaoStatus ? `Status: ${descricaoStatus}` : '',
-      dataMaisRecente ? `Data mais recente: ${dataMaisRecente}` : '',
-      'Registros históricos de duplicidade oriundos da migração. A importação atual já bloqueia duplicados sem gerar novas pendências.',
-    ].filter(Boolean);
-
     return [criarPendenciaBase({
       id: 'le-dup-importacao-legado-consolidado',
       categoria: 'Legado/Outros',
       prioridade: 'baixa',
       situacao: 'Duplicidade pendente',
-      titulo: `Duplicidades de importação legado (${totalOcorrencias} ocorrências)`,
+      titulo: `Histórico de duplicidades da migração (${totalOcorrencias} registros)`,
       descricao: montarDescricaoCurta({
         situacao: 'Consolidado de migração',
-        detalhe: detalhePartes.join(' • '),
+        detalhe: [`${totalOcorrencias} registros históricos`, descricaoStatus ? `Status: ${descricaoStatus}` : ''].filter(Boolean).join(' • '),
         dataReferencia: registroMaisRecente?.created_at || registroMaisRecente?.created_date,
       }),
       militar: '—',
       setor: '—',
       dataReferencia: registroMaisRecente?.created_at || registroMaisRecente?.created_date,
       origem: 'Revisão de Duplicidades',
-      sugestaoAcao: 'Registros históricos de duplicidade oriundos da migração. A importação atual já bloqueia duplicados sem gerar novas pendências.',
+      sugestaoAcao: `Abrir a revisão para auditoria e saneamento histórico.${dataMaisRecente ? ` Último registro em ${dataMaisRecente}.` : ''}`,
       origemLink: '/RevisaoDuplicidadesMilitar',
+      origemLinkLabel: 'Ver revisão de duplicidades',
+      ehHistorico: true,
     })];
   })();
 
@@ -477,7 +501,10 @@ export default function useCentralPendencias() {
 
   const pendenciasFiltradas = useMemo(() => {
     const lista = filtrarPendencias(query.data?.pendencias || [], filtros);
-    return ordenarPendencias(lista, filtros.ordenacao);
+    const ordenadas = ordenarPendencias(lista, filtros.ordenacao);
+    const prioridadeBaixaOuHistorico = ordenadas.filter((item) => item.prioridade === 'baixa' || item.ehHistorico);
+    const restantes = ordenadas.filter((item) => item.prioridade !== 'baixa' && !item.ehHistorico);
+    return [...restantes, ...prioridadeBaixaOuHistorico];
   }, [query.data?.pendencias, filtros]);
 
   const resumo = useMemo(() => {
