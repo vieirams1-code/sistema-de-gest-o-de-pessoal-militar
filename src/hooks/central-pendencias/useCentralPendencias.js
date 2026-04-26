@@ -248,6 +248,7 @@ function mapComportamentoPendencias(registros = []) {
     origem: 'Controle de Comportamento',
     sugestaoAcao: 'Validar análise/aprovação no módulo de Avaliação de Comportamento.',
     origemLink: '/AvaliacaoComportamento',
+    origemLinkLabel: 'Revisar pendências de comportamento',
   })];
 }
 
