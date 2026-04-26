@@ -303,8 +303,40 @@ function mapLegadoPendencias(publicacoesLegado = [], duplicidades = []) {
     return `${tipo} ${valor}`;
   };
 
+  const ehDuplicidadeImportacaoLegado = (item = {}) => {
+    const candidatos = [
+      item.origem_fluxo,
+      item.origem,
+      item.origem_label,
+      item.categoria_origem,
+      item.tipo_origem,
+    ]
+      .map((v) => normalizarTexto(v))
+      .filter(Boolean);
+
+    return candidatos.some((valor) => {
+      const possuiImportacao = valor.includes('importacao');
+      const possuiLegado = valor.includes('legado');
+      const possuiRotulo = valor.includes('legado/importacao') || valor.includes('importacao/legado');
+      return (possuiImportacao && possuiLegado) || possuiRotulo;
+    });
+  };
+
+  const formatarDataPtBr = (value) => {
+    if (!value) return '';
+    const data = new Date(value);
+    if (Number.isNaN(data.getTime())) return '';
+    return data.toLocaleDateString('pt-BR');
+  };
+
+  const duplicidadesImportacaoLegado = [];
   const gruposDuplicidade = new Map();
   (duplicidades || []).forEach((item) => {
+    if (ehDuplicidadeImportacaoLegado(item)) {
+      duplicidadesImportacaoLegado.push(item);
+      return;
+    }
+
     const chaveLogica = extrairDadosChave(item);
     const chaveGrupo = `${chaveLogica.tipo}:${chaveLogica.valor}`;
     if (!gruposDuplicidade.has(chaveGrupo)) {
@@ -351,7 +383,56 @@ function mapLegadoPendencias(publicacoesLegado = [], duplicidades = []) {
     });
   });
 
-  return [...pendenciasClassificacao, ...pendenciasDuplicidade];
+  const pendenciaDuplicidadeImportacaoLegado = (() => {
+    if (!duplicidadesImportacaoLegado.length) return [];
+
+    const totalOcorrencias = duplicidadesImportacaoLegado.length;
+    const contagemPorStatus = duplicidadesImportacaoLegado.reduce((acc, item) => {
+      const status = (item.status || item.situacao || 'Pendente').trim() || 'Pendente';
+      acc.set(status, (acc.get(status) || 0) + 1);
+      return acc;
+    }, new Map());
+
+    const descricaoStatus = Array.from(contagemPorStatus.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([status, quantidade]) => `${status}: ${quantidade}`)
+      .join(' • ');
+
+    const registroMaisRecente = duplicidadesImportacaoLegado.reduce((maisRecente, atual) => {
+      const dataAtual = new Date(atual.created_at || atual.created_date || 0).getTime();
+      const dataMaisRecente = new Date(maisRecente.created_at || maisRecente.created_date || 0).getTime();
+      return dataAtual > dataMaisRecente ? atual : maisRecente;
+    }, duplicidadesImportacaoLegado[0]);
+
+    const dataMaisRecente = formatarDataPtBr(registroMaisRecente?.created_at || registroMaisRecente?.created_date);
+    const detalhePartes = [
+      `${totalOcorrencias} ocorrências`,
+      descricaoStatus ? `Status: ${descricaoStatus}` : '',
+      dataMaisRecente ? `Data mais recente: ${dataMaisRecente}` : '',
+      'Registros históricos de duplicidade oriundos da migração. A importação atual já bloqueia duplicados sem gerar novas pendências.',
+    ].filter(Boolean);
+
+    return [criarPendenciaBase({
+      id: 'le-dup-importacao-legado-consolidado',
+      categoria: 'Legado/Outros',
+      prioridade: 'baixa',
+      situacao: 'Duplicidade pendente',
+      titulo: `Duplicidades de importação legado (${totalOcorrencias} ocorrências)`,
+      descricao: montarDescricaoCurta({
+        situacao: 'Consolidado de migração',
+        detalhe: detalhePartes.join(' • '),
+        dataReferencia: registroMaisRecente?.created_at || registroMaisRecente?.created_date,
+      }),
+      militar: '—',
+      setor: '—',
+      dataReferencia: registroMaisRecente?.created_at || registroMaisRecente?.created_date,
+      origem: 'Revisão de Duplicidades',
+      sugestaoAcao: 'Registros históricos de duplicidade oriundos da migração. A importação atual já bloqueia duplicados sem gerar novas pendências.',
+      origemLink: '/RevisaoDuplicidadesMilitar',
+    })];
+  })();
+
+  return [...pendenciasClassificacao, ...pendenciaDuplicidadeImportacaoLegado, ...pendenciasDuplicidade];
 }
 
 export default function useCentralPendencias() {
