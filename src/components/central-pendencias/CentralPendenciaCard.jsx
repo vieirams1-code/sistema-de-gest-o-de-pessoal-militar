@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { formatarDataSegura } from '@/utils/central-pendencias/centralPendencias.helpers';
 import CentralPendenciaActionModal from './CentralPendenciaActionModal';
+import CentralPendenciaAtestadoModal from './CentralPendenciaAtestadoModal';
 
 const PRIORIDADE_CLASSES = {
   critica: 'bg-red-100 text-red-700',
@@ -11,11 +12,16 @@ const PRIORIDADE_CLASSES = {
   baixa: 'bg-slate-100 text-slate-700',
 };
 
-export default function CentralPendenciaCard({ item }) {
+export default function CentralPendenciaCard({ item, pendenciasAtestado = [], indiceAtestado = -1 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const ehComportamentoConsolidado = item?.id === 'co-consolidado-disciplinar';
+  const ehAtestado = item?.categoriaSlug === 'atestados';
+  const [indiceAtestadoSelecionado, setIndiceAtestadoSelecionado] = useState(indiceAtestado >= 0 ? indiceAtestado : 0);
 
   const abrirModal = () => {
+    if (ehAtestado && indiceAtestado >= 0) {
+      setIndiceAtestadoSelecionado(indiceAtestado);
+    }
     setModalOpen(true);
   };
 
@@ -43,19 +49,36 @@ export default function CentralPendenciaCard({ item }) {
             Analisar pendências
           </Button>
         ) : null}
+        {ehAtestado ? (
+          <Button type="button" size="sm" onClick={abrirModal}>
+            Analisar atestado
+          </Button>
+        ) : null}
 
-        {item.origemLink ? (
+        {item.origemLink && !ehAtestado ? (
           <Link to={item.origemLink} className="text-xs text-[#1e3a5f] underline">
             {item.origemLinkLabel || 'Abrir origem'}
           </Link>
         ) : null}
       </div>
 
-      <CentralPendenciaActionModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        item={item}
-      />
+      {ehComportamentoConsolidado ? (
+        <CentralPendenciaActionModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          item={item}
+        />
+      ) : null}
+
+      {ehAtestado ? (
+        <CentralPendenciaAtestadoModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          pendenciasAtestado={pendenciasAtestado}
+          indiceAtual={indiceAtestadoSelecionado}
+          onSelecionarIndice={setIndiceAtestadoSelecionado}
+        />
+      ) : null}
     </article>
   );
 }
