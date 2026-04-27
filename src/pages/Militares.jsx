@@ -29,6 +29,9 @@ import {
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
 import { isPostoOficial } from '@/utils/postoQuadroCompatibilidade';
 
+const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
+const SEM_LOTACAO_VALUE = '__sem_lotacao__';
+
 export default function Militares() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -52,6 +55,7 @@ export default function Militares() {
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
   const [statusFilter, setStatusFilter] = useState('all');
   const [postoFilter, setPostoFilter] = useState('all');
+  const [lotacaoFilter, setLotacaoFilter] = useState(TODAS_LOTACOES_VALUE);
   const [mostrarInativos, setMostrarInativos] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
   const [visualizacaoMode, setVisualizacaoMode] = useState('lista');
@@ -117,14 +121,25 @@ export default function Militares() {
   });
 
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos });
+  const lotacoesDisponiveis = Array.from(
+    new Set(
+      operacionais
+        .map((m) => (m.lotacao || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
   const filteredMilitares = operacionais.filter(m => {
     const matchesSearch = militarCorrespondeBusca(m, searchTerm);
     
     const matchesStatus = statusFilter === 'all' || m.status_cadastro === statusFilter;
     const matchesPosto = postoFilter === 'all' || m.posto_graduacao === postoFilter;
+    const lotacaoMilitar = (m.lotacao || '').trim();
+    const matchesLotacao = lotacaoFilter === TODAS_LOTACOES_VALUE
+      || (lotacaoFilter === SEM_LOTACAO_VALUE ? !lotacaoMilitar : lotacaoMilitar === lotacaoFilter);
     const matchesAtivo = mostrarInativos || m.status_cadastro !== 'Inativo';
     
-    return matchesSearch && matchesStatus && matchesPosto && matchesAtivo;
+    return matchesSearch && matchesStatus && matchesPosto && matchesLotacao && matchesAtivo;
   });
 
   // Agrupar por posto/graduação
@@ -295,6 +310,20 @@ export default function Militares() {
                   <SelectItem value="Soldado">Soldado</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={lotacaoFilter} onValueChange={setLotacaoFilter}>
+                <SelectTrigger className="w-48 h-10 border-slate-200">
+                  <SelectValue placeholder="Lotação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODAS_LOTACOES_VALUE}>Todas Lotações</SelectItem>
+                  <SelectItem value={SEM_LOTACAO_VALUE}>Sem lotação</SelectItem>
+                  {lotacoesDisponiveis.map((lotacao) => (
+                    <SelectItem key={lotacao} value={lotacao}>
+                      {lotacao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="flex border border-slate-200 rounded-lg overflow-hidden">
                 <Button
                   variant={visualizacaoMode === 'lista' ? 'default' : 'ghost'}
@@ -366,11 +395,11 @@ export default function Militares() {
               Nenhum militar encontrado
             </h3>
             <p className="text-slate-500 mb-6">
-              {searchTerm || statusFilter !== 'all' || postoFilter !== 'all'
+              {searchTerm || statusFilter !== 'all' || postoFilter !== 'all' || lotacaoFilter !== TODAS_LOTACOES_VALUE
                 ? 'Tente ajustar os filtros de busca'
                 : 'Comece cadastrando o primeiro militar'}
             </p>
-            {!searchTerm && statusFilter === 'all' && postoFilter === 'all' && (
+            {!searchTerm && statusFilter === 'all' && postoFilter === 'all' && lotacaoFilter === TODAS_LOTACOES_VALUE && (
               <Button
                 onClick={() => navigate(createPageUrl('CadastrarMilitar'))}
                 className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
