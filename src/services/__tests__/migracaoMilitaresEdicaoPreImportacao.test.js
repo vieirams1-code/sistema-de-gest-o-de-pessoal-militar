@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   __setMigracaoMilitaresClientForTests,
+  analisarArquivoMigracao,
   corrigirLinhaPreImportacao,
   importarAnalise,
   persistirCorrecaoPreImportacaoHistorico,
@@ -39,10 +40,19 @@ function setupClients() {
   const ImportacaoMilitares = createEntity([]);
   const PossivelDuplicidadeMilitar = createEntity([]);
 
-  __setMigracaoMilitaresClientForTests({ entities: { Militar, ImportacaoMilitares } });
+  __setMigracaoMilitaresClientForTests({ entities: { Militar, MatriculaMilitar, ImportacaoMilitares } });
   __setMilitarIdentidadeClientForTests({ entities: { Militar, MatriculaMilitar, PossivelDuplicidadeMilitar } });
 
   return { Militar, MatriculaMilitar, ImportacaoMilitares, PossivelDuplicidadeMilitar };
+}
+
+function createFileLike(content, name = 'migracao.csv') {
+  return {
+    name,
+    type: 'text/csv',
+    text: async () => content,
+    arrayBuffer: async () => new TextEncoder().encode(content).buffer,
+  };
 }
 
 function analiseBase() {
@@ -299,5 +309,66 @@ test('bloqueia duplicidade na importação sem criar pendência persistida', asy
   assert.equal(resultado.totalNaoImportadas, 2);
   assert.equal(PossivelDuplicidadeMilitar._rows.length, 0);
   assert.ok(resultado.relatorio.importacao.nao_importadas.some((item) => item.motivo === 'Possível duplicidade identificada.'));
+  assert.ok(resultado.relatorio.importacao.nao_importadas.some((item) => item.motivo === 'Matrícula já cadastrada.'));
+});
+
+test('análise detecta matrícula já cadastrada no histórico de matrícula mesmo sem cadastro legado', async () => {
+  const { MatriculaMilitar } = setupClients();
+  await MatriculaMilitar.create({
+    militar_id: 'm1',
+    matricula: '423.553-021',
+    matricula_normalizada: '423553021',
+    is_atual: true,
+  });
+
+  const file = createFileLike([
+    'nome_completo;nome_guerra;matricula;posto_graduacao;data_inclusao',
+    'Carlos Eduardo Duarte Batista;Duarte;423553021;CB;14/07/2014',
+  ].join('\n'));
+
+  const resultado = await analisarArquivoMigracao(file);
+  assert.equal(resultado.linhas[0].status, 'DUPLICADO');
+  assert.ok(resultado.linhas[0].alertas.some((alerta) => alerta.includes('Matrícula já cadastrada')));
+});
+
+test('importação não falha o lote quando a matrícula já existe apenas em MatriculaMilitar', async () => {
+  const { MatriculaMilitar } = setupClients();
+  const usuario = { email: 'admin@sgp', full_name: 'Administrador' };
+
+  await MatriculaMilitar.create({
+    militar_id: 'm-legado',
+    matricula: '423.553-021',
+    matricula_normalizada: '423553021',
+    is_atual: true,
+  });
+
+  const analise = {
+    arquivo: { nome: 'matricula-historica.csv', tipo: 'text/csv', hash: 'hash-mat' },
+    resumo: { total_linhas: 1, total_aptas: 1, total_aptas_com_alerta: 0, total_duplicadas: 0, total_erros: 0 },
+    linhas: [
+      {
+        linhaNumero: 2,
+        status: 'APTO',
+        alertas: [],
+        erros: [],
+        transformado: {
+          nome_completo: 'Carlos Eduardo Duarte Batista',
+          nome_guerra: 'Duarte',
+          matricula: '423.553-021',
+          cpf: '728.722.091-15',
+          data_inclusao: '2014-07-13',
+          posto_graduacao: 'Cabo',
+          data_nascimento: '1988-05-18',
+        },
+      },
+    ],
+    versao_regra_migracao: 'v1.1.0',
+  };
+
+  const historico = await salvarAnaliseHistorico(analise, usuario);
+  const resultado = await importarAnalise({ analise, incluirAlertas: false, historicoId: historico.id, usuario });
+
+  assert.equal(resultado.statusImportacao, 'Falhou');
+  assert.equal(resultado.totalImportadas, 0);
   assert.ok(resultado.relatorio.importacao.nao_importadas.some((item) => item.motivo === 'Matrícula já cadastrada.'));
 });
