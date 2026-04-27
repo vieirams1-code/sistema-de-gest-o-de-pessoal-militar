@@ -27,6 +27,7 @@ import {
   FileUp,
   History,
   CircleAlert,
+  UserCircle2,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,6 +35,16 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
 import SgpThemeModeMount from '@/themes/sgpThemeModes/SgpThemeModeMount';
+import SgpThemeProfileSelector from '@/themes/sgpThemeModes/SgpThemeProfileSelector';
+import useSgpThemeMode from '@/themes/sgpThemeModes/useSgpThemeMode';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 const menuGroups = [
   {
     title: 'Principal',
@@ -150,7 +161,16 @@ const adminMenuGroup = {
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState([]);
-  const { isAdmin, canAccessModule, canAccessAction, permissions, canAccessAll } = useCurrentUser();
+  const {
+    isAdmin,
+    canAccessModule,
+    canAccessAction,
+    permissions,
+    canAccessAll,
+    user,
+    userEmail,
+  } = useCurrentUser();
+  const { themeMode, setThemeMode, isBombeiroMode } = useSgpThemeMode();
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
   const temPermissao = (actionKey) => canAccessAction(actionKey);
   useVerificacaoComportamentoDiaria({ enabled: canAccessModule('militares') || isAdmin });
@@ -212,7 +232,7 @@ export default function Layout({ children, currentPageName }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <SgpThemeModeMount />
+      <SgpThemeModeMount isBombeiroMode={isBombeiroMode} />
       {/* Header Mobile */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#173764] text-white z-40 px-4 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3 min-w-0">
@@ -401,8 +421,44 @@ export default function Layout({ children, currentPageName }) {
       {/* Conteúdo */}
       <main className="lg:pl-72 pt-16 lg:pt-0 min-h-screen">
         <div className="sticky top-16 lg:top-0 z-30 border-b border-slate-200 bg-slate-50/95 backdrop-blur px-4 py-3">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto flex items-center gap-3">
             <GlobalMilitarSearch />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="ml-auto h-10 min-w-[170px] justify-between gap-2 border-slate-300 bg-white px-3"
+                >
+                  <span className="inline-flex items-center gap-2 min-w-0">
+                    <UserCircle2 className="w-4 h-4 text-slate-500 shrink-0" />
+                    <span className="truncate text-sm">
+                      {user?.full_name || userEmail || 'Perfil'}
+                    </span>
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuLabel className="pb-0">
+                  Minha conta
+                </DropdownMenuLabel>
+                <p className="px-2 pb-2 text-xs text-slate-500">
+                  {userEmail || 'Usuário autenticado'}
+                </p>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-slate-500">
+                  Preferências
+                </DropdownMenuLabel>
+                <SgpThemeProfileSelector
+                  themeMode={themeMode}
+                  setThemeMode={setThemeMode}
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => base44.auth.logout()} className="text-red-600 focus:text-red-700">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         {children}
