@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Users, Search, CheckSquare, Square, Building2, GitMerge, MapPin, ChevronRight, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -22,6 +23,16 @@ const normalizeTipo = (tipo) => {
   return 'Subsetor';
 };
 
+const SEM_LOTACAO_VALUE = '__sem_lotacao__';
+const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
+
+const formatarLotacaoAtual = (militar) => {
+  if (militar.subgrupamento_nome) {
+    return `${militar.subgrupamento_nome}${militar.grupamento_nome && militar.grupamento_nome !== militar.subgrupamento_nome ? ` (${militar.grupamento_nome})` : ''}`;
+  }
+  return militar.grupamento_nome || 'Sem lotação';
+};
+
 export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast, dismiss } = useToast();
@@ -29,6 +40,7 @@ export default function LotacaoMilitares() {
   const hasLotacaoAccess = canAccessModule('lotacao_militares');
 
   const [searchMilitar, setSearchMilitar] = useState('');
+  const [lotacaoAtualFiltro, setLotacaoAtualFiltro] = useState(TODAS_LOTACOES_VALUE);
   const [selectedMilitares, setSelectedMilitares] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null); // Nó de destino selecionado na árvore
   const [expandedNodes, setExpandedNodes] = useState({});
@@ -61,15 +73,38 @@ export default function LotacaoMilitares() {
     return militares.map((m) => enriquecerMilitarComMatriculas(m, indiceMatriculas));
   }, [matriculas, militares]);
 
-  // Filtragem de militares
-  const militaresFiltrados = useMemo(() => {
+  const militaresOperacionais = useMemo(() => {
     return filtrarMilitaresOperacionais(militaresComMatriculaAtual)
+      .sort((a, b) => String(a?.nome_completo || '').localeCompare(String(b?.nome_completo || ''), 'pt-BR'));
+  }, [militaresComMatriculaAtual]);
+
+  const lotacoesAtuaisDisponiveis = useMemo(() => {
+    const lotacoes = new Set();
+    militaresOperacionais.forEach((militar) => {
+      const lotacaoText = formatarLotacaoAtual(militar);
+      if (lotacaoText !== 'Sem lotação') {
+        lotacoes.add(lotacaoText);
+      }
+    });
+    return Array.from(lotacoes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [militaresOperacionais]);
+
+  // Filtragem de militares (busca + lotação atual)
+  const militaresFiltrados = useMemo(() => {
+    return militaresOperacionais
       .filter(m => {
         if (!searchMilitar?.trim()) return true;
         return militarCorrespondeBusca(m, searchMilitar);
       })
-      .sort((a, b) => String(a?.nome_completo || '').localeCompare(String(b?.nome_completo || ''), 'pt-BR'));
-  }, [militaresComMatriculaAtual, searchMilitar]);
+      .filter((militar) => {
+        if (lotacaoAtualFiltro === TODAS_LOTACOES_VALUE) return true;
+        const lotacaoText = formatarLotacaoAtual(militar);
+        if (lotacaoAtualFiltro === SEM_LOTACAO_VALUE) {
+          return lotacaoText === 'Sem lotação';
+        }
+        return lotacaoText === lotacaoAtualFiltro;
+      });
+  }, [militaresOperacionais, searchMilitar, lotacaoAtualFiltro]);
 
   const toggleExpand = (id, e) => {
     e.stopPropagation();
@@ -266,9 +301,9 @@ export default function LotacaoMilitares() {
           {/* COLUNA DIREITA: Lista de Militares */}
           <div className="lg:col-span-7 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-4 bg-[#1e3a5f]/5 border-b border-slate-100 shrink-0">
-               <h2 className="font-bold text-[#1e3a5f] flex items-center justify-between">
+              <h2 className="font-bold text-[#1e3a5f] flex items-center justify-between">
                 <span>2. Selecione os Militares a Mover</span>
-                <Badge variant="outline" className="bg-white">{selectedMilitares.length} selecionados</Badge>
+                <Badge variant="outline" className="bg-white">{selectedMilitares.length} selecionados • {militaresFiltrados.length} na lista</Badge>
               </h2>
             </div>
             
@@ -281,6 +316,22 @@ export default function LotacaoMilitares() {
                   onChange={e => setSearchMilitar(e.target.value)} 
                   className="pl-9 bg-slate-50" 
                 />
+              </div>
+              <div className="w-[260px] shrink-0">
+                <Select value={lotacaoAtualFiltro} onValueChange={setLotacaoAtualFiltro}>
+                  <SelectTrigger className="bg-slate-50">
+                    <SelectValue placeholder="Lotação atual: Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TODAS_LOTACOES_VALUE}>Lotação atual: Todas</SelectItem>
+                    <SelectItem value={SEM_LOTACAO_VALUE}>Lotação atual: Sem lotação</SelectItem>
+                    {lotacoesAtuaisDisponiveis.map((lotacao) => (
+                      <SelectItem key={lotacao} value={lotacao}>
+                        {`Lotação atual: ${lotacao}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button variant="outline" onClick={toggleTodos} className="shrink-0 bg-slate-50">
                 {militaresFiltrados.every(m => selectedMilitares.includes(m.id)) ? (
@@ -295,14 +346,13 @@ export default function LotacaoMilitares() {
               {loadingMilitares || loadingMatriculas ? (
                 <p className="text-center text-slate-400 py-10">Carregando militares...</p>
               ) : militaresFiltrados.length === 0 ? (
-                <p className="text-center text-slate-400 py-10">Nenhum militar encontrado para a busca.</p>
+                <p className="text-center text-slate-400 py-10">Nenhum militar encontrado com os filtros selecionados.</p>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {militaresFiltrados.map(m => {
                     const isSelected = selectedMilitares.includes(m.id);
                     const matriculaAtual = m.matricula_atual || m.matricula || 'N/I';
-                    // Computa lotacao formatada
-                    const lotacaoText = m.subgrupamento_nome ? `${m.subgrupamento_nome}${m.grupamento_nome && m.grupamento_nome !== m.subgrupamento_nome ? ` (${m.grupamento_nome})` : ''}` : m.grupamento_nome || 'Sem lotação';
+                    const lotacaoText = formatarLotacaoAtual(m);
                     
                     return (
                       <div 
