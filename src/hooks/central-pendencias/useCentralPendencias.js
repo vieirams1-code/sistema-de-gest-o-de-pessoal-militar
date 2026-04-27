@@ -46,6 +46,7 @@ const criarPendenciaBase = (dados) => ({
   origemLink: dados.origemLink || '',
   origemLinkLabel: dados.origemLinkLabel || '',
   ehHistorico: Boolean(dados.ehHistorico),
+  ...dados,
 });
 
 async function listarPorEscopo({ entidade, isAdmin, getMilitarScopeFilters, ordem = '-created_date' }) {
@@ -135,6 +136,8 @@ function mapAtestadosPendentes(registros = []) {
       const dias = diferencaDias(dataFim, hoje);
       const prioridade = calcularPrioridadePorPrazo({ diasParaVencer: dias, vencido: (dias ?? 0) < 0, status: item.status_jiso || item.status || '' });
       const situacao = item.status_jiso || item.status || 'Aguardando homologação';
+      const necessitaJiso = Boolean(item.necessita_jiso || normalizarTexto(item.fluxo_homologacao).includes('jiso'));
+      const observacoes = item.observacoes || item.observacao || item.justificativa || item.motivo || '';
       return criarPendenciaBase({
         id: `at-${item.id}`,
         categoria: 'Atestados',
@@ -148,6 +151,17 @@ function mapAtestadosPendentes(registros = []) {
         origem: 'Atestados',
         sugestaoAcao: 'Revisar o fluxo de homologação/JISO no módulo de Atestados.',
         origemLink: '/Atestados',
+        origemLinkLabel: 'Abrir no módulo completo',
+        atestadoId: item.id,
+        militarMatricula: item.matricula || item.matricula_formatada || item.militar_matricula || '',
+        tipoAtestado: item.tipo_afastamento || item.tipo_atestado || item.tipo || '—',
+        dataInicial: item.data_inicio || '',
+        dataFinal: dataFim || '',
+        quantidadeDias: item.quantidade_dias || item.dias || item.duracao_dias || '',
+        statusAtestado: situacao,
+        necessitaHomologacaoJiso: necessitaJiso ? 'Sim' : 'Não',
+        observacoesAtestado: observacoes,
+        origemRegistro: item.origem_registro || item.origem || 'Atestado',
       });
     });
 }
