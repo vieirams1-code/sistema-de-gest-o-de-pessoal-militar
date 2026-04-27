@@ -27,6 +27,7 @@ import {
   militarCorrespondeBusca,
 } from '@/services/matriculaMilitarViewService';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
+import { isPostoOficial } from '@/utils/postoQuadroCompatibilidade';
 
 export default function Militares() {
   const navigate = useNavigate();
@@ -174,7 +175,7 @@ export default function Militares() {
   const stats = {
     total: militaresAtivos.length,
     ativos: militaresAtivos.filter(m => m.status_cadastro === 'Ativo' || !m.status_cadastro).length,
-    oficiais: militaresAtivos.filter(m => ['2º Tenente', '1º Tenente', 'Capitão', 'Major', 'Tenente-Coronel', 'Coronel', 'Aspirante'].includes(m.posto_graduacao)).length,
+    oficiais: militaresAtivos.filter(m => isPostoOficial(m.posto_graduacao)).length,
     pracas: militaresAtivos.filter(m => ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente'].includes(m.posto_graduacao)).length,
     inativos: militaresOperacionaisComInativos.filter(m => m.status_cadastro === 'Inativo').length
   };

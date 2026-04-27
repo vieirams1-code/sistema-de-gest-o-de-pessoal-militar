@@ -16,7 +16,7 @@ const postoAbreviado = {
   '1º Tenente': '1º Ten',
   Capitão: 'Cap',
   Major: 'Maj',
-  'Tenente-Coronel': 'TC',
+  'Tenente Coronel': 'TC',
   Coronel: 'Cel',
 };
 
