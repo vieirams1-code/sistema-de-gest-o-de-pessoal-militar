@@ -934,7 +934,12 @@ export async function analisarArquivoMigracao(file) {
   const cabecalho = dadosCsv[0];
   const headerMap = mapHeaders(cabecalho);
   const militaresExistentes = await getMigracaoClient().entities.Militar.list();
-  const matriculasExistentes = new Set((militaresExistentes || []).map((m) => normalizarMatricula(m?.matricula)));
+  const matriculasLegadas = new Set((militaresExistentes || []).map((m) => normalizarMatricula(m?.matricula)).filter(Boolean));
+  const matriculaEntity = getMigracaoClient().entities.MatriculaMilitar;
+  const matriculasHistoricas = matriculaEntity?.list
+    ? new Set((await matriculaEntity.list()).map((m) => normalizarMatricula(m?.matricula_normalizada || m?.matricula)).filter(Boolean))
+    : new Set();
+  const matriculasExistentes = new Set([...matriculasLegadas, ...matriculasHistoricas]);
 
   const linhas = dadosCsv.slice(1).map((cells, idx) => {
     const alertas = [];
@@ -1216,8 +1221,9 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
     for (const linha of elegiveis) {
       const { matricula, posto_graduacao, data_inclusao } = linha.transformado;
 
-      const duplicidade = await getMigracaoClient().entities.Militar.filter({ matricula });
-      if (duplicidade.length > 0) {
+      try {
+        await validarMatriculaDisponivel(matricula);
+      } catch (error) {
         naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada.' });
         continue;
       }
@@ -1241,8 +1247,21 @@ export async function importarAnalise({ analise, incluirAlertas, historicoId, us
       }
 
       const payloadMilitar = sanitizarCamposNumericosMilitar(linha.transformado);
-      const criado = await criarMilitarComMatricula(payloadMilitar, { origemRegistro: 'importacao_legado', criadoPor: usuario?.email || '' });
-      idsCriados.push(criado?.id);
+      try {
+        const criado = await criarMilitarComMatricula(payloadMilitar, { origemRegistro: 'importacao_legado', criadoPor: usuario?.email || '' });
+        idsCriados.push(criado?.id);
+      } catch (error) {
+        const mensagem = String(error?.message || '').toLowerCase();
+        if (mensagem.includes('matrícula já cadastrada')) {
+          naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Matrícula já cadastrada.' });
+          continue;
+        }
+        if (mensagem.includes('possível duplicidade')) {
+          naoImportadas.push({ linhaNumero: linha.linhaNumero, motivo: 'Possível duplicidade identificada.' });
+          continue;
+        }
+        throw error;
+      }
     }
 
     const totalImportadas = idsCriados.length;
