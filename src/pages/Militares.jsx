@@ -19,12 +19,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Users, Grid3X3, List, GitBranch, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Users, Grid3X3, List, Eye, Pencil, Trash2 } from 'lucide-react';
 import MilitarCard from '@/components/militar/MilitarCard';
-import MapaDeLotacao from '@/components/militar/MapaDeLotacao';
 import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
+  getLotacaoAtualMilitar,
   militarCorrespondeBusca,
 } from '@/services/matriculaMilitarViewService';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
@@ -66,7 +66,6 @@ export default function Militares() {
   const [lotacaoFilter, setLotacaoFilter] = useState(TODAS_LOTACOES_VALUE);
   const [mostrarInativos, setMostrarInativos] = useState(false);
   const [viewMode, setViewMode] = useState('list');
-  const [visualizacaoMode, setVisualizacaoMode] = useState('lista');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
@@ -139,12 +138,16 @@ export default function Militares() {
   const showMilitaresError = !isInitialLoading && militaresQueryError;
   const showResolvedData = !isInitialLoading && !showMilitaresError && militaresQuerySuccess;
 
-  const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos });
+  const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos }).map((militar) => ({
+    ...militar,
+    lotacao_atual: getLotacaoAtualMilitar(militar),
+  }));
   const lotacoesDisponiveis = Array.from(
     new Set(
       operacionais
-        .map((m) => (m.lotacao || '').trim())
+        .map((m) => (m.lotacao_atual || '').trim())
         .filter(Boolean)
+        .filter((lotacao) => lotacao !== 'Sem lotação')
     )
   ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
@@ -153,7 +156,7 @@ export default function Militares() {
     
     const matchesStatus = statusFilter === 'all' || m.status_cadastro === statusFilter;
     const matchesPosto = postoFilter === 'all' || m.posto_graduacao === postoFilter;
-    const lotacaoMilitar = (m.lotacao || '').trim();
+    const lotacaoMilitar = (m.lotacao_atual || '').trim();
     const matchesLotacao = lotacaoFilter === TODAS_LOTACOES_VALUE
       || (lotacaoFilter === SEM_LOTACAO_VALUE ? !lotacaoMilitar : lotacaoMilitar === lotacaoFilter);
     const matchesAtivo = mostrarInativos || m.status_cadastro !== 'Inativo';
@@ -345,43 +348,22 @@ export default function Militares() {
               </Select>
               <div className="flex border border-slate-200 rounded-lg overflow-hidden">
                 <Button
-                  variant={visualizacaoMode === 'lista' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setVisualizacaoMode('lista')}
-                  className={visualizacaoMode === 'lista' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f] rounded-none' : 'rounded-none'}
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="icon"
+                  onClick={() => setViewMode('grid')}
+                  className={viewMode === 'grid' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
                 >
-                  Lista
+                  <Grid3X3 className="w-4 h-4" />
                 </Button>
                 <Button
-                  variant={visualizacaoMode === 'mapa' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setVisualizacaoMode('mapa')}
-                  className={visualizacaoMode === 'mapa' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f] rounded-none' : 'rounded-none'}
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="icon"
+                  onClick={() => setViewMode('list')}
+                  className={viewMode === 'list' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
                 >
-                  <GitBranch className="w-4 h-4 mr-1" />
-                  Mapa
+                  <List className="w-4 h-4" />
                 </Button>
               </div>
-              {visualizacaoMode === 'lista' && (
-                <div className="flex border border-slate-200 rounded-lg overflow-hidden">
-                  <Button
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                    size="icon"
-                    onClick={() => setViewMode('grid')}
-                    className={viewMode === 'grid' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
-                  >
-                    <Grid3X3 className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'list' ? 'default' : 'ghost'}
-                    size="icon"
-                    onClick={() => setViewMode('list')}
-                    className={viewMode === 'list' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
-                  >
-                    <List className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4">
@@ -450,8 +432,6 @@ export default function Militares() {
               </Button>
             )}
           </div>
-        ) : visualizacaoMode === 'mapa' ? (
-          <MapaDeLotacao militares={filteredMilitares} onViewMilitar={handleView} />
         ) : (
           <div className="space-y-6">
             {orderedPostos
@@ -501,7 +481,7 @@ export default function Militares() {
                               {militar.quadro || '—'}
                             </div>
                             <div className="col-span-6 md:col-span-2 text-slate-700 truncate">
-                              {militar.lotacao || 'Sem lotação'}
+                              {militar.lotacao_atual || 'Sem lotação'}
                             </div>
                             <div className="col-span-6 md:col-span-1">
                               <Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>
