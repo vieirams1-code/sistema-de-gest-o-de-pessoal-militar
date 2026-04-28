@@ -1,5 +1,6 @@
 export const ACOES_MEDALHAS = {
   INDICAR: 'indicar_medalhas',
+  ADMIN_OVERRIDE: 'editar_medalhas',
   CONCEDER: 'conceder_medalhas',
   RESETAR: 'resetar_indicacoes_medalhas',
   IMPEDIMENTOS: 'gerir_impedimentos_medalha',

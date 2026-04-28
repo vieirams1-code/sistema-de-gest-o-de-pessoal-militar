@@ -7,6 +7,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -28,6 +29,7 @@ import { exportarIndicadosParaExcel } from '@/utils/indicadosExcelExport';
 import {
   ACOES_MEDALHAS,
   adicionarAuditoriaMedalha,
+  listarImpedimentosEscopo,
   listarMedalhasEscopo,
   listarMilitaresEscopo,
   validarMilitarDentroEscopo,
@@ -37,6 +39,7 @@ import {
   criarIndicacaoAutomatica,
   filtrarIndicacoesDomPedroResetaveis,
   garantirCatalogoFixoMedalhaTempo,
+  apurarListaMilitaresDomPedroII,
   normalizarStatusMedalha,
   resolverCodigoTipoMedalha,
   resolverOuGarantirTipoMedalha,
@@ -54,12 +57,13 @@ export default function IndicacoesDomPedroII() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { user, isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
   const hasDomPedroAccess = canAccessAction(ACOES_MEDALHAS.DOM_PEDRO);
   const podeConceder = canAccessAction(ACOES_MEDALHAS.CONCEDER);
   const podeResetar = canAccessAction(ACOES_MEDALHAS.RESETAR);
   const podeExportar = canAccessAction(ACOES_MEDALHAS.EXPORTAR);
+  const podeModoAdmin = canAccessAction(ACOES_MEDALHAS.ADMIN_OVERRIDE);
 
   const [search, setSearch] = useState('');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
@@ -67,6 +71,8 @@ export default function IndicacoesDomPedroII() {
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [medalhaFilter, setMedalhaFilter] = useState('TODAS');
   const [concederDialog, setConcederDialog] = useState({ open: false, medalha: null, data: hojeISO(), doems: '' });
+  const [adminModeAtivo, setAdminModeAtivo] = useState(false);
+  const [adminIndicacaoDialog, setAdminIndicacaoDialog] = useState({ open: false, militar: null, justificativa: '' });
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
@@ -94,11 +100,24 @@ export default function IndicacoesDomPedroII() {
     queryFn: () => base44.entities.TipoMedalha.list('nome'),
     enabled: isAccessResolved && hasMedalhasAccess,
   });
+  const impedimentosQuery = useQuery({
+    queryKey: ['dompedro-impedimentos'],
+    queryFn: async () => {
+      const militaresEscopo = await listarMilitaresEscopo({ base44Client: base44, isAdmin, getMilitarScopeFilters });
+      return listarImpedimentosEscopo({ base44Client: base44, isAdmin, militarIds: militaresEscopo.map((m) => m.id).filter(Boolean) });
+    },
+    enabled: isAccessResolved && hasMedalhasAccess && hasDomPedroAccess,
+  });
 
   const militares = militaresQuery.data || [];
   const medalhas = medalhasQuery.data || [];
   const tipos = tiposQuery.data || [];
+  const impedimentos = impedimentosQuery.data || [];
   const militarIdsEscopo = useMemo(() => new Set(militares.map((m) => m.id).filter(Boolean)), [militares]);
+  const apuracaoPorMilitar = useMemo(() => {
+    const apuracoes = apurarListaMilitaresDomPedroII({ militares, medalhas, tiposMedalha: tipos, impedimentos });
+    return new Map(apuracoes.map((item) => [item.militar_id, item]));
+  }, [militares, medalhas, tipos, impedimentos]);
 
   const domPedroRegistros = useMemo(() => medalhas.filter((m) => resolverCodigoTipoMedalha(m) === 'DOM_PEDRO_II'), [medalhas]);
 
@@ -119,16 +138,18 @@ export default function IndicacoesDomPedroII() {
 
   const rows = useMemo(() => militares.filter((m) => {
     const registro = registroPorMilitar.get(m.id);
+    const apuracao = apuracaoPorMilitar.get(m.id);
     const status = normalizarStatusMedalha(registro?.status) || 'SEM_INDICACAO';
     const termo = search.toLowerCase();
     const unidade = m.lotacao || m.unidade;
     const medalhaCodigo = registro ? resolverCodigoTipoMedalha(registro) : 'SEM_INDICACAO';
+    const situacao = apuracao?.situacao || 'SEM_DIREITO';
     return (!termo || `${m.nome_completo || ''} ${m.matricula || ''}`.toLowerCase().includes(termo))
       && (unidadeFilter === 'TODAS' || unidade === unidadeFilter)
       && (postoFilter === 'TODOS' || m.posto_graduacao === postoFilter)
-      && (statusFilter === 'TODOS' || status === statusFilter)
+      && (statusFilter === 'TODOS' || status === statusFilter || (statusFilter === 'BLOQUEADO' && situacao === 'IMPEDIDO') || (statusFilter === 'INABILITADO' && situacao !== 'ELEGIVEL' && situacao !== 'IMPEDIDO'))
       && (medalhaFilter === 'TODAS' || medalhaCodigo === medalhaFilter);
-  }), [militares, registroPorMilitar, search, unidadeFilter, postoFilter, statusFilter, medalhaFilter]);
+  }), [militares, registroPorMilitar, apuracaoPorMilitar, search, unidadeFilter, postoFilter, statusFilter, medalhaFilter]);
 
   const exportRows = useMemo(() => rows.flatMap((militar) => {
     const registro = registroPorMilitar.get(militar.id);
@@ -194,6 +215,38 @@ export default function IndicacoesDomPedroII() {
     onSuccess: () => { refresh(); toast({ title: 'Indicação registrada para Dom Pedro II.' }); },
   });
 
+  const indicarAdminMutation = useMutation({
+    mutationFn: async ({ militar, justificativa }) => {
+      validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.ADMIN_OVERRIDE, mensagem: 'Sem permissão para usar override administrativo.' });
+      validarMilitarDentroEscopo({ isAdmin, militarId: militar?.id, militarIdsEscopo });
+      if (!justificativa?.trim()) {
+        throw new Error('A justificativa do override administrativo é obrigatória.');
+      }
+      const existente = registroPorMilitar.get(militar.id);
+      const tipo = await resolverOuGarantirTipoMedalha(base44, 'DOM_PEDRO_II', tipos);
+      if (!tipo?.id) throw new Error('Tipo DOM_PEDRO_II não encontrado.');
+      const payload = criarIndicacaoAutomatica({ militar, medalhaDevida: 'DOM_PEDRO_II', tipoMedalha: tipo });
+      payload.origem_registro = 'INDICACAO_MANUAL_DOM_PEDRO_II_ADMIN_OVERRIDE';
+      payload.observacoes = `Indicação Dom Pedro II por override administrativo. Justificativa: ${justificativa.trim()}`;
+      payload.override_admin = true;
+      payload.override_motivo = justificativa.trim();
+      payload.override_usuario_id = user?.id || userEmail || '';
+      payload.override_usuario_nome = user?.name || user?.full_name || userEmail || 'Usuário não identificado';
+      payload.override_data = new Date().toISOString();
+
+      if (existente?.id && normalizarStatusMedalha(existente.status) !== 'CONCEDIDA') {
+        return base44.entities.Medalha.update(existente.id, adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
+      }
+      return base44.entities.Medalha.create(adicionarAuditoriaMedalha(payload, { userEmail, acao: 'indicacao' }));
+    },
+    onSuccess: () => {
+      refresh();
+      setAdminIndicacaoDialog({ open: false, militar: null, justificativa: '' });
+      toast({ title: 'Indicação administrativa registrada', description: 'Registro salvo com metadados de override.' });
+    },
+    onError: (error) => toast({ title: 'Erro no override', description: error.message, variant: 'destructive' }),
+  });
+
   const concederMutation = useMutation({
     mutationFn: ({ medalhaId, militarId, data_concessao, numero_publicacao }) => {
       validarPermissaoAcaoMedalhas({ canAccessAction, acao: ACOES_MEDALHAS.CONCEDER, mensagem: 'Sem permissão para conceder medalhas.' });
@@ -248,6 +301,14 @@ export default function IndicacoesDomPedroII() {
             </div>
           </div>
           <div className="flex gap-2">
+            {podeModoAdmin && (
+              <Button
+                variant={adminModeAtivo ? 'destructive' : 'outline'}
+                onClick={() => setAdminModeAtivo((prev) => !prev)}
+              >
+                {adminModeAtivo ? 'Modo Admin ativo' : 'Ativar Modo Admin'}
+              </Button>
+            )}
             {podeExportar && <Button
               variant="outline"
               onClick={() => {
@@ -267,6 +328,13 @@ export default function IndicacoesDomPedroII() {
           </div>
         </div>
 
+        {adminModeAtivo && podeModoAdmin && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold">Override administrativo</p>
+            <p>Modo Admin ativo: indicações podem ser feitas mesmo em situações de inabilitação ou bloqueio. Use apenas mediante conferência e justificativa.</p>
+          </div>
+        )}
+
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-6 gap-3">
           <div className="relative md:col-span-2">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -275,7 +343,7 @@ export default function IndicacoesDomPedroII() {
           <Select value={unidadeFilter} onValueChange={setUnidadeFilter}><SelectTrigger><SelectValue placeholder="Unidade" /></SelectTrigger><SelectContent><SelectItem value="TODAS">Todas unidades</SelectItem>{unidades.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select>
           <Select value={postoFilter} onValueChange={setPostoFilter}><SelectTrigger><SelectValue placeholder="Posto/Graduação" /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos postos</SelectItem>{postos.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>
           <Select value={medalhaFilter} onValueChange={setMedalhaFilter}><SelectTrigger><SelectValue placeholder="Tipo/Faixa" /></SelectTrigger><SelectContent><SelectItem value="TODAS">Todas medalhas</SelectItem><SelectItem value="DOM_PEDRO_II">Dom Pedro II</SelectItem><SelectItem value="SEM_INDICACAO">Sem indicação</SelectItem></SelectContent></Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos status</SelectItem><SelectItem value="SEM_INDICACAO">Sem indicação</SelectItem><SelectItem value="INDICADA">Indicada</SelectItem><SelectItem value="CONCEDIDA">Concedida</SelectItem></SelectContent></Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="TODOS">Todos status</SelectItem><SelectItem value="SEM_INDICACAO">Sem indicação</SelectItem><SelectItem value="INDICADA">Indicada</SelectItem><SelectItem value="CONCEDIDA">Concedida</SelectItem><SelectItem value="BLOQUEADO">Bloqueado</SelectItem><SelectItem value="INABILITADO">Inabilitado</SelectItem></SelectContent></Select>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm overflow-x-auto">
@@ -284,14 +352,23 @@ export default function IndicacoesDomPedroII() {
             <tbody>
               {rows.map((militar) => {
                 const registro = registroPorMilitar.get(militar.id);
+                const apuracao = apuracaoPorMilitar.get(militar.id);
                 const status = normalizarStatusMedalha(registro?.status) || 'SEM_INDICACAO';
+                const situacao = apuracao?.situacao || 'SEM_DIREITO';
+                const estaBloqueado = situacao === 'IMPEDIDO';
+                const estaInabilitado = situacao !== 'ELEGIVEL' && situacao !== 'IMPEDIDO';
                 return (
                   <tr key={militar.id} className="border-b last:border-0">
                     <td className="py-3 px-2"><p className="font-semibold text-slate-800">{militar.posto_graduacao} {militar.nome_completo}</p><p className="text-xs text-slate-500">Mat: {militar.matricula || '—'}</p></td>
                     <td className="py-3 px-2">{militar.lotacao || militar.unidade || '—'}</td>
-                    <td className="py-3 px-2">{status === 'CONCEDIDA' ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Concedida</Badge> : status === 'INDICADA' ? <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Indicada</Badge> : <span className="text-slate-500">Sem indicação</span>}</td>
+                    <td className="py-3 px-2">
+                      {status === 'CONCEDIDA' ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Concedida</Badge> : status === 'INDICADA' ? <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Indicada</Badge> : estaBloqueado ? <Badge className="bg-amber-100 text-amber-800 border-amber-200">Bloqueado</Badge> : estaInabilitado ? <span className="text-slate-500">Inabilitado</span> : <span className="text-slate-500">Sem indicação</span>}
+                    </td>
                     <td className="py-3 px-2 flex gap-2">
-                      {status !== 'CONCEDIDA' && <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={() => indicarMutation.mutate(militar)}>Indicar</Button>}
+                      {(status !== 'CONCEDIDA' && !estaBloqueado && !estaInabilitado) && <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={() => indicarMutation.mutate(militar)}>Indicar</Button>}
+                      {(status !== 'CONCEDIDA' && (estaBloqueado || estaInabilitado) && adminModeAtivo && podeModoAdmin) && (
+                        <Button size="sm" variant="outline" onClick={() => setAdminIndicacaoDialog({ open: true, militar, justificativa: '' })}>Indicar Admin</Button>
+                      )}
                       {status === 'INDICADA' && podeConceder && <Button size="sm" variant="outline" onClick={() => setConcederDialog({ open: true, medalha: registro, data: hojeISO(), doems: '' })}>Conceder</Button>}
                     </td>
                   </tr>
@@ -312,6 +389,35 @@ export default function IndicacoesDomPedroII() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setConcederDialog({ open: false, medalha: null, data: hojeISO(), doems: '' })}>Cancelar</Button>
             <Button disabled={!concederDialog.data || !concederDialog.doems} onClick={() => concederMutation.mutate({ medalhaId: concederDialog.medalha?.id, militarId: concederDialog.medalha?.militar_id, data_concessao: concederDialog.data, numero_publicacao: concederDialog.doems })}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={adminIndicacaoDialog.open} onOpenChange={(open) => setAdminIndicacaoDialog((curr) => ({ ...curr, open, justificativa: open ? curr.justificativa : '' }))}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmação de override administrativo</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-700">
+              Esta indicação será registrada por override administrativo, apesar da situação atual do militar. Confirme apenas se houver autorização/justificativa.
+            </p>
+            <div>
+              <p className="text-sm text-slate-600 mb-1">Justificativa do override administrativo</p>
+              <Textarea
+                value={adminIndicacaoDialog.justificativa}
+                onChange={(e) => setAdminIndicacaoDialog((curr) => ({ ...curr, justificativa: e.target.value }))}
+                placeholder="Descreva a autorização e o motivo do override."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdminIndicacaoDialog({ open: false, militar: null, justificativa: '' })}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={!adminIndicacaoDialog.justificativa.trim() || indicarAdminMutation.isPending}
+              onClick={() => indicarAdminMutation.mutate({ militar: adminIndicacaoDialog.militar, justificativa: adminIndicacaoDialog.justificativa })}
+            >
+              Confirmar indicação admin
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
