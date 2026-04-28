@@ -26,6 +26,10 @@ const ADMIN_RECOVERY_ROLES = new Set(['superadmin', 'developer', 'desenvolvedor'
 const SUPER_ADMIN_EMAILS = [
   'vieirams1@gmail.com',
 ];
+const USUARIO_ACESSO_FALLBACK_LIMIT = 500;
+const USUARIO_ACESSO_RETRY_COUNT = 3;
+
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
 const normalizeAccessMode = (value) => {
   const normalized = toLowerSafe(value);
@@ -98,6 +102,90 @@ const resolveImpersonationContext = (user) => {
   };
 };
 
+const toTimestamp = (value) => {
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const sortUsuarioAcessoByRecent = (a, b) => {
+  const aTime = Math.max(toTimestamp(a?.updated_date), toTimestamp(a?.created_date));
+  const bTime = Math.max(toTimestamp(b?.updated_date), toTimestamp(b?.created_date));
+  return bTime - aTime;
+};
+
+const isUsuarioAcessoAtivo = (item) => item?.ativo === true;
+
+const filtrarUsuarioAcessoPorEmail = (items = [], emailNormalizado = '') => (
+  (Array.isArray(items) ? items : [])
+    .filter((item) => normalizeEmail(item?.user_email) === emailNormalizado && isUsuarioAcessoAtivo(item))
+    .sort(sortUsuarioAcessoByRecent)
+);
+
+const buscarUsuarioAcessoPorEmail = async (emailNormalizado) => {
+  const safeEmail = normalizeEmail(emailNormalizado);
+  const debug = {
+    filterAttempt: 'not_used',
+    fallbackList: {
+      used: false,
+      status: 'not_used',
+      foundCount: 0,
+    },
+    selectedUsuarioAcessoId: null,
+    duplicatedCount: 0,
+  };
+
+  if (!safeEmail) {
+    return {
+      emailNormalizado: safeEmail,
+      selected: null,
+      list: [],
+      debug,
+    };
+  }
+
+  let filterError = null;
+  try {
+    const filterResult = await base44.entities.UsuarioAcesso.filter({ user_email: safeEmail, ativo: true });
+    const fromFilter = filtrarUsuarioAcessoPorEmail(filterResult, safeEmail);
+    debug.filterAttempt = 'success';
+    if (fromFilter.length > 0) {
+      debug.selectedUsuarioAcessoId = fromFilter[0]?.id || null;
+      debug.duplicatedCount = Math.max(0, fromFilter.length - 1);
+      return {
+        emailNormalizado: safeEmail,
+        selected: fromFilter[0] || null,
+        list: fromFilter,
+        debug,
+      };
+    }
+  } catch {
+    debug.filterAttempt = 'error';
+    filterError = new Error('USUARIO_ACESSO_FILTER_FAILED');
+  }
+
+  debug.fallbackList.used = true;
+
+  try {
+    const fallbackList = await base44.entities.UsuarioAcesso.list('-created_date', USUARIO_ACESSO_FALLBACK_LIMIT);
+    const filteredFallback = filtrarUsuarioAcessoPorEmail(fallbackList, safeEmail);
+    debug.fallbackList.status = 'success';
+    debug.fallbackList.foundCount = filteredFallback.length;
+    debug.selectedUsuarioAcessoId = filteredFallback[0]?.id || null;
+    debug.duplicatedCount = Math.max(0, filteredFallback.length - 1);
+    return {
+      emailNormalizado: safeEmail,
+      selected: filteredFallback[0] || null,
+      list: filteredFallback,
+      debug,
+    };
+  } catch {
+    debug.fallbackList.status = 'error';
+    const accessLookupError = new Error('Falha ao carregar UsuarioAcesso por filter e fallback list');
+    accessLookupError.cause = filterError;
+    throw accessLookupError;
+  }
+};
+
 export function useCurrentUser() {
   const {
     data: user,
@@ -121,21 +209,51 @@ export function useCurrentUser() {
   ) || user?.isSuperAdmin === true || user?.isDeveloper === true;
 
   const {
-    data: usuarioAcessoList,
+    data: usuarioAcessoQueryData,
     isLoading: loadingAcesso,
     isFetched: fetchedAcesso,
     isError: isAcessoError,
     refetch: refetchAcesso,
   } = useQuery({
     queryKey: ['usuarioAcesso', accessLookupEmail, impersonationContext.isImpersonating],
-    queryFn: () => base44.entities.UsuarioAcesso.filter({ user_email: accessLookupEmail, ativo: true }),
+    queryFn: () => buscarUsuarioAcessoPorEmail(accessLookupEmail),
     enabled: !!accessLookupEmail,
     staleTime: 0,
     gcTime: 60 * 1000,
     refetchOnMount: 'always',
+    retry: USUARIO_ACESSO_RETRY_COUNT,
+    retryDelay: (attemptIndex) => Math.min(250 * (2 ** attemptIndex), 1500),
   });
 
-  const acesso = usuarioAcessoList?.[0] || null;
+  const usuarioAcessoList = usuarioAcessoQueryData?.list || [];
+  const acesso = usuarioAcessoQueryData?.selected || usuarioAcessoList?.[0] || null;
+  const usuarioAcessoDebug = usuarioAcessoQueryData?.debug || {
+    filterAttempt: 'not_used',
+    fallbackList: {
+      used: false,
+      status: 'not_used',
+      foundCount: 0,
+    },
+    selectedUsuarioAcessoId: null,
+    duplicatedCount: 0,
+  };
+  const hasUsuarioAcessoFallbackData = usuarioAcessoList.length > 0;
+  const hasUsuarioAcessoCriticalError = isAcessoError && !hasUsuarioAcessoFallbackData;
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (usuarioAcessoDebug.duplicatedCount > 0 && accessLookupEmail) {
+      console.warn('[useCurrentUser] Múltiplos UsuarioAcesso ativos para o mesmo e-mail. Mantendo o mais recente.', {
+        email: accessLookupEmail,
+        duplicatedCount: usuarioAcessoDebug.duplicatedCount,
+        selectedUsuarioAcessoId: usuarioAcessoDebug.selectedUsuarioAcessoId,
+      });
+    }
+  }, [
+    accessLookupEmail,
+    usuarioAcessoDebug.duplicatedCount,
+    usuarioAcessoDebug.selectedUsuarioAcessoId,
+  ]);
 
   const {
     data: acessoCompleto,
@@ -305,7 +423,7 @@ export function useCurrentUser() {
     || (requiresUnidades && loadingUnidades);
   const criticalAccessError = Boolean(
     isAuthError
-    || isAcessoError
+    || hasUsuarioAcessoCriticalError
   );
   const nonCriticalPermissionError = Boolean(
     isAcessoCompletoError
@@ -316,7 +434,7 @@ export function useCurrentUser() {
   const accessErrorDetails = {
     critical: {
       auth: Boolean(isAuthError),
-      usuarioAcesso: Boolean(isAcessoError),
+      usuarioAcesso: Boolean(hasUsuarioAcessoCriticalError),
     },
     nonCritical: {
       usuarioAcessoCompleto: Boolean(isAcessoCompletoError),
@@ -365,6 +483,12 @@ export function useCurrentUser() {
         isLoading: Boolean(loadingAcesso),
         isFetched: Boolean(fetchedAcesso),
         isError: Boolean(isAcessoError),
+        result: usuarioAcessoDebug.filterAttempt,
+      },
+      usuarioAcessoFallbackList: {
+        used: Boolean(usuarioAcessoDebug.fallbackList.used),
+        result: usuarioAcessoDebug.fallbackList.status,
+        foundCount: usuarioAcessoDebug.fallbackList.foundCount,
       },
       perfilPermissaoGet: {
         attempted: Boolean(acessoResolvido?.perfil_id),
@@ -384,6 +508,8 @@ export function useCurrentUser() {
     },
     usuarioAcessoEncontradosQuantidade: Array.isArray(usuarioAcessoList) ? usuarioAcessoList.length : 0,
     usuarioAcessoEncontradosIds: Array.isArray(usuarioAcessoList) ? usuarioAcessoList.map((item) => item?.id).filter(Boolean) : [],
+    selectedUsuarioAcessoId: usuarioAcessoDebug.selectedUsuarioAcessoId,
+    duplicatedCount: usuarioAcessoDebug.duplicatedCount,
     perfil_id: acessoResolvido?.perfil_id || null,
     modulesPermitidos: {
       count: grantedModules.length,
