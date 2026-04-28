@@ -39,6 +39,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit = true, canDelete = true }) {
   const { hasAccess, hasSelfAccess } = useCurrentUser();
   const canAccess = hasAccess(militar) || hasSelfAccess(militar);
+  const lotacaoAtual = militar.lotacao_atual || militar.lotacao;
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -114,10 +115,10 @@ export default function MilitarCard({ militar, onEdit, onDelete, onView, canEdit
               <Badge className={`${statusColors[militar.status_cadastro] || statusColors['Ativo']} border`}>
                 {militar.status_cadastro || 'Ativo'}
               </Badge>
-              {militar.lotacao && (
+              {lotacaoAtual && (
                 <Badge variant="outline" className="text-slate-600">
                   <MapPin className="w-3 h-3 mr-1" />
-                  {militar.lotacao}
+                  {lotacaoAtual}
                 </Badge>
               )}
             </div>

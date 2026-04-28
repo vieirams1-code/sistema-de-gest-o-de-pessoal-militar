@@ -123,3 +123,22 @@ export function militarCorrespondeBusca(militar = {}, termo = '') {
     return matNorm.includes(queryNorm);
   });
 }
+
+export function getLotacaoAtualMilitar(militar = {}) {
+  const subgrupamentoNome = String(militar?.subgrupamento_nome || '').trim();
+  const grupamentoNome = String(militar?.grupamento_nome || '').trim();
+  const lotacaoAtual = String(militar?.lotacao_atual || '').trim();
+  const lotacao = String(militar?.lotacao || '').trim();
+
+  if (subgrupamentoNome) {
+    if (grupamentoNome && grupamentoNome !== subgrupamentoNome) {
+      return `${subgrupamentoNome} (${grupamentoNome})`;
+    }
+    return subgrupamentoNome;
+  }
+
+  if (grupamentoNome) return grupamentoNome;
+  if (lotacaoAtual) return lotacaoAtual;
+  if (lotacao) return lotacao;
+  return 'Sem lotação';
+}

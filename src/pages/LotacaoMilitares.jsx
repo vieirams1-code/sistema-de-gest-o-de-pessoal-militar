@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import {
   enriquecerMilitarComMatriculas,
   filtrarMilitaresOperacionais,
+  getLotacaoAtualMilitar,
   militarCorrespondeBusca,
   montarIndiceMatriculas,
 } from '@/services/matriculaMilitarViewService';
@@ -25,13 +26,6 @@ const normalizeTipo = (tipo) => {
 
 const SEM_LOTACAO_VALUE = '__sem_lotacao__';
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
-
-const formatarLotacaoAtual = (militar) => {
-  if (militar.subgrupamento_nome) {
-    return `${militar.subgrupamento_nome}${militar.grupamento_nome && militar.grupamento_nome !== militar.subgrupamento_nome ? ` (${militar.grupamento_nome})` : ''}`;
-  }
-  return militar.grupamento_nome || 'Sem lotação';
-};
 
 export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
@@ -81,7 +75,7 @@ export default function LotacaoMilitares() {
   const lotacoesAtuaisDisponiveis = useMemo(() => {
     const lotacoes = new Set();
     militaresOperacionais.forEach((militar) => {
-      const lotacaoText = formatarLotacaoAtual(militar);
+      const lotacaoText = getLotacaoAtualMilitar(militar);
       if (lotacaoText !== 'Sem lotação') {
         lotacoes.add(lotacaoText);
       }
@@ -98,7 +92,7 @@ export default function LotacaoMilitares() {
       })
       .filter((militar) => {
         if (lotacaoAtualFiltro === TODAS_LOTACOES_VALUE) return true;
-        const lotacaoText = formatarLotacaoAtual(militar);
+        const lotacaoText = getLotacaoAtualMilitar(militar);
         if (lotacaoAtualFiltro === SEM_LOTACAO_VALUE) {
           return lotacaoText === 'Sem lotação';
         }
@@ -352,7 +346,7 @@ export default function LotacaoMilitares() {
                   {militaresFiltrados.map(m => {
                     const isSelected = selectedMilitares.includes(m.id);
                     const matriculaAtual = m.matricula_atual || m.matricula || 'N/I';
-                    const lotacaoText = formatarLotacaoAtual(m);
+                    const lotacaoText = getLotacaoAtualMilitar(m);
                     
                     return (
                       <div 
