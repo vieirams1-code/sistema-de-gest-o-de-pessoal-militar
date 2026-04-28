@@ -1,0 +1,44 @@
+{
+  "name": "BaseConhecimentoProcedimento",
+  "type": "object",
+  "title": "Base de Conhecimento de Procedimentos",
+  "description": "Base estruturada para respostas do assistente de procedimentos sem uso de IA externa.",
+  "properties": {
+    "tipo_procedimento": {
+      "type": "string",
+      "default": ""
+    },
+    "topico": {
+      "type": "string",
+      "default": ""
+    },
+    "pergunta_exemplo": {
+      "type": "string",
+      "default": ""
+    },
+    "palavras_chave": {
+      "type": "array",
+      "default": []
+    },
+    "resposta_objetiva": {
+      "type": "string",
+      "default": ""
+    },
+    "resposta_detalhada": {
+      "type": "string",
+      "default": ""
+    },
+    "fundamento_legal": {
+      "type": "string",
+      "default": ""
+    },
+    "referencia_norma": {
+      "type": "string",
+      "default": ""
+    },
+    "permite_contexto": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

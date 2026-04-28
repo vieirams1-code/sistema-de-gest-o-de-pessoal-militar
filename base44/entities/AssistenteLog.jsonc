@@ -1,0 +1,72 @@
+{
+  "name": "AssistenteLog",
+  "type": "object",
+  "title": "Log do Assistente de Procedimentos",
+  "description": "Histórico de perguntas e respostas do assistente de procedimentos.",
+  "properties": {
+    "tipo_procedimento": {
+      "type": "string",
+      "default": ""
+    },
+    "pergunta": {
+      "type": "string",
+      "default": ""
+    },
+    "pergunta_normalizada": {
+      "type": "string",
+      "default": ""
+    },
+    "base_conhecimento_id": {
+      "type": "string",
+      "default": ""
+    },
+    "resposta_objetiva": {
+      "type": "string",
+      "default": ""
+    },
+    "resposta_detalhada": {
+      "type": "string",
+      "default": ""
+    },
+    "fundamento_legal": {
+      "type": "string",
+      "default": ""
+    },
+    "referencia_norma": {
+      "type": "string",
+      "default": ""
+    },
+    "procedimento_id": {
+      "type": "string",
+      "default": ""
+    },
+    "status_procedimento": {
+      "type": "string",
+      "default": ""
+    },
+    "prazo": {
+      "type": "string",
+      "default": ""
+    },
+    "prorrogacoes": {
+      "type": "string",
+      "default": ""
+    },
+    "sugestao_pratica": {
+      "type": "string",
+      "default": ""
+    },
+    "score_correspondencia": {
+      "type": "number",
+      "default": 0
+    },
+    "sem_correspondencia": {
+      "type": "boolean",
+      "default": false
+    },
+    "data_pergunta": {
+      "type": "date",
+      "default": ""
+    }
+  }
+}
