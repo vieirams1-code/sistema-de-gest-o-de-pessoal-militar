@@ -204,9 +204,16 @@ export function useCurrentUser() {
   const impersonationContext = resolveImpersonationContext(user);
   const accessLookupEmail = impersonationContext.effectiveEmail;
   const normalizedUserRole = toLowerSafe(user?.role);
+  const normalizedBaseEmail = toLowerSafe(impersonationContext.baseEmail);
+  const isRecoveryEmail = Boolean(
+    normalizedBaseEmail && SUPER_ADMIN_EMAILS.includes(normalizedBaseEmail),
+  );
   const isPrivilegedRecoveryUser = (
     normalizedUserRole && ADMIN_RECOVERY_ROLES.has(normalizedUserRole)
-  ) || user?.isSuperAdmin === true || user?.isDeveloper === true;
+  ) || user?.isSuperAdmin === true || user?.isDeveloper === true || isRecoveryEmail;
+  const shouldBypassUsuarioAcessoBlocking = Boolean(
+    isPrivilegedRecoveryUser && !impersonationContext.isImpersonating,
+  );
 
   const {
     data: usuarioAcessoQueryData,
@@ -423,7 +430,7 @@ export function useCurrentUser() {
     || (requiresUnidades && loadingUnidades);
   const criticalAccessError = Boolean(
     isAuthError
-    || hasUsuarioAcessoCriticalError
+    || (!shouldBypassUsuarioAcessoBlocking && hasUsuarioAcessoCriticalError)
   );
   const nonCriticalPermissionError = Boolean(
     isAcessoCompletoError
@@ -435,6 +442,7 @@ export function useCurrentUser() {
     critical: {
       auth: Boolean(isAuthError),
       usuarioAcesso: Boolean(hasUsuarioAcessoCriticalError),
+      usuarioAcessoBlocking: Boolean(!shouldBypassUsuarioAcessoBlocking && hasUsuarioAcessoCriticalError),
     },
     nonCritical: {
       usuarioAcessoCompleto: Boolean(isAcessoCompletoError),
@@ -448,12 +456,23 @@ export function useCurrentUser() {
   const isPermissionPartialError = nonCriticalPermissionError;
   const isAccessResolved = !accessLookupEmail || (
     !criticalAccessError
-    && !loadingAcesso
-    && !loadingAcessoCompleto
-    && !loadingResolvedPermissions
-    && !profileFetchInFlight
-    && fetchedAcesso
-    && (!requiresUnidades || (!loadingUnidades && fetchedUnidades))
+    && (
+      shouldBypassUsuarioAcessoBlocking
+        ? (
+          !loadingAcessoCompleto
+          && !loadingResolvedPermissions
+          && !profileFetchInFlight
+          && (!requiresUnidades || (!loadingUnidades && fetchedUnidades))
+        )
+        : (
+          !loadingAcesso
+          && !loadingAcessoCompleto
+          && !loadingResolvedPermissions
+          && !profileFetchInFlight
+          && fetchedAcesso
+          && (!requiresUnidades || (!loadingUnidades && fetchedUnidades))
+        )
+    )
   );
 
   const hasPerfilPermissaoPartialError = accessErrorDetails.nonCritical.perfilPermissao;
@@ -521,6 +540,7 @@ export function useCurrentUser() {
     },
     isAccessError,
     isPermissionPartialError,
+    shouldBypassUsuarioAcessoBlocking,
     accessErrorDetails,
   };
 
