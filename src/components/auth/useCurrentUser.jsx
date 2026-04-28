@@ -84,7 +84,7 @@ const resolveImpersonationContext = (user) => {
 };
 
 export function useCurrentUser() {
-  const { data: user, isLoading: loadingAuth } = useQuery({
+  const { data: user, isLoading: loadingAuth, refetch: refetchCurrentUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
     staleTime: 0,
@@ -100,7 +100,13 @@ export function useCurrentUser() {
     normalizedUserRole && ADMIN_RECOVERY_ROLES.has(normalizedUserRole)
   ) || user?.isSuperAdmin === true || user?.isDeveloper === true;
 
-  const { data: usuarioAcessoList, isLoading: loadingAcesso, isFetched: fetchedAcesso } = useQuery({
+  const {
+    data: usuarioAcessoList,
+    isLoading: loadingAcesso,
+    isFetched: fetchedAcesso,
+    isError: isAcessoError,
+    refetch: refetchAcesso,
+  } = useQuery({
     queryKey: ['usuarioAcesso', accessLookupEmail, impersonationContext.isImpersonating],
     queryFn: () => base44.entities.UsuarioAcesso.filter({ user_email: accessLookupEmail, ativo: true }),
     enabled: !!accessLookupEmail,
@@ -111,7 +117,12 @@ export function useCurrentUser() {
 
   const acesso = usuarioAcessoList?.[0] || null;
 
-  const { data: acessoCompleto, isLoading: loadingAcessoCompleto } = useQuery({
+  const {
+    data: acessoCompleto,
+    isLoading: loadingAcessoCompleto,
+    isError: isAcessoCompletoError,
+    refetch: refetchAcessoCompleto,
+  } = useQuery({
     queryKey: ['usuarioAcessoCompleto', acesso?.id],
     queryFn: () => base44.entities.UsuarioAcesso.get(acesso.id),
     enabled: !!acesso?.id,
@@ -127,14 +138,18 @@ export function useCurrentUser() {
   const superAdmin = isServiceSuperAdmin(user, acessoResolvido, { safeEmails: SUPER_ADMIN_EMAILS }) || isSuperAdminFallback;
   const hasAbsoluteAccess = superAdmin;
 
-  const { data: perfilAcesso } = useQuery({
+  const { data: perfilAcesso, isError: isPerfilAcessoError, refetch: refetchPerfilAcesso } = useQuery({
     queryKey: ['perfilPermissao', acessoResolvido?.perfil_id],
     queryFn: () => base44.entities.PerfilPermissao.get(acessoResolvido.perfil_id),
     enabled: !!acessoResolvido?.perfil_id,
     staleTime: 60 * 1000,
   });
 
-  const { data: resolvedPermissionsData } = useQuery({
+  const {
+    data: resolvedPermissionsData,
+    isError: isResolvedPermissionsError,
+    refetch: refetchResolvedPermissions,
+  } = useQuery({
     queryKey: ['resolvedPermissions', acessoResolvido?.id, perfilAcesso?.id],
     enabled: !!acessoResolvido,
     queryFn: async () => {
@@ -192,7 +207,13 @@ export function useCurrentUser() {
   }
 
   const requiresUnidades = modoAcesso === 'subsetor' && !!subgrupamentoId;
-  const { data: unidadesFilhas = [], isLoading: loadingUnidades, isFetched: fetchedUnidades } = useQuery({
+  const {
+    data: unidadesFilhas = [],
+    isLoading: loadingUnidades,
+    isFetched: fetchedUnidades,
+    isError: isUnidadesError,
+    refetch: refetchUnidades,
+  } = useQuery({
     queryKey: ['unidadesFilhas', subgrupamentoId],
     queryFn: () => base44.entities.Subgrupamento.filter({ tipo: 'Unidade', grupamento_id: subgrupamentoId }),
     enabled: requiresUnidades,
@@ -200,7 +221,29 @@ export function useCurrentUser() {
   });
 
   const isLoading = loadingAuth || loadingAcesso || loadingAcessoCompleto || (requiresUnidades && loadingUnidades);
-  const isAccessResolved = !accessLookupEmail || (!loadingAcesso && !loadingAcessoCompleto && fetchedAcesso && (!requiresUnidades || (!loadingUnidades && fetchedUnidades)));
+  const isAccessError = Boolean(
+    isAcessoError
+    || isAcessoCompletoError
+    || isPerfilAcessoError
+    || isResolvedPermissionsError
+    || (requiresUnidades && isUnidadesError)
+  );
+  const isAccessResolved = !accessLookupEmail || (
+    !isAccessError
+    && !loadingAcesso
+    && !loadingAcessoCompleto
+    && fetchedAcesso
+    && (!requiresUnidades || (!loadingUnidades && fetchedUnidades))
+  );
+
+  const refetchAccess = async () => {
+    await refetchCurrentUser();
+    await refetchAcesso();
+    if (acesso?.id) await refetchAcessoCompleto();
+    if (acessoResolvido?.perfil_id) await refetchPerfilAcesso();
+    if (acessoResolvido) await refetchResolvedPermissions();
+    if (requiresUnidades) await refetchUnidades();
+  };
 
   const getAccessModeFromUser = (targetUser, targetAcesso = null) => {
     if (targetAcesso) return normalizeAccessMode(targetAcesso.tipo_acesso) || 'proprio';
@@ -340,6 +383,7 @@ export function useCurrentUser() {
     permissions: normalizedResolvedPermissions,
     canAccessAll: false,
     isLoading,
+    isAccessError,
     isAccessResolved,
     modoAcesso,
     subgrupamentoId,
@@ -355,6 +399,7 @@ export function useCurrentUser() {
     getMilitarScopeFilters,
     getAccessModeFromUser,
     resolvedAccessContext,
+    refetchAccess,
   };
 
   if (isSuperAdminFallback) {
