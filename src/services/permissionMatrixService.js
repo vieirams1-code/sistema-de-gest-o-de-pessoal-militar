@@ -111,6 +111,12 @@ export const ADMIN_RECOVERY_ACTION_KEYS = [
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 const isObjectRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const isTruthyPermissionValue = (value) => toBooleanPermission(value) === true;
+const normalizeKeyToken = (value) => (
+  typeof value === 'string'
+    ? value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    : ''
+);
 
 export const isLegacyCustomProfile = (profile = {}) => {
   if (!isObjectRecord(profile)) return false;
@@ -186,6 +192,54 @@ export const mergeUserOverridesWithMatrix = (existingOverrides = {}, matrix = {}
   baseOverrides.matrix_v2 = sanitizePermissionsMatrix(matrix);
   baseOverrides.source = source;
   return baseOverrides;
+};
+
+const expandCanonicalPermissionKey = (key = '') => {
+  const normalized = normalizeKeyToken(key);
+  if (!normalized) return null;
+  if (canonicalPermissionKeys.includes(normalized)) return normalized;
+  if (canonicalPermissionKeys.includes(`acesso_${normalized}`)) return `acesso_${normalized}`;
+  if (canonicalPermissionKeys.includes(`perm_${normalized}`)) return `perm_${normalized}`;
+  return null;
+};
+
+const flattenPermissionsFromCollections = (source = {}) => {
+  if (!isObjectRecord(source)) return null;
+  const collections = [source.modules, source.modulos, source.permissions, source.permissoes]
+    .filter((item) => Array.isArray(item));
+  if (collections.length === 0) return null;
+
+  const flattened = {};
+
+  collections.forEach((entries) => {
+    entries.forEach((entry) => {
+      if (!isObjectRecord(entry)) return;
+
+      const moduleKeyCandidate = entry.key || entry.module_key || entry.modulo_key || entry.module || entry.modulo || entry.nome;
+      const canonicalModuleKey = expandCanonicalPermissionKey(moduleKeyCandidate);
+      const moduleEnabledValue = entry.enabled ?? entry.allow ?? entry.allowed ?? entry.permitido ?? entry.value ?? entry.ativo;
+
+      if (canonicalModuleKey && moduleEnabledValue !== undefined) {
+        flattened[canonicalModuleKey] = isTruthyPermissionValue(moduleEnabledValue);
+      }
+
+      const actionsCollections = [entry.actions, entry.acoes, entry.permissoes].filter((item) => Array.isArray(item));
+      actionsCollections.forEach((actions) => {
+        actions.forEach((actionEntry) => {
+          if (!isObjectRecord(actionEntry)) return;
+          const actionKeyCandidate = actionEntry.key || actionEntry.action_key || actionEntry.permissao_key || actionEntry.action || actionEntry.permissao || actionEntry.nome;
+          const canonicalActionKey = expandCanonicalPermissionKey(actionKeyCandidate);
+          const actionEnabledValue = actionEntry.enabled ?? actionEntry.allow ?? actionEntry.allowed ?? actionEntry.permitido ?? actionEntry.value ?? actionEntry.ativo;
+
+          if (canonicalActionKey && actionEnabledValue !== undefined) {
+            flattened[canonicalActionKey] = isTruthyPermissionValue(actionEnabledValue);
+          }
+        });
+      });
+    });
+  });
+
+  return Object.keys(flattened).length > 0 ? flattened : null;
 };
 
 const collectPermissionSources = (source = {}) => {
@@ -297,6 +351,8 @@ export const resolveProfilePermissions = ({ profileSource = {}, fallbackSource =
   permissions: (() => {
     const parsedProfileDescription = extractProfileMatrixFromDescription(profileSource?.descricao);
     if (parsedProfileDescription.matrix) return buildPermissionsFromSource(parsedProfileDescription.matrix);
+    const flattenedCollectionMatrix = flattenPermissionsFromCollections(profileSource);
+    if (flattenedCollectionMatrix) return buildPermissionsFromSource(flattenedCollectionMatrix, fallbackSource);
     return buildPermissionsFromSource(profileSource, fallbackSource);
   })(),
 });

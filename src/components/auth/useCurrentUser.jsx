@@ -43,6 +43,14 @@ const getNestedValue = (obj, path) => {
   return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : null), obj);
 };
 
+const countGrantedPermissions = (permissions = {}) => (
+  Object.values(permissions || {}).filter((value) => value === true).length
+);
+
+const countGrantedByPrefix = (permissions = {}, prefix = '') => (
+  Object.entries(permissions || {}).filter(([key, value]) => key.startsWith(prefix) && value === true).length
+);
+
 const resolveImpersonationContext = (user) => {
   const baseEmail = toLowerSafe(user?.email);
 
@@ -144,20 +152,70 @@ export function useCurrentUser() {
   const superAdmin = isServiceSuperAdmin(user, acessoResolvido, { safeEmails: SUPER_ADMIN_EMAILS }) || isSuperAdminFallback;
   const hasAbsoluteAccess = superAdmin;
 
-  const { data: perfilAcesso, isError: isPerfilAcessoError, refetch: refetchPerfilAcesso } = useQuery({
+  const resolvePerfilPermissao = async (acessoSource) => {
+    const perfilId = acessoSource?.perfil_id;
+    const perfilNome = acessoSource?.perfil_nome;
+    if (!perfilId && !perfilNome) return { profile: null, fallbackReason: null };
+
+    try {
+      if (perfilId) {
+        const directProfile = await base44.entities.PerfilPermissao.get(perfilId);
+        if (directProfile?.id) return { profile: directProfile, fallbackReason: null };
+      }
+    } catch {
+      // fallback abaixo
+    }
+
+    if (perfilId) {
+      try {
+        const filteredById = await base44.entities.PerfilPermissao.filter({ id: perfilId });
+        if (Array.isArray(filteredById) && filteredById[0]?.id) {
+          return { profile: filteredById[0], fallbackReason: 'filter_by_id' };
+        }
+      } catch {
+        // mantém fluxo para próximo fallback
+      }
+    }
+
+    if (perfilNome) {
+      try {
+        const filteredByName = await base44.entities.PerfilPermissao.filter({ nome_perfil: perfilNome });
+        if (Array.isArray(filteredByName) && filteredByName[0]?.id) {
+          return { profile: filteredByName[0], fallbackReason: 'filter_by_name' };
+        }
+      } catch {
+        // sem fallback adicional
+      }
+    }
+
+    throw new Error('PERFIL_PERMISSAO_NOT_FOUND');
+  };
+
+  const {
+    data: perfilAcessoResult,
+    isLoading: loadingPerfilAcesso,
+    isError: isPerfilAcessoError,
+    refetch: refetchPerfilAcesso,
+  } = useQuery({
     queryKey: ['perfilPermissao', acessoResolvido?.perfil_id],
-    queryFn: () => base44.entities.PerfilPermissao.get(acessoResolvido.perfil_id),
-    enabled: !!acessoResolvido?.perfil_id,
+    queryFn: () => resolvePerfilPermissao(acessoResolvido),
+    enabled: !!acessoResolvido && !!(acessoResolvido?.perfil_id || acessoResolvido?.perfil_nome),
     staleTime: 60 * 1000,
+    retry: 4,
+    retryDelay: (attemptIndex) => Math.min(400 * (attemptIndex + 1), 2000),
   });
+  const perfilAcesso = perfilAcessoResult?.profile || null;
+  const perfilFallbackReason = perfilAcessoResult?.fallbackReason || null;
+  const hasPerfilVinculado = Boolean(acessoResolvido?.perfil_id || acessoResolvido?.perfil_nome);
 
   const {
     data: resolvedPermissionsData,
+    isLoading: loadingResolvedPermissions,
     isError: isResolvedPermissionsError,
     refetch: refetchResolvedPermissions,
   } = useQuery({
     queryKey: ['resolvedPermissions', acessoResolvido?.id, perfilAcesso?.id],
-    enabled: !!acessoResolvido,
+    enabled: !!acessoResolvido && (!hasPerfilVinculado || !loadingPerfilAcesso),
     queryFn: async () => {
       return resolveUserPermissions({
         userSource: acessoResolvido,
@@ -230,7 +288,15 @@ export function useCurrentUser() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isLoading = loadingAuth || loadingAcesso || loadingAcessoCompleto || (requiresUnidades && loadingUnidades);
+  const profileFetchInFlight = hasPerfilVinculado && loadingPerfilAcesso;
+  const profileFetchFatalError = hasPerfilVinculado && !loadingPerfilAcesso && isPerfilAcessoError;
+
+  const isLoading = loadingAuth
+    || loadingAcesso
+    || loadingAcessoCompleto
+    || loadingResolvedPermissions
+    || profileFetchInFlight
+    || (requiresUnidades && loadingUnidades);
   const criticalAccessError = Boolean(
     isAuthError
     || isAcessoError
@@ -249,6 +315,7 @@ export function useCurrentUser() {
     nonCritical: {
       usuarioAcessoCompleto: Boolean(isAcessoCompletoError),
       perfilPermissao: Boolean(isPerfilAcessoError),
+      perfilPermissaoFatal: Boolean(profileFetchFatalError),
       resolvedPermissions: Boolean(isResolvedPermissionsError),
       unidades: Boolean(requiresUnidades && isUnidadesError),
     },
@@ -259,6 +326,8 @@ export function useCurrentUser() {
     !criticalAccessError
     && !loadingAcesso
     && !loadingAcessoCompleto
+    && !loadingResolvedPermissions
+    && !profileFetchInFlight
     && fetchedAcesso
     && (!requiresUnidades || (!loadingUnidades && fetchedUnidades))
   );
@@ -266,24 +335,38 @@ export function useCurrentUser() {
   const hasPerfilPermissaoPartialError = accessErrorDetails.nonCritical.perfilPermissao;
   const hasResolvedPermissionsPartialError = accessErrorDetails.nonCritical.resolvedPermissions;
   const hasUnidadesPartialError = accessErrorDetails.nonCritical.unidades;
+  const permissionErrorMessage = profileFetchFatalError
+    ? 'Não foi possível carregar o perfil de permissões.'
+    : null;
+  const shouldBlockAccessByPermissionError = profileFetchFatalError && !superAdmin;
 
   useEffect(() => {
-    if (!import.meta.env.DEV || !nonCriticalPermissionError) return;
+    if (!import.meta.env.DEV || (!nonCriticalPermissionError && !acessoResolvido)) return;
 
-    if (hasPerfilPermissaoPartialError) {
-      console.warn('[useCurrentUser] Falha não crítica ao carregar PerfilPermissao.');
-    }
-    if (hasResolvedPermissionsPartialError) {
-      console.warn('[useCurrentUser] Falha não crítica ao resolver permissões (resolvedPermissions).');
-    }
-    if (hasUnidadesPartialError) {
-      console.warn('[useCurrentUser] Falha não crítica ao carregar unidades de escopo.');
-    }
+    console.info('[useCurrentUser] Diagnóstico de permissões', {
+      email: accessLookupEmail || null,
+      perfil_id: acessoResolvido?.perfil_id || null,
+      perfil_nome: acessoResolvido?.perfil_nome || null,
+      perfil_carregado: Boolean(perfilAcesso?.id),
+      perfil_fallback: perfilFallbackReason || null,
+      perfil_erro: Boolean(hasPerfilPermissaoPartialError),
+      resolved_permissions_erro: Boolean(hasResolvedPermissionsPartialError),
+      modules_permitidos: countGrantedByPrefix(normalizedResolvedPermissions, 'acesso_'),
+      actions_permitidas: countGrantedByPrefix(normalizedResolvedPermissions, 'perm_'),
+      total_permissoes_permitidas: countGrantedPermissions(normalizedResolvedPermissions),
+      access_blocked_by_profile_error: shouldBlockAccessByPermissionError,
+    });
   }, [
-    nonCriticalPermissionError,
+    acessoResolvido,
+    accessLookupEmail,
+    normalizedResolvedPermissions,
+    perfilAcesso?.id,
+    perfilFallbackReason,
+    shouldBlockAccessByPermissionError,
     hasPerfilPermissaoPartialError,
     hasResolvedPermissionsPartialError,
     hasUnidadesPartialError,
+    nonCriticalPermissionError,
   ]);
 
   const refetchAccess = async () => {
@@ -308,6 +391,7 @@ export function useCurrentUser() {
   const canAccessModule = (modulo) => {
     if (hasAbsoluteAccess) return true;
     if (accessLookupEmail && !isAccessResolved) return false;
+    if (shouldBlockAccessByPermissionError) return false;
 
     if (acessoResolvido) {
       const campo = `acesso_${modulo}`;
@@ -325,6 +409,7 @@ export function useCurrentUser() {
   const canAccessAction = (acao) => {
     if (hasAbsoluteAccess) return true;
     if (accessLookupEmail && !isAccessResolved) return false;
+    if (shouldBlockAccessByPermissionError) return false;
 
     if (acessoResolvido) {
       const campo = `perm_${acao}`;
@@ -435,6 +520,8 @@ export function useCurrentUser() {
     isLoading,
     isAccessError,
     isPermissionPartialError,
+    shouldBlockAccessByPermissionError,
+    permissionErrorMessage,
     accessErrorDetails,
     isAccessResolved,
     modoAcesso,
