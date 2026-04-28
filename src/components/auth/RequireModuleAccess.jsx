@@ -18,10 +18,17 @@ export default function RequireModuleAccess({
     isLoading,
     isAccessError,
     isAccessResolved,
+    isPermissionPartialError,
+    accessErrorDetails,
     permissions,
     canAccessAll,
     refetchAccess,
   } = useCurrentUser();
+
+  React.useEffect(() => {
+    if (!import.meta.env.DEV || !isPermissionPartialError) return;
+    console.warn('[RequireModuleAccess] Erro parcial de permissões detectado (não bloqueante).', accessErrorDetails);
+  }, [isPermissionPartialError, accessErrorDetails]);
 
   if (isLoading) {
     return null;
