@@ -68,24 +68,56 @@ export async function carregarMilitaresComMatriculas(militares = []) {
   if (militarIds.length === 0) return [];
 
   let matriculas = [];
+  let carregamentoMatriculasOk = false;
 
   try {
     matriculas = await base44.entities.MatriculaMilitar.filter({
       militar_id: { in: militarIds },
     }, '-created_date');
-  } catch (_error) {
-    const lotes = [];
+    carregamentoMatriculasOk = true;
+  } catch (erroInOperator) {
     const tamanhoLote = 20;
-    for (let i = 0; i < militarIds.length; i += tamanhoLote) {
-      lotes.push(militarIds.slice(i, i + tamanhoLote));
+    let totalSucessos = 0;
+    let totalFalhas = 0;
+
+    for (let inicio = 0; inicio < militarIds.length; inicio += tamanhoLote) {
+      const loteIds = militarIds.slice(inicio, inicio + tamanhoLote);
+      const consultasLote = loteIds.map((militarId) => (
+        base44.entities.MatriculaMilitar.filter({ militar_id: militarId }, '-created_date')
+      ));
+      const resultadosLote = await Promise.allSettled(consultasLote);
+
+      const sucessosLote = resultadosLote.filter((resultado) => resultado.status === 'fulfilled');
+      const falhasLote = resultadosLote.length - sucessosLote.length;
+
+      matriculas.push(...sucessosLote.flatMap((resultado) => resultado.value || []));
+      totalSucessos += sucessosLote.length;
+      totalFalhas += falhasLote;
     }
 
-    for (const loteIds of lotes) {
-      for (const militarId of loteIds) {
-        const lista = await base44.entities.MatriculaMilitar.filter({ militar_id: militarId }, '-created_date');
-        matriculas.push(...lista);
-      }
+    carregamentoMatriculasOk = totalSucessos > 0;
+
+    if (import.meta.env.DEV && totalFalhas > 0) {
+      console.warn('[matriculaMilitarViewService] Falha parcial no fallback de matrícula por militar_id.', {
+        totalMilitares: militarIds.length,
+        sucessos: totalSucessos,
+        falhas: totalFalhas,
+        erroInOperator,
+        tamanhoLote,
+      });
     }
+  }
+
+  if (!carregamentoMatriculasOk) {
+    if (import.meta.env.DEV) {
+      console.warn('[matriculaMilitarViewService] Não foi possível carregar histórico de matrículas. Mantendo matrícula original do militar.');
+    }
+    return (militares || []).map((militar) => ({
+      ...militar,
+      matricula_atual: formatarMatriculaPadrao(militar?.matricula || ''),
+      matriculas_historico: [],
+      is_mesclado: isMilitarMesclado(militar),
+    }));
   }
 
   const indice = montarIndiceMatriculas(matriculas);
