@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Search, CheckSquare, Square, Building2, GitMerge, MapPin, ChevronRight, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Users, Search, CheckSquare, Square, Building2, GitMerge, MapPin, ChevronRight, ChevronDown, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
@@ -30,7 +30,7 @@ const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast, dismiss } = useToast();
-  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule } = useCurrentUser();
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule, isAdmin, getMilitarScopeFilters } = useCurrentUser();
   const hasLotacaoAccess = canAccessModule('lotacao_militares');
 
   const [searchMilitar, setSearchMilitar] = useState('');
@@ -39,21 +39,98 @@ export default function LotacaoMilitares() {
   const [selectedNode, setSelectedNode] = useState(null); // Nó de destino selecionado na árvore
   const [expandedNodes, setExpandedNodes] = useState({});
 
-  const { data: militares = [], isLoading: loadingMilitares } = useQuery({ 
-    queryKey: ['militares-ativos'], 
-    queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }) 
-  });
+  const {
+    data: militaresData = { militares: [], partialFailures: 0 },
+    isLoading: loadingMilitares,
+    isError: isMilitaresError,
+    refetch: refetchMilitares,
+  } = useQuery({
+    queryKey: ['militares-ativos', isAdmin],
+    queryFn: async () => {
+      if (isAdmin) {
+        const militares = await base44.entities.Militar.filter({ status_cadastro: 'Ativo' });
+        return { militares, partialFailures: 0 };
+      }
 
-  const { data: matriculas = [], isLoading: loadingMatriculas } = useQuery({
+      const filters = getMilitarScopeFilters();
+      if (!filters.length) return { militares: [], partialFailures: 0 };
+
+      const resultados = await Promise.allSettled(
+        filters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
+      );
+      const sucessos = resultados
+        .filter((resultado) => resultado.status === 'fulfilled')
+        .map((resultado) => resultado.value || []);
+      const falhas = resultados.length - sucessos.length;
+
+      if (import.meta.env.DEV && falhas > 0) {
+        console.warn('[LotacaoMilitares] Falha parcial ao carregar militares por escopo.', {
+          totalFiltros: resultados.length,
+          falhas,
+        });
+      }
+      if (!sucessos.length) {
+        throw new Error('Falha ao carregar militares do escopo.');
+      }
+
+      const ids = new Set();
+      const merged = [];
+      for (const militar of sucessos.flat()) {
+        if (!militar?.id || ids.has(militar.id)) continue;
+        ids.add(militar.id);
+        merged.push(militar);
+      }
+
+      return {
+        militares: merged.filter((militar) => militar?.status_cadastro === 'Ativo'),
+        partialFailures: falhas,
+      };
+    },
+    enabled: hasLotacaoAccess && isAccessResolved,
+  });
+  const militares = militaresData?.militares || [];
+  const militaresPartialFailures = Number(militaresData?.partialFailures || 0);
+
+  const { data: matriculasData = { matriculas: [], partialFailures: 0 }, isLoading: loadingMatriculas } = useQuery({
     queryKey: ['lotacao-matriculas-militar'],
-    queryFn: () => base44.entities.MatriculaMilitar.list('-created_date', 10000),
+    queryFn: async () => {
+      try {
+        const matriculas = await base44.entities.MatriculaMilitar.list('-created_date', 10000);
+        return { matriculas, partialFailures: 0 };
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[LotacaoMilitares] Falha ao carregar matrículas para enriquecimento.', error);
+        }
+        return { matriculas: [], partialFailures: 1 };
+      }
+    },
     enabled: hasLotacaoAccess,
   });
+  const matriculas = matriculasData?.matriculas || [];
+  const matriculasPartialFailures = Number(matriculasData?.partialFailures || 0);
   
-  const { data: estruturaRaw = [], isLoading: loadingEstrutura } = useQuery({
+  const {
+    data: estruturaData = { estrutura: [], partialFailures: 0 },
+    isLoading: loadingEstrutura,
+    refetch: refetchEstrutura,
+  } = useQuery({
     queryKey: ['estruturaOrganizacional'],
-    queryFn: () => base44.entities.Subgrupamento.list('nome'),
+    queryFn: async () => {
+      try {
+        const estrutura = await base44.entities.Subgrupamento.list('nome');
+        return { estrutura, partialFailures: 0 };
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[LotacaoMilitares] Falha ao carregar estrutura organizacional.', error);
+        }
+        return { estrutura: [], partialFailures: 1 };
+      }
+    },
+    enabled: hasLotacaoAccess,
   });
+  const estruturaRaw = estruturaData?.estrutura || [];
+  const estruturaPartialFailures = Number(estruturaData?.partialFailures || 0);
+  const hasPartialDataWarning = militaresPartialFailures > 0 || matriculasPartialFailures > 0 || estruturaPartialFailures > 0;
 
   const estrutura = useMemo(() => {
     return estruturaRaw.map(item => ({ ...item, tipoNormalizado: normalizeTipo(item.tipo) }));
@@ -199,6 +276,7 @@ export default function LotacaoMilitares() {
   if (!canAccess) {
     return <AccessDenied modulo="Lotação de Militares" />;
   }
+  const showTotalError = !loadingMilitares && isMilitaresError;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -213,6 +291,21 @@ export default function LotacaoMilitares() {
           </div>
         </div>
 
+        {hasPartialDataWarning && !showTotalError && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Alguns dados não puderam ser carregados. Tente novamente para atualizar.
+          </div>
+        )}
+        {showTotalError ? (
+          <div className="bg-white rounded-xl shadow-sm border border-red-200 p-12 text-center">
+            <Users className="w-16 h-16 mx-auto text-red-300 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Falha ao carregar dados</h3>
+            <div className="flex items-center justify-center gap-3">
+              <Button onClick={() => refetchMilitares()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">Tentar novamente</Button>
+              <Button variant="outline" onClick={() => refetchEstrutura()}>Recarregar estrutura</Button>
+            </div>
+          </div>
+        ) : (
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
           
           {/* COLUNA ESQUERDA: Árvore Organizacional */}
@@ -226,6 +319,11 @@ export default function LotacaoMilitares() {
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
               {loadingEstrutura ? (
                 <p className="text-center text-slate-400 py-10">Carregando estrutura...</p>
+              ) : setores.length === 0 ? (
+                <div className="text-center text-slate-500 py-10">
+                  <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-amber-500" />
+                  Estrutura indisponível no momento.
+                </div>
               ) : (
                 <div className="space-y-1">
                   {setores.map(setor => {
@@ -407,6 +505,7 @@ export default function LotacaoMilitares() {
           </div>
 
         </div>
+        )}
       </div>
     </div>
   );

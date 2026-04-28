@@ -97,7 +97,23 @@ export async function enriquecerFeriasComContextoMilitar(ferias = [], { contexto
   if (!militarIds.length) return [];
 
   const { base44 } = await import('../api/base44Client.js');
-  const colecoes = await Promise.all(militarIds.map((id) => base44.entities.Militar.filter({ id })));
+  const resultados = await Promise.allSettled(militarIds.map((id) => base44.entities.Militar.filter({ id })));
+  const colecoes = resultados
+    .filter((resultado) => resultado.status === 'fulfilled')
+    .map((resultado) => resultado.value || []);
+  const falhas = resultados.length - colecoes.length;
+
+  if (import.meta.env.DEV && falhas > 0) {
+    console.warn('[feriasMilitarContextService] Falha parcial ao carregar militares para enriquecimento de férias.', {
+      totalMilitares: militarIds.length,
+      falhas,
+    });
+  }
+
+  if (!colecoes.length) {
+    return (ferias || []).map((item) => aplicarContextoMilitarNaFerias(item, null, { contexto }));
+  }
+
   const militares = await carregarMilitaresComMatriculas(colecoes.flat());
   const byId = new Map(militares.map((m) => [String(m.id), m]));
 

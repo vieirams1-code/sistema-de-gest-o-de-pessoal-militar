@@ -296,7 +296,7 @@ export default function Ferias() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
   const {
-    data: ferias = [],
+    data: feriasData,
     isLoading,
     isError: isFeriasError,
     refetch: refetchFerias,
@@ -305,23 +305,60 @@ export default function Ferias() {
     queryFn: async () => {
       if (isAdmin) {
         const lista = await base44.entities.Ferias.list('-data_inicio');
-        return enriquecerFeriasComContextoMilitar(lista, { contexto: 'operacional' });
+        const ferias = await enriquecerFeriasComContextoMilitar(lista, { contexto: 'operacional' });
+        return { ferias, partialFailures: 0 };
       }
 
       const militarScopeFilters = getMilitarScopeFilters();
-      if (!militarScopeFilters.length) return [];
+      if (!militarScopeFilters.length) return { ferias: [], partialFailures: 0 };
 
-      const militarQueries = await Promise.all(
+      const militarScopeResults = await Promise.allSettled(
         militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
       );
+      const militarQueries = militarScopeResults
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value || []);
+      const militarScopeFailures = militarScopeResults.length - militarQueries.length;
+      if (import.meta.env.DEV && militarScopeFailures > 0) {
+        console.warn('[Ferias] Falha parcial ao carregar militares por escopo.', {
+          totalFiltros: militarScopeResults.length,
+          falhas: militarScopeFailures,
+        });
+      }
+      if (!militarQueries.length) {
+        throw new Error('Falha ao carregar militares do escopo.');
+      }
+
       const militaresAcessiveis = militarQueries.flat();
       const militarIds = [...new Set(militaresAcessiveis.map((m) => m.id).filter(Boolean))];
 
-      if (!militarIds.length) return [];
+      if (!militarIds.length) return { ferias: [], partialFailures: militarScopeFailures };
 
-      const feriasByMilitar = await Promise.all(
-        militarIds.map((militarId) => base44.entities.Ferias.filter({ militar_id: militarId }, '-data_inicio'))
-      );
+      const tamanhoLote = 25;
+      const feriasByMilitar = [];
+      let feriasFailures = 0;
+
+      for (let inicio = 0; inicio < militarIds.length; inicio += tamanhoLote) {
+        const lote = militarIds.slice(inicio, inicio + tamanhoLote);
+        const resultadosLote = await Promise.allSettled(
+          lote.map((militarId) => base44.entities.Ferias.filter({ militar_id: militarId }, '-data_inicio'))
+        );
+        const sucessos = resultadosLote
+          .filter((resultado) => resultado.status === 'fulfilled')
+          .map((resultado) => resultado.value || []);
+        feriasByMilitar.push(...sucessos);
+        feriasFailures += resultadosLote.length - sucessos.length;
+      }
+      if (import.meta.env.DEV && feriasFailures > 0) {
+        console.warn('[Ferias] Falha parcial ao carregar férias por militar.', {
+          totalMilitares: militarIds.length,
+          falhas: feriasFailures,
+          tamanhoLote,
+        });
+      }
+      if (!feriasByMilitar.length && militarIds.length > 0) {
+        throw new Error('Falha ao carregar férias dos militares acessíveis.');
+      }
 
       const ids = new Set();
       const merged = [];
@@ -338,30 +375,71 @@ export default function Ferias() {
         return db - da;
       });
 
-      return enriquecerFeriasComContextoMilitar(sorted, { contexto: 'operacional' });
+      const ferias = await enriquecerFeriasComContextoMilitar(sorted, { contexto: 'operacional' });
+      return {
+        ferias,
+        partialFailures: militarScopeFailures + feriasFailures,
+      };
     },
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
+  const ferias = feriasData?.ferias || [];
+  const feriasPartialFailures = Number(feriasData?.partialFailures || 0);
 
-  const { data: registrosLivro = [] } = useQuery({
+  const { data: registrosLivroData = { registros: [], partialFailures: 0 } } = useQuery({
     queryKey: ['registros-livro-all', isAdmin, modoAcesso, userEmail],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.RegistroLivro.list();
+      if (isAdmin) return { registros: await base44.entities.RegistroLivro.list(), partialFailures: 0 };
 
       const militarScopeFilters = getMilitarScopeFilters();
-      if (!militarScopeFilters.length) return [];
+      if (!militarScopeFilters.length) return { registros: [], partialFailures: 0 };
 
-      const militarQueries = await Promise.all(
+      const militarScopeResults = await Promise.allSettled(
         militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter))
       );
+      const militarQueries = militarScopeResults
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value || []);
+      const militarScopeFailures = militarScopeResults.length - militarQueries.length;
+      if (import.meta.env.DEV && militarScopeFailures > 0) {
+        console.warn('[Ferias] Falha parcial ao carregar militares para registros do livro.', {
+          totalFiltros: militarScopeResults.length,
+          falhas: militarScopeFailures,
+        });
+      }
+      if (!militarQueries.length) {
+        throw new Error('Falha ao carregar militares do escopo para registros do livro.');
+      }
+
       const militaresAcessiveis = militarQueries.flat();
       const militarIds = [...new Set(militaresAcessiveis.map((m) => m.id).filter(Boolean))];
 
-      if (!militarIds.length) return [];
+      if (!militarIds.length) return { registros: [], partialFailures: militarScopeFailures };
 
-      const registrosByMilitar = await Promise.all(
-        militarIds.map((militarId) => base44.entities.RegistroLivro.filter({ militar_id: militarId }))
-      );
+      const registrosByMilitar = [];
+      let registrosFailures = 0;
+      const tamanhoLote = 25;
+      for (let inicio = 0; inicio < militarIds.length; inicio += tamanhoLote) {
+        const lote = militarIds.slice(inicio, inicio + tamanhoLote);
+        const resultadosLote = await Promise.allSettled(
+          lote.map((militarId) => base44.entities.RegistroLivro.filter({ militar_id: militarId }))
+        );
+        const sucessos = resultadosLote
+          .filter((resultado) => resultado.status === 'fulfilled')
+          .map((resultado) => resultado.value || []);
+        registrosByMilitar.push(...sucessos);
+        registrosFailures += resultadosLote.length - sucessos.length;
+      }
+      if (import.meta.env.DEV && registrosFailures > 0) {
+        console.warn('[Ferias] Falha parcial ao carregar registros do livro por militar.', {
+          totalMilitares: militarIds.length,
+          falhas: registrosFailures,
+          tamanhoLote,
+        });
+      }
+      if (!registrosByMilitar.length && militarIds.length > 0) {
+        throw new Error('Falha ao carregar registros do livro dos militares acessíveis.');
+      }
 
       const ids = new Set();
       const merged = [];
@@ -372,10 +450,13 @@ export default function Ferias() {
         merged.push(registro);
       }
 
-      return merged;
+      return { registros: merged, partialFailures: militarScopeFailures + registrosFailures };
     },
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
+  const registrosLivro = registrosLivroData?.registros || [];
+  const registrosPartialFailures = Number(registrosLivroData?.partialFailures || 0);
+  const hasPartialDataWarning = feriasPartialFailures > 0 || registrosPartialFailures > 0;
 
   const { data: creditosExtraFerias = [] } = useQuery({
     queryKey: ['ferias-creditos-extra'],
@@ -686,6 +767,11 @@ export default function Ferias() {
         <div className="mb-4 text-sm text-slate-500">
           {isFeriasError ? 'Falha ao carregar dados.' : `${filteredFerias.length} férias encontrada(s)`}
         </div>
+        {!isFeriasError && hasPartialDataWarning && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Alguns dados não puderam ser carregados. Tente novamente para atualizar.
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
