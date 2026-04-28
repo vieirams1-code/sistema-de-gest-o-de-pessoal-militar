@@ -51,6 +51,12 @@ const countGrantedByPrefix = (permissions = {}, prefix = '') => (
   Object.entries(permissions || {}).filter(([key, value]) => key.startsWith(prefix) && value === true).length
 );
 
+const listGrantedByPrefix = (permissions = {}, prefix = '') => (
+  Object.entries(permissions || {})
+    .filter(([key, value]) => key.startsWith(prefix) && value === true)
+    .map(([key]) => key)
+);
+
 const resolveImpersonationContext = (user) => {
   const baseEmail = toLowerSafe(user?.email);
 
@@ -339,6 +345,58 @@ export function useCurrentUser() {
     ? 'Não foi possível carregar o perfil de permissões.'
     : null;
   const shouldBlockAccessByPermissionError = profileFetchFatalError && !superAdmin;
+  const grantedModules = listGrantedByPrefix(normalizedResolvedPermissions, 'acesso_');
+  const grantedActions = listGrantedByPrefix(normalizedResolvedPermissions, 'perm_');
+  const debugAccess = {
+    emailAuthOriginal: user?.email || null,
+    emailNormalizado: accessLookupEmail || null,
+    status: {
+      currentUser: {
+        isLoading: Boolean(loadingAuth),
+        isError: Boolean(isAuthError),
+        hasData: Boolean(user),
+      },
+      auth: {
+        isAuthenticated: Boolean(user),
+        isImpersonating: Boolean(impersonationContext.isImpersonating),
+      },
+      usuarioAcessoFilter: {
+        enabled: Boolean(accessLookupEmail),
+        isLoading: Boolean(loadingAcesso),
+        isFetched: Boolean(fetchedAcesso),
+        isError: Boolean(isAcessoError),
+      },
+      perfilPermissaoGet: {
+        attempted: Boolean(acessoResolvido?.perfil_id),
+        isLoading: Boolean(loadingPerfilAcesso),
+        isError: Boolean(isPerfilAcessoError),
+      },
+      perfilPermissaoFallbackFilter: {
+        used: Boolean(perfilFallbackReason),
+        strategy: perfilFallbackReason || null,
+        isError: Boolean(isPerfilAcessoError && !perfilAcesso?.id),
+      },
+      resolvedPermissions: {
+        isLoading: Boolean(loadingResolvedPermissions),
+        isError: Boolean(isResolvedPermissionsError),
+        hasData: Boolean(resolvedPermissionsData?.permissions),
+      },
+    },
+    usuarioAcessoEncontradosQuantidade: Array.isArray(usuarioAcessoList) ? usuarioAcessoList.length : 0,
+    usuarioAcessoEncontradosIds: Array.isArray(usuarioAcessoList) ? usuarioAcessoList.map((item) => item?.id).filter(Boolean) : [],
+    perfil_id: acessoResolvido?.perfil_id || null,
+    modulesPermitidos: {
+      count: grantedModules.length,
+      lista: grantedModules,
+    },
+    actionsPermitidas: {
+      count: grantedActions.length,
+      lista: grantedActions,
+    },
+    isAccessError,
+    isPermissionPartialError,
+    accessErrorDetails,
+  };
 
   useEffect(() => {
     if (!import.meta.env.DEV || (!nonCriticalPermissionError && !acessoResolvido)) return;
@@ -523,6 +581,7 @@ export function useCurrentUser() {
     shouldBlockAccessByPermissionError,
     permissionErrorMessage,
     accessErrorDetails,
+    debugAccess,
     isAccessResolved,
     modoAcesso,
     subgrupamentoId,

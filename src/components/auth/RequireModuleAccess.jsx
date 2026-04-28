@@ -1,6 +1,7 @@
 import React from 'react';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import AccessDebugPanel from '@/components/auth/AccessDebugPanel';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -22,6 +23,7 @@ export default function RequireModuleAccess({
     accessErrorDetails,
     shouldBlockAccessByPermissionError,
     permissionErrorMessage,
+    debugAccess,
     permissions,
     canAccessAll,
     refetchAccess,
@@ -54,6 +56,7 @@ export default function RequireModuleAccess({
           >
             Tentar novamente
           </Button>
+          <AccessDebugPanel debugAccess={debugAccess} />
         </div>
       </div>
     );
@@ -81,6 +84,7 @@ export default function RequireModuleAccess({
           >
             Tentar novamente
           </Button>
+          <AccessDebugPanel debugAccess={debugAccess} />
         </div>
       </div>
     );
