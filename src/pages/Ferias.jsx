@@ -295,7 +295,12 @@ export default function Ferias() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
-  const { data: ferias = [], isLoading } = useQuery({
+  const {
+    data: ferias = [],
+    isLoading,
+    isError: isFeriasError,
+    refetch: refetchFerias,
+  } = useQuery({
     queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
     queryFn: async () => {
       if (isAdmin) {
@@ -679,12 +684,25 @@ export default function Ferias() {
         </div>
 
         <div className="mb-4 text-sm text-slate-500">
-          {filteredFerias.length} férias encontrada(s)
+          {isFeriasError ? 'Falha ao carregar dados.' : `${filteredFerias.length} férias encontrada(s)`}
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : isFeriasError ? (
+          <div className="bg-white rounded-xl shadow-sm border border-red-200 p-12 text-center">
+            <Calendar className="w-16 h-16 mx-auto text-red-300 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">
+              Falha ao carregar dados
+            </h3>
+            <Button
+              onClick={() => refetchFerias()}
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+            >
+              Tentar novamente
+            </Button>
           </div>
         ) : filteredFerias.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
