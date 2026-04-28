@@ -62,6 +62,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
+import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -298,7 +299,10 @@ export default function Ferias() {
   const {
     data: feriasData,
     isLoading,
+    isFetching: isFeriasFetching,
+    isSuccess: isFeriasSuccess,
     isError: isFeriasError,
+    error: feriasError,
     refetch: refetchFerias,
   } = useQuery({
     queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
@@ -386,7 +390,14 @@ export default function Ferias() {
   const ferias = feriasData?.ferias || [];
   const feriasPartialFailures = Number(feriasData?.partialFailures || 0);
 
-  const { data: registrosLivroData = { registros: [], partialFailures: 0 } } = useQuery({
+  const {
+    data: registrosLivroData = { registros: [], partialFailures: 0 },
+    isLoading: isRegistrosLoading,
+    isFetching: isRegistrosFetching,
+    isSuccess: isRegistrosSuccess,
+    isError: isRegistrosError,
+    error: registrosError,
+  } = useQuery({
     queryKey: ['registros-livro-all', isAdmin, modoAcesso, userEmail],
     queryFn: async () => {
       if (isAdmin) return { registros: await base44.entities.RegistroLivro.list(), partialFailures: 0 };
@@ -457,6 +468,73 @@ export default function Ferias() {
   const registrosLivro = registrosLivroData?.registros || [];
   const registrosPartialFailures = Number(registrosLivroData?.partialFailures || 0);
   const hasPartialDataWarning = feriasPartialFailures > 0 || registrosPartialFailures > 0;
+  const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail];
+  const registrosLivroQueryKey = ['registros-livro-all', isAdmin, modoAcesso, userEmail];
+  const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
+
+  const getFeriasEstagioProvavel = () => {
+    const feriasErrorMessage = String(feriasError?.message || '').toLowerCase();
+    const registrosErrorMessage = String(registrosError?.message || '').toLowerCase();
+
+    if (isAdmin && isFeriasError) return 'Ferias.list';
+    if (feriasErrorMessage.includes('escopo') || registrosErrorMessage.includes('escopo')) return 'Militar.filter escopo';
+    if (feriasErrorMessage.includes('férias dos militares acessíveis')) return 'Ferias.filter por militar';
+    if (registrosErrorMessage.includes('registros do livro')) return 'RegistroLivro.filter por militar';
+    if (isFeriasError || feriasPartialFailures > 0) return 'enriquecerFeriasComContextoMilitar';
+    return 'Ferias.filter por militar';
+  };
+
+  const feriasDebugData = (isFeriasError || isRegistrosError || hasPartialDataWarning)
+    ? {
+      pagina: 'Ferias',
+      usuario: userEmail || null,
+      isAdmin,
+      modoAcesso: modoAcesso || null,
+      scopeFilters: militarScopeFilters,
+      queryKeyFerias: feriasQueryKey,
+      queryKeyRegistrosLivro: registrosLivroQueryKey,
+      status: {
+        ferias: {
+          loading: isLoading,
+          fetching: isFeriasFetching,
+          isError: isFeriasError,
+          isSuccess: isFeriasSuccess,
+        },
+        registrosLivro: {
+          loading: isRegistrosLoading,
+          fetching: isRegistrosFetching,
+          isError: isRegistrosError,
+          isSuccess: isRegistrosSuccess,
+        },
+      },
+      erroFerias: feriasError
+        ? {
+          message: feriasError.message || null,
+          name: feriasError.name || null,
+          stack: feriasError.stack ? String(feriasError.stack).split('\n').slice(0, 5).join('\n') : null,
+        }
+        : null,
+      erroRegistrosLivro: registrosError
+        ? {
+          message: registrosError.message || null,
+          name: registrosError.name || null,
+          stack: registrosError.stack ? String(registrosError.stack).split('\n').slice(0, 5).join('\n') : null,
+        }
+        : null,
+      partialFailures: {
+        ferias: feriasPartialFailures,
+        registrosLivro: registrosPartialFailures,
+      },
+      quantidades: {
+        feriasCarregadas: ferias.length,
+        registrosLivroCarregados: registrosLivro.length,
+      },
+      estagioProvavel: getFeriasEstagioProvavel(),
+      timestamps: {
+        generatedAt: new Date().toISOString(),
+      },
+    }
+    : null;
 
   const { data: creditosExtraFerias = [] } = useQuery({
     queryKey: ['ferias-creditos-extra'],
@@ -770,6 +848,7 @@ export default function Ferias() {
         {!isFeriasError && hasPartialDataWarning && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Alguns dados não puderam ser carregados. Tente novamente para atualizar.
+            <DataDebugPanel debugData={feriasDebugData} />
           </div>
         )}
 
@@ -789,6 +868,7 @@ export default function Ferias() {
             >
               Tentar novamente
             </Button>
+            <DataDebugPanel debugData={feriasDebugData} className="text-left" />
           </div>
         ) : filteredFerias.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">

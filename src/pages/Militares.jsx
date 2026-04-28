@@ -29,6 +29,7 @@ import {
 } from '@/services/matriculaMilitarViewService';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
 import { isPostoOficial } from '@/utils/postoQuadroCompatibilidade';
+import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const SEM_LOTACAO_VALUE = '__sem_lotacao__';
@@ -75,6 +76,7 @@ export default function Militares() {
     isFetching: fetchingMilitaresQuery,
     isError: militaresQueryError,
     isSuccess: militaresQuerySuccess,
+    error: militaresMainError,
     refetch: refetchMilitares,
   } = useQuery({
     queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
@@ -156,6 +158,7 @@ export default function Militares() {
   });
   const militares = militaresData?.militares || [];
   const partialFailures = Number(militaresData?.partialFailures || 0);
+  const militaresQueryKey = ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail];
 
   const deleteMutation = useMutation({
     mutationFn: (id) => excluirMilitarComDependencias(id, { executadoPor: userEmail || '' }),
@@ -171,6 +174,50 @@ export default function Militares() {
   const isInitialLoading = loadingUser || !isAccessResolved || loadingMilitaresQuery || (fetchingMilitaresQuery && !militaresQuerySuccess);
   const showMilitaresError = !isInitialLoading && militaresQueryError;
   const showResolvedData = !isInitialLoading && !showMilitaresError && militaresQuerySuccess;
+  const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
+
+  const getMilitaresEstagioProvavel = () => {
+    const message = String(militaresMainError?.message || '').toLowerCase();
+    if (isAdmin && (militaresQueryError || partialFailures > 0)) return 'Militar.list';
+    if (message.includes('modo próprio')) return 'Militar.filter escopo';
+    if (message.includes('escopo')) return 'Militar.filter escopo';
+    if (message.includes('matrícula') || message.includes('matricula')) return 'MatriculaMilitar.filter in';
+    if (message.includes('fallback')) return 'MatriculaMilitar fallback';
+    if (partialFailures > 0) return 'Militar.filter escopo';
+    return 'carregarMilitaresComMatriculas';
+  };
+
+  const militaresDebugData = (showMilitaresError || (showResolvedData && partialFailures > 0))
+    ? {
+      pagina: 'Militares',
+      usuario: userEmail || linkedMilitarEmail || null,
+      isAdmin,
+      modoAcesso: modoAcesso || null,
+      scopeFilters: militarScopeFilters,
+      queryKey: militaresQueryKey,
+      status: {
+        loading: loadingMilitaresQuery,
+        fetching: fetchingMilitaresQuery,
+        isError: militaresQueryError,
+        isSuccess: militaresQuerySuccess,
+      },
+      erroPrincipal: militaresMainError
+        ? {
+          message: militaresMainError.message || null,
+          name: militaresMainError.name || null,
+          stack: militaresMainError.stack ? String(militaresMainError.stack).split('\n').slice(0, 5).join('\n') : null,
+        }
+        : null,
+      quantidades: {
+        militaresCarregados: militares.length,
+      },
+      partialFailures,
+      estagioProvavel: getMilitaresEstagioProvavel(),
+      timestamps: {
+        generatedAt: new Date().toISOString(),
+      },
+    }
+    : null;
 
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos }).map((militar) => ({
     ...militar,
@@ -427,6 +474,7 @@ export default function Militares() {
         {!showMilitaresError && showResolvedData && partialFailures > 0 && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Alguns dados não puderam ser carregados. Tente novamente para atualizar.
+            <DataDebugPanel debugData={militaresDebugData} />
           </div>
         )}
 
@@ -449,6 +497,7 @@ export default function Militares() {
             >
               Tentar novamente
             </Button>
+            <DataDebugPanel debugData={militaresDebugData} className="text-left" />
           </div>
         ) : showResolvedData && filteredMilitares.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
