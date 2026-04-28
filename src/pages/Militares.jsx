@@ -62,7 +62,14 @@ export default function Militares() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
-  const { data: militares = [], isLoading } = useQuery({
+  const {
+    data: militares = [],
+    isLoading: loadingMilitaresQuery,
+    isFetching: fetchingMilitaresQuery,
+    isError: militaresQueryError,
+    isSuccess: militaresQuerySuccess,
+    refetch: refetchMilitares,
+  } = useQuery({
     queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
     queryFn: async () => {
       if (isAdmin) {
@@ -119,6 +126,10 @@ export default function Militares() {
       setMilitarToDelete(null);
     }
   });
+
+  const isInitialLoading = loadingUser || !isAccessResolved || loadingMilitaresQuery || (fetchingMilitaresQuery && !militaresQuerySuccess);
+  const showMilitaresError = !isInitialLoading && militaresQueryError;
+  const showResolvedData = !isInitialLoading && !showMilitaresError && militaresQuerySuccess;
 
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos });
   const lotacoesDisponiveis = Array.from(
@@ -187,7 +198,7 @@ export default function Militares() {
 
   if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
   
-  const stats = {
+  const stats = isInitialLoading ? null : {
     total: militaresAtivos.length,
     ativos: militaresAtivos.filter(m => m.status_cadastro === 'Ativo' || !m.status_cadastro).length,
     oficiais: militaresAtivos.filter(m => isPostoOficial(m.posto_graduacao)).length,
@@ -225,7 +236,7 @@ export default function Militares() {
                 <Users className="w-5 h-5 text-[#1e3a5f]" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-[#1e3a5f]">{stats.total}</p>
+                <p className="text-2xl font-bold text-[#1e3a5f]">{stats ? stats.total : '—'}</p>
                 <p className="text-xs text-slate-500">Total</p>
               </div>
             </div>
@@ -236,7 +247,7 @@ export default function Militares() {
                 <Users className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-emerald-600">{stats.ativos}</p>
+                <p className="text-2xl font-bold text-emerald-600">{stats ? stats.ativos : '—'}</p>
                 <p className="text-xs text-slate-500">Ativos</p>
               </div>
             </div>
@@ -247,7 +258,7 @@ export default function Militares() {
                 <Users className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-amber-600">{stats.oficiais}</p>
+                <p className="text-2xl font-bold text-amber-600">{stats ? stats.oficiais : '—'}</p>
                 <p className="text-xs text-slate-500">Oficiais</p>
               </div>
             </div>
@@ -258,7 +269,7 @@ export default function Militares() {
                 <Users className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-blue-600">{stats.pracas}</p>
+                <p className="text-2xl font-bold text-blue-600">{stats ? stats.pracas : '—'}</p>
                 <p className="text-xs text-slate-500">Praças</p>
               </div>
             </div>
@@ -373,22 +384,41 @@ export default function Militares() {
               className={mostrarInativos ? "bg-slate-600" : ""}
             >
               {mostrarInativos ? 'Ocultar Inativos' : 'Mostrar Inativos'}
-              {stats.inativos > 0 && ` (${stats.inativos})`}
+              {stats && stats.inativos > 0 && ` (${stats.inativos})`}
             </Button>
           </div>
         </div>
 
         {/* Results count */}
         <div className="mb-4 text-sm text-slate-500">
-          {filteredMilitares.length} militar(es) encontrado(s)
+          {isInitialLoading
+            ? 'Carregando militares...'
+            : showMilitaresError
+              ? 'Falha ao carregar militares.'
+              : `${filteredMilitares.length} militar(es) encontrado(s)`}
         </div>
 
         {/* Content */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+        {isInitialLoading ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
+            <div className="w-8 h-8 mx-auto mb-4 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Carregando efetivo...</h3>
+            <p className="text-slate-500 text-sm">Aguarde enquanto buscamos os militares.</p>
           </div>
-        ) : filteredMilitares.length === 0 ? (
+        ) : showMilitaresError ? (
+          <div className="bg-white rounded-xl shadow-sm border border-red-200 p-12 text-center">
+            <Users className="w-16 h-16 mx-auto text-red-300 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">
+              Não foi possível carregar o efetivo. Tente recarregar.
+            </h3>
+            <Button
+              onClick={() => refetchMilitares()}
+              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        ) : showResolvedData && filteredMilitares.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
             <Users className="w-16 h-16 mx-auto text-slate-300 mb-4" />
             <h3 className="text-lg font-semibold text-slate-700 mb-2">
