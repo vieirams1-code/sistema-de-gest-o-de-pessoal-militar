@@ -60,7 +60,16 @@ const markProfileAsLegacy = async (profile) => {
 
 export default function PermissoesUsuarios() {
   const queryClient = useQueryClient();
-  const { canAccessAction, isLoading: loadingUser, isAccessResolved, userEmail, acesso: acessoLogado } = useCurrentUser();
+  const {
+    canAccessAction,
+    isLoading: loadingUser,
+    isAccessResolved,
+    userEmail,
+    acesso: acessoLogado,
+    shouldBlockAccessByPermissionError,
+    permissionErrorMessage,
+    refetchAccess,
+  } = useCurrentUser();
   const hasAccess = !loadingUser && isAccessResolved && canAccessAction('gerir_permissoes');
   const canManageAccessLifecycle = hasAccess && (
     canAccessAction('gerir_permissoes_usuarios')
@@ -171,6 +180,28 @@ export default function PermissoesUsuarios() {
   }, [selectedCategory]);
 
   if (loadingUser || !isAccessResolved) return null;
+  if (shouldBlockAccessByPermissionError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center space-y-5">
+          <div className="w-20 h-20 mx-auto rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center">
+            <BadgeAlert className="w-10 h-10 text-amber-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800">Erro de Permissões</h1>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            {permissionErrorMessage || 'Não foi possível carregar o perfil de permissões.'}
+          </p>
+          <Button
+            type="button"
+            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white mt-2"
+            onClick={() => refetchAccess()}
+          >
+            Tentar novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
   if (!canAccessAction('gerir_permissoes')) {
     return <AccessDenied modulo="Permissões de Usuários" />;
   }

@@ -20,6 +20,8 @@ export default function RequireModuleAccess({
     isAccessResolved,
     isPermissionPartialError,
     accessErrorDetails,
+    shouldBlockAccessByPermissionError,
+    permissionErrorMessage,
     permissions,
     canAccessAll,
     refetchAccess,
@@ -59,6 +61,29 @@ export default function RequireModuleAccess({
 
   if (!isAccessResolved) {
     return null;
+  }
+
+  if (shouldBlockAccessByPermissionError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center space-y-5">
+          <div className="w-20 h-20 mx-auto rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center">
+            <AlertTriangle className="w-10 h-10 text-amber-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800">Erro de Permissões</h1>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            {permissionErrorMessage || 'Não foi possível carregar o perfil de permissões.'}
+          </p>
+          <Button
+            type="button"
+            className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white mt-2"
+            onClick={() => refetchAccess()}
+          >
+            Tentar novamente
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (canAccessAll || permissions === 'ALL') {
