@@ -70,7 +70,7 @@ export default function Militares() {
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
   const {
-    data: militares = [],
+    data: militaresData,
     isLoading: loadingMilitaresQuery,
     isFetching: fetchingMilitaresQuery,
     isError: militaresQueryError,
@@ -81,12 +81,13 @@ export default function Militares() {
     queryFn: async () => {
       if (isAdmin) {
         const lista = await base44.entities.Militar.list('-created_date');
-        return carregarMilitaresComMatriculas(lista);
+        const militares = await carregarMilitaresComMatriculas(lista);
+        return { militares, partialFailures: 0 };
       }
 
       if (modoAcesso === 'proprio') {
         const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
-        if (!linkedMilitarId && knownEmails.length === 0) return [];
+        if (!linkedMilitarId && knownEmails.length === 0) return { militares: [], partialFailures: 0 };
 
         const requests = [];
         if (linkedMilitarId) requests.push(base44.entities.Militar.filter({ id: linkedMilitarId }, '-created_date'));
@@ -98,30 +99,63 @@ export default function Militares() {
           requests.push(base44.entities.Militar.filter({ militar_email: email }, '-created_date'));
         }
 
-        const batches = await Promise.all(requests);
+        const resultados = await Promise.allSettled(requests);
+        const batches = resultados
+          .filter((resultado) => resultado.status === 'fulfilled')
+          .map((resultado) => resultado.value || []);
+        const failures = resultados.length - batches.length;
+
+        if (import.meta.env.DEV && failures > 0) {
+          console.warn('[Militares] Falha parcial ao carregar militares no modo próprio.', {
+            totalConsultas: resultados.length,
+            falhas: failures,
+          });
+        }
+        if (!batches.length && requests.length > 0) {
+          throw new Error('Falha ao carregar militares no modo próprio.');
+        }
+
         const ids = new Set();
         const vinculados = batches.flat().filter((m) => {
           if (!hasSelfAccess(m) || ids.has(m.id)) return false;
           ids.add(m.id);
           return true;
         });
-        return carregarMilitaresComMatriculas(vinculados);
+        const militares = await carregarMilitaresComMatriculas(vinculados);
+        return { militares, partialFailures: failures };
       }
 
       const filters = getMilitarScopeFilters();
-      if (!filters.length) return [];
+      if (!filters.length) return { militares: [], partialFailures: 0 };
       
       const requests = filters.map(f => base44.entities.Militar.filter(f, '-created_date'));
-      const batches = await Promise.all(requests);
+      const resultados = await Promise.allSettled(requests);
+      const batches = resultados
+        .filter((resultado) => resultado.status === 'fulfilled')
+        .map((resultado) => resultado.value || []);
+      const failures = resultados.length - batches.length;
+      if (import.meta.env.DEV && failures > 0) {
+        console.warn('[Militares] Falha parcial ao carregar militares por escopo.', {
+          totalFiltros: resultados.length,
+          falhas: failures,
+        });
+      }
+      if (!batches.length && requests.length > 0) {
+        throw new Error('Falha ao carregar militares por escopo.');
+      }
+
       const ids = new Set();
       const merged = [];
       for (const m of batches.flat()) {
         if (!ids.has(m.id)) { ids.add(m.id); merged.push(m); }
       }
-      return carregarMilitaresComMatriculas(merged);
+      const militares = await carregarMilitaresComMatriculas(merged);
+      return { militares, partialFailures: failures };
     },
     enabled: isAccessResolved,
   });
+  const militares = militaresData?.militares || [];
+  const partialFailures = Number(militaresData?.partialFailures || 0);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => excluirMilitarComDependencias(id, { executadoPor: userEmail || '' }),
@@ -390,6 +424,11 @@ export default function Militares() {
             <span>{militares.length} carregado(s)</span>
           )}
         </div>
+        {!showMilitaresError && showResolvedData && partialFailures > 0 && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Alguns dados não puderam ser carregados. Tente novamente para atualizar.
+          </div>
+        )}
 
         {/* Content */}
         {isInitialLoading ? (
