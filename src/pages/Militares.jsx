@@ -18,9 +18,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Users, Grid3X3, List, GitBranch } from 'lucide-react';
+import { Plus, Search, Users, Grid3X3, List, GitBranch, Network } from 'lucide-react';
 import MilitarCard from '@/components/militar/MilitarCard';
 import MapaDeLotacao from '@/components/militar/MapaDeLotacao';
+import MilitaresDistribuicaoView from '@/components/militar/MilitaresDistribuicaoView';
 import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
@@ -356,6 +357,15 @@ export default function Militares() {
                   <GitBranch className="w-4 h-4 mr-1" />
                   Mapa
                 </Button>
+                <Button
+                  variant={visualizacaoMode === 'distribuicao' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setVisualizacaoMode('distribuicao')}
+                  className={visualizacaoMode === 'distribuicao' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f] rounded-none' : 'rounded-none'}
+                >
+                  <Network className="w-4 h-4 mr-1" />
+                  Distribuição
+                </Button>
               </div>
               {visualizacaoMode === 'lista' && (
                 <div className="flex border border-slate-200 rounded-lg overflow-hidden">
@@ -428,7 +438,7 @@ export default function Militares() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
             <Users className="w-16 h-16 mx-auto text-slate-300 mb-4" />
             <h3 className="text-lg font-semibold text-slate-700 mb-2">
-              Nenhum militar encontrado
+              Nenhum militar encontrado com os filtros selecionados.
             </h3>
             <p className="text-slate-500 mb-6">
               {searchTerm || statusFilter !== 'all' || postoFilter !== 'all' || lotacaoFilter !== TODAS_LOTACOES_VALUE
@@ -447,6 +457,16 @@ export default function Militares() {
           </div>
         ) : visualizacaoMode === 'mapa' ? (
           <MapaDeLotacao militares={filteredMilitares} onViewMilitar={handleView} />
+        ) : visualizacaoMode === 'distribuicao' ? (
+          <MilitaresDistribuicaoView
+            militares={filteredMilitares}
+            onView={handleView}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            canEdit={canAccessAction('editar_militares')}
+            canDelete={canAccessAction('excluir_militares')}
+            searchTerm={searchTerm}
+          />
         ) : (
           <div className="space-y-6">
             {orderedPostos
