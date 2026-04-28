@@ -7,7 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { buscarResposta, aplicarContexto } from './assistenteProcedimentosService';
 
-export default function AssistenteProcedimentosModal({ tipoProcedimento = '', procedimento = {} }) {
+export default function AssistenteProcedimentosModal({
+  tipoProcedimento = '',
+  procedimento = {},
+  disabled = false,
+}) {
   const [open, setOpen] = useState(false);
   const [pergunta, setPergunta] = useState('');
   const [respostaAtual, setRespostaAtual] = useState(null);
@@ -65,7 +69,7 @@ export default function AssistenteProcedimentosModal({ tipoProcedimento = '', pr
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" className="gap-2">
+        <Button type="button" variant="outline" className="gap-2" disabled={disabled}>
           <MessageCircleQuestion className="h-4 w-4" />
           Assistente
         </Button>

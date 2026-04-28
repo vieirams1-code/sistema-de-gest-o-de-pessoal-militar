@@ -1,0 +1,12 @@
+{
+  "name": "ProcedimentoEnvolvido",
+  "type": "object",
+  "title": "Envolvido do Procedimento",
+  "properties": {
+    "procedimento_id": { "type": "string", "default": "" },
+    "tipo_envolvido": { "type": "string", "default": "" },
+    "nome": { "type": "string", "default": "" },
+    "responsavel": { "type": "string", "default": "" },
+    "observacao": { "type": "string", "default": "" }
+  }
+}

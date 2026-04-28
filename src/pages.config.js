@@ -98,6 +98,7 @@ import RegistrosMilitar from './pages/RegistrosMilitar';
 import CadastrarRegistroRP from './pages/CadastrarRegistroRP';
 import CentralPendencias from './pages/CentralPendencias';
 import RevisaoDuplicidadesMilitar from './pages/RevisaoDuplicidadesMilitar';
+import ProcedimentosProcessos from './pages/ProcedimentosProcessos';
 import __Layout from './Layout.jsx';
 
 
@@ -153,6 +154,7 @@ export const PAGES = {
     "CadastrarRegistroRP": CadastrarRegistroRP,
     "CentralPendencias": CentralPendencias,
     "RevisaoDuplicidadesMilitar": RevisaoDuplicidadesMilitar,
+    "ProcedimentosProcessos": ProcedimentosProcessos,
 }
 
 export const pagesConfig = {

@@ -1,0 +1,27 @@
+{
+  "name": "ProcedimentoPrazoHistorico",
+  "type": "object",
+  "title": "Histórico de Prazos do Procedimento",
+  "properties": {
+    "procedimento_id": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_prazo": {
+      "type": "string",
+      "default": "inicial"
+    },
+    "data_prazo": {
+      "type": "date",
+      "default": ""
+    },
+    "motivo_prorrogacao": {
+      "type": "string",
+      "default": ""
+    },
+    "nova_data_final": {
+      "type": "date",
+      "default": ""
+    }
+  }
+}

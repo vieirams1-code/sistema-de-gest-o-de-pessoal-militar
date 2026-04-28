@@ -1,0 +1,13 @@
+{
+  "name": "ProcedimentoPendencia",
+  "type": "object",
+  "title": "Pendência do Procedimento",
+  "properties": {
+    "procedimento_id": { "type": "string", "default": "" },
+    "descricao": { "type": "string", "default": "" },
+    "responsavel": { "type": "string", "default": "" },
+    "prazo": { "type": "date", "default": "" },
+    "status": { "type": "string", "default": "aberta" },
+    "observacao": { "type": "string", "default": "" }
+  }
+}

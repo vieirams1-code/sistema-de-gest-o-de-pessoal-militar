@@ -1,0 +1,15 @@
+{
+  "name": "ProcedimentoViatura",
+  "type": "object",
+  "title": "Viatura/Materiais de Inquérito Técnico",
+  "properties": {
+    "procedimento_id": { "type": "string", "default": "" },
+    "viatura": { "type": "string", "default": "" },
+    "prefixo": { "type": "string", "default": "" },
+    "placa": { "type": "string", "default": "" },
+    "dano_avaria": { "type": "string", "default": "" },
+    "condutor": { "type": "string", "default": "" },
+    "situacao_viatura": { "type": "string", "default": "" },
+    "estimativa_prejuizo": { "type": "string", "default": "" }
+  }
+}
