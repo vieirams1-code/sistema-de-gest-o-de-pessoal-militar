@@ -119,6 +119,17 @@ export const permissionStructure = [
         actions: [
           { key: 'perm_visualizar_central_pendencias', label: 'Visualizar Central de Pendências' }
         ]
+      },
+      {
+        key: 'acesso_procedimentos_processos',
+        label: 'Procedimentos e Processos',
+        actions: [
+          { key: 'perm_visualizar_procedimentos_processos', label: 'Visualizar Procedimentos e Processos' },
+          { key: 'perm_criar_procedimento', label: 'Criar Procedimento', sensitive: true },
+          { key: 'perm_editar_procedimento', label: 'Editar Procedimento', sensitive: true },
+          { key: 'perm_encerrar_procedimento', label: 'Encerrar Procedimento', sensitive: true },
+          { key: 'perm_gerir_prazos_procedimento', label: 'Gerir Prazos do Procedimento', sensitive: true }
+        ]
       }
     ]
   },

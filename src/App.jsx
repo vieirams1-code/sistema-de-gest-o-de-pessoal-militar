@@ -75,6 +75,7 @@ const moduleGuardByPage = {
   ClassificacaoPendentesLegado: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['classificar_legado'], moduleName: 'Migração de Alterações Legado' },
   RevisaoDuplicidadesMilitar: { moduleKeys: ['migracao_alteracoes_legado'], actionKeys: ['revisar_duplicidades'], moduleName: 'Migração de Alterações Legado' },
   CentralPendencias: { moduleKey: 'central_pendencias', actionKey: 'visualizar_central_pendencias', moduleName: 'Central de Pendências' },
+  ProcedimentosProcessos: { moduleKey: 'procedimentos_processos', actionKey: 'visualizar_procedimentos_processos', moduleName: 'Procedimentos e Processos' },
 };
 
 const moduleGuardByPageNormalized = Object.entries(moduleGuardByPage).reduce((acc, [pageKey, guard]) => {

@@ -59,6 +59,7 @@ const menuGroups = [
       { name: 'Efetivo', page: 'Militares', icon: Users, viewPermission: 'visualizar_militares' },
       { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
       { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
+      { name: 'Procedimentos e Processos', page: 'ProcedimentosProcessos', icon: ClipboardList, actionKey: 'visualizar_procedimentos_processos' },
     ],
   },
   {

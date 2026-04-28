@@ -15,3 +15,8 @@ export const ResetOperacionalLog = base44.entities.ResetOperacionalLog;
 
 export const BaseConhecimentoProcedimento = base44.entities.BaseConhecimentoProcedimento;
 export const AssistenteLog = base44.entities.AssistenteLog;
+export const ProcedimentoProcesso = base44.entities.ProcedimentoProcesso;
+export const ProcedimentoEnvolvido = base44.entities.ProcedimentoEnvolvido;
+export const ProcedimentoPendencia = base44.entities.ProcedimentoPendencia;
+export const ProcedimentoViatura = base44.entities.ProcedimentoViatura;
+export const ProcedimentoPrazoHistorico = base44.entities.ProcedimentoPrazoHistorico;

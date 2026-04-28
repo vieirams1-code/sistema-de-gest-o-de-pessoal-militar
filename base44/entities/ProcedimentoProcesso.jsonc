@@ -1,0 +1,72 @@
+{
+  "name": "ProcedimentoProcesso",
+  "type": "object",
+  "title": "Procedimento e Processo",
+  "description": "Controle externo de procedimentos administrativos/militares.",
+  "properties": {
+    "tipo_procedimento": {
+      "type": "string",
+      "default": ""
+    },
+    "numero_procedimento": {
+      "type": "string",
+      "default": ""
+    },
+    "numero_portaria": {
+      "type": "string",
+      "default": ""
+    },
+    "data_portaria": {
+      "type": "date",
+      "default": ""
+    },
+    "data_instauracao": {
+      "type": "date",
+      "default": ""
+    },
+    "prazo_final": {
+      "type": "date",
+      "default": ""
+    },
+    "autoridade_instauradora": {
+      "type": "string",
+      "default": ""
+    },
+    "responsavel_id": {
+      "type": "string",
+      "default": ""
+    },
+    "responsavel_nome": {
+      "type": "string",
+      "default": ""
+    },
+    "unidade": {
+      "type": "string",
+      "default": ""
+    },
+    "objeto": {
+      "type": "string",
+      "default": ""
+    },
+    "sigiloso": {
+      "type": "boolean",
+      "default": false
+    },
+    "observacoes": {
+      "type": "string",
+      "default": ""
+    },
+    "status": {
+      "type": "string",
+      "default": "Em andamento"
+    },
+    "prioridade_risco": {
+      "type": "string",
+      "default": "Média"
+    },
+    "prorrogacoes_count": {
+      "type": "integer",
+      "default": 0
+    }
+  }
+}
