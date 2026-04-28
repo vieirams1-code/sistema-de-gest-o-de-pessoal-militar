@@ -12,3 +12,6 @@ export const CreditoExtraFerias = base44.entities.CreditoExtraFerias;
 export const User = base44.auth;
 
 export const ResetOperacionalLog = base44.entities.ResetOperacionalLog;
+
+export const BaseConhecimentoProcedimento = base44.entities.BaseConhecimentoProcedimento;
+export const AssistenteLog = base44.entities.AssistenteLog;
