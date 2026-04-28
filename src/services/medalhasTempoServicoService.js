@@ -573,6 +573,7 @@ export async function indicarMedalhaPorCodigo(base44Client, {
   dataIndicacao = new Date().toISOString().split('T')[0],
   origemRegistro = 'APURACAO_TEMPO_SERVICO',
   observacoes = 'Indicação automática gerada na apuração de medalhas.',
+  camposExtras = {},
 }) {
   const codigoResolvido = resolverCodigoTipoMedalha(codigoMedalha);
   if (!codigoResolvido) {
@@ -591,6 +592,7 @@ export async function indicarMedalhaPorCodigo(base44Client, {
       tipo_medalha_id: tipoMedalha.id,
       tipo_medalha_codigo: tipoMedalha.codigo || codigoResolvido,
       tipo_medalha_nome: tipoMedalha.nome,
+      ...camposExtras,
     });
   }
 
@@ -605,5 +607,6 @@ export async function indicarMedalhaPorCodigo(base44Client, {
     origem_registro: origemRegistro,
     observacoes,
     data_indicacao: dataIndicacao,
+    ...camposExtras,
   });
 }

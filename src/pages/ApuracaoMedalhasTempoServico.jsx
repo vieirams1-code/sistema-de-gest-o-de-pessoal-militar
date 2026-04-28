@@ -7,6 +7,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -76,13 +77,14 @@ export default function ApuracaoMedalhasTempoServico() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { user, isAdmin, getMilitarScopeFilters, userEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasMedalhasAccess = canAccessModule('medalhas');
   const hasApuracaoAccess = temAlgumaPermissaoMedalhas(canAccessAction, ACOES_APURACAO);
   const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
   const podeConceder = canAccessAction(ACOES_MEDALHAS.CONCEDER);
   const podeResetar = canAccessAction(ACOES_MEDALHAS.RESETAR);
   const podeExportar = canAccessAction(ACOES_MEDALHAS.EXPORTAR);
+  const podeModoAdmin = canAccessAction(ACOES_MEDALHAS.ADMIN_OVERRIDE);
 
   const [search, setSearch] = useState('');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
@@ -90,6 +92,13 @@ export default function ApuracaoMedalhasTempoServico() {
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [faixaFilter, setFaixaFilter] = useState('TODAS');
   const [concederDialog, setConcederDialog] = useState({ open: false, medalha: null, data: hojeISO(), doems: '' });
+  const [adminModeAtivo, setAdminModeAtivo] = useState(false);
+  const [adminIndicacaoDialog, setAdminIndicacaoDialog] = useState({
+    open: false,
+    item: null,
+    codigo: null,
+    justificativa: '',
+  });
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
 
@@ -285,6 +294,45 @@ export default function ApuracaoMedalhasTempoServico() {
     onError: (error) => toast({ title: 'Erro ao indicar', description: error.message, variant: 'destructive' }),
   });
 
+  const indicarAdminMutation = useMutation({
+    mutationFn: async ({ item, codigo, justificativa }) => {
+      validarPermissaoAcaoMedalhas({
+        canAccessAction,
+        acao: ACOES_MEDALHAS.ADMIN_OVERRIDE,
+        mensagem: 'Sem permissão para usar override administrativo de medalhas.',
+      });
+      validarMilitarDentroEscopo({ isAdmin, militarId: item?.militar_id, militarIdsEscopo });
+      if (!justificativa?.trim()) {
+        throw new Error('A justificativa do override administrativo é obrigatória.');
+      }
+      const existente = registroPorMilitarCodigo.get(`${item.militar_id}:${codigo}`);
+      const overrideUsuarioId = user?.id || userEmail || '';
+      const overrideUsuarioNome = user?.name || user?.full_name || userEmail || 'Usuário não identificado';
+      return indicarMedalhaPorCodigo(base44, {
+        militar: item.militar,
+        codigoMedalha: codigo,
+        tiposMedalha: tiposCatalogo,
+        registroExistente: existente,
+        dataIndicacao: hojeISO(),
+        origemRegistro: 'APURACAO_TEMPO_SERVICO_ADMIN_OVERRIDE',
+        observacoes: `Indicação registrada via override administrativo. Justificativa: ${justificativa.trim()}`,
+        camposExtras: adicionarAuditoriaMedalha({
+          override_admin: true,
+          override_motivo: justificativa.trim(),
+          override_usuario_id: overrideUsuarioId,
+          override_usuario_nome: overrideUsuarioNome,
+          override_data: new Date().toISOString(),
+        }, { userEmail, acao: 'indicacao' }),
+      });
+    },
+    onSuccess: () => {
+      refreshQueries();
+      setAdminIndicacaoDialog({ open: false, item: null, codigo: null, justificativa: '' });
+      toast({ title: 'Indicação administrativa registrada', description: 'Registro salvo com auditoria de override.' });
+    },
+    onError: (error) => toast({ title: 'Erro no override administrativo', description: error.message, variant: 'destructive' }),
+  });
+
   const concederMutation = useMutation({
     mutationFn: async ({ medalhaId, data_concessao, numero_publicacao, militarId }) => {
       validarPermissaoAcaoMedalhas({
@@ -351,6 +399,14 @@ export default function ApuracaoMedalhasTempoServico() {
             </div>
           </div>
           <div className="flex gap-2">
+            {podeModoAdmin && (
+              <Button
+                variant={adminModeAtivo ? 'destructive' : 'outline'}
+                onClick={() => setAdminModeAtivo((prev) => !prev)}
+              >
+                {adminModeAtivo ? 'Modo Admin ativo' : 'Ativar Modo Admin'}
+              </Button>
+            )}
             {podeExportar && (
               <Button
                 variant="outline"
@@ -370,6 +426,13 @@ export default function ApuracaoMedalhasTempoServico() {
             {podeResetar && <Button variant="outline" onClick={() => setResetDialogOpen(true)}><RefreshCw className="w-4 h-4 mr-2" />Resetar indicações</Button>}
           </div>
         </div>
+
+        {adminModeAtivo && podeModoAdmin && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold">Override administrativo</p>
+            <p>Modo Admin ativo: indicações podem ser feitas mesmo em situações de inabilitação ou bloqueio. Use apenas mediante conferência e justificativa.</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[{ label: 'Elegíveis', value: totais.elegiveis }, { label: 'Indicados', value: totais.indicados }, { label: 'Contemplados', value: totais.contemplados }].map((card) => (
@@ -469,9 +532,37 @@ export default function ApuracaoMedalhasTempoServico() {
                             ) : cell.type === 'CONTEMPLADO' ? (
                               <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Contemplado</Badge>
                             ) : cell.type === 'IMPEDIDO' ? (
-                              <Badge className="bg-amber-100 text-amber-800 border-amber-200">Impedido</Badge>
+                              <div className="space-y-1">
+                                <Badge className="bg-amber-100 text-amber-800 border-amber-200">Bloqueado</Badge>
+                                {adminModeAtivo && podeModoAdmin && (
+                                  <div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={indicarAdminMutation.isPending}
+                                      onClick={() => setAdminIndicacaoDialog({ open: true, item, codigo, justificativa: '' })}
+                                    >
+                                      Indicar Admin
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             ) : (
-                              <span className="text-slate-400">Inabilitado</span>
+                              <div className="space-y-1">
+                                <span className="text-slate-400">Inabilitado</span>
+                                {adminModeAtivo && podeModoAdmin && (
+                                  <div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={indicarAdminMutation.isPending}
+                                      onClick={() => setAdminIndicacaoDialog({ open: true, item, codigo, justificativa: '' })}
+                                    >
+                                      Indicar Admin
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </td>
                         );
@@ -523,6 +614,48 @@ export default function ApuracaoMedalhasTempoServico() {
               })}
             >
               Confirmar concessão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={adminIndicacaoDialog.open}
+        onOpenChange={(open) => setAdminIndicacaoDialog((curr) => ({
+          ...curr,
+          open,
+          justificativa: open ? curr.justificativa : '',
+        }))}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmação de override administrativo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-700">
+              Esta indicação será registrada por override administrativo, apesar da situação atual do militar. Confirme apenas se houver autorização/justificativa.
+            </p>
+            <div>
+              <p className="text-sm text-slate-600 mb-1">Justificativa do override administrativo</p>
+              <Textarea
+                value={adminIndicacaoDialog.justificativa}
+                onChange={(e) => setAdminIndicacaoDialog((curr) => ({ ...curr, justificativa: e.target.value }))}
+                placeholder="Descreva a autorização e o motivo do override."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdminIndicacaoDialog({ open: false, item: null, codigo: null, justificativa: '' })}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={!adminIndicacaoDialog.justificativa.trim() || indicarAdminMutation.isPending}
+              onClick={() => indicarAdminMutation.mutate({
+                item: adminIndicacaoDialog.item,
+                codigo: adminIndicacaoDialog.codigo,
+                justificativa: adminIndicacaoDialog.justificativa,
+              })}
+            >
+              Confirmar indicação admin
             </Button>
           </DialogFooter>
         </DialogContent>
