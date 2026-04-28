@@ -18,10 +18,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Users, Grid3X3, List, GitBranch, Network } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, Users, Grid3X3, List, GitBranch, Eye, Pencil, Trash2 } from 'lucide-react';
 import MilitarCard from '@/components/militar/MilitarCard';
 import MapaDeLotacao from '@/components/militar/MapaDeLotacao';
-import MilitaresDistribuicaoView from '@/components/militar/MilitaresDistribuicaoView';
 import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
@@ -32,7 +32,13 @@ import { isPostoOficial } from '@/utils/postoQuadroCompatibilidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const SEM_LOTACAO_VALUE = '__sem_lotacao__';
-const MILITARES_PAGE_SIZE = 50;
+const statusBadgeClass = {
+  Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  Inativo: 'bg-slate-100 text-slate-700 border-slate-200',
+  Reserva: 'bg-amber-100 text-amber-700 border-amber-200',
+  Reforma: 'bg-blue-100 text-blue-700 border-blue-200',
+  Falecido: 'bg-red-100 text-red-700 border-red-200',
+};
 
 export default function Militares() {
   const navigate = useNavigate();
@@ -59,11 +65,10 @@ export default function Militares() {
   const [postoFilter, setPostoFilter] = useState('all');
   const [lotacaoFilter, setLotacaoFilter] = useState(TODAS_LOTACOES_VALUE);
   const [mostrarInativos, setMostrarInativos] = useState(false);
-  const [viewMode, setViewMode] = useState('grid');
+  const [viewMode, setViewMode] = useState('list');
   const [visualizacaoMode, setVisualizacaoMode] = useState('lista');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
-  const [militaresLimit, setMilitaresLimit] = useState(MILITARES_PAGE_SIZE);
 
   const {
     data: militares = [],
@@ -73,10 +78,10 @@ export default function Militares() {
     isSuccess: militaresQuerySuccess,
     refetch: refetchMilitares,
   } = useQuery({
-    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail, militaresLimit],
+    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
     queryFn: async () => {
       if (isAdmin) {
-        const lista = await base44.entities.Militar.list('-created_date', militaresLimit);
+        const lista = await base44.entities.Militar.list('-created_date');
         return carregarMilitaresComMatriculas(lista);
       }
 
@@ -133,7 +138,6 @@ export default function Militares() {
   const isInitialLoading = loadingUser || !isAccessResolved || loadingMilitaresQuery || (fetchingMilitaresQuery && !militaresQuerySuccess);
   const showMilitaresError = !isInitialLoading && militaresQueryError;
   const showResolvedData = !isInitialLoading && !showMilitaresError && militaresQuerySuccess;
-  const canLoadMoreMilitares = isAdmin && militares.length >= militaresLimit;
 
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos });
   const lotacoesDisponiveis = Array.from(
@@ -357,15 +361,6 @@ export default function Militares() {
                   <GitBranch className="w-4 h-4 mr-1" />
                   Mapa
                 </Button>
-                <Button
-                  variant={visualizacaoMode === 'distribuicao' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setVisualizacaoMode('distribuicao')}
-                  className={visualizacaoMode === 'distribuicao' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f] rounded-none' : 'rounded-none'}
-                >
-                  <Network className="w-4 h-4 mr-1" />
-                  Distribuição
-                </Button>
               </div>
               {visualizacaoMode === 'lista' && (
                 <div className="flex border border-slate-200 rounded-lg overflow-hidden">
@@ -457,16 +452,6 @@ export default function Militares() {
           </div>
         ) : visualizacaoMode === 'mapa' ? (
           <MapaDeLotacao militares={filteredMilitares} onViewMilitar={handleView} />
-        ) : visualizacaoMode === 'distribuicao' ? (
-          <MilitaresDistribuicaoView
-            militares={filteredMilitares}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            canEdit={canAccessAction('editar_militares')}
-            canDelete={canAccessAction('excluir_militares')}
-            searchTerm={searchTerm}
-          />
         ) : (
           <div className="space-y-6">
             {orderedPostos
@@ -479,33 +464,72 @@ export default function Militares() {
                   <div className={
                     viewMode === 'grid'
                       ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-                      : 'space-y-3'
+                      : 'space-y-2'
                   }>
                     {militaresAgrupados[posto].map((militar) => (
-                <MilitarCard
-                  key={militar.id}
-                  militar={militar}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onView={handleView}
-                  canEdit={canAccessAction('editar_militares')}
-                  canDelete={canAccessAction('excluir_militares')}
-                />
+                      viewMode === 'grid' ? (
+                        <MilitarCard
+                          key={militar.id}
+                          militar={militar}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          onView={handleView}
+                          canEdit={canAccessAction('editar_militares')}
+                          canDelete={canAccessAction('excluir_militares')}
+                        />
+                      ) : (
+                        <div
+                          key={militar.id}
+                          className="bg-white border border-slate-200 rounded-lg px-3 py-2"
+                        >
+                          <div className="grid grid-cols-12 items-center gap-3 text-sm">
+                            <div className="col-span-12 md:col-span-2 font-semibold text-[#1e3a5f]">
+                              {militar.posto_graduacao || 'Sem posto'}
+                            </div>
+                            <div className="col-span-12 md:col-span-3 min-w-0">
+                              <p className="font-medium text-slate-900 truncate">
+                                {militar.nome_guerra || militar.nome_completo}
+                              </p>
+                              {militar.nome_guerra && (
+                                <p className="text-xs text-slate-500 truncate">{militar.nome_completo}</p>
+                              )}
+                            </div>
+                            <div className="col-span-6 md:col-span-2 text-slate-700 truncate">
+                              {militar.matricula || '—'}
+                            </div>
+                            <div className="col-span-6 md:col-span-1 text-slate-700 truncate">
+                              {militar.quadro || '—'}
+                            </div>
+                            <div className="col-span-6 md:col-span-2 text-slate-700 truncate">
+                              {militar.lotacao || 'Sem lotação'}
+                            </div>
+                            <div className="col-span-6 md:col-span-1">
+                              <Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>
+                                {militar.status_cadastro || 'Ativo'}
+                              </Badge>
+                            </div>
+                            <div className="col-span-12 md:col-span-1 flex justify-start md:justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleView(militar)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              {canAccessAction('editar_militares') && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(militar)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {canAccessAction('excluir_militares') && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700" onClick={() => handleDelete(militar)}>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
                     ))}
                   </div>
                 </div>
               ))}
-          </div>
-        )}
-        {showResolvedData && canLoadMoreMilitares && (
-          <div className="flex justify-center pt-6">
-            <Button
-              variant="outline"
-              onClick={() => setMilitaresLimit((atual) => atual + MILITARES_PAGE_SIZE)}
-              disabled={fetchingMilitaresQuery}
-            >
-              {fetchingMilitaresQuery ? 'Carregando...' : `Carregar mais ${MILITARES_PAGE_SIZE}`}
-            </Button>
           </div>
         )}
       </div>
