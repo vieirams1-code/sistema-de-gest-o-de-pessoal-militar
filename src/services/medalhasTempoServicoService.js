@@ -96,7 +96,8 @@ export function deduplicarTiposMedalha(tipos = []) {
 
   tipos.forEach((tipo) => {
     if (!tipo) return;
-    const chaveCodigo = String(tipo.codigo || '').trim().toUpperCase();
+    const codigoResolvido = resolverCodigoTipoMedalha(tipo);
+    const chaveCodigo = String(codigoResolvido || tipo.codigo || '').trim().toUpperCase();
     const chaveNome = normalizarTexto(tipo.nome);
     const chave = chaveCodigo ? `COD:${chaveCodigo}` : `NOME:${chaveNome}`;
     if (!chaveNome && !chaveCodigo) return;

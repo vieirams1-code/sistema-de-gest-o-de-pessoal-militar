@@ -1,6 +1,6 @@
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -14,6 +14,8 @@ import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
 import { deduplicarTiposMedalha, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
 import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas } from '@/services/medalhasAcessoService';
+
+const ORDEM_TIPOS_MEDALHA = ['DOM_PEDRO_II', 'TEMPO_10', 'TEMPO_20', 'TEMPO_30', 'TEMPO_40'];
 
 export default function CadastrarMedalha() {
   const navigate = useNavigate();
@@ -49,6 +51,20 @@ export default function CadastrarMedalha() {
     },
   });
 
+  const tiposMedalhaOrdenados = useMemo(() => {
+    const prioridade = new Map(ORDEM_TIPOS_MEDALHA.map((codigo, index) => [codigo, index]));
+
+    return deduplicarTiposMedalha(tiposMedalha).sort((a, b) => {
+      const aCodigo = String(a?.codigo || '').trim().toUpperCase();
+      const bCodigo = String(b?.codigo || '').trim().toUpperCase();
+      const aPrioridade = prioridade.has(aCodigo) ? prioridade.get(aCodigo) : Number.MAX_SAFE_INTEGER;
+      const bPrioridade = prioridade.has(bCodigo) ? prioridade.get(bCodigo) : Number.MAX_SAFE_INTEGER;
+
+      if (aPrioridade !== bPrioridade) return aPrioridade - bPrioridade;
+      return String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR');
+    });
+  }, [tiposMedalha]);
+
   useQuery({
     queryKey: ['tipos-medalha-fixos-sync-cadastro'],
     queryFn: () => garantirCatalogoFixoMedalhaTempo(base44),
@@ -82,7 +98,7 @@ export default function CadastrarMedalha() {
   const isConcedida = formData.status === 'CONCEDIDA';
 
   const handleTipoMedalhaChange = (tipoId) => {
-    const tipo = tiposMedalha.find(t => t.id === tipoId);
+    const tipo = tiposMedalhaOrdenados.find(t => t.id === tipoId);
     setFormData(prev => ({
       ...prev,
       tipo_medalha_id: tipoId,
@@ -180,7 +196,7 @@ export default function CadastrarMedalha() {
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tiposMedalha.map(tipo => (
+                    {tiposMedalhaOrdenados.map(tipo => (
                       <SelectItem key={tipo.id} value={tipo.id}>{tipo.nome}</SelectItem>
                     ))}
                   </SelectContent>
