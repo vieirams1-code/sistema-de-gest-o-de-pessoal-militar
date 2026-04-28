@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import {
@@ -84,7 +85,12 @@ const resolveImpersonationContext = (user) => {
 };
 
 export function useCurrentUser() {
-  const { data: user, isLoading: loadingAuth, refetch: refetchCurrentUser } = useQuery({
+  const {
+    data: user,
+    isLoading: loadingAuth,
+    isError: isAuthError,
+    refetch: refetchCurrentUser,
+  } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
     staleTime: 0,
@@ -163,9 +169,13 @@ export function useCurrentUser() {
   });
 
   const resolvedPermissionMatrix = resolvedPermissionsData?.permissions || {};
+  const fallbackAcessoPermissions = buildPermissionsFromSource(acessoResolvido || {});
   const normalizedResolvedPermissions = superAdmin
     ? buildFullAccessPermissions()
-    : buildPermissionsFromSource(resolvedPermissionMatrix);
+    : buildPermissionsFromSource(
+      isResolvedPermissionsError ? fallbackAcessoPermissions : resolvedPermissionMatrix,
+      fallbackAcessoPermissions,
+    );
   const resolvedTipoAcesso = normalizeAccessMode(acessoResolvido?.tipo_acesso) || 'proprio';
   const isSelfRestrictedScope = resolvedTipoAcesso === 'proprio';
 
@@ -221,20 +231,60 @@ export function useCurrentUser() {
   });
 
   const isLoading = loadingAuth || loadingAcesso || loadingAcessoCompleto || (requiresUnidades && loadingUnidades);
-  const isAccessError = Boolean(
-    isAcessoError
-    || isAcessoCompletoError
+  const criticalAccessError = Boolean(
+    isAuthError
+    || isAcessoError
+  );
+  const nonCriticalPermissionError = Boolean(
+    isAcessoCompletoError
     || isPerfilAcessoError
     || isResolvedPermissionsError
     || (requiresUnidades && isUnidadesError)
   );
+  const accessErrorDetails = {
+    critical: {
+      auth: Boolean(isAuthError),
+      usuarioAcesso: Boolean(isAcessoError),
+    },
+    nonCritical: {
+      usuarioAcessoCompleto: Boolean(isAcessoCompletoError),
+      perfilPermissao: Boolean(isPerfilAcessoError),
+      resolvedPermissions: Boolean(isResolvedPermissionsError),
+      unidades: Boolean(requiresUnidades && isUnidadesError),
+    },
+  };
+  const isAccessError = criticalAccessError;
+  const isPermissionPartialError = nonCriticalPermissionError;
   const isAccessResolved = !accessLookupEmail || (
-    !isAccessError
+    !criticalAccessError
     && !loadingAcesso
     && !loadingAcessoCompleto
     && fetchedAcesso
     && (!requiresUnidades || (!loadingUnidades && fetchedUnidades))
   );
+
+  const hasPerfilPermissaoPartialError = accessErrorDetails.nonCritical.perfilPermissao;
+  const hasResolvedPermissionsPartialError = accessErrorDetails.nonCritical.resolvedPermissions;
+  const hasUnidadesPartialError = accessErrorDetails.nonCritical.unidades;
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || !nonCriticalPermissionError) return;
+
+    if (hasPerfilPermissaoPartialError) {
+      console.warn('[useCurrentUser] Falha não crítica ao carregar PerfilPermissao.');
+    }
+    if (hasResolvedPermissionsPartialError) {
+      console.warn('[useCurrentUser] Falha não crítica ao resolver permissões (resolvedPermissions).');
+    }
+    if (hasUnidadesPartialError) {
+      console.warn('[useCurrentUser] Falha não crítica ao carregar unidades de escopo.');
+    }
+  }, [
+    nonCriticalPermissionError,
+    hasPerfilPermissaoPartialError,
+    hasResolvedPermissionsPartialError,
+    hasUnidadesPartialError,
+  ]);
 
   const refetchAccess = async () => {
     await refetchCurrentUser();
@@ -384,6 +434,8 @@ export function useCurrentUser() {
     canAccessAll: false,
     isLoading,
     isAccessError,
+    isPermissionPartialError,
+    accessErrorDetails,
     isAccessResolved,
     modoAcesso,
     subgrupamentoId,
