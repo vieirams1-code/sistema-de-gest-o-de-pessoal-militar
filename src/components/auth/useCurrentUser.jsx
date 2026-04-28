@@ -28,6 +28,7 @@ const SUPER_ADMIN_EMAILS = [
 ];
 const USUARIO_ACESSO_FALLBACK_LIMIT = 500;
 const USUARIO_ACESSO_RETRY_COUNT = 3;
+const ACCESS_QUERY_STALE_TIME = 30 * 1000;
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 
@@ -195,10 +196,10 @@ export function useCurrentUser() {
   } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
-    staleTime: 0,
+    staleTime: ACCESS_QUERY_STALE_TIME,
     gcTime: 60 * 1000,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const impersonationContext = resolveImpersonationContext(user);
@@ -211,8 +212,15 @@ export function useCurrentUser() {
   const isPrivilegedRecoveryUser = (
     normalizedUserRole && ADMIN_RECOVERY_ROLES.has(normalizedUserRole)
   ) || user?.isSuperAdmin === true || user?.isDeveloper === true || isRecoveryEmail;
+  const isAuthAdminUser = Boolean(
+    normalizedUserRole === 'admin'
+    || normalizedUserRole === 'owner'
+    || user?.isAdmin === true
+    || user?.isSuperAdmin === true
+    || isRecoveryEmail,
+  );
   const shouldBypassUsuarioAcessoBlocking = Boolean(
-    isPrivilegedRecoveryUser && !impersonationContext.isImpersonating,
+    (isPrivilegedRecoveryUser || isAuthAdminUser) && !impersonationContext.isImpersonating,
   );
 
   const {
@@ -225,9 +233,10 @@ export function useCurrentUser() {
     queryKey: ['usuarioAcesso', accessLookupEmail, impersonationContext.isImpersonating],
     queryFn: () => buscarUsuarioAcessoPorEmail(accessLookupEmail),
     enabled: !!accessLookupEmail,
-    staleTime: 0,
+    staleTime: ACCESS_QUERY_STALE_TIME,
     gcTime: 60 * 1000,
-    refetchOnMount: 'always',
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     retry: USUARIO_ACESSO_RETRY_COUNT,
     retryDelay: (attemptIndex) => Math.min(250 * (2 ** attemptIndex), 1500),
   });
@@ -271,7 +280,8 @@ export function useCurrentUser() {
     queryKey: ['usuarioAcessoCompleto', acesso?.id],
     queryFn: () => base44.entities.UsuarioAcesso.get(acesso.id),
     enabled: !!acesso?.id,
-    staleTime: 0,
+    staleTime: ACCESS_QUERY_STALE_TIME,
+    refetchOnWindowFocus: false,
   });
 
   const acessoResolvido = acessoCompleto || acesso;
@@ -354,7 +364,8 @@ export function useCurrentUser() {
         preferProfilePermissions: true,
       });
     },
-    staleTime: 0,
+    staleTime: ACCESS_QUERY_STALE_TIME,
+    refetchOnWindowFocus: false,
   });
 
   const resolvedPermissionMatrix = resolvedPermissionsData?.permissions || {};
@@ -422,15 +433,27 @@ export function useCurrentUser() {
   const profileFetchInFlight = hasPerfilVinculado && loadingPerfilAcesso;
   const profileFetchFatalError = hasPerfilVinculado && !loadingPerfilAcesso && isPerfilAcessoError;
 
-  const isLoading = loadingAuth
-    || loadingAcesso
-    || loadingAcessoCompleto
-    || loadingResolvedPermissions
-    || profileFetchInFlight
-    || (requiresUnidades && loadingUnidades);
+  const isLoading = shouldBypassUsuarioAcessoBlocking
+    ? loadingAuth
+    : (
+      loadingAuth
+      || loadingAcesso
+      || loadingAcessoCompleto
+      || loadingResolvedPermissions
+      || profileFetchInFlight
+      || (requiresUnidades && loadingUnidades)
+    );
+  const hasCommonUserWithoutValidAccess = Boolean(
+    !shouldBypassUsuarioAcessoBlocking
+    && !loadingAcesso
+    && fetchedAcesso
+    && !acessoResolvido
+    && !hasUsuarioAcessoCriticalError,
+  );
   const criticalAccessError = Boolean(
     isAuthError
     || (!shouldBypassUsuarioAcessoBlocking && hasUsuarioAcessoCriticalError)
+    || hasCommonUserWithoutValidAccess
   );
   const nonCriticalPermissionError = Boolean(
     isAcessoCompletoError
@@ -443,6 +466,7 @@ export function useCurrentUser() {
       auth: Boolean(isAuthError),
       usuarioAcesso: Boolean(hasUsuarioAcessoCriticalError),
       usuarioAcessoBlocking: Boolean(!shouldBypassUsuarioAcessoBlocking && hasUsuarioAcessoCriticalError),
+      commonUserWithoutValidAccess: Boolean(hasCommonUserWithoutValidAccess),
     },
     nonCritical: {
       usuarioAcessoCompleto: Boolean(isAcessoCompletoError),
@@ -458,12 +482,7 @@ export function useCurrentUser() {
     !criticalAccessError
     && (
       shouldBypassUsuarioAcessoBlocking
-        ? (
-          !loadingAcessoCompleto
-          && !loadingResolvedPermissions
-          && !profileFetchInFlight
-          && (!requiresUnidades || (!loadingUnidades && fetchedUnidades))
-        )
+        ? !loadingAuth
         : (
           !loadingAcesso
           && !loadingAcessoCompleto
@@ -481,7 +500,7 @@ export function useCurrentUser() {
   const permissionErrorMessage = profileFetchFatalError
     ? 'Não foi possível carregar o perfil de permissões.'
     : null;
-  const shouldBlockAccessByPermissionError = profileFetchFatalError && !superAdmin;
+  const shouldBlockAccessByPermissionError = profileFetchFatalError && !shouldBypassUsuarioAcessoBlocking;
   const grantedModules = listGrantedByPrefix(normalizedResolvedPermissions, 'acesso_');
   const grantedActions = listGrantedByPrefix(normalizedResolvedPermissions, 'perm_');
   const debugAccess = {
@@ -541,6 +560,7 @@ export function useCurrentUser() {
     isAccessError,
     isPermissionPartialError,
     shouldBypassUsuarioAcessoBlocking,
+    isAuthAdminUser,
     accessErrorDetails,
   };
 

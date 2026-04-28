@@ -384,7 +384,7 @@ export default function Militares() {
           {isInitialLoading
             ? 'Carregando militares...'
             : showMilitaresError
-              ? 'Falha ao carregar militares.'
+              ? 'Falha ao carregar dados.'
               : `${filteredMilitares.length} militar(es) encontrado(s)`}
           {isAdmin && showResolvedData && (
             <span>{militares.length} carregado(s)</span>
@@ -402,7 +402,7 @@ export default function Militares() {
           <div className="bg-white rounded-xl shadow-sm border border-red-200 p-12 text-center">
             <Users className="w-16 h-16 mx-auto text-red-300 mb-4" />
             <h3 className="text-lg font-semibold text-slate-700 mb-2">
-              Não foi possível carregar o efetivo. Tente recarregar.
+              Falha ao carregar dados
             </h3>
             <Button
               onClick={() => refetchMilitares()}
