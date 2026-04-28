@@ -16,6 +16,7 @@ import {
   militarCorrespondeBusca,
   montarIndiceMatriculas,
 } from '@/services/matriculaMilitarViewService';
+import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const normalizeTipo = (tipo) => {
   if (tipo === 'Grupamento') return 'Setor';
@@ -42,7 +43,10 @@ export default function LotacaoMilitares() {
   const {
     data: militaresData = { militares: [], partialFailures: 0 },
     isLoading: loadingMilitares,
+    isFetching: fetchingMilitares,
+    isSuccess: isMilitaresSuccess,
     isError: isMilitaresError,
+    error: militaresError,
     refetch: refetchMilitares,
   } = useQuery({
     queryKey: ['militares-ativos', isAdmin],
@@ -91,7 +95,14 @@ export default function LotacaoMilitares() {
   const militares = militaresData?.militares || [];
   const militaresPartialFailures = Number(militaresData?.partialFailures || 0);
 
-  const { data: matriculasData = { matriculas: [], partialFailures: 0 }, isLoading: loadingMatriculas } = useQuery({
+  const {
+    data: matriculasData = { matriculas: [], partialFailures: 0 },
+    isLoading: loadingMatriculas,
+    isFetching: fetchingMatriculas,
+    isSuccess: isMatriculasSuccess,
+    isError: isMatriculasError,
+    error: matriculasError,
+  } = useQuery({
     queryKey: ['lotacao-matriculas-militar'],
     queryFn: async () => {
       try {
@@ -112,6 +123,10 @@ export default function LotacaoMilitares() {
   const {
     data: estruturaData = { estrutura: [], partialFailures: 0 },
     isLoading: loadingEstrutura,
+    isFetching: fetchingEstrutura,
+    isSuccess: isEstruturaSuccess,
+    isError: isEstruturaError,
+    error: estruturaError,
     refetch: refetchEstrutura,
   } = useQuery({
     queryKey: ['estruturaOrganizacional'],
@@ -131,6 +146,71 @@ export default function LotacaoMilitares() {
   const estruturaRaw = estruturaData?.estrutura || [];
   const estruturaPartialFailures = Number(estruturaData?.partialFailures || 0);
   const hasPartialDataWarning = militaresPartialFailures > 0 || matriculasPartialFailures > 0 || estruturaPartialFailures > 0;
+  const showTotalError = !loadingMilitares && isMilitaresError;
+  const militaresQueryKey = ['militares-ativos', isAdmin];
+  const estruturaQueryKey = ['estruturaOrganizacional'];
+  const matriculasQueryKey = ['lotacao-matriculas-militar'];
+
+  const getEstagioProvavel = () => {
+    if (isMilitaresError) return 'Militar.filter/list';
+    if (isEstruturaError || estruturaPartialFailures > 0) return 'Subgrupamento.list';
+    if (isMatriculasError || matriculasPartialFailures > 0) return 'MatriculaMilitar.list';
+    return hasPartialDataWarning ? 'MatriculaMilitar.list' : null;
+  };
+
+  const lotacaoDebugData = (showTotalError || hasPartialDataWarning)
+    ? {
+      pagina: 'LotacaoMilitares',
+      usuario: null,
+      isAdmin,
+      queryKeyMilitares: militaresQueryKey,
+      queryKeyEstrutura: estruturaQueryKey,
+      queryKeyMatriculas: matriculasQueryKey,
+      status: {
+        militares: {
+          loading: loadingMilitares,
+          fetching: fetchingMilitares,
+          isError: isMilitaresError,
+          isSuccess: isMilitaresSuccess,
+        },
+        estrutura: {
+          loading: loadingEstrutura,
+          fetching: fetchingEstrutura,
+          isError: isEstruturaError,
+          isSuccess: isEstruturaSuccess,
+        },
+        matriculas: {
+          loading: loadingMatriculas,
+          fetching: fetchingMatriculas,
+          isError: isMatriculasError,
+          isSuccess: isMatriculasSuccess,
+        },
+      },
+      erroPrincipal: militaresError || estruturaError || matriculasError
+        ? {
+          message: militaresError?.message || estruturaError?.message || matriculasError?.message || null,
+          name: militaresError?.name || estruturaError?.name || matriculasError?.name || null,
+          stack: (militaresError?.stack || estruturaError?.stack || matriculasError?.stack)
+            ? String(militaresError?.stack || estruturaError?.stack || matriculasError?.stack).split('\n').slice(0, 5).join('\n')
+            : null,
+        }
+        : null,
+      partialFailures: {
+        militares: militaresPartialFailures,
+        estrutura: estruturaPartialFailures,
+        matriculas: matriculasPartialFailures,
+      },
+      quantidades: {
+        militares: militares.length,
+        estrutura: estruturaRaw.length,
+        matriculas: matriculas.length,
+      },
+      estagioProvavel: getEstagioProvavel(),
+      timestamps: {
+        generatedAt: new Date().toISOString(),
+      },
+    }
+    : null;
 
   const estrutura = useMemo(() => {
     return estruturaRaw.map(item => ({ ...item, tipoNormalizado: normalizeTipo(item.tipo) }));
@@ -276,7 +356,6 @@ export default function LotacaoMilitares() {
   if (!canAccess) {
     return <AccessDenied modulo="Lotação de Militares" />;
   }
-  const showTotalError = !loadingMilitares && isMilitaresError;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -294,6 +373,7 @@ export default function LotacaoMilitares() {
         {hasPartialDataWarning && !showTotalError && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Alguns dados não puderam ser carregados. Tente novamente para atualizar.
+            <DataDebugPanel debugData={lotacaoDebugData} />
           </div>
         )}
         {showTotalError ? (
@@ -304,6 +384,7 @@ export default function LotacaoMilitares() {
               <Button onClick={() => refetchMilitares()} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">Tentar novamente</Button>
               <Button variant="outline" onClick={() => refetchEstrutura()}>Recarregar estrutura</Button>
             </div>
+            <DataDebugPanel debugData={lotacaoDebugData} className="text-left" />
           </div>
         ) : (
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
