@@ -64,7 +64,30 @@ export function enriquecerMilitarComMatriculas(militar = {}, indiceMatriculas = 
 
 export async function carregarMilitaresComMatriculas(militares = []) {
   const { base44 } = await import('../api/base44Client.js');
-  const matriculas = await base44.entities.MatriculaMilitar.list('-created_date');
+  const militarIds = [...new Set((militares || []).map((m) => String(m?.id || '')).filter(Boolean))];
+  if (militarIds.length === 0) return [];
+
+  let matriculas = [];
+
+  try {
+    matriculas = await base44.entities.MatriculaMilitar.filter({
+      militar_id: { in: militarIds },
+    }, '-created_date');
+  } catch (_error) {
+    const lotes = [];
+    const tamanhoLote = 20;
+    for (let i = 0; i < militarIds.length; i += tamanhoLote) {
+      lotes.push(militarIds.slice(i, i + tamanhoLote));
+    }
+
+    for (const loteIds of lotes) {
+      for (const militarId of loteIds) {
+        const lista = await base44.entities.MatriculaMilitar.filter({ militar_id: militarId }, '-created_date');
+        matriculas.push(...lista);
+      }
+    }
+  }
+
   const indice = montarIndiceMatriculas(matriculas);
   return (militares || []).map((m) => enriquecerMilitarComMatriculas(m, indice));
 }

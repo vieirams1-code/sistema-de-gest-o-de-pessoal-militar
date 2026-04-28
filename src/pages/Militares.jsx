@@ -31,6 +31,7 @@ import { isPostoOficial } from '@/utils/postoQuadroCompatibilidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const SEM_LOTACAO_VALUE = '__sem_lotacao__';
+const MILITARES_PAGE_SIZE = 50;
 
 export default function Militares() {
   const navigate = useNavigate();
@@ -61,6 +62,7 @@ export default function Militares() {
   const [visualizacaoMode, setVisualizacaoMode] = useState('lista');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
+  const [militaresLimit, setMilitaresLimit] = useState(MILITARES_PAGE_SIZE);
 
   const {
     data: militares = [],
@@ -70,10 +72,10 @@ export default function Militares() {
     isSuccess: militaresQuerySuccess,
     refetch: refetchMilitares,
   } = useQuery({
-    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
+    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail, militaresLimit],
     queryFn: async () => {
       if (isAdmin) {
-        const lista = await base44.entities.Militar.list('-created_date');
+        const lista = await base44.entities.Militar.list('-created_date', militaresLimit);
         return carregarMilitaresComMatriculas(lista);
       }
 
@@ -130,6 +132,7 @@ export default function Militares() {
   const isInitialLoading = loadingUser || !isAccessResolved || loadingMilitaresQuery || (fetchingMilitaresQuery && !militaresQuerySuccess);
   const showMilitaresError = !isInitialLoading && militaresQueryError;
   const showResolvedData = !isInitialLoading && !showMilitaresError && militaresQuerySuccess;
+  const canLoadMoreMilitares = isAdmin && militares.length >= militaresLimit;
 
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos });
   const lotacoesDisponiveis = Array.from(
@@ -390,12 +393,15 @@ export default function Militares() {
         </div>
 
         {/* Results count */}
-        <div className="mb-4 text-sm text-slate-500">
+        <div className="mb-4 flex items-center justify-between gap-4 text-sm text-slate-500">
           {isInitialLoading
             ? 'Carregando militares...'
             : showMilitaresError
               ? 'Falha ao carregar militares.'
               : `${filteredMilitares.length} militar(es) encontrado(s)`}
+          {isAdmin && showResolvedData && (
+            <span>{militares.length} carregado(s)</span>
+          )}
         </div>
 
         {/* Content */}
@@ -469,6 +475,17 @@ export default function Militares() {
                   </div>
                 </div>
               ))}
+          </div>
+        )}
+        {showResolvedData && canLoadMoreMilitares && (
+          <div className="flex justify-center pt-6">
+            <Button
+              variant="outline"
+              onClick={() => setMilitaresLimit((atual) => atual + MILITARES_PAGE_SIZE)}
+              disabled={fetchingMilitaresQuery}
+            >
+              {fetchingMilitaresQuery ? 'Carregando...' : `Carregar mais ${MILITARES_PAGE_SIZE}`}
+            </Button>
           </div>
         )}
       </div>
