@@ -30,6 +30,7 @@ import { excluirMilitarComDependencias } from '@/services/militarExclusaoService
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
+const LOTACAO_FILTER_FIELDS = ['subgrupamento_nome', 'grupamento_nome', 'lotacao', 'lotacao_atual', 'unidade_nome'];
 const statusBadgeClass = { Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200', Inativo: 'bg-slate-100 text-slate-700 border-slate-200', Reserva: 'bg-amber-100 text-amber-700 border-amber-200', Reforma: 'bg-blue-100 text-blue-700 border-blue-200', Falecido: 'bg-red-100 text-red-700 border-red-200' };
 const GRADUACAO_GROUPS = [
   { key: 'oficiais', label: 'Oficiais', postos: ['Coronel', 'Tenente Coronel', 'Tenente-Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'] },
@@ -70,6 +71,17 @@ export default function Militares() {
       try {
         const lotacoes = await base44.entities.Subgrupamento.list('nome');
         return (lotacoes || [])
+          .filter((item) => {
+            const status = String(item?.status || '').trim().toLowerCase();
+            if (item?.deleted === true) return false;
+            if (item?.is_deleted === true) return false;
+            if (item?.excluido === true) return false;
+            if (item?.ativo === false) return false;
+            if (item?.archived === true) return false;
+            if (item?.arquivado === true) return false;
+            if (status === 'excluído' || status === 'excluido' || status === 'inativo') return false;
+            return true;
+          })
           .map((item) => String(item?.nome || '').trim())
           .filter(Boolean)
           .sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -83,29 +95,48 @@ export default function Militares() {
     queryKey: ['militares-consulta-rapida', isAdmin, lotacaoFilter, selectedPostos.join('|')],
     enabled: shouldQuery,
     queryFn: async () => {
-      const filters = isAdmin ? (lotacaoFilter === TODAS_LOTACOES_VALUE
-        ? [{ posto_graduacao: { in: selectedPostos } }]
-        : [{ subgrupamento_nome: lotacaoFilter, posto_graduacao: { in: selectedPostos } }])
-        : getMilitarScopeFilters();
+      const filters = isAdmin ? [{ posto_graduacao: { in: selectedPostos } }] : getMilitarScopeFilters();
       if (!filters.length) return { militares: [], partialFailures: 0 };
 
-      const runFilter = async (filter) => {
+      const runFilter = async (filter, diagnostico = null) => {
         try {
           const data = await base44.entities.Militar.filter(filter, '-created_date');
+          if (diagnostico) diagnostico.quantidade = Array.isArray(data) ? data.length : 0;
           return data || [];
-        } catch {
+        } catch (erroInOperator) {
           const results = await Promise.allSettled(
             selectedPostos.map((posto) =>
               base44.entities.Militar.filter({ ...filter, posto_graduacao: posto }, '-created_date')
             )
           );
-          return results
+          const fulfilled = results
             .filter((result) => result.status === 'fulfilled')
             .flatMap((result) => result.value || []);
+          if (diagnostico) {
+            diagnostico.erro = erroInOperator;
+            diagnostico.fallbackIndividual = true;
+            diagnostico.quantidade = fulfilled.length;
+          }
+          return fulfilled;
         }
       };
 
-      const settled = await Promise.allSettled(filters.map((f) => runFilter(f)));
+      const diagnostico = [];
+      const applyLotacaoFallback = isAdmin && lotacaoFilter !== TODAS_LOTACOES_VALUE;
+      const queryFilters = applyLotacaoFallback
+        ? LOTACAO_FILTER_FIELDS.map((field) => ({
+          ...filters[0],
+          [field]: { contains: lotacaoFilter },
+        }))
+        : filters;
+
+      const settled = await Promise.allSettled(
+        queryFilters.map((filtro) => {
+          const diag = { filtro: filtro, quantidade: 0 };
+          diagnostico.push(diag);
+          return runFilter(filtro, diag);
+        })
+      );
       const fulfilled = settled.filter((s) => s.status === 'fulfilled').map((s) => s.value || []);
       const partialFailures = settled.length - fulfilled.length;
       if (!fulfilled.length && settled.length) throw new Error('Falha ao carregar militares por escopo.');
@@ -113,6 +144,21 @@ export default function Militares() {
       const unique = new Map();
       fulfilled.flat().forEach((m) => { if (!unique.has(m.id)) unique.set(m.id, m); });
       const militares = await carregarMilitaresComMatriculas(Array.from(unique.values()));
+
+      if (import.meta.env.DEV) {
+        console.warn('[Militares] Diagnóstico consulta rápida', {
+          lotacaoFilter,
+          selectedPostos,
+          filtrosTentados: diagnostico.map((item) => ({
+            filtro: item.filtro,
+            fallbackIndividual: Boolean(item.fallbackIndividual),
+            quantidade: item.quantidade,
+            erro: item.erro ? String(item.erro?.message || item.erro) : null,
+          })),
+          totalUnico: unique.size,
+        });
+      }
+
       return { militares, partialFailures };
     },
   });
@@ -179,7 +225,18 @@ export default function Militares() {
             <DataDebugPanel debugData={{ pagina: 'Militares', erroPrincipal: error ? { message: error.message } : null, estagioProvavel: 'Militar.filter escopo' }} className="text-left" />
           </div>
         ) : filteredMilitares.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center"><h3 className="text-lg font-semibold text-slate-700">Nenhum resultado encontrado.</h3></div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
+            <h3 className="text-lg font-semibold text-slate-700">Nenhum militar encontrado para os filtros selecionados.</h3>
+            <DataDebugPanel
+              debugData={{
+                pagina: 'Militares',
+                lotacaoFilter,
+                selectedPostos,
+                totalFiltrado: 0,
+              }}
+              className="text-left mt-4"
+            />
+          </div>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
