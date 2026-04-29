@@ -293,19 +293,63 @@ export default function LotacaoMilitares() {
       }
       return data;
     },
-    onSuccess: () => {
-      // Lote 1C-B.1: invalida e força refetch imediato de TODAS as queries que alimentam a tela,
-      // ignorando o staleTime de 5min para refletir a movimentação na hora.
-      // - lotacao-militares-ativos: lista base de militares (getScopedMilitares).
-      // - lotacao-militares-com-matriculas: lista enriquecida usada na renderização.
-      // - lotacao-estrutura: árvore organizacional (refetch garante coerência se a estrutura mudou).
-      // - militares-consulta-rapida-scoped: query compartilhada por outras telas (Efetivo).
-      queryClient.invalidateQueries({ queryKey: ['lotacao-militares-ativos'] });
-      queryClient.invalidateQueries({ queryKey: ['lotacao-militares-com-matriculas'] });
-      queryClient.invalidateQueries({ queryKey: ['lotacao-estrutura'] });
-      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
-      queryClient.refetchQueries({ queryKey: ['lotacao-militares-ativos'] });
-      queryClient.refetchQueries({ queryKey: ['lotacao-militares-com-matriculas'] });
+    onSuccess: (data, variables) => {
+      // Lote 1C-B.3: atualização local IMEDIATA do cache antes de qualquer refetch.
+      // O backend confirmou a movimentação e devolveu `camposAplicados` (campos modernos
+      // estrutura_* + legados grupamento_*/subgrupamento_* + lotacao). Aplicamos esses
+      // campos diretamente no cache das queries que alimentam a renderização desta tela,
+      // de modo que a UI reflete a nova lotação na hora, sem depender do refetch.
+      const militaresIdsAlterados = Array.isArray(variables?.militaresIds) ? variables.militaresIds : [];
+      const camposAplicados = data?.camposAplicados || null;
+
+      if (camposAplicados && militaresIdsAlterados.length > 0) {
+        const idsSet = new Set(militaresIdsAlterados.map(String));
+
+        const aplicarCamposNoMilitar = (militar) => {
+          if (!militar?.id || !idsSet.has(String(militar.id))) return militar;
+          return { ...militar, ...camposAplicados };
+        };
+
+        // ['lotacao-militares-ativos', ...] -> { militares: [...] }
+        queryClient.setQueriesData(
+          { queryKey: ['lotacao-militares-ativos'] },
+          (oldData) => {
+            if (!oldData || !Array.isArray(oldData.militares)) return oldData;
+            return {
+              ...oldData,
+              militares: oldData.militares.map(aplicarCamposNoMilitar),
+            };
+          }
+        );
+
+        // ['lotacao-militares-com-matriculas', ...] -> { militaresEnriquecidos: [...] }
+        queryClient.setQueriesData(
+          { queryKey: ['lotacao-militares-com-matriculas'] },
+          (oldData) => {
+            if (!oldData || !Array.isArray(oldData.militaresEnriquecidos)) return oldData;
+            return {
+              ...oldData,
+              militaresEnriquecidos: oldData.militaresEnriquecidos.map(aplicarCamposNoMilitar),
+            };
+          }
+        );
+      }
+
+      // Lote 1C-B.4: NÃO invalidar/refetchar imediatamente as queries que alimentam ESTA tela.
+      // O refetch imediato corria contra a indexação do backend e podia sobrescrever o cache
+      // local recém-atualizado pelo setQueriesData com a lotação anterior, deixando a tela
+      // sempre uma movimentação atrasada. A reconciliação fica adiada por ~2s, dando tempo
+      // do backend indexar a escrita feita pela Deno Function.
+      // - lotacao-estrutura NÃO é refetchada: a estrutura organizacional não mudou.
+      // - militares-consulta-rapida-scoped (outras telas) entra junto no refetch adiado.
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['lotacao-militares-ativos'] });
+        queryClient.invalidateQueries({ queryKey: ['lotacao-militares-com-matriculas'] });
+        queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
+        queryClient.refetchQueries({ queryKey: ['lotacao-militares-ativos'] });
+        queryClient.refetchQueries({ queryKey: ['lotacao-militares-com-matriculas'] });
+      }, 2000);
+
       dismiss();
       toast({
         title: "Lotação Atualizada",
