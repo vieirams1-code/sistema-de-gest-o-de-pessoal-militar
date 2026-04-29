@@ -140,6 +140,23 @@ Deno.serve(async (req) => {
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
     const dryRun = body.dryRun !== false; // default true
 
+    const TOKEN_CONFIRMACAO = 'SANEAR_LOTACAO_MILITARES';
+    const confirmacaoRecebida = body.confirmarExecucao === TOKEN_CONFIRMACAO;
+    const execucaoRealAutorizada = !dryRun && confirmacaoRecebida;
+
+    // Trava extra: dryRun:false só executa com confirmarExecucao correto
+    if (!dryRun && !confirmacaoRecebida) {
+      return Response.json({
+        error: 'Execução real bloqueada. Para executar o saneamento, envie confirmarExecucao: SANEAR_LOTACAO_MILITARES.',
+        meta: {
+          dryRun: false,
+          execucaoRealAutorizada: false,
+          confirmacaoRecebida: false,
+        },
+        nenhum_dado_alterado: true,
+      }, { status: 400 });
+    }
+
     const [militaresAtivos, subgrupamentos] = await Promise.all([
       listarTodos(base44.asServiceRole.entities.Militar, { status_cadastro: 'Ativo' }),
       listarTodos(base44.asServiceRole.entities.Subgrupamento, {}),
@@ -233,6 +250,11 @@ Deno.serve(async (req) => {
     const relatorio = {
       modo: dryRun ? 'dry-run' : 'execucao',
       executado_em: new Date().toISOString(),
+      meta: {
+        dryRun,
+        execucaoRealAutorizada,
+        confirmacaoRecebida,
+      },
       totais: {
         total_analisado: totalAnalisado,
         total_com_estrutura_id_preenchido: totalComEstrutura,
@@ -277,12 +299,18 @@ Deno.serve(async (req) => {
     }
 
     for (const item of migraveis) {
-      const ok = await updateComRetry(item.militar_id, {
+      // Atualiza somente os 4 campos autorizados; lotacao apenas se estiver vazia
+      const updateData = {
         estrutura_id: item.estrutura_id_proposto,
         estrutura_nome: item.estrutura_nome_proposto,
         estrutura_tipo: item.estrutura_tipo_proposto,
-        lotacao: item.lotacao_proposta,
-      });
+      };
+      const lotacaoAtual = (item.lotacao_atual || '').trim();
+      if (!lotacaoAtual) {
+        updateData.lotacao = item.lotacao_proposta;
+      }
+
+      const ok = await updateComRetry(item.militar_id, updateData);
       if (ok) atualizados += 1;
       // throttle leve entre escritas para evitar 429
       await sleep(120);
