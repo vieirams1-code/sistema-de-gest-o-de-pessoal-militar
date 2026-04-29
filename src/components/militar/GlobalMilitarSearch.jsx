@@ -2,36 +2,23 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Search, UserRound, BadgeCheck, Hash, Building2, ArrowRight } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
-import {
-  construirAtalhosMilitar,
-  filtrarMilitaresGlobal,
-  filtrarMilitaresPorEscopo,
-} from '@/services/globalMilitarSearchService';
+import { construirAtalhosMilitar } from '@/services/globalMilitarSearchService';
+import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 const RESULT_LIMIT = 10;
+const BACKEND_LIMIT = 50;
 const DEBOUNCE_MS = 300;
 
 export default function GlobalMilitarSearch() {
   const {
-    isAdmin,
-    subgrupamentoId,
-    subgrupamentoTipo,
-    modoAcesso,
-    userEmail,
-    linkedMilitarId,
-    linkedMilitarEmail,
-    hasSelfAccess,
-    hasAccess,
     canAccessAction,
     isAccessResolved,
-    getMilitarScopeFilters,
   } = useCurrentUser();
 
   const [term, setTerm] = useState('');
@@ -43,77 +30,36 @@ export default function GlobalMilitarSearch() {
     return () => clearTimeout(timer);
   }, [term]);
 
-  const { data: militaresAcessiveis = [], isLoading } = useQuery({
-    queryKey: ['global-search-militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
-    queryFn: async () => {
-      if (isAdmin) {
-        const lista = await base44.entities.Militar.list('-created_date');
-        const enriquecidos = await carregarMilitaresComMatriculas(lista);
-        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: true });
-      }
-
-      if (modoAcesso === 'proprio') {
-        const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
-        if (!linkedMilitarId && knownEmails.length === 0) return [];
-
-        const requests = [];
-        if (linkedMilitarId) requests.push(base44.entities.Militar.filter({ id: linkedMilitarId }, '-created_date'));
-        for (const email of knownEmails) {
-          requests.push(base44.entities.Militar.filter({ email }, '-created_date'));
-          requests.push(base44.entities.Militar.filter({ email_particular: email }, '-created_date'));
-          requests.push(base44.entities.Militar.filter({ email_funcional: email }, '-created_date'));
-          requests.push(base44.entities.Militar.filter({ created_by: email }, '-created_date'));
-          requests.push(base44.entities.Militar.filter({ militar_email: email }, '-created_date'));
-        }
-
-        const batches = await Promise.all(requests);
-        const ids = new Set();
-        const vinculados = batches.flat().filter((m) => {
-          if (!hasSelfAccess(m) || ids.has(m.id)) return false;
-          ids.add(m.id);
-          return true;
-        });
-
-        const enriquecidos = await carregarMilitaresComMatriculas(vinculados);
-        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: true });
-      }
-
-      const filters = getMilitarScopeFilters();
-      if (!filters.length) return [];
-
-      const requests = filters.map((f) => base44.entities.Militar.filter(f, '-created_date'));
-      const batches = await Promise.all(requests);
-      const ids = new Set();
-      const merged = [];
-      for (const militar of batches.flat()) {
-        if (ids.has(militar.id)) continue;
-        ids.add(militar.id);
-        merged.push(militar);
-      }
-
-      const enriquecidos = await carregarMilitaresComMatriculas(merged);
-      const operacionais = filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: true });
-      return filtrarMilitaresPorEscopo(operacionais, { hasAccess, hasSelfAccess });
-    },
-    enabled: isAccessResolved && (
-      canAccessAction('visualizar_militares')
-      || canAccessAction('visualizar_ferias')
-      || canAccessAction('visualizar_medalhas')
-      || canAccessAction('visualizar_registros_militar')
-    ),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const resultados = useMemo(
-    () => filtrarMilitaresGlobal(militaresAcessiveis, debouncedTerm, { limit: RESULT_LIMIT }),
-    [militaresAcessiveis, debouncedTerm],
-  );
+  const effectiveEmail = getEffectiveEmail();
 
   const hasAnyPermissaoAtalho = (
     canAccessAction('visualizar_militares')
     || canAccessAction('visualizar_ferias')
     || canAccessAction('visualizar_medalhas')
     || canAccessAction('visualizar_registros_militar')
+  );
+
+  const { data: militaresAcessiveis = [], isLoading } = useQuery({
+    queryKey: ['global-search-militares', debouncedTerm, effectiveEmail || 'self'],
+    queryFn: async () => {
+      const { militares } = await fetchScopedMilitares({
+        search: debouncedTerm,
+        limit: BACKEND_LIMIT,
+        offset: 0,
+        includeFoto: false,
+      });
+      const enriquecidos = await carregarMilitaresComMatriculas(militares);
+      return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: true });
+    },
+    enabled: isAccessResolved && hasAnyPermissaoAtalho && debouncedTerm.length > 0,
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+
+  const resultados = useMemo(
+    () => militaresAcessiveis.slice(0, RESULT_LIMIT),
+    [militaresAcessiveis],
   );
 
   if (!hasAnyPermissaoAtalho) return null;

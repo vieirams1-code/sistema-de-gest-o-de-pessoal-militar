@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Search, User, X } from 'lucide-react';
@@ -15,75 +15,41 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getFeriasElegiveisPorOperacao, getMensagemSemElegibilidade } from '@/components/livro/feriasOperacaoUtils';
-import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, isMilitarMesclado, militarCorrespondeBusca, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
+import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+
+const BACKEND_LIMIT = 100;
+const SEARCH_DEBOUNCE_MS = 350;
 
 export default function MilitarSelector({ value, onChange, onMilitarSelect, livroOperacaoFerias = null, dataBase = '', somenteElegiveis = false }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const { isAdmin, modoAcesso, subgrupamentoId, userEmail, linkedMilitarId, linkedMilitarEmail, hasAccess, hasSelfAccess } = useCurrentUser();
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const effectiveEmail = getEffectiveEmail();
 
   const { data: militares = [] } = useQuery({
-    queryKey: ['militares-ativos-selector', isAdmin, modoAcesso, subgrupamentoId, userEmail, linkedMilitarId, linkedMilitarEmail],
+    queryKey: ['militares-ativos-selector', debouncedSearch, effectiveEmail || 'self'],
     queryFn: async () => {
-      if (isAdmin) {
-        const all = await base44.entities.Militar.list('-nome_completo');
-        const enriquecidos = await carregarMilitaresComMatriculas(all);
-        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
-      }
-
-      if (modoAcesso === 'setor') {
-        const [porGrupamento, porSubgrupamento] = await Promise.all([
-          base44.entities.Militar.filter({ grupamento_id: subgrupamentoId }, '-nome_completo'),
-          base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-nome_completo'),
-        ]);
-        const ids = new Set();
-        const permitidos = [...porGrupamento, ...porSubgrupamento]
-          .filter((m) => {
-            if (!hasAccess(m) || ids.has(m.id)) return false;
-            ids.add(m.id);
-            return true;
-          });
-        const enriquecidos = await carregarMilitaresComMatriculas(permitidos);
-        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
-      }
-
-      if (modoAcesso === 'subsetor' && subgrupamentoId) {
-        const list = await base44.entities.Militar.filter({ subgrupamento_id: subgrupamentoId }, '-nome_completo');
-        const enriquecidos = await carregarMilitaresComMatriculas(list.filter(hasAccess));
-        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
-      }
-
-      if (modoAcesso === 'proprio') {
-        const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
-        if (!linkedMilitarId && knownEmails.length === 0) return [];
-
-        const requests = [];
-        if (linkedMilitarId) requests.push(base44.entities.Militar.filter({ id: linkedMilitarId }, '-nome_completo'));
-        for (const email of knownEmails) {
-          requests.push(base44.entities.Militar.filter({ email }, '-nome_completo'));
-          requests.push(base44.entities.Militar.filter({ email_particular: email }, '-nome_completo'));
-          requests.push(base44.entities.Militar.filter({ email_funcional: email }, '-nome_completo'));
-          requests.push(base44.entities.Militar.filter({ created_by: email }, '-nome_completo'));
-          requests.push(base44.entities.Militar.filter({ militar_email: email }, '-nome_completo'));
-        }
-
-        const batches = await Promise.all(requests);
-        const ids = new Set();
-        const vinculados = batches
-          .flat()
-          .filter((m) => {
-            if (!hasSelfAccess(m) || ids.has(m.id)) return false;
-            ids.add(m.id);
-            return true;
-          });
-        const enriquecidos = await carregarMilitaresComMatriculas(vinculados);
-        return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
-      }
-
-      return [];
-    }
+      const { militares: lista } = await fetchScopedMilitares({
+        search: debouncedSearch,
+        statusCadastro: 'Ativo',
+        limit: BACKEND_LIMIT,
+        offset: 0,
+        includeFoto: false,
+      });
+      const enriquecidos = await carregarMilitaresComMatriculas(lista);
+      return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
+    },
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 
   const { data: feriasElegibilidade = [], isLoading: isLoadingElegibilidade } = useQuery({
@@ -94,8 +60,16 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
       return militares.filter((militar, index) => getFeriasElegiveisPorOperacao(lotes[index] || [], livroOperacaoFerias).length > 0);
     },
     enabled: somenteElegiveis && !!livroOperacaoFerias && militares.length > 0,
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 
+  // Busca pontual por ID do militar selecionado.
+  // JUSTIFICATIVA: getScopedMilitares (Lote 1A) ainda não suporta filtro
+  // direto por militarId. Usar listagem ampla aqui seria pior — então
+  // mantemos uma chamada cirúrgica por ID enquanto o suporte não chega.
+  // Esta chamada é sempre escopada por id e nunca retorna >1 registro.
   const { data: selectedMilitar } = useQuery({
     queryKey: ['militar-selected', value],
     queryFn: async () => {
@@ -106,12 +80,19 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
       const [enriquecido] = await carregarMilitaresComMatriculas([militar]);
       return enriquecido || militar;
     },
-    enabled: !!value
+    enabled: !!value,
+    staleTime: 2 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 
-  const militaresDisponiveis = useMemo(() => (somenteElegiveis && livroOperacaoFerias ? feriasElegibilidade : militares), [feriasElegibilidade, livroOperacaoFerias, militares, somenteElegiveis]);
+  const militaresDisponiveis = useMemo(
+    () => (somenteElegiveis && livroOperacaoFerias ? feriasElegibilidade : militares),
+    [feriasElegibilidade, livroOperacaoFerias, militares, somenteElegiveis],
+  );
 
-  const filteredMilitares = militaresDisponiveis.filter((m) => militarCorrespondeBusca(m, searchTerm));
+  // O backend já aplica o filtro de busca; exibimos a lista como vem.
+  const filteredMilitares = militaresDisponiveis;
 
   const handleSelect = (militar) => {
     if (isMilitarMesclado(militar)) return;
@@ -201,7 +182,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-full p-0" align="start">
-            <Command>
+            <Command shouldFilter={false}>
               <CommandInput 
                 placeholder="Buscar por nome, nome de guerra ou matrícula..." 
                 value={searchTerm}
