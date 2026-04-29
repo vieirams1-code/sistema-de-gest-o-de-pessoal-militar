@@ -83,16 +83,64 @@ function normalizeText(texto = '') {
     .toUpperCase();
 }
 
+// Lote 1D-C.1 — parser tolerante a formatos brasileiros.
+// Aceita:
+//   - Date válido
+//   - "YYYY-MM-DD" (ISO, possivelmente com sufixo de hora)
+//   - "DD/MM/YYYY" (padrão BR usado na interface)
+// Recusa: vazio/null, formatos não reconhecidos e datas impossíveis
+// (validação cronológica — 1900..hoje+1 — é feita em isDataInclusaoValida).
 function toDate(dateLike) {
-  if (!dateLike) return null;
+  if (dateLike === null || dateLike === undefined || dateLike === '') return null;
   if (dateLike instanceof Date) return Number.isNaN(dateLike.getTime()) ? null : dateLike;
-  const date = new Date(`${String(dateLike).slice(0, 10)}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+
+  const raw = String(dateLike).trim();
+  if (!raw) return null;
+
+  // BR: DD/MM/YYYY (ex.: "13/07/2014")
+  const matchBR = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (matchBR) {
+    const [, dd, mm, yyyy] = matchBR;
+    const day = Number(dd);
+    const month = Number(mm);
+    const year = Number(yyyy);
+    if (month < 1 || month > 12) return null;
+    if (day < 1 || day > 31) return null;
+    const date = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return null;
+    // Detecta datas impossíveis tipo 31/02 (que o JS rebobina para 03/03)
+    if (
+      date.getFullYear() !== year
+      || date.getMonth() + 1 !== month
+      || date.getDate() !== day
+    ) {
+      return null;
+    }
+    return date;
+  }
+
+  // ISO: YYYY-MM-DD (com possível sufixo, ex.: "2014-07-13T00:00:00Z")
+  const matchISO = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (matchISO) {
+    const date = new Date(`${raw.slice(0, 10)}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  return null;
 }
 
 function formatDateISO(date) {
   if (!date) return null;
   return date.toISOString().slice(0, 10);
+}
+
+// Lote 1D-C.1 — formato brasileiro para exibição no relatório.
+function formatDateBR(date) {
+  if (!date) return null;
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 function addYears(baseDate, years) {
@@ -637,7 +685,8 @@ function montarSugestao(militar, punicoes, dataReferenciaDate, incluirReabilitad
   if (!isPraca(militar.posto_graduacao)) return null;
 
   // BLOQUEIO 1D-C: sem data_inclusao válida não há janela confiável.
-  // Não calculamos comportamento e registramos inconsistência.
+  // Lote 1D-C.1: o parser agora aceita DD/MM/YYYY, então só caem aqui
+  // realmente vazios/nulos ou impossíveis.
   if (!isDataInclusaoValida(militar.data_inclusao)) {
     return {
       tipo: 'inconsistencia',
@@ -647,6 +696,7 @@ function montarSugestao(militar, punicoes, dataReferenciaDate, incluirReabilitad
         posto_graduacao: militar.posto_graduacao || '',
         motivo: 'DATA_INCLUSAO_AUSENTE_OU_INVALIDA',
         data_inclusao_recebida: militar.data_inclusao ?? null,
+        data_inclusao_normalizada: formatDateBR(toDate(militar.data_inclusao)),
       },
     };
   }
