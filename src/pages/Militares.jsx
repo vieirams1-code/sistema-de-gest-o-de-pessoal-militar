@@ -30,7 +30,6 @@ import { excluirMilitarComDependencias } from '@/services/militarExclusaoService
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
-const LOTACAO_FILTER_FIELDS = ['subgrupamento_nome', 'grupamento_nome', 'lotacao', 'lotacao_atual', 'unidade_nome'];
 const statusBadgeClass = { Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200', Inativo: 'bg-slate-100 text-slate-700 border-slate-200', Reserva: 'bg-amber-100 text-amber-700 border-amber-200', Reforma: 'bg-blue-100 text-blue-700 border-blue-200', Falecido: 'bg-red-100 text-red-700 border-red-200' };
 const GRADUACAO_GROUPS = [
   { key: 'oficiais', label: 'Oficiais', postos: ['Coronel', 'Tenente Coronel', 'Tenente-Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'] },
@@ -96,46 +95,53 @@ export default function Militares() {
     enabled: shouldQuery,
     queryFn: async () => {
       const filters = isAdmin ? [{ posto_graduacao: { in: selectedPostos } }] : getMilitarScopeFilters();
-      if (!filters.length) return { militares: [], partialFailures: 0 };
+      if (!filters.length) return { militares: [], partialFailures: 0, totalCarregadoAntesFiltroLocal: 0, totalDepoisFiltroLocal: 0, lotacoesEncontradasNosResultados: [] };
 
-      const runFilter = async (filter, diagnostico = null) => {
+      const runAdminFilter = async () => {
+        const diagnostico = { filtro: filters[0], quantidade: 0, fallbackIndividual: false, erro: null };
         try {
-          const data = await base44.entities.Militar.filter(filter, '-created_date');
-          if (diagnostico) diagnostico.quantidade = Array.isArray(data) ? data.length : 0;
-          return data || [];
-        } catch (erroInOperator) {
+          const data = await base44.entities.Militar.filter(filters[0], '-created_date');
+          const lista = data || [];
+          diagnostico.quantidade = lista.length;
+
+          if (lista.length > 0) return { data: lista, diagnostico };
+
           const results = await Promise.allSettled(
-            selectedPostos.map((posto) =>
-              base44.entities.Militar.filter({ ...filter, posto_graduacao: posto }, '-created_date')
-            )
+            selectedPostos.map((posto) => base44.entities.Militar.filter({ posto_graduacao: posto }, '-created_date'))
           );
           const fulfilled = results
             .filter((result) => result.status === 'fulfilled')
             .flatMap((result) => result.value || []);
-          if (diagnostico) {
-            diagnostico.erro = erroInOperator;
-            diagnostico.fallbackIndividual = true;
-            diagnostico.quantidade = fulfilled.length;
-          }
-          return fulfilled;
+          diagnostico.fallbackIndividual = true;
+          diagnostico.quantidade = fulfilled.length;
+          return { data: fulfilled, diagnostico };
+        } catch (erroInOperator) {
+          const results = await Promise.allSettled(
+            selectedPostos.map((posto) => base44.entities.Militar.filter({ posto_graduacao: posto }, '-created_date'))
+          );
+          const fulfilled = results
+            .filter((result) => result.status === 'fulfilled')
+            .flatMap((result) => result.value || []);
+          diagnostico.erro = erroInOperator;
+          diagnostico.fallbackIndividual = true;
+          diagnostico.quantidade = fulfilled.length;
+          return { data: fulfilled, diagnostico };
         }
       };
 
       const diagnostico = [];
-      const applyLotacaoFallback = isAdmin && lotacaoFilter !== TODAS_LOTACOES_VALUE;
-      const queryFilters = applyLotacaoFallback
-        ? LOTACAO_FILTER_FIELDS.map((field) => ({
-          ...filters[0],
-          [field]: { contains: lotacaoFilter },
-        }))
-        : filters;
-
       const settled = await Promise.allSettled(
-        queryFilters.map((filtro) => {
-          const diag = { filtro: filtro, quantidade: 0 };
-          diagnostico.push(diag);
-          return runFilter(filtro, diag);
-        })
+        isAdmin
+          ? [runAdminFilter().then((result) => { diagnostico.push(result.diagnostico); return result.data; })]
+          : filters.map((filtro) => {
+            const diag = { filtro, quantidade: 0 };
+            diagnostico.push(diag);
+            return base44.entities.Militar.filter(filtro, '-created_date').then((data) => {
+              const lista = data || [];
+              diag.quantidade = lista.length;
+              return lista;
+            });
+          })
       );
       const fulfilled = settled.filter((s) => s.status === 'fulfilled').map((s) => s.value || []);
       const partialFailures = settled.length - fulfilled.length;
@@ -143,7 +149,18 @@ export default function Militares() {
 
       const unique = new Map();
       fulfilled.flat().forEach((m) => { if (!unique.has(m.id)) unique.set(m.id, m); });
-      const militares = await carregarMilitaresComMatriculas(Array.from(unique.values()));
+      const militaresEnriquecidos = await carregarMilitaresComMatriculas(Array.from(unique.values()));
+      const militaresComLotacaoAtual = militaresEnriquecidos.map((m) => ({ ...m, lotacao_atual: getLotacaoAtualMilitar(m) }));
+      const totalCarregadoAntesFiltroLocal = militaresComLotacaoAtual.length;
+      const lotacaoNormalizada = String(lotacaoFilter || '').trim().toLowerCase();
+      const militares = lotacaoFilter !== TODAS_LOTACOES_VALUE
+        ? militaresComLotacaoAtual.filter((m) => {
+          const lotacaoAtual = String(m.lotacao_atual || '').trim().toLowerCase();
+          return lotacaoAtual.includes(lotacaoNormalizada) || lotacaoNormalizada.includes(lotacaoAtual);
+        })
+        : militaresComLotacaoAtual;
+      const totalDepoisFiltroLocal = militares.length;
+      const lotacoesEncontradasNosResultados = [...new Set(militaresComLotacaoAtual.map((m) => m.lotacao_atual).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
       if (import.meta.env.DEV) {
         console.warn('[Militares] Diagnóstico consulta rápida', {
@@ -156,14 +173,17 @@ export default function Militares() {
             erro: item.erro ? String(item.erro?.message || item.erro) : null,
           })),
           totalUnico: unique.size,
+          totalCarregadoAntesFiltroLocal,
+          totalDepoisFiltroLocal,
+          lotacoesEncontradasNosResultados,
         });
       }
 
-      return { militares, partialFailures };
+      return { militares, partialFailures, totalCarregadoAntesFiltroLocal, totalDepoisFiltroLocal, lotacoesEncontradasNosResultados };
     },
   });
 
-  const militares = useMemo(() => (militaresData?.militares || []).map((m) => ({ ...m, lotacao_atual: getLotacaoAtualMilitar(m) })), [militaresData]);
+  const militares = useMemo(() => militaresData?.militares || [], [militaresData]);
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: true });
   const filteredMilitares = operacionais.filter((m) => militarCorrespondeBusca(m, searchTerm));
 
@@ -232,7 +252,9 @@ export default function Militares() {
                 pagina: 'Militares',
                 lotacaoFilter,
                 selectedPostos,
-                totalFiltrado: 0,
+                totalCarregadoAntesFiltroLocal: militaresData?.totalCarregadoAntesFiltroLocal || 0,
+                totalDepoisFiltroLocal: militaresData?.totalDepoisFiltroLocal || 0,
+                lotacoesEncontradasNosResultados: militaresData?.lotacoesEncontradasNosResultados || [],
               }}
               className="text-left mt-4"
             />
