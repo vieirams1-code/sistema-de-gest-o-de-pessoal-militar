@@ -10,12 +10,13 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useToast } from "@/components/ui/use-toast";
 import {
-  enriquecerMilitarComMatriculas,
+  carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
   getLotacaoAtualMilitar,
   militarCorrespondeBusca,
-  montarIndiceMatriculas,
 } from '@/services/matriculaMilitarViewService';
+import { fetchScopedMilitares, getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
+import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const normalizeTipo = (tipo) => {
@@ -31,8 +32,9 @@ const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 export default function LotacaoMilitares() {
   const queryClient = useQueryClient();
   const { toast, dismiss } = useToast();
-  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule, isAdmin, getMilitarScopeFilters } = useCurrentUser();
+  const { canAccessAction, isLoading: loadingUser, isAccessResolved, canAccessModule, isAdmin } = useCurrentUser();
   const hasLotacaoAccess = canAccessModule('lotacao_militares');
+  const effectiveEmail = getEffectiveEmailMilitares() || 'self';
 
   const [searchMilitar, setSearchMilitar] = useState('');
   const [lotacaoAtualFiltro, setLotacaoAtualFiltro] = useState(TODAS_LOTACOES_VALUE);
@@ -40,6 +42,8 @@ export default function LotacaoMilitares() {
   const [selectedNode, setSelectedNode] = useState(null); // Nó de destino selecionado na árvore
   const [expandedNodes, setExpandedNodes] = useState({});
 
+  // Lote 1C-B: militares via Deno Function getScopedMilitares (escopo resolvido no backend).
+  const militaresQueryKey = ['lotacao-militares-ativos', effectiveEmail];
   const {
     data: militaresData = { militares: [], partialFailures: 0 },
     isLoading: loadingMilitares,
@@ -49,77 +53,64 @@ export default function LotacaoMilitares() {
     error: militaresError,
     refetch: refetchMilitares,
   } = useQuery({
-    queryKey: ['militares-ativos', isAdmin],
+    queryKey: militaresQueryKey,
     queryFn: async () => {
-      if (isAdmin) {
-        const militares = await base44.entities.Militar.filter({ status_cadastro: 'Ativo' });
-        return { militares, partialFailures: 0 };
-      }
-
-      const filters = getMilitarScopeFilters();
-      if (!filters.length) return { militares: [], partialFailures: 0 };
-
-      const resultados = await Promise.allSettled(
-        filters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
-      );
-      const sucessos = resultados
-        .filter((resultado) => resultado.status === 'fulfilled')
-        .map((resultado) => resultado.value || []);
-      const falhas = resultados.length - sucessos.length;
-
-      if (import.meta.env.DEV && falhas > 0) {
-        console.warn('[LotacaoMilitares] Falha parcial ao carregar militares por escopo.', {
-          totalFiltros: resultados.length,
-          falhas,
-        });
-      }
-      if (!sucessos.length) {
-        throw new Error('Falha ao carregar militares do escopo.');
-      }
-
-      const ids = new Set();
-      const merged = [];
-      for (const militar of sucessos.flat()) {
-        if (!militar?.id || ids.has(militar.id)) continue;
-        ids.add(militar.id);
-        merged.push(militar);
-      }
-
-      return {
-        militares: merged.filter((militar) => militar?.status_cadastro === 'Ativo'),
-        partialFailures: falhas,
-      };
+      const { militares } = await fetchScopedMilitares({
+        statusCadastro: 'Ativo',
+        limit: 300,
+        offset: 0,
+        includeFoto: false,
+      });
+      return { militares: militares || [], partialFailures: 0 };
     },
     enabled: hasLotacaoAccess && isAccessResolved,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
   const militares = militaresData?.militares || [];
   const militaresPartialFailures = Number(militaresData?.partialFailures || 0);
 
+  // Lote 1C-B: enriquecimento de matrículas por IDs dos militares carregados.
+  // Substitui MatriculaMilitar.list('-created_date', 10000) global, usando
+  // carregarMilitaresComMatriculas, que filtra por militar_id (IN) com fallback em lotes.
+  const militaresIdsKey = useMemo(() => (
+    militares.map((m) => m?.id).filter(Boolean).sort().join(',')
+  ), [militares]);
+  const matriculasQueryKey = ['lotacao-militares-com-matriculas', effectiveEmail, militaresIdsKey];
   const {
-    data: matriculasData = { matriculas: [], partialFailures: 0 },
+    data: matriculasData = { militaresEnriquecidos: [], partialFailures: 0 },
     isLoading: loadingMatriculas,
     isFetching: fetchingMatriculas,
     isSuccess: isMatriculasSuccess,
     isError: isMatriculasError,
     error: matriculasError,
   } = useQuery({
-    queryKey: ['lotacao-matriculas-militar'],
+    queryKey: matriculasQueryKey,
     queryFn: async () => {
+      if (!militares.length) return { militaresEnriquecidos: [], partialFailures: 0 };
       try {
-        const matriculas = await base44.entities.MatriculaMilitar.list('-created_date', 10000);
-        return { matriculas, partialFailures: 0 };
+        const enriquecidos = await carregarMilitaresComMatriculas(militares);
+        return { militaresEnriquecidos: enriquecidos, partialFailures: 0 };
       } catch (error) {
         if (import.meta.env.DEV) {
-          console.warn('[LotacaoMilitares] Falha ao carregar matrículas para enriquecimento.', error);
+          console.warn('[LotacaoMilitares] Falha ao enriquecer com matrículas.', error);
         }
-        return { matriculas: [], partialFailures: 1 };
+        return { militaresEnriquecidos: militares, partialFailures: 1 };
       }
     },
-    enabled: hasLotacaoAccess,
+    enabled: hasLotacaoAccess && isMilitaresSuccess && militares.length > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
-  const matriculas = matriculasData?.matriculas || [];
+  const militaresEnriquecidos = matriculasData?.militaresEnriquecidos?.length
+    ? matriculasData.militaresEnriquecidos
+    : militares;
   const matriculasPartialFailures = Number(matriculasData?.partialFailures || 0);
-  
+
+  // Lote 1C-B: estrutura via Deno Function getScopedLotacoes (escopo resolvido no backend).
+  const estruturaQueryKey = ['lotacao-estrutura', effectiveEmail];
   const {
     data: estruturaData = { estrutura: [], partialFailures: 0 },
     isLoading: loadingEstrutura,
@@ -129,33 +120,26 @@ export default function LotacaoMilitares() {
     error: estruturaError,
     refetch: refetchEstrutura,
   } = useQuery({
-    queryKey: ['estruturaOrganizacional'],
+    queryKey: estruturaQueryKey,
     queryFn: async () => {
-      try {
-        const estrutura = await base44.entities.Subgrupamento.list('nome');
-        return { estrutura, partialFailures: 0 };
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.warn('[LotacaoMilitares] Falha ao carregar estrutura organizacional.', error);
-        }
-        return { estrutura: [], partialFailures: 1 };
-      }
+      const { lotacoes } = await fetchScopedLotacoes({});
+      return { estrutura: lotacoes || [], partialFailures: 0 };
     },
-    enabled: hasLotacaoAccess,
+    enabled: hasLotacaoAccess && isAccessResolved,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
   const estruturaRaw = estruturaData?.estrutura || [];
   const estruturaPartialFailures = Number(estruturaData?.partialFailures || 0);
   const hasPartialDataWarning = militaresPartialFailures > 0 || matriculasPartialFailures > 0 || estruturaPartialFailures > 0;
   const showTotalError = !loadingMilitares && isMilitaresError;
-  const militaresQueryKey = ['militares-ativos', isAdmin];
-  const estruturaQueryKey = ['estruturaOrganizacional'];
-  const matriculasQueryKey = ['lotacao-matriculas-militar'];
 
   const getEstagioProvavel = () => {
-    if (isMilitaresError) return 'Militar.filter/list';
-    if (isEstruturaError || estruturaPartialFailures > 0) return 'Subgrupamento.list';
-    if (isMatriculasError || matriculasPartialFailures > 0) return 'MatriculaMilitar.list';
-    return hasPartialDataWarning ? 'MatriculaMilitar.list' : null;
+    if (isMilitaresError) return 'getScopedMilitares';
+    if (isEstruturaError || estruturaPartialFailures > 0) return 'getScopedLotacoes';
+    if (isMatriculasError || matriculasPartialFailures > 0) return 'carregarMilitaresComMatriculas';
+    return hasPartialDataWarning ? 'carregarMilitaresComMatriculas' : null;
   };
 
   const lotacaoDebugData = (showTotalError || hasPartialDataWarning)
@@ -203,7 +187,7 @@ export default function LotacaoMilitares() {
       quantidades: {
         militares: militares.length,
         estrutura: estruturaRaw.length,
-        matriculas: matriculas.length,
+        militaresEnriquecidos: militaresEnriquecidos.length,
       },
       estagioProvavel: getEstagioProvavel(),
       timestamps: {
@@ -219,15 +203,10 @@ export default function LotacaoMilitares() {
   const setores = estrutura.filter(s => s.tipoNormalizado === 'Setor');
   const getFilhos = (parentId, nivelTarget) => estrutura.filter(s => s.grupamento_id === parentId && s.tipoNormalizado === nivelTarget);
 
-  const militaresComMatriculaAtual = useMemo(() => {
-    const indiceMatriculas = montarIndiceMatriculas(matriculas);
-    return militares.map((m) => enriquecerMilitarComMatriculas(m, indiceMatriculas));
-  }, [matriculas, militares]);
-
   const militaresOperacionais = useMemo(() => {
-    return filtrarMilitaresOperacionais(militaresComMatriculaAtual)
+    return filtrarMilitaresOperacionais(militaresEnriquecidos)
       .sort((a, b) => String(a?.nome_completo || '').localeCompare(String(b?.nome_completo || ''), 'pt-BR'));
-  }, [militaresComMatriculaAtual]);
+  }, [militaresEnriquecidos]);
 
   const lotacoesAtuaisDisponiveis = useMemo(() => {
     const lotacoes = new Set();
@@ -316,7 +295,7 @@ export default function LotacaoMilitares() {
       await Promise.all(militaresIds.map(id => base44.entities.Militar.update(id, updateData)));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
+      queryClient.invalidateQueries({ queryKey: ['lotacao-militares-ativos'] });
       dismiss();
       toast({
         title: "Lotação Atualizada",
