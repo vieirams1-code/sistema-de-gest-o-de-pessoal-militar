@@ -65,17 +65,20 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
     refetchOnWindowFocus: false,
   });
 
-  // Busca pontual por ID do militar selecionado.
-  // JUSTIFICATIVA: getScopedMilitares (Lote 1A) ainda não suporta filtro
-  // direto por militarId. Usar listagem ampla aqui seria pior — então
-  // mantemos uma chamada cirúrgica por ID enquanto o suporte não chega.
-  // Esta chamada é sempre escopada por id e nunca retorna >1 registro.
+  // Hidratação do militar selecionado via getScopedMilitares (Lote 1B.1).
+  // Usa o payload `militarIds` que aplica interseção com o escopo do usuário
+  // efetivo no backend — IDs fora do escopo são silenciosamente descartados.
   const { data: selectedMilitar } = useQuery({
-    queryKey: ['militar-selected', value],
+    queryKey: ['militar-selected', value, effectiveEmail || 'self'],
     queryFn: async () => {
       if (!value) return null;
-      const list = await base44.entities.Militar.filter({ id: value });
-      const [militar] = list;
+      const { militares: lista } = await fetchScopedMilitares({
+        militarIds: [value],
+        includeFoto: true,
+        limit: 1,
+        offset: 0,
+      });
+      const [militar] = lista;
       if (!militar) return null;
       const [enriquecido] = await carregarMilitaresComMatriculas([militar]);
       return enriquecido || militar;
