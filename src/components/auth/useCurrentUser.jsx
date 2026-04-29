@@ -188,24 +188,31 @@ export function useCurrentUser() {
     },
   };
 
-  const isAccessResolved = !isLoading && !isError && Boolean(data) && (!requiresUnidades || (fetchedUnidades && !loadingUnidades));
+  // isPermissionResolved: indica que getUserPermissions já retornou modules/actions
+  // consolidados pelo backend. Independe do carregamento de unidadesFilhas, que
+  // afeta apenas escopo organizacional (getMilitarScopeFilters/hasAccess).
+  const isPermissionResolved = !isLoading && !isError && Boolean(data);
+
+  // isAccessResolved: contexto completo de acesso/escopo (inclui unidadesFilhas
+  // quando o usuário é subsetor). Mantido para compatibilidade com consumidores
+  // que dependem do escopo organizacional resolvido.
+  const isAccessResolved = isPermissionResolved && (!requiresUnidades || (fetchedUnidades && !loadingUnidades));
 
   // Função utilitária: testa permissão de módulo.
   // Para admin, retorna true sempre.
   // Para restritos, consulta `modules[modulo]` (chave canônica do backend).
+  // Depende apenas de isPermissionResolved — NÃO espera unidadesFilhas.
   const canAccessModule = (modulo) => {
     if (!modulo) return false;
     if (hasAbsoluteAccess) return true;
-    if (isLoading || !isAccessResolved) return false;
-    if (isError) return false;
+    if (!isPermissionResolved) return false;
     return modules[modulo] === true;
   };
 
   const canAccessAction = (acao) => {
     if (!acao) return false;
     if (hasAbsoluteAccess) return true;
-    if (isLoading || !isAccessResolved) return false;
-    if (isError) return false;
+    if (!isPermissionResolved) return false;
     return actions[acao] === true;
   };
 
