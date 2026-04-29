@@ -57,27 +57,79 @@ async function fetchWithRetry(queryFn, label = 'query') {
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
-// Consolida modules e actions a partir dos perfis ativos.
+// Extrai a matriz de permissões serializada no campo `descricao` de um
+// PerfilPermissao, no formato:
+//   [SGP_PERMISSIONS_MATRIX]{...JSON...}[/SGP_PERMISSIONS_MATRIX]
+// Retorna um objeto plano com chaves acesso_* / perm_* booleanas, ou {} se ausente.
+function extrairMatrizPermissoes(descricao) {
+    if (typeof descricao !== 'string' || !descricao) return {};
+    const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
+    const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
+    if (start === -1 || end === -1 || end <= start) return {};
+    const jsonStr = descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim();
+    if (!jsonStr) return {};
+    try {
+        const parsed = JSON.parse(jsonStr);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_e) {
+        return {};
+    }
+}
+
+// Consolida modules e actions a partir dos perfis ativos E dos UsuarioAcesso.
 // Estratégia: prefixos "acesso_" => modules, "perm_" => actions.
-// Faz OR entre os perfis (qualquer perfil que conceda já habilita).
-function consolidarModulesActions(perfis) {
+//
+// Regra de consolidação (OR aditivo):
+//   - Qualquer fonte (PerfilPermissao OU UsuarioAcesso) com acesso_x === true habilita modules.x.
+//   - Qualquer fonte (PerfilPermissao OU UsuarioAcesso) com perm_y === true habilita actions.y.
+//   - Valores false NUNCA sobrescrevem um true já consolidado.
+//   - Chaves não vistas em nenhuma fonte ficam como false (apenas se vistas como false em alguma fonte).
+//
+// Importante: PerfilPermissao é a fonte principal das permissões; UsuarioAcesso
+// pode apenas ADICIONAR permissões quando seus campos acesso_*/perm_* forem true.
+// Campos false em UsuarioAcesso são ignorados em termos de bloqueio.
+//
+// Para PerfilPermissao, lemos tanto os campos booleanos da raiz quanto a matriz
+// completa serializada em `descricao` ([SGP_PERMISSIONS_MATRIX]{...}[/...]).
+function consolidarModulesActions(perfis, acessos = []) {
     const modules = {};
     const actions = {};
-    (perfis || []).forEach((p) => {
-        if (!p) return;
-        Object.entries(p).forEach(([key, val]) => {
+
+    const aplicarFonte = (fonte) => {
+        if (!fonte) return;
+        Object.entries(fonte).forEach(([key, val]) => {
             if (typeof val !== 'boolean') return;
             if (key.startsWith('acesso_')) {
                 const moduleKey = key.replace(/^acesso_/, '');
-                if (val === true) modules[moduleKey] = true;
-                else if (modules[moduleKey] !== true) modules[moduleKey] = false;
+                if (val === true) {
+                    modules[moduleKey] = true;
+                } else if (!(moduleKey in modules)) {
+                    modules[moduleKey] = false;
+                }
+                // se já é true, nunca sobrescreve com false
             } else if (key.startsWith('perm_')) {
                 const actionKey = key.replace(/^perm_/, '');
-                if (val === true) actions[actionKey] = true;
-                else if (actions[actionKey] !== true) actions[actionKey] = false;
+                if (val === true) {
+                    actions[actionKey] = true;
+                } else if (!(actionKey in actions)) {
+                    actions[actionKey] = false;
+                }
+                // se já é true, nunca sobrescreve com false
             }
         });
+    };
+
+    (perfis || []).forEach((p) => {
+        if (!p) return;
+        // 1. Campos booleanos diretos do perfil
+        aplicarFonte(p);
+        // 2. Matriz completa embutida em descricao
+        const matriz = extrairMatrizPermissoes(p.descricao);
+        aplicarFonte(matriz);
     });
+
+    (acessos || []).forEach(aplicarFonte);
+
     return { modules, actions };
 }
 
@@ -256,8 +308,8 @@ Deno.serve(async (req) => {
         );
         const isAdmin = isAdminByRole || isAdminByAccess;
 
-        // 5. modules/actions
-        const { modules, actions } = consolidarModulesActions(perfis);
+        // 5. modules/actions (consolida perfis + acessos por OR aditivo)
+        const { modules, actions } = consolidarModulesActions(perfis, acessos);
 
         // 6. scope estável
         const scope = descreverScope(acessos || [], isAdmin);
