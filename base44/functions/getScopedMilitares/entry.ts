@@ -7,11 +7,13 @@ const LIMIT_DEFAULT = 100;
 const LIMIT_MAX = 300;
 const OFFSET_DEFAULT = 0;
 
-const RETRY_MAX_ATTEMPTS = 3; // total de tentativas (incluindo a primeira)
-const RETRY_BASE_DELAY_MS = 450; // entre 400ms e 500ms
+const RETRY_MAX_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 450;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
-// Campos base da entidade Militar (sem foto por padrão para reduzir payload)
+// Campos base da entidade Militar (sem foto por padrão)
+// IMPORTANTE: A seleção de campos do SDK Base44 nem sempre é honrada na resposta;
+// por isso aplicamos uma projeção manual no servidor antes de retornar.
 const CAMPOS_BASE_MILITAR = [
     'id',
     'nome_completo',
@@ -29,6 +31,15 @@ const CAMPOS_BASE_MILITAR = [
     'funcao',
     'condicao',
 ];
+
+function projetarMilitar(m, campos) {
+    if (!m || typeof m !== 'object') return m;
+    const out = {};
+    campos.forEach((k) => {
+        if (k in m) out[k] = m[k];
+    });
+    return out;
+}
 
 // =====================================================================
 // Helper: Retry com backoff exponencial + jitter
@@ -86,20 +97,13 @@ function clampOffset(raw) {
 }
 
 // =====================================================================
-// Resolução de escopo consolidado a partir de TODOS os UsuarioAcesso ativos
+// Resolução de escopo consolidado
 // =====================================================================
-// Retorna:
-//   { isAdmin: true }                                  -> sem restrição
-//   { tipo: 'proprio', militarIds: [...] }             -> apenas militares específicos
-//   { tipo: 'estrutura', estruturaIds: [...] }         -> filtro $in em estrutura_id
-//   { tipo: 'vazio' }                                  -> usuário sem escopo válido
-//   { tipo: 'invalido', reason: '...' }                -> erro de configuração (ex: proprio sem militar_id)
 async function resolverEscopoConsolidado(base44, acessos) {
     if (!acessos || acessos.length === 0) {
         return { tipo: 'vazio' };
     }
 
-    // Prioridade: admin > setor > subsetor > unidade > proprio
     const haveAdmin = acessos.some((a) => normalizeTipo(a.tipo_acesso) === 'admin');
     if (haveAdmin) return { isAdmin: true };
 
@@ -108,23 +112,17 @@ async function resolverEscopoConsolidado(base44, acessos) {
     const unidades = acessos.filter((a) => normalizeTipo(a.tipo_acesso) === 'unidade' && a.subgrupamento_id);
     const proprios = acessos.filter((a) => normalizeTipo(a.tipo_acesso) === 'proprio');
 
-    // Se só houver "proprio", trata como filtro por militar_id
     const haNaoProprio = setores.length || subsetores.length || unidades.length;
     if (!haNaoProprio && proprios.length > 0) {
         const militarIds = proprios.map((a) => a.militar_id).filter(Boolean);
         if (militarIds.length === 0) {
-            return {
-                tipo: 'invalido',
-                reason: 'PROPRIO_SEM_MILITAR_ID',
-            };
+            return { tipo: 'invalido', reason: 'PROPRIO_SEM_MILITAR_ID' };
         }
         return { tipo: 'proprio', militarIds };
     }
 
-    // União de IDs de estrutura permitidos (sem ampliar além do que está cadastrado)
     const estruturaIds = new Set();
 
-    // setor: grupamento_raiz_id => todos os descendentes
     if (setores.length > 0) {
         const grupamentoIds = [...new Set(setores.map((s) => s.grupamento_id).filter(Boolean))];
         grupamentoIds.forEach((id) => estruturaIds.add(id));
@@ -133,7 +131,8 @@ async function resolverEscopoConsolidado(base44, acessos) {
                 base44.asServiceRole.entities.Subgrupamento.filter(
                     { grupamento_raiz_id: { $in: grupamentoIds } },
                     undefined,
-                    undefined,
+                    LIMIT_MAX,
+                    0,
                     ['id']
                 ),
             'subgrupamento.descendentes_setor'
@@ -141,7 +140,6 @@ async function resolverEscopoConsolidado(base44, acessos) {
         (descendentes || []).forEach((d) => d?.id && estruturaIds.add(d.id));
     }
 
-    // subsetor: parent_id => unidades filhas diretas
     if (subsetores.length > 0) {
         const subIds = [...new Set(subsetores.map((s) => s.subgrupamento_id).filter(Boolean))];
         subIds.forEach((id) => estruturaIds.add(id));
@@ -150,7 +148,8 @@ async function resolverEscopoConsolidado(base44, acessos) {
                 base44.asServiceRole.entities.Subgrupamento.filter(
                     { parent_id: { $in: subIds } },
                     undefined,
-                    undefined,
+                    LIMIT_MAX,
+                    0,
                     ['id']
                 ),
             'subgrupamento.filhos_subsetor'
@@ -158,12 +157,10 @@ async function resolverEscopoConsolidado(base44, acessos) {
         (filhos || []).forEach((f) => f?.id && estruturaIds.add(f.id));
     }
 
-    // unidade: somente o id da unidade
     if (unidades.length > 0) {
         unidades.forEach((u) => u.subgrupamento_id && estruturaIds.add(u.subgrupamento_id));
     }
 
-    // Caso haja "proprio" combinado com escopo estrutural, mantemos os dois caminhos
     const militarIdsProprios = proprios.map((a) => a.militar_id).filter(Boolean);
 
     if (estruturaIds.size === 0 && militarIdsProprios.length === 0) {
@@ -189,7 +186,6 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Não autenticado', militares: [] }, { status: 401 });
         }
 
-        // Parse seguro do body
         let payload = {};
         try {
             payload = await req.json();
@@ -212,14 +208,15 @@ Deno.serve(async (req) => {
         const effOffset = clampOffset(offset);
         const effIncludeFoto = includeFoto === true;
 
-        // 1. Buscar TODOS os UsuarioAcesso ativos do usuário
+        // 1. Buscar UsuarioAcesso ativos com seleção de campos
         const acessos = await fetchWithRetry(
             () =>
                 base44.asServiceRole.entities.UsuarioAcesso.filter(
                     { user_email: user.email, ativo: true },
                     undefined,
-                    undefined,
-                    ['tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id']
+                    LIMIT_MAX,
+                    0,
+                    ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id']
                 ),
             'usuarioAcesso.list'
         );
@@ -238,22 +235,24 @@ Deno.serve(async (req) => {
             escopo = await resolverEscopoConsolidado(base44, acessos || []);
         }
 
-        // Caso: usuário sem nenhum acesso configurado e sem role admin
         if (!isAdmin && escopo.tipo === 'vazio') {
             return Response.json(
                 {
                     militares: [],
                     meta: {
-                        total: 0,
-                        reason: 'SEM_ACESSO_CONFIGURADO',
+                        returned: 0,
+                        limit: effLimit,
+                        offset: effOffset,
+                        hasMore: false,
+                        offsetAplicadoNaConsulta: false,
                         scope_tipo: 'vazio',
+                        reason: 'SEM_ACESSO_CONFIGURADO',
                     },
                 },
                 { status: 200 }
             );
         }
 
-        // Caso: configuração inválida (ex: proprio sem militar_id)
         if (!isAdmin && escopo.tipo === 'invalido') {
             return Response.json(
                 {
@@ -265,9 +264,8 @@ Deno.serve(async (req) => {
             );
         }
 
-        // 3. Construir filtro base de Militar
+        // 3. Filtro base
         const baseFilter = {};
-
         if (postoGraduacaoFiltro) baseFilter.posto_graduacao = postoGraduacaoFiltro;
         if (statusCadastro) baseFilter.status_cadastro = statusCadastro;
         if (situacaoMilitar) baseFilter.situacao_militar = situacaoMilitar;
@@ -277,17 +275,21 @@ Deno.serve(async (req) => {
         let usouFiltroProprios = false;
 
         if (isAdmin) {
-            if (lotacaoFiltro) {
-                militarFilter.estrutura_id = lotacaoFiltro;
-            }
+            if (lotacaoFiltro) militarFilter.estrutura_id = lotacaoFiltro;
         } else if (escopo.tipo === 'proprio') {
-            // Acesso somente individual
             if (lotacaoFiltro) {
-                // Não pode ampliar escopo
                 return Response.json(
                     {
                         militares: [],
-                        meta: { reason: 'LOTACAO_FORA_DO_ESCOPO', scope_tipo: 'proprio' },
+                        meta: {
+                            returned: 0,
+                            limit: effLimit,
+                            offset: effOffset,
+                            hasMore: false,
+                            offsetAplicadoNaConsulta: false,
+                            scope_tipo: 'proprio',
+                            reason: 'LOTACAO_FORA_DO_ESCOPO',
+                        },
                     },
                     { status: 200 }
                 );
@@ -303,7 +305,15 @@ Deno.serve(async (req) => {
                     return Response.json(
                         {
                             militares: [],
-                            meta: { reason: 'LOTACAO_FORA_DO_ESCOPO', scope_tipo: 'estrutura' },
+                            meta: {
+                                returned: 0,
+                                limit: effLimit,
+                                offset: effOffset,
+                                hasMore: false,
+                                offsetAplicadoNaConsulta: false,
+                                scope_tipo: 'estrutura',
+                                reason: 'LOTACAO_FORA_DO_ESCOPO',
+                            },
                         },
                         { status: 200 }
                     );
@@ -313,66 +323,86 @@ Deno.serve(async (req) => {
                 militarFilter.estrutura_id = { $in: permitidos };
             }
 
-            // Se houver "proprios" combinados com estrutura, faremos uma segunda busca
-            // mais abaixo, e uniremos os resultados (sem ampliar além do cadastrado).
             usouFiltroProprios = proprios.length > 0;
         }
 
-        // 5. Seleção de campos (foto somente se solicitado)
+        // 5. Seleção de campos
         const campos = effIncludeFoto ? [...CAMPOS_BASE_MILITAR, 'foto'] : CAMPOS_BASE_MILITAR;
 
-        // 6. Buscar militares (com paginação SDK quando search NÃO foi enviado)
-        // Quando search é enviado, ampliamos o conjunto carregado (até LIMIT_MAX)
-        // para filtrar localmente, mas SEM remover o limite.
-        const fetchLimit = search ? LIMIT_MAX : effLimit;
-        const fetchOffset = search ? 0 : effOffset;
+        // 6. Buscar militares
+        // Assinatura SDK confirmada: filter(query, sort, limit, skip, fields)
+        // Estratégia hasMore: pedir limit + 1 e cortar antes de retornar.
+        const semBusca = !search || !String(search).trim();
 
-        const militaresEstrutura = await fetchWithRetry(
-            () =>
-                base44.asServiceRole.entities.Militar.filter(
-                    militarFilter,
-                    '-nome_completo',
-                    fetchLimit,
-                    campos,
-                    fetchOffset
-                ),
-            'militar.filter.principal'
-        );
+        let militares = [];
+        let offsetAplicadoNaConsulta = false;
+        let buscaAplicada = false;
+        let buscaLimitadaPorAmostra = false;
+        let hasMore = false;
 
-        // 6b. União com militares "proprios" quando aplicável (escopo estrutura + proprio)
-        let militaresProprios = [];
-        if (
-            !isAdmin &&
-            escopo.tipo === 'estrutura' &&
-            usouFiltroProprios &&
-            (escopo.militarIdsProprios || []).length > 0 &&
-            !lotacaoFiltro // se há lotacaoFiltro, já restringimos a estrutura
-        ) {
-            const proprioFilter = { ...baseFilter, id: { $in: escopo.militarIdsProprios } };
-            militaresProprios = await fetchWithRetry(
+        if (semBusca) {
+            // Sem busca textual -> pagina direto no SDK
+            const fetchLimit = effLimit + 1;
+            const result = await fetchWithRetry(
                 () =>
                     base44.asServiceRole.entities.Militar.filter(
-                        proprioFilter,
+                        militarFilter,
                         '-nome_completo',
-                        LIMIT_MAX,
+                        fetchLimit,
+                        effOffset,
                         campos
                     ),
-                'militar.filter.proprios'
+                'militar.filter.principal'
             );
-        }
+            offsetAplicadoNaConsulta = true;
+            const arr = result || [];
+            hasMore = arr.length > effLimit;
+            militares = hasMore ? arr.slice(0, effLimit) : arr;
 
-        // União por id
-        const mapaUniao = new Map();
-        (militaresEstrutura || []).forEach((m) => m?.id && mapaUniao.set(m.id, m));
-        (militaresProprios || []).forEach((m) => m?.id && !mapaUniao.has(m.id) && mapaUniao.set(m.id, m));
-        let militares = Array.from(mapaUniao.values());
+            // União com "proprios" (escopo estrutura + proprio, sem lotacaoFiltro)
+            if (
+                !isAdmin &&
+                escopo.tipo === 'estrutura' &&
+                usouFiltroProprios &&
+                (escopo.militarIdsProprios || []).length > 0 &&
+                !lotacaoFiltro
+            ) {
+                const proprioFilter = { ...baseFilter, id: { $in: escopo.militarIdsProprios } };
+                const proprios = await fetchWithRetry(
+                    () =>
+                        base44.asServiceRole.entities.Militar.filter(
+                            proprioFilter,
+                            '-nome_completo',
+                            LIMIT_MAX,
+                            0,
+                            campos
+                        ),
+                    'militar.filter.proprios'
+                );
+                const mapa = new Map();
+                militares.forEach((m) => m?.id && mapa.set(m.id, m));
+                (proprios || []).forEach((m) => m?.id && !mapa.has(m.id) && mapa.set(m.id, m));
+                militares = Array.from(mapa.values()).slice(0, effLimit);
+            }
+        } else {
+            // Com busca textual: carregar amostra (LIMIT_MAX) com offset 0,
+            // filtrar localmente, paginar resultado.
+            const amostra = await fetchWithRetry(
+                () =>
+                    base44.asServiceRole.entities.Militar.filter(
+                        militarFilter,
+                        '-nome_completo',
+                        LIMIT_MAX,
+                        0,
+                        campos
+                    ),
+                'militar.filter.search'
+            );
+            offsetAplicadoNaConsulta = false;
+            buscaLimitadaPorAmostra = (amostra || []).length >= LIMIT_MAX;
 
-        // 7. Busca textual (aplicada localmente sobre o conjunto já escopado)
-        let buscaAplicada = false;
-        let buscaLimitada = false;
-        if (search && String(search).trim()) {
             const term = normalizeText(String(search).trim());
-            militares = militares.filter((m) => {
+            let filtrados = (amostra || []).filter((m) => {
                 return (
                     normalizeText(m.nome_completo).includes(term) ||
                     normalizeText(m.nome_guerra).includes(term) ||
@@ -380,26 +410,31 @@ Deno.serve(async (req) => {
                 );
             });
             buscaAplicada = true;
-            // Se trouxemos LIMIT_MAX, há risco de o resultado completo ter ficado fora
-            buscaLimitada = (militaresEstrutura || []).length >= LIMIT_MAX;
 
-            // Reaplicar paginação após filtro textual
-            militares = militares.slice(effOffset, effOffset + effLimit);
+            const total = filtrados.length;
+            const pageSlice = filtrados.slice(effOffset, effOffset + effLimit);
+            hasMore = effOffset + pageSlice.length < total || buscaLimitadaPorAmostra;
+            militares = pageSlice;
         }
 
+        // Projeção manual para garantir payload enxuto (campos selecionados apenas)
+        const militaresProjetados = militares.map((m) => projetarMilitar(m, campos));
+
         return Response.json({
-            militares,
+            militares: militaresProjetados,
             meta: {
-                total: militares.length,
+                returned: militaresProjetados.length,
                 limit: effLimit,
                 offset: effOffset,
+                hasMore,
+                offsetAplicadoNaConsulta,
                 scope_tipo: isAdmin ? 'admin' : escopo.tipo,
                 aplicou_filtro_lotacao: !!lotacaoFiltro,
                 aplicou_filtro_posto: !!postoGraduacaoFiltro,
                 aplicou_filtro_status: !!statusCadastro,
                 aplicou_filtro_situacao: !!situacaoMilitar,
                 busca_aplicada: buscaAplicada,
-                busca_limitada_por_amostra: buscaLimitada,
+                busca_limitada_por_amostra: buscaLimitadaPorAmostra,
                 include_foto: effIncludeFoto,
             },
         });
@@ -410,10 +445,7 @@ Deno.serve(async (req) => {
             status,
         });
         return Response.json(
-            {
-                error: error?.message || 'Erro interno ao buscar militares',
-                militares: [],
-            },
+            { error: error?.message || 'Erro interno ao buscar militares', militares: [] },
             { status }
         );
     }

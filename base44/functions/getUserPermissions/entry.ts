@@ -7,6 +7,18 @@ const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 450;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
+// Campos selecionados em UsuarioAcesso (reduz payload)
+const CAMPOS_USUARIO_ACESSO = [
+    'id',
+    'user_email',
+    'ativo',
+    'tipo_acesso',
+    'grupamento_id',
+    'subgrupamento_id',
+    'militar_id',
+    'perfil_id',
+];
+
 // =====================================================================
 // Helper: Retry com backoff exponencial + jitter
 // =====================================================================
@@ -45,10 +57,10 @@ async function fetchWithRetry(queryFn, label = 'query') {
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 
 // Consolida modules e actions a partir dos perfis ativos.
-// Conforme o schema atual de PerfilPermissao:
-//   - Campos com prefixo "acesso_" representam módulos
-//   - Campos com prefixo "perm_" representam ações específicas
-// A consolidação faz OR (qualquer perfil que conceda já habilita a permissão).
+// Estratégia: prefixos "acesso_" => modules, "perm_" => actions.
+// Faz OR entre os perfis (qualquer perfil que conceda já habilita).
+// IMPORTANTE: para admin, NÃO marcamos tudo como true aqui — o frontend deve
+// usar isAdmin/accessMode para decidir o tratamento de acesso total.
 function consolidarModulesActions(perfis) {
     const modules = {};
     const actions = {};
@@ -70,9 +82,6 @@ function consolidarModulesActions(perfis) {
     return { modules, actions };
 }
 
-// Resolve um descritor estável de "scope" a partir dos acessos ativos.
-// Não busca descendentes aqui (isso é feito em getScopedMilitares); apenas
-// descreve a configuração para o frontend.
 function descreverScope(acessos, isAdmin) {
     if (isAdmin) {
         return { tipo: 'admin', estruturaIds: [], militarId: null, reason: null };
@@ -135,9 +144,16 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Não autenticado' }, { status: 401 });
         }
 
-        // 1. Buscar todos os UsuarioAcesso ativos
+        // 1. Buscar UsuarioAcesso ativos com campos selecionados
         const acessos = await fetchWithRetry(
-            () => base44.asServiceRole.entities.UsuarioAcesso.filter({ user_email: user.email, ativo: true }),
+            () =>
+                base44.asServiceRole.entities.UsuarioAcesso.filter(
+                    { user_email: user.email, ativo: true },
+                    undefined,
+                    100,
+                    0,
+                    CAMPOS_USUARIO_ACESSO
+                ),
             'usuarioAcesso.list'
         );
 
@@ -146,7 +162,9 @@ Deno.serve(async (req) => {
             new Set((acessos || []).map((a) => a?.perfil_id).filter(Boolean))
         );
 
-        // 3. Buscar perfis em UMA única chamada com $in
+        // 3. Buscar perfis em UMA chamada (sem seleção de campos: estrutura
+        // de PerfilPermissao usa muitos booleanos acesso_*/perm_* que precisamos
+        // varrer dinamicamente)
         let perfis = [];
         if (perfilIds.length > 0) {
             perfis = await fetchWithRetry(
@@ -171,11 +189,15 @@ Deno.serve(async (req) => {
         );
         const isAdmin = isAdminByRole || isAdminByAccess;
 
-        // 5. Consolidar modules/actions
+        // 5. modules/actions
         const { modules, actions } = consolidarModulesActions(perfis);
 
-        // 6. Scope estável
+        // 6. scope estável
         const scope = descreverScope(acessos || [], isAdmin);
+
+        // 7. accessMode / permissionsResolvedAs
+        const accessMode = isAdmin ? 'admin' : 'restricted';
+        const permissionsResolvedAs = isAdmin ? 'admin' : 'profiles';
 
         return Response.json({
             user: {
@@ -187,6 +209,8 @@ Deno.serve(async (req) => {
             isAdminByRole,
             isAdminByAccess,
             isAdmin,
+            accessMode,
+            permissionsResolvedAs,
             acessos: acessos || [],
             perfis: perfisMap,
             scope,
@@ -195,6 +219,7 @@ Deno.serve(async (req) => {
             meta: {
                 total_acessos: (acessos || []).length,
                 total_perfis: (perfis || []).length,
+                schemaStrategy: 'dynamic_prefix_acesso_perm',
                 generatedAt: new Date().toISOString(),
             },
         });
@@ -212,6 +237,8 @@ Deno.serve(async (req) => {
                 modules: {},
                 actions: {},
                 scope: { tipo: 'erro', estruturaIds: [], militarId: null, reason: 'INTERNAL_ERROR' },
+                accessMode: 'restricted',
+                permissionsResolvedAs: 'profiles',
             },
             { status }
         );
