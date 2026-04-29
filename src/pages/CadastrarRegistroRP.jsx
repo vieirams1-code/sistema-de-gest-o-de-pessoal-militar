@@ -311,19 +311,16 @@ export default function CadastrarRegistroRP() {
     grupamento_id:
       militarSelecionado?.grupamento_id ||
       formData.grupamento_id ||
-      acesso?.grupamento_id ||
       user?.grupamento_id ||
       '',
     subgrupamento_id:
       militarSelecionado?.subgrupamento_id ||
       formData.subgrupamento_id ||
-      acesso?.subgrupamento_id ||
       user?.subgrupamento_id ||
       '',
     subgrupamento_tipo:
       militarSelecionado?.subgrupamento_tipo ||
       formData.subgrupamento_tipo ||
-      acesso?.subgrupamento_tipo ||
       user?.subgrupamento_tipo ||
       '',
     unidade_id:
@@ -333,19 +330,16 @@ export default function CadastrarRegistroRP() {
     setor_id:
       militarSelecionado?.grupamento_id ||
       formData.grupamento_id ||
-      acesso?.grupamento_id ||
       user?.grupamento_id ||
       '',
     subsetor_id:
       militarSelecionado?.subgrupamento_id ||
       formData.subgrupamento_id ||
-      acesso?.subgrupamento_id ||
       user?.subgrupamento_id ||
       '',
     tipo_subgrupamento:
       militarSelecionado?.subgrupamento_tipo ||
       formData.subgrupamento_tipo ||
-      acesso?.subgrupamento_tipo ||
       user?.subgrupamento_tipo ||
       '',
     user_email: user?.email || '',
@@ -358,9 +352,6 @@ export default function CadastrarRegistroRP() {
     formData.subgrupamento_id,
     formData.subgrupamento_tipo,
     formData.unidade_id,
-    acesso?.grupamento_id,
-    acesso?.subgrupamento_id,
-    acesso?.subgrupamento_tipo,
     user?.grupamento_id,
     user?.subgrupamento_id,
     user?.subgrupamento_tipo,
