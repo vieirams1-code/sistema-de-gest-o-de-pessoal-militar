@@ -144,6 +144,23 @@ function isPraca(postoGraduacao) {
   return PRACAS.has(postoGraduacao);
 }
 
+// Lote 1D-C — bloqueio por dado cadastral incompleto.
+// Considera data_inclusao válida apenas se for uma data parseável e
+// cronologicamente plausível (>= 1900-01-01 e <= hoje + 1 dia).
+function isDataInclusaoValida(rawDataInclusao) {
+  if (rawDataInclusao === null || rawDataInclusao === undefined || rawDataInclusao === '') {
+    return false;
+  }
+  const d = toDate(rawDataInclusao);
+  if (!d) return false;
+  const minimo = new Date('1900-01-01T00:00:00');
+  const amanha = new Date();
+  amanha.setDate(amanha.getDate() + 1);
+  if (d < minimo) return false;
+  if (d > amanha) return false;
+  return true;
+}
+
 function isPunicaoValida(punicao, { incluirReabilitadas = false } = {}) {
   const status = normalizeText(getStatusPunicao(punicao));
   const tipo = normalizeText(getTipoPunicao(punicao));
@@ -419,6 +436,7 @@ Deno.serve(async (req) => {
       : new Date();
 
     const sugestoes = [];
+    const inconsistencias = [];
     const erros = [];
     let totalMilitaresLidos = 0;
     let totalPracasProcessadas = 0;
@@ -451,8 +469,11 @@ Deno.serve(async (req) => {
           parametros: params,
           total_militares_lidos: 0,
           total_pracas_processadas: 0,
+          total_sugestoes: 0,
           total_mudancas_sugeridas: 0,
+          total_inconsistencias: 0,
           sugestoes: [],
+          inconsistencias: [],
           erros: [{ militar_id: params.militarId, erro: 'militar_nao_encontrado' }],
         });
       }
@@ -466,8 +487,11 @@ Deno.serve(async (req) => {
           parametros: params,
           total_militares_lidos: 1,
           total_pracas_processadas: 0,
+          total_sugestoes: 0,
           total_mudancas_sugeridas: 0,
+          total_inconsistencias: 0,
           sugestoes: [],
+          inconsistencias: [],
           erros: [{
             militar_id: militar.id,
             erro: `posto_graduacao_nao_e_praca: ${militar.posto_graduacao || 'desconhecido'}`,
@@ -485,12 +509,19 @@ Deno.serve(async (req) => {
         punicoes = [];
       }
 
-      const sugestao = montarSugestao(militar, punicoes, dataReferenciaDate, params.incluirReabilitadas);
-      if (sugestao) {
+      const resultado = montarSugestao(militar, punicoes, dataReferenciaDate, params.incluirReabilitadas);
+      if (resultado) {
         totalPracasProcessadas = 1;
-        sugestoes.push(sugestao);
-        if (sugestao.mudou_para_melhor || sugestao.comportamento_calculado !== sugestao.comportamento_atual) {
-          totalMudancasSugeridas = 1;
+        if (resultado.tipo === 'sugestao') {
+          sugestoes.push(resultado.sugestao);
+          if (
+            resultado.sugestao.mudou_para_melhor
+            || resultado.sugestao.comportamento_calculado !== resultado.sugestao.comportamento_atual
+          ) {
+            totalMudancasSugeridas = 1;
+          }
+        } else if (resultado.tipo === 'inconsistencia') {
+          inconsistencias.push(resultado.inconsistencia);
         }
       }
 
@@ -502,8 +533,11 @@ Deno.serve(async (req) => {
         parametros: params,
         total_militares_lidos: totalMilitaresLidos,
         total_pracas_processadas: totalPracasProcessadas,
+        total_sugestoes: sugestoes.length,
         total_mudancas_sugeridas: totalMudancasSugeridas,
+        total_inconsistencias: inconsistencias.length,
         sugestoes,
+        inconsistencias,
         erros,
       });
     }
@@ -547,12 +581,19 @@ Deno.serve(async (req) => {
     for (const militar of pracas) {
       try {
         const punicoes = punicoesPorMilitar.get(militar.id) || [];
-        const sugestao = montarSugestao(militar, punicoes, dataReferenciaDate, params.incluirReabilitadas);
-        if (sugestao) {
+        const resultado = montarSugestao(militar, punicoes, dataReferenciaDate, params.incluirReabilitadas);
+        if (resultado) {
           totalPracasProcessadas += 1;
-          sugestoes.push(sugestao);
-          if (sugestao.comportamento_calculado && sugestao.comportamento_calculado !== sugestao.comportamento_atual) {
-            totalMudancasSugeridas += 1;
+          if (resultado.tipo === 'sugestao') {
+            sugestoes.push(resultado.sugestao);
+            if (
+              resultado.sugestao.comportamento_calculado
+              && resultado.sugestao.comportamento_calculado !== resultado.sugestao.comportamento_atual
+            ) {
+              totalMudancasSugeridas += 1;
+            }
+          } else if (resultado.tipo === 'inconsistencia') {
+            inconsistencias.push(resultado.inconsistencia);
           }
         }
       } catch (e) {
@@ -568,8 +609,11 @@ Deno.serve(async (req) => {
       parametros: params,
       total_militares_lidos: totalMilitaresLidos,
       total_pracas_processadas: totalPracasProcessadas,
+      total_sugestoes: sugestoes.length,
       total_mudancas_sugeridas: totalMudancasSugeridas,
+      total_inconsistencias: inconsistencias.length,
       sugestoes,
+      inconsistencias,
       erros,
     });
   } catch (error) {
@@ -584,9 +628,28 @@ Deno.serve(async (req) => {
 // Auxiliar: monta o item de sugestão para um militar.
 // Retorna null se o cálculo não puder ser feito.
 // ----------------------------------------------------------------------------
+// Lote 1D-C — agora pode retornar:
+//   - { tipo: 'sugestao', sugestao }
+//   - { tipo: 'inconsistencia', inconsistencia }
+//   - null  (não é praça ou militar inválido)
 function montarSugestao(militar, punicoes, dataReferenciaDate, incluirReabilitadas) {
   if (!militar || !militar.id) return null;
   if (!isPraca(militar.posto_graduacao)) return null;
+
+  // BLOQUEIO 1D-C: sem data_inclusao válida não há janela confiável.
+  // Não calculamos comportamento e registramos inconsistência.
+  if (!isDataInclusaoValida(militar.data_inclusao)) {
+    return {
+      tipo: 'inconsistencia',
+      inconsistencia: {
+        militar_id: militar.id,
+        militar_nome: militar.nome_completo || '',
+        posto_graduacao: militar.posto_graduacao || '',
+        motivo: 'DATA_INCLUSAO_AUSENTE_OU_INVALIDA',
+        data_inclusao_recebida: militar.data_inclusao ?? null,
+      },
+    };
+  }
 
   const calculado = calcularComportamento(
     Array.isArray(punicoes) ? punicoes : [],
@@ -605,13 +668,16 @@ function montarSugestao(militar, punicoes, dataReferenciaDate, incluirReabilitad
   const mudouParaMelhor = compararComportamentos(atual, calc) > 0;
 
   return {
-    militar_id: militar.id,
-    militar_nome: militar.nome_completo || '',
-    posto_graduacao: militar.posto_graduacao || '',
-    comportamento_atual: atual,
-    comportamento_calculado: calc,
-    mudou_para_melhor: mudouParaMelhor,
-    fundamento_legal: calculado.fundamento || '',
-    detalhes_calculo: calculado.detalhes || {},
+    tipo: 'sugestao',
+    sugestao: {
+      militar_id: militar.id,
+      militar_nome: militar.nome_completo || '',
+      posto_graduacao: militar.posto_graduacao || '',
+      comportamento_atual: atual,
+      comportamento_calculado: calc,
+      mudou_para_melhor: mudouParaMelhor,
+      fundamento_legal: calculado.fundamento || '',
+      detalhes_calculo: calculado.detalhes || {},
+    },
   };
 }
