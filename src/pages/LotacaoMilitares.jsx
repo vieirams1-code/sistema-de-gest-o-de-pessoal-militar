@@ -292,10 +292,26 @@ export default function LotacaoMilitares() {
         };
       }
 
+      // Lote 1C-B.1: também atualizar campos modernos da estrutura saneada e o campo
+      // textual `lotacao`, garantindo consistência entre modelo legado e moderno.
+      // `estrutura_tipo` usa o tipo cru do node (ex.: 'Grupamento'/'Subgrupamento'/'Unidade'),
+      // que é o formato real esperado pela entidade Militar.
+      updateData = {
+        ...updateData,
+        estrutura_id: targetNode.id,
+        estrutura_nome: targetNode.nome,
+        estrutura_tipo: targetNode.tipo,
+        lotacao: targetNode.nome,
+      };
+
       await Promise.all(militaresIds.map(id => base44.entities.Militar.update(id, updateData)));
     },
     onSuccess: () => {
+      // Lote 1C-B.1: invalidar ambas as queries que alimentam a lista
+      // (a base de militares ativos e o enriquecimento com matrículas).
       queryClient.invalidateQueries({ queryKey: ['lotacao-militares-ativos'] });
+      queryClient.invalidateQueries({ queryKey: ['lotacao-militares-com-matriculas'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
       dismiss();
       toast({
         title: "Lotação Atualizada",

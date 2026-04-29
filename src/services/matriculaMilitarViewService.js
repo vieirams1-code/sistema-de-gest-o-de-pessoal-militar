@@ -157,6 +157,16 @@ export function militarCorrespondeBusca(militar = {}, termo = '') {
 }
 
 export function getLotacaoAtualMilitar(militar = {}) {
+  // Lote 1C-B.1: prioriza o modelo moderno saneado (estrutura_id + estrutura_nome)
+  // como fonte primária da lotação atual. Caso o militar tenha estrutura_id preenchido,
+  // ele já passou pelo saneamento de lotação e estrutura_nome é a verdade.
+  const estruturaId = String(militar?.estrutura_id || '').trim();
+  const estruturaNome = String(militar?.estrutura_nome || '').trim();
+  if (estruturaId && estruturaNome) {
+    return estruturaNome;
+  }
+
+  // Fallback legado para registros ainda não saneados.
   const subgrupamentoNome = String(militar?.subgrupamento_nome || '').trim();
   const grupamentoNome = String(militar?.grupamento_nome || '').trim();
   const lotacaoAtual = String(militar?.lotacao_atual || '').trim();
