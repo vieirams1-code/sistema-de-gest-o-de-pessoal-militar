@@ -38,8 +38,6 @@ const GRADUACAO_GROUPS = [
   { key: 'soldados', label: 'Soldados', postos: ['Soldado'] },
 ];
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export default function Militares() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -63,28 +61,48 @@ export default function Militares() {
     return [...new Set(postos)];
   }, [debouncedGroups]);
 
-  const shouldQuery = isAccessResolved && selectedPostos.length > 0 && (!isAdmin || lotacaoFilter !== TODAS_LOTACOES_VALUE);
+  const shouldQuery = isAccessResolved && selectedPostos.length > 0;
+
+  const { data: lotacoesAdminData = [] } = useQuery({
+    queryKey: ['militares-lotacoes-admin'],
+    enabled: isAdmin,
+    queryFn: async () => {
+      try {
+        const lotacoes = await base44.entities.Subgrupamento.list('nome');
+        return (lotacoes || [])
+          .map((item) => String(item?.nome || '').trim())
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      } catch {
+        return [];
+      }
+    },
+  });
 
   const { data: militaresData, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['militares-consulta-rapida', isAdmin, lotacaoFilter, selectedPostos.join('|')],
     enabled: shouldQuery,
     queryFn: async () => {
-      const filters = [];
-      if (isAdmin) {
-        filters.push({ subgrupamento_nome: lotacaoFilter });
-      } else {
-        filters.push(...getMilitarScopeFilters());
-      }
+      const filters = isAdmin ? (lotacaoFilter === TODAS_LOTACOES_VALUE
+        ? [{ posto_graduacao: { in: selectedPostos } }]
+        : [{ subgrupamento_nome: lotacaoFilter, posto_graduacao: { in: selectedPostos } }])
+        : getMilitarScopeFilters();
       if (!filters.length) return { militares: [], partialFailures: 0 };
 
       const runFilter = async (filter) => {
-        const results = [];
-        for (const posto of selectedPostos) {
-          const data = await base44.entities.Militar.filter({ ...filter, posto_graduacao: posto }, '-created_date');
-          results.push(...(data || []));
-          await delay(80);
+        try {
+          const data = await base44.entities.Militar.filter(filter, '-created_date');
+          return data || [];
+        } catch {
+          const results = await Promise.allSettled(
+            selectedPostos.map((posto) =>
+              base44.entities.Militar.filter({ ...filter, posto_graduacao: posto }, '-created_date')
+            )
+          );
+          return results
+            .filter((result) => result.status === 'fulfilled')
+            .flatMap((result) => result.value || []);
         }
-        return results;
       };
 
       const settled = await Promise.allSettled(filters.map((f) => runFilter(f)));
@@ -103,11 +121,7 @@ export default function Militares() {
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: true });
   const filteredMilitares = operacionais.filter((m) => militarCorrespondeBusca(m, searchTerm));
 
-  const lotacoesDisponiveis = useMemo(() => {
-    const set = new Set();
-    operacionais.forEach((m) => { if (m.lotacao_atual && m.lotacao_atual !== 'Sem lotação') set.add(m.lotacao_atual); });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [operacionais]);
+  const lotacoesDisponiveis = useMemo(() => (isAdmin ? lotacoesAdminData : []), [isAdmin, lotacoesAdminData]);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => excluirMilitarComDependencias(id, { executadoPor: userEmail || '' }),
@@ -120,9 +134,7 @@ export default function Militares() {
 
   if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
 
-  const emptyInstruction = isAdmin && lotacaoFilter === TODAS_LOTACOES_VALUE
-    ? 'Selecione uma lotação ou graduação para consultar.'
-    : 'Selecione uma ou mais graduações para carregar o efetivo.';
+  const emptyInstruction = 'Selecione uma ou mais graduações para carregar o efetivo.';
 
   const isRateLimitError = String(error?.message || '').toLowerCase().includes('rate limit');
 
