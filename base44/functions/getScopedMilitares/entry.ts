@@ -235,6 +235,7 @@ Deno.serve(async (req) => {
         const {
             lotacaoFiltro,
             postoGraduacaoFiltro,
+            postoGraduacaoFiltros: postoGraduacaoFiltrosRaw,
             search,
             statusCadastro,
             situacaoMilitar,
@@ -244,6 +245,13 @@ Deno.serve(async (req) => {
             effectiveEmail,
             militarIds: militarIdsRaw,
         } = payload || {};
+
+        // Suporte a múltiplos postos via $in (Lote 1C-A) — aditivo e
+        // retrocompatível com postoGraduacaoFiltro (string única).
+        // Se ambos forem fornecidos, postoGraduacaoFiltros prevalece.
+        const postoGraduacaoFiltros = Array.isArray(postoGraduacaoFiltrosRaw)
+            ? [...new Set(postoGraduacaoFiltrosRaw.filter((p) => typeof p === 'string' && p.trim()))]
+            : null;
 
         const effLimit = clampLimit(limit);
         const effOffset = clampOffset(offset);
@@ -364,7 +372,11 @@ Deno.serve(async (req) => {
 
         // 6. Filtro base
         const baseFilter = {};
-        if (postoGraduacaoFiltro) baseFilter.posto_graduacao = postoGraduacaoFiltro;
+        if (postoGraduacaoFiltros && postoGraduacaoFiltros.length > 0) {
+            baseFilter.posto_graduacao = { $in: postoGraduacaoFiltros };
+        } else if (postoGraduacaoFiltro) {
+            baseFilter.posto_graduacao = postoGraduacaoFiltro;
+        }
         if (statusCadastro) baseFilter.status_cadastro = statusCadastro;
         if (situacaoMilitar) baseFilter.situacao_militar = situacaoMilitar;
 
@@ -629,7 +641,8 @@ Deno.serve(async (req) => {
                 offsetAplicadoNaConsulta,
                 scope_tipo: isAdmin ? 'admin' : escopo.tipo,
                 aplicou_filtro_lotacao: !!lotacaoFiltro,
-                aplicou_filtro_posto: !!postoGraduacaoFiltro,
+                aplicou_filtro_posto: !!postoGraduacaoFiltro || (postoGraduacaoFiltros && postoGraduacaoFiltros.length > 0),
+                postos_solicitados: postoGraduacaoFiltros ? postoGraduacaoFiltros.length : (postoGraduacaoFiltro ? 1 : 0),
                 aplicou_filtro_status: !!statusCadastro,
                 aplicou_filtro_situacao: !!situacaoMilitar,
                 busca_aplicada: buscaAplicada,
