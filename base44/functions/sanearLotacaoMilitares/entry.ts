@@ -257,18 +257,35 @@ Deno.serve(async (req) => {
 
     let atualizados = 0;
     const erros = [];
-    for (const item of migraveis) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    async function updateComRetry(id, data, tentativa = 0) {
       try {
-        await base44.asServiceRole.entities.Militar.update(item.militar_id, {
-          estrutura_id: item.estrutura_id_proposto,
-          estrutura_nome: item.estrutura_nome_proposto,
-          estrutura_tipo: item.estrutura_tipo_proposto,
-          lotacao: item.lotacao_proposta,
-        });
-        atualizados += 1;
+        await base44.asServiceRole.entities.Militar.update(id, data);
+        return true;
       } catch (err) {
-        erros.push({ militar_id: item.militar_id, error: err.message });
+        const msg = String(err && err.message || '');
+        const isRateLimit = msg.includes('Rate limit') || msg.includes('429');
+        if (isRateLimit && tentativa < 6) {
+          const backoff = Math.min(2000 * Math.pow(2, tentativa), 30000) + Math.floor(Math.random() * 500);
+          await sleep(backoff);
+          return updateComRetry(id, data, tentativa + 1);
+        }
+        erros.push({ militar_id: id, error: msg });
+        return false;
       }
+    }
+
+    for (const item of migraveis) {
+      const ok = await updateComRetry(item.militar_id, {
+        estrutura_id: item.estrutura_id_proposto,
+        estrutura_nome: item.estrutura_nome_proposto,
+        estrutura_tipo: item.estrutura_tipo_proposto,
+        lotacao: item.lotacao_proposta,
+      });
+      if (ok) atualizados += 1;
+      // throttle leve entre escritas para evitar 429
+      await sleep(120);
     }
 
     return Response.json({
