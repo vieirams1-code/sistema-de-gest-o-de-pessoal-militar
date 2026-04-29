@@ -50,6 +50,31 @@ const loadSubgrupamentosWithRetry = async ({ maxRetries = 2, baseDelayMs = 500 }
   throw lastError || new Error('Falha ao carregar lotações.');
 };
 
+const loadMilitaresWithRetry = async (filter, options = {}) => {
+  const { sort = '-created_date', maxRetries = 2, baseDelayMs = 400 } = options;
+  let lastError = null;
+  let hadRetry = false;
+  let hadRateLimit = false;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const data = await base44.entities.Militar.filter(filter, sort);
+      return { data: data || [], retryInfo: { hadRetry, hadRateLimit, attempts: attempt + 1 } };
+    } catch (error) {
+      lastError = error;
+      const isRateLimit = String(error?.message || '').toLowerCase().includes('rate limit');
+      hadRateLimit = hadRateLimit || isRateLimit;
+      if (attempt >= maxRetries) break;
+      hadRetry = true;
+      await sleep(baseDelayMs * (2 ** attempt));
+    }
+  }
+
+  throw Object.assign(lastError || new Error('Falha ao carregar dados.'), {
+    retryInfo: { hadRetry, hadRateLimit, attempts: maxRetries + 1 },
+  });
+};
+
 const GRADUACAO_GROUPS = [
   { key: 'oficiais', label: 'Oficiais', postos: ['Coronel', 'Tenente Coronel', 'Tenente-Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'] },
   { key: 'sargentos', label: 'Sargentos', postos: ['Subtenente', '1º Sargento', '2º Sargento', '3º Sargento'] },
@@ -120,33 +145,81 @@ export default function Militares() {
       if (!filters.length) return { militares: [], partialFailures: 0, totalCarregadoAntesFiltroLocal: 0, totalDepoisFiltroLocal: 0, lotacoesEncontradasNosResultados: [] };
 
       const runAdminFilter = async () => {
-        const diagnostico = { filtro: filters[0], quantidade: 0, fallbackIndividual: false, erro: null };
+        const diagnostico = {
+          filtro: filters[0],
+          quantidade: 0,
+          fallbackIndividual: false,
+          erro: null,
+          falhas: 0,
+          houveRetry: false,
+          houveRateLimit: false,
+          quantidadeTentada: 1,
+        };
         try {
-          const data = await base44.entities.Militar.filter(filters[0], '-created_date');
-          const lista = data || [];
+          const { data: lista, retryInfo } = await loadMilitaresWithRetry(filters[0]);
           diagnostico.quantidade = lista.length;
+          diagnostico.houveRetry = retryInfo.hadRetry;
+          diagnostico.houveRateLimit = retryInfo.hadRateLimit;
 
           if (lista.length > 0) return { data: lista, diagnostico };
 
-          const results = await Promise.allSettled(
-            selectedPostos.map((posto) => base44.entities.Militar.filter({ posto_graduacao: posto }, '-created_date'))
-          );
-          const fulfilled = results
-            .filter((result) => result.status === 'fulfilled')
-            .flatMap((result) => result.value || []);
+          const fulfilled = [];
+          let failures = 0;
+          let hadRetry = diagnostico.houveRetry;
+          let hadRateLimit = diagnostico.houveRateLimit;
+          for (const posto of selectedPostos) {
+            try {
+              const { data, retryInfo } = await loadMilitaresWithRetry({ posto_graduacao: posto });
+              fulfilled.push(...(data || []));
+              hadRetry = hadRetry || retryInfo.hadRetry;
+              hadRateLimit = hadRateLimit || retryInfo.hadRateLimit;
+            } catch (error) {
+              failures += 1;
+              const isRateLimit = String(error?.message || '').toLowerCase().includes('rate limit');
+              hadRateLimit = hadRateLimit || isRateLimit;
+              if (import.meta.env.DEV) {
+                console.warn('[Militares] Falha parcial no fallback por posto', { posto, erro: String(error?.message || error) });
+              }
+            }
+            await sleep(100);
+          }
           diagnostico.fallbackIndividual = true;
           diagnostico.quantidade = fulfilled.length;
+          diagnostico.falhas = failures;
+          diagnostico.houveRetry = hadRetry;
+          diagnostico.houveRateLimit = hadRateLimit;
+          diagnostico.quantidadeTentada = 1 + selectedPostos.length;
+          if (failures === selectedPostos.length) throw new Error('Falha ao carregar dados');
           return { data: fulfilled, diagnostico };
         } catch (erroInOperator) {
-          const results = await Promise.allSettled(
-            selectedPostos.map((posto) => base44.entities.Militar.filter({ posto_graduacao: posto }, '-created_date'))
-          );
-          const fulfilled = results
-            .filter((result) => result.status === 'fulfilled')
-            .flatMap((result) => result.value || []);
+          const fulfilled = [];
+          let failures = 0;
+          let hadRetry = diagnostico.houveRetry;
+          let hadRateLimit = diagnostico.houveRateLimit;
+          for (const posto of selectedPostos) {
+            try {
+              const { data, retryInfo } = await loadMilitaresWithRetry({ posto_graduacao: posto });
+              fulfilled.push(...(data || []));
+              hadRetry = hadRetry || retryInfo.hadRetry;
+              hadRateLimit = hadRateLimit || retryInfo.hadRateLimit;
+            } catch (error) {
+              failures += 1;
+              const isRateLimit = String(error?.message || '').toLowerCase().includes('rate limit');
+              hadRateLimit = hadRateLimit || isRateLimit;
+              if (import.meta.env.DEV) {
+                console.warn('[Militares] Falha parcial no fallback por posto', { posto, erro: String(error?.message || error) });
+              }
+            }
+            await sleep(100);
+          }
           diagnostico.erro = erroInOperator;
           diagnostico.fallbackIndividual = true;
           diagnostico.quantidade = fulfilled.length;
+          diagnostico.falhas = failures;
+          diagnostico.houveRetry = hadRetry;
+          diagnostico.houveRateLimit = hadRateLimit;
+          diagnostico.quantidadeTentada = 1 + selectedPostos.length;
+          if (failures === selectedPostos.length) throw new Error('Falha ao carregar dados');
           return { data: fulfilled, diagnostico };
         }
       };
@@ -158,9 +231,13 @@ export default function Militares() {
           : filters.map((filtro) => {
             const diag = { filtro, quantidade: 0 };
             diagnostico.push(diag);
-            return base44.entities.Militar.filter(filtro, '-created_date').then((data) => {
+            return loadMilitaresWithRetry(filtro).then(({ data, retryInfo }) => {
               const lista = data || [];
               diag.quantidade = lista.length;
+              diag.quantidadeTentada = 1;
+              diag.falhas = 0;
+              diag.houveRetry = retryInfo.hadRetry;
+              diag.houveRateLimit = retryInfo.hadRateLimit;
               return lista;
             });
           })
@@ -191,7 +268,11 @@ export default function Militares() {
           filtrosTentados: diagnostico.map((item) => ({
             filtro: item.filtro,
             fallbackIndividual: Boolean(item.fallbackIndividual),
+            quantidadeTentada: item.quantidadeTentada || 0,
             quantidade: item.quantidade,
+            falhas: item.falhas || 0,
+            houveRetry: Boolean(item.houveRetry),
+            houveRateLimit: Boolean(item.houveRateLimit),
             erro: item.erro ? String(item.erro?.message || item.erro) : null,
           })),
           totalUnico: unique.size,
