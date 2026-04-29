@@ -31,6 +31,25 @@ import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const statusBadgeClass = { Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200', Inativo: 'bg-slate-100 text-slate-700 border-slate-200', Reserva: 'bg-amber-100 text-amber-700 border-amber-200', Reforma: 'bg-blue-100 text-blue-700 border-blue-200', Falecido: 'bg-red-100 text-red-700 border-red-200' };
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const loadSubgrupamentosWithRetry = async ({ maxRetries = 2, baseDelayMs = 500 } = {}) => {
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return await base44.entities.Subgrupamento.list('nome', 200);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= maxRetries) break;
+      await sleep(baseDelayMs * (2 ** attempt));
+    }
+  }
+
+  throw lastError || new Error('Falha ao carregar lotações.');
+};
+
 const GRADUACAO_GROUPS = [
   { key: 'oficiais', label: 'Oficiais', postos: ['Coronel', 'Tenente Coronel', 'Tenente-Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'] },
   { key: 'sargentos', label: 'Sargentos', postos: ['Subtenente', '1º Sargento', '2º Sargento', '3º Sargento'] },
@@ -63,30 +82,33 @@ export default function Militares() {
 
   const shouldQuery = isAccessResolved && selectedPostos.length > 0;
 
-  const { data: lotacoesAdminData = [] } = useQuery({
-    queryKey: ['militares-lotacoes-admin'],
+  const lotacoesAdminQueryKey = ['militares-lotacoes-admin'];
+  const {
+    data: lotacoesAdminData = [],
+    isLoading: isLoadingLotacoesAdmin,
+    isError: isErrorLotacoesAdmin,
+    error: lotacoesAdminError,
+    refetch: refetchLotacoesAdmin,
+  } = useQuery({
+    queryKey: lotacoesAdminQueryKey,
     enabled: isAdmin,
     queryFn: async () => {
-      try {
-        const lotacoes = await base44.entities.Subgrupamento.list('nome');
-        return (lotacoes || [])
-          .filter((item) => {
-            const status = String(item?.status || '').trim().toLowerCase();
-            if (item?.deleted === true) return false;
-            if (item?.is_deleted === true) return false;
-            if (item?.excluido === true) return false;
-            if (item?.ativo === false) return false;
-            if (item?.archived === true) return false;
-            if (item?.arquivado === true) return false;
-            if (status === 'excluído' || status === 'excluido' || status === 'inativo') return false;
-            return true;
-          })
-          .map((item) => String(item?.nome || '').trim())
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-      } catch {
-        return [];
-      }
+      const lotacoes = await loadSubgrupamentosWithRetry({ maxRetries: 2, baseDelayMs: 400 });
+      return (lotacoes || [])
+        .filter((item) => {
+          const status = String(item?.status || '').trim().toLowerCase();
+          if (item?.deleted === true) return false;
+          if (item?.is_deleted === true) return false;
+          if (item?.excluido === true) return false;
+          if (item?.ativo === false) return false;
+          if (item?.archived === true) return false;
+          if (item?.arquivado === true) return false;
+          if (status === 'excluído' || status === 'excluido' || status === 'inativo') return false;
+          return true;
+        })
+        .map((item) => String(item?.nome || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
     },
   });
 
@@ -188,6 +210,9 @@ export default function Militares() {
   const filteredMilitares = operacionais.filter((m) => militarCorrespondeBusca(m, searchTerm));
 
   const lotacoesDisponiveis = useMemo(() => (isAdmin ? lotacoesAdminData : []), [isAdmin, lotacoesAdminData]);
+  const isLotacoesAdminRateLimit = String(lotacoesAdminError?.message || '').includes('Rate limit exceeded');
+  const lotacoesAdminEmptyForAdmin = isAdmin && !isLoadingLotacoesAdmin && !isErrorLotacoesAdmin && lotacoesDisponiveis.length === 0;
+  const shouldShowLotacoesDebugPanel = isAdmin && (isErrorLotacoesAdmin || lotacoesAdminEmptyForAdmin);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => excluirMilitarComDependencias(id, { executadoPor: userEmail || '' }),
@@ -227,6 +252,13 @@ export default function Militares() {
             <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input className="pl-9" placeholder="Buscar nome ou matrícula..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
           </div>
         </div>
+
+        {isAdmin && isErrorLotacoesAdmin && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 mb-4">
+            <p className="text-sm font-medium">{isLotacoesAdminRateLimit ? 'Rate limit excedido ao carregar lotações. Você ainda pode consultar por graduação.' : 'Não foi possível carregar lotações. Você ainda pode consultar por graduação.'}</p>
+            <Button onClick={() => refetchLotacoesAdmin()} variant="outline" size="sm" className="mt-2">Tentar carregar lotações</Button>
+          </div>
+        )}
 
         {!shouldQuery ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
@@ -274,6 +306,23 @@ export default function Militares() {
               </div>
             ))}
           </div>
+        )}
+
+        {shouldShowLotacoesDebugPanel && (
+          <DataDebugPanel
+            debugData={{
+              pagina: 'Militares',
+              estagioProvavel: 'Subgrupamento.list',
+              lotacoesAdminData: {
+                isLoading: isLoadingLotacoesAdmin,
+                isError: isErrorLotacoesAdmin,
+                erro: lotacoesAdminError ? { message: lotacoesAdminError.message } : null,
+                quantidadeRetornada: lotacoesDisponiveis.length,
+                queryKey: lotacoesAdminQueryKey,
+              },
+            }}
+            className="text-left mt-4"
+          />
         )}
       </div>
 
