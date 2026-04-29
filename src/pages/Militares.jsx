@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -19,8 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Users, Grid3X3, List, Eye, Pencil, Trash2 } from 'lucide-react';
-import MilitarCard from '@/components/militar/MilitarCard';
+import { Plus, Search, Eye, Pencil, Trash2, Users } from 'lucide-react';
 import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
@@ -28,601 +27,166 @@ import {
   militarCorrespondeBusca,
 } from '@/services/matriculaMilitarViewService';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
-import { isPostoOficial } from '@/utils/postoQuadroCompatibilidade';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
-const SEM_LOTACAO_VALUE = '__sem_lotacao__';
-const statusBadgeClass = {
-  Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  Inativo: 'bg-slate-100 text-slate-700 border-slate-200',
-  Reserva: 'bg-amber-100 text-amber-700 border-amber-200',
-  Reforma: 'bg-blue-100 text-blue-700 border-blue-200',
-  Falecido: 'bg-red-100 text-red-700 border-red-200',
-};
+const statusBadgeClass = { Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200', Inativo: 'bg-slate-100 text-slate-700 border-slate-200', Reserva: 'bg-amber-100 text-amber-700 border-amber-200', Reforma: 'bg-blue-100 text-blue-700 border-blue-200', Falecido: 'bg-red-100 text-red-700 border-red-200' };
+const GRADUACAO_GROUPS = [
+  { key: 'oficiais', label: 'Oficiais', postos: ['Coronel', 'Tenente Coronel', 'Tenente-Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'] },
+  { key: 'sargentos', label: 'Sargentos', postos: ['Subtenente', '1º Sargento', '2º Sargento', '3º Sargento'] },
+  { key: 'cabos', label: 'Cabos', postos: ['Cabo'] },
+  { key: 'soldados', label: 'Soldados', postos: ['Soldado'] },
+];
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function Militares() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const {
-    isAdmin,
-    subgrupamentoId,
-    subgrupamentoTipo,
-    modoAcesso,
-    userEmail,
-    linkedMilitarId,
-    linkedMilitarEmail,
-    hasSelfAccess,
-    canAccessModule,
-    canAccessAction,
-    getMilitarScopeFilters,
-    isLoading: loadingUser,
-    isAccessResolved,
-  } = useCurrentUser();
+  const { isAdmin, userEmail, linkedMilitarEmail, canAccessModule, canAccessAction, getMilitarScopeFilters, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
 
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [postoFilter, setPostoFilter] = useState('all');
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [debouncedGroups, setDebouncedGroups] = useState([]);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODAS_LOTACOES_VALUE);
-  const [mostrarInativos, setMostrarInativos] = useState(false);
-  const [viewMode, setViewMode] = useState('list');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
-  const {
-    data: militaresData,
-    isLoading: loadingMilitaresQuery,
-    isFetching: fetchingMilitaresQuery,
-    isError: militaresQueryError,
-    isSuccess: militaresQuerySuccess,
-    error: militaresMainError,
-    refetch: refetchMilitares,
-  } = useQuery({
-    queryKey: ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail],
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedGroups(selectedGroups), 300);
+    return () => clearTimeout(t);
+  }, [selectedGroups]);
+
+  const selectedPostos = useMemo(() => {
+    const postos = GRADUACAO_GROUPS.filter((g) => debouncedGroups.includes(g.key)).flatMap((g) => g.postos);
+    return [...new Set(postos)];
+  }, [debouncedGroups]);
+
+  const shouldQuery = isAccessResolved && selectedPostos.length > 0 && (!isAdmin || lotacaoFilter !== TODAS_LOTACOES_VALUE);
+
+  const { data: militaresData, isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: ['militares-consulta-rapida', isAdmin, lotacaoFilter, selectedPostos.join('|')],
+    enabled: shouldQuery,
     queryFn: async () => {
+      const filters = [];
       if (isAdmin) {
-        const lista = await base44.entities.Militar.list('-created_date');
-        const militares = await carregarMilitaresComMatriculas(lista);
-        return { militares, partialFailures: 0 };
+        filters.push({ subgrupamento_nome: lotacaoFilter });
+      } else {
+        filters.push(...getMilitarScopeFilters());
       }
-
-      if (modoAcesso === 'proprio') {
-        const knownEmails = [userEmail, linkedMilitarEmail].filter(Boolean);
-        if (!linkedMilitarId && knownEmails.length === 0) return { militares: [], partialFailures: 0 };
-
-        const requests = [];
-        if (linkedMilitarId) requests.push(base44.entities.Militar.filter({ id: linkedMilitarId }, '-created_date'));
-        for (const email of knownEmails) {
-          requests.push(base44.entities.Militar.filter({ email }, '-created_date'));
-          requests.push(base44.entities.Militar.filter({ email_particular: email }, '-created_date'));
-          requests.push(base44.entities.Militar.filter({ email_funcional: email }, '-created_date'));
-          requests.push(base44.entities.Militar.filter({ created_by: email }, '-created_date'));
-          requests.push(base44.entities.Militar.filter({ militar_email: email }, '-created_date'));
-        }
-
-        const resultados = await Promise.allSettled(requests);
-        const batches = resultados
-          .filter((resultado) => resultado.status === 'fulfilled')
-          .map((resultado) => resultado.value || []);
-        const failures = resultados.length - batches.length;
-
-        if (import.meta.env.DEV && failures > 0) {
-          console.warn('[Militares] Falha parcial ao carregar militares no modo próprio.', {
-            totalConsultas: resultados.length,
-            falhas: failures,
-          });
-        }
-        if (!batches.length && requests.length > 0) {
-          throw new Error('Falha ao carregar militares no modo próprio.');
-        }
-
-        const ids = new Set();
-        const vinculados = batches.flat().filter((m) => {
-          if (!hasSelfAccess(m) || ids.has(m.id)) return false;
-          ids.add(m.id);
-          return true;
-        });
-        const militares = await carregarMilitaresComMatriculas(vinculados);
-        return { militares, partialFailures: failures };
-      }
-
-      const filters = getMilitarScopeFilters();
       if (!filters.length) return { militares: [], partialFailures: 0 };
-      
-      const requests = filters.map(f => base44.entities.Militar.filter(f, '-created_date'));
-      const resultados = await Promise.allSettled(requests);
-      const batches = resultados
-        .filter((resultado) => resultado.status === 'fulfilled')
-        .map((resultado) => resultado.value || []);
-      const failures = resultados.length - batches.length;
-      if (import.meta.env.DEV && failures > 0) {
-        console.warn('[Militares] Falha parcial ao carregar militares por escopo.', {
-          totalFiltros: resultados.length,
-          falhas: failures,
-        });
-      }
-      if (!batches.length && requests.length > 0) {
-        throw new Error('Falha ao carregar militares por escopo.');
-      }
 
-      const ids = new Set();
-      const merged = [];
-      for (const m of batches.flat()) {
-        if (!ids.has(m.id)) { ids.add(m.id); merged.push(m); }
-      }
-      const militares = await carregarMilitaresComMatriculas(merged);
-      return { militares, partialFailures: failures };
+      const runFilter = async (filter) => {
+        const results = [];
+        for (const posto of selectedPostos) {
+          const data = await base44.entities.Militar.filter({ ...filter, posto_graduacao: posto }, '-created_date');
+          results.push(...(data || []));
+          await delay(80);
+        }
+        return results;
+      };
+
+      const settled = await Promise.allSettled(filters.map((f) => runFilter(f)));
+      const fulfilled = settled.filter((s) => s.status === 'fulfilled').map((s) => s.value || []);
+      const partialFailures = settled.length - fulfilled.length;
+      if (!fulfilled.length && settled.length) throw new Error('Falha ao carregar militares por escopo.');
+
+      const unique = new Map();
+      fulfilled.flat().forEach((m) => { if (!unique.has(m.id)) unique.set(m.id, m); });
+      const militares = await carregarMilitaresComMatriculas(Array.from(unique.values()));
+      return { militares, partialFailures };
     },
-    enabled: isAccessResolved,
   });
-  const militares = militaresData?.militares || [];
-  const partialFailures = Number(militaresData?.partialFailures || 0);
-  const militaresQueryKey = ['militares', isAdmin, subgrupamentoId, subgrupamentoTipo, modoAcesso, userEmail, linkedMilitarId, linkedMilitarEmail];
+
+  const militares = useMemo(() => (militaresData?.militares || []).map((m) => ({ ...m, lotacao_atual: getLotacaoAtualMilitar(m) })), [militaresData]);
+  const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: true });
+  const filteredMilitares = operacionais.filter((m) => militarCorrespondeBusca(m, searchTerm));
+
+  const lotacoesDisponiveis = useMemo(() => {
+    const set = new Set();
+    operacionais.forEach((m) => { if (m.lotacao_atual && m.lotacao_atual !== 'Sem lotação') set.add(m.lotacao_atual); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [operacionais]);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => excluirMilitarComDependencias(id, { executadoPor: userEmail || '' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['militares'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-pendencias-comportamento'] });
-      queryClient.invalidateQueries({ queryKey: ['militares-ativos'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida'] });
       setDeleteDialogOpen(false);
       setMilitarToDelete(null);
     }
   });
 
-  const isInitialLoading = loadingUser || !isAccessResolved || loadingMilitaresQuery || (fetchingMilitaresQuery && !militaresQuerySuccess);
-  const showMilitaresError = !isInitialLoading && militaresQueryError;
-  const showResolvedData = !isInitialLoading && !showMilitaresError && militaresQuerySuccess;
-  const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
-
-  const getMilitaresEstagioProvavel = () => {
-    const message = String(militaresMainError?.message || '').toLowerCase();
-    if (isAdmin && (militaresQueryError || partialFailures > 0)) return 'Militar.list';
-    if (message.includes('modo próprio')) return 'Militar.filter escopo';
-    if (message.includes('escopo')) return 'Militar.filter escopo';
-    if (message.includes('matrícula') || message.includes('matricula')) return 'MatriculaMilitar.filter in';
-    if (message.includes('fallback')) return 'MatriculaMilitar fallback';
-    if (partialFailures > 0) return 'Militar.filter escopo';
-    return 'carregarMilitaresComMatriculas';
-  };
-
-  const militaresDebugData = (showMilitaresError || (showResolvedData && partialFailures > 0))
-    ? {
-      pagina: 'Militares',
-      usuario: userEmail || linkedMilitarEmail || null,
-      isAdmin,
-      modoAcesso: modoAcesso || null,
-      scopeFilters: militarScopeFilters,
-      queryKey: militaresQueryKey,
-      status: {
-        loading: loadingMilitaresQuery,
-        fetching: fetchingMilitaresQuery,
-        isError: militaresQueryError,
-        isSuccess: militaresQuerySuccess,
-      },
-      erroPrincipal: militaresMainError
-        ? {
-          message: militaresMainError.message || null,
-          name: militaresMainError.name || null,
-          stack: militaresMainError.stack ? String(militaresMainError.stack).split('\n').slice(0, 5).join('\n') : null,
-        }
-        : null,
-      quantidades: {
-        militaresCarregados: militares.length,
-      },
-      partialFailures,
-      estagioProvavel: getMilitaresEstagioProvavel(),
-      timestamps: {
-        generatedAt: new Date().toISOString(),
-      },
-    }
-    : null;
-
-  const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: mostrarInativos }).map((militar) => ({
-    ...militar,
-    lotacao_atual: getLotacaoAtualMilitar(militar),
-  }));
-  const lotacoesDisponiveis = Array.from(
-    new Set(
-      operacionais
-        .map((m) => (m.lotacao_atual || '').trim())
-        .filter(Boolean)
-        .filter((lotacao) => lotacao !== 'Sem lotação')
-    )
-  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-
-  const filteredMilitares = operacionais.filter(m => {
-    const matchesSearch = militarCorrespondeBusca(m, searchTerm);
-    
-    const matchesStatus = statusFilter === 'all' || m.status_cadastro === statusFilter;
-    const matchesPosto = postoFilter === 'all' || m.posto_graduacao === postoFilter;
-    const lotacaoMilitar = (m.lotacao_atual || '').trim();
-    const matchesLotacao = lotacaoFilter === TODAS_LOTACOES_VALUE
-      || (lotacaoFilter === SEM_LOTACAO_VALUE ? !lotacaoMilitar : lotacaoMilitar === lotacaoFilter);
-    const matchesAtivo = mostrarInativos || m.status_cadastro !== 'Inativo';
-    
-    return matchesSearch && matchesStatus && matchesPosto && matchesLotacao && matchesAtivo;
-  });
-
-  // Agrupar por posto/graduação
-  const militaresAgrupados = filteredMilitares.reduce((acc, m) => {
-    const posto = m.posto_graduacao || 'Sem Posto';
-    if (!acc[posto]) acc[posto] = [];
-    acc[posto].push(m);
-    return acc;
-  }, {});
-
-  const orderedPostos = [
-    'Coronel', 'Tenente Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante',
-    'Subtenente', '1º Sargento', '2º Sargento', '3º Sargento', 'Cabo', 'Soldado', 'Sem Posto'
-  ];
-
-  const handleEdit = (militar) => {
-    if (!canAccessAction('editar_militares')) {
-      alert('Ação negada: você não tem permissão para editar militares.');
-      return;
-    }
-    navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`);
-  };
-
-  const handleDelete = (militar) => {
-    if (!canAccessAction('excluir_militares')) {
-      alert('Ação negada: você não tem permissão para excluir militares.');
-      return;
-    }
-    setMilitarToDelete(militar);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleView = (militar) => {
-    navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`);
-  };
-
-  const confirmDelete = () => {
-    if (militarToDelete) {
-      deleteMutation.mutate(militarToDelete.id);
-    }
-  };
-
-  const militaresAtivos = filtrarMilitaresOperacionais(militares, { incluirInativos: false });
-  const militaresOperacionaisComInativos = filtrarMilitaresOperacionais(militares, { incluirInativos: true });
-
   if (!loadingUser && isAccessResolved && !canAccessModule('militares')) return <AccessDenied modulo="Efetivo" />;
-  
-  const stats = isInitialLoading ? null : {
-    total: militaresAtivos.length,
-    ativos: militaresAtivos.filter(m => m.status_cadastro === 'Ativo' || !m.status_cadastro).length,
-    oficiais: militaresAtivos.filter(m => isPostoOficial(m.posto_graduacao)).length,
-    pracas: militaresAtivos.filter(m => ['Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Subtenente'].includes(m.posto_graduacao)).length,
-    inativos: militaresOperacionaisComInativos.filter(m => m.status_cadastro === 'Inativo').length
-  };
+
+  const emptyInstruction = isAdmin && lotacaoFilter === TODAS_LOTACOES_VALUE
+    ? 'Selecione uma lotação ou graduação para consultar.'
+    : 'Selecione uma ou mais graduações para carregar o efetivo.';
+
+  const isRateLimitError = String(error?.message || '').toLowerCase().includes('rate limit');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-[#1e3a5f]">Efetivo</h1>
-            <p className="text-slate-500">Gerenciamento de pessoal da unidade</p>
+            <p className="text-slate-500">Consulta rápida por lotação e graduação</p>
+            <p className="text-xs text-slate-500 mt-1">Escopo atual: {isAdmin ? 'Administrador' : (linkedMilitarEmail || userEmail || 'Usuário')}</p>
           </div>
-          <div className="flex gap-3">
-            {canAccessAction('adicionar_militares') && (
-              <Button
-                onClick={() => navigate(createPageUrl('CadastrarMilitar'))}
-                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Novo Militar
-              </Button>
-            )}
+          {canAccessAction('adicionar_militares') && <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"><Plus className="w-5 h-5 mr-2" />Novo Militar</Button>}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {GRADUACAO_GROUPS.map((group) => (
+              <Button key={group.key} size="sm" variant={selectedGroups.includes(group.key) ? 'default' : 'outline'} onClick={() => setSelectedGroups((prev) => prev.includes(group.key) ? prev.filter((k) => k !== group.key) : [...prev, group.key])} className={selectedGroups.includes(group.key) ? 'bg-[#1e3a5f]' : ''}>{group.label}</Button>
+            ))}
+          </div>
+          <div className="flex flex-col md:flex-row gap-3">
+            {isAdmin && <Select value={lotacaoFilter} onValueChange={setLotacaoFilter}><SelectTrigger className="md:w-72"><SelectValue placeholder="Selecione uma lotação" /></SelectTrigger><SelectContent><SelectItem value={TODAS_LOTACOES_VALUE}>Todas as lotações</SelectItem>{lotacoesDisponiveis.map((lotacao) => <SelectItem key={lotacao} value={lotacao}>{lotacao}</SelectItem>)}</SelectContent></Select>}
+            <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input className="pl-9" placeholder="Buscar nome ou matrícula..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-[#1e3a5f]" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-[#1e3a5f]">{stats ? stats.total : '—'}</p>
-                <p className="text-xs text-slate-500">Total</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                <Users className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-emerald-600">{stats ? stats.ativos : '—'}</p>
-                <p className="text-xs text-slate-500">Ativos</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                <Users className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-amber-600">{stats ? stats.oficiais : '—'}</p>
-                <p className="text-xs text-slate-500">Oficiais</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-blue-600">{stats ? stats.pracas : '—'}</p>
-                <p className="text-xs text-slate-500">Praças</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <Input
-                placeholder="Buscar por nome, nome de guerra ou matrícula..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-10 border-slate-200"
-              />
-            </div>
-            <div className="flex gap-3">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-36 h-10 border-slate-200">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Inativo">Inativo</SelectItem>
-                  <SelectItem value="Reserva">Reserva</SelectItem>
-                  <SelectItem value="Reforma">Reforma</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={postoFilter} onValueChange={setPostoFilter}>
-                <SelectTrigger className="w-40 h-10 border-slate-200">
-                  <SelectValue placeholder="Posto/Grad" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Postos</SelectItem>
-                  <SelectItem value="Coronel">Coronel</SelectItem>
-                  <SelectItem value="Tenente-Coronel">Tenente-Coronel</SelectItem>
-                  <SelectItem value="Major">Major</SelectItem>
-                  <SelectItem value="Capitão">Capitão</SelectItem>
-                  <SelectItem value="1º Tenente">1º Tenente</SelectItem>
-                  <SelectItem value="2º Tenente">2º Tenente</SelectItem>
-                  <SelectItem value="Subtenente">Subtenente</SelectItem>
-                  <SelectItem value="1º Sargento">1º Sargento</SelectItem>
-                  <SelectItem value="2º Sargento">2º Sargento</SelectItem>
-                  <SelectItem value="3º Sargento">3º Sargento</SelectItem>
-                  <SelectItem value="Cabo">Cabo</SelectItem>
-                  <SelectItem value="Soldado">Soldado</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={lotacaoFilter} onValueChange={setLotacaoFilter}>
-                <SelectTrigger className="w-48 h-10 border-slate-200">
-                  <SelectValue placeholder="Lotação" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODAS_LOTACOES_VALUE}>Todas Lotações</SelectItem>
-                  <SelectItem value={SEM_LOTACAO_VALUE}>Sem lotação</SelectItem>
-                  {lotacoesDisponiveis.map((lotacao) => (
-                    <SelectItem key={lotacao} value={lotacao}>
-                      {lotacao}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex border border-slate-200 rounded-lg overflow-hidden">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="icon"
-                  onClick={() => setViewMode('grid')}
-                  className={viewMode === 'grid' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
-                >
-                  <Grid3X3 className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="icon"
-                  onClick={() => setViewMode('list')}
-                  className={viewMode === 'list' ? 'bg-[#1e3a5f] hover:bg-[#2d4a6f]' : ''}
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 mt-4">
-            <Button
-              variant={mostrarInativos ? "default" : "outline"}
-              size="sm"
-              onClick={() => setMostrarInativos(!mostrarInativos)}
-              className={mostrarInativos ? "bg-slate-600" : ""}
-            >
-              {mostrarInativos ? 'Ocultar Inativos' : 'Mostrar Inativos'}
-              {stats && stats.inativos > 0 && ` (${stats.inativos})`}
-            </Button>
-          </div>
-        </div>
-
-        {/* Results count */}
-        <div className="mb-4 flex items-center justify-between gap-4 text-sm text-slate-500">
-          {isInitialLoading
-            ? 'Carregando militares...'
-            : showMilitaresError
-              ? 'Falha ao carregar dados.'
-              : `${filteredMilitares.length} militar(es) encontrado(s)`}
-          {isAdmin && showResolvedData && (
-            <span>{militares.length} carregado(s)</span>
-          )}
-        </div>
-        {!showMilitaresError && showResolvedData && partialFailures > 0 && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Alguns dados não puderam ser carregados. Tente novamente para atualizar.
-            <DataDebugPanel debugData={militaresDebugData} />
-          </div>
-        )}
-
-        {/* Content */}
-        {isInitialLoading ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
-            <div className="w-8 h-8 mx-auto mb-4 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">Carregando efetivo...</h3>
-            <p className="text-slate-500 text-sm">Aguarde enquanto buscamos os militares.</p>
-          </div>
-        ) : showMilitaresError ? (
-          <div className="bg-white rounded-xl shadow-sm border border-red-200 p-12 text-center">
-            <Users className="w-16 h-16 mx-auto text-red-300 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">
-              Falha ao carregar dados
-            </h3>
-            <Button
-              onClick={() => refetchMilitares()}
-              className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-            >
-              Tentar novamente
-            </Button>
-            <DataDebugPanel debugData={militaresDebugData} className="text-left" />
-          </div>
-        ) : showResolvedData && filteredMilitares.length === 0 ? (
+        {!shouldQuery ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
             <Users className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">
-              Nenhum militar encontrado com os filtros selecionados.
-            </h3>
-            <p className="text-slate-500 mb-6">
-              {searchTerm || statusFilter !== 'all' || postoFilter !== 'all' || lotacaoFilter !== TODAS_LOTACOES_VALUE
-                ? 'Tente ajustar os filtros de busca'
-                : 'Comece cadastrando o primeiro militar'}
-            </p>
-            {!searchTerm && statusFilter === 'all' && postoFilter === 'all' && lotacaoFilter === TODAS_LOTACOES_VALUE && (
-              <Button
-                onClick={() => navigate(createPageUrl('CadastrarMilitar'))}
-                className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Cadastrar Militar
-              </Button>
-            )}
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">{emptyInstruction}</h3>
           </div>
+        ) : isLoading || isFetching ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+            {[...Array(6)].map((_, idx) => <div key={idx} className="h-10 bg-slate-100 animate-pulse rounded mb-2" />)}
+          </div>
+        ) : isError ? (
+          <div className="bg-white rounded-xl shadow-sm border border-red-200 p-8 text-center">
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Falha ao carregar dados</h3>
+            <p className="text-sm text-slate-600 mb-4">{isRateLimitError ? 'Muitas requisições em pouco tempo. Aguarde alguns segundos e tente novamente.' : 'Não foi possível carregar os dados da consulta.'}</p>
+            <Button onClick={() => refetch()} className="bg-[#1e3a5f] text-white">Tentar novamente</Button>
+            <DataDebugPanel debugData={{ pagina: 'Militares', erroPrincipal: error ? { message: error.message } : null, estagioProvavel: 'Militar.filter escopo' }} className="text-left" />
+          </div>
+        ) : filteredMilitares.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center"><h3 className="text-lg font-semibold text-slate-700">Nenhum resultado encontrado.</h3></div>
         ) : (
-          <div className="space-y-6">
-            {orderedPostos
-              .filter(posto => militaresAgrupados[posto] && militaresAgrupados[posto].length > 0)
-              .map(posto => (
-                <div key={posto}>
-                  <h3 className="text-lg font-bold text-[#1e3a5f] mb-3 pb-2 border-b-2 border-[#1e3a5f]">
-                    {posto} ({militaresAgrupados[posto].length})
-                  </h3>
-                  <div className={
-                    viewMode === 'grid'
-                      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-                      : 'space-y-2'
-                  }>
-                    {militaresAgrupados[posto].map((militar) => (
-                      viewMode === 'grid' ? (
-                        <MilitarCard
-                          key={militar.id}
-                          militar={militar}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          onView={handleView}
-                          canEdit={canAccessAction('editar_militares')}
-                          canDelete={canAccessAction('excluir_militares')}
-                        />
-                      ) : (
-                        <div
-                          key={militar.id}
-                          className="bg-white border border-slate-200 rounded-lg px-3 py-2"
-                        >
-                          <div className="grid grid-cols-12 items-center gap-3 text-sm">
-                            <div className="col-span-12 md:col-span-2 font-semibold text-[#1e3a5f]">
-                              {militar.posto_graduacao || 'Sem posto'}
-                            </div>
-                            <div className="col-span-12 md:col-span-3 min-w-0">
-                              <p className="font-medium text-slate-900 truncate">
-                                {militar.nome_guerra || militar.nome_completo}
-                              </p>
-                              {militar.nome_guerra && (
-                                <p className="text-xs text-slate-500 truncate">{militar.nome_completo}</p>
-                              )}
-                            </div>
-                            <div className="col-span-6 md:col-span-2 text-slate-700 truncate">
-                              {militar.matricula || '—'}
-                            </div>
-                            <div className="col-span-6 md:col-span-1 text-slate-700 truncate">
-                              {militar.quadro || '—'}
-                            </div>
-                            <div className="col-span-6 md:col-span-2 text-slate-700 truncate">
-                              {militar.lotacao_atual || 'Sem lotação'}
-                            </div>
-                            <div className="col-span-6 md:col-span-1">
-                              <Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>
-                                {militar.status_cadastro || 'Ativo'}
-                              </Badge>
-                            </div>
-                            <div className="col-span-12 md:col-span-1 flex justify-start md:justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleView(militar)}>
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              {canAccessAction('editar_militares') && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(militar)}>
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {canAccessAction('excluir_militares') && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700" onClick={() => handleDelete(militar)}>
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    ))}
-                  </div>
-                </div>
-              ))}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
+              <div className="col-span-2">Graduação</div><div className="col-span-3">Nome/Nome de guerra</div><div className="col-span-2">Matrícula</div><div className="col-span-1">Quadro</div><div className="col-span-2">Lotação</div><div className="col-span-1">Status</div><div className="col-span-1 text-right">Ações</div>
+            </div>
+            {filteredMilitares.map((militar) => (
+              <div key={militar.id} className="grid grid-cols-12 gap-2 px-3 py-2 border-b text-sm items-center">
+                <div className="col-span-2 font-semibold text-[#1e3a5f]">{militar.posto_graduacao || 'Sem posto'}</div>
+                <div className="col-span-3"><div className="font-medium truncate">{militar.nome_guerra || militar.nome_completo}</div><div className="text-xs text-slate-500 truncate">{militar.nome_completo}</div></div>
+                <div className="col-span-2 truncate">{militar.matricula || '—'}</div><div className="col-span-1 truncate">{militar.quadro || '—'}</div><div className="col-span-2 truncate">{militar.lotacao_atual || 'Sem lotação'}</div>
+                <div className="col-span-1"><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>
+                <div className="col-span-1 flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}><Eye className="w-4 h-4" /></Button>{canAccessAction('editar_militares') && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('CadastrarMilitar') + `?id=${militar.id}`)}><Pencil className="w-4 h-4" /></Button>}{canAccessAction('excluir_militares') && <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => { setMilitarToDelete(militar); setDeleteDialogOpen(true); }}><Trash2 className="w-4 h-4" /></Button>}</div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o militar {militarToDelete?.nome_completo}? 
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Confirmar exclusão</AlertDialogTitle><AlertDialogDescription>Tem certeza que deseja excluir o militar {militarToDelete?.nome_completo}?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => militarToDelete && deleteMutation.mutate(militarToDelete.id)} className="bg-red-600 hover:bg-red-700">Excluir</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
