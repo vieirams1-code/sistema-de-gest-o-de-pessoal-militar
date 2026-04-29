@@ -59,10 +59,17 @@ export default function EstruturaOrganizacional() {
   const [expandedNodes, setExpandedNodes] = useState({});
   const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
 
-  const { data: todos = [], isLoading } = useQuery({
+  const { data: todosResponse = [], isLoading } = useQuery({
     queryKey: ['estruturaOrganizacional'],
     queryFn: () => base44.entities.Subgrupamento.list('nome'),
   });
+
+  const todos = useMemo(() => {
+    if (Array.isArray(todosResponse)) return todosResponse;
+    if (Array.isArray(todosResponse?.items)) return todosResponse.items;
+    if (Array.isArray(todosResponse?.data)) return todosResponse.data;
+    return [];
+  }, [todosResponse]);
 
   const estrutura = useMemo(() => {
     return todos.map(item => ({ ...item, parentId: getParentId(item), tipoNormalizado: normalizeTipo(item) }));
