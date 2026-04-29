@@ -307,11 +307,18 @@ export default function LotacaoMilitares() {
       await Promise.all(militaresIds.map(id => base44.entities.Militar.update(id, updateData)));
     },
     onSuccess: () => {
-      // Lote 1C-B.1: invalidar ambas as queries que alimentam a lista
-      // (a base de militares ativos e o enriquecimento com matrículas).
+      // Lote 1C-B.1: invalida e força refetch imediato de TODAS as queries que alimentam a tela,
+      // ignorando o staleTime de 5min para refletir a movimentação na hora.
+      // - lotacao-militares-ativos: lista base de militares (getScopedMilitares).
+      // - lotacao-militares-com-matriculas: lista enriquecida usada na renderização.
+      // - lotacao-estrutura: árvore organizacional (refetch garante coerência se a estrutura mudou).
+      // - militares-consulta-rapida-scoped: query compartilhada por outras telas (Efetivo).
       queryClient.invalidateQueries({ queryKey: ['lotacao-militares-ativos'] });
       queryClient.invalidateQueries({ queryKey: ['lotacao-militares-com-matriculas'] });
+      queryClient.invalidateQueries({ queryKey: ['lotacao-estrutura'] });
       queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
+      queryClient.refetchQueries({ queryKey: ['lotacao-militares-ativos'] });
+      queryClient.refetchQueries({ queryKey: ['lotacao-militares-com-matriculas'] });
       dismiss();
       toast({
         title: "Lotação Atualizada",
