@@ -261,50 +261,37 @@ export default function LotacaoMilitares() {
 
   const moveMutation = useMutation({
     mutationFn: async ({ militaresIds, targetNode }) => {
-      // Determinar o grupamento e subgrupamento baseado no nível do targetNode
-      let updateData = {};
-      
-      if (targetNode.tipoNormalizado === 'Setor') {
-        updateData = { 
-          grupamento_id: targetNode.id, 
-          grupamento_nome: targetNode.nome, 
-          subgrupamento_id: '', 
-          subgrupamento_nome: '' 
-        };
-      } else {
-        // É Subsetor ou Unidade. Precisamos achar o Setor pai (Grupamento Nível 1)
-        // Como a árvore pode ter 3 níveis, se for Unidade, o grupamento_id aponta pro Subsetor.
-        // O ideal é que o banco guarde a cadeia. O backend legado espera grupamento_id = Nível 1.
-        let setorPai = targetNode;
-        if (targetNode.tipoNormalizado === 'Unidade') {
-          const subsetorPaí = estrutura.find(e => e.id === targetNode.grupamento_id);
-          if (subsetorPaí) setorPai = estrutura.find(e => e.id === subsetorPaí.grupamento_id) || subsetorPaí;
-        } else if (targetNode.tipoNormalizado === 'Subsetor') {
-          setorPai = estrutura.find(e => e.id === targetNode.grupamento_id) || targetNode;
-        }
-        
-        // Aqui assumimos que o SGP já lida bem se enviarmos subgrupamento_id com a Unidade ou Subsetor
-        updateData = { 
-          grupamento_id: setorPai.id, 
-          grupamento_nome: setorPai.nome, 
-          subgrupamento_id: targetNode.id, 
-          subgrupamento_nome: targetNode.nome 
-        };
-      }
-
-      // Lote 1C-B.1: também atualizar campos modernos da estrutura saneada e o campo
-      // textual `lotacao`, garantindo consistência entre modelo legado e moderno.
-      // `estrutura_tipo` usa o tipo cru do node (ex.: 'Grupamento'/'Subgrupamento'/'Unidade'),
-      // que é o formato real esperado pela entidade Militar.
-      updateData = {
-        ...updateData,
-        estrutura_id: targetNode.id,
-        estrutura_nome: targetNode.nome,
-        estrutura_tipo: targetNode.tipo,
-        lotacao: targetNode.nome,
+      // Lote 1C-B.2: a movimentação foi migrada para a Deno Function
+      // `moverMilitaresLotacao`, que valida autenticação/permissão, hidrata o
+      // nó destino com dado real do banco, calcula o setor-pai e aplica os
+      // campos modernos (estrutura_*) + legados (grupamento_*/subgrupamento_*)
+      // com retry/backoff e service role.
+      const payload = {
+        militaresIds,
+        targetNode: {
+          id: targetNode.id,
+          nome: targetNode.nome,
+          sigla: targetNode.sigla,
+          tipo: targetNode.tipo,
+          tipoNormalizado: targetNode.tipoNormalizado,
+          parent_id: targetNode.parent_id,
+          grupamento_id: targetNode.grupamento_id,
+          grupamento_raiz_id: targetNode.grupamento_raiz_id,
+        },
       };
+      const emailEfetivo = getEffectiveEmailMilitares();
+      if (emailEfetivo) payload.effectiveEmail = emailEfetivo;
 
-      await Promise.all(militaresIds.map(id => base44.entities.Militar.update(id, updateData)));
+      const response = await base44.functions.invoke('moverMilitaresLotacao', payload);
+      const data = response?.data || {};
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      if (Array.isArray(data?.erros) && data.erros.length > 0) {
+        const primeiro = data.erros[0];
+        throw new Error(primeiro?.message || 'Falha ao atualizar parte dos militares.');
+      }
+      return data;
     },
     onSuccess: () => {
       // Lote 1C-B.1: invalida e força refetch imediato de TODAS as queries que alimentam a tela,
