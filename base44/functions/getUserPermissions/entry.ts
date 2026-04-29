@@ -55,12 +55,11 @@ async function fetchWithRetry(queryFn, label = 'query') {
 // Utilitários
 // =====================================================================
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
+const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
 // Consolida modules e actions a partir dos perfis ativos.
 // Estratégia: prefixos "acesso_" => modules, "perm_" => actions.
 // Faz OR entre os perfis (qualquer perfil que conceda já habilita).
-// IMPORTANTE: para admin, NÃO marcamos tudo como true aqui — o frontend deve
-// usar isAdmin/accessMode para decidir o tratamento de acesso total.
 function consolidarModulesActions(perfis) {
     const modules = {};
     const actions = {};
@@ -135,36 +134,96 @@ function descreverScope(acessos, isAdmin) {
 // =====================================================================
 // Handler
 // =====================================================================
+//
+// Suporte a "effectiveEmail" (modo usuário efetivo / impersonação para
+// suporte e testes administrativos).
+//
+// IMPORTANTE: a barra "Você está agindo como..." do preview do Base44 é uma
+// camada externa e NÃO altera o retorno de base44.auth.me(). Para permitir
+// que um administrador real valide o sistema sob a perspectiva de outro
+// usuário, esta função aceita opcionalmente um campo effectiveEmail no
+// payload. A validação real (somente admins reais podem usar effectiveEmail)
+// ocorre obrigatoriamente aqui no backend; o frontend usa apenas como ponte.
+// =====================================================================
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        const user = await base44.auth.me();
-        if (!user) {
+        const authUser = await base44.auth.me();
+        if (!authUser) {
             return Response.json({ error: 'Não autenticado' }, { status: 401 });
         }
 
-        // 1. Buscar UsuarioAcesso ativos com campos selecionados
-        const acessos = await fetchWithRetry(
+        // Lê payload opcional
+        let payload = {};
+        try {
+            payload = await req.json();
+        } catch (_e) {
+            payload = {};
+        }
+
+        const effectiveEmailRaw = payload?.effectiveEmail;
+        const authUserEmail = normalizeEmail(authUser.email);
+        const effectiveEmailNorm = normalizeEmail(effectiveEmailRaw);
+        const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
+
+        // ----- Buscar UsuarioAcesso do usuário autenticado real (sempre, para validar admin) -----
+        const acessosAuth = await fetchWithRetry(
             () =>
                 base44.asServiceRole.entities.UsuarioAcesso.filter(
-                    { user_email: user.email, ativo: true },
+                    { user_email: authUser.email, ativo: true },
                     undefined,
                     100,
                     0,
                     CAMPOS_USUARIO_ACESSO
                 ),
-            'usuarioAcesso.list'
+            'usuarioAcesso.list.auth'
         );
+
+        const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
+        const authIsAdminByAccess = (acessosAuth || []).some(
+            (a) => normalizeTipo(a.tipo_acesso) === 'admin'
+        );
+        const authIsAdmin = authIsAdminByRole || authIsAdminByAccess;
+
+        // ----- Validação de impersonação -----
+        if (wantsImpersonation && !authIsAdmin) {
+            console.warn('[getUserPermissions] tentativa de impersonação por não-admin', {
+                authUserEmail,
+                effectiveEmailNorm,
+            });
+            return Response.json(
+                { error: 'Ação não permitida: somente administradores podem usar effectiveEmail.' },
+                { status: 403 }
+            );
+        }
+
+        // ----- Decide email-alvo para resolução de permissões -----
+        const isImpersonating = wantsImpersonation && authIsAdmin;
+        const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
+
+        // ----- Busca UsuarioAcesso do email-alvo -----
+        // Se não estiver impersonando, reaproveita os acessos já buscados.
+        const acessos = isImpersonating
+            ? await fetchWithRetry(
+                () =>
+                    base44.asServiceRole.entities.UsuarioAcesso.filter(
+                        { user_email: targetEmail, ativo: true },
+                        undefined,
+                        100,
+                        0,
+                        CAMPOS_USUARIO_ACESSO
+                    ),
+                'usuarioAcesso.list.target'
+            )
+            : (acessosAuth || []);
 
         // 2. Coletar perfil_ids únicos
         const perfilIds = Array.from(
             new Set((acessos || []).map((a) => a?.perfil_id).filter(Boolean))
         );
 
-        // 3. Buscar perfis em UMA chamada (sem seleção de campos: estrutura
-        // de PerfilPermissao usa muitos booleanos acesso_*/perm_* que precisamos
-        // varrer dinamicamente)
+        // 3. Buscar perfis em UMA chamada
         let perfis = [];
         if (perfilIds.length > 0) {
             perfis = await fetchWithRetry(
@@ -177,13 +236,21 @@ Deno.serve(async (req) => {
             );
         }
 
-        // 4. Mapa de perfis e flags admin
+        // 4. Mapa de perfis e flags admin DO USUÁRIO EFETIVO
         const perfisMap = {};
         (perfis || []).forEach((p) => {
             if (p?.id) perfisMap[p.id] = p;
         });
 
-        const isAdminByRole = String(user.role || '').toLowerCase() === 'admin';
+        // SEGURANÇA: Quando impersonando, isAdminByRole é FALSE.
+        // Não temos acesso seguro à role real do usuário efetivo a partir do
+        // SDK (auth.me retorna o autenticado), e não podemos deixar a role do
+        // admin autenticado contaminar as permissões do usuário efetivo.
+        // O único sinal confiável de admin para o usuário efetivo é a
+        // presença de UsuarioAcesso com tipo_acesso === 'admin'.
+        const isAdminByRole = isImpersonating
+            ? false
+            : (String(authUser.role || '').toLowerCase() === 'admin');
         const isAdminByAccess = (acessos || []).some(
             (a) => normalizeTipo(a.tipo_acesso) === 'admin'
         );
@@ -199,13 +266,26 @@ Deno.serve(async (req) => {
         const accessMode = isAdmin ? 'admin' : 'restricted';
         const permissionsResolvedAs = isAdmin ? 'admin' : 'profiles';
 
+        // 8. Montar user representando o usuário efetivo
+        const userOut = isImpersonating
+            ? {
+                id: null,
+                email: targetEmail,
+                full_name: null,
+                role: null,
+            }
+            : {
+                id: authUser.id,
+                email: authUser.email,
+                full_name: authUser.full_name,
+                role: authUser.role,
+            };
+
         return Response.json({
-            user: {
-                id: user.id,
-                email: user.email,
-                full_name: user.full_name,
-                role: user.role,
-            },
+            authUserEmail: authUser.email,
+            effectiveUserEmail: isImpersonating ? targetEmail : authUser.email,
+            isImpersonating,
+            user: userOut,
             isAdminByRole,
             isAdminByAccess,
             isAdmin,
@@ -221,6 +301,8 @@ Deno.serve(async (req) => {
                 total_perfis: (perfis || []).length,
                 schemaStrategy: 'dynamic_prefix_acesso_perm',
                 generatedAt: new Date().toISOString(),
+                impersonationRequested: wantsImpersonation,
+                authIsAdmin,
             },
         });
     } catch (error) {
@@ -239,6 +321,7 @@ Deno.serve(async (req) => {
                 scope: { tipo: 'erro', estruturaIds: [], militarId: null, reason: 'INTERNAL_ERROR' },
                 accessMode: 'restricted',
                 permissionsResolvedAs: 'profiles',
+                isImpersonating: false,
             },
             { status }
         );

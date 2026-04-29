@@ -29,6 +29,36 @@ const ACCESS_QUERY_GC_TIME = 15 * 60 * 1000;
 
 const SELF_RESTRICTED_SCOPES = new Set(['proprio', 'próprio', 'individual', 'self', 'auto']);
 
+// =====================================================================
+// MODO USUÁRIO EFETIVO (impersonação para suporte/teste administrativo)
+// ---------------------------------------------------------------------
+// `sgp_effective_user_email` é uma PONTE CONTROLADA via sessionStorage.
+// É enviada à Deno Function `getUserPermissions` no parâmetro `effectiveEmail`.
+//
+// IMPORTANTE: a validação real (somente admins reais podem usar esse modo)
+// ocorre OBRIGATORIAMENTE no backend. Esta chave de sessionStorage não
+// concede privilégio nenhum por si só — se um usuário não-admin a definir
+// manualmente, o backend retorna 403.
+//
+// A barra azul "Você está agindo como..." do preview do Base44 NÃO é lida
+// nem usada aqui — ela é uma camada externa que não altera base44.auth.me().
+// Para testar o modo usuário efetivo, o admin define manualmente:
+//   sessionStorage.setItem('sgp_effective_user_email', 'alguem@dominio.com')
+// e em seguida recarrega/atualiza a query.
+// =====================================================================
+const EFFECTIVE_EMAIL_STORAGE_KEY = 'sgp_effective_user_email';
+
+function readEffectiveEmailFromStorage() {
+  if (typeof window === 'undefined' || !window.sessionStorage) return null;
+  try {
+    const raw = window.sessionStorage.getItem(EFFECTIVE_EMAIL_STORAGE_KEY);
+    const trimmed = (raw || '').trim();
+    return trimmed ? trimmed.toLowerCase() : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 const toLowerSafe = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : null);
 
 const normalizeAccessMode = (value) => {
@@ -47,8 +77,9 @@ const normalizeAccessMode = (value) => {
 // ou `canAccessAll === true`.
 const ALL_PERMISSIONS_SENTINEL = 'ALL';
 
-async function fetchUserPermissions() {
-  const response = await base44.functions.invoke('getUserPermissions', {});
+async function fetchUserPermissions(effectiveEmail) {
+  const requestPayload = effectiveEmail ? { effectiveEmail } : {};
+  const response = await base44.functions.invoke('getUserPermissions', requestPayload);
   // base44.functions.invoke retorna axios-like: { data, status, headers }
   const payload = response?.data ?? response;
 
@@ -66,6 +97,12 @@ async function fetchUserPermissions() {
 }
 
 export function useCurrentUser() {
+  // Lê effectiveEmail apenas uma vez por montagem do hook.
+  // Para mudar o usuário efetivo em runtime, basta atualizar o sessionStorage
+  // e invalidar a query (`queryClient.invalidateQueries(['current-user-permissions'])`)
+  // ou recarregar a página.
+  const effectiveEmailFromStorage = readEffectiveEmailFromStorage();
+
   const {
     data,
     isLoading,
@@ -73,8 +110,8 @@ export function useCurrentUser() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['current-user-permissions'],
-    queryFn: fetchUserPermissions,
+    queryKey: ['current-user-permissions', effectiveEmailFromStorage || 'self'],
+    queryFn: () => fetchUserPermissions(effectiveEmailFromStorage),
     staleTime: ACCESS_QUERY_STALE_TIME,
     gcTime: ACCESS_QUERY_GC_TIME,
     retry: 1,
@@ -87,6 +124,11 @@ export function useCurrentUser() {
   const acesso = acessos[0] || null; // primeiro registro de acesso ativo
   const perfisMap = data?.perfis || {};
   const perfilAcesso = acesso?.perfil_id ? (perfisMap[acesso.perfil_id] || null) : null;
+
+  // Campos de impersonação vindos do backend (fonte de verdade).
+  const isImpersonating = Boolean(data?.isImpersonating);
+  const authUserEmail = data?.authUserEmail || null;
+  const effectiveUserEmail = data?.effectiveUserEmail || null;
 
   const scope = data?.scope || { tipo: 'vazio', estruturaIds: [], militarId: null, reason: null };
   const modules = data?.modules || {};
@@ -133,7 +175,9 @@ export function useCurrentUser() {
     }
   }
 
-  const userEmail = user?.email || null;
+  // userEmail representa o usuário efetivo (impersonado quando aplicável).
+  // Para acessar o email do autenticado real, use authUserEmail.
+  const userEmail = effectiveUserEmail || user?.email || null;
   const linkedMilitarId = scope?.militarId || acesso?.militar_id || null;
   const linkedMilitarEmail = acesso?.militar_email || null;
 
@@ -329,8 +373,11 @@ export function useCurrentUser() {
   })();
 
   const debugAccess = {
-    emailAuthOriginal: user?.email || null,
+    emailAuthOriginal: authUserEmail || user?.email || null,
     emailNormalizado: userEmail,
+    authUserEmail,
+    effectiveUserEmail,
+    isImpersonating,
     status: {
       currentUser: {
         isLoading,
@@ -339,7 +386,7 @@ export function useCurrentUser() {
       },
       auth: {
         isAuthenticated: Boolean(user),
-        isImpersonating: false,
+        isImpersonating,
       },
       getUserPermissions: {
         isLoading,
@@ -388,9 +435,9 @@ export function useCurrentUser() {
   };
 
   const resolvedAccessContext = {
-    isImpersonating: false,
-    baseEmail: userEmail,
-    effectiveEmail: userEmail,
+    isImpersonating,
+    baseEmail: authUserEmail || userEmail,
+    effectiveEmail: effectiveUserEmail || userEmail,
     hasAcessoRecord: Boolean(acesso),
     modoAcesso,
     isAdmin,

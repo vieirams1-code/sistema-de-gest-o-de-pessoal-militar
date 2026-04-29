@@ -32,6 +32,17 @@ const CAMPOS_BASE_MILITAR = [
     'condicao',
 ];
 
+const CAMPOS_USUARIO_ACESSO = [
+    'id',
+    'user_email',
+    'ativo',
+    'tipo_acesso',
+    'grupamento_id',
+    'subgrupamento_id',
+    'militar_id',
+    'perfil_id',
+];
+
 function projetarMilitar(m, campos) {
     if (!m || typeof m !== 'object') return m;
     const out = {};
@@ -77,6 +88,7 @@ async function fetchWithRetry(queryFn, label = 'query') {
 // Utilitários
 // =====================================================================
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
+const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
 const normalizeText = (s) =>
     String(s || '')
@@ -177,12 +189,20 @@ async function resolverEscopoConsolidado(base44, acessos) {
 // =====================================================================
 // Handler
 // =====================================================================
+//
+// Suporte a "effectiveEmail" (modo usuário efetivo / impersonação para
+// suporte e testes administrativos). A validação é a mesma de
+// getUserPermissions: somente admins reais (por role ou por UsuarioAcesso
+// tipo_acesso='admin') podem usar effectiveEmail. A barra "Você está
+// agindo como..." do preview do Base44 NÃO é fonte para isso — usamos
+// somente sgp_effective_user_email (sessionStorage) como ponte controlada.
+// =====================================================================
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        const user = await base44.auth.me();
-        if (!user) {
+        const authUser = await base44.auth.me();
+        if (!authUser) {
             return Response.json({ error: 'Não autenticado', militares: [] }, { status: 401 });
         }
 
@@ -202,32 +222,77 @@ Deno.serve(async (req) => {
             limit,
             offset,
             includeFoto,
+            effectiveEmail,
         } = payload || {};
 
         const effLimit = clampLimit(limit);
         const effOffset = clampOffset(offset);
         const effIncludeFoto = includeFoto === true;
 
-        // 1. Buscar UsuarioAcesso ativos com seleção de campos
-        const acessos = await fetchWithRetry(
+        const authUserEmail = normalizeEmail(authUser.email);
+        const effectiveEmailNorm = normalizeEmail(effectiveEmail);
+        const wantsImpersonation = Boolean(effectiveEmailNorm) && effectiveEmailNorm !== authUserEmail;
+
+        // 1. Buscar UsuarioAcesso do usuário autenticado real (sempre, para validar admin)
+        const acessosAuth = await fetchWithRetry(
             () =>
                 base44.asServiceRole.entities.UsuarioAcesso.filter(
-                    { user_email: user.email, ativo: true },
+                    { user_email: authUser.email, ativo: true },
                     undefined,
                     LIMIT_MAX,
                     0,
-                    ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id']
+                    CAMPOS_USUARIO_ACESSO
                 ),
-            'usuarioAcesso.list'
+            'usuarioAcesso.list.auth'
         );
 
-        const isAdminByRole = String(user.role || '').toLowerCase() === 'admin';
+        const authIsAdminByRole = String(authUser.role || '').toLowerCase() === 'admin';
+        const authIsAdminByAccess = (acessosAuth || []).some(
+            (a) => normalizeTipo(a.tipo_acesso) === 'admin'
+        );
+        const authIsAdmin = authIsAdminByRole || authIsAdminByAccess;
+
+        // 2. Validação de impersonação
+        if (wantsImpersonation && !authIsAdmin) {
+            console.warn('[getScopedMilitares] tentativa de impersonação por não-admin', {
+                authUserEmail,
+                effectiveEmailNorm,
+            });
+            return Response.json(
+                { error: 'Ação não permitida: somente administradores podem usar effectiveEmail.', militares: [] },
+                { status: 403 }
+            );
+        }
+
+        const isImpersonating = wantsImpersonation && authIsAdmin;
+        const targetEmail = isImpersonating ? effectiveEmailNorm : authUser.email;
+
+        // 3. Buscar UsuarioAcesso do email-alvo (reaproveita se não impersonando)
+        const acessos = isImpersonating
+            ? await fetchWithRetry(
+                () =>
+                    base44.asServiceRole.entities.UsuarioAcesso.filter(
+                        { user_email: targetEmail, ativo: true },
+                        undefined,
+                        LIMIT_MAX,
+                        0,
+                        CAMPOS_USUARIO_ACESSO
+                    ),
+                'usuarioAcesso.list.target'
+            )
+            : (acessosAuth || []);
+
+        // 4. Calcular admin DO USUÁRIO EFETIVO
+        // SEGURANÇA: quando impersonando, NÃO consideramos role do autenticado.
+        const isAdminByRole = isImpersonating
+            ? false
+            : authIsAdminByRole;
         const isAdminByAccess = (acessos || []).some(
             (a) => normalizeTipo(a.tipo_acesso) === 'admin'
         );
         const isAdmin = isAdminByRole || isAdminByAccess;
 
-        // 2. Resolver escopo
+        // 5. Resolver escopo
         let escopo;
         if (isAdmin) {
             escopo = { isAdmin: true };
@@ -235,11 +300,18 @@ Deno.serve(async (req) => {
             escopo = await resolverEscopoConsolidado(base44, acessos || []);
         }
 
+        const baseMeta = {
+            authUserEmail: authUser.email,
+            effectiveUserEmail: isImpersonating ? targetEmail : authUser.email,
+            isImpersonating,
+        };
+
         if (!isAdmin && escopo.tipo === 'vazio') {
             return Response.json(
                 {
                     militares: [],
                     meta: {
+                        ...baseMeta,
                         returned: 0,
                         limit: effLimit,
                         offset: effOffset,
@@ -258,19 +330,19 @@ Deno.serve(async (req) => {
                 {
                     error: 'Acesso "proprio" sem militar_id vinculado.',
                     militares: [],
-                    meta: { reason: escopo.reason },
+                    meta: { ...baseMeta, reason: escopo.reason },
                 },
                 { status: 403 }
             );
         }
 
-        // 3. Filtro base
+        // 6. Filtro base
         const baseFilter = {};
         if (postoGraduacaoFiltro) baseFilter.posto_graduacao = postoGraduacaoFiltro;
         if (statusCadastro) baseFilter.status_cadastro = statusCadastro;
         if (situacaoMilitar) baseFilter.situacao_militar = situacaoMilitar;
 
-        // 4. Aplicar escopo + lotacaoFiltro
+        // 7. Aplicar escopo + lotacaoFiltro
         let militarFilter = { ...baseFilter };
         let usouFiltroProprios = false;
 
@@ -282,6 +354,7 @@ Deno.serve(async (req) => {
                     {
                         militares: [],
                         meta: {
+                            ...baseMeta,
                             returned: 0,
                             limit: effLimit,
                             offset: effOffset,
@@ -306,6 +379,7 @@ Deno.serve(async (req) => {
                         {
                             militares: [],
                             meta: {
+                                ...baseMeta,
                                 returned: 0,
                                 limit: effLimit,
                                 offset: effOffset,
@@ -326,12 +400,10 @@ Deno.serve(async (req) => {
             usouFiltroProprios = proprios.length > 0;
         }
 
-        // 5. Seleção de campos
+        // 8. Seleção de campos
         const campos = effIncludeFoto ? [...CAMPOS_BASE_MILITAR, 'foto'] : CAMPOS_BASE_MILITAR;
 
-        // 6. Buscar militares
-        // Assinatura SDK confirmada: filter(query, sort, limit, skip, fields)
-        // Estratégia hasMore: pedir limit + 1 e cortar antes de retornar.
+        // 9. Buscar militares
         const semBusca = !search || !String(search).trim();
 
         let militares = [];
@@ -341,7 +413,6 @@ Deno.serve(async (req) => {
         let hasMore = false;
 
         if (semBusca) {
-            // Sem busca textual -> pagina direto no SDK
             const fetchLimit = effLimit + 1;
             const result = await fetchWithRetry(
                 () =>
@@ -359,7 +430,6 @@ Deno.serve(async (req) => {
             hasMore = arr.length > effLimit;
             militares = hasMore ? arr.slice(0, effLimit) : arr;
 
-            // União com "proprios" (escopo estrutura + proprio, sem lotacaoFiltro)
             if (
                 !isAdmin &&
                 escopo.tipo === 'estrutura' &&
@@ -385,8 +455,6 @@ Deno.serve(async (req) => {
                 militares = Array.from(mapa.values()).slice(0, effLimit);
             }
         } else {
-            // Com busca textual: carregar amostra (LIMIT_MAX) com offset 0,
-            // filtrar localmente, paginar resultado.
             const amostra = await fetchWithRetry(
                 () =>
                     base44.asServiceRole.entities.Militar.filter(
@@ -417,12 +485,12 @@ Deno.serve(async (req) => {
             militares = pageSlice;
         }
 
-        // Projeção manual para garantir payload enxuto (campos selecionados apenas)
         const militaresProjetados = militares.map((m) => projetarMilitar(m, campos));
 
         return Response.json({
             militares: militaresProjetados,
             meta: {
+                ...baseMeta,
                 returned: militaresProjetados.length,
                 limit: effLimit,
                 offset: effOffset,
