@@ -44,6 +44,7 @@ const moduleGuardByPage = {
   EstruturaOrganizacional: { moduleKey: 'estrutura_organizacional', moduleName: 'Estrutura Organizacional' },
   CadastrarArmamento: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
   CadastrarMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  // Guardas validadas para páginas com controle por action key específico
   VerMilitar: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
   FichaMilitar: { moduleKey: 'militares', moduleName: 'Efetivo' },
   CadastrarFerias: { moduleKey: 'ferias', moduleName: 'Férias' },
