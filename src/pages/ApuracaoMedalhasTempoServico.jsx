@@ -550,6 +550,9 @@ export default function ApuracaoMedalhasTempoServico() {
                             ) : (
                               <div className="space-y-1">
                                 <span className="text-slate-400">Inabilitado</span>
+                                {item.motivo_inabilitacao === 'COMPORTAMENTO_PRACA_INCOMPATIVEL' && (
+                                  <p className="text-[11px] text-slate-500">Motivo: comportamento incompatível para praça.</p>
+                                )}
                                 {adminModeAtivo && podeModoAdmin && (
                                   <div>
                                     <Button

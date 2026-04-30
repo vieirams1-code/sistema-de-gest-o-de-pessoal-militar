@@ -1,8 +1,11 @@
 import { calcularTempoServico } from './tempoServicoService.js';
+import { classificarPostoGraduacao } from '../utils/postoQuadroCompatibilidade.js';
 
 export const CATEGORIA_TEMPO_SERVICO = 'TEMPO_SERVICO';
 export const CATEGORIA_DOM_PEDRO_II = 'DOM_PEDRO_II';
 export const DOM_PEDRO_II_ANOS_MINIMOS_PADRAO = 30;
+const COMPORTAMENTOS_DOM_PEDRO_PRACA = new Set(['BOM', 'OTIMO', 'EXCEPCIONAL']);
+const MOTIVO_INABILITACAO_COMPORTAMENTO = 'COMPORTAMENTO_PRACA_INCOMPATIVEL';
 
 export const TIPOS_FIXOS_MEDALHA_TEMPO = [
   {
@@ -84,6 +87,14 @@ function normalizarTexto(valor) {
     .replace(/[^a-zA-Z0-9]+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+function normalizarComportamento(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
 }
 
 export function normalizarStatusMedalha(status) {
@@ -343,9 +354,14 @@ export function apurarMedalhaTempoServicoMilitar({
   const maiorMedalhaRecebida = obterMaiorMedalhaTempoRecebida(medalhas, tipoIndexado);
   const maiorMedalhaRecebidaOrdem = obterOrdemHierarquicaRegistro(maiorMedalhaRecebida, tipoIndexado);
   const faixaAlcancadaOrdem = faixaAlcancadaTipo?.ordem_hierarquica || -1;
+  const categoriaPosto = classificarPostoGraduacao(militar?.posto_graduacao || militar?.posto);
+  const comportamentoNormalizado = normalizarComportamento(militar?.comportamento);
+  const pracaComportamentoInvalido = categoriaPosto === 'praca'
+    && !COMPORTAMENTOS_DOM_PEDRO_PRACA.has(comportamentoNormalizado);
 
   let situacao = tempoServico.valido ? 'SEM_DIREITO' : 'INCONSISTENTE';
   let medalhaDevidaCodigo = null;
+  let motivo_inabilitacao = null;
 
   if (!tempoServico.valido) {
     situacao = 'INCONSISTENTE';
@@ -363,6 +379,11 @@ export function apurarMedalhaTempoServicoMilitar({
     }
   } else if (maiorMedalhaRecebida) {
     situacao = 'INCONSISTENTE';
+  }
+
+  if (situacao === 'ELEGIVEL' && pracaComportamentoInvalido) {
+    situacao = 'SEM_DIREITO';
+    motivo_inabilitacao = MOTIVO_INABILITACAO_COMPORTAMENTO;
   }
 
   const impedido = medalhaDevidaCodigo && temImpedimentoAplicavel({
@@ -383,6 +404,7 @@ export function apurarMedalhaTempoServicoMilitar({
       resolverTipoMedalha(maiorMedalhaRecebida, tipoIndexado)?.codigo || maiorMedalhaRecebida?.tipo_medalha_codigo || null,
     medalha_devida_codigo: medalhaDevidaCodigo,
     situacao,
+    motivo_inabilitacao,
   };
 }
 
@@ -470,14 +492,21 @@ export function apurarMedalhaDomPedroIIMilitar({
   const tempoServico = calcularTempoServico(militar, referencia);
   const tempoServicoAnos = tempoServico.valido ? tempoServico.anos_completos : null;
   const jaRecebeu = Boolean(obterMaiorMedalhaDomPedroRecebida(medalhas, tipoIndexado));
+  const categoriaPosto = classificarPostoGraduacao(militar?.posto_graduacao || militar?.posto);
+  const comportamentoNormalizado = normalizarComportamento(militar?.comportamento);
+  const pracaComportamentoInvalido = categoriaPosto === 'praca'
+    && !COMPORTAMENTOS_DOM_PEDRO_PRACA.has(comportamentoNormalizado);
 
   let situacao = 'SEM_DIREITO';
+  let motivo_inabilitacao = null;
   if (!tempoServico.valido) {
     situacao = 'INCONSISTENTE';
   } else if (jaRecebeu) {
     situacao = 'JA_CONTEMPLADO';
-  } else if (tempoServicoAnos >= anosMinimos) {
+  } else if (!pracaComportamentoInvalido) {
     situacao = 'ELEGIVEL';
+  } else {
+    motivo_inabilitacao = MOTIVO_INABILITACAO_COMPORTAMENTO;
   }
 
   const medalhaDevidaCodigo = (situacao === 'ELEGIVEL' || situacao === 'JA_CONTEMPLADO') ? 'DOM_PEDRO_II' : null;
@@ -497,6 +526,7 @@ export function apurarMedalhaDomPedroIIMilitar({
     maior_medalha_recebida_codigo: jaRecebeu ? 'DOM_PEDRO_II' : null,
     medalha_devida_codigo: medalhaDevidaCodigo,
     situacao,
+    motivo_inabilitacao,
   };
 }
 

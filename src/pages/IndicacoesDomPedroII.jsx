@@ -362,7 +362,14 @@ export default function IndicacoesDomPedroII() {
                     <td className="py-3 px-2"><p className="font-semibold text-slate-800">{militar.posto_graduacao} {militar.nome_completo}</p><p className="text-xs text-slate-500">Mat: {militar.matricula || '—'}</p></td>
                     <td className="py-3 px-2">{militar.lotacao || militar.unidade || '—'}</td>
                     <td className="py-3 px-2">
-                      {status === 'CONCEDIDA' ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Concedida</Badge> : status === 'INDICADA' ? <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Indicada</Badge> : estaBloqueado ? <Badge className="bg-amber-100 text-amber-800 border-amber-200">Bloqueado</Badge> : estaInabilitado ? <span className="text-slate-500">Inabilitado</span> : <span className="text-slate-500">Sem indicação</span>}
+                      {status === 'CONCEDIDA' ? <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Concedida</Badge> : status === 'INDICADA' ? <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Indicada</Badge> : estaBloqueado ? <Badge className="bg-amber-100 text-amber-800 border-amber-200">Bloqueado</Badge> : estaInabilitado ? (
+                        <div>
+                          <span className="text-slate-500">Inabilitado</span>
+                          {apuracao?.motivo_inabilitacao === 'COMPORTAMENTO_PRACA_INCOMPATIVEL' && (
+                            <p className="text-[11px] text-slate-500">Motivo: comportamento incompatível para praça.</p>
+                          )}
+                        </div>
+                      ) : <span className="text-slate-500">Sem indicação</span>}
                     </td>
                     <td className="py-3 px-2 flex gap-2">
                       {(status !== 'CONCEDIDA' && !estaBloqueado && !estaInabilitado) && <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d4a6f]" onClick={() => indicarMutation.mutate(militar)}>Indicar</Button>}
