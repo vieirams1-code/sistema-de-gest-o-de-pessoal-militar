@@ -72,6 +72,7 @@ export default function PeriodoAquisitivoGenerator() {
   const [escopo, setEscopo] = useState('all');
   const [militarSelecionadoId, setMilitarSelecionadoId] = useState('');
   const [militarSelectorOpen, setMilitarSelectorOpen] = useState(false);
+  const [militarSearch, setMilitarSearch] = useState('');
   const queryClient = useQueryClient();
 
   const { data: militares = [] } = useQuery({
@@ -106,6 +107,48 @@ export default function PeriodoAquisitivoGenerator() {
     () => militaresSelecionaveis.find((militar) => String(militar.id) === String(militarSelecionadoId)) || null,
     [militarSelecionadoId, militaresSelecionaveis]
   );
+
+  const normalizarBusca = (texto) => String(texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[.\-_/\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const normalizarMatricula = (texto) => String(texto || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().trim();
+
+  const montarTextoBuscaMilitar = (militar) => {
+    const postoAbreviado = abreviarPostoGraduacao(militar?.posto_graduacao);
+    const lotacao = militar?.lotacao_atual || militar?.lotacao || militar?.estrutura_nome || militar?.subgrupamento_nome || militar?.grupamento_nome || '';
+    const matriculaAtual = militar?.matricula_atual || '';
+    const matriculaLegada = militar?.matricula || '';
+
+    return [
+      militar?.nome,
+      militar?.nome_completo,
+      militar?.nome_guerra,
+      matriculaAtual,
+      matriculaLegada,
+      normalizarMatricula(matriculaAtual),
+      normalizarMatricula(matriculaLegada),
+      militar?.posto_graduacao,
+      postoAbreviado,
+      militar?.quadro,
+      lotacao,
+    ].filter(Boolean).join(' ');
+  };
+
+  const militaresFiltrados = useMemo(() => {
+    const termo = normalizarBusca(militarSearch);
+    if (!termo) return militaresSelecionaveis;
+
+    return militaresSelecionaveis.filter((militar) => {
+      const textoBusca = normalizarBusca(montarTextoBuscaMilitar(militar));
+      const termoSemPontuacao = normalizarMatricula(termo);
+      return textoBusca.includes(termo) || (termoSemPontuacao && textoBusca.includes(termoSemPontuacao));
+    });
+  }, [militarSearch, militaresSelecionaveis]);
 
   const formatarMilitarPrincipal = (militar) => {
     const posto = abreviarPostoGraduacao(militar?.posto_graduacao);
@@ -263,28 +306,23 @@ export default function PeriodoAquisitivoGenerator() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-                  <Command>
-                    <CommandInput placeholder="Buscar por nome, guerra, matrícula, posto ou quadro..." />
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Buscar por nome, guerra, matrícula, posto ou quadro..."
+                      value={militarSearch}
+                      onValueChange={setMilitarSearch}
+                    />
                     <CommandList>
                       <CommandEmpty>Nenhum militar encontrado.</CommandEmpty>
                       <CommandGroup>
-                        {militaresSelecionaveis.map((militar) => (
+                        {militaresFiltrados.map((militar) => (
                           <CommandItem
                             key={militar.id}
-                            value={[
-                              militar?.nome_completo,
-                              militar?.nome_guerra,
-                              militar?.matricula_atual,
-                              militar?.matricula,
-                              militar?.posto_graduacao,
-                              abreviarPostoGraduacao(militar?.posto_graduacao),
-                              militar?.quadro,
-                              militar?.lotacao_atual,
-                              militar?.lotacao,
-                            ].filter(Boolean).join(' ')}
+                            value={montarTextoBuscaMilitar(militar)}
                             onSelect={() => {
                               setMilitarSelecionadoId(String(militar.id));
                               setMilitarSelectorOpen(false);
+                              setMilitarSearch('');
                             }}
                             className="flex items-start gap-2 py-2"
                           >
