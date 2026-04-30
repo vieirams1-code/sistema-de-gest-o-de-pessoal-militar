@@ -18,7 +18,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { garantirImplantacaoHistoricoComportamento, registrarMarcoHistoricoComportamento } from '@/services/justicaDisciplinaService';
 import { adicionarNovaMatriculaMilitar, atualizarMilitarSemTrocarMatricula, criarMilitarComMatricula, formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
-import { getQuadrosCompativeis, isPostoOficial, isQuadroCompativel } from '@/utils/postoQuadroCompatibilidade';
+import { getQuadrosCompativeis, isPostoOficial, isQuadroCompativel, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { enriquecerMilitarComMatriculas, isMilitarMesclado, montarIndiceMatriculas } from '@/services/matriculaMilitarViewService';
 import { normalizarDataParaCampoCanonico } from '@/services/tempoServicoService';
 
@@ -100,8 +100,6 @@ const POSTOS_GRADUACOES = [
   { value: 'Soldado', label: 'Soldado (SD)', grupo: 'Praças' },
 ];
 
-const QUADROS_FIXOS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QBMPT'];
-
 const onlyDigits = (value = '') => String(value).replace(/\D/g, '');
 
 const formatMatricula = (value = '') => {
@@ -139,6 +137,7 @@ const normalizarMilitarParaFormulario = (militar = {}) => {
   return {
     ...initialFormData,
     ...militar,
+    quadro: normalizarQuadroLegado(militar.quadro),
     data_inclusao: dataCanonica,
     matricula: formatMatricula(militar.matricula),
   };
@@ -223,13 +222,16 @@ export default function CadastrarMilitar() {
     }
 
     if (name === 'quadro') {
-      if (!isQuadroCompativel(formData.posto_graduacao, value)) {
+      const quadroNormalizado = normalizarQuadroLegado(value);
+      if (!isQuadroCompativel(formData.posto_graduacao, quadroNormalizado)) {
         setAvisoCompatibilidadeQuadro(
-          `O quadro "${value}" não é compatível com o posto/graduação selecionado.`,
+          `O quadro "${quadroNormalizado}" não é compatível com o posto/graduação selecionado.`,
         );
         return;
       }
       setAvisoCompatibilidadeQuadro('');
+      setFormData(prev => ({ ...prev, quadro: quadroNormalizado }));
+      return;
     }
 
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -267,6 +269,7 @@ export default function CadastrarMilitar() {
 
     const dataToSave = {
       ...formData,
+      quadro: normalizarQuadroLegado(formData.quadro),
       data_inclusao: normalizarDataParaCampoCanonico(formData.data_inclusao),
       matricula: formatarMatriculaPadrao(formData.matricula),
       altura: formData.altura ? parseFloat(formData.altura) : null,
