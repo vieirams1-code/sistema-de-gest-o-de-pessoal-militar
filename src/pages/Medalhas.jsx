@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { fetchScopedMedalhasBundle } from '@/services/getScopedMedalhasBundleClient';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,7 @@ function formatDate(d) {
 export default function Medalhas() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, modoAcesso, userEmail, effectiveUserEmail, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasMedalhasAccess = canAccessModule('medalhas');
   const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
@@ -82,27 +83,14 @@ export default function Medalhas() {
     deleteMutation.mutate(deleteDialog.id);
   };
 
-  const { data: medalhas = [], isLoading } = useQuery({
-    queryKey: ['medalhas', isAdmin],
-    queryFn: async () => {
-      if (isAdmin) return base44.entities.Medalha.list('-data_indicacao');
-      const scopeFilters = getMilitarScopeFilters();
-      if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map(f => base44.entities.Militar.filter(f)));
-      const militarIds = [...new Set(militarQueries.flat().map(m => m.id).filter(Boolean))];
-      if (!militarIds.length) return [];
-      const arrays = await Promise.all(militarIds.map(id => base44.entities.Medalha.filter({ militar_id: id }, '-data_indicacao')));
-      const m = new Map();
-      arrays.flat().forEach(item => m.set(item.id, item));
-      return Array.from(m.values()).sort((a, b) => new Date(b.data_indicacao || 0) - new Date(a.data_indicacao || 0));
-    },
+  const medalhasQueryKey = ['medalhas', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null, searchTerm, statusFilter, tipoFilter, unidadeFilter, postoFilter];
+  const { data: medalhasBundle = { medalhas: [], tiposMedalha: [], meta: {} }, isLoading } = useQuery({
+    queryKey: medalhasQueryKey,
+    queryFn: () => fetchScopedMedalhasBundle(),
     enabled: isAccessResolved && hasMedalhasAccess,
   });
-  const { data: tiposMedalha = [] } = useQuery({
-    queryKey: ['medalhas-tipos'],
-    queryFn: () => base44.entities.TipoMedalha.list('nome'),
-    enabled: isAccessResolved && hasMedalhasAccess,
-  });
+  const medalhas = medalhasBundle.medalhas || [];
+  const tiposMedalha = medalhasBundle.tiposMedalha || [];
 
   const deleteMutation = useMutation({
     mutationFn: (id) => {
