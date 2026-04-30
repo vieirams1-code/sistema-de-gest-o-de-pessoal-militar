@@ -7,6 +7,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import HierarchicalLotacaoSelect from '@/components/militar/HierarchicalLotacaoSelect';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,70 @@ import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/ut
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const BACKEND_LIMIT = 100;
 const STALE_TIME_MS = 5 * 60 * 1000;
+
+const TIPO_ORDEM = { root: 0, setor: 1, subsetor: 2, unidade: 3 };
+
+function normalizeLotacaoType(item = {}) {
+  const tipoRaw = String(item?.estrutura_tipo || item?.tipo || item?.subgrupamento_tipo || '').toLowerCase();
+  if (tipoRaw.includes('setor') || tipoRaw.includes('grupamento')) return 'setor';
+  if (tipoRaw.includes('subsetor') || tipoRaw.includes('subgrupamento')) return 'subsetor';
+  if (tipoRaw.includes('unidade')) return 'unidade';
+
+  if (!item?.parent_id && !item?.grupamento_id) return 'setor';
+  return 'unidade';
+}
+
+function buildLotacoesTree(flatLotacoes = []) {
+  const byId = new Map();
+
+  flatLotacoes.forEach((item) => {
+    const id = String(item?.id || '');
+    if (!id) return;
+
+    const nome = String(item?.nome || '').trim();
+    const sigla = String(item?.sigla || '').trim();
+    const tipo = normalizeLotacaoType(item);
+    const subtitle = [sigla, tipo !== 'unidade' ? tipo.toUpperCase() : ''].filter(Boolean).join(' • ');
+
+    const parentId = String(
+      item?.parent_id
+      || item?.setor_pai_id
+      || item?.grupamento_id
+      || item?.grupamento_raiz_id
+      || ''
+    ).trim();
+
+    byId.set(id, {
+      id,
+      label: nome || sigla || id,
+      subtitle: subtitle || undefined,
+      type: tipo,
+      parentId,
+      children: [],
+    });
+  });
+
+  const roots = [];
+  byId.forEach((node) => {
+    if (node.parentId && byId.has(node.parentId) && node.parentId !== node.id) {
+      byId.get(node.parentId).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const sortNodes = (nodes) => {
+    nodes.sort((a, b) => {
+      const typeDiff = (TIPO_ORDEM[a.type] ?? 99) - (TIPO_ORDEM[b.type] ?? 99);
+      if (typeDiff !== 0) return typeDiff;
+      return a.label.localeCompare(b.label, 'pt-BR');
+    });
+    nodes.forEach((node) => sortNodes(node.children));
+    return nodes;
+  };
+
+  return sortNodes(roots).map(({ parentId, ...node }) => node);
+}
 
 const statusBadgeClass = {
   Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -114,10 +179,19 @@ export default function Militares() {
 
   const lotacoesDisponiveis = useMemo(() => {
     return (lotacoesData?.lotacoes || [])
-      .map((item) => ({ id: item.id, nome: String(item?.nome || '').trim() }))
-      .filter((item) => item.nome)
-      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      .filter((item) => String(item?.id || '').trim() && String(item?.nome || '').trim());
   }, [lotacoesData]);
+
+  const lotacoesTree = useMemo(() => {
+    const lotacoesEstruturadas = buildLotacoesTree(lotacoesDisponiveis);
+    return [{
+      id: TODAS_LOTACOES_VALUE,
+      label: 'Todas as lotações',
+      subtitle: 'Escopo atual',
+      type: 'root',
+      children: lotacoesEstruturadas,
+    }];
+  }, [lotacoesDisponiveis]);
 
   const lotacoesDisponiveisIds = useMemo(
     () => new Set(lotacoesDisponiveis.map((item) => String(item.id))),
@@ -245,17 +319,12 @@ export default function Militares() {
           </div>
           <div className="flex flex-col md:flex-row gap-3">
             {shouldShowLotacaoFilter && (
-              <Select value={lotacaoFilter} onValueChange={setLotacaoFilter}>
-                <SelectTrigger className="md:w-72">
-                  <SelectValue placeholder="Selecione uma lotação" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODAS_LOTACOES_VALUE}>Todas as lotações</SelectItem>
-                  {lotacoesDisponiveis.map((lotacao) => (
-                    <SelectItem key={lotacao.id} value={lotacao.id}>{lotacao.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <HierarchicalLotacaoSelect
+                tree={lotacoesTree}
+                value={lotacaoFilter}
+                onChange={setLotacaoFilter}
+                placeholder="Todas as lotações"
+              />
             )}
             <Select value={quadroFilter} onValueChange={setQuadroFilter}>
               <SelectTrigger className="md:w-56">
