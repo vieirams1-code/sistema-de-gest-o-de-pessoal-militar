@@ -26,23 +26,32 @@ const STATUS_OPTIONS = [
 ];
 
 function getVinculosResumo(periodo, registrosLivro = []) {
-  const periodoId = periodo?.id;
-  const periodoRef = periodo?.referencia;
+  const periodoId = String(periodo?.id || '').trim();
+  const periodoRef = String(periodo?.referencia || '').trim();
+  const militarId = String(periodo?.militar_id || '').trim();
 
   const feriasVinculadas = Number(periodo?.fracoes?.length || 0) > 0;
   const usoOperacional = Number(periodo?.dias_gozados || 0) > 0 || Number(periodo?.dias_previstos || 0) > 0;
 
   const livroVinculado = registrosLivro.some((registro) => {
+    const registroMilitarId = String(registro?.militar_id || '').trim();
+    if (registroMilitarId && militarId && registroMilitarId !== militarId) return false;
+
     const matchId = periodoId && (
-      registro?.periodo_aquisitivo_id === periodoId ||
-      registro?.periodo_id === periodoId ||
-      registro?.referencia_id === periodoId
+      String(registro?.periodo_aquisitivo_id || '').trim() === periodoId ||
+      String(registro?.periodo_id || '').trim() === periodoId ||
+      String(registro?.referencia_id || '').trim() === periodoId
     );
 
     const matchRef = periodoRef && (
-      registro?.periodo_aquisitivo === periodoRef ||
-      registro?.periodo_aquisitivo_ref === periodoRef ||
-      registro?.ano_referencia === periodoRef
+      !String(registro?.periodo_aquisitivo_id || '').trim() &&
+      !String(registro?.periodo_id || '').trim() &&
+      !String(registro?.referencia_id || '').trim() &&
+      (
+        String(registro?.periodo_aquisitivo || '').trim() === periodoRef ||
+        String(registro?.periodo_aquisitivo_ref || '').trim() === periodoRef ||
+        String(registro?.ano_referencia || '').trim() === periodoRef
+      )
     );
 
     return Boolean(matchId || matchRef);

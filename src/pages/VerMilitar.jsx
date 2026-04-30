@@ -37,7 +37,7 @@ import { useToast } from '@/components/ui/use-toast';
 import {
   formatarTipoCreditoExtra } from
 '@/services/creditoExtraFeriasService';
-import { getSaldoConsolidadoPeriodo } from '@/components/ferias/periodoSaldoUtils';
+import { getSaldoConsolidadoPeriodo, isFeriasDoPeriodo } from '@/components/ferias/periodoSaldoUtils';
 import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularPeriodoAquisitivo';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
@@ -298,7 +298,7 @@ export default function VerMilitar() {
       .filter((periodo) => periodo.status !== 'Inativo')
       .map((periodo) => {
         const feriasRelacionadas = feriasSistema.filter((f) =>
-          f.periodo_aquisitivo_id === periodo.id || f.periodo_aquisitivo_ref === periodo.ano_referencia
+          isFeriasDoPeriodo(f, periodo)
         );
         const saldo = getSaldoConsolidadoPeriodo({ periodo, ferias: feriasRelacionadas });
         const statusRecalculado = calcularStatusPeriodoAquisitivo({
