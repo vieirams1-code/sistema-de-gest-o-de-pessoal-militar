@@ -1,5 +1,5 @@
-import { base44 } from '@/api/base44Client';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
 const STATUS_BLOQUEADOS = ['homologado', 'encerrado', 'cancelado', 'finalizado'];
 
@@ -20,7 +20,7 @@ export async function encaminharAtestadoParaJiso(atestado = {}) {
     status_jiso: atestado.status_jiso || 'Aguardando JISO',
   };
 
-  await base44.entities.Atestado.update(atestado.id, payload);
+  await atualizarEscopado('Atestado', atestado.id, payload);
   await sincronizarAtestadoJisoNoQuadro({ ...atestado, ...payload });
 
   return payload;
@@ -36,5 +36,5 @@ export async function marcarAtestadoJisoEmAnalise(atestado = {}) {
     throw new Error('Status finalizado/homologado não permite marcação em análise.');
   }
 
-  await base44.entities.Atestado.update(atestado.id, { status_jiso: 'Em análise' });
+  await atualizarEscopado('Atestado', atestado.id, { status_jiso: 'Em análise' });
 }

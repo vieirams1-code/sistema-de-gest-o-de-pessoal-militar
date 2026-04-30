@@ -284,6 +284,12 @@ function mapearEntityPublicacao(tipo) {
   return base44.entities.PublicacaoExOfficio;
 }
 
+function mapearEntityNamePublicacao(tipo) {
+  if (tipo === 'atestado') return 'Atestado';
+  if (tipo === 'livro') return 'RegistroLivro';
+  return 'PublicacaoExOfficio';
+}
+
 function campoStatusPorTipo(tipo) {
   return tipo === 'atestado' ? 'status_publicacao' : 'status';
 }
@@ -411,7 +417,7 @@ export default function Publicacoes() {
         depois: null,
       });
 
-      await entity.update(id, {
+      await atualizarEscopado(mapearEntityNamePublicacao(origemTipo), id, {
         historico_publicacao: anexarEventoAuditoriaPublicacao(registro || {}, eventoExclusao),
       });
 
@@ -423,25 +429,26 @@ export default function Publicacoes() {
           const origemTipoHint = registro.publicacao_referencia_origem_tipo || null;
           if (refId) {
             const entityOriginal = origemTipoHint === 'atestado' ? base44.entities.Atestado : origemTipoHint === 'livro' ? base44.entities.RegistroLivro : base44.entities.PublicacaoExOfficio;
+            const entityNameOriginal = origemTipoHint === 'atestado' ? 'Atestado' : origemTipoHint === 'livro' ? 'RegistroLivro' : 'PublicacaoExOfficio';
             const [original] = await entityOriginal.filter({ id: refId });
             if (original) {
               const payload = { ...(origemTipoHint === 'atestado' ? {} : { status: calcStatusPublicacao(original) }) };
               if (isApostila) { payload.apostilada_por_id = null; payload.foi_apostilada = false; }
               if (isTSE) { payload.tornada_sem_efeito_por_id = null; payload.foi_tornada_sem_efeito = false; }
               if (origemTipoHint === 'atestado') payload.status_publicacao = calcStatusPublicacao(original);
-              await entityOriginal.update(refId, payload);
+              await atualizarEscopado(entityNameOriginal, refId, payload);
             }
           }
 
           if (isTSE && refId && (!origemTipoHint || origemTipoHint === 'ex-officio')) {
             const [publicacaoReferencia] = await base44.entities.PublicacaoExOfficio.filter({ id: refId });
             for (const atestadoId of getAtestadoIdsVinculados(publicacaoReferencia)) {
-              await atualizarEstadoAtestadoPelasPublicacoes(atestadoId, base44.entities.Atestado, base44.entities.PublicacaoExOfficio);
+              await atualizarEstadoAtestadoPelasPublicacoes(atestadoId, base44.entities.Atestado, base44.entities.PublicacaoExOfficio, atualizarEscopado);
             }
           }
         }
 
-        await reverterAtestadosPorExclusaoPublicacao(registro, base44.entities.Atestado, base44.entities.PublicacaoExOfficio);
+        await reverterAtestadosPorExclusaoPublicacao(registro, base44.entities.Atestado, base44.entities.PublicacaoExOfficio, atualizarEscopado);
         return excluirEscopado('PublicacaoExOfficio', id);
       }
 
@@ -524,7 +531,7 @@ export default function Publicacoes() {
         depois: extrairSnapshotPublicacao(registroDestino || {}),
         metadata: { bloqueio_tipo: 'transicao_invalida', permitir_reversao_publicado: permitirReversaoPublicado },
       });
-      entity.update(id, { historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual || {}, eventoBloqueio) }).catch(() => {});
+      atualizarEscopado(mapearEntityNamePublicacao(origemTipo), id, { historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual || {}, eventoBloqueio) }).catch(() => {});
       return alert(validacao.motivo || 'Transição inválida de status para publicação.');
     }
     updateMutation.mutate({ id, data, tipo, permitirReversaoPublicado });

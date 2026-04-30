@@ -33,6 +33,7 @@ import {
   listarCreditosExtraFerias,
   salvarCreditoExtraFerias,
 } from '@/services/creditoExtraFeriasService';
+import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 
 const initialForm = {
   id: '',
@@ -246,7 +247,7 @@ export default function CreditosExtraordinariosFerias() {
       if (isCreditoBloqueadoPorUso(credito, gozoById)) {
         throw new Error('Crédito já utilizado não pode ser cancelado.');
       }
-      return base44.entities.CreditoExtraFerias.update(credito.id, {
+      return atualizarEscopado('CreditoExtraFerias', credito.id, {
         status: STATUS_CREDITO_EXTRA_FERIAS.CANCELADO,
         gozo_ferias_id: '',
       });
@@ -268,7 +269,7 @@ export default function CreditosExtraordinariosFerias() {
         throw new Error('Crédito já utilizado não pode ser excluído.');
       }
 
-      return base44.entities.CreditoExtraFerias.delete(credito.id);
+      return excluirEscopado('CreditoExtraFerias', credito.id);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['creditos-extra-ferias'] });
@@ -294,7 +295,7 @@ export default function CreditosExtraordinariosFerias() {
       if (!gozo) throw new Error('Gozo selecionado não encontrado. Atualize a página e tente novamente.');
       if (gozo.militar_id !== credito.militar_id) throw new Error('O gozo deve pertencer ao mesmo militar do crédito.');
 
-      return base44.entities.CreditoExtraFerias.update(credito.id, {
+      return atualizarEscopado('CreditoExtraFerias', credito.id, {
         gozo_ferias_id: gozoFeriasId,
         status: STATUS_CREDITO_EXTRA_FERIAS.VINCULADO,
       });
@@ -318,7 +319,7 @@ export default function CreditosExtraordinariosFerias() {
         throw new Error('Crédito utilizado não pode ter vínculo removido por esta tela.');
       }
 
-      return base44.entities.CreditoExtraFerias.update(credito.id, {
+      return atualizarEscopado('CreditoExtraFerias', credito.id, {
         gozo_ferias_id: '',
         status: STATUS_CREDITO_EXTRA_FERIAS.DISPONIVEL,
       });

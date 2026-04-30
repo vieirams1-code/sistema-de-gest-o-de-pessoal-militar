@@ -638,7 +638,7 @@ export default function CadastrarRegistroRP() {
     if (!validacaoTransicao.valido) {
       if (registroEdicao?.id) {
         const moduloPersistencia = moduloOrigemEdicao === 'Livro' ? MODULO_LIVRO : MODULO_EX_OFFICIO;
-        const entity = mapearEntityPublicacaoPorModulo(moduloPersistencia);
+        const entityNameBloqueio = nomeEntidadePorModulo(moduloPersistencia);
         const eventoBloqueio = criarEventoAuditoriaPublicacao({
           registro: {
             ...registroEdicao,
@@ -654,7 +654,7 @@ export default function CadastrarRegistroRP() {
           depois: extrairSnapshotPublicacao(registroDestino || {}),
           metadata: { bloqueio_tipo: 'transicao_invalida' },
         });
-        entity.update(registroEdicao.id, {
+        atualizarEscopado(entityNameBloqueio, registroEdicao.id, {
           historico_publicacao: anexarEventoAuditoriaPublicacao(registroEdicao, eventoBloqueio),
         }).catch(() => {});
       }

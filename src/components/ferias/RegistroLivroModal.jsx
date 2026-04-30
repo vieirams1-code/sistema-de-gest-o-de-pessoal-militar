@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { reconciliarCadeiaFerias, calcularSnapshotInterrupcao, compareEventosFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -595,14 +596,14 @@ export default function RegistroLivroModal({
           await liberarCreditosDoGozo({ gozoFeriasId: ferias.id });
         }
 
-        await base44.entities.Ferias.update(ferias.id, {
+        await atualizarEscopado('Ferias', ferias.id, {
           dias_base_gozo: totaisGozo.dias_base_gozo,
           dias_extras_creditos: totaisGozo.dias_extras_creditos,
           dias_totais_gozo: totaisGozo.dias_totais_gozo,
         });
       }
 
-      await base44.entities.RegistroLivro.create(registroPayload);
+      await criarEscopado('RegistroLivro', registroPayload);
 
       if (TIPOS_OPERACIONAIS.includes(tipoRegistro)) {
         await reconciliarCadeiaFerias({ feriasId: ferias.id, ferias });
