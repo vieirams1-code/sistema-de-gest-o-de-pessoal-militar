@@ -56,6 +56,7 @@ export default function Militares() {
   const queryClient = useQueryClient();
   const {
     isAdmin,
+    modoAcesso,
     userEmail,
     linkedMilitarEmail,
     canAccessModule,
@@ -92,8 +93,9 @@ export default function Militares() {
   const shouldQuery = isAccessResolved;
 
   // ===================================================================
-  // Lotações (filtro de admin) — via getScopedLotacoes
+  // Lotações (filtro escopado) — via getScopedLotacoes
   // ===================================================================
+  const shouldShowLotacaoFilter = isAdmin || ['setor', 'subsetor', 'unidade'].includes(modoAcesso);
   const lotacoesQueryKey = ['militares-lotacoes-scoped', effectiveEmail || 'self'];
   const {
     data: lotacoesData = { lotacoes: [], meta: {} },
@@ -103,7 +105,7 @@ export default function Militares() {
     refetch: refetchLotacoes,
   } = useQuery({
     queryKey: lotacoesQueryKey,
-    enabled: isAccessResolved && isAdmin,
+    enabled: isAccessResolved && shouldShowLotacaoFilter,
     queryFn: () => fetchScopedLotacoes({}),
     staleTime: STALE_TIME_MS,
     retry: 1,
@@ -111,12 +113,22 @@ export default function Militares() {
   });
 
   const lotacoesDisponiveis = useMemo(() => {
-    if (!isAdmin) return [];
     return (lotacoesData?.lotacoes || [])
       .map((item) => ({ id: item.id, nome: String(item?.nome || '').trim() }))
       .filter((item) => item.nome)
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [isAdmin, lotacoesData]);
+  }, [lotacoesData]);
+
+  const lotacoesDisponiveisIds = useMemo(
+    () => new Set(lotacoesDisponiveis.map((item) => String(item.id))),
+    [lotacoesDisponiveis],
+  );
+
+  useEffect(() => {
+    if (lotacaoFilter === TODAS_LOTACOES_VALUE) return;
+    if (lotacoesDisponiveisIds.has(String(lotacaoFilter))) return;
+    setLotacaoFilter(TODAS_LOTACOES_VALUE);
+  }, [lotacaoFilter, lotacoesDisponiveisIds]);
 
   // ===================================================================
   // Militares — via getScopedMilitares (sem fallback em loop)
@@ -146,7 +158,11 @@ export default function Militares() {
       };
       if (selectedPostos.length > 0) payload.postoGraduacaoFiltros = selectedPostos;
       if (debouncedSearchTerm) payload.search = debouncedSearchTerm;
-      if (isAdmin && lotacaoFilter !== TODAS_LOTACOES_VALUE) {
+      if (
+        shouldShowLotacaoFilter
+        && lotacaoFilter !== TODAS_LOTACOES_VALUE
+        && lotacoesDisponiveisIds.has(String(lotacaoFilter))
+      ) {
         payload.lotacaoFiltro = lotacaoFilter;
       }
 
@@ -174,8 +190,8 @@ export default function Militares() {
     .filter((m) => militarCorrespondeBusca(m, searchTerm));
 
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
-  const lotacoesEmptyForAdmin = isAdmin && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
-  const shouldShowLotacoesDebugPanel = isAdmin && (isErrorLotacoes || lotacoesEmptyForAdmin);
+  const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
+  const shouldShowLotacoesDebugPanel = shouldShowLotacaoFilter && (isErrorLotacoes || lotacoesEmptyForScopedUser);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => excluirMilitarComDependencias(id, { executadoPor: userEmail || '' }),
@@ -228,7 +244,7 @@ export default function Militares() {
             ))}
           </div>
           <div className="flex flex-col md:flex-row gap-3">
-            {isAdmin && (
+            {shouldShowLotacaoFilter && (
               <Select value={lotacaoFilter} onValueChange={setLotacaoFilter}>
                 <SelectTrigger className="md:w-72">
                   <SelectValue placeholder="Selecione uma lotação" />
@@ -264,7 +280,7 @@ export default function Militares() {
           </div>
         </div>
 
-        {isAdmin && isErrorLotacoes && (
+        {shouldShowLotacaoFilter && isErrorLotacoes && (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 mb-4">
             <p className="text-sm font-medium">
               {isLotacoesRateLimit
