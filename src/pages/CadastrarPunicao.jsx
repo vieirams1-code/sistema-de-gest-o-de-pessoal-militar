@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import {
   getPunicaoEntity,
   validarPunicaoDisciplinar,
@@ -37,6 +38,7 @@ export default function CadastrarPunicao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasPunicoesAccess = canAccessModule('punicoes');
 
   const [searchParams] = useSearchParams();
@@ -266,8 +268,29 @@ export default function CadastrarPunicao() {
     e.preventDefault();
     if (!canPersistirPunicao) return;
     if (isSubmittingRef.current || saveMutation.isPending) return;
+
+    // Lote Trava Emergencial — escopo de escrita
+    const militarAlvoId = punicaoExistente?.militar_id || formData.militar_id;
+    const escopo = validarEscopoMilitar(militarAlvoId);
+    if (!escopo.permitido) {
+      setErroValidacao(escopo.motivo);
+      return;
+    }
+
     isSubmittingRef.current = true;
     saveMutation.mutate();
+  };
+
+  const handleConfirmDelete = () => {
+    if (!canExcluirPunicoes) return;
+    // Lote Trava Emergencial — escopo de exclusão
+    const militarAlvoId = punicaoExistente?.militar_id || formData.militar_id;
+    const escopo = validarEscopoMilitar(militarAlvoId);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    deleteMutation.mutate(punicaoId);
   };
 
   const necessitaDias = TIPOS_COM_CUMPRIMENTO.has(formData.tipo_punicao);
@@ -466,7 +489,7 @@ export default function CadastrarPunicao() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => canExcluirPunicoes && deleteMutation.mutate(punicaoId)} className="bg-red-600 hover:bg-red-700">
+              <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">
                 Excluir
               </AlertDialogAction>
             </AlertDialogFooter>

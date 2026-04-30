@@ -15,6 +15,7 @@ import { addDays, format, addYears } from 'date-fns';
 
 import FormSection from '@/components/militar/FormSection';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import {
   getAlertaPeriodoConcessivo,
   validarInicioNoPeriodoConcessivo,
@@ -65,6 +66,7 @@ export default function CadastrarFerias() {
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasFeriasAccess = canAccessModule('ferias');
 
 
@@ -181,6 +183,14 @@ export default function CadastrarFerias() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.militar_id || !formData.periodo_aquisitivo_ref) return;
+
+    // Lote Trava Emergencial — escopo de escrita
+    const militarAlvoId = editingFerias?.militar_id || formData.militar_id;
+    const escopo = validarEscopoMilitar(militarAlvoId);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
 
     const erroOrdem = validarOrdemFracoesCadastro({
       militarId: formData.militar_id,

@@ -12,11 +12,13 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import FormField from '@/components/militar/FormField';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 
 export default function CadastrarArmamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasArmamentosAccess = canAccessModule('armamentos');
 
   const [searchParams] = useSearchParams();
@@ -61,6 +63,15 @@ export default function CadastrarArmamento() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Lote Trava Emergencial — escopo de escrita
+    const militarAlvoId = armamentoExistente?.militar_id || formData.militar_id;
+    const escopo = validarEscopoMilitar(militarAlvoId);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+
     setLoading(true);
 
     try {

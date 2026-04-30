@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -109,6 +110,7 @@ export default function CadastrarRegistroRP() {
   const isEditing = !!registroId;
 
   const { canAccessModule, canAccessAction, isAccessResolved, isLoading: loadingUser, user } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAccess = canAccessModule('rp');
   const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
   const canPublicarBg = canAccessAction('publicar_bg') || canAccessAction('admin_mode');
@@ -599,6 +601,14 @@ export default function CadastrarRegistroRP() {
     if (conflitoTemplateNoSubmit.temConflito) return;
     if (!canGerirPublicacoes) {
       alert('Ação negada: você não tem permissão para criar/editar publicações.');
+      return;
+    }
+
+    // Lote Trava Emergencial — escopo de escrita
+    const militarAlvoId = registroEdicao?.militar_id || formData.militar_id;
+    const escopo = validarEscopoMilitar(militarAlvoId);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
       return;
     }
 

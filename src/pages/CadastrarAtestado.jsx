@@ -17,6 +17,7 @@ import DateCalculator from '@/components/atestado/DateCalculator';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 
 const initialFormData = {
   militar_id: '',
@@ -51,6 +52,7 @@ export default function CadastrarAtestado() {
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
 
   const [formData, setFormData] = useState(initialFormData);
@@ -130,6 +132,15 @@ export default function CadastrarAtestado() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Lote Trava Emergencial — escopo de escrita
+    const militarAlvoId = editingAtestado?.militar_id || formData.militar_id;
+    const escopo = validarEscopoMilitar(militarAlvoId);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+
     setLoading(true);
 
     const dataToSave = {

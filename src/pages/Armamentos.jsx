@@ -20,6 +20,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { Button } from '@/components/ui/button';
 
 const normalizeText = (value) => value?.toString().toLowerCase().trim() || '';
@@ -48,7 +49,18 @@ export default function Armamentos() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const { isAdmin, isLoading: loadingUser, hasAccess, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const canAdicionarArmamentos = canAccessAction('adicionar_armamentos');
+
+  const handleEditarArmamento = (arma) => {
+    // Lote Trava Emergencial — escopo de escrita: bloquear navegação para edição
+    const escopo = validarEscopoMilitar(arma?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    navigate(createPageUrl('CadastrarArmamento') + `?id=${arma.id}`);
+  };
 
   const { data: armamentos = [], isLoading } = useQuery({
     queryKey: ['armamentos', isAdmin],
@@ -315,7 +327,7 @@ export default function Armamentos() {
                         type="button"
                         className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-200 rounded transition-colors"
                         title="Editar"
-                        onClick={() => navigate(createPageUrl('CadastrarArmamento') + `?id=${arma.id}`)}
+                        onClick={() => handleEditarArmamento(arma)}
                       >
                         <PenSquare size={18} />
                       </button>

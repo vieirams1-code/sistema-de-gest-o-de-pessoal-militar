@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import FormField from '@/components/militar/FormField';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { deduplicarTiposMedalha, garantirCatalogoFixoMedalhaTempo, normalizarStatusMedalha } from '@/services/medalhasTempoServicoService';
 import { ACOES_MEDALHAS, adicionarAuditoriaMedalha, validarPermissaoAcaoMedalhas } from '@/services/medalhasAcessoService';
 
@@ -21,6 +22,7 @@ export default function CadastrarMedalha() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAccessModule, canAccessAction, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasMedalhasAccess = canAccessModule('medalhas');
   const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
 
@@ -108,6 +110,15 @@ export default function CadastrarMedalha() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Lote Trava Emergencial — escopo de escrita
+    const militarAlvoId = medalhaExistente?.militar_id || formData.militar_id;
+    const escopo = validarEscopoMilitar(militarAlvoId);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+
     setLoading(true);
 
     try {
