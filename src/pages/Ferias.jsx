@@ -351,7 +351,7 @@ export default function Ferias() {
     const registrosErrorMessage = String(registrosError?.message || '').toLowerCase();
 
     if (isAdmin && isFeriasError) return 'Ferias.list';
-    if (isRateLimitError(feriasError) || isRateLimitError(registrosError) || feriasErrorMessage.includes('429') || registrosErrorMessage.includes('429')) return 'getScopedFeriasBundle / rate limit';
+    if (feriasErrorMessage.includes('429') || registrosErrorMessage.includes('429') || feriasErrorMessage.includes('rate limit') || registrosErrorMessage.includes('rate limit')) return 'getScopedFeriasBundle / rate limit';
     if (feriasErrorMessage.includes('férias dos militares do escopo')) return 'getScopedFeriasBundle';
     if (registrosErrorMessage.includes('registros do livro dos militares do escopo')) return 'RegistroLivro.filter por militar';
     if (feriasErrorMessage.includes('escopo') || registrosErrorMessage.includes('escopo')) return 'Militar.filter escopo';
