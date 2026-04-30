@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
-import { montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
+import { abreviarPostoGraduacao, montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, getLotacaoAtualMilitar, militarCorrespondeBusca, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -282,7 +282,7 @@ function obterMatriculaAtualMilitar(militar = {}) {
 }
 
 function montarLinhaPrincipalMilitar(militar = {}) {
-  const postoGrad = limparCampoTexto(militar?.posto_graduacao);
+  const postoGrad = abreviarPostoGraduacao(limparCampoTexto(militar?.posto_graduacao));
   const quadro = limparCampoTexto(militar?.quadro);
   const nomeCompleto = limparCampoTexto(militar?.nome_completo || militar?.nome_guerra || militar?.nome_de_guerra);
   const matriculaAtual = obterMatriculaAtualMilitar(militar);
@@ -378,6 +378,8 @@ export default function FolhaAlteracoes() {
   const [configOpen, setConfigOpen] = useState(false);
   const [signatarioPopoverOpen, setSignatarioPopoverOpen] = useState(false);
   const [buscaSignatario, setBuscaSignatario] = useState('');
+  const [militarPopoverOpen, setMilitarPopoverOpen] = useState(false);
+  const [buscaMilitar, setBuscaMilitar] = useState('');
   const [impressaoConfig, setImpressaoConfig] = useState(getDefaultImpressaoConfig());
 
   const { data: militares = [], isLoading: loadingMilitares } = useQuery({
@@ -599,6 +601,12 @@ export default function FolhaAlteracoes() {
     if (!termo) return militaresOrdenados;
     return militaresOrdenados.filter((militar) => militarCorrespondeBusca(militar, termo));
   }, [buscaSignatario, militaresOrdenados]);
+
+  const militaresFolhaFiltrados = useMemo(() => {
+    const termo = buscaMilitar.trim().toLowerCase();
+    if (!termo) return militaresOrdenados;
+    return militaresOrdenados.filter((militar) => militarCorrespondeBusca(militar, termo));
+  }, [buscaMilitar, militaresOrdenados]);
 
   if (!loadingUser && isAccessResolved && !canAccessModule('folha_alteracoes')) {
     return <AccessDenied modulo="Folha de Alterações" />;
@@ -864,23 +872,45 @@ export default function FolhaAlteracoes() {
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2 md:col-span-3">
                 <label className="text-sm font-medium text-slate-700">Militar</label>
-                <Select value={filtroMilitarId} onValueChange={setFiltroMilitarId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingMilitares ? 'Carregando militares...' : 'Selecione um militar'}>
-                      {militarSelecionado ? montarLinhaPrincipalMilitar(militarSelecionado) : null}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {militaresOrdenados.map((militar) => (
-                      <SelectItem key={militar.id} value={militar.id}>
-                        <div className="flex flex-col">
-                          <span className="truncate">{montarLinhaPrincipalMilitar(militar)}</span>
-                          {obterNomeGuerraMilitar(militar) ? <span className="font-bold">{obterNomeGuerraMilitar(militar)}</span> : null}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={militarPopoverOpen} onOpenChange={setMilitarPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      <span className="truncate text-left">
+                        {militarSelecionado ? montarLinhaPrincipalMilitar(militarSelecionado) : (loadingMilitares ? 'Carregando militares...' : 'Selecione um militar')}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[min(92vw,760px)] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Buscar por nome, nome de guerra, matrícula e outros critérios..."
+                        value={buscaMilitar}
+                        onValueChange={setBuscaMilitar}
+                      />
+                      <CommandEmpty>Nenhum militar encontrado.</CommandEmpty>
+                      <CommandGroup className="max-h-72 overflow-auto">
+                        {militaresFolhaFiltrados.map((militar) => (
+                          <CommandItem
+                            key={militar.id}
+                            value={`${montarLinhaPrincipalMilitar(militar)} ${obterNomeGuerraMilitar(militar)}`}
+                            onSelect={() => {
+                              setFiltroMilitarId(militar.id);
+                              setMilitarPopoverOpen(false);
+                              setBuscaMilitar('');
+                            }}
+                          >
+                            <Check className={cn('mr-2 h-4 w-4', filtroMilitarId === militar.id ? 'opacity-100' : 'opacity-0')} />
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate">{montarLinhaPrincipalMilitar(militar)}</span>
+                              {obterNomeGuerraMilitar(militar) ? <span className="font-bold">{obterNomeGuerraMilitar(militar)}</span> : null}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
