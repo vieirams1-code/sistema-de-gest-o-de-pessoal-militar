@@ -29,6 +29,7 @@ import { excluirMilitarComDependencias } from '@/services/militarExclusaoService
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
+import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const BACKEND_LIMIT = 100;
@@ -68,6 +69,7 @@ export default function Militares() {
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [debouncedGroups, setDebouncedGroups] = useState([]);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODAS_LOTACOES_VALUE);
+  const [quadroFilter, setQuadroFilter] = useState('todos');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
 
@@ -87,7 +89,7 @@ export default function Militares() {
   }, [debouncedGroups]);
 
   const effectiveEmail = getEffectiveEmail();
-  const shouldQuery = isAccessResolved && selectedPostos.length > 0;
+  const shouldQuery = isAccessResolved;
 
   // ===================================================================
   // Lotações (filtro de admin) — via getScopedLotacoes
@@ -124,6 +126,7 @@ export default function Militares() {
     isAdmin,
     lotacaoFilter,
     selectedPostos.join('|'),
+    quadroFilter,
     debouncedSearchTerm,
     effectiveEmail || 'self',
   ];
@@ -136,12 +139,12 @@ export default function Militares() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const payload = {
-        postoGraduacaoFiltros: selectedPostos,
         statusCadastro: 'Ativo',
         limit: BACKEND_LIMIT,
         offset: 0,
         includeFoto: false,
       };
+      if (selectedPostos.length > 0) payload.postoGraduacaoFiltros = selectedPostos;
       if (debouncedSearchTerm) payload.search = debouncedSearchTerm;
       if (isAdmin && lotacaoFilter !== TODAS_LOTACOES_VALUE) {
         payload.lotacaoFiltro = lotacaoFilter;
@@ -161,7 +164,11 @@ export default function Militares() {
 
   const militares = useMemo(() => militaresData?.militares || [], [militaresData]);
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: true });
-  const filteredMilitares = operacionais.filter((m) => militarCorrespondeBusca(m, searchTerm));
+  const quadrosDisponiveis = useMemo(() => QUADROS_FIXOS.map((quadro) => ({ value: quadro, label: quadro })), []);
+
+  const filteredMilitares = operacionais
+    .filter((m) => (quadroFilter === 'todos' ? true : String(m?.quadro || '').trim() === quadroFilter))
+    .filter((m) => militarCorrespondeBusca(m, searchTerm));
 
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForAdmin = isAdmin && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
@@ -180,7 +187,7 @@ export default function Militares() {
     return <AccessDenied modulo="Efetivo" />;
   }
 
-  const emptyInstruction = 'Selecione uma ou mais graduações para carregar o efetivo.';
+  const emptyInstruction = 'Ajuste os filtros para carregar o efetivo.';
   const isRateLimitError = String(error?.message || '').toLowerCase().includes('rate limit');
 
   return (
@@ -231,6 +238,17 @@ export default function Militares() {
                 </SelectContent>
               </Select>
             )}
+            <Select value={quadroFilter} onValueChange={setQuadroFilter}>
+              <SelectTrigger className="md:w-56">
+                <SelectValue placeholder="Selecione um quadro" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os quadros</SelectItem>
+                {quadrosDisponiveis.map((quadro) => (
+                  <SelectItem key={quadro.value} value={quadro.value}>{quadro.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
@@ -291,6 +309,7 @@ export default function Militares() {
                 pagina: 'Militares',
                 lotacaoFilter,
                 selectedPostos,
+                quadroFilter,
                 debouncedSearchTerm,
                 meta: militaresData?.meta || null,
                 totalRetornado: militaresData?.totalRetornado || 0,
