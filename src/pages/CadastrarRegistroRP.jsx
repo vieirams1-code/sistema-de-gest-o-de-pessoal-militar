@@ -6,6 +6,7 @@ import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,6 +44,10 @@ import {
 
 function mapearEntityPublicacaoPorModulo(modulo) {
   return modulo === MODULO_LIVRO ? base44.entities.RegistroLivro : base44.entities.PublicacaoExOfficio;
+}
+
+function nomeEntidadePorModulo(modulo) {
+  return modulo === MODULO_LIVRO ? 'RegistroLivro' : 'PublicacaoExOfficio';
 }
 
 function montarResumoEdicaoCamposPublicacao(antes = {}, depois = {}) {
@@ -502,7 +507,7 @@ export default function CadastrarRegistroRP() {
 
       if (isEditing) {
         const moduloPersistencia = moduloOrigemEdicao === 'Livro' ? MODULO_LIVRO : MODULO_EX_OFFICIO;
-        const entity = mapearEntityPublicacaoPorModulo(moduloPersistencia);
+        const entityName = nomeEntidadePorModulo(moduloPersistencia);
         const registroAtual = registroEdicao || {};
         const payloadAtualizacaoBase = moduloPersistencia === MODULO_LIVRO ? payloadLivro : payloadExOfficio;
         const registroDestino = { ...registroAtual, ...payloadAtualizacaoBase };
@@ -527,14 +532,14 @@ export default function CadastrarRegistroRP() {
           depois: extrairSnapshotPublicacao(registroDestino),
         });
 
-        return entity.update(registroId, {
+        return atualizarEscopado(entityName, registroId, {
           ...payloadAtualizacaoBase,
           historico_publicacao: anexarEventoAuditoriaPublicacao(registroAtual, eventoEdicao),
         });
       }
 
       if (isLivro) {
-        const criado = await base44.entities.RegistroLivro.create(payloadLivro);
+        const criado = await criarEscopado('RegistroLivro', payloadLivro);
         const eventoCriacao = criarEventoAuditoriaPublicacao({
           registro: { ...criado, origem_tipo: 'livro' },
           evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
@@ -545,13 +550,13 @@ export default function CadastrarRegistroRP() {
           antes: null,
           depois: extrairSnapshotPublicacao(criado),
         });
-        await base44.entities.RegistroLivro.update(criado.id, {
+        await atualizarEscopado('RegistroLivro', criado.id, {
           historico_publicacao: anexarEventoAuditoriaPublicacao(criado, eventoCriacao),
         });
         return criado;
       }
 
-      const criado = await base44.entities.PublicacaoExOfficio.create(payloadExOfficio);
+      const criado = await criarEscopado('PublicacaoExOfficio', payloadExOfficio);
       const eventoCriacao = criarEventoAuditoriaPublicacao({
         registro: { ...criado, origem_tipo: 'ex-officio' },
         evento: EVENTO_AUDITORIA_PUBLICACAO.CRIACAO,
@@ -562,7 +567,7 @@ export default function CadastrarRegistroRP() {
         antes: null,
         depois: extrairSnapshotPublicacao(criado),
       });
-      await base44.entities.PublicacaoExOfficio.update(criado.id, {
+      await atualizarEscopado('PublicacaoExOfficio', criado.id, {
         historico_publicacao: anexarEventoAuditoriaPublicacao(criado, eventoCriacao),
       });
       return criado;

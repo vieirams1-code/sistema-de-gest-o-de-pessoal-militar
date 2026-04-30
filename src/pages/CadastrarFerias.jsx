@@ -24,6 +24,7 @@ import {
 import { validarDiasNoSaldoPeriodo } from '@/components/ferias/periodoSaldoUtils';
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {
@@ -236,67 +237,73 @@ export default function CadastrarFerias() {
 
     let periodoAquisitivoId = formData.periodo_aquisitivo_id || editingFerias?.periodo_aquisitivo_id || null;
 
-    // Se é edição, atualizar registro único
-    if (editId) {
-      const f = fracoes[0];
-      await base44.entities.Ferias.update(editId, {
-        ...formData,
-        dias: f.dias,
-        // Gravar dias_base apenas se ainda não existir (não sobrescrever base imutável)
-        ...(editingFerias?.dias_base ? {} : { dias_base: f.dias }),
-        data_inicio: f.data_inicio,
-        data_fim: f.data_fim,
-        data_retorno: f.data_retorno,
-        fracionamento: editingFerias?.fracionamento || labelFracao(0, fracoes.length)
-      });
-    } else {
-      // Criar uma fração por registro
-      for (let i = 0; i < fracoes.length; i++) {
-        const f = fracoes[i];
-        const fracionamento = labelFracao(i, fracoes.length);
-        await base44.entities.Ferias.create({
+    try {
+      // Se é edição, atualizar registro único
+      if (editId) {
+        const f = fracoes[0];
+        await atualizarEscopado('Ferias', editId, {
           ...formData,
           dias: f.dias,
-          dias_base: f.dias,       // base imutável — nunca alterada por adição/desconto
+          // Gravar dias_base apenas se ainda não existir (não sobrescrever base imutável)
+          ...(editingFerias?.dias_base ? {} : { dias_base: f.dias }),
           data_inicio: f.data_inicio,
           data_fim: f.data_fim,
           data_retorno: f.data_retorno,
-          fracionamento
+          fracionamento: editingFerias?.fracionamento || labelFracao(0, fracoes.length)
         });
-      }
-
-      // Criar ou atualizar período aquisitivo se não existir
-      if (!formData.periodo_aquisitivo_id) {
-        const partes = formData.periodo_aquisitivo_ref.split('/');
-        const anoInicio = parseInt(partes[0]);
-        const anoFim = parseInt(partes[1]);
-        const militar = await base44.entities.Militar.filter({ id: formData.militar_id });
-        const m = militar[0];
-        if (m) {
-          const dataInclusao = new Date((m.data_inclusao || `${anoInicio}-01-01`) + 'T00:00:00');
-          const diaAniversario = format(dataInclusao, 'MM-dd');
-          const inicio = `${anoInicio}-${diaAniversario}`;
-          const fim = format(addDays(new Date(`${anoFim}-${diaAniversario}T00:00:00`), -1), 'yyyy-MM-dd');
-          const limite = format(addYears(new Date(fim + 'T00:00:00'), 2), 'yyyy-MM-dd');
-          const periodoCriado = await base44.entities.PeriodoAquisitivo.create({
-            militar_id: formData.militar_id,
-            militar_nome: formData.militar_nome,
-            militar_posto: formData.militar_posto,
-            militar_matricula: formData.militar_matricula,
-            inicio_aquisitivo: inicio,
-            fim_aquisitivo: fim,
-            data_limite_gozo: limite,
-            dias_base: DIAS_BASE_PADRAO,
-            dias_total: DIAS_BASE_PADRAO,
-            dias_gozados: 0,
-            dias_previstos: 0,
-            dias_saldo: DIAS_BASE_PADRAO,
-            status: 'Disponível',
-            ano_referencia: formData.periodo_aquisitivo_ref
+      } else {
+        // Criar uma fração por registro
+        for (let i = 0; i < fracoes.length; i++) {
+          const f = fracoes[i];
+          const fracionamento = labelFracao(i, fracoes.length);
+          await criarEscopado('Ferias', {
+            ...formData,
+            dias: f.dias,
+            dias_base: f.dias,       // base imutável — nunca alterada por adição/desconto
+            data_inicio: f.data_inicio,
+            data_fim: f.data_fim,
+            data_retorno: f.data_retorno,
+            fracionamento
           });
-          periodoAquisitivoId = periodoCriado?.id || periodoAquisitivoId;
+        }
+
+        // Criar ou atualizar período aquisitivo se não existir
+        if (!formData.periodo_aquisitivo_id) {
+          const partes = formData.periodo_aquisitivo_ref.split('/');
+          const anoInicio = parseInt(partes[0]);
+          const anoFim = parseInt(partes[1]);
+          const militar = await base44.entities.Militar.filter({ id: formData.militar_id });
+          const m = militar[0];
+          if (m) {
+            const dataInclusao = new Date((m.data_inclusao || `${anoInicio}-01-01`) + 'T00:00:00');
+            const diaAniversario = format(dataInclusao, 'MM-dd');
+            const inicio = `${anoInicio}-${diaAniversario}`;
+            const fim = format(addDays(new Date(`${anoFim}-${diaAniversario}T00:00:00`), -1), 'yyyy-MM-dd');
+            const limite = format(addYears(new Date(fim + 'T00:00:00'), 2), 'yyyy-MM-dd');
+            const periodoCriado = await criarEscopado('PeriodoAquisitivo', {
+              militar_id: formData.militar_id,
+              militar_nome: formData.militar_nome,
+              militar_posto: formData.militar_posto,
+              militar_matricula: formData.militar_matricula,
+              inicio_aquisitivo: inicio,
+              fim_aquisitivo: fim,
+              data_limite_gozo: limite,
+              dias_base: DIAS_BASE_PADRAO,
+              dias_total: DIAS_BASE_PADRAO,
+              dias_gozados: 0,
+              dias_previstos: 0,
+              dias_saldo: DIAS_BASE_PADRAO,
+              status: 'Disponível',
+              ano_referencia: formData.periodo_aquisitivo_ref
+            });
+            periodoAquisitivoId = periodoCriado?.id || periodoAquisitivoId;
+          }
         }
       }
+    } catch (err) {
+      setLoading(false);
+      alert(err?.message || 'Falha ao salvar férias.');
+      return;
     }
 
     await sincronizarPeriodoAquisitivoDaFerias({

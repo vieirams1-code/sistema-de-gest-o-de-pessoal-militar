@@ -12,6 +12,7 @@ import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
+import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
@@ -375,12 +376,16 @@ export default function Publicacoes() {
       };
 
       if (origemTipo === 'livro') {
-        await entity.update(id, payloadComAuditoria);
+        await atualizarEscopado('RegistroLivro', id, payloadComAuditoria);
         if (isFeriasOperacional(registroAtual)) await reconciliarCadeiaFerias({ feriasId: registroAtual.ferias_id });
         return null;
       }
 
-      return entity.update(id, payloadComAuditoria);
+      if (origemTipo === 'atestado') {
+        return atualizarEscopado('Atestado', id, payloadComAuditoria);
+      }
+
+      return atualizarEscopado('PublicacaoExOfficio', id, payloadComAuditoria);
     },
     onSuccess: refrescarDadosPublicacoes,
     onError: (error) => {
@@ -437,12 +442,12 @@ export default function Publicacoes() {
         }
 
         await reverterAtestadosPorExclusaoPublicacao(registro, base44.entities.Atestado, base44.entities.PublicacaoExOfficio);
-        return entity.delete(id);
+        return excluirEscopado('PublicacaoExOfficio', id);
       }
 
       if (tipo === 'livro') {
         if (isFeriasOperacional(registro)) throw new Error('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
-        return entity.delete(id);
+        return excluirEscopado('RegistroLivro', id);
       }
     },
     onSuccess: async () => {

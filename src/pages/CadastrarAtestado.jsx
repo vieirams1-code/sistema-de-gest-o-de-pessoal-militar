@@ -18,6 +18,7 @@ import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpe
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 
 const initialFormData = {
   militar_id: '',
@@ -164,11 +165,17 @@ export default function CadastrarAtestado() {
     delete dataToSave.parecer_jiso;
 
     let atestadoSalvo;
-    if (editId) {
-      await base44.entities.Atestado.update(editId, dataToSave);
-      atestadoSalvo = { id: editId, ...formData, ...dataToSave };
-    } else {
-      atestadoSalvo = await base44.entities.Atestado.create(dataToSave);
+    try {
+      if (editId) {
+        await atualizarEscopado('Atestado', editId, dataToSave);
+        atestadoSalvo = { id: editId, ...formData, ...dataToSave };
+      } else {
+        atestadoSalvo = await criarEscopado('Atestado', dataToSave);
+      }
+    } catch (err) {
+      setLoading(false);
+      alert(err?.message || 'Falha ao salvar atestado.');
+      return;
     }
 
     await sincronizarAtestadoJisoNoQuadro(atestadoSalvo);

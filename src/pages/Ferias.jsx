@@ -62,6 +62,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
+import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 
@@ -548,7 +549,7 @@ export default function Ferias() {
     mutationFn: async (params) => {
       const { feriasId, periodoId, periodoRef, militarId } = params;
       await liberarCreditosDoGozo({ gozoFeriasId: feriasId });
-      await base44.entities.Ferias.delete(feriasId);
+      await excluirEscopado('Ferias', feriasId);
       await sincronizarPeriodoAquisitivoDaFerias({
         periodoAquisitivoId: periodoId,
         periodoAquisitivoRef: periodoRef,
@@ -735,7 +736,7 @@ export default function Ferias() {
         'yyyy-MM-dd'
       );
 
-      await base44.entities.Ferias.update(f.id, {
+      await atualizarEscopado('Ferias', f.id, {
         data_inicio: editDataModal.novaData,
         data_fim: novaDataFim,
         data_retorno: novaDataRetorno,
