@@ -40,6 +40,7 @@ import {
   Lock,
   RefreshCw,
   ShieldAlert,
+  MessageSquareText,
 } from 'lucide-react';
 import RegistroLivroModal from '@/components/ferias/RegistroLivroModal';
 import FamiliaFeriasPanel from '@/components/ferias/FamiliaFeriasPanel';
@@ -52,7 +53,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format, parseISO, addDays, differenceInDays } from 'date-fns';
+import { format, parseISO, addDays, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { montarCadeia } from '@/components/ferias/feriasAdminUtils';
 import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation';
@@ -100,6 +101,17 @@ function formatDate(dateString) {
 
 function getEventDate(evento) {
   return evento?.data_registro || evento?.data_inicio || null;
+}
+
+function toIsoDate(date) {
+  return format(date, 'yyyy-MM-dd');
+}
+
+function getFeriasIntervalo(ferias) {
+  const inicio = ferias?.data_inicio ? parseISO(`${ferias.data_inicio}T00:00:00`) : null;
+  const fimBase = ferias?.data_fim || ferias?.data_retorno || null;
+  const fim = fimBase ? parseISO(`${fimBase}T00:00:00`) : null;
+  return { inicio, fim };
 }
 
 function deriveInterrupcaoData(ferias, registrosLivro) {
@@ -278,6 +290,11 @@ export default function Ferias() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [periodFilterType, setPeriodFilterType] = useState('none');
+  const [periodStart, setPeriodStart] = useState('');
+  const [periodEnd, setPeriodEnd] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [customRangeError, setCustomRangeError] = useState('');
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [feriasToDelete, setFeriasToDelete] = useState(null);
@@ -446,13 +463,34 @@ export default function Ferias() {
   });
 
   const filteredFerias = useMemo(() => {
+    const hasPeriodFilter = Boolean(periodStart && periodEnd);
+    const hasValidPeriod = !hasPeriodFilter || parseISO(`${periodEnd}T00:00:00`) >= parseISO(`${periodStart}T00:00:00`);
     return ferias.filter((f) => {
       const matchesSearch = feriasCorrespondeBusca(f, searchTerm);
-
       const matchesStatus = statusFilter === 'all' || f.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      if (!hasPeriodFilter || !hasValidPeriod) return matchesSearch && matchesStatus;
+
+      const { inicio, fim } = getFeriasIntervalo(f);
+      if (!inicio || !fim || Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) {
+        return false;
+      }
+
+      const filtroInicio = parseISO(`${periodStart}T00:00:00`);
+      const filtroFim = parseISO(`${periodEnd}T00:00:00`);
+      const hasIntersection = inicio <= filtroFim && fim >= filtroInicio;
+      return matchesSearch && matchesStatus && hasIntersection;
     });
-  }, [ferias, searchTerm, statusFilter]);
+  }, [ferias, searchTerm, statusFilter, periodStart, periodEnd]);
+
+  const periodFilterLabel = useMemo(() => {
+    if (!periodStart || !periodEnd) return 'Período: Todos';
+    if (periodFilterType === 'month' && selectedMonth) {
+      const [year, month] = selectedMonth.split('-');
+      const nome = format(new Date(Number(year), Number(month) - 1, 1), "MMMM/yyyy", { locale: ptBR });
+      return `Período: ${nome.charAt(0).toUpperCase()}${nome.slice(1)}`;
+    }
+    return `Período: ${formatDate(periodStart)} a ${formatDate(periodEnd)}`;
+  }, [periodStart, periodEnd, periodFilterType, selectedMonth]);
 
   const feriasAgrupadas = useMemo(() => {
     return filteredFerias.reduce((acc, f) => {
@@ -640,6 +678,47 @@ export default function Ferias() {
     }
   };
 
+  const applyPresetPeriod = (preset) => {
+    const now = new Date();
+    if (preset === 'none') {
+      setPeriodFilterType('none');
+      setPeriodStart('');
+      setPeriodEnd('');
+      setSelectedMonth('');
+      setCustomRangeError('');
+      return;
+    }
+
+    let start = null;
+    let end = null;
+    if (preset === 'today') {
+      start = now;
+      end = now;
+    } else if (preset === 'this_week') {
+      start = startOfWeek(now, { weekStartsOn: 1 });
+      end = endOfWeek(now, { weekStartsOn: 1 });
+    } else if (preset === 'last_week') {
+      const base = subWeeks(now, 1);
+      start = startOfWeek(base, { weekStartsOn: 1 });
+      end = endOfWeek(base, { weekStartsOn: 1 });
+    } else if (preset === 'this_month') {
+      start = startOfMonth(now);
+      end = endOfMonth(now);
+    } else if (preset === 'last_month') {
+      const base = subMonths(now, 1);
+      start = startOfMonth(base);
+      end = endOfMonth(base);
+    }
+
+    if (start && end) {
+      setPeriodFilterType(preset);
+      setPeriodStart(toIsoDate(start));
+      setPeriodEnd(toIsoDate(end));
+      setSelectedMonth('');
+      setCustomRangeError('');
+    }
+  };
+
   if (!loadingUser && isAccessResolved && !canAccessModule('ferias')) return <AccessDenied modulo="Férias" />;
 
   const stats = {
@@ -767,6 +846,91 @@ export default function Ferias() {
               </SelectContent>
             </Select>
           </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-[220px_1fr_auto] gap-3 items-start">
+            <Select
+              value={periodFilterType}
+              onValueChange={(value) => {
+                setPeriodFilterType(value);
+                setCustomRangeError('');
+                if (['none', 'today', 'this_week', 'last_week', 'this_month', 'last_month'].includes(value)) {
+                  applyPresetPeriod(value);
+                } else if (value !== 'month') {
+                  setSelectedMonth('');
+                }
+              }}
+            >
+              <SelectTrigger className="h-10 border-slate-200">
+                <SelectValue placeholder="Filtro de período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem período</SelectItem>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="this_week">Esta semana</SelectItem>
+                <SelectItem value="last_week">Semana passada</SelectItem>
+                <SelectItem value="this_month">Este mês</SelectItem>
+                <SelectItem value="last_month">Mês passado</SelectItem>
+                <SelectItem value="month">Selecionar mês</SelectItem>
+                <SelectItem value="custom">Período customizado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex flex-wrap gap-2 items-center">
+              {periodFilterType === 'month' && (
+                <Input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => {
+                    const monthValue = e.target.value;
+                    setSelectedMonth(monthValue);
+                    if (!monthValue) return;
+                    const [year, month] = monthValue.split('-');
+                    const dt = new Date(Number(year), Number(month) - 1, 1);
+                    setPeriodStart(toIsoDate(startOfMonth(dt)));
+                    setPeriodEnd(toIsoDate(endOfMonth(dt)));
+                  }}
+                  className="h-10 w-[190px] border-slate-200"
+                />
+              )}
+
+              {periodFilterType === 'custom' && (
+                <>
+                  <Input
+                    type="date"
+                    value={periodStart}
+                    onChange={(e) => setPeriodStart(e.target.value)}
+                    className="h-10 w-[165px] border-slate-200"
+                  />
+                  <span className="text-slate-400 text-sm">até</span>
+                  <Input
+                    type="date"
+                    value={periodEnd}
+                    onChange={(e) => setPeriodEnd(e.target.value)}
+                    className="h-10 w-[165px] border-slate-200"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (!periodStart || !periodEnd) return;
+                      if (parseISO(`${periodEnd}T00:00:00`) < parseISO(`${periodStart}T00:00:00`)) {
+                        setCustomRangeError('Período inválido: fim anterior ao início.');
+                        return;
+                      }
+                      setCustomRangeError('');
+                    }}
+                  >
+                    Aplicar
+                  </Button>
+                </>
+              )}
+            </div>
+
+            <Button type="button" variant="ghost" onClick={() => applyPresetPeriod('none')}>
+              Limpar período
+            </Button>
+          </div>
+          {customRangeError && <p className="text-xs text-red-600 mt-2">{customRangeError}</p>}
+          <p className="text-xs text-slate-500 mt-2">{periodFilterLabel}</p>
         </div>
 
         <div className="mb-4 text-sm text-slate-500">
@@ -876,6 +1040,8 @@ export default function Ferias() {
                             : null;
 
                         const inicioBlocked = Boolean(inicioBlockedReason);
+                        const observacaoFerias = String(f.observacao || f.observacoes || '').trim();
+                        const temObservacaoFerias = observacaoFerias.length > 0;
 
                         return (
                           <tr
@@ -883,12 +1049,29 @@ export default function Ferias() {
                             className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
                           >
                             <td className="px-4 py-3">
-                              <span className="font-medium text-slate-900">
-                                {f.militar_posto && (
-                                  <span className="text-slate-500 mr-1 text-xs">{f.militar_posto}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-slate-900">
+                                  {f.militar_posto && (
+                                    <span className="text-slate-500 mr-1 text-xs">{f.militar_posto}</span>
+                                  )}
+                                  {f.militar_nome}
+                                </span>
+                                {temObservacaoFerias && (
+                                  <TooltipProvider delayDuration={100}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 cursor-help">
+                                          <MessageSquareText className="w-3 h-3" />
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-[340px] whitespace-pre-wrap break-words p-3 bg-slate-50 border border-slate-200 text-slate-700 shadow-lg">
+                                        <p className="text-xs font-semibold text-[#1e3a5f] mb-1">Observação</p>
+                                        <p className="text-xs text-slate-600">{observacaoFerias}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 )}
-                                {f.militar_nome}
-                              </span>
+                              </div>
                               <p className="text-xs text-slate-400">Mat: {f.militar_matricula_label || f.militar_matricula || '—'}</p>
                               {f.militar_mesclado && (
                                 <p className="text-[11px] text-amber-700">Registro vinculado a militar mesclado (somente histórico documental).</p>
