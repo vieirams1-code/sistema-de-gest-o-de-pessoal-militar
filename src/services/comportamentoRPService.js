@@ -9,6 +9,7 @@ import {
 } from '@/utils/comportamentoTemplateUtils';
 import { formatarMatriculaPadrao } from '@/services/militarIdentidadeService';
 import { isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
+import { criarEscopado } from '@/services/cudEscopadoClient';
 
 function normalizarTexto(value) {
   return String(value || '').trim();
@@ -211,7 +212,7 @@ export async function gerarPublicacaoRPAutomaticaPorHistoricoComportamento({
 
   let registroCriado;
   try {
-    registroCriado = await base44.entities.PublicacaoExOfficio.create(payloadPublicacao);
+    registroCriado = await criarEscopado('PublicacaoExOfficio', payloadPublicacao);
     console.info('[RP_AUTO][create] publicação criada com sucesso', {
       publicacaoId: registroCriado?.id || '',
     });

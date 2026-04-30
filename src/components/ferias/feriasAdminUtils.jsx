@@ -2,6 +2,7 @@ import { format, addDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import { reconciliarCadeiaFerias } from './reconciliacaoCadeiaFerias';
 import { liberarCreditosDoGozo } from '@/services/creditoExtraFeriasService';
+import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 
 /**
  * Tipos de eventos que representam operações na cadeia de férias.
@@ -112,7 +113,7 @@ async function invalidarPublicacaoDeEvento(evento, inconsistencia) {
     observacoes: anexarObservacao(evento?.observacoes, observacao),
   };
 
-  await base44.entities.RegistroLivro.update(evento.id, payload);
+  await atualizarEscopado('RegistroLivro', evento.id, payload);
   return { id: evento.id, tipo_registro: evento?.tipo_registro };
 }
 
@@ -236,7 +237,7 @@ export async function executarExclusaoAdminCadeia({
 
   // Excluir eventos selecionados
   for (const id of idsParaExcluir) {
-    await base44.entities.RegistroLivro.delete(id);
+    await excluirEscopado('RegistroLivro', id);
   }
 
   // Calcular eventos sobreviventes (excluindo os removidos)

@@ -17,6 +17,7 @@ import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
 import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
 export default function EditarJISO() {
   const navigate = useNavigate();
@@ -179,7 +180,7 @@ export default function EditarJISO() {
       const dataTerminoJiso = addDays(dataInicio, diasJiso - 1);
       const dataRetornoJiso = addDays(dataTerminoJiso, 1);
 
-      await base44.entities.Atestado.update(atestadoId, {
+      await atualizarEscopado('Atestado', atestadoId, {
         dias_original: atestado.dias,
         dias_jiso: diasJiso,
         data_termino_jiso: formatDate(dataTerminoJiso, 'yyyy-MM-dd'),

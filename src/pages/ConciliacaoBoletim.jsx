@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeftRight, FileSearch, Link2, Unlink2 } from 'lucide-react';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
 const PDFJS_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
 const PDFJS_WORKER_CDN_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
@@ -693,14 +694,14 @@ export default function ConciliacaoBoletim() {
 
 
         if (pub.origem_tipo === 'atestado') {
-          return [base44.entities.Atestado.update(pub.id, { ...payloadBase, status_publicacao: 'Publicado' })];
+          return [atualizarEscopado('Atestado', pub.id, { ...payloadBase, status_publicacao: 'Publicado' })];
         }
 
         if (pub.origem_tipo === 'ex-officio') {
-          return [base44.entities.PublicacaoExOfficio.update(pub.id, { ...payloadBase, status: 'Publicado' })];
+          return [atualizarEscopado('PublicacaoExOfficio', pub.id, { ...payloadBase, status: 'Publicado' })];
         }
 
-        return [base44.entities.RegistroLivro.update(pub.id, { ...payloadBase, status: 'Publicado' })];
+        return [atualizarEscopado('RegistroLivro', pub.id, { ...payloadBase, status: 'Publicado' })];
       });
 
       await Promise.all(updates);
@@ -734,17 +735,17 @@ export default function ConciliacaoBoletim() {
     const payload = { nota_conciliada_boletim: notaNormalizada || '' };
 
     if (pub.origem_tipo === 'atestado') {
-      await base44.entities.Atestado.update(pub.id, payload);
+      await atualizarEscopado('Atestado', pub.id, payload);
       return;
     }
 
     if (pub.origem_tipo === 'ex-officio') {
-      await base44.entities.PublicacaoExOfficio.update(pub.id, payload);
+      await atualizarEscopado('PublicacaoExOfficio', pub.id, payload);
       return;
     }
 
 
-    await base44.entities.RegistroLivro.update(pub.id, payload);
+    await atualizarEscopado('RegistroLivro', pub.id, payload);
   };
 
   const processarBoletim = async () => {
