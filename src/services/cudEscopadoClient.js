@@ -24,6 +24,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'Atestado',
   'RegistroLivro',
   'PublicacaoExOfficio',
+  'CreditoExtraFerias',
 ]);
 
 function assertEntidadePermitida(entityName) {

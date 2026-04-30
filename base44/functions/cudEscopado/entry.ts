@@ -37,6 +37,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'Atestado',
   'RegistroLivro',
   'PublicacaoExOfficio',
+  'CreditoExtraFerias',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete']);
