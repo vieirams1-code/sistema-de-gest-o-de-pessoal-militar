@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CalendarClock, Filter, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { buildAfastamentosVigentes, sortAfastamentosByRetorno } from '@/services/afastamentosVigentesService';
+import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 
 function formatDateBR(date) {
   if (!date) return '—';
@@ -28,19 +29,36 @@ export default function AfastamentosVigentesPanel() {
   const [tipoFilter, setTipoFilter] = useState('all');
   const [origemFilter, setOrigemFilter] = useState('all');
 
+  // Lote 1D-E: escopo transversal — filtra todas as entidades por militar_id
+  // dentro do escopo do usuário. Para admin (scopedIds === null), mantém global.
+  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+  const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
+
   const { data: atestados = [] } = useQuery({
-    queryKey: ['painel-afastamentos-atestados'],
-    queryFn: () => base44.entities.Atestado.list('-created_date'),
+    queryKey: ['painel-afastamentos-atestados', scopeKey],
+    queryFn: async () => {
+      const lista = await base44.entities.Atestado.list('-created_date');
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: scopedReady,
   });
 
   const { data: ferias = [] } = useQuery({
-    queryKey: ['painel-afastamentos-ferias'],
-    queryFn: () => base44.entities.Ferias.list('-data_inicio'),
+    queryKey: ['painel-afastamentos-ferias', scopeKey],
+    queryFn: async () => {
+      const lista = await base44.entities.Ferias.list('-data_inicio');
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: scopedReady,
   });
 
   const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['painel-afastamentos-livro'],
-    queryFn: () => base44.entities.RegistroLivro.list('-created_date'),
+    queryKey: ['painel-afastamentos-livro', scopeKey],
+    queryFn: async () => {
+      const lista = await base44.entities.RegistroLivro.list('-created_date');
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: scopedReady,
   });
 
   const afastamentos = useMemo(() => {

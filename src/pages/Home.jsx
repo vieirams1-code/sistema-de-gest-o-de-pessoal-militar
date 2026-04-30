@@ -21,6 +21,7 @@ import {
   listarInconsistenciasCadastraisDashboard,
 } from '@/services/dashboardMilitarPendenciasService';
 import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewService';
+import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
   return (
@@ -150,48 +151,85 @@ export default function Home() {
     enabled: isAccessResolved,
   });
 
+  // Lote 1D-E — Auditoria de Escopo Transversal:
+  // Universo de militar_ids permitidos para o usuário corrente. Para admin,
+  // `scopedIds === null` → consultas globais. Para restritos, todas as
+  // entidades vinculadas a militares são filtradas por estes IDs.
+  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+  const dashboardEnabled = scopedReady;
+
   const { data: periodos = [] } = useQuery({
-    queryKey: ['periodos-aquisitivos'],
-    queryFn: () => base44.entities.PeriodoAquisitivo.list(),
+    queryKey: ['periodos-aquisitivos', scopedIsAdmin ? 'admin' : (scopedIds || []).join(',')],
+    queryFn: async () => {
+      const lista = await base44.entities.PeriodoAquisitivo.list();
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: dashboardEnabled,
   });
 
   const { data: atestados = [] } = useQuery({
-    queryKey: ['atestados-ativos'],
-    queryFn: () => base44.entities.Atestado.list(),
+    queryKey: ['atestados-ativos', scopedIsAdmin ? 'admin' : (scopedIds || []).join(',')],
+    queryFn: async () => {
+      const lista = await base44.entities.Atestado.list();
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: dashboardEnabled,
   });
 
   const { data: punicoes = [] } = useQuery({
-    queryKey: ['punicoes-ativas'],
-    queryFn: () => punicaoEntity.list(),
+    queryKey: ['punicoes-ativas', scopedIsAdmin ? 'admin' : (scopedIds || []).join(',')],
+    queryFn: async () => {
+      const lista = await punicaoEntity.list();
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: dashboardEnabled,
   });
 
   const { data: armamentos = [] } = useQuery({
-    queryKey: ['armamentos'],
-    queryFn: () => base44.entities.Armamento.list(),
+    queryKey: ['armamentos', scopedIsAdmin ? 'admin' : (scopedIds || []).join(',')],
+    queryFn: async () => {
+      const lista = await base44.entities.Armamento.list();
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: dashboardEnabled,
   });
 
   const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['registros-livro-recentes'],
-    queryFn: () => base44.entities.RegistroLivro.list('-created_date'),
+    queryKey: ['registros-livro-recentes', scopedIsAdmin ? 'admin' : (scopedIds || []).join(',')],
+    queryFn: async () => {
+      const lista = await base44.entities.RegistroLivro.list('-created_date');
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: dashboardEnabled,
   });
 
   const { data: publicacoesUrgentes = [] } = useQuery({
-    queryKey: ['publicacoes-urgentes'],
+    queryKey: ['publicacoes-urgentes', scopedIsAdmin ? 'admin' : (scopedIds || []).join(',')],
     queryFn: async () => {
       const [exofficio, livro] = await Promise.all([
         base44.entities.PublicacaoExOfficio.list('-created_date'),
         base44.entities.RegistroLivro.list('-created_date'),
       ]);
-      return [...exofficio, ...livro].filter(p => p.status !== 'Publicado' && (p.urgente || p.importante));
+      const consolidados = [...exofficio, ...livro].filter(p => p.status !== 'Publicado' && (p.urgente || p.importante));
+      return filtrarPorMilitarIdsPermitidos(consolidados, scopedIds);
     },
+    enabled: dashboardEnabled,
   });
   const { data: pendenciasComportamento = [] } = useQuery({
-    queryKey: ['dashboard-pendencias-comportamento'],
-    queryFn: () => base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' }),
+    queryKey: ['dashboard-pendencias-comportamento', scopedIsAdmin ? 'admin' : (scopedIds || []).join(',')],
+    queryFn: async () => {
+      const lista = await base44.entities.PendenciaComportamento.filter({ status_pendencia: 'Pendente' });
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: dashboardEnabled,
   });
   const { data: jisos = [] } = useQuery({
-    queryKey: ['dashboard-jisos'],
-    queryFn: () => base44.entities.JISO.list('-data_jiso'),
+    queryKey: ['dashboard-jisos', scopedIsAdmin ? 'admin' : (scopedIds || []).join(',')],
+    queryFn: async () => {
+      const lista = await base44.entities.JISO.list('-data_jiso');
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: dashboardEnabled,
   });
 
   // Alertas de férias por nível

@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { calcularComportamento, calcularProximaMelhoria } from '@/utils/calcularComportamento';
 import { getPunicaoEntity, obterHistoricoComportamentoMilitar } from '@/services/justicaDisciplinaService';
 import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
+import { useScopedMilitarIds } from '@/hooks/useScopedMilitarIds';
+import AccessDenied from '@/components/auth/AccessDenied';
 
 
 const COMPORTAMENTO_LEVEL = {
@@ -31,6 +33,13 @@ export default function DetalheComportamento() {
   const id = searchParams.get('id');
   const punicaoEntity = getPunicaoEntity();
 
+  // Lote 1D-E: bloqueio de acesso por escopo. Se o militar consultado não
+  // estiver no universo escopado do usuário, a tela é negada e nenhuma
+  // requisição (punições, histórico) é disparada.
+  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+  const idForaDoEscopo = scopedReady && !scopedIsAdmin && id && !(scopedIds || []).map(String).includes(String(id));
+  const consultaPermitida = Boolean(id) && scopedReady && !idForaDoEscopo;
+
   const { data: militar } = useQuery({
     queryKey: ['detalhe-comportamento-militar', id],
     queryFn: async () => {
@@ -39,19 +48,19 @@ export default function DetalheComportamento() {
       const [militarEnriquecido] = await carregarMilitaresComMatriculas([militarBase]);
       return militarEnriquecido || militarBase;
     },
-    enabled: !!id,
+    enabled: consultaPermitida,
   });
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['detalhe-comportamento-punicoes', id],
     queryFn: () => punicaoEntity.filter({ militar_id: id }, '-data_fim_cumprimento'),
-    enabled: !!id,
+    enabled: consultaPermitida,
   });
 
   const { data: historico = [] } = useQuery({
     queryKey: ['detalhe-comportamento-historico', id],
     queryFn: () => obterHistoricoComportamentoMilitar(id, { ordem: 'asc' }),
-    enabled: !!id,
+    enabled: consultaPermitida,
   });
 
   const calculado = useMemo(() => {
@@ -78,6 +87,10 @@ export default function DetalheComportamento() {
       dataInclusaoMilitar: militar.data_inclusao,
     });
   }, [militar, punicoes]);
+
+  if (idForaDoEscopo) {
+    return <AccessDenied modulo="Detalhe de Comportamento" />;
+  }
 
   if (!militar) return <div className="p-6">Carregando...</div>;
 

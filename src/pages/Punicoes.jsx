@@ -20,6 +20,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento } from '@/utils/calcularComportamento';
 import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
+import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 
 export default function Punicoes() {
   const navigate = useNavigate();
@@ -33,10 +34,18 @@ export default function Punicoes() {
   let entity = null;
   try { entity = getPunicaoEntity(); } catch (_) {}
 
+  // Lote 1D-E: escopo transversal — usuário restrito vê apenas punições
+  // dos militares dentro do seu escopo. Admin continua vendo tudo.
+  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+  const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
+
   const { data: punicoes = [], isLoading } = useQuery({
-    queryKey: ['punicoes-disciplinares'],
-    queryFn: async () => entity.list('-created_date'),
-    enabled: isAccessResolved && !!entity
+    queryKey: ['punicoes-disciplinares', scopeKey],
+    queryFn: async () => {
+      const lista = await entity.list('-created_date');
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: isAccessResolved && !!entity && scopedReady,
   });
 
   const deleteMutation = useMutation({

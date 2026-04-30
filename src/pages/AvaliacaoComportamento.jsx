@@ -19,12 +19,21 @@ import {
 import { gerarPublicacaoRPAutomaticaPorHistoricoComportamento } from '@/services/comportamentoRPService';
 import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoService';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
+import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { isLoading: loadingUser, isAccessResolved, canAccessAction } = useCurrentUser();
+  const {
+    isLoading: loadingUser,
+    isAccessResolved,
+    canAccessAction,
+    isAdmin,
+    modoAcesso,
+    userEmail,
+    getMilitarScopeFilters,
+  } = useCurrentUser();
   const canGerarPendencias = canAccessAction('gerar_pendencias_comportamento');
   const canAprovarMudanca = canAccessAction('aprovar_mudanca_comportamento');
   const [filtro, setFiltro] = useState('');
@@ -34,21 +43,53 @@ export default function AvaliacaoComportamento() {
   });
   const punicaoEntity = getPunicaoEntity();
 
+  // Lote 1D-E: escopo transversal — substitui Militar.list() global por
+  // listagem escopada via getMilitarScopeFilters().
+  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
+  const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
+
   const { data: militares = [], isLoading } = useQuery({
-    queryKey: ['avaliacao-comportamento-militares'],
+    queryKey: ['avaliacao-comportamento-militares', isAdmin, modoAcesso, userEmail],
     queryFn: async () => {
-      const lista = await base44.entities.Militar.list();
+      let lista = [];
+      if (isAdmin) {
+        lista = await base44.entities.Militar.list();
+      } else {
+        const filters = getMilitarScopeFilters();
+        if (!filters.length) return [];
+        const batches = await Promise.all(
+          filters.map((filtro) => base44.entities.Militar.filter(filtro))
+        );
+        const ids = new Set();
+        for (const m of batches.flat()) {
+          if (m?.id && !ids.has(m.id)) {
+            ids.add(m.id);
+            lista.push(m);
+          }
+        }
+      }
       const enriquecidos = await carregarMilitaresComMatriculas(lista);
       return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
     },
+    enabled: isAccessResolved,
   });
   const { data: punicoes = [], isLoading: loadingPunicoes } = useQuery({
-    queryKey: ['avaliacao-comportamento-punicoes'],
-    queryFn: () => punicaoEntity.list(),
+    queryKey: ['avaliacao-comportamento-punicoes', scopeKey],
+    queryFn: async () => {
+      const lista = await punicaoEntity.list();
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: scopedReady,
   });
   const { data: pendencias = [] } = useQuery({
-    queryKey: ['pendencias-comportamento'],
-    queryFn: () => base44.entities.PendenciaComportamento?.list?.('-created_date') || [],
+    queryKey: ['pendencias-comportamento', scopeKey],
+    queryFn: async () => {
+      const lista = base44.entities.PendenciaComportamento?.list
+        ? await base44.entities.PendenciaComportamento.list('-created_date')
+        : [];
+      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+    },
+    enabled: scopedReady,
   });
 
   const avaliacao = useMemo(() => {
