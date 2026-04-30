@@ -4,7 +4,9 @@ import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Zap, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Calendar, Zap, CheckCircle, AlertCircle, Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { addYears, addMonths, format } from 'date-fns';
 import {
   Dialog,
@@ -20,6 +22,7 @@ import {
   filtrarMilitaresOperacionais,
   montarIndiceMatriculas,
 } from '@/services/matriculaMilitarViewService';
+import { abreviarPostoGraduacao } from '@/components/folha-alteracoes/postoGraduacao';
 
 const ANOS_RETROSPECTIVOS = 3;
 const PERIODOS_FUTUROS = 2;
@@ -68,6 +71,7 @@ export default function PeriodoAquisitivoGenerator() {
   const [result, setResult] = useState(null);
   const [escopo, setEscopo] = useState('all');
   const [militarSelecionadoId, setMilitarSelecionadoId] = useState('');
+  const [militarSelectorOpen, setMilitarSelectorOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: militares = [] } = useQuery({
@@ -97,6 +101,22 @@ export default function PeriodoAquisitivoGenerator() {
     () => [...militaresOperacionais].sort((a, b) => (a?.nome_completo || '').localeCompare(b?.nome_completo || '')),
     [militaresOperacionais]
   );
+
+  const militarSelecionado = useMemo(
+    () => militaresSelecionaveis.find((militar) => String(militar.id) === String(militarSelecionadoId)) || null,
+    [militarSelecionadoId, militaresSelecionaveis]
+  );
+
+  const formatarMilitarPrincipal = (militar) => {
+    const posto = abreviarPostoGraduacao(militar?.posto_graduacao);
+    const quadro = String(militar?.quadro || '').trim().toUpperCase();
+    const nomeCompleto = String(militar?.nome_completo || '').trim();
+    const matricula = String(militar?.matricula_atual || militar?.matricula || '').trim();
+    const lotacao = String(militar?.lotacao_atual || militar?.lotacao || '').trim();
+    return [posto, quadro, nomeCompleto].filter(Boolean).join(' ')
+      + (matricula ? ` — Mat. ${matricula}` : '')
+      + (lotacao ? ` — ${lotacao}` : '');
+  };
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -228,18 +248,60 @@ export default function PeriodoAquisitivoGenerator() {
           {escopo === 'individual' && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-700">Militar</p>
-              <Select value={militarSelecionadoId} onValueChange={setMilitarSelecionadoId} disabled={generating}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o militar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {militaresSelecionaveis.map((militar) => (
-                    <SelectItem key={militar.id} value={String(militar.id)}>
-                      {militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}{militar.nome_completo}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={militarSelectorOpen} onOpenChange={setMilitarSelectorOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    disabled={generating}
+                    className="w-full justify-between min-h-10 h-auto"
+                  >
+                    <div className="text-left truncate">
+                      {militarSelecionado ? formatarMilitarPrincipal(militarSelecionado) : 'Selecione o militar'}
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar por nome, guerra, matrícula, posto ou quadro..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum militar encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {militaresSelecionaveis.map((militar) => (
+                          <CommandItem
+                            key={militar.id}
+                            value={[
+                              militar?.nome_completo,
+                              militar?.nome_guerra,
+                              militar?.matricula_atual,
+                              militar?.matricula,
+                              militar?.posto_graduacao,
+                              abreviarPostoGraduacao(militar?.posto_graduacao),
+                              militar?.quadro,
+                              militar?.lotacao_atual,
+                              militar?.lotacao,
+                            ].filter(Boolean).join(' ')}
+                            onSelect={() => {
+                              setMilitarSelecionadoId(String(militar.id));
+                              setMilitarSelectorOpen(false);
+                            }}
+                            className="flex items-start gap-2 py-2"
+                          >
+                            <Check className={`mt-0.5 h-4 w-4 ${militarSelecionadoId === String(militar.id) ? 'opacity-100' : 'opacity-0'}`} />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm text-slate-900">{formatarMilitarPrincipal(militar)}</p>
+                              {String(militar?.nome_guerra || '').trim() && (
+                                <p className="truncate text-xs font-bold text-slate-700">{String(militar.nome_guerra).trim()}</p>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
 
