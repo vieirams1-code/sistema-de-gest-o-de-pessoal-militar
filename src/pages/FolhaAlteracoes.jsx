@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import FolhaAlteracoesDocumento from '@/components/folha-alteracoes/FolhaAlteracoesDocumento';
 import { montarLinhaAssinatura } from '@/components/folha-alteracoes/postoGraduacao';
-import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
+import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, getLotacaoAtualMilitar, militarCorrespondeBusca, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 import { Check, ChevronsUpDown, FileSpreadsheet, Printer, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -260,16 +260,42 @@ function getDefaultImpressaoConfig() {
   };
 }
 
-function obterMatriculaAtualMilitar(militar = {}) {
-  const matriculaAtual = String(militar?.matricula_atual || militar?.matricula || '').trim();
-  return matriculaAtual;
+function limparCampoTexto(value) {
+  const texto = String(value || '').trim();
+  if (!texto) return '';
+  const normalizado = texto.toLowerCase();
+  if (['undefined', 'null', 'não informado', 'nao informado'].includes(normalizado)) return '';
+  return texto;
 }
 
-function montarLabelMilitar(militar = {}) {
-  const nome = `${militar.posto_graduacao ? `${militar.posto_graduacao} ` : ''}${militar.nome_guerra || militar.nome_completo || ''}`.trim();
+function obterNomeGuerraMilitar(militar = {}) {
+  return limparCampoTexto(militar?.nome_guerra || militar?.nome_de_guerra || '');
+}
+
+function obterMatriculaAtualMilitar(militar = {}) {
+  return limparCampoTexto(
+    resolverMatriculaAtual(militar, militar?.matriculas_historico || [])
+      || militar?.matricula_atual
+      || militar?.matricula
+      || ''
+  );
+}
+
+function montarLinhaPrincipalMilitar(militar = {}) {
+  const postoGrad = limparCampoTexto(militar?.posto_graduacao);
+  const quadro = limparCampoTexto(militar?.quadro);
+  const nomeCompleto = limparCampoTexto(militar?.nome_completo || militar?.nome_guerra || militar?.nome_de_guerra);
   const matriculaAtual = obterMatriculaAtualMilitar(militar);
-  if (!matriculaAtual) return nome;
-  return `${nome} • Mat ${matriculaAtual}`;
+  const lotacao = limparCampoTexto(getLotacaoAtualMilitar(militar));
+
+  const identificacao = [postoGrad, quadro, nomeCompleto].filter(Boolean).join(' ');
+  const detalhes = [
+    matriculaAtual ? `Mat. ${matriculaAtual}` : '',
+    lotacao || '',
+  ].filter(Boolean).join(' — ');
+
+  if (identificacao && detalhes) return `${identificacao} — ${detalhes}`;
+  return identificacao || detalhes || 'Militar sem identificação';
 }
 
 function carregarConfigImpressao(user) {
@@ -840,12 +866,17 @@ export default function FolhaAlteracoes() {
                 <label className="text-sm font-medium text-slate-700">Militar</label>
                 <Select value={filtroMilitarId} onValueChange={setFiltroMilitarId}>
                   <SelectTrigger>
-                    <SelectValue placeholder={loadingMilitares ? 'Carregando militares...' : 'Selecione um militar'} />
+                    <SelectValue placeholder={loadingMilitares ? 'Carregando militares...' : 'Selecione um militar'}>
+                      {militarSelecionado ? montarLinhaPrincipalMilitar(militarSelecionado) : null}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {militaresOrdenados.map((militar) => (
                       <SelectItem key={militar.id} value={militar.id}>
-                        {montarLabelMilitar(militar)}
+                        <div className="flex flex-col">
+                          <span className="truncate">{montarLinhaPrincipalMilitar(militar)}</span>
+                          {obterNomeGuerraMilitar(militar) ? <span className="font-bold">{obterNomeGuerraMilitar(militar)}</span> : null}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
