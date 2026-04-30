@@ -24,8 +24,8 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { getAtestadoIdsVinculados, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
-import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
+import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
 
 const STATUS_FLUXO_FINALIZADO = new Set([
   'Homologado pela JISO',
@@ -59,7 +59,7 @@ const isAtestadoVigente = (atestado, hoje) => {
 export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, modoAcesso, userEmail, effectiveUserEmail } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
   const canAdicionarAtestado = canAccessAction('adicionar_atestados');
@@ -76,27 +76,13 @@ export default function Atestados() {
   const [finalizadosCollapsed, setFinalizadosCollapsed] = useState(true);
 
   const { data: atestados = [], isLoading } = useQuery({
-    queryKey: ['atestados', isAdmin],
+    queryKey: ['atestados', isAdmin, modoAcesso, userEmail, effectiveUserEmail || null],
     queryFn: async () => {
-      if (isAdmin) {
-        const all = await base44.entities.Atestado.list('-created_date');
-        return enriquecerAtestadosComContextoMilitar(all, { contexto: 'operacional', filtrarMesclados: true });
+      const { atestados, meta } = await fetchScopedAtestadosBundle();
+      if (meta?.partialFailures > 0) {
+        console.warn('getScopedAtestadosBundle retornou partialFailures', meta);
       }
-
-      const scopeFilters = getMilitarScopeFilters();
-      if (!scopeFilters.length) return [];
-      const militarQueries = await Promise.all(scopeFilters.map((f) => base44.entities.Militar.filter(f)));
-      const militaresEscopo = await carregarMilitaresComMatriculas(militarQueries.flat());
-      const militaresOperacionais = filtrarMilitaresOperacionais(militaresEscopo, { incluirInativos: true });
-      const militarIds = [...new Set(militaresOperacionais.map((m) => m.id).filter(Boolean))];
-      if (!militarIds.length) return [];
-
-      const queryPromises = militarIds.map((id) => base44.entities.Atestado.filter({ militar_id: id }, '-created_date'));
-      const arrays = await Promise.all(queryPromises);
-      const unicos = new Map();
-      arrays.flat().forEach((item) => unicos.set(item.id, item));
-      const ordenados = Array.from(unicos.values()).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
-      return enriquecerAtestadosComContextoMilitar(ordenados, { contexto: 'operacional', filtrarMesclados: true });
+      return enriquecerAtestadosComContextoMilitar(atestados, { contexto: 'operacional', filtrarMesclados: true });
     },
     enabled: isAccessResolved && hasAtestadosAccess
   });
