@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import AfastamentosVigentesPanel from '@/components/dashboard/AfastamentosVigentesPanel';
+import AuditoriaComportamentoAlert from '@/components/dashboard/AuditoriaComportamentoAlert';
 import { ptBR } from 'date-fns/locale';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
@@ -277,6 +278,12 @@ export default function Home() {
         <div className="mb-8">
           <AfastamentosVigentesPanel />
         </div>
+
+        {isAdmin && (
+          <div className="mb-8">
+            <AuditoriaComportamentoAlert isAdmin={isAdmin} />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
