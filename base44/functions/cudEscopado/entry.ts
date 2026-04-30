@@ -42,6 +42,93 @@ const ENTIDADES_PERMITIDAS = new Set([
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete']);
 
+// =====================================================================
+// PERMISSIONS_MAP — Validação funcional por entidade × operação
+// ---------------------------------------------------------------------
+// Chaves extraídas de config/permissionStructure.js (chaves reais já
+// existentes no projeto). NÃO inventar permissões novas. CreditoExtra
+// Ferias e PeriodoAquisitivo herdam as chaves de Férias por estarem no
+// mesmo módulo (acesso_ferias) e não possuírem chaves próprias.
+// Admin sempre passa por bypass — esta tabela só é consultada para
+// usuários não-admin.
+// =====================================================================
+const PERMISSIONS_MAP = {
+  Ferias: {
+    create: 'adicionar_ferias',
+    update: 'editar_ferias',
+    delete: 'excluir_ferias',
+  },
+  PeriodoAquisitivo: {
+    create: 'adicionar_ferias',
+    update: 'editar_ferias',
+    delete: 'editar_ferias',
+  },
+  CreditoExtraFerias: {
+    create: 'adicionar_ferias',
+    update: 'editar_ferias',
+    delete: 'excluir_ferias',
+  },
+  Atestado: {
+    create: 'adicionar_atestados',
+    update: 'editar_atestados',
+    delete: 'excluir_atestado',
+  },
+  RegistroLivro: {
+    create: 'adicionar_livro',
+    update: 'editar_livro',
+    delete: 'excluir_livro',
+  },
+  PublicacaoExOfficio: {
+    create: 'adicionar_publicacoes',
+    update: 'editar_publicacoes',
+    delete: 'excluir_publicacoes',
+  },
+};
+
+// Extrai matriz [SGP_PERMISSIONS_MATRIX]{...}[/SGP_PERMISSIONS_MATRIX]
+// do campo descricao de PerfilPermissao (espelha getUserPermissions).
+function extrairMatrizPermissoes(descricao) {
+  if (typeof descricao !== 'string' || !descricao) return {};
+  const start = descricao.indexOf('[SGP_PERMISSIONS_MATRIX]');
+  const end = descricao.indexOf('[/SGP_PERMISSIONS_MATRIX]');
+  if (start === -1 || end === -1 || end <= start) return {};
+  const jsonStr = descricao.slice(start + '[SGP_PERMISSIONS_MATRIX]'.length, end).trim();
+  if (!jsonStr) return {};
+  try {
+    const parsed = JSON.parse(jsonStr);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_e) {
+    return {};
+  }
+}
+
+// Consolida actions (chaves perm_*) por OR aditivo a partir de perfis
+// (campos diretos + matriz embutida) e UsuarioAcesso. Espelha exatamente
+// a regra de consolidarModulesActions de getUserPermissions.
+function consolidarActions(perfis, acessos) {
+  const actions = {};
+  const aplicarFonte = (fonte) => {
+    if (!fonte) return;
+    Object.entries(fonte).forEach(([key, val]) => {
+      if (typeof val !== 'boolean') return;
+      if (!key.startsWith('perm_')) return;
+      const actionKey = key.replace(/^perm_/, '');
+      if (val === true) {
+        actions[actionKey] = true;
+      } else if (!(actionKey in actions)) {
+        actions[actionKey] = false;
+      }
+    });
+  };
+  (perfis || []).forEach((p) => {
+    if (!p) return;
+    aplicarFonte(p);
+    aplicarFonte(extrairMatrizPermissoes(p.descricao));
+  });
+  (acessos || []).forEach(aplicarFonte);
+  return actions;
+}
+
 const CAMPOS_USUARIO_ACESSO = [
   'id',
   'user_email',
@@ -89,7 +176,30 @@ async function resolverPermissoes(base44, email) {
   const isAdminByAccess = (acessos || []).some(
     (a) => normalizeTipo(a.tipo_acesso) === 'admin',
   );
-  return { acessos: acessos || [], isAdminByAccess };
+
+  // Carrega perfis ativos para consolidar actions funcionais
+  const perfilIds = Array.from(
+    new Set((acessos || []).map((a) => a?.perfil_id).filter(Boolean)),
+  );
+  let perfis = [];
+  if (perfilIds.length > 0) {
+    perfis = await fetchWithRetry(
+      () => base44.asServiceRole.entities.PerfilPermissao.filter({
+        id: { $in: perfilIds },
+        ativo: true,
+      }),
+      `perfilPermissao.in:${email}`,
+    );
+  }
+
+  const actions = consolidarActions(perfis || [], acessos || []);
+
+  return {
+    acessos: acessos || [],
+    perfis: perfis || [],
+    actions,
+    isAdminByAccess,
+  };
 }
 
 // Replicação simplificada de listarMilitarIdsDoEscopo de moverMilitaresLotacao.js.
@@ -296,6 +406,33 @@ Deno.serve(async (req) => {
             { status: 403 },
           );
         }
+      }
+    }
+
+    // ---- Validação de permissão funcional (PERMISSIONS_MAP) ----
+    // Admin: bypass. Não-admin: precisa ter a action mapeada.
+    if (!targetIsAdmin) {
+      const mapaEntidade = PERMISSIONS_MAP[entityName];
+      const requiredPermission = mapaEntidade ? mapaEntidade[operation] : null;
+      if (!requiredPermission) {
+        console.warn('[cudEscopado] operação não mapeada', { entityName, operation });
+        return Response.json(
+          { error: 'Acesso negado: operação não mapeada para esta entidade.' },
+          { status: 403 },
+        );
+      }
+      const possui = targetPerms.actions?.[requiredPermission] === true;
+      if (!possui) {
+        console.warn('[cudEscopado] permissão funcional insuficiente', {
+          targetEmail,
+          entityName,
+          operation,
+          requiredPermission,
+        });
+        return Response.json(
+          { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+          { status: 403 },
+        );
       }
     }
 

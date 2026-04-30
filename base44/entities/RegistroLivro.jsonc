@@ -1,0 +1,216 @@
+{
+  "name": "RegistroLivro",
+  "type": "object",
+  "properties": {
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_posto": {
+      "type": "string"
+    },
+    "militar_matricula": {
+      "type": "string"
+    },
+    "ferias_id": {
+      "type": "string"
+    },
+    "tipo_registro": {
+      "type": "string",
+      "enum": [
+        "Sa\u00edda F\u00e9rias",
+        "Retorno F\u00e9rias",
+        "Interrup\u00e7\u00e3o de F\u00e9rias",
+        "Nova Sa\u00edda / Retomada",
+        "Adi\u00e7\u00e3o de Dias",
+        "Desconto em F\u00e9rias",
+        "Licen\u00e7a Maternidade",
+        "Prorroga\u00e7\u00e3o de Licen\u00e7a Maternidade",
+        "Licen\u00e7a Paternidade",
+        "N\u00fapcias",
+        "Luto",
+        "Ced\u00eancia",
+        "Transfer\u00eancia para RR",
+        "Tr\u00e2nsito",
+        "Instala\u00e7\u00e3o",
+        "Dispensa Recompensa",
+        "Dispensa Desconto F\u00e9rias",
+        "Deslocamento Miss\u00e3o",
+        "Curso/Est\u00e1gio",
+        "Designa\u00e7\u00e3o de Fun\u00e7\u00e3o",
+        "Dispensa de Fun\u00e7\u00e3o",
+        "Outro"
+      ]
+    },
+    "data_registro": {
+      "type": "string",
+      "format": "date"
+    },
+    "dias": {
+      "type": "number"
+    },
+    "dias_evento": {
+      "type": "number",
+      "description": "Quantidade de dias do impacto do evento (usado em Adi\u00e7\u00e3o e Desconto)"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_termino": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_retorno": {
+      "type": "string",
+      "format": "date"
+    },
+    "conjuge_nome": {
+      "type": "string"
+    },
+    "falecido_nome": {
+      "type": "string"
+    },
+    "falecido_certidao": {
+      "type": "string"
+    },
+    "grau_parentesco": {
+      "type": "string"
+    },
+    "origem": {
+      "type": "string"
+    },
+    "destino": {
+      "type": "string"
+    },
+    "data_cedencia": {
+      "type": "string",
+      "format": "date"
+    },
+    "obs_cedencia": {
+      "type": "string"
+    },
+    "publicacao_transferencia": {
+      "type": "string",
+      "description": "Publica\u00e7\u00e3o da transfer\u00eancia, ex: DOEMS n\u00ba XX.XXX de XX de XXX de XXXX"
+    },
+    "data_transferencia": {
+      "type": "string",
+      "format": "date"
+    },
+    "motivo_dispensa": {
+      "type": "string"
+    },
+    "periodo_aquisitivo": {
+      "type": "string"
+    },
+    "dias_restantes": {
+      "type": "number"
+    },
+    "curso_nome": {
+      "type": "string"
+    },
+    "curso_local": {
+      "type": "string"
+    },
+    "edicao_ano": {
+      "type": "string"
+    },
+    "missao_descricao": {
+      "type": "string"
+    },
+    "documento_referencia": {
+      "type": "string"
+    },
+    "documento_texto": {
+      "type": "string"
+    },
+    "funcao": {
+      "type": "string"
+    },
+    "data_designacao": {
+      "type": "string",
+      "format": "date"
+    },
+    "texto_publicacao": {
+      "type": "string"
+    },
+    "nota_para_bg": {
+      "type": "string"
+    },
+    "numero_bg": {
+      "type": "string"
+    },
+    "data_bg": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Aguardando Nota",
+        "Aguardando Publica\u00e7\u00e3o",
+        "Publicado"
+      ],
+      "default": "Aguardando Nota"
+    },
+    "importante": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marcado como importante"
+    },
+    "urgente": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marcado como urgente"
+    },
+    "apostilada_por_id": {
+      "type": "string",
+      "description": "ID da publica\u00e7\u00e3o de Apostila que corrigiu este registro"
+    },
+    "tornada_sem_efeito_por_id": {
+      "type": "string",
+      "description": "ID da publica\u00e7\u00e3o que tornou este registro sem efeito"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "publicacao_compilada_id": {
+      "type": "string",
+      "description": "ID da PublicacaoCompilada (lote pai) ao qual este registro est\u00e1 vinculado"
+    },
+    "compilado_em_lote": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica se o registro est\u00e1 agrupado em um lote de publica\u00e7\u00e3o compilada"
+    },
+    "publicacao_compilada_ordem": {
+      "type": "number",
+      "description": "Posi\u00e7\u00e3o/ordem deste registro dentro do lote compilado"
+    }
+  },
+  "required": [
+    "militar_id",
+    "tipo_registro",
+    "data_registro"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

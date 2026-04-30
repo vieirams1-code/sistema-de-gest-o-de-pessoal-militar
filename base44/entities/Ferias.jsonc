@@ -1,0 +1,140 @@
+{
+  "name": "Ferias",
+  "type": "object",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar"
+    },
+    "militar_nome": {
+      "type": "string",
+      "description": "Nome do militar (denormalizado)"
+    },
+    "militar_posto": {
+      "type": "string",
+      "description": "Posto do militar (denormalizado)"
+    },
+    "militar_matricula": {
+      "type": "string",
+      "description": "Matr\u00edcula do militar (denormalizado)"
+    },
+    "periodo_aquisitivo_id": {
+      "type": "string",
+      "description": "ID do per\u00edodo aquisitivo"
+    },
+    "periodo_aquisitivo_ref": {
+      "type": "string",
+      "description": "Refer\u00eancia do per\u00edodo (ex: 2022/2023)"
+    },
+    "plano_ferias_id": {
+      "type": "string",
+      "description": "ID do plano de f\u00e9rias vinculado"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "F\u00e9rias Regulares",
+        "F\u00e9rias Pr\u00eamio",
+        "Recesso",
+        "Abono Pecuni\u00e1rio"
+      ],
+      "default": "F\u00e9rias Regulares"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio das f\u00e9rias"
+    },
+    "data_fim": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de fim das f\u00e9rias"
+    },
+    "data_retorno": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de retorno ao trabalho"
+    },
+    "dias": {
+      "type": "number",
+      "description": "Quantidade atual de dias (recalculada a partir de dias_base + ajustes)"
+    },
+    "dias_base": {
+      "type": "number",
+      "description": "Base imut\u00e1vel de dias concedidos na cria\u00e7\u00e3o. Nunca alterada por adi\u00e7\u00e3o ou desconto. Fonte de verdade para rec\u00e1lculo."
+    },
+    "dias_originais": {
+      "type": "number",
+      "description": "Campo legado \u2014 substitu\u00eddo por dias_base. Mantido para compatibilidade."
+    },
+    "fracionamento": {
+      "type": "string",
+      "description": "Informa\u00e7\u00e3o sobre fracionamento (ex: 1\u00aa parcela de 20 dias)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Prevista",
+        "Autorizada",
+        "Em Curso",
+        "Gozada",
+        "Interrompida",
+        "Cancelada"
+      ],
+      "default": "Prevista"
+    },
+    "data_saida_registrada": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora do registro de sa\u00edda no livro"
+    },
+    "data_retorno_registrada": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora do registro de retorno no livro"
+    },
+    "bg_publicacao": {
+      "type": "string",
+      "description": "N\u00famero do Boletim Geral"
+    },
+    "data_bg": {
+      "type": "string",
+      "format": "date"
+    },
+    "substituto_id": {
+      "type": "string",
+      "description": "ID do militar substituto"
+    },
+    "substituto_nome": {
+      "type": "string",
+      "description": "Nome do substituto"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "militar_id",
+    "periodo_aquisitivo_id",
+    "data_inicio",
+    "data_fim",
+    "dias"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

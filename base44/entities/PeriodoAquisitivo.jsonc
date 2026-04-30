@@ -1,0 +1,101 @@
+{
+  "name": "PeriodoAquisitivo",
+  "type": "object",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar"
+    },
+    "militar_nome": {
+      "type": "string",
+      "description": "Nome do militar (denormalizado)"
+    },
+    "militar_posto": {
+      "type": "string",
+      "description": "Posto do militar (denormalizado)"
+    },
+    "militar_matricula": {
+      "type": "string",
+      "description": "Matr\u00edcula do militar (denormalizado)"
+    },
+    "inicio_aquisitivo": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio do per\u00edodo aquisitivo"
+    },
+    "fim_aquisitivo": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de fim do per\u00edodo aquisitivo"
+    },
+    "data_limite_gozo": {
+      "type": "string",
+      "format": "date",
+      "description": "Data limite para gozar as f\u00e9rias (24 meses ap\u00f3s fim aquisitivo)"
+    },
+    "dias_direito": {
+      "type": "number",
+      "default": 30,
+      "description": "Quantidade de dias de direito"
+    },
+    "dias_gozados": {
+      "type": "number",
+      "default": 0,
+      "description": "Quantidade de dias j\u00e1 gozados"
+    },
+    "dias_previstos": {
+      "type": "number",
+      "default": 0,
+      "description": "Quantidade de dias previstos no plano"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Pendente",
+        "Dispon\u00edvel",
+        "Previsto",
+        "Parcialmente Gozado",
+        "Gozado",
+        "Vencido",
+        "Inativo"
+      ],
+      "default": "Pendente",
+      "description": "Status do per\u00edodo aquisitivo"
+    },
+    "ano_referencia": {
+      "type": "string",
+      "description": "Ano de refer\u00eancia (ex: 2023/2024)"
+    },
+    "inativo": {
+      "type": "boolean",
+      "default": false,
+      "description": "Per\u00edodo inativado (desconsiderado no controle)"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es sobre o per\u00edodo"
+    }
+  },
+  "required": [
+    "militar_id",
+    "inicio_aquisitivo",
+    "fim_aquisitivo"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

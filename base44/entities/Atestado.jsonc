@@ -1,0 +1,198 @@
+{
+  "name": "Atestado",
+  "type": "object",
+  "properties": {
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_posto": {
+      "type": "string"
+    },
+    "militar_matricula": {
+      "type": "string"
+    },
+    "medico": {
+      "type": "string"
+    },
+    "arquivo_atestado": {
+      "type": "string"
+    },
+    "tipo_afastamento": {
+      "type": "string",
+      "enum": [
+        "Afastamento Total",
+        "Esfor\u00e7o F\u00edsico"
+      ],
+      "default": "Afastamento Total"
+    },
+    "cid_10": {
+      "type": "string"
+    },
+    "cid_descricao": {
+      "type": "string"
+    },
+    "acompanhado": {
+      "type": "boolean",
+      "default": false
+    },
+    "grau_parentesco": {
+      "type": "string",
+      "enum": [
+        "Pai",
+        "M\u00e3e",
+        "Filho(a)",
+        "C\u00f4njuge",
+        "Irm\u00e3o(\u00e3)",
+        "Av\u00f4(\u00f3)",
+        "Outro"
+      ]
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date"
+    },
+    "dias": {
+      "type": "number"
+    },
+    "data_termino": {
+      "type": "string",
+      "format": "date"
+    },
+    "data_retorno": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Ativo",
+        "Encerrado"
+      ],
+      "default": "Ativo"
+    },
+    "fluxo_homologacao": {
+      "type": "string",
+      "enum": [
+        "comandante",
+        "jiso"
+      ],
+      "description": "Define o fluxo de homologa\u00e7\u00e3o: comandante (at\u00e9 15 dias) ou jiso (mais de 15 dias)"
+    },
+    "necessita_jiso": {
+      "type": "boolean",
+      "default": false
+    },
+    "homologado_comandante": {
+      "type": "boolean",
+      "default": false
+    },
+    "encaminhado_jiso": {
+      "type": "boolean",
+      "default": false
+    },
+    "data_jiso_agendada": {
+      "type": "string",
+      "format": "date"
+    },
+    "jiso_id": {
+      "type": "string"
+    },
+    "historico_jiso": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "data_registro": {
+            "type": "string",
+            "format": "date"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "Prorroga\u00e7\u00e3o",
+              "Cassa\u00e7\u00e3o"
+            ]
+          },
+          "dias_alterados": {
+            "type": "number"
+          },
+          "nova_data_termino": {
+            "type": "string",
+            "format": "date"
+          },
+          "nova_data_retorno": {
+            "type": "string",
+            "format": "date"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "texto_publicacao": {
+      "type": "string"
+    },
+    "nota_para_bg": {
+      "type": "string"
+    },
+    "numero_bg": {
+      "type": "string"
+    },
+    "data_bg": {
+      "type": "string",
+      "format": "date"
+    },
+    "status_publicacao": {
+      "type": "string",
+      "enum": [
+        "Aguardando Nota",
+        "Aguardando Publica\u00e7\u00e3o",
+        "Publicado"
+      ],
+      "default": "Aguardando Nota"
+    },
+    "status_jiso": {
+      "type": "string",
+      "enum": [
+        "Aguardando JISO",
+        "Homologado pela JISO",
+        "Homologado pelo Comandante"
+      ]
+    },
+    "apostilada_por_id": {
+      "type": "string"
+    },
+    "tornada_sem_efeito_por_id": {
+      "type": "string"
+    },
+    "observacoes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "militar_id",
+    "data_inicio",
+    "dias"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,242 @@
+{
+  "name": "PublicacaoExOfficio",
+  "type": "object",
+  "properties": {
+    "militar_id": {
+      "type": "string"
+    },
+    "militar_nome": {
+      "type": "string"
+    },
+    "militar_posto": {
+      "type": "string"
+    },
+    "militar_matricula": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "Elogio Individual",
+        "Melhoria de Comportamento",
+        "Puni\u00e7\u00e3o",
+        "Geral",
+        "Designa\u00e7\u00e3o de Fun\u00e7\u00e3o",
+        "Dispensa de Fun\u00e7\u00e3o",
+        "Ata JISO",
+        "Transcri\u00e7\u00e3o de Documentos",
+        "Interrup\u00e7\u00e3o de F\u00e9rias",
+        "Transfer\u00eancia para RR",
+        "Homologa\u00e7\u00e3o de Atestado",
+        "Apostila",
+        "Tornar sem Efeito"
+      ]
+    },
+    "data_publicacao": {
+      "type": "string",
+      "format": "date"
+    },
+    "texto_base": {
+      "type": "string"
+    },
+    "texto_complemento": {
+      "type": "string"
+    },
+    "texto_publicacao": {
+      "type": "string"
+    },
+    "data_melhoria": {
+      "type": "string",
+      "format": "date"
+    },
+    "comportamento_atual": {
+      "type": "string"
+    },
+    "comportamento_ingressou": {
+      "type": "string"
+    },
+    "portaria": {
+      "type": "string"
+    },
+    "tipo_punicao": {
+      "type": "string"
+    },
+    "data_portaria": {
+      "type": "string",
+      "format": "date"
+    },
+    "dias_punicao": {
+      "type": "number"
+    },
+    "data_punicao": {
+      "type": "string",
+      "format": "date"
+    },
+    "comportamento_inicial": {
+      "type": "string"
+    },
+    "itens_enquadramento": {
+      "type": "string"
+    },
+    "comportamento_ingresso": {
+      "type": "string"
+    },
+    "graduacao_punicao": {
+      "type": "string"
+    },
+    "subtipo_geral": {
+      "type": "string"
+    },
+    "data_fato": {
+      "type": "string",
+      "format": "date"
+    },
+    "funcao": {
+      "type": "string"
+    },
+    "data_designacao": {
+      "type": "string",
+      "format": "date"
+    },
+    "finalidade_jiso": {
+      "type": "string"
+    },
+    "secao_jiso": {
+      "type": "string"
+    },
+    "data_ata": {
+      "type": "string",
+      "format": "date"
+    },
+    "nup": {
+      "type": "string"
+    },
+    "parecer_jiso": {
+      "type": "string"
+    },
+    "atestados_jiso_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "atestado_homologado_id": {
+      "type": "string"
+    },
+    "documento": {
+      "type": "string"
+    },
+    "data_documento": {
+      "type": "string",
+      "format": "date"
+    },
+    "assunto": {
+      "type": "string"
+    },
+    "arquivo_url": {
+      "type": "string"
+    },
+    "ferias_interrompida_id": {
+      "type": "string"
+    },
+    "data_interrupcao": {
+      "type": "string",
+      "format": "date"
+    },
+    "dias_gozados_interrupcao": {
+      "type": "number"
+    },
+    "documento_referencia_rr": {
+      "type": "string",
+      "description": "DOEMS n\u00ba XX.XXX, de xx de maio de xxxx"
+    },
+    "data_transferencia_rr": {
+      "type": "string",
+      "format": "date"
+    },
+    "nota_para_bg": {
+      "type": "string"
+    },
+    "numero_bg": {
+      "type": "string"
+    },
+    "data_bg": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Aguardando Nota",
+        "Aguardando Publica\u00e7\u00e3o",
+        "Publicado"
+      ],
+      "default": "Aguardando Nota"
+    },
+    "importante": {
+      "type": "boolean",
+      "default": false
+    },
+    "urgente": {
+      "type": "boolean",
+      "default": false
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "publicacao_referencia_id": {
+      "type": "string",
+      "description": "ID da publica\u00e7\u00e3o original referenciada (para Apostila e Tornar sem Efeito)"
+    },
+    "publicacao_referencia_numero_bg": {
+      "type": "string",
+      "description": "N\u00famero do BG da publica\u00e7\u00e3o referenciada"
+    },
+    "publicacao_referencia_data_bg": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do BG da publica\u00e7\u00e3o referenciada"
+    },
+    "publicacao_referencia_nota": {
+      "type": "string",
+      "description": "Nota da publica\u00e7\u00e3o referenciada"
+    },
+    "texto_errado": {
+      "type": "string",
+      "description": "Trecho de texto errado a ser corrigido (Apostila)"
+    },
+    "texto_novo": {
+      "type": "string",
+      "description": "Novo texto correto (Apostila)"
+    },
+    "apostilada_por_id": {
+      "type": "string",
+      "description": "ID da publica\u00e7\u00e3o de Apostila que corrigiu esta publica\u00e7\u00e3o"
+    },
+    "tornada_sem_efeito_por_id": {
+      "type": "string",
+      "description": "ID da publica\u00e7\u00e3o que tornou esta sem efeito"
+    }
+  },
+  "required": [
+    "tipo",
+    "data_publicacao"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
