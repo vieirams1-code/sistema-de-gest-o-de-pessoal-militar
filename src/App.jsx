@@ -20,6 +20,8 @@ const adminOnlyPages = new Set([
   // de uma action key específica na arquitetura (ex: gerir_solicitacoes_atualizacao).
   'SolicitacoesAtualizacao',
   'Subgrupamentos',
+  // Lote 1D-D: Auditoria de Comportamento — admin only por requisito do lote.
+  'AuditoriaComportamento',
 ]);
 
 

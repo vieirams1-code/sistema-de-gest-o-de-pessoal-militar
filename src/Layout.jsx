@@ -8,6 +8,7 @@ import {
   X,
   Home,
   Shield,
+  ShieldCheck,
   ChevronRight,
   ChevronDown,
   LogOut,
@@ -68,6 +69,7 @@ const menuGroups = [
     items: [
       { name: 'Controle de Comportamento', page: 'AvaliacaoComportamento', icon: ScrollText, viewPermission: 'visualizar_controle_comportamento' },
       { name: 'Lançamento de Punições', page: 'Punicoes', icon: Shield, viewPermission: 'visualizar_punicoes' },
+      { name: 'Auditar Comportamento', page: 'AuditoriaComportamento', icon: ShieldCheck, adminOnly: true },
     ],
   },
   {
