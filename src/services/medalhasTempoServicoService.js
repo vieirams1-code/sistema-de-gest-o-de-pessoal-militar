@@ -1,8 +1,10 @@
 import { calcularTempoServico } from './tempoServicoService.js';
+import { classificarPostoGraduacao } from '../utils/postoQuadroCompatibilidade.js';
 
 export const CATEGORIA_TEMPO_SERVICO = 'TEMPO_SERVICO';
 export const CATEGORIA_DOM_PEDRO_II = 'DOM_PEDRO_II';
 export const DOM_PEDRO_II_ANOS_MINIMOS_PADRAO = 30;
+const COMPORTAMENTOS_DOM_PEDRO_PRACA = new Set(['BOM', 'OTIMO', 'EXCEPCIONAL']);
 
 export const TIPOS_FIXOS_MEDALHA_TEMPO = [
   {
@@ -84,6 +86,14 @@ function normalizarTexto(valor) {
     .replace(/[^a-zA-Z0-9]+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+function normalizarComportamento(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
 }
 
 export function normalizarStatusMedalha(status) {
@@ -470,13 +480,17 @@ export function apurarMedalhaDomPedroIIMilitar({
   const tempoServico = calcularTempoServico(militar, referencia);
   const tempoServicoAnos = tempoServico.valido ? tempoServico.anos_completos : null;
   const jaRecebeu = Boolean(obterMaiorMedalhaDomPedroRecebida(medalhas, tipoIndexado));
+  const categoriaPosto = classificarPostoGraduacao(militar?.posto_graduacao || militar?.posto);
+  const comportamentoNormalizado = normalizarComportamento(militar?.comportamento);
+  const pracaComportamentoInvalido = categoriaPosto === 'praca'
+    && !COMPORTAMENTOS_DOM_PEDRO_PRACA.has(comportamentoNormalizado);
 
   let situacao = 'SEM_DIREITO';
   if (!tempoServico.valido) {
     situacao = 'INCONSISTENTE';
   } else if (jaRecebeu) {
     situacao = 'JA_CONTEMPLADO';
-  } else if (tempoServicoAnos >= anosMinimos) {
+  } else if (!pracaComportamentoInvalido) {
     situacao = 'ELEGIVEL';
   }
 

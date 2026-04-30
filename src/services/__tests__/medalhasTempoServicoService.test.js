@@ -280,9 +280,9 @@ test('resolução por código encontra tipo mesmo com catálogo misto', () => {
   assert.equal(resolverCodigoTipoMedalha('Medalha de Tempo de Serviço - 20 anos'), 'TEMPO_20');
 });
 
-test('apuração Dom Pedro II é separada da apuração de tempo e respeita base configurável', () => {
+test('apuração Dom Pedro II é separada da apuração de tempo e não exige tempo mínimo', () => {
   const apuracao = apurarMedalhaDomPedroIIMilitar({
-    militar: { id: 'm20', data_inclusao: '1990-04-21' },
+    militar: { id: 'm20', data_inclusao: '2024-04-21', posto_graduacao: 'Capitão', comportamento: 'Insuficiente' },
     medalhas: [],
     tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
     referencia: new Date('2026-04-21T00:00:00Z'),
@@ -291,6 +291,24 @@ test('apuração Dom Pedro II é separada da apuração de tempo e respeita base
 
   assert.equal(apuracao.medalha_devida_codigo, 'DOM_PEDRO_II');
   assert.equal(apuracao.situacao, 'ELEGIVEL');
+});
+
+test('apuração Dom Pedro II exige comportamento Bom/Ótimo/Excepcional para praças', () => {
+  const inabilitado = apurarMedalhaDomPedroIIMilitar({
+    militar: { id: 'm20b', data_inclusao: '2024-04-21', posto_graduacao: 'Soldado', comportamento: 'Mau' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+  assert.equal(inabilitado.situacao, 'SEM_DIREITO');
+
+  const elegivel = apurarMedalhaDomPedroIIMilitar({
+    militar: { id: 'm20c', data_inclusao: '2024-04-21', posto_graduacao: 'Cabo', comportamento: 'Ótimo' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+  assert.equal(elegivel.situacao, 'ELEGIVEL');
 });
 
 test('apuração Dom Pedro II marca já contemplado e impedido sem misturar faixas de tempo', () => {
@@ -315,8 +333,8 @@ test('apuração Dom Pedro II marca já contemplado e impedido sem misturar faix
 test('lista Dom Pedro II retorna mesma quantidade de militares processados', () => {
   const lista = apurarListaMilitaresDomPedroII({
     militares: [
-      { id: 'm23', data_inclusao: '1990-04-21' },
-      { id: 'm24', data_inclusao: '2022-04-21' },
+      { id: 'm23', data_inclusao: '1990-04-21', posto_graduacao: 'Capitão', comportamento: 'Insuficiente' },
+      { id: 'm24', data_inclusao: '2022-04-21', posto_graduacao: 'Soldado', comportamento: 'Mau' },
     ],
     medalhas: [],
     tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
