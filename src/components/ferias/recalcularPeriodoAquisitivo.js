@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { recalcularSaldoPeriodo } from './periodoSaldoUtils';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
 function parseDateOnly(date) {
   if (!date) return null;
@@ -83,7 +84,7 @@ export async function recalcularPeriodoAquisitivoVinculado({ periodoId = null, p
 
   for (const periodo of periodos) {
     const payload = montarPayloadRecalculoPeriodo(periodo, todasFerias);
-    await base44.entities.PeriodoAquisitivo.update(periodo.id, payload);
+    await atualizarEscopado('PeriodoAquisitivo', periodo.id, payload);
     atualizacoes.push({ periodoId: periodo.id, payload });
   }
 

@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 
 export const CHECKLIST_PRESETS = {
   JISO: [
@@ -198,7 +199,7 @@ export async function excluirAtestadoComReflexoNoQuadro(atestado) {
   }
 
   await registrarExclusaoAtestadoNoCard(atestadoCompleto);
-  await base44.entities.Atestado.delete(atestadoId);
+  await excluirEscopado('Atestado', atestadoId);
 }
 
 function isMesmoVinculo(vinculo, { cardId, tipoVinculo, referenciaId }) {
@@ -243,7 +244,7 @@ export async function sincronizarDataJisoCardAtestado({ cardId, atestadoId, data
 
   await Promise.all([
     base44.entities.CardOperacional.update(cardId, { prazo: dataJiso || '' }),
-    base44.entities.Atestado.update(atestadoId, { data_jiso_agendada: dataJiso || '' }),
+    atualizarEscopado('Atestado', atestadoId, { data_jiso_agendada: dataJiso || '' }),
   ]);
 }
 

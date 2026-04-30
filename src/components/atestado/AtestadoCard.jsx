@@ -48,6 +48,7 @@ import {
 } from './atestadoPublicacaoHelpers';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContextService';
+import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -198,7 +199,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       numero_bg: homologacaoForm.numero_bg,
       data_bg: homologacaoForm.data_bg,
     });
-    await base44.entities.PublicacaoExOfficio.create({
+    await criarEscopado('PublicacaoExOfficio', {
       tipo: 'Homologação de Atestado',
       militar_id: atestado.militar_id,
       militar_nome: atestado.militar_nome,
@@ -212,7 +213,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       data_bg: homologacaoForm.data_bg,
       status
     });
-    await base44.entities.Atestado.update(atestado.id, {
+    await atualizarEscopado('Atestado', atestado.id, {
       homologado_comandante: true,
       status_jiso: 'Homologado pelo Comandante',
       status_publicacao: status
@@ -251,7 +252,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       numero_bg: ataJisoForm.numero_bg,
       data_bg: ataJisoForm.data_bg,
     });
-    await base44.entities.PublicacaoExOfficio.create({
+    await criarEscopado('PublicacaoExOfficio', {
       tipo: 'Ata JISO',
       militar_id: atestado.militar_id,
       militar_nome: atestado.militar_nome,
@@ -270,7 +271,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       data_bg: ataJisoForm.data_bg,
       status
     });
-    await base44.entities.Atestado.update(atestado.id, {
+    await atualizarEscopado('Atestado', atestado.id, {
       status_jiso: 'Homologado pela JISO',
       status_publicacao: status
     });
@@ -332,7 +333,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       return;
     }
     setSavingJiso(true);
-    await base44.entities.Atestado.update(atestado.id, {
+    await atualizarEscopado('Atestado', atestado.id, {
       data_jiso_agendada: jisoDate,
       ...((!atestado.status_jiso || atestado.status_jiso === 'Em análise') ? { status_jiso: 'Aguardando JISO' } : {})
     });

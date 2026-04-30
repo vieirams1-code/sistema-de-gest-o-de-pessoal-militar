@@ -3,6 +3,7 @@ import { strFromU8, unzipSync } from 'fflate';
 import { atualizarHistoricoImportacaoAlteracoesLegado, criarHistoricoImportacaoAlteracoesLegado } from '@/services/importacaoAlteracoesLegadoService';
 import { getTiposRPFiltrados } from '@/components/rp/rpTiposConfig';
 import { gerarChaveOrigemLinhaDeterministica, gerarHashLotePorTabelaDeterministico } from '@/services/migracaoAlteracoesLegadoIdempotencia';
+import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 
 export const STATUS_LINHA = {
   APTO: 'APTO',
@@ -1127,7 +1128,7 @@ export async function importarAnaliseAlteracoesLegado({ analise, incluirAlertas 
         continue;
       }
       const payload = buildPayloadPublicacaoLegado(linha, historicoId, usuario);
-      const criado = await base44.entities.PublicacaoExOfficio.create(payload);
+      const criado = await criarEscopado('PublicacaoExOfficio', payload);
       resultado.totalImportadas += 1;
       resultado.idsPublicacoes.push(criado.id);
       resultado.linhasProcessadas.push({ linhaNumero: linha.linhaNumero, chave_origem: payload.chave_origem_legado, estado_operacional: 'IMPORTADO', reaproveitado: false, publicacaoId: criado.id });
@@ -1220,7 +1221,7 @@ export async function classificarPublicacaoLegadoPendente({ publicacaoId, tipoPu
     throw new Error('Tipo de publicação inválido para classificação posterior.');
   }
 
-  return base44.entities.PublicacaoExOfficio.update(publicacaoId, {
+  return atualizarEscopado('PublicacaoExOfficio', publicacaoId, {
     tipo: tipoValido,
     tipo_publicacao_confirmado: tipoValido,
     classificacao_pendente: false,

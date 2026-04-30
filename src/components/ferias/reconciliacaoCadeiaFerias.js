@@ -1,6 +1,7 @@
 import { addDays, differenceInDays, format } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import { sincronizarPeriodoAquisitivoDaFerias } from './feriasService';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
 export const TIPOS_EVENTO_FERIAS = [
   'Saída Férias',
@@ -132,7 +133,7 @@ function buildFeriasUpdate(ferias, eventosValidos, ultimoContexto) {
 }
 
 async function invalidarEvento(evento, motivo) {
-  await base44.entities.RegistroLivro.update(evento.id, {
+  await atualizarEscopado('RegistroLivro', evento.id, {
     status: 'Inconsistente',
     inconsistencia_motivo_curto: motivo,
     inconsistencia_detalhe: 'Evento perdeu base lógica na cadeia de férias durante reconciliação.',
@@ -218,13 +219,13 @@ export async function reconciliarCadeiaFerias({ feriasId, ferias: feriasInput = 
         Number(evento.saldo_remanescente ?? -1) !== payload.saldo_remanescente;
       if (mudou) {
         // eslint-disable-next-line no-await-in-loop
-        await base44.entities.RegistroLivro.update(evento.id, payload);
+        await atualizarEscopado('RegistroLivro', evento.id, payload);
       }
     }
   }
 
   const updateFerias = buildFeriasUpdate(ferias, validos, snapshots);
-  await base44.entities.Ferias.update(ferias.id, updateFerias);
+  await atualizarEscopado('Ferias', ferias.id, updateFerias);
 
   await sincronizarPeriodoAquisitivoDaFerias({
     periodoAquisitivoId: ferias.periodo_aquisitivo_id || null,

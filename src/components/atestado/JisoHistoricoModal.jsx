@@ -6,10 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, addDays, parseISO } from 'date-fns';
 import { PlusCircle, History, Trash2 } from 'lucide-react';
+import { atualizarEscopado } from '@/services/cudEscopadoClient';
 
 export default function JisoHistoricoModal({ atestado, open, onClose }) {
   const queryClient = useQueryClient();
@@ -48,7 +48,7 @@ export default function JisoHistoricoModal({ atestado, open, onClose }) {
     };
 
     const historicoAtual = atestado.historico_jiso || [];
-    await base44.entities.Atestado.update(atestado.id, {
+    await atualizarEscopado('Atestado', atestado.id, {
       data_termino: novasDatas.nova_data_termino,
       data_retorno: novasDatas.nova_data_retorno,
       historico_jiso: [...historicoAtual, novoRegistro]
@@ -80,7 +80,7 @@ export default function JisoHistoricoModal({ atestado, open, onClose }) {
     const novaDataTermino = format(termino, 'yyyy-MM-dd');
     const novaDataRetorno = format(ad(termino, 1), 'yyyy-MM-dd');
 
-    await base44.entities.Atestado.update(atestado.id, {
+    await atualizarEscopado('Atestado', atestado.id, {
       historico_jiso: restante,
       data_termino: novaDataTermino,
       data_retorno: novaDataRetorno

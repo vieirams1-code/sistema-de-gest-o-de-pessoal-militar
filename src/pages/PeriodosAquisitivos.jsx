@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays } from 'date-fns';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
+import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -71,7 +72,7 @@ export default function PeriodosAquisitivos() {
 
 
   const updatePeriodoMutation = useMutation({
-    mutationFn: ({ periodoId, payload }) => base44.entities.PeriodoAquisitivo.update(periodoId, payload),
+    mutationFn: ({ periodoId, payload }) => atualizarEscopado('PeriodoAquisitivo', periodoId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
@@ -80,7 +81,7 @@ export default function PeriodosAquisitivos() {
   });
 
   const deletePeriodoMutation = useMutation({
-    mutationFn: ({ periodoId }) => base44.entities.PeriodoAquisitivo.delete(periodoId),
+    mutationFn: ({ periodoId }) => excluirEscopado('PeriodoAquisitivo', periodoId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
