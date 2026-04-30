@@ -47,6 +47,31 @@ test('militar com 20 anos e sem medalha prévia é indicado para TEMPO_20', () =
   assert.equal(apuracao.situacao, 'ELEGIVEL');
 });
 
+test('apuração de tempo inabilita praça com comportamento inválido e retorna motivo', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm1b', data_inclusao: '2006-04-21', posto_graduacao: 'Soldado', comportamento: 'Mau' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.medalha_devida_codigo, 'TEMPO_20');
+  assert.equal(apuracao.situacao, 'SEM_DIREITO');
+  assert.equal(apuracao.motivo_inabilitacao, 'COMPORTAMENTO_PRACA_INCOMPATIVEL');
+});
+
+test('apuração de tempo mantém praça com comportamento válido como elegível', () => {
+  const apuracao = apurarMedalhaTempoServicoMilitar({
+    militar: { id: 'm1c', data_inclusao: '2006-04-21', posto_graduacao: 'Cabo', comportamento: 'ÓTIMO' },
+    medalhas: [],
+    tiposMedalha: TIPOS_FIXOS_MEDALHA_TEMPO,
+    referencia: new Date('2026-04-21T00:00:00Z'),
+  });
+
+  assert.equal(apuracao.situacao, 'ELEGIVEL');
+  assert.equal(apuracao.motivo_inabilitacao, null);
+});
+
 test('militar com 30 anos já contemplado com TEMPO_30 não aparece como elegível', () => {
   const militar = { id: 'm2', data_inclusao: '1996-04-21' };
   const medalhas = [
@@ -301,6 +326,7 @@ test('apuração Dom Pedro II exige comportamento Bom/Ótimo/Excepcional para pr
     referencia: new Date('2026-04-21T00:00:00Z'),
   });
   assert.equal(inabilitado.situacao, 'SEM_DIREITO');
+  assert.equal(inabilitado.motivo_inabilitacao, 'COMPORTAMENTO_PRACA_INCOMPATIVEL');
 
   const elegivel = apurarMedalhaDomPedroIIMilitar({
     militar: { id: 'm20c', data_inclusao: '2024-04-21', posto_graduacao: 'Cabo', comportamento: 'Ótimo' },
@@ -309,6 +335,7 @@ test('apuração Dom Pedro II exige comportamento Bom/Ótimo/Excepcional para pr
     referencia: new Date('2026-04-21T00:00:00Z'),
   });
   assert.equal(elegivel.situacao, 'ELEGIVEL');
+  assert.equal(elegivel.motivo_inabilitacao, null);
 });
 
 test('apuração Dom Pedro II marca já contemplado e impedido sem misturar faixas de tempo', () => {

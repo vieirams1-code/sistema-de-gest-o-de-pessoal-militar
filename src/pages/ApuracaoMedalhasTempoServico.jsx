@@ -38,6 +38,7 @@ import {
   validarPermissaoAcaoMedalhas,
 } from '@/services/medalhasAcessoService';
 import {
+  MOTIVO_INABILITACAO_COMPORTAMENTO_PRACA,
   TIPOS_FIXOS_MEDALHA_TEMPO,
   apurarListaMilitaresTempoServico,
   filtrarIndicacoesTempoResetaveis,
@@ -550,6 +551,9 @@ export default function ApuracaoMedalhasTempoServico() {
                             ) : (
                               <div className="space-y-1">
                                 <span className="text-slate-400">Inabilitado</span>
+                                {item.motivo_inabilitacao === MOTIVO_INABILITACAO_COMPORTAMENTO_PRACA && (
+                                  <p className="text-[11px] text-slate-500">Comportamento incompatível (praça)</p>
+                                )}
                                 {adminModeAtivo && podeModoAdmin && (
                                   <div>
                                     <Button
