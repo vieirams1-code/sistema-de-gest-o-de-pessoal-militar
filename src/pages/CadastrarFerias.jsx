@@ -36,9 +36,10 @@ const gerarOpcoesAnos = () => {
   return opcoes.reverse();
 };
 
-// Fracoes válidas: 10 ou 20 dias, soma = 30
+// Fracoes válidas: combinações fixas com soma = 30
 const OPCOES_FRACOES = [
   { label: '1 fração de 30 dias', fracoes: [30] },
+  { label: '2 frações: 15 + 15', fracoes: [15, 15] },
   { label: '2 frações: 20 + 10', fracoes: [20, 10] },
   { label: '2 frações: 10 + 20', fracoes: [10, 20] },
   { label: '3 frações: 10 + 10 + 10', fracoes: [10, 10, 10] },
