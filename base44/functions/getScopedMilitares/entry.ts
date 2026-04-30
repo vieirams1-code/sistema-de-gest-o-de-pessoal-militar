@@ -200,6 +200,71 @@ async function resolverEscopoConsolidado(base44, acessos) {
     };
 }
 
+
+async function listarDescendentesSubgrupamento(base44, raizIds) {
+    const visitados = new Set((raizIds || []).filter(Boolean));
+    const fila = [...visitados];
+
+    while (fila.length > 0) {
+        const lote = fila.splice(0, LIMIT_MAX);
+        const filhos = await fetchWithRetry(
+            () =>
+                base44.asServiceRole.entities.Subgrupamento.filter(
+                    { parent_id: { $in: lote } },
+                    undefined,
+                    LIMIT_MAX,
+                    0,
+                    ['id']
+                ),
+            'subgrupamento.descendentes_lotacao_filtro'
+        );
+
+        for (const filho of filhos || []) {
+            const id = filho?.id;
+            if (!id || visitados.has(id)) continue;
+            visitados.add(id);
+            fila.push(id);
+        }
+    }
+
+    return Array.from(visitados);
+}
+
+async function resolverEstruturasLotacaoFiltro(base44, lotacaoFiltro, permitidos = null) {
+    const lotacaoId = String(lotacaoFiltro || '').trim();
+    if (!lotacaoId) return [];
+
+    const candidatos = new Set([lotacaoId]);
+
+    const itemSubgrupamento = await fetchWithRetry(
+        () => base44.asServiceRole.entities.Subgrupamento.get(lotacaoId),
+        'subgrupamento.get.lotacao_filtro'
+    ).catch(() => null);
+
+    if (itemSubgrupamento?.id) {
+        const subDesc = await listarDescendentesSubgrupamento(base44, [itemSubgrupamento.id]);
+        subDesc.forEach((id) => candidatos.add(id));
+    }
+
+    const descendentesSetor = await fetchWithRetry(
+        () =>
+            base44.asServiceRole.entities.Subgrupamento.filter(
+                { grupamento_raiz_id: lotacaoId },
+                undefined,
+                LIMIT_MAX,
+                0,
+                ['id']
+            ),
+        'subgrupamento.descendentes_setor_lotacao_filtro'
+    ).catch(() => []);
+    (descendentesSetor || []).forEach((d) => d?.id && candidatos.add(d.id));
+
+    if (!permitidos) return Array.from(candidatos);
+
+    const permitidosSet = new Set((permitidos || []).map((id) => String(id)));
+    return Array.from(candidatos).filter((id) => permitidosSet.has(String(id)));
+}
+
 // =====================================================================
 // Handler
 // =====================================================================
@@ -385,7 +450,12 @@ Deno.serve(async (req) => {
         let usouFiltroProprios = false;
 
         if (isAdmin) {
-            if (lotacaoFiltro) militarFilter.estrutura_id = lotacaoFiltro;
+            if (lotacaoFiltro) {
+                const estruturasFiltradas = await resolverEstruturasLotacaoFiltro(base44, lotacaoFiltro);
+                militarFilter.estrutura_id = estruturasFiltradas.length > 0
+                    ? { $in: estruturasFiltradas }
+                    : lotacaoFiltro;
+            }
         } else if (escopo.tipo === 'proprio') {
             if (lotacaoFiltro) {
                 return Response.json(
@@ -432,7 +502,28 @@ Deno.serve(async (req) => {
                         { status: 200 }
                     );
                 }
-                militarFilter.estrutura_id = lotacaoFiltro;
+
+                const estruturasFiltradas = await resolverEstruturasLotacaoFiltro(base44, lotacaoFiltro, permitidos);
+                if (estruturasFiltradas.length === 0) {
+                    return Response.json(
+                        {
+                            militares: [],
+                            meta: {
+                                ...baseMeta,
+                                returned: 0,
+                                militar_ids_retornados: 0,
+                                limit: effLimit,
+                                offset: effOffset,
+                                hasMore: false,
+                                offsetAplicadoNaConsulta: false,
+                                scope_tipo: 'estrutura',
+                                reason: 'LOTACAO_SEM_DESCENDENTES_PERMITIDOS',
+                            },
+                        },
+                        { status: 200 }
+                    );
+                }
+                militarFilter.estrutura_id = { $in: estruturasFiltradas };
             } else if (permitidos.length > 0) {
                 militarFilter.estrutura_id = { $in: permitidos };
             }
@@ -483,7 +574,12 @@ Deno.serve(async (req) => {
                 militares = [];
             } else if (isAdmin || escopo.tipo === 'proprio') {
                 const filtroFinal = { ...baseFilter, id: { $in: idsPermitidosParaConsulta } };
-                if (isAdmin && lotacaoFiltro) filtroFinal.estrutura_id = lotacaoFiltro;
+                if (isAdmin && lotacaoFiltro) {
+                    const estruturasFiltradas = await resolverEstruturasLotacaoFiltro(base44, lotacaoFiltro);
+                    filtroFinal.estrutura_id = estruturasFiltradas.length > 0
+                        ? { $in: estruturasFiltradas }
+                        : lotacaoFiltro;
+                }
                 const result = await fetchWithRetry(
                     () =>
                         base44.asServiceRole.entities.Militar.filter(
@@ -500,12 +596,15 @@ Deno.serve(async (req) => {
                 const permitidos = escopo.estruturaIds || [];
                 const propriosScope = escopo.militarIdsProprios || [];
                 const mapa = new Map();
+                const estruturasPermitidasLotacao = lotacaoFiltro
+                    ? await resolverEstruturasLotacaoFiltro(base44, lotacaoFiltro, permitidos)
+                    : permitidos;
 
-                if (permitidos.length > 0) {
+                if (estruturasPermitidasLotacao.length > 0) {
                     const filtroEstr = {
                         ...baseFilter,
                         id: { $in: idsPermitidosParaConsulta },
-                        estrutura_id: lotacaoFiltro || { $in: permitidos },
+                        estrutura_id: { $in: estruturasPermitidasLotacao },
                     };
                     const r1 = await fetchWithRetry(
                         () =>
