@@ -1,7 +1,17 @@
 const NORMALIZACAO_REGEX = /\s+/g;
 
-export const QUADROS_OFICIAIS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU'];
-export const QUADROS_FIXOS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QBMPT'];
+export const QUADROS_OFICIAIS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QOETBM', 'QOSTBM'];
+export const QUADROS_FIXOS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QOETBM', 'QOSTBM', 'QPTBM'];
+
+const QUADRO_ALIASES_LEGADOS = {
+  QBMPT: 'QPTBM',
+};
+
+export function normalizarQuadroLegado(quadro) {
+  const quadroNormalizado = String(quadro || '').trim().toUpperCase();
+  if (!quadroNormalizado) return '';
+  return QUADRO_ALIASES_LEGADOS[quadroNormalizado] || quadroNormalizado;
+}
 
 const POSTOS_OFICIAIS = new Set([
   'CORONEL',
@@ -38,12 +48,13 @@ export function getQuadrosCompativeis(postoGraduacao, quadrosFixos = QUADROS_FIX
   const categoria = classificarPostoGraduacao(postoGraduacao);
   if (!categoria) return quadrosFixos;
   return quadrosFixos.filter((quadro) => {
-    const isQuadroOficial = QUADROS_OFICIAIS.includes(quadro);
+    const isQuadroOficial = QUADROS_OFICIAIS.includes(normalizarQuadroLegado(quadro));
     return categoria === 'oficial' ? isQuadroOficial : !isQuadroOficial;
   });
 }
 
 export function isQuadroCompativel(postoGraduacao, quadro) {
   if (!quadro) return true;
-  return getQuadrosCompativeis(postoGraduacao).includes(quadro);
+  const quadroNormalizado = normalizarQuadroLegado(quadro);
+  return getQuadrosCompativeis(postoGraduacao).includes(quadroNormalizado);
 }

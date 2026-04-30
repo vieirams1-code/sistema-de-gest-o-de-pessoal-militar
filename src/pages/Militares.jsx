@@ -29,7 +29,7 @@ import { excluirMilitarComDependencias } from '@/services/militarExclusaoService
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
-import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
+import { normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const BACKEND_LIMIT = 100;
@@ -167,7 +167,10 @@ export default function Militares() {
   const quadrosDisponiveis = useMemo(() => QUADROS_FIXOS.map((quadro) => ({ value: quadro, label: quadro })), []);
 
   const filteredMilitares = operacionais
-    .filter((m) => (quadroFilter === 'todos' ? true : String(m?.quadro || '').trim() === quadroFilter))
+    .filter((m) => {
+      if (quadroFilter === 'todos') return true;
+      return normalizarQuadroLegado(m?.quadro) === quadroFilter;
+    })
     .filter((m) => militarCorrespondeBusca(m, searchTerm));
 
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');

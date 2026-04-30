@@ -30,7 +30,10 @@ const abrevQuadro = {
   'QBMP-1.a': 'QBMP',
   'QBMP-1.b': 'QBMP',
   'QBMP-2': 'QBMP',
-  'QBMPT': 'QBMPT',
+  'QBMPT': 'QPTBM',
+  'QPTBM': 'QPTBM',
+  'QOETBM': 'QOETBM',
+  'QOSTBM': 'QOSTBM',
 };
 
 /**

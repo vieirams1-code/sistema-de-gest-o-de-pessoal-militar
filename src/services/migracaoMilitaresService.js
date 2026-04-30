@@ -60,8 +60,11 @@ const QUADRO_MAP = {
   'QBMP-1.A': 'QBMP-1.a',
   'QBMP-1.B': 'QBMP-1.b',
   'QBMP-2': 'QBMP-2',
-  QBMT: 'QBMPT',
-  QBMPT: 'QBMPT',
+  QBMT: 'QPTBM',
+  QBMPT: 'QPTBM',
+  QPTBM: 'QPTBM',
+  QOETBM: 'QOETBM',
+  QOSTBM: 'QOSTBM',
 };
 
 const ESCOLARIDADE_MAP = {
