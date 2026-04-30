@@ -65,6 +65,7 @@ import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/se
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
+import { fetchScopedMilitares, getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -299,6 +300,23 @@ export default function Ferias() {
   const [modoAdmin, setModoAdmin] = useState(false);
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
+  const effectiveEmail = getEffectiveEmailMilitares();
+
+  const carregarMilitaresEscopados = async () => {
+    const { militares = [], meta = {} } = await fetchScopedMilitares({
+      includeInativos: true,
+      includeHistorico: false,
+      ...(effectiveEmail ? { effectiveEmail } : {}),
+    });
+
+    const militarIds = [...new Set((militares || []).map((m) => String(m?.id || '')).filter(Boolean))];
+    return {
+      militarIds,
+      militarIdsSet: new Set(militarIds),
+      meta,
+    };
+  };
+
   const {
     data: feriasData,
     isLoading,
@@ -308,7 +326,7 @@ export default function Ferias() {
     error: feriasError,
     refetch: refetchFerias,
   } = useQuery({
-    queryKey: ['ferias', isAdmin, modoAcesso, userEmail],
+    queryKey: ['ferias', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
     queryFn: async () => {
       if (isAdmin) {
         const lista = await base44.entities.Ferias.list('-data_inicio');
@@ -316,28 +334,8 @@ export default function Ferias() {
         return { ferias, partialFailures: 0 };
       }
 
-      const militarScopeFilters = getMilitarScopeFilters();
-      if (!militarScopeFilters.length) return { ferias: [], partialFailures: 0 };
-
-      const militarScopeResults = await Promise.allSettled(
-        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter, '-created_date'))
-      );
-      const militarQueries = militarScopeResults
-        .filter((result) => result.status === 'fulfilled')
-        .map((result) => result.value || []);
-      const militarScopeFailures = militarScopeResults.length - militarQueries.length;
-      if (import.meta.env.DEV && militarScopeFailures > 0) {
-        console.warn('[Ferias] Falha parcial ao carregar militares por escopo.', {
-          totalFiltros: militarScopeResults.length,
-          falhas: militarScopeFailures,
-        });
-      }
-      if (!militarQueries.length) {
-        throw new Error('Falha ao carregar militares do escopo.');
-      }
-
-      const militaresAcessiveis = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcessiveis.map((m) => m.id).filter(Boolean))];
+      const { militarIds, militarIdsSet } = await carregarMilitaresEscopados();
+      const militarScopeFailures = 0;
 
       if (!militarIds.length) return { ferias: [], partialFailures: militarScopeFailures };
 
@@ -376,13 +374,17 @@ export default function Ferias() {
         merged.push(registro);
       }
 
-      const sorted = merged.sort((a, b) => {
+      const filtradasPorEscopo = merged.filter((registro) => militarIdsSet.has(String(registro?.militar_id || '')));
+      const sorted = filtradasPorEscopo.sort((a, b) => {
         const da = new Date(`${a?.data_inicio || '1900-01-01'}T00:00:00`).getTime();
         const db = new Date(`${b?.data_inicio || '1900-01-01'}T00:00:00`).getTime();
         return db - da;
       });
 
       const ferias = await enriquecerFeriasComContextoMilitar(sorted, { contexto: 'operacional' });
+      if (feriasFailures > 0 && ferias.length === 0 && militarIds.length > 0) {
+        throw new Error('Falha parcial ao carregar férias dos militares do escopo. Nenhum registro pôde ser exibido.');
+      }
       return {
         ferias,
         partialFailures: militarScopeFailures + feriasFailures,
@@ -401,32 +403,12 @@ export default function Ferias() {
     isError: isRegistrosError,
     error: registrosError,
   } = useQuery({
-    queryKey: ['registros-livro-all', isAdmin, modoAcesso, userEmail],
+    queryKey: ['registros-livro-all', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
     queryFn: async () => {
       if (isAdmin) return { registros: await base44.entities.RegistroLivro.list(), partialFailures: 0 };
 
-      const militarScopeFilters = getMilitarScopeFilters();
-      if (!militarScopeFilters.length) return { registros: [], partialFailures: 0 };
-
-      const militarScopeResults = await Promise.allSettled(
-        militarScopeFilters.map((filter) => base44.entities.Militar.filter(filter))
-      );
-      const militarQueries = militarScopeResults
-        .filter((result) => result.status === 'fulfilled')
-        .map((result) => result.value || []);
-      const militarScopeFailures = militarScopeResults.length - militarQueries.length;
-      if (import.meta.env.DEV && militarScopeFailures > 0) {
-        console.warn('[Ferias] Falha parcial ao carregar militares para registros do livro.', {
-          totalFiltros: militarScopeResults.length,
-          falhas: militarScopeFailures,
-        });
-      }
-      if (!militarQueries.length) {
-        throw new Error('Falha ao carregar militares do escopo para registros do livro.');
-      }
-
-      const militaresAcessiveis = militarQueries.flat();
-      const militarIds = [...new Set(militaresAcessiveis.map((m) => m.id).filter(Boolean))];
+      const { militarIds, militarIdsSet } = await carregarMilitaresEscopados();
+      const militarScopeFailures = 0;
 
       if (!militarIds.length) return { registros: [], partialFailures: militarScopeFailures };
 
@@ -464,15 +446,19 @@ export default function Ferias() {
         merged.push(registro);
       }
 
-      return { registros: merged, partialFailures: militarScopeFailures + registrosFailures };
+      const registrosFiltrados = merged.filter((registro) => militarIdsSet.has(String(registro?.militar_id || '')));
+      if (registrosFailures > 0 && registrosFiltrados.length === 0 && militarIds.length > 0) {
+        throw new Error('Falha parcial ao carregar registros do livro dos militares do escopo. Nenhum registro pôde ser exibido.');
+      }
+      return { registros: registrosFiltrados, partialFailures: militarScopeFailures + registrosFailures };
     },
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
   const registrosLivro = registrosLivroData?.registros || [];
   const registrosPartialFailures = Number(registrosLivroData?.partialFailures || 0);
   const hasPartialDataWarning = feriasPartialFailures > 0 || registrosPartialFailures > 0;
-  const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail];
-  const registrosLivroQueryKey = ['registros-livro-all', isAdmin, modoAcesso, userEmail];
+  const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
+  const registrosLivroQueryKey = ['registros-livro-all', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
   const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
 
   const getFeriasEstagioProvavel = () => {
@@ -480,6 +466,9 @@ export default function Ferias() {
     const registrosErrorMessage = String(registrosError?.message || '').toLowerCase();
 
     if (isAdmin && isFeriasError) return 'Ferias.list';
+    if (feriasErrorMessage.includes('militares do escopo')) return 'getScopedMilitares';
+    if (feriasErrorMessage.includes('férias dos militares do escopo')) return 'Ferias.filter por militar';
+    if (registrosErrorMessage.includes('registros do livro dos militares do escopo')) return 'RegistroLivro.filter por militar';
     if (feriasErrorMessage.includes('escopo') || registrosErrorMessage.includes('escopo')) return 'Militar.filter escopo';
     if (feriasErrorMessage.includes('férias dos militares acessíveis')) return 'Ferias.filter por militar';
     if (registrosErrorMessage.includes('registros do livro')) return 'RegistroLivro.filter por militar';
