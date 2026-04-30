@@ -7,6 +7,8 @@ const QUADRO_ALIASES_LEGADOS = {
   QBMPT: 'QPTBM',
 };
 
+const QUADROS_COM_DESTAQUE = new Set(['QOETBM', 'QOSTBM', 'QPTBM']);
+
 export function normalizarQuadroLegado(quadro) {
   const quadroNormalizado = String(quadro || '').trim().toUpperCase();
   if (!quadroNormalizado) return '';
@@ -57,4 +59,9 @@ export function isQuadroCompativel(postoGraduacao, quadro) {
   if (!quadro) return true;
   const quadroNormalizado = normalizarQuadroLegado(quadro);
   return getQuadrosCompativeis(postoGraduacao).includes(quadroNormalizado);
+}
+
+export function isQuadroComDestaque(quadro) {
+  const quadroNormalizado = normalizarQuadroLegado(quadro);
+  return QUADROS_COM_DESTAQUE.has(quadroNormalizado);
 }

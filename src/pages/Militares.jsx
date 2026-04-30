@@ -29,7 +29,7 @@ import { excluirMilitarComDependencias } from '@/services/militarExclusaoService
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
-import { normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
+import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const BACKEND_LIMIT = 100;
@@ -331,8 +331,14 @@ export default function Militares() {
               <div className="col-span-1">Status</div>
               <div className="col-span-1 text-right">Ações</div>
             </div>
-            {filteredMilitares.map((militar) => (
-              <div key={militar.id} className="grid grid-cols-12 gap-2 px-3 py-2 border-b text-sm items-center">
+            {filteredMilitares.map((militar) => {
+              const destacarQuadro = isQuadroComDestaque(militar?.quadro);
+
+              return (
+                <div
+                  key={militar.id}
+                  className={`grid grid-cols-12 gap-2 px-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
+                >
                 <div className="col-span-2 font-semibold text-[#1e3a5f]">{militar.posto_graduacao || 'Sem posto'}</div>
                 <div className="col-span-3">
                   <div className="font-medium truncate">{militar.nome_guerra || militar.nome_completo}</div>
@@ -361,8 +367,9 @@ export default function Militares() {
                     </Button>
                   )}
                 </div>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         )}
 
