@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,7 +64,8 @@ import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/se
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
-import { fetchScopedMilitares, getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
+import { getEffectiveEmail as getEffectiveEmailMilitares } from '@/services/getScopedMilitaresClient';
+import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 
 const statusColors = {
   Prevista: 'bg-slate-100 text-slate-700',
@@ -301,47 +301,6 @@ export default function Ferias() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, ferias: null });
 
   const effectiveEmail = getEffectiveEmailMilitares();
-  const scopedMilitaresQueryKey = ['ferias-militares-escopados', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
-  const scopedMilitaresEnabled = isAccessResolved && canAccessModule('ferias') && !isAdmin;
-  const isRateLimitError = (error) => {
-    const status = Number(error?.status || error?.response?.status || error?.cause?.status || 0);
-    const message = String(error?.message || '').toLowerCase();
-    return status === 429 || message.includes('429') || message.includes('too many requests') || message.includes('rate limit');
-  };
-
-  const carregarMilitaresEscopados = async () => {
-    const { militares = [], meta = {} } = await fetchScopedMilitares({
-      includeInativos: true,
-      includeHistorico: false,
-      ...(effectiveEmail ? { effectiveEmail } : {}),
-    });
-
-    const militarIds = [...new Set((militares || []).map((m) => String(m?.id || '')).filter(Boolean))];
-    return {
-      militarIds,
-      militarIdsSet: new Set(militarIds),
-      meta,
-    };
-  };
-
-  const {
-    data: militaresEscopadosData,
-    isLoading: isScopedMilitaresLoading,
-    isFetching: isScopedMilitaresFetching,
-    isSuccess: isScopedMilitaresSuccess,
-    isError: isScopedMilitaresError,
-    error: scopedMilitaresError,
-    refetch: refetchScopedMilitares,
-  } = useQuery({
-    queryKey: scopedMilitaresQueryKey,
-    queryFn: carregarMilitaresEscopados,
-    enabled: scopedMilitaresEnabled,
-    staleTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    retry: (failureCount, error) => isRateLimitError(error) && failureCount < 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * (2 ** attemptIndex), 6000),
-  });
-
   const {
     data: feriasData,
     isLoading,
@@ -353,75 +312,17 @@ export default function Ferias() {
   } = useQuery({
     queryKey: ['ferias', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
     queryFn: async () => {
-      if (isAdmin) {
-        const lista = await base44.entities.Ferias.list('-data_inicio');
-        const ferias = await enriquecerFeriasComContextoMilitar(lista, { contexto: 'operacional' });
-        return { ferias, partialFailures: 0 };
-      }
-
-      const { militarIds = [], militarIdsSet = new Set() } = militaresEscopadosData || {};
-      const militarScopeFailures = 0;
-
-      if (!militarIds.length) return { ferias: [], partialFailures: militarScopeFailures };
-
-      const tamanhoLote = 25;
-      const feriasByMilitar = [];
-      let feriasFailures = 0;
-
-      for (let inicio = 0; inicio < militarIds.length; inicio += tamanhoLote) {
-        const lote = militarIds.slice(inicio, inicio + tamanhoLote);
-        const resultadosLote = await Promise.allSettled(
-          lote.map((militarId) => base44.entities.Ferias.filter({ militar_id: militarId }, '-data_inicio'))
-        );
-        const sucessos = resultadosLote
-          .filter((resultado) => resultado.status === 'fulfilled')
-          .map((resultado) => resultado.value || []);
-        feriasByMilitar.push(...sucessos);
-        feriasFailures += resultadosLote.length - sucessos.length;
-      }
-      if (import.meta.env.DEV && feriasFailures > 0) {
-        console.warn('[Ferias] Falha parcial ao carregar férias por militar.', {
-          totalMilitares: militarIds.length,
-          falhas: feriasFailures,
-          tamanhoLote,
-        });
-      }
-      if (!feriasByMilitar.length && militarIds.length > 0) {
-        throw new Error('Falha ao carregar férias dos militares acessíveis.');
-      }
-
-      const ids = new Set();
-      const merged = [];
-
-      for (const registro of feriasByMilitar.flat()) {
-        if (!registro?.id || ids.has(registro.id)) continue;
-        ids.add(registro.id);
-        merged.push(registro);
-      }
-
-      const filtradasPorEscopo = merged.filter((registro) => militarIdsSet.has(String(registro?.militar_id || '')));
-      const sorted = filtradasPorEscopo.sort((a, b) => {
-        const da = new Date(`${a?.data_inicio || '1900-01-01'}T00:00:00`).getTime();
-        const db = new Date(`${b?.data_inicio || '1900-01-01'}T00:00:00`).getTime();
-        return db - da;
-      });
-
-      const ferias = await enriquecerFeriasComContextoMilitar(sorted, { contexto: 'operacional' });
-      if (feriasFailures > 0 && ferias.length === 0 && militarIds.length > 0) {
-        throw new Error('Falha parcial ao carregar férias dos militares do escopo. Nenhum registro pôde ser exibido.');
-      }
-      return {
-        ferias,
-        partialFailures: militarScopeFailures + feriasFailures,
-      };
+      const bundle = await fetchScopedFeriasBundle();
+      const ferias = await enriquecerFeriasComContextoMilitar(bundle.ferias || [], { contexto: 'operacional' });
+      return { ferias, partialFailures: Number(bundle.partialFailures || 0), meta: bundle.meta || {} };
     },
-    enabled: isAccessResolved && canAccessModule('ferias') && (isAdmin || isScopedMilitaresSuccess),
+    enabled: isAccessResolved && canAccessModule('ferias'),
   });
   const ferias = feriasData?.ferias || [];
   const feriasPartialFailures = Number(feriasData?.partialFailures || 0);
 
   const {
-    data: registrosLivroData = { registros: [], partialFailures: 0 },
+    data: registrosLivroData = { registros: [], partialFailures: 0, meta: {} },
     isLoading: isRegistrosLoading,
     isFetching: isRegistrosFetching,
     isSuccess: isRegistrosSuccess,
@@ -431,61 +332,16 @@ export default function Ferias() {
   } = useQuery({
     queryKey: ['registros-livro-all', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
     queryFn: async () => {
-      if (isAdmin) return { registros: await base44.entities.RegistroLivro.list(), partialFailures: 0 };
-
-      const { militarIds = [], militarIdsSet = new Set() } = militaresEscopadosData || {};
-      const militarScopeFailures = 0;
-
-      if (!militarIds.length) return { registros: [], partialFailures: militarScopeFailures };
-
-      const registrosByMilitar = [];
-      let registrosFailures = 0;
-      const tamanhoLote = 25;
-      for (let inicio = 0; inicio < militarIds.length; inicio += tamanhoLote) {
-        const lote = militarIds.slice(inicio, inicio + tamanhoLote);
-        const resultadosLote = await Promise.allSettled(
-          lote.map((militarId) => base44.entities.RegistroLivro.filter({ militar_id: militarId }))
-        );
-        const sucessos = resultadosLote
-          .filter((resultado) => resultado.status === 'fulfilled')
-          .map((resultado) => resultado.value || []);
-        registrosByMilitar.push(...sucessos);
-        registrosFailures += resultadosLote.length - sucessos.length;
-      }
-      if (import.meta.env.DEV && registrosFailures > 0) {
-        console.warn('[Ferias] Falha parcial ao carregar registros do livro por militar.', {
-          totalMilitares: militarIds.length,
-          falhas: registrosFailures,
-          tamanhoLote,
-        });
-      }
-      if (!registrosByMilitar.length && militarIds.length > 0) {
-        throw new Error('Falha ao carregar registros do livro dos militares acessíveis.');
-      }
-
-      const ids = new Set();
-      const merged = [];
-
-      for (const registro of registrosByMilitar.flat()) {
-        if (!registro?.id || ids.has(registro.id)) continue;
-        ids.add(registro.id);
-        merged.push(registro);
-      }
-
-      const registrosFiltrados = merged.filter((registro) => militarIdsSet.has(String(registro?.militar_id || '')));
-      if (registrosFailures > 0 && registrosFiltrados.length === 0 && militarIds.length > 0) {
-        throw new Error('Falha parcial ao carregar registros do livro dos militares do escopo. Nenhum registro pôde ser exibido.');
-      }
-      return { registros: registrosFiltrados, partialFailures: militarScopeFailures + registrosFailures };
+      const bundle = await fetchScopedFeriasBundle();
+      return { registros: bundle.registrosLivro || [], partialFailures: Number(bundle.partialFailures || 0), meta: bundle.meta || {} };
     },
-    enabled: isAccessResolved && canAccessModule('ferias') && (isAdmin || isScopedMilitaresSuccess),
+    enabled: isAccessResolved && canAccessModule('ferias'),
   });
   const registrosLivro = registrosLivroData?.registros || [];
   const registrosPartialFailures = Number(registrosLivroData?.partialFailures || 0);
   const hasPartialDataWarning = feriasPartialFailures > 0 || registrosPartialFailures > 0;
-  const hasFeriasLoadError = isScopedMilitaresError || isFeriasError || isRegistrosError;
-  const isScopedMilitaresPending = !isAdmin && (isScopedMilitaresLoading || isScopedMilitaresFetching);
-  const isPageLoading = isLoading || isScopedMilitaresPending;
+  const hasFeriasLoadError = isFeriasError || isRegistrosError;
+  const isPageLoading = isLoading;
   const feriasQueryKey = ['ferias', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
   const registrosLivroQueryKey = ['registros-livro-all', isAdmin, modoAcesso, userEmail, effectiveEmail || null];
   const militarScopeFilters = isAccessResolved ? getMilitarScopeFilters() : [];
@@ -493,22 +349,19 @@ export default function Ferias() {
   const getFeriasEstagioProvavel = () => {
     const feriasErrorMessage = String(feriasError?.message || '').toLowerCase();
     const registrosErrorMessage = String(registrosError?.message || '').toLowerCase();
-    const scopedMilitaresErrorMessage = String(scopedMilitaresError?.message || '').toLowerCase();
 
     if (isAdmin && isFeriasError) return 'Ferias.list';
-    if (isScopedMilitaresError || isRateLimitError(scopedMilitaresError) || scopedMilitaresErrorMessage.includes('429')) return 'getScopedMilitares / rate limit';
-    if (isRateLimitError(feriasError) || isRateLimitError(registrosError) || feriasErrorMessage.includes('429') || registrosErrorMessage.includes('429')) return 'getScopedMilitares / rate limit';
-    if (feriasErrorMessage.includes('militares do escopo')) return 'getScopedMilitares';
-    if (feriasErrorMessage.includes('férias dos militares do escopo')) return 'Ferias.filter por militar';
+    if (isRateLimitError(feriasError) || isRateLimitError(registrosError) || feriasErrorMessage.includes('429') || registrosErrorMessage.includes('429')) return 'getScopedFeriasBundle / rate limit';
+    if (feriasErrorMessage.includes('férias dos militares do escopo')) return 'getScopedFeriasBundle';
     if (registrosErrorMessage.includes('registros do livro dos militares do escopo')) return 'RegistroLivro.filter por militar';
     if (feriasErrorMessage.includes('escopo') || registrosErrorMessage.includes('escopo')) return 'Militar.filter escopo';
-    if (feriasErrorMessage.includes('férias dos militares acessíveis')) return 'Ferias.filter por militar';
+    if (feriasErrorMessage.includes('férias dos militares acessíveis')) return 'getScopedFeriasBundle';
     if (registrosErrorMessage.includes('registros do livro')) return 'RegistroLivro.filter por militar';
     if (isFeriasError || feriasPartialFailures > 0) return 'enriquecerFeriasComContextoMilitar';
-    return 'Ferias.filter por militar';
+    return 'getScopedFeriasBundle';
   };
 
-  const feriasDebugData = (isScopedMilitaresError || isFeriasError || isRegistrosError || hasPartialDataWarning)
+  const feriasDebugData = (isFeriasError || isRegistrosError || hasPartialDataWarning)
     ? {
       pagina: 'Ferias',
       usuario: userEmail || null,
@@ -530,21 +383,7 @@ export default function Ferias() {
           isError: isRegistrosError,
           isSuccess: isRegistrosSuccess,
         },
-        militaresEscopados: {
-          loading: isScopedMilitaresLoading,
-          fetching: isScopedMilitaresFetching,
-          isError: isScopedMilitaresError,
-          isSuccess: isScopedMilitaresSuccess,
-        },
       },
-      queryKeyMilitaresEscopados: scopedMilitaresQueryKey,
-      erroMilitaresEscopados: scopedMilitaresError
-        ? {
-          message: scopedMilitaresError.message || null,
-          name: scopedMilitaresError.name || null,
-          stack: scopedMilitaresError.stack ? String(scopedMilitaresError.stack).split('\n').slice(0, 5).join('\n') : null,
-        }
-        : null,
       erroFerias: feriasError
         ? {
           message: feriasError.message || null,
@@ -573,17 +412,13 @@ export default function Ferias() {
       },
     }
     : null;
-  const isRateLimitScopedError = isRateLimitError(scopedMilitaresError);
+  const isRateLimitScopedError = false;
   const retryFeriasLoad = async () => {
-    if (isScopedMilitaresError) {
-      await refetchScopedMilitares();
-      return;
-    }
     await Promise.all([refetchFerias(), refetchRegistrosLivro()]);
   };
 
   const { data: creditosExtraFerias = [] } = useQuery({
-    queryKey: ['ferias-creditos-extra'],
+    queryKey: ['ferias-creditos-extra', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
     queryFn: () => listarCreditosExtraFerias('-data_referencia'),
     enabled: isAccessResolved && canAccessModule('ferias'),
   });
@@ -601,6 +436,8 @@ export default function Ferias() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias-creditos-extra'] });
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
       setDeleteDialogOpen(false);
       setFeriasToDelete(null);
@@ -792,6 +629,8 @@ export default function Ferias() {
       });
 
       queryClient.invalidateQueries({ queryKey: ['ferias'] });
+      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+      queryClient.invalidateQueries({ queryKey: ['ferias-creditos-extra'] });
       setEditDataModal({ open: false, ferias: null, novaData: '' });
     } catch (error) {
       console.error('Erro ao alterar data de início das férias:', error);
