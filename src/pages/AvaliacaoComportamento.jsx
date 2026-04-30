@@ -20,6 +20,7 @@ import { gerarPublicacaoRPAutomaticaPorHistoricoComportamento } from '@/services
 import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoService';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, militarCorrespondeBusca } from '@/services/matriculaMilitarViewService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 
 export default function AvaliacaoComportamento() {
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ export default function AvaliacaoComportamento() {
   } = useCurrentUser();
   const canGerarPendencias = canAccessAction('gerar_pendencias_comportamento');
   const canAprovarMudanca = canAccessAction('aprovar_mudanca_comportamento');
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const [filtro, setFiltro] = useState('');
   const [aprovacaoModal, setAprovacaoModal] = useState({
     open: false,
@@ -126,6 +128,12 @@ export default function AvaliacaoComportamento() {
   const aplicarSugestao = async (linha, { gerarPublicacao = false } = {}) => {
     if (!canAprovarMudanca) return;
     if (!linha.calculado?.comportamento) return;
+
+    const escopo = validarEscopoMilitar(linha?.militar?.id);
+    if (!escopo.permitido) {
+      toast({ variant: 'destructive', title: 'Acesso negado', description: escopo.motivo });
+      return;
+    }
 
     try {
       let pendenciaParaAplicacao = linha.pendenciaExistente;
@@ -224,6 +232,11 @@ export default function AvaliacaoComportamento() {
 
   const gerarPendencia = async (linha) => {
     if (!linha.divergente || linha.pendenciaExistente || !linha.calculado?.comportamento || linha.inconsistenteCalculo) return;
+    const escopo = validarEscopoMilitar(linha?.militar?.id);
+    if (!escopo.permitido) {
+      toast({ variant: 'destructive', title: 'Acesso negado', description: escopo.motivo });
+      return;
+    }
     await criarPendenciaComportamentoSemDuplicidade({
       militar_id: linha.militar.id,
       militar_nome: linha.militar.nome_completo,

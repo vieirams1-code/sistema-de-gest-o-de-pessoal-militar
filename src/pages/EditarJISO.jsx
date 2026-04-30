@@ -11,6 +11,7 @@ import { ArrowLeft, Save, Calendar, FileText, AlertTriangle } from 'lucide-react
 import { addDays, format as formatDate } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { createPageUrl } from '@/utils';
 import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
@@ -23,6 +24,7 @@ export default function EditarJISO() {
   const atestadoId = searchParams.get('atestado_id');
   const queryClient = useQueryClient();
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
   const canGerirJiso = canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso');
 
@@ -141,6 +143,12 @@ export default function EditarJISO() {
     
     if (militarMesclado) {
       alert('Registro bloqueado: militar mesclado é permitido apenas para consulta histórica.');
+      return;
+    }
+
+    const escopo = validarEscopoMilitar(atestado?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
       return;
     }
 

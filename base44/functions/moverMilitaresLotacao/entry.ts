@@ -135,6 +135,80 @@ function temPermissaoMover(authIsAdmin, targetIsAdmin, targetActions) {
     return ACTIONS_AUTORIZADAS.some((k) => targetActions?.[k] === true);
 }
 
+// =====================================================================
+// Lote 1D-F: validação de escopo de militares no backend.
+// ---------------------------------------------------------------------
+// Para usuários NÃO admin, todos os militaresIds informados devem
+// pertencer ao escopo organizacional do usuário (descendentes de
+// grupamento/subgrupamento/unidade/proprio).
+// Replica a lógica de getMilitarScopeFilters em modo simplificado.
+// =====================================================================
+async function listarMilitarIdsDoEscopo(base44, acessos) {
+    const ids = new Set();
+
+    for (const acesso of acessos || []) {
+        const tipo = normalizeTipo(acesso?.tipo_acesso);
+        if (tipo === 'admin') return null; // sem restrição
+
+        // proprio: militar vinculado pelo militar_id direto
+        if (tipo === 'proprio') {
+            if (acesso?.militar_id) ids.add(String(acesso.militar_id));
+            continue;
+        }
+
+        // setor / subsetor / unidade: resolve via estrutura
+        const grupamentoId = acesso?.grupamento_id || null;
+        const subgrupamentoId = acesso?.subgrupamento_id || null;
+
+        // Universo organizacional: setor pega tudo abaixo do grupamento raiz;
+        // subsetor/unidade pegam apenas o nó (e seus filhos diretos via parent_id).
+        const filtros = [];
+        if (tipo === 'setor' && grupamentoId) {
+            // raiz e descendentes
+            filtros.push({ grupamento_raiz_id: grupamentoId });
+            filtros.push({ grupamento_id: grupamentoId });
+            filtros.push({ estrutura_id: grupamentoId });
+        } else if (tipo === 'subsetor' && subgrupamentoId) {
+            filtros.push({ estrutura_id: subgrupamentoId });
+            filtros.push({ subgrupamento_id: subgrupamentoId });
+            // descendentes (Unidades) – consulta separada por parent_id
+            try {
+                const filhos = await fetchWithRetry(
+                    () => base44.asServiceRole.entities.Subgrupamento.filter({ parent_id: subgrupamentoId }),
+                    `subgrupamento.parent:${subgrupamentoId}`
+                );
+                for (const filho of (filhos || [])) {
+                    if (filho?.id) {
+                        filtros.push({ estrutura_id: filho.id });
+                        filtros.push({ subgrupamento_id: filho.id });
+                    }
+                }
+            } catch (_e) {
+                // falha de descoberta não bloqueia, apenas reduz universo
+            }
+        } else if (tipo === 'unidade' && subgrupamentoId) {
+            filtros.push({ estrutura_id: subgrupamentoId });
+            filtros.push({ subgrupamento_id: subgrupamentoId });
+        }
+
+        for (const filtro of filtros) {
+            try {
+                const militares = await fetchWithRetry(
+                    () => base44.asServiceRole.entities.Militar.filter(filtro, undefined, 1000, 0, ['id']),
+                    `militar.escopo:${JSON.stringify(filtro)}`
+                );
+                for (const m of (militares || [])) {
+                    if (m?.id) ids.add(String(m.id));
+                }
+            } catch (_e) {
+                // mantém o que conseguiu coletar
+            }
+        }
+    }
+
+    return Array.from(ids);
+}
+
 async function buscarNoEstrutura(base44, id) {
     if (!id) return null;
     try {
@@ -271,6 +345,32 @@ Deno.serve(async (req) => {
                 { error: 'Permissão insuficiente para mover militares.' },
                 { status: 403 }
             );
+        }
+
+        // ---- Lote 1D-F: validar escopo de militares (anti-bypass) ----
+        // Para não-admin, todos os militaresIds alvo devem pertencer ao
+        // escopo organizacional do usuário efetivo (alvo da ação).
+        if (!targetIsAdmin) {
+            const idsPermitidos = await listarMilitarIdsDoEscopo(base44, targetPerms.acessos);
+            if (idsPermitidos === null) {
+                // segurança extra: se algo retornar admin aqui, mantém o fluxo
+            } else {
+                const setPermitidos = new Set(idsPermitidos.map(String));
+                const foraDoEscopo = militaresIds.filter((id) => !setPermitidos.has(String(id)));
+                if (foraDoEscopo.length > 0) {
+                    console.warn('[moverMilitaresLotacao] tentativa de mover militares fora do escopo', {
+                        targetEmail,
+                        foraDoEscopo,
+                    });
+                    return Response.json(
+                        {
+                            error: 'Acesso negado: um ou mais militares estão fora do seu escopo.',
+                            militaresForaDoEscopo: foraDoEscopo,
+                        },
+                        { status: 403 }
+                    );
+                }
+            }
         }
 
         // ---- Validar e hidratar nó destino com dado real ----

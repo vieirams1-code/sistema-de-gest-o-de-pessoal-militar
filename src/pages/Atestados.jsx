@@ -22,6 +22,7 @@ import AtestadoCard from '@/components/atestado/AtestadoCard';
 import { excluirAtestadoComReflexoNoQuadro } from '@/components/quadro/quadroHelpers';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { getAtestadoIdsVinculados, isPublicacaoAtestadoAtiva } from '@/components/atestado/atestadoPublicacaoHelpers';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
@@ -59,6 +60,7 @@ export default function Atestados() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
   const canAdicionarAtestado = canAccessAction('adicionar_atestados');
   const canEditarAtestado = canAccessAction('editar_atestados');
@@ -155,6 +157,11 @@ export default function Atestados() {
       alert('Ação negada: você não tem permissão para editar atestados.');
       return;
     }
+    const escopo = validarEscopoMilitar(atestado?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
     const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestado.militar_id });
     const possuiPublicacaoVinculada = publicacoesMilitar.some(
       (publicacao) => isPublicacaoAtestadoAtiva(publicacao) && getAtestadoIdsVinculados(publicacao).includes(atestado.id)
@@ -165,13 +172,28 @@ export default function Atestados() {
     }
     navigate(createPageUrl('CadastrarAtestado') + `?id=${atestado.id}`);
   };
-  const handleDelete = (atestado) => { setAtestadoToDelete(atestado); setDeleteDialogOpen(true); };
+  const handleDelete = (atestado) => {
+    const escopo = validarEscopoMilitar(atestado?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    setAtestadoToDelete(atestado);
+    setDeleteDialogOpen(true);
+  };
   const handleView = (atestado) => navigate(createPageUrl('VerAtestado') + `?id=${atestado.id}`);
   const confirmDelete = async () => {
     if (!atestadoToDelete) return;
     if (!canExcluirAtestado) {
       alert('Ação negada: você não tem permissão para excluir atestados.');
       setDeleteDialogOpen(false);
+      return;
+    }
+    const escopoConfirm = validarEscopoMilitar(atestadoToDelete?.militar_id);
+    if (!escopoConfirm.permitido) {
+      alert(escopoConfirm.motivo);
+      setDeleteDialogOpen(false);
+      setAtestadoToDelete(null);
       return;
     }
     const publicacoesMilitar = await base44.entities.PublicacaoExOfficio.filter({ militar_id: atestadoToDelete.militar_id });

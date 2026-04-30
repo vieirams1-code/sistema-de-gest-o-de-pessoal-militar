@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { normalizarStatusMedalha, obterTipoMedalhaPorCodigo, resolverCodigoTipoMedalha } from '@/services/medalhasTempoServicoService';
 import { ACOES_MEDALHAS } from '@/services/medalhasAcessoService';
 
@@ -39,6 +40,7 @@ export default function Medalhas() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasMedalhasAccess = canAccessModule('medalhas');
   const podeIndicar = canAccessAction(ACOES_MEDALHAS.INDICAR);
   const podeGerirDomPedro = canAccessAction(ACOES_MEDALHAS.DOM_PEDRO);
@@ -48,7 +50,37 @@ export default function Medalhas() {
   const [tipoFilter, setTipoFilter] = useState('TODOS');
   const [unidadeFilter, setUnidadeFilter] = useState('TODAS');
   const [postoFilter, setPostoFilter] = useState('TODOS');
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null, militar_id: null });
+
+  const handleEditarMedalha = (medalha) => {
+    if (!podeIndicar) return;
+    const escopo = validarEscopoMilitar(medalha?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    navigate(createPageUrl('CadastrarMedalha') + `?id=${medalha.id}`);
+  };
+
+  const handleAbrirExcluirMedalha = (medalha) => {
+    if (!podeIndicar) return;
+    const escopo = validarEscopoMilitar(medalha?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    setDeleteDialog({ open: true, id: medalha.id, militar_id: medalha.militar_id });
+  };
+
+  const handleConfirmarExcluirMedalha = () => {
+    const escopo = validarEscopoMilitar(deleteDialog.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      setDeleteDialog({ open: false, id: null, militar_id: null });
+      return;
+    }
+    deleteMutation.mutate(deleteDialog.id);
+  };
 
   const { data: medalhas = [], isLoading } = useQuery({
     queryKey: ['medalhas', isAdmin],
@@ -273,7 +305,7 @@ export default function Medalhas() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => navigate(createPageUrl('CadastrarMedalha') + `?id=${medalha.id}`)}
+                        onClick={() => handleEditarMedalha(medalha)}
                         className="text-[#1e3a5f] hover:text-[#2d4a6f]"
                       >
                         <Edit className="w-4 h-4" />
@@ -281,7 +313,7 @@ export default function Medalhas() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setDeleteDialog({ open: true, id: medalha.id })}
+                        onClick={() => handleAbrirExcluirMedalha(medalha)}
                         className="text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -306,7 +338,7 @@ export default function Medalhas() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteMutation.mutate(deleteDialog.id)}
+              onClick={handleConfirmarExcluirMedalha}
               className="bg-red-600 hover:bg-red-700"
             >
               Excluir

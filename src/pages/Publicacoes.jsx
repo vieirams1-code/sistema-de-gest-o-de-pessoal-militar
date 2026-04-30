@@ -11,6 +11,7 @@ import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPan
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import {
   atualizarEstadoAtestadoPelasPublicacoes,
   calcStatusPublicacao,
@@ -302,6 +303,7 @@ export default function Publicacoes() {
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
   const { user, isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasPublicacoesAccess = canAccessModule('controle_publicacoes');
   const canCriarPublicacoes = canAccessAction('adicionar_publicacoes') || canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
 
@@ -495,6 +497,8 @@ export default function Publicacoes() {
     if (!canAccessAction('publicar_bg') && !canAccessAction('admin_mode')) return alert('Ação negada: você não tem permissão para atualizar dados de publicação.');
     const permitirReversaoPublicado = !!(isAdmin && canAccessAction('admin_mode') && modoAdmin);
     const registroAtual = todosRegistros.find((item) => item.id === id);
+    const escopoUpd = validarEscopoMilitar(registroAtual?.militar_id);
+    if (!escopoUpd.permitido) return alert(escopoUpd.motivo);
     const registroDestino = { ...(registroAtual || {}), ...(data || {}) };
     const validacao = validarPayloadPublicacao({
       registroAtual,
@@ -525,6 +529,8 @@ export default function Publicacoes() {
     if ((!canAccessAction('excluir_publicacoes') && !canAccessAction('admin_mode')) || !modoAdmin) return alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
     const registro = todosRegistros.find((r) => r.id === id);
     if (!registro) return;
+    const escopoDel = validarEscopoMilitar(registro?.militar_id);
+    if (!escopoDel.permitido) return alert(escopoDel.motivo);
     if (tipo === 'atestado') return alert('Atestados não podem ser excluídos pelo Controle de Publicações. Acesse o módulo de Atestados.');
     if (tipo === 'livro' && isFeriasOperacional(registro)) return alert('Esta publicação está vinculada a uma cadeia de férias e não pode ser excluída isoladamente. Use as ações administrativas da cadeia.');
     if (registro.status_calculado === STATUS_PUBLICACAO.PUBLICADO && registro.tipo !== 'Apostila' && registro.tipo !== 'Tornar sem Efeito') return alert('Publicações já publicadas não podem ser excluídas. Use Apostila ou Tornar sem Efeito.');

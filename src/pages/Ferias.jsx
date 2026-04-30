@@ -60,6 +60,7 @@ import { getBlockingReasonForInicio } from '@/components/ferias/inicioValidation
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { enriquecerFeriasComContextoMilitar, feriasCorrespondeBusca } from '@/services/feriasMilitarContextService';
 import { formatarTipoCreditoExtra, liberarCreditosDoGozo, listarCreditosExtraFerias } from '@/services/creditoExtraFeriasService';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
@@ -271,6 +272,7 @@ export default function Ferias() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin, modoAcesso, userEmail, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -635,6 +637,11 @@ export default function Ferias() {
       alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
       return;
     }
+    const escopo = validarEscopoMilitar(f?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
 
     const cadeiaOperacional = registrosLivro
       .filter(
@@ -666,6 +673,11 @@ export default function Ferias() {
       alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
       return;
     }
+    const escopo = validarEscopoMilitar(feriasToDelete?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
 
     deleteMutation.mutate({
       feriasId: feriasToDelete.id,
@@ -675,8 +687,40 @@ export default function Ferias() {
     });
   };
 
+  const abrirRegistroLivroModal = (ferias, tipo) => {
+    const escopo = validarEscopoMilitar(ferias?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    setRegistroLivroModal({ open: true, ferias, tipo });
+  };
+
+  const abrirEdicaoFerias = (ferias) => {
+    const escopo = validarEscopoMilitar(ferias?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    navigate(createPageUrl('CadastrarFerias') + `?id=${ferias.id}`);
+  };
+
+  const abrirEditDataModal = (ferias) => {
+    const escopo = validarEscopoMilitar(ferias?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    setEditDataModal({ open: true, ferias, novaData: ferias.data_inicio || '' });
+  };
+
   const handleSalvarEditData = async () => {
     if (!editDataModal.ferias || !editDataModal.novaData || editDataError) return;
+    const escopo = validarEscopoMilitar(editDataModal.ferias?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
 
     setSavingEdit(true);
 
@@ -972,13 +1016,7 @@ export default function Ferias() {
                                   <button
                                     className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-[#1e3a5f]"
                                     title="Alterar data de início"
-                                    onClick={() =>
-                                      setEditDataModal({
-                                        open: true,
-                                        ferias: f,
-                                        novaData: f.data_inicio || '',
-                                      })
-                                    }
+                                    onClick={() => abrirEditDataModal(f)}
                                   >
                                     <Pencil className="w-3 h-3" />
                                   </button>
@@ -1080,13 +1118,7 @@ export default function Ferias() {
                                       <DropdownMenuItem
                                         disabled={inicioBlocked}
                                         title={inicioBlockedReason || ''}
-                                        onClick={() =>
-                                          setRegistroLivroModal({
-                                            open: true,
-                                            ferias: f,
-                                            tipo: 'Saída Férias',
-                                          })
-                                        }
+                                        onClick={() => abrirRegistroLivroModal(f, 'Saída Férias')}
                                       >
                                         {inicioBlocked ? (
                                           <Lock className="w-4 h-4 mr-2 text-red-500" />
@@ -1099,13 +1131,7 @@ export default function Ferias() {
 
                                     {f.status === 'Interrompida' && (
                                       <DropdownMenuItem
-                                        onClick={() =>
-                                          setRegistroLivroModal({
-                                            open: true,
-                                            ferias: f,
-                                            tipo: 'Nova Saída / Retomada',
-                                          })
-                                        }
+                                        onClick={() => abrirRegistroLivroModal(f, 'Nova Saída / Retomada')}
                                       >
                                         <RefreshCw className="w-4 h-4 mr-2 text-teal-600" />
                                         <span>Continuação</span>
@@ -1115,26 +1141,14 @@ export default function Ferias() {
                                     {f.status === 'Em Curso' && (
                                       <>
                                         <DropdownMenuItem
-                                          onClick={() =>
-                                            setRegistroLivroModal({
-                                              open: true,
-                                              ferias: f,
-                                              tipo: 'Retorno Férias',
-                                            })
-                                          }
+                                          onClick={() => abrirRegistroLivroModal(f, 'Retorno Férias')}
                                         >
                                           <LogIn className="w-4 h-4 mr-2 text-blue-600" />
                                           <span>Término</span>
                                         </DropdownMenuItem>
 
                                         <DropdownMenuItem
-                                          onClick={() =>
-                                            setRegistroLivroModal({
-                                              open: true,
-                                              ferias: f,
-                                              tipo: 'Interrupção de Férias',
-                                            })
-                                          }
+                                          onClick={() => abrirRegistroLivroModal(f, 'Interrupção de Férias')}
                                         >
                                           <PauseCircle className="w-4 h-4 mr-2 text-orange-600" />
                                           <span>Interrupção</span>
@@ -1147,22 +1161,14 @@ export default function Ferias() {
                                         <DropdownMenuSeparator />
 
                                         <DropdownMenuItem
-                                          onClick={() =>
-                                            setEditDataModal({
-                                              open: true,
-                                              ferias: f,
-                                              novaData: f.data_inicio || '',
-                                            })
-                                          }
+                                          onClick={() => abrirEditDataModal(f)}
                                         >
                                           <Pencil className="w-4 h-4 mr-2 text-slate-500" />
                                           <span>Alterar Data de Início</span>
                                         </DropdownMenuItem>
 
                                         <DropdownMenuItem
-                                          onClick={() =>
-                                            navigate(createPageUrl('CadastrarFerias') + `?id=${f.id}`)
-                                          }
+                                          onClick={() => abrirEdicaoFerias(f)}
                                         >
                                           <Pencil className="w-4 h-4 mr-2 text-slate-500" />
                                           <span>Editar Férias</span>

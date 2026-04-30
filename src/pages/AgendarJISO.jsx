@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais } from '@/services/matriculaMilitarViewService';
 import { enriquecerAtestadosComContextoMilitar } from '@/services/atestadoJisoMilitarContextService';
 
@@ -17,6 +18,7 @@ export default function AgendarJISO() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const { isAdmin, getMilitarScopeFilters, canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
   const isAccessPending = loadingUser || !isAccessResolved;
 
@@ -208,7 +210,14 @@ export default function AgendarJISO() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`)}
+                          onClick={() => {
+                            const escopo = validarEscopoMilitar(atestado?.militar_id);
+                            if (!escopo.permitido) {
+                              alert(escopo.motivo);
+                              return;
+                            }
+                            navigate(createPageUrl('EditarJISO') + `?atestado_id=${atestado.id}`);
+                          }}
                         >
                           <Edit className="w-4 h-4 mr-1" />
                           {jiso ? 'Editar JISO' : 'Registrar JISO'}

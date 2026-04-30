@@ -21,13 +21,15 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { calcularComportamento } from '@/utils/calcularComportamento';
 import { getPunicaoEntity } from '@/services/justicaDisciplinaService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
+import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 
 export default function Punicoes() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const [searchTerm, setSearchTerm] = useState('');
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, id: null });
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, militar_id: null, id: null });
   const canAdicionarPunicoes = canAccessAction('adicionar_punicoes');
   const canEditarPunicoes = canAccessAction('editar_punicoes');
   const canExcluirPunicoes = canAccessAction('excluir_punicoes');
@@ -56,9 +58,35 @@ export default function Punicoes() {
     }
   });
 
-  const openDeleteDialog = (id) => {
+  const openDeleteDialog = (punicao) => {
     if (!canExcluirPunicoes) return;
-    setDeleteDialog({ open: true, id });
+    const escopo = validarEscopoMilitar(punicao?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    setDeleteDialog({ open: true, id: punicao.id, militar_id: punicao.militar_id });
+  };
+
+  const handleNavegarEditarPunicao = (punicao) => {
+    if (!canEditarPunicoes) return;
+    const escopo = validarEscopoMilitar(punicao?.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      return;
+    }
+    navigate(createPageUrl('CadastrarPunicao') + `?id=${punicao.id}`);
+  };
+
+  const confirmarExclusaoPunicao = () => {
+    if (!canExcluirPunicoes) return;
+    const escopo = validarEscopoMilitar(deleteDialog.militar_id);
+    if (!escopo.permitido) {
+      alert(escopo.motivo);
+      setDeleteDialog({ open: false, id: null, militar_id: null });
+      return;
+    }
+    deleteMutation.mutate(deleteDialog.id);
   };
 
   const filteredPunicoes = punicoes.filter(p =>
@@ -120,10 +148,10 @@ export default function Punicoes() {
                   </div>
                   <div className="flex gap-2">
                     {canEditarPunicoes && (
-                      <Button variant="ghost" size="icon" onClick={() => navigate(createPageUrl('CadastrarPunicao') + `?id=${punicao.id}`)} className="text-[#1e3a5f]"><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleNavegarEditarPunicao(punicao)} className="text-[#1e3a5f]"><Edit className="w-4 h-4" /></Button>
                     )}
                     {canExcluirPunicoes && (
-                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(punicao.id)} className="text-red-600"><Trash2 className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(punicao)} className="text-red-600"><Trash2 className="w-4 h-4" /></Button>
                     )}
                   </div>
                 </div>
@@ -140,7 +168,7 @@ export default function Punicoes() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => canExcluirPunicoes && deleteMutation.mutate(deleteDialog.id)} className="bg-red-600 hover:bg-red-700">Excluir</AlertDialogAction>
+              <AlertDialogAction onClick={confirmarExclusaoPunicao} className="bg-red-600 hover:bg-red-700">Excluir</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
