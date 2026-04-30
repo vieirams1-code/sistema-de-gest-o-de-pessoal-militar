@@ -12,25 +12,38 @@ function hasNumericValue(value) {
   return Number.isFinite(Number(value));
 }
 
-function getPeriodoKeys(periodo = {}) {
-  const referencia =
+function normalizarId(valor) {
+  return String(valor ?? '').trim();
+}
+
+function normalizarReferenciaPeriodo(periodo = {}) {
+  return normalizarId(
     periodo?.ano_referencia ||
     periodo?.referencia ||
-    periodo?.periodo_aquisitivo_ref;
+    periodo?.periodo_aquisitivo_ref
+  );
+}
 
-  return [periodo?.id, referencia].filter(Boolean);
+export function isFeriasDoPeriodo(ferias = {}, periodo = {}) {
+  const militarFeriasId = normalizarId(ferias?.militar_id);
+  const militarPeriodoId = normalizarId(periodo?.militar_id);
+  const mesmoMilitar = militarFeriasId && militarFeriasId === militarPeriodoId;
+  if (!mesmoMilitar) return false;
+
+  const feriasPeriodoId = normalizarId(ferias?.periodo_aquisitivo_id);
+  const periodoId = normalizarId(periodo?.id);
+
+  if (feriasPeriodoId) {
+    return Boolean(periodoId && feriasPeriodoId === periodoId);
+  }
+
+  const feriasRef = normalizarId(ferias?.periodo_aquisitivo_ref);
+  const periodoRef = normalizarReferenciaPeriodo(periodo);
+  return Boolean(feriasRef && periodoRef && feriasRef === periodoRef);
 }
 
 export function filtrarFeriasDoPeriodo(periodo = {}, ferias = []) {
-  const keys = new Set(getPeriodoKeys(periodo));
-  if (!keys.size) return [];
-
-  return (ferias || []).filter(
-    (item) =>
-      item &&
-      (keys.has(item.periodo_aquisitivo_id) ||
-        keys.has(item.periodo_aquisitivo_ref))
-  );
+  return (ferias || []).filter((item) => item && isFeriasDoPeriodo(item, periodo));
 }
 
 export function obterDiasBase(periodo = {}) {
