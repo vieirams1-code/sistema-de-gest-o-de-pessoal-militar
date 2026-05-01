@@ -23,6 +23,7 @@ const adminOnlyPages = new Set([
   // Lote 1D-D: Auditoria de Comportamento — admin only por requisito do lote.
   'AuditoriaComportamento',
   'AntiguidadeDiagnostico',
+  'AntiguidadeImportarPromocoes',
 ]);
 
 
@@ -41,6 +42,7 @@ const moduleGuardByPage = {
   Medalhas: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   ApuracaoMedalhasTempoServico: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   AntiguidadeDiagnostico: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
+  AntiguidadeImportarPromocoes: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   IndicacoesDomPedroII: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   QuadroOperacional: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
