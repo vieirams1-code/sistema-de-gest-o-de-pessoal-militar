@@ -18,6 +18,8 @@ import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
+import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
+import CarreiraAntiguidadePanel from '@/components/antiguidade/CarreiraAntiguidadePanel';
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import HistoricoComportamentoChart from '@/components/militar/HistoricoComportamentoChart';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -116,6 +118,7 @@ export default function VerMilitar() {
   const { isAdmin, hasAccess, hasSelfAccess, canAccessAction, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
   const [showSolicitacao, setShowSolicitacao] = useState(false);
+  const [showPromocaoAtualModal, setShowPromocaoAtualModal] = useState(false);
   const [impedimentoForm, setImpedimentoForm] = useState({
     data_inicio: new Date().toISOString().split('T')[0],
     data_fim: '',
@@ -186,6 +189,11 @@ export default function VerMilitar() {
   const { data: armamentos = [] } = useQuery({
     queryKey: ['ver-armamentos', id],
     queryFn: () => base44.entities.Armamento.filter({ militar_id: id }),
+    enabled: !!id && isAccessResolved && canViewMilitar
+  });
+  const { data: historicoPromocoes = [], refetch: refetchHistoricoPromocoes } = useQuery({
+    queryKey: ['ver-historico-promocoes', id],
+    queryFn: () => base44.entities.HistoricoPromocao.filter({ militar_id: id }, '-data_promocao'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 
@@ -497,6 +505,7 @@ export default function VerMilitar() {
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
             <TabsTrigger value="medalhas"><Award className="w-4 h-4 mr-1" />Medalhas</TabsTrigger>
             <TabsTrigger value="armamentos"><Shield className="w-4 h-4 mr-1" />Armamentos</TabsTrigger>
+            <TabsTrigger value="antiguidade"><FileText className="w-4 h-4 mr-1" />Carreira e Antiguidade</TabsTrigger>
           </TabsList>
 
           {/* Dados Pessoais */}
@@ -877,8 +886,27 @@ export default function VerMilitar() {
             </div>
           </TabsContent>
 
+          <TabsContent value="antiguidade">
+            <CarreiraAntiguidadePanel
+              militar={militar}
+              historicoPromocoes={historicoPromocoes}
+              canManage={isAdmin}
+              onOpenPromocaoAtualModal={() => setShowPromocaoAtualModal(true)}
+            />
+          </TabsContent>
+
         </Tabs>
       </div>
+
+      <PromocaoAtualModal
+        open={showPromocaoAtualModal}
+        onOpenChange={setShowPromocaoAtualModal}
+        militar={militar}
+        onSaved={async () => {
+          await refetchHistoricoPromocoes();
+          await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+        }}
+      />
 
       {showSolicitacao &&
       <SolicitarAtualizacaoModal

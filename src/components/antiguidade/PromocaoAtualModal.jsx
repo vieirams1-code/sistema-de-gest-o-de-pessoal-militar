@@ -24,7 +24,7 @@ const FORM_INICIAL = {
   motivo_retificacao: '',
 };
 
-export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
+export default function PromocaoAtualModal({ open, onOpenChange, militar, onSaved }) {
   const [form, setForm] = React.useState(FORM_INICIAL);
   const [registroConflitante, setRegistroConflitante] = React.useState(null);
   const [mensagem, setMensagem] = React.useState('');
@@ -85,6 +85,7 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
         await base44.entities.HistoricoPromocao.create(payloadBase);
         setMensagem('Promoção atual registrada com sucesso.');
         await atualizarDiagnostico();
+        await onSaved?.();
         return;
       }
 
@@ -106,6 +107,7 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
 
       setMensagem('Retificação concluída com novo registro ativo.');
       await atualizarDiagnostico();
+      await onSaved?.();
     } catch (e) {
       setMensagem(e?.message || 'Erro ao registrar promoção atual.');
     } finally {
