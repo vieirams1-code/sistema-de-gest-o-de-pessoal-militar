@@ -1,0 +1,20 @@
+{
+  "name": "AntiguidadeSnapshot",
+  "type": "object",
+  "description": "Snapshot de conferência da listagem de antiguidade.",
+  "properties": {
+    "competencia_data": { "type": "string", "format": "date" },
+    "configuracao_antiguidade_id": { "type": "string" },
+    "versao_regra": { "type": "string", "default": "antiguidade.v1" },
+    "status_workflow": { "type": "string", "enum": ["rascunho", "em_analise", "homologado", "publicado", "cancelado"], "default": "rascunho" },
+    "total_militares_considerados": { "type": "number", "default": 0 },
+    "total_aptos": { "type": "number", "default": 0 },
+    "total_pendentes": { "type": "number", "default": 0 },
+    "hash_integridade": { "type": "string" },
+    "hash_entrada_dados": { "type": "string" },
+    "homologado_por": { "type": "string" },
+    "homologado_em": { "type": "string", "format": "date-time" },
+    "observacoes_homologacao": { "type": "string" }
+  },
+  "required": ["competencia_data", "versao_regra", "status_workflow"]
+}

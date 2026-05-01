@@ -1,0 +1,26 @@
+{
+  "name": "AntiguidadeItem",
+  "type": "object",
+  "description": "Linha congelada de militar dentro de um snapshot de antiguidade.",
+  "properties": {
+    "snapshot_id": { "type": "string" },
+    "militar_id": { "type": "string" },
+    "matricula_snapshot": { "type": "string" },
+    "nome_guerra_snapshot": { "type": "string" },
+    "nome_completo_snapshot": { "type": "string" },
+    "posto_graduacao_snapshot": { "type": "string" },
+    "quadro_snapshot": { "type": "string" },
+    "lotacao_snapshot": { "type": "string" },
+    "data_promocao_atual_snapshot": { "type": "string", "format": "date" },
+    "antiguidade_referencia_ordem_snapshot": { "type": "number" },
+    "antiguidade_referencia_id_snapshot": { "type": "string" },
+    "ordem_geral": { "type": "number" },
+    "ordem_no_posto": { "type": "number" },
+    "ordem_no_posto_quadro": { "type": "number" },
+    "status_item": { "type": "string", "enum": ["apto", "pendente", "empatado_nao_resolvido"], "default": "pendente" },
+    "motivo_pendencia": { "type": "string" },
+    "chave_empate": { "type": "string" },
+    "observacoes": { "type": "string" }
+  },
+  "required": ["snapshot_id", "militar_id", "status_item"]
+}

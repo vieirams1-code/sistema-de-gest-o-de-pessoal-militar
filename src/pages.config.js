@@ -53,6 +53,7 @@ import AuditoriaComportamento from './pages/AuditoriaComportamento';
 import AvaliacaoComportamento from './pages/AvaliacaoComportamento';
 import Armamentos from './pages/Armamentos';
 import ApuracaoMedalhasTempoServico from './pages/ApuracaoMedalhasTempoServico';
+import AntiguidadeDiagnostico from './pages/AntiguidadeDiagnostico';
 import Atestados from './pages/Atestados';
 import CadastrarArmamento from './pages/CadastrarArmamento';
 import CadastrarAtestado from './pages/CadastrarAtestado';
@@ -110,6 +111,7 @@ export const PAGES = {
     "AvaliacaoComportamento": AvaliacaoComportamento,
     "Armamentos": Armamentos,
     "ApuracaoMedalhasTempoServico": ApuracaoMedalhasTempoServico,
+    "AntiguidadeDiagnostico": AntiguidadeDiagnostico,
     "Atestados": Atestados,
     "CadastrarArmamento": CadastrarArmamento,
     "CadastrarAtestado": CadastrarAtestado,

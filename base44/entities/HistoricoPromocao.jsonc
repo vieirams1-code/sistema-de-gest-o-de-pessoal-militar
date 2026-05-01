@@ -1,0 +1,22 @@
+{
+  "name": "HistoricoPromocao",
+  "type": "object",
+  "description": "Eventos de promoção militar com rastreabilidade de antiguidade herdada.",
+  "properties": {
+    "militar_id": { "type": "string" },
+    "posto_graduacao_anterior": { "type": "string" },
+    "quadro_anterior": { "type": "string" },
+    "posto_graduacao_novo": { "type": "string" },
+    "quadro_novo": { "type": "string" },
+    "data_promocao": { "type": "string", "format": "date" },
+    "boletim_referencia": { "type": "string" },
+    "ato_referencia": { "type": "string" },
+    "antiguidade_referencia_ordem": { "type": "number" },
+    "antiguidade_referencia_id": { "type": "string" },
+    "origem_dado": { "type": "string", "enum": ["manual", "importacao", "integracao", "backfill_controlado"], "default": "manual" },
+    "status_registro": { "type": "string", "enum": ["ativo", "retificado", "cancelado"], "default": "ativo" },
+    "motivo_retificacao": { "type": "string" },
+    "observacoes": { "type": "string" }
+  },
+  "required": ["militar_id", "posto_graduacao_novo", "quadro_novo", "data_promocao", "origem_dado", "status_registro"]
+}
