@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil, Trash2, Users } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock } from 'lucide-react';
 import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
@@ -30,6 +30,7 @@ import { excluirMilitarComDependencias } from '@/services/militarExclusaoService
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
+import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
@@ -138,6 +139,7 @@ export default function Militares() {
   const [quadroFilter, setQuadroFilter] = useState('todos');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
+  const [militarPromocaoAtual, setMilitarPromocaoAtual] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedGroups(selectedGroups), 300);
@@ -446,6 +448,17 @@ export default function Militares() {
                       <Pencil className="w-4 h-4" />
                     </Button>
                   )}
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Registrar promoção atual"
+                      onClick={() => setMilitarPromocaoAtual(militar)}
+                    >
+                      <CalendarClock className="w-4 h-4" />
+                    </Button>
+                  )}
                   {canAccessAction('excluir_militares') && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => { setMilitarToDelete(militar); setDeleteDialogOpen(true); }}>
                       <Trash2 className="w-4 h-4" />
@@ -476,6 +489,12 @@ export default function Militares() {
           />
         )}
       </div>
+
+      <PromocaoAtualModal
+        open={Boolean(militarPromocaoAtual)}
+        onOpenChange={(open) => { if (!open) setMilitarPromocaoAtual(null); }}
+        militar={militarPromocaoAtual}
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
