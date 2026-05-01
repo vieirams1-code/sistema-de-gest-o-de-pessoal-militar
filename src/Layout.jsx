@@ -206,33 +206,32 @@ export default function Layout({ children, currentPageName }) {
   };
 
   // Filtra itens de menu por permissão de módulo
-  const filterItemsByPermission = (items) => {
-    if (hasAbsoluteAccess) return items;
+  const canViewMenuEntry = (entry) => {
+    if (entry.adminOnly && !isAdmin) return false;
+    if (hasAbsoluteAccess) return true;
 
+    if (entry.viewPermission && !temPermissao(entry.viewPermission)) return false;
+    if (entry.actionKey && !canAccessAction(entry.actionKey)) return false;
+    if (entry.moduleKey && !canAccessModule(entry.moduleKey)) return false;
+    if (entry.anyOf?.length) {
+      const hasAnyPermission = entry.anyOf.some((permission) => (
+        permission.type === 'module'
+          ? canAccessModule(permission.key)
+          : canAccessAction(permission.key)
+      ));
+      if (!hasAnyPermission) return false;
+    }
+
+    return true;
+  };
+
+  const filterItemsByPermission = (items) => {
     return items.filter((item) => {
-      if (item.adminOnly && !isAdmin) return false;
-      if (item.viewPermission && !temPermissao(item.viewPermission)) return false;
-      if (item.actionKey && !canAccessAction(item.actionKey)) return false;
-      if (item.moduleKey && !canAccessModule(item.moduleKey)) return false;
-      if (item.anyOf?.length) {
-        const hasAnyPermission = item.anyOf.some((permission) => (
-          permission.type === 'module'
-            ? canAccessModule(permission.key)
-            : canAccessAction(permission.key)
-        ));
-        if (!hasAnyPermission) return false;
-      }
-      return true;
+      return canViewMenuEntry(item);
     }).map((item) => {
       if (!item.children?.length) return item;
 
-      const visibleChildren = item.children.filter((child) => {
-        if (child.adminOnly && !isAdmin) return false;
-        if (child.viewPermission && !temPermissao(child.viewPermission)) return false;
-        if (child.actionKey && !canAccessAction(child.actionKey)) return false;
-        if (child.moduleKey && !canAccessModule(child.moduleKey)) return false;
-        return true;
-      });
+      const visibleChildren = item.children.filter((child) => canViewMenuEntry(child));
       
       return { ...item, children: visibleChildren };
     }).filter((item) => !item.children || item.children.length > 0);
