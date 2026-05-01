@@ -10,7 +10,7 @@ import { gerarPreviaImportacao, parseArquivoPromocoes } from '@/utils/antiguidad
 const STATUS_ATIVO = 'ativo';
 
 const DEFAULT_FORM = {
-  militar_id: '', posto_graduacao_anterior: '', quadro_anterior: '', posto_graduacao_novo: '', quadro_novo: '',
+  militar_id: '',
   data_promocao: '', data_publicacao: '', boletim_referencia: '', ato_referencia: '', antiguidade_referencia_ordem: '',
   antiguidade_referencia_id: '', observacoes: '',
 };
@@ -88,19 +88,28 @@ export default function AntiguidadeImportarPromocoes() {
   };
 
   const validarManual = async () => {
-    if (!form.militar_id || !form.posto_graduacao_novo || !form.quadro_novo || !form.data_promocao) throw new Error('Preencha militar, posto/graduação novo, quadro novo e data de promoção.');
+    if (!form.militar_id || !militarSelecionado?.posto_graduacao || !militarSelecionado?.quadro || !form.data_promocao) throw new Error('Preencha militar e data da promoção atual. Posto/quadro são obtidos do cadastro atual do militar.');
     const todos = await base44.entities.HistoricoPromocaoMilitar.list();
     const ativos = todos.filter((h) => h.status_registro === STATUS_ATIVO && h.militar_id === form.militar_id);
-    const dup = ativos.find((h) => h.posto_graduacao_novo === form.posto_graduacao_novo && h.data_promocao === form.data_promocao);
+    const postoAtual = militarSelecionado.posto_graduacao || '';
+    const quadroAtual = militarSelecionado.quadro || '';
+    const dup = ativos.find((h) => h.posto_graduacao_novo === postoAtual && h.quadro_novo === quadroAtual && h.data_promocao === form.data_promocao);
     if (dup) throw new Error('Já existe registro ativo igual (militar, posto/graduação novo, data de promoção).');
-    const divergente = ativos.find((h) => h.posto_graduacao_novo === form.posto_graduacao_novo && h.data_promocao !== form.data_promocao);
+    const divergente = ativos.find((h) => h.posto_graduacao_novo === postoAtual && h.quadro_novo === quadroAtual && h.data_promocao !== form.data_promocao);
     if (divergente) throw new Error('Existe registro ativo divergente para o mesmo militar/posto. Use retificação controlada.');
   };
 
   const lancarManual = async () => {
     setFeedbackManual('');
     await validarManual();
-    await base44.entities.HistoricoPromocaoMilitar.create({ ...form, origem_dado: 'manual', status_registro: STATUS_ATIVO, antiguidade_referencia_ordem: form.antiguidade_referencia_ordem ? Number(form.antiguidade_referencia_ordem) : null });
+    await base44.entities.HistoricoPromocaoMilitar.create({
+      ...form,
+      posto_graduacao_novo: militarSelecionado?.posto_graduacao || '',
+      quadro_novo: militarSelecionado?.quadro || '',
+      origem_dado: 'manual',
+      status_registro: STATUS_ATIVO,
+      antiguidade_referencia_ordem: form.antiguidade_referencia_ordem ? Number(form.antiguidade_referencia_ordem) : null,
+    });
     setFeedbackManual('Registro manual criado com sucesso.');
     await atualizarDiagnostico();
     await carregarHistorico(form.militar_id);
@@ -138,11 +147,11 @@ export default function AntiguidadeImportarPromocoes() {
     {aba === 'manual' && <>
       <Card><CardHeader><CardTitle>Registrar promoção atual (manual)</CardTitle></CardHeader><CardContent className="space-y-4">
         <div><Label>Buscar militar</Label><Input value={buscaMilitar} onChange={(e) => setBuscaMilitar(e.target.value)} placeholder="Nome, nome de guerra, matrícula, lotação..." /></div>
-        <div className="max-h-56 overflow-auto border rounded-md p-2 space-y-1">{militaresFiltrados.map((m) => <button key={m.id} className={`w-full text-left p-2 rounded ${form.militar_id === m.id ? 'bg-slate-100' : ''}`} onClick={() => { setForm((f) => ({ ...f, militar_id: m.id, posto_graduacao_anterior: m.posto_graduacao || '', quadro_anterior: m.quadro || '', posto_graduacao_novo: m.posto_graduacao || '', quadro_novo: m.quadro || '' })); carregarHistorico(m.id); }}><div className="text-sm">{`${m.posto_graduacao || 'S/POSTO'} ${m.quadro || 'S/QUADRO'} ${m.nome_completo || ''} — ${m.matricula || 'S/MAT'} — ${m.lotacao || 'S/LOTAÇÃO'}`}</div><div className="text-xs"><strong>{m.nome_guerra || 'Sem nome de guerra'}</strong></div></button>)}</div>
+        <div className="max-h-56 overflow-auto border rounded-md p-2 space-y-1">{militaresFiltrados.map((m) => <button key={m.id} className={`w-full text-left p-2 rounded ${form.militar_id === m.id ? 'bg-slate-100' : ''}`} onClick={() => { setForm((f) => ({ ...f, militar_id: m.id })); carregarHistorico(m.id); }}><div className="text-sm">{`${m.posto_graduacao || 'S/POSTO'} ${m.quadro || 'S/QUADRO'} ${m.nome_completo || ''} — ${m.matricula || 'S/MAT'} — ${m.lotacao || 'S/LOTAÇÃO'}`}</div><div className="text-xs"><strong>{m.nome_guerra || 'Sem nome de guerra'}</strong></div></button>)}</div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Input placeholder="Posto/graduação novo" value={form.posto_graduacao_novo} readOnly />
-          <Input placeholder="Quadro novo" value={form.quadro_novo} readOnly />
+          <Input placeholder="Posto/graduação atual (somente leitura)" value={militarSelecionado?.posto_graduacao || ''} readOnly />
+          <Input placeholder="Quadro atual (somente leitura)" value={militarSelecionado?.quadro || ''} readOnly />
           <Input type="date" value={form.data_promocao} onChange={(e) => setForm((f) => ({ ...f, data_promocao: e.target.value }))} />
           <Input type="date" value={form.data_publicacao} onChange={(e) => setForm((f) => ({ ...f, data_publicacao: e.target.value }))} />
           <Input placeholder="Boletim" value={form.boletim_referencia} onChange={(e) => setForm((f) => ({ ...f, boletim_referencia: e.target.value }))} />

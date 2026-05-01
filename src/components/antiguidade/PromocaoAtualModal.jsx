@@ -19,12 +19,8 @@ const FORM_INICIAL = {
   data_promocao: '',
   data_publicacao: '',
   boletim_referencia: '',
-  ato_referencia: '',
   antiguidade_referencia_ordem: '',
-  antiguidade_referencia_id: '',
   observacoes: '',
-  posto_graduacao_anterior: '',
-  quadro_anterior: '',
   motivo_retificacao: '',
 };
 
@@ -78,12 +74,8 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
         data_promocao: form.data_promocao,
         data_publicacao: form.data_publicacao || null,
         boletim_referencia: form.boletim_referencia || '',
-        ato_referencia: form.ato_referencia || '',
         antiguidade_referencia_ordem: form.antiguidade_referencia_ordem ? Number(form.antiguidade_referencia_ordem) : null,
-        antiguidade_referencia_id: form.antiguidade_referencia_id || '',
         observacoes: form.observacoes || '',
-        posto_graduacao_anterior: form.posto_graduacao_anterior || '',
-        quadro_anterior: form.quadro_anterior || '',
         origem_dado: 'manual',
         status_registro: STATUS_ATIVO,
       };
@@ -143,10 +135,8 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div><Label>Data da promoção *</Label><Input type="date" value={form.data_promocao} onChange={(e) => setForm((f) => ({ ...f, data_promocao: e.target.value }))} /></div>
           <div><Label>Data da publicação</Label><Input type="date" value={form.data_publicacao} onChange={(e) => setForm((f) => ({ ...f, data_publicacao: e.target.value }))} /></div>
-          <div><Label>Boletim de referência</Label><Input value={form.boletim_referencia} onChange={(e) => setForm((f) => ({ ...f, boletim_referencia: e.target.value }))} /></div>
-          <div><Label>Ato de referência</Label><Input value={form.ato_referencia} onChange={(e) => setForm((f) => ({ ...f, ato_referencia: e.target.value }))} /></div>
+          <div><Label>DOEMS / boletim / referência</Label><Input value={form.boletim_referencia} onChange={(e) => setForm((f) => ({ ...f, boletim_referencia: e.target.value }))} /></div>
           <div><Label>Antiguidade (ordem)</Label><Input value={form.antiguidade_referencia_ordem} onChange={(e) => setForm((f) => ({ ...f, antiguidade_referencia_ordem: e.target.value }))} /></div>
-          <div><Label>Antiguidade (ID)</Label><Input value={form.antiguidade_referencia_id} onChange={(e) => setForm((f) => ({ ...f, antiguidade_referencia_id: e.target.value }))} /></div>
           <div className="md:col-span-2"><Label>Observações</Label><Input value={form.observacoes} onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))} /></div>
           {registroConflitante && (
             <div className="md:col-span-2 p-3 border rounded bg-amber-50">

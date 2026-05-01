@@ -5,6 +5,10 @@ export const QUADROS_FIXOS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QB
 
 const QUADRO_ALIASES_LEGADOS = {
   QBMPT: 'QPTBM',
+  'QBMP-1': 'QBMP-1.a',
+  'QBMP-1A': 'QBMP-1.a',
+  'QBMP-1.A': 'QBMP-1.a',
+  'QBMP-1ª': 'QBMP-1.a',
 };
 
 const QUADROS_COM_DESTAQUE = new Set(['QOETBM', 'QOSTBM', 'QPTBM']);
@@ -12,7 +16,14 @@ const QUADROS_COM_DESTAQUE = new Set(['QOETBM', 'QOSTBM', 'QPTBM']);
 export function normalizarQuadroLegado(quadro) {
   const quadroNormalizado = String(quadro || '').trim().toUpperCase();
   if (!quadroNormalizado) return '';
-  return QUADRO_ALIASES_LEGADOS[quadroNormalizado] || quadroNormalizado;
+  const quadroCompactado = quadroNormalizado.replace(/\s+/g, '').replace(/-/g, '-');
+  const chaveSemPontuacao = quadroCompactado.replace(/[.\-]/g, '');
+  return (
+    QUADRO_ALIASES_LEGADOS[quadroCompactado]
+    || QUADRO_ALIASES_LEGADOS[chaveSemPontuacao]
+    || QUADRO_ALIASES_LEGADOS[quadroNormalizado]
+    || quadroCompactado
+  );
 }
 
 const POSTOS_OFICIAIS = new Set([
