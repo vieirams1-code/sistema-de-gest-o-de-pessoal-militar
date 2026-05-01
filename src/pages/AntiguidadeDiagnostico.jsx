@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import gerarDiagnosticoAntiguidade from '@/utils/antiguidade/gerarDiagnosticoAntiguidade';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,34 +29,22 @@ function TabelaResumo({ titulo, dados }) {
 }
 
 export default function AntiguidadeDiagnostico() {
-  const [loading, setLoading] = React.useState(true);
-  const [diag, setDiag] = React.useState(null);
-  const [erro, setErro] = React.useState('');
-
-  React.useEffect(() => {
-    const carregar = async () => {
-      setLoading(true);
-      setErro('');
+  const { data: diag, isLoading: loading, error } = useQuery({
+    queryKey: ['antiguidade-diagnostico'],
+    queryFn: async () => {
+      const militares = await base44.entities.Militar.filter({ status_cadastro: 'Ativo' });
+      let historicos = [];
       try {
-        const militares = await base44.entities.Militar.filter({ status_cadastro: 'Ativo' });
-        let historicos = [];
-        try {
-          historicos = await base44.entities.HistoricoPromocao.list();
-        } catch {
-          historicos = [];
-        }
-        setDiag(gerarDiagnosticoAntiguidade(militares, historicos, CONFIG_PADRAO));
-      } catch (e) {
-        setErro(e?.message || 'Falha ao carregar diagnóstico de antiguidade.');
-      } finally {
-        setLoading(false);
+        historicos = await base44.entities.HistoricoPromocao.list();
+      } catch {
+        historicos = [];
       }
-    };
-    carregar();
-  }, []);
+      return gerarDiagnosticoAntiguidade(militares, historicos, CONFIG_PADRAO);
+    },
+  });
 
   if (loading) return <div className="p-6">Carregando diagnóstico...</div>;
-  if (erro) return <div className="p-6 text-red-600">{erro}</div>;
+  if (error) return <div className="p-6 text-red-600">{error?.message || 'Falha ao carregar diagnóstico de antiguidade.'}</div>;
 
   const cards = [
     ['Total de militares ativos', diag.totalAtivos],
