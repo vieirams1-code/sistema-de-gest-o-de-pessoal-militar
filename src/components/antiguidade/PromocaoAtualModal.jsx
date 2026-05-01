@@ -24,7 +24,7 @@ const FORM_INICIAL = {
   motivo_retificacao: '',
 };
 
-export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
+export default function PromocaoAtualModal({ open, onOpenChange, militar, onSaved }) {
   const [form, setForm] = React.useState(FORM_INICIAL);
   const [registroConflitante, setRegistroConflitante] = React.useState(null);
   const [mensagem, setMensagem] = React.useState('');
@@ -53,7 +53,7 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
     setMensagem('');
 
     try {
-      const todos = await base44.entities.HistoricoPromocaoMilitar.list();
+      const todos = await base44.entities.HistoricoPromocao.list();
       const ativosCompativeis = todos.filter((h) =>
         h.status_registro === STATUS_ATIVO
         && h.militar_id === militar.id
@@ -82,9 +82,10 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
 
       const divergente = ativosCompativeis[0] || null;
       if (!divergente) {
-        await base44.entities.HistoricoPromocaoMilitar.create(payloadBase);
+        await base44.entities.HistoricoPromocao.create(payloadBase);
         setMensagem('Promoção atual registrada com sucesso.');
         await atualizarDiagnostico();
+        await onSaved?.();
         return;
       }
 
@@ -94,18 +95,19 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar }) {
         return;
       }
 
-      await base44.entities.HistoricoPromocaoMilitar.update(divergente.id, {
+      await base44.entities.HistoricoPromocao.update(divergente.id, {
         status_registro: 'retificado',
         observacoes: `${divergente.observacoes || ''} | Retificado: ${form.motivo_retificacao}`.trim(),
       });
 
-      await base44.entities.HistoricoPromocaoMilitar.create({
+      await base44.entities.HistoricoPromocao.create({
         ...payloadBase,
         observacoes: `${payloadBase.observacoes || ''} | Retificação: ${form.motivo_retificacao}`.trim(),
       });
 
       setMensagem('Retificação concluída com novo registro ativo.');
       await atualizarDiagnostico();
+      await onSaved?.();
     } catch (e) {
       setMensagem(e?.message || 'Erro ao registrar promoção atual.');
     } finally {

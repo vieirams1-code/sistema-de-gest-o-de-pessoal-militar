@@ -1,232 +1,174 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, FileText, ListChecks, PencilLine, ShieldAlert, History } from 'lucide-react';
+import { queryClientInstance } from '@/lib/query-client';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { gerarPreviaImportacao, parseArquivoPromocoes } from '@/utils/antiguidade/importarPromocoes';
 
-const militarMock = {
-  nomeGuerra: 'SILVA',
-  nomeCompleto: 'João Carlos da Silva',
-  matricula: 'BM-123456',
-  postoGraduacaoAtual: 'Subtenente',
-  quadroAtual: 'QBMG-1',
-  lotacaoAtual: '1º GBM - Campo Grande',
-};
+const STATUS_ATIVO = 'ativo';
 
-const historicoMock = [
-  {
-    id: 'h1',
-    status: 'ativo',
-    postoAnterior: '1º Sargento',
-    postoNovo: 'Subtenente',
-    quadro: 'QBMG-1',
-    dataPromocao: '2025-12-01',
-    numeroAntiguidade: 14,
-    ato: 'DOEMS nº 11.921 / Boletim 334',
-    observacoes: 'Promoção por merecimento.',
-    origem: 'Cadastro manual',
-    registroAtual: true,
-  },
-  {
-    id: 'h2',
-    status: 'retificado',
-    postoAnterior: '2º Sargento',
-    postoNovo: '1º Sargento',
-    quadro: 'QBMG-1',
-    dataPromocao: '2022-06-15',
-    numeroAntiguidade: 22,
-    ato: 'DOEMS nº 10.877',
-    observacoes: 'Retificado para ajuste da data de publicação.',
-    origem: 'Migração legado',
-    registroAtual: false,
-  },
-];
-
-const statusRegistroClass = {
-  ativo: 'bg-emerald-100 text-emerald-800',
-  pendente: 'bg-amber-100 text-amber-800',
-  retificado: 'bg-blue-100 text-blue-800',
-  cancelado: 'bg-rose-100 text-rose-800',
+const DEFAULT_FORM = {
+  militar_id: '',
+  data_promocao: '', data_publicacao: '', boletim_referencia: '', ato_referencia: '', antiguidade_referencia_ordem: '',
+  antiguidade_referencia_id: '', observacoes: '',
 };
 
 export default function AntiguidadeImportarPromocoes() {
-  const [openModal, setOpenModal] = React.useState(false);
-  const [isRetificacao, setIsRetificacao] = React.useState(false);
+  const [aba, setAba] = React.useState('importacao');
+  const [arquivo, setArquivo] = React.useState(null);
+  const [processando, setProcessando] = React.useState(false);
+  const [previa, setPrevia] = React.useState(null);
+  const [importando, setImportando] = React.useState(false);
+  const [resultado, setResultado] = React.useState(null);
+  const [erro, setErro] = React.useState('');
 
-  const registroAtual = historicoMock.find((item) => item.registroAtual && item.status === 'ativo');
-  const statusListagem = registroAtual?.dataPromocao && registroAtual?.numeroAntiguidade ? 'Apto' : 'Pendente';
+  const [militares, setMilitares] = React.useState([]);
+  const [buscaMilitar, setBuscaMilitar] = React.useState('');
+  const [form, setForm] = React.useState(DEFAULT_FORM);
+  const [historico, setHistorico] = React.useState([]);
+  const [feedbackManual, setFeedbackManual] = React.useState('');
+  const [motivoRetificacao, setMotivoRetificacao] = React.useState('');
 
-  const criterios = [
-    { label: 'Posto/graduação válido', ok: true },
-    { label: 'Quadro compatível', ok: true },
-    { label: 'Data de promoção preenchida', ok: Boolean(registroAtual?.dataPromocao) },
-    { label: 'Número de antiguidade definido', ok: Boolean(registroAtual?.numeroAntiguidade) },
-  ];
+  React.useEffect(() => {
+    if (aba !== 'manual') return;
+    const carregar = async () => {
+      const militaresAtivos = await base44.entities.Militar.filter({ status_cadastro: 'Ativo' });
+      setMilitares(militaresAtivos);
+    };
+    carregar();
+  }, [aba]);
 
-  const pendencias = [
-    !registroAtual?.dataPromocao && 'Sem data de promoção',
-    !registroAtual?.numeroAntiguidade && 'Sem número de antiguidade',
-    false && 'Empate não resolvido',
-    false && 'Quadro incompatível',
-  ].filter(Boolean);
+  const militarSelecionado = React.useMemo(() => militares.find((m) => m.id === form.militar_id) || null, [militares, form.militar_id]);
 
-  return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#1e3a5f]">Carreira e Antiguidade</h1>
-        <p className="text-sm text-slate-600">Visualização e gestão apenas da promoção atual e histórico já registrado.</p>
-      </div>
+  const militaresFiltrados = React.useMemo(() => {
+    const q = buscaMilitar.trim().toLowerCase();
+    if (!q) return militares.slice(0, 25);
+    return militares.filter((m) => [m.nome_completo, m.nome_guerra, m.matricula, m.lotacao, m.posto_graduacao, m.quadro].some((v) => String(v || '').toLowerCase().includes(q))).slice(0, 25);
+  }, [militares, buscaMilitar]);
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Situação Atual</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-          <Info label="Nome de guerra" value={militarMock.nomeGuerra} />
-          <Info label="Nome completo" value={militarMock.nomeCompleto} />
-          <Info label="Matrícula" value={militarMock.matricula} />
-          <Info label="Posto/graduação atual" value={militarMock.postoGraduacaoAtual} />
-          <Info label="Quadro atual" value={militarMock.quadroAtual} />
-          <Info label="Lotação atual" value={militarMock.lotacaoAtual} />
-        </CardContent>
-      </Card>
+  const carregarHistorico = async (militarId) => {
+    if (!militarId) return;
+    const todos = await base44.entities.HistoricoPromocao.list();
+    const hist = todos.filter((h) => h.militar_id === militarId).sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || '')));
+    setHistorico(hist);
+  };
 
-      <Card>
-        <CardHeader className="flex flex-row justify-between items-start gap-3">
-          <CardTitle>Dados da Promoção Atual</CardTitle>
-          <Button onClick={() => { setIsRetificacao(Boolean(registroAtual)); setOpenModal(true); }}>
-            <PencilLine className="w-4 h-4 mr-2" />
-            Registrar / Retificar Promoção Atual
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          {!registroAtual && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900">
-              <AlertTriangle className="w-4 h-4 mt-0.5" />
-              Promoção atual sem data registrada. Este militar ficará pendente na listagem de antiguidade.
-            </div>
-          )}
+  const atualizarDiagnostico = async () => {
+    await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+  };
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Info label="Data da promoção atual" value={registroAtual?.dataPromocao || '—'} />
-            <Info label="Nº/ordem de antiguidade" value={registroAtual?.numeroAntiguidade || '—'} />
-            <Info label="DOEMS / Boletim / Ato" value={registroAtual?.ato || '—'} />
-            <Info label="Data da publicação" value={registroAtual?.dataPromocao || '—'} />
-            <Info label="Status do registro" value={<Badge className={statusRegistroClass[registroAtual?.status || 'pendente']}>{registroAtual ? 'Ativo' : 'Pendente'}</Badge>} />
-          </div>
-        </CardContent>
-      </Card>
+  const processarPrevia = async () => {
+    if (!arquivo) return;
+    setProcessando(true);
+    setErro('');
+    setResultado(null);
+    try {
+      const rows = await parseArquivoPromocoes(arquivo);
+      const [militaresAtivos, historicos] = await Promise.all([base44.entities.Militar.filter({ status_cadastro: 'Ativo' }), base44.entities.HistoricoPromocao.list()]);
+      setPrevia(gerarPreviaImportacao(rows, militaresAtivos, historicos));
+    } catch (e) { setErro(e?.message || 'Erro ao processar prévia de importação.'); } finally { setProcessando(false); }
+  };
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Impacto na Listagem</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div className="flex items-center gap-2">
-            <Badge className={statusListagem === 'Apto' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}>{statusListagem}</Badge>
-            <span className="text-slate-600">Status na composição de antiguidade.</span>
-          </div>
+  const importarValidos = async () => {
+    if (!previa) return;
+    setImportando(true);
+    setErro('');
+    try {
+      let criados = 0;
+      for (const item of previa.previas) {
+        if (!item.podeImportar || !item.militar) continue;
+        await base44.entities.HistoricoPromocao.create({ militar_id: item.militar.id, posto_graduacao_anterior: item.militar.posto_graduacao || '', quadro_anterior: item.militar.quadro || '', posto_graduacao_novo: item.row.posto_graduacao_novo || '', quadro_novo: item.row.quadro_novo || '', data_promocao: item.dataPromocao, data_publicacao: item.row.data_publicacao || null, boletim_referencia: item.row.boletim_referencia || '', ato_referencia: item.row.ato_referencia || '', antiguidade_referencia_ordem: item.row.antiguidade_referencia_ordem ? Number(item.row.antiguidade_referencia_ordem) : null, antiguidade_referencia_id: item.row.antiguidade_referencia_id || '', origem_dado: 'importacao', status_registro: STATUS_ATIVO, observacoes: item.row.observacoes || '' });
+        criados += 1;
+      }
+      await atualizarDiagnostico();
+      setResultado({ criados });
+    } catch (e) { setErro(e?.message || 'Erro ao importar registros válidos.'); } finally { setImportando(false); }
+  };
 
-          <div>
-            <h3 className="font-semibold mb-2">Critérios identificados:</h3>
-            <ul className="space-y-1">
-              {criterios.map((criterio) => (
-                <li key={criterio.label} className="flex items-center gap-2">
-                  {criterio.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Clock3 className="w-4 h-4 text-amber-600" />}
-                  {criterio.label}
-                </li>
-              ))}
-            </ul>
-          </div>
+  const validarManual = async () => {
+    if (!form.militar_id || !militarSelecionado?.posto_graduacao || !militarSelecionado?.quadro || !form.data_promocao) throw new Error('Preencha militar e data da promoção atual. Posto/quadro são obtidos do cadastro atual do militar.');
+    const todos = await base44.entities.HistoricoPromocao.list();
+    const ativos = todos.filter((h) => h.status_registro === STATUS_ATIVO && h.militar_id === form.militar_id);
+    const postoAtual = militarSelecionado.posto_graduacao || '';
+    const quadroAtual = militarSelecionado.quadro || '';
+    const dup = ativos.find((h) => h.posto_graduacao_novo === postoAtual && h.quadro_novo === quadroAtual && h.data_promocao === form.data_promocao);
+    if (dup) throw new Error('Já existe registro ativo igual (militar, posto/graduação novo, data de promoção).');
+    const divergente = ativos.find((h) => h.posto_graduacao_novo === postoAtual && h.quadro_novo === quadroAtual && h.data_promocao !== form.data_promocao);
+    if (divergente) throw new Error('Existe registro ativo divergente para o mesmo militar/posto. Use retificação controlada.');
+  };
 
-          <div>
-            <h3 className="font-semibold mb-2">Pendências, se existirem:</h3>
-            {pendencias.length === 0 ? <p className="text-emerald-700">Sem pendências.</p> : (
-              <ul className="space-y-1 text-amber-800">
-                {pendencias.map((p) => <li key={p} className="flex items-center gap-2"><ShieldAlert className="w-4 h-4" />{p}</li>)}
-              </ul>
-            )}
-          </div>
+  const lancarManual = async () => {
+    setFeedbackManual('');
+    await validarManual();
+    await base44.entities.HistoricoPromocao.create({
+      ...form,
+      posto_graduacao_novo: militarSelecionado?.posto_graduacao || '',
+      quadro_novo: militarSelecionado?.quadro || '',
+      origem_dado: 'manual',
+      status_registro: STATUS_ATIVO,
+      antiguidade_referencia_ordem: form.antiguidade_referencia_ordem ? Number(form.antiguidade_referencia_ordem) : null,
+    });
+    setFeedbackManual('Registro manual criado com sucesso.');
+    await atualizarDiagnostico();
+    await carregarHistorico(form.militar_id);
+  };
 
-          <div className="rounded-md bg-slate-100 px-3 py-2 text-slate-700">Prévia: “Aguardando snapshot rascunho”</div>
-        </CardContent>
-      </Card>
+  const retificarRegistro = async (registro) => {
+    if (!motivoRetificacao.trim()) throw new Error('Informe motivo da retificação/cancelamento.');
+    await base44.entities.HistoricoPromocao.update(registro.id, { status_registro: 'retificado', observacoes: `${registro.observacoes || ''} | Retificado: ${motivoRetificacao}`.trim() });
+    await base44.entities.HistoricoPromocao.create({ ...registro, id: undefined, status_registro: STATUS_ATIVO, origem_dado: 'manual', observacoes: `${registro.observacoes || ''} | Novo registro por retificação: ${motivoRetificacao}`.trim() });
+    setMotivoRetificacao('');
+    await atualizarDiagnostico();
+    await carregarHistorico(registro.militar_id);
+  };
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><History className="w-4 h-4" /> Histórico de Promoções</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {historicoMock.map((item) => (
-            <div key={item.id} className="rounded-lg border p-4 bg-white space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className={statusRegistroClass[item.status]}>{item.status[0].toUpperCase() + item.status.slice(1)}</Badge>
-                {item.registroAtual && <Badge variant="outline">Registro atual</Badge>}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                <Info label="Posto/graduação anterior" value={item.postoAnterior} />
-                <Info label="Posto/graduação novo" value={item.postoNovo} />
-                <Info label="Quadro" value={item.quadro} />
-                <Info label="Data da promoção" value={item.dataPromocao} />
-                <Info label="Nº/ordem de antiguidade" value={item.numeroAntiguidade} />
-                <Info label="DOEMS / boletim / ato" value={item.ato} />
-                <Info label="Observações" value={item.observacoes} />
-                <Info label="Origem do dado" value={item.origem} />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm"><FileText className="w-4 h-4 mr-2" />Ver detalhes</Button>
-                <Button variant="outline" size="sm">Retificar</Button>
-                <Button variant="destructive" size="sm">Cancelar</Button>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+  const cancelarRegistro = async (registro) => {
+    if (!motivoRetificacao.trim()) throw new Error('Informe motivo da retificação/cancelamento.');
+    await base44.entities.HistoricoPromocao.update(registro.id, { status_registro: 'cancelado', observacoes: `${registro.observacoes || ''} | Cancelado: ${motivoRetificacao}`.trim() });
+    setMotivoRetificacao('');
+    await atualizarDiagnostico();
+    await carregarHistorico(registro.militar_id);
+  };
 
-      <Dialog open={openModal} onOpenChange={setOpenModal}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Registrar / Retificar Promoção Atual</DialogTitle>
-            <DialogDescription>
-              Este registro não altera o posto, graduação ou quadro do militar. Ele apenas registra os dados da promoção atual para fins de antiguidade.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <ReadOnlyField label="Militar" value={militarMock.nomeCompleto} />
-            <ReadOnlyField label="Matrícula" value={militarMock.matricula} />
-            <ReadOnlyField label="Posto/graduação atual" value={militarMock.postoGraduacaoAtual} />
-            <ReadOnlyField label="Quadro atual" value={militarMock.quadroAtual} />
-            <ReadOnlyField label="Lotação" value={militarMock.lotacaoAtual} />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div><Label>Data da promoção atual</Label><Input type="date" /></div>
-            <div><Label>Nº/ordem de antiguidade</Label><Input placeholder="Ex: 14" /></div>
-            <div><Label>DOEMS / Boletim / Ato</Label><Input placeholder="Número da referência" /></div>
-            <div><Label>Data da publicação</Label><Input type="date" /></div>
-            <div className="md:col-span-2"><Label>Observações</Label><Textarea placeholder="Observações do registro" /></div>
-            {isRetificacao && <div className="md:col-span-2"><Label>Motivo da retificação</Label><Textarea placeholder="Obrigatório na retificação" /></div>}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenModal(false)}>Cancelar</Button>
-            <Button><ListChecks className="w-4 h-4 mr-2" />Salvar registro</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+  return <div className="p-6 space-y-6">
+    <h1 className="text-2xl font-bold text-[#1e3a5f]">Promoções de Antiguidade</h1>
+    <div className="flex gap-2">
+      <Button variant={aba === 'importacao' ? 'default' : 'outline'} onClick={() => setAba('importacao')}>Importação</Button>
+      <Button variant={aba === 'manual' ? 'default' : 'outline'} onClick={() => setAba('manual')}>Registrar promoção atual</Button>
     </div>
-  );
-}
 
-function Info({ label, value }) {
-  return <div><p className="text-xs uppercase text-slate-500">{label}</p><div className="font-medium text-slate-800">{value}</div></div>;
-}
+    {aba === 'importacao' && <>{/* existing */}
+      <Card><CardHeader><CardTitle>Arquivo de importação</CardTitle></CardHeader><CardContent className="space-y-4"><input type="file" accept=".csv,.xlsx" onChange={(e) => setArquivo(e.target.files?.[0] || null)} /><div><Button disabled={!arquivo || processando} onClick={processarPrevia}>{processando ? 'Processando...' : 'Processar prévia (dry-run)'}</Button></div>{erro && <p className="text-red-600 text-sm">{erro}</p>}</CardContent></Card>
+      {previa && <Card><CardHeader><CardTitle>Resumo da prévia</CardTitle></CardHeader><CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">{Object.entries(previa.resumo).map(([k, v]) => <div key={k}><strong>{k}</strong>: {v}</div>)}<div className="col-span-full mt-2"><Button onClick={importarValidos} disabled={importando || previa.resumo.prontosImportar === 0}>{importando ? 'Importando...' : 'Importar registros válidos'}</Button></div>{resultado && <p className="col-span-full text-green-700 font-semibold">Importação concluída. Registros criados: {resultado.criados}</p>}</CardContent></Card>}
+    </>}
 
-function ReadOnlyField({ label, value }) {
-  return <div className="rounded-md border bg-slate-50 px-3 py-2"><p className="text-xs uppercase text-slate-500">{label}</p><p className="font-medium">{value}</p></div>;
+    {aba === 'manual' && <>
+      <Card><CardHeader><CardTitle>Registrar promoção atual (manual)</CardTitle></CardHeader><CardContent className="space-y-4">
+        <div><Label>Buscar militar</Label><Input value={buscaMilitar} onChange={(e) => setBuscaMilitar(e.target.value)} placeholder="Nome, nome de guerra, matrícula, lotação..." /></div>
+        <div className="max-h-56 overflow-auto border rounded-md p-2 space-y-1">{militaresFiltrados.map((m) => <button key={m.id} className={`w-full text-left p-2 rounded ${form.militar_id === m.id ? 'bg-slate-100' : ''}`} onClick={() => { setForm((f) => ({ ...f, militar_id: m.id })); carregarHistorico(m.id); }}><div className="text-sm">{`${m.posto_graduacao || 'S/POSTO'} ${m.quadro || 'S/QUADRO'} ${m.nome_completo || ''} — ${m.matricula || 'S/MAT'} — ${m.lotacao || 'S/LOTAÇÃO'}`}</div><div className="text-xs"><strong>{m.nome_guerra || 'Sem nome de guerra'}</strong></div></button>)}</div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Input placeholder="Posto/graduação atual (somente leitura)" value={militarSelecionado?.posto_graduacao || ''} readOnly />
+          <Input placeholder="Quadro atual (somente leitura)" value={militarSelecionado?.quadro || ''} readOnly />
+          <Input type="date" value={form.data_promocao} onChange={(e) => setForm((f) => ({ ...f, data_promocao: e.target.value }))} />
+          <Input type="date" value={form.data_publicacao} onChange={(e) => setForm((f) => ({ ...f, data_publicacao: e.target.value }))} />
+          <Input placeholder="Boletim" value={form.boletim_referencia} onChange={(e) => setForm((f) => ({ ...f, boletim_referencia: e.target.value }))} />
+          <Input placeholder="Ato" value={form.ato_referencia} onChange={(e) => setForm((f) => ({ ...f, ato_referencia: e.target.value }))} />
+          <Input placeholder="Antiguidade ordem" value={form.antiguidade_referencia_ordem} onChange={(e) => setForm((f) => ({ ...f, antiguidade_referencia_ordem: e.target.value }))} />
+          <Input placeholder="Antiguidade ID" value={form.antiguidade_referencia_id} onChange={(e) => setForm((f) => ({ ...f, antiguidade_referencia_id: e.target.value }))} />
+        </div>
+        <Input placeholder="Observações" value={form.observacoes} onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))} />
+        <p className="text-xs text-slate-600">Este lançamento não altera o posto ou graduação do militar. Apenas registra a data e referências da promoção atual já cadastrada.</p><div className="flex gap-2"><Button onClick={() => lancarManual().catch((e) => setFeedbackManual(e.message))}>Registrar promoção atual</Button></div>
+        {militarSelecionado && <p className="text-xs text-slate-600">Militar selecionado: {militarSelecionado.nome_completo}</p>}
+        {feedbackManual && <p className="text-sm text-blue-700">{feedbackManual}</p>}
+      </CardContent></Card>
+
+      <Card><CardHeader><CardTitle>Histórico de promoções do militar</CardTitle></CardHeader><CardContent className="space-y-3">
+        <Input placeholder="Motivo obrigatório para retificar/cancelar" value={motivoRetificacao} onChange={(e) => setMotivoRetificacao(e.target.value)} />
+        <div className="overflow-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th>Status</th><th>Posto ant.</th><th>Posto novo</th><th>Quadro</th><th>Data</th><th>Boletim/Ato</th><th>Antiguidade ordem</th><th>Origem</th><th>Observações</th><th>Ações</th></tr></thead><tbody>{historico.map((h) => <tr key={h.id} className="border-b"><td>{h.status_registro}</td><td>{h.posto_graduacao_anterior || '—'}</td><td>{h.posto_graduacao_novo || '—'}</td><td>{h.quadro_novo || '—'}</td><td>{h.data_promocao || '—'}</td><td>{h.boletim_referencia || h.ato_referencia || '—'}</td><td>{h.antiguidade_referencia_ordem ?? '—'}</td><td>{h.origem_dado || '—'}</td><td>{h.observacoes || '—'}</td><td className="space-x-1"><Button size="sm" variant="outline" disabled={h.status_registro !== STATUS_ATIVO} onClick={() => retificarRegistro(h).catch((e) => setFeedbackManual(e.message))}>Retificar</Button><Button size="sm" variant="destructive" disabled={h.status_registro !== STATUS_ATIVO} onClick={() => cancelarRegistro(h).catch((e) => setFeedbackManual(e.message))}>Cancelar</Button></td></tr>)}</tbody></table></div>
+      </CardContent></Card>
+    </>}
+  </div>;
 }
