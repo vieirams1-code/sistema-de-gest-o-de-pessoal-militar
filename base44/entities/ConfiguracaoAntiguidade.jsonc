@@ -1,0 +1,18 @@
+{
+  "name": "ConfiguracaoAntiguidade",
+  "type": "object",
+  "description": "Configuração versionada da regra de cálculo de antiguidade.",
+  "properties": {
+    "nome_configuracao": { "type": "string" },
+    "ativo": { "type": "boolean", "default": false },
+    "versao_regra": { "type": "string", "default": "antiguidade.v1" },
+    "ordem_postos": { "type": "object" },
+    "ordem_quadros": { "type": "object" },
+    "politica_desempate": { "type": "string", "enum": ["antiguidade_referencia", "pendencia_obrigatoria"], "default": "pendencia_obrigatoria" },
+    "permite_desempate_por_nome_visual": { "type": "boolean", "default": false },
+    "vigencia_inicio": { "type": "string", "format": "date" },
+    "vigencia_fim": { "type": "string", "format": "date" },
+    "observacoes": { "type": "string" }
+  },
+  "required": ["nome_configuracao", "ativo", "versao_regra", "ordem_postos", "ordem_quadros", "politica_desempate", "permite_desempate_por_nome_visual", "vigencia_inicio"]
+}
