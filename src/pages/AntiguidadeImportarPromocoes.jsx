@@ -127,7 +127,7 @@ export default function AntiguidadeImportarPromocoes() {
     <h1 className="text-2xl font-bold text-[#1e3a5f]">Promoções de Antiguidade</h1>
     <div className="flex gap-2">
       <Button variant={aba === 'importacao' ? 'default' : 'outline'} onClick={() => setAba('importacao')}>Importação</Button>
-      <Button variant={aba === 'manual' ? 'default' : 'outline'} onClick={() => setAba('manual')}>Lançamento Manual</Button>
+      <Button variant={aba === 'manual' ? 'default' : 'outline'} onClick={() => setAba('manual')}>Registrar promoção atual</Button>
     </div>
 
     {aba === 'importacao' && <>{/* existing */}
@@ -136,13 +136,13 @@ export default function AntiguidadeImportarPromocoes() {
     </>}
 
     {aba === 'manual' && <>
-      <Card><CardHeader><CardTitle>Lançamento manual individual</CardTitle></CardHeader><CardContent className="space-y-4">
+      <Card><CardHeader><CardTitle>Registrar promoção atual (manual)</CardTitle></CardHeader><CardContent className="space-y-4">
         <div><Label>Buscar militar</Label><Input value={buscaMilitar} onChange={(e) => setBuscaMilitar(e.target.value)} placeholder="Nome, nome de guerra, matrícula, lotação..." /></div>
-        <div className="max-h-56 overflow-auto border rounded-md p-2 space-y-1">{militaresFiltrados.map((m) => <button key={m.id} className={`w-full text-left p-2 rounded ${form.militar_id === m.id ? 'bg-slate-100' : ''}`} onClick={() => { setForm((f) => ({ ...f, militar_id: m.id, posto_graduacao_anterior: m.posto_graduacao || '', quadro_anterior: m.quadro || '' })); carregarHistorico(m.id); }}><div className="text-sm">{`${m.posto_graduacao || 'S/POSTO'} ${m.quadro || 'S/QUADRO'} ${m.nome_completo || ''} — ${m.matricula || 'S/MAT'} — ${m.lotacao || 'S/LOTAÇÃO'}`}</div><div className="text-xs"><strong>{m.nome_guerra || 'Sem nome de guerra'}</strong></div></button>)}</div>
+        <div className="max-h-56 overflow-auto border rounded-md p-2 space-y-1">{militaresFiltrados.map((m) => <button key={m.id} className={`w-full text-left p-2 rounded ${form.militar_id === m.id ? 'bg-slate-100' : ''}`} onClick={() => { setForm((f) => ({ ...f, militar_id: m.id, posto_graduacao_anterior: m.posto_graduacao || '', quadro_anterior: m.quadro || '', posto_graduacao_novo: m.posto_graduacao || '', quadro_novo: m.quadro || '' })); carregarHistorico(m.id); }}><div className="text-sm">{`${m.posto_graduacao || 'S/POSTO'} ${m.quadro || 'S/QUADRO'} ${m.nome_completo || ''} — ${m.matricula || 'S/MAT'} — ${m.lotacao || 'S/LOTAÇÃO'}`}</div><div className="text-xs"><strong>{m.nome_guerra || 'Sem nome de guerra'}</strong></div></button>)}</div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Input placeholder="Posto/graduação novo" value={form.posto_graduacao_novo} onChange={(e) => setForm((f) => ({ ...f, posto_graduacao_novo: e.target.value }))} />
-          <Input placeholder="Quadro novo" value={form.quadro_novo} onChange={(e) => setForm((f) => ({ ...f, quadro_novo: e.target.value }))} />
+          <Input placeholder="Posto/graduação novo" value={form.posto_graduacao_novo} readOnly />
+          <Input placeholder="Quadro novo" value={form.quadro_novo} readOnly />
           <Input type="date" value={form.data_promocao} onChange={(e) => setForm((f) => ({ ...f, data_promocao: e.target.value }))} />
           <Input type="date" value={form.data_publicacao} onChange={(e) => setForm((f) => ({ ...f, data_publicacao: e.target.value }))} />
           <Input placeholder="Boletim" value={form.boletim_referencia} onChange={(e) => setForm((f) => ({ ...f, boletim_referencia: e.target.value }))} />
@@ -151,7 +151,7 @@ export default function AntiguidadeImportarPromocoes() {
           <Input placeholder="Antiguidade ID" value={form.antiguidade_referencia_id} onChange={(e) => setForm((f) => ({ ...f, antiguidade_referencia_id: e.target.value }))} />
         </div>
         <Input placeholder="Observações" value={form.observacoes} onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))} />
-        <div className="flex gap-2"><Button onClick={() => lancarManual().catch((e) => setFeedbackManual(e.message))}>Lançar promoção manual</Button></div>
+        <p className="text-xs text-slate-600">Este lançamento não altera o posto ou graduação do militar. Apenas registra a data e referências da promoção atual já cadastrada.</p><div className="flex gap-2"><Button onClick={() => lancarManual().catch((e) => setFeedbackManual(e.message))}>Registrar promoção atual</Button></div>
         {militarSelecionado && <p className="text-xs text-slate-600">Militar selecionado: {militarSelecionado.nome_completo}</p>}
         {feedbackManual && <p className="text-sm text-blue-700">{feedbackManual}</p>}
       </CardContent></Card>
