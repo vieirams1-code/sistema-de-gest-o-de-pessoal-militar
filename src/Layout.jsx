@@ -30,6 +30,7 @@ import {
   History,
   CircleAlert,
   UserCircle2,
+  ListOrdered,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -100,6 +101,23 @@ const menuGroups = [
       { name: 'Conciliação com Boletim', page: 'ConciliacaoBoletim', icon: ArrowLeftRight, viewPermission: 'visualizar_conciliacao_boletim' },
     ],
   },
+  {
+    title: 'Antiguidade',
+    items: [
+      {
+        name: 'Antiguidade',
+        page: 'AntiguidadeDiagnostico',
+        icon: ListOrdered,
+        adminOnly: true,
+        children: [
+          { name: 'Diagnóstico', page: 'AntiguidadeDiagnostico', icon: ClipboardList, adminOnly: true },
+          { name: 'Importar Promoções', page: 'AntiguidadeImportarPromocoes', icon: ScrollText, adminOnly: true },
+        ],
+      },
+    ],
+  },
+
+
   {
     title: 'Patrimônio e Reconhecimento',
     items: [
