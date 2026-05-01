@@ -10,6 +10,7 @@
     "posto_graduacao_novo": { "type": "string", "default": "" },
     "quadro_novo": { "type": "string", "default": "" },
     "data_promocao": { "type": "date", "default": "" },
+    "data_publicacao": { "type": "date", "default": "" },
     "boletim_referencia": { "type": "string", "default": "" },
     "ato_referencia": { "type": "string", "default": "" },
     "antiguidade_referencia_ordem": { "type": "number", "default": 0 },

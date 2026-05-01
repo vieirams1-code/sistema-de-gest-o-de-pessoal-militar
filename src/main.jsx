@@ -8,6 +8,7 @@ import {
   PunicaoDisciplinar,
   ImpedimentoMedalha,
   CreditoExtraFerias,
+  HistoricoPromocao,
   ResetOperacionalLog,
   BaseConhecimentoProcedimento,
   AssistenteLog,
@@ -26,6 +27,7 @@ void ImportacaoAlteracoesLegado;
 void PunicaoDisciplinar;
 void ImpedimentoMedalha;
 void CreditoExtraFerias;
+void HistoricoPromocao;
 void ResetOperacionalLog;
 void BaseConhecimentoProcedimento;
 void AssistenteLog;
@@ -39,6 +41,7 @@ void base44.entities.ImportacaoAlteracoesLegado;
 void base44.entities.PunicaoDisciplinar;
 void base44.entities.ImpedimentoMedalha;
 void base44.entities.CreditoExtraFerias;
+void base44.entities.HistoricoPromocao;
 void base44.entities.ResetOperacionalLog;
 void base44.entities.BaseConhecimentoProcedimento;
 void base44.entities.AssistenteLog;
