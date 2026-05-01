@@ -50,7 +50,7 @@ export default function AntiguidadeImportarPromocoes() {
 
   const carregarHistorico = async (militarId) => {
     if (!militarId) return;
-    const todos = await base44.entities.HistoricoPromocaoMilitar.list();
+    const todos = await base44.entities.HistoricoPromocao.list();
     const hist = todos.filter((h) => h.militar_id === militarId).sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || '')));
     setHistorico(hist);
   };
@@ -66,7 +66,7 @@ export default function AntiguidadeImportarPromocoes() {
     setResultado(null);
     try {
       const rows = await parseArquivoPromocoes(arquivo);
-      const [militaresAtivos, historicos] = await Promise.all([base44.entities.Militar.filter({ status_cadastro: 'Ativo' }), base44.entities.HistoricoPromocaoMilitar.list()]);
+      const [militaresAtivos, historicos] = await Promise.all([base44.entities.Militar.filter({ status_cadastro: 'Ativo' }), base44.entities.HistoricoPromocao.list()]);
       setPrevia(gerarPreviaImportacao(rows, militaresAtivos, historicos));
     } catch (e) { setErro(e?.message || 'Erro ao processar prévia de importação.'); } finally { setProcessando(false); }
   };
@@ -79,7 +79,7 @@ export default function AntiguidadeImportarPromocoes() {
       let criados = 0;
       for (const item of previa.previas) {
         if (!item.podeImportar || !item.militar) continue;
-        await base44.entities.HistoricoPromocaoMilitar.create({ militar_id: item.militar.id, posto_graduacao_anterior: item.militar.posto_graduacao || '', quadro_anterior: item.militar.quadro || '', posto_graduacao_novo: item.row.posto_graduacao_novo || '', quadro_novo: item.row.quadro_novo || '', data_promocao: item.dataPromocao, data_publicacao: item.row.data_publicacao || null, boletim_referencia: item.row.boletim_referencia || '', ato_referencia: item.row.ato_referencia || '', antiguidade_referencia_ordem: item.row.antiguidade_referencia_ordem ? Number(item.row.antiguidade_referencia_ordem) : null, antiguidade_referencia_id: item.row.antiguidade_referencia_id || '', origem_dado: 'importacao', status_registro: STATUS_ATIVO, observacoes: item.row.observacoes || '' });
+        await base44.entities.HistoricoPromocao.create({ militar_id: item.militar.id, posto_graduacao_anterior: item.militar.posto_graduacao || '', quadro_anterior: item.militar.quadro || '', posto_graduacao_novo: item.row.posto_graduacao_novo || '', quadro_novo: item.row.quadro_novo || '', data_promocao: item.dataPromocao, data_publicacao: item.row.data_publicacao || null, boletim_referencia: item.row.boletim_referencia || '', ato_referencia: item.row.ato_referencia || '', antiguidade_referencia_ordem: item.row.antiguidade_referencia_ordem ? Number(item.row.antiguidade_referencia_ordem) : null, antiguidade_referencia_id: item.row.antiguidade_referencia_id || '', origem_dado: 'importacao', status_registro: STATUS_ATIVO, observacoes: item.row.observacoes || '' });
         criados += 1;
       }
       await atualizarDiagnostico();
@@ -89,7 +89,7 @@ export default function AntiguidadeImportarPromocoes() {
 
   const validarManual = async () => {
     if (!form.militar_id || !militarSelecionado?.posto_graduacao || !militarSelecionado?.quadro || !form.data_promocao) throw new Error('Preencha militar e data da promoção atual. Posto/quadro são obtidos do cadastro atual do militar.');
-    const todos = await base44.entities.HistoricoPromocaoMilitar.list();
+    const todos = await base44.entities.HistoricoPromocao.list();
     const ativos = todos.filter((h) => h.status_registro === STATUS_ATIVO && h.militar_id === form.militar_id);
     const postoAtual = militarSelecionado.posto_graduacao || '';
     const quadroAtual = militarSelecionado.quadro || '';
@@ -102,7 +102,7 @@ export default function AntiguidadeImportarPromocoes() {
   const lancarManual = async () => {
     setFeedbackManual('');
     await validarManual();
-    await base44.entities.HistoricoPromocaoMilitar.create({
+    await base44.entities.HistoricoPromocao.create({
       ...form,
       posto_graduacao_novo: militarSelecionado?.posto_graduacao || '',
       quadro_novo: militarSelecionado?.quadro || '',
@@ -117,8 +117,8 @@ export default function AntiguidadeImportarPromocoes() {
 
   const retificarRegistro = async (registro) => {
     if (!motivoRetificacao.trim()) throw new Error('Informe motivo da retificação/cancelamento.');
-    await base44.entities.HistoricoPromocaoMilitar.update(registro.id, { status_registro: 'retificado', observacoes: `${registro.observacoes || ''} | Retificado: ${motivoRetificacao}`.trim() });
-    await base44.entities.HistoricoPromocaoMilitar.create({ ...registro, id: undefined, status_registro: STATUS_ATIVO, origem_dado: 'manual', observacoes: `${registro.observacoes || ''} | Novo registro por retificação: ${motivoRetificacao}`.trim() });
+    await base44.entities.HistoricoPromocao.update(registro.id, { status_registro: 'retificado', observacoes: `${registro.observacoes || ''} | Retificado: ${motivoRetificacao}`.trim() });
+    await base44.entities.HistoricoPromocao.create({ ...registro, id: undefined, status_registro: STATUS_ATIVO, origem_dado: 'manual', observacoes: `${registro.observacoes || ''} | Novo registro por retificação: ${motivoRetificacao}`.trim() });
     setMotivoRetificacao('');
     await atualizarDiagnostico();
     await carregarHistorico(registro.militar_id);
@@ -126,7 +126,7 @@ export default function AntiguidadeImportarPromocoes() {
 
   const cancelarRegistro = async (registro) => {
     if (!motivoRetificacao.trim()) throw new Error('Informe motivo da retificação/cancelamento.');
-    await base44.entities.HistoricoPromocaoMilitar.update(registro.id, { status_registro: 'cancelado', observacoes: `${registro.observacoes || ''} | Cancelado: ${motivoRetificacao}`.trim() });
+    await base44.entities.HistoricoPromocao.update(registro.id, { status_registro: 'cancelado', observacoes: `${registro.observacoes || ''} | Cancelado: ${motivoRetificacao}`.trim() });
     setMotivoRetificacao('');
     await atualizarDiagnostico();
     await carregarHistorico(registro.militar_id);
