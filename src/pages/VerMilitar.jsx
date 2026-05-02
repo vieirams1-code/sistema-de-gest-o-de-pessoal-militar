@@ -892,6 +892,10 @@ export default function VerMilitar() {
               historicoPromocoes={historicoPromocoes}
               canManage={isAdmin}
               onOpenPromocaoAtualModal={() => setShowPromocaoAtualModal(true)}
+              onHistoricoChanged={async () => {
+                await refetchHistoricoPromocoes();
+                await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+              }}
             />
           </TabsContent>
 

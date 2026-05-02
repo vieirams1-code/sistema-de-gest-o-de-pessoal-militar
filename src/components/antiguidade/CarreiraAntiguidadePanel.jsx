@@ -1,8 +1,12 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, FileText } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import validarDadosAntiguidade, { MOTIVOS } from '@/utils/antiguidade/validarDadosAntiguidade';
 
 const STATUS_BADGE = {
@@ -19,19 +23,66 @@ const MOTIVOS_LABEL = {
   [MOTIVOS.SEM_QUADRO]: 'Quadro incompatível',
 };
 
-export default function CarreiraAntiguidadePanel({ militar, historicoPromocoes, onOpenPromocaoAtualModal, canManage }) {
+export default function CarreiraAntiguidadePanel({ militar, historicoPromocoes, onOpenPromocaoAtualModal, onHistoricoChanged, canManage }) {
+  const [detalhe, setDetalhe] = React.useState(null);
+  const [retificar, setRetificar] = React.useState(null);
+  const [cancelar, setCancelar] = React.useState(null);
+  const [motivo, setMotivo] = React.useState('');
+  const [erroAcao, setErroAcao] = React.useState('');
   const historico = React.useMemo(() => [...(historicoPromocoes || [])].sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || ''))), [historicoPromocoes]);
 
   const promocaoAtual = React.useMemo(() => {
     const posto = String(militar?.posto_graduacao || '').trim();
     const quadro = String(militar?.quadro || '').trim();
-    return historico.find((h) =>
-      String(h.status_registro || '').trim().toLowerCase() === 'ativo'
-      && String(h.militar_id || '') === String(militar?.id || '')
-      && String(h.posto_graduacao_novo || '').trim() === posto
+    const ativosOuSemStatus = historico.filter((h) => {
+      const status = String(h.status_registro || '').trim().toLowerCase();
+      return (!status || status === 'ativo') && String(h.militar_id || '') === String(militar?.id || '') && String(h.data_promocao || '').trim();
+    });
+    const completo = ativosOuSemStatus.find((h) =>
+      String(h.posto_graduacao_novo || '').trim() === posto
       && String(h.quadro_novo || '').trim() === quadro,
-    ) || null;
+    );
+    if (completo) return completo;
+    if (ativosOuSemStatus.length === 1) return ativosOuSemStatus[0];
+    return null;
   }, [historico, militar]);
+
+  const promocaoAtualIncompleta = Boolean(promocaoAtual?.data_promocao)
+    && (!promocaoAtual?.posto_graduacao_novo || !promocaoAtual?.quadro_novo || !promocaoAtual?.status_registro);
+
+  const onRetificar = async (registro) => {
+    if (!motivo.trim()) return setErroAcao('Informe o motivo da retificação.');
+    setErroAcao('');
+    await base44.entities.HistoricoPromocaoMilitar.update(registro.id, {
+      status_registro: 'retificado',
+      motivo_retificacao: motivo,
+      observacoes: `${registro.observacoes || ''} | Retificado: ${motivo}`.trim(),
+    });
+    await base44.entities.HistoricoPromocaoMilitar.create({
+      ...registro,
+      id: undefined,
+      status_registro: 'ativo',
+      origem_dado: registro.origem_dado || 'manual',
+      motivo_retificacao: motivo,
+      observacoes: `${registro.observacoes || ''} | Novo registro por retificação: ${motivo}`.trim(),
+    });
+    setRetificar(null);
+    setMotivo('');
+    await onHistoricoChanged?.();
+  };
+
+  const onCancelar = async (registro) => {
+    if (!motivo.trim()) return setErroAcao('Informe o motivo do cancelamento.');
+    setErroAcao('');
+    await base44.entities.HistoricoPromocaoMilitar.update(registro.id, {
+      status_registro: 'cancelado',
+      motivo_retificacao: motivo,
+      observacoes: `${registro.observacoes || ''} | Cancelado: ${motivo}`.trim(),
+    });
+    setCancelar(null);
+    setMotivo('');
+    await onHistoricoChanged?.();
+  };
 
   const diagnostico = validarDadosAntiguidade(militar || {}, historico || [], { exigeAntiguidadeAnterior: true });
   const pendencias = diagnostico.motivos.map((m) => MOTIVOS_LABEL[m]).filter(Boolean);
@@ -63,6 +114,7 @@ export default function CarreiraAntiguidadePanel({ militar, historicoPromocoes, 
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         {!promocaoAtual && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Promoção atual sem data registrada. Este militar ficará pendente na listagem de antiguidade.</div>}
+        {promocaoAtualIncompleta && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Registro histórico com campos incompletos. Recomenda-se retificar.</div>}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           <Info label="Data da promoção atual" value={promocaoAtual?.data_promocao || '—'} />
           <Info label="Nº/ordem de antiguidade" value={promocaoAtual?.antiguidade_referencia_ordem ?? '—'} />
@@ -98,10 +150,22 @@ export default function CarreiraAntiguidadePanel({ militar, historicoPromocoes, 
             <Info label="Observações" value={h.observacoes || '—'} />
             <Info label="Origem do dado" value={h.origem_dado || '—'} />
           </div>
-          <div className="flex gap-2"><Button size="sm" variant="outline"><FileText className="w-4 h-4 mr-1" />Ver detalhes</Button><Button size="sm" variant="outline" disabled={!canManage}>Retificar</Button><Button size="sm" variant="destructive" disabled={!canManage}>Cancelar</Button></div>
+          <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setDetalhe(h)}><FileText className="w-4 h-4 mr-1" />Ver detalhes</Button><Button size="sm" variant="outline" disabled={!canManage || h.status_registro !== 'ativo'} onClick={() => { setRetificar(h); setErroAcao(''); }}>Retificar</Button><Button size="sm" variant="destructive" disabled={!canManage || h.status_registro !== 'ativo'} onClick={() => { setCancelar(h); setErroAcao(''); }}>Cancelar</Button></div>
         </div>)}
       </CardContent>
     </Card>
+    <Dialog open={Boolean(detalhe)} onOpenChange={(o) => !o && setDetalhe(null)}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Detalhes do registro</DialogTitle></DialogHeader>
+        <div className="text-sm space-y-1">{detalhe && Object.entries(detalhe).map(([k, v]) => <p key={k}><strong>{k}:</strong> {String(v ?? '—')}</p>)}</div>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={Boolean(retificar)} onOpenChange={(o) => !o && setRetificar(null)}>
+      <DialogContent><DialogHeader><DialogTitle>Retificar promoção</DialogTitle><DialogDescription>O registro atual será marcado como retificado e um novo registro ativo será criado.</DialogDescription></DialogHeader><Label>Motivo da retificação *</Label><Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setRetificar(null)}>Fechar</Button><Button onClick={() => onRetificar(retificar)}>Confirmar retificação</Button></DialogFooter></DialogContent>
+    </Dialog>
+    <Dialog open={Boolean(cancelar)} onOpenChange={(o) => !o && setCancelar(null)}>
+      <DialogContent><DialogHeader><DialogTitle>Cancelar registro</DialogTitle><DialogDescription>O registro será mantido no histórico com status cancelado.</DialogDescription></DialogHeader><Label>Motivo do cancelamento *</Label><Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setCancelar(null)}>Fechar</Button><Button variant="destructive" onClick={() => onCancelar(cancelar)}>Confirmar cancelamento</Button></DialogFooter></DialogContent>
+    </Dialog>
   </div>;
 }
 
