@@ -5,11 +5,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { POSTOS_GRADUACOES, QUADROS, resolverQuadroPromocao } from '@/components/antiguidade/promocaoHistoricaUtils';
+import {
+  getPostoAnteriorPrevisto,
+  getPostosHistoricosPermitidos,
+  isPromocaoAcimaDoPostoAtual,
+  resolverQuadroPromocao,
+} from '@/components/antiguidade/promocaoHistoricaUtils';
 
 const STATUS_ATIVO = 'ativo';
 
 const FORM_INICIAL = {
+  posto_alcancado_historico: '',
   posto_graduacao_anterior: '',
   posto_graduacao_novo: '',
   quadro_novo: '',
@@ -28,33 +34,44 @@ export default function PromocaoHistoricaModal({ open, onOpenChange, militar, on
   const [mensagem, setMensagem] = React.useState('');
   const [saving, setSaving] = React.useState(false);
 
+  const postosPermitidos = React.useMemo(() => getPostosHistoricosPermitidos(militar?.posto_graduacao), [militar?.posto_graduacao]);
+
   React.useEffect(() => {
     if (open) {
-      setForm({ ...FORM_INICIAL, quadro_novo: militar?.quadro || '' });
+      setForm({ ...FORM_INICIAL });
       setMensagem('');
     }
-  }, [open, militar?.id, militar?.quadro]);
+  }, [open, militar?.id]);
 
-  const updateCampo = (campo, valor) => {
-    setForm((prev) => {
-      const next = { ...prev, [campo]: valor };
-      if (campo === 'posto_graduacao_anterior' || campo === 'posto_graduacao_novo' || campo === 'quadro_novo') {
-        next.quadro_novo = resolverQuadroPromocao({
-          postoAnterior: campo === 'posto_graduacao_anterior' ? valor : next.posto_graduacao_anterior,
-          postoNovo: campo === 'posto_graduacao_novo' ? valor : next.posto_graduacao_novo,
-          quadroInformado: campo === 'quadro_novo' ? valor : next.quadro_novo,
-          quadroAtual: militar?.quadro,
-        });
-      }
-      return next;
+  const onSelectPosto = (postoNovo) => {
+    const postoAnterior = getPostoAnteriorPrevisto(postoNovo);
+    const quadroNovo = resolverQuadroPromocao({
+      postoAnterior,
+      postoNovo,
+      quadroAtual: militar?.quadro,
+      quadroAnteriorInformado: militar?.quadro,
     });
+
+    setForm((prev) => ({
+      ...prev,
+      posto_alcancado_historico: postoNovo,
+      posto_graduacao_novo: postoNovo,
+      posto_graduacao_anterior: postoAnterior,
+      quadro_novo: quadroNovo,
+    }));
   };
 
   const onSave = async () => {
     if (!militar?.id) return;
     if (!form.data_promocao) return setMensagem('Data da promoção é obrigatória.');
-    if (!valorTexto(form.posto_graduacao_novo)) return setMensagem('Posto/graduação novo é obrigatório.');
-    if (!valorTexto(form.quadro_novo)) return setMensagem('Quadro novo é obrigatório.');
+    if (!valorTexto(form.posto_graduacao_novo)) return setMensagem('Selecione o posto/graduação alcançado na promoção histórica.');
+
+    const postoInvalido = !postosPermitidos.includes(form.posto_graduacao_novo)
+      || isPromocaoAcimaDoPostoAtual({ postoAtual: militar?.posto_graduacao, postoNovo: form.posto_graduacao_novo });
+
+    if (postoInvalido) {
+      return setMensagem('Este fluxo registra apenas promoções anteriores. Para promoção efetiva acima do posto atual, será necessário fluxo próprio de atualização funcional.');
+    }
 
     setSaving(true);
     setMensagem('');
@@ -64,8 +81,8 @@ export default function PromocaoHistoricaModal({ open, onOpenChange, militar, on
       const quadroResolvido = resolverQuadroPromocao({
         postoAnterior: form.posto_graduacao_anterior,
         postoNovo: form.posto_graduacao_novo,
-        quadroInformado: form.quadro_novo,
         quadroAtual: militar?.quadro,
+        quadroAnteriorInformado: militar?.quadro,
       });
 
       const duplicado = todos.find((h) =>
@@ -112,8 +129,8 @@ export default function PromocaoHistoricaModal({ open, onOpenChange, militar, on
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Adicionar promoção ao histórico</DialogTitle>
-          <DialogDescription>Registra promoções anteriores sem alterar posto/quadro atual do militar.</DialogDescription>
+          <DialogTitle>Adicionar promoção anterior ao histórico</DialogTitle>
+          <DialogDescription>Este lançamento registra promoções anteriores da carreira. Não altera o posto atual do militar.</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
@@ -126,25 +143,29 @@ export default function PromocaoHistoricaModal({ open, onOpenChange, militar, on
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div><Label>Posto/graduação anterior</Label><Input list="postos" value={form.posto_graduacao_anterior} onChange={(e) => updateCampo('posto_graduacao_anterior', e.target.value)} /></div>
-          <div><Label>Posto/graduação novo *</Label><Input list="postos" value={form.posto_graduacao_novo} onChange={(e) => updateCampo('posto_graduacao_novo', e.target.value)} /></div>
-          <div><Label>Quadro novo *</Label><Input list="quadros" value={form.quadro_novo} onChange={(e) => updateCampo('quadro_novo', e.target.value)} /></div>
-          <div><Label>Data da promoção *</Label><Input type="date" value={form.data_promocao} onChange={(e) => updateCampo('data_promocao', e.target.value)} /></div>
-          <div><Label>Data da publicação</Label><Input type="date" value={form.data_publicacao} onChange={(e) => updateCampo('data_publicacao', e.target.value)} /></div>
-          <div><Label>DOEMS / boletim / referência</Label><Input value={form.boletim_referencia} onChange={(e) => updateCampo('boletim_referencia', e.target.value)} /></div>
-          <div><Label>Ato de referência</Label><Input value={form.ato_referencia} onChange={(e) => updateCampo('ato_referencia', e.target.value)} /></div>
-          <div><Label>Antiguidade (ordem)</Label><Input value={form.antiguidade_referencia_ordem} onChange={(e) => updateCampo('antiguidade_referencia_ordem', e.target.value)} /></div>
-          <div className="md:col-span-2"><Label>Observações</Label><Input value={form.observacoes} onChange={(e) => updateCampo('observacoes', e.target.value)} /></div>
+          <div>
+            <Label>Posto/graduação alcançado na promoção histórica *</Label>
+            <select className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm" value={form.posto_alcancado_historico} onChange={(e) => onSelectPosto(e.target.value)}>
+              <option value="">Selecione...</option>
+              {postosPermitidos.map((posto) => <option key={posto} value={posto}>{posto}</option>)}
+            </select>
+          </div>
+          <div><Label>Data da promoção *</Label><Input type="date" value={form.data_promocao} onChange={(e) => setForm((prev) => ({ ...prev, data_promocao: e.target.value }))} /></div>
+          <div><Label>Posto/graduação anterior previsto</Label><Input value={form.posto_graduacao_anterior || 'Ingresso/Inicial'} readOnly /></div>
+          <div><Label>Posto/graduação novo</Label><Input value={form.posto_graduacao_novo} readOnly /></div>
+          <div><Label>Quadro do registro histórico</Label><Input value={form.quadro_novo} readOnly /></div>
+          <div><Label>Data da publicação</Label><Input type="date" value={form.data_publicacao} onChange={(e) => setForm((prev) => ({ ...prev, data_publicacao: e.target.value }))} /></div>
+          <div><Label>DOEMS / boletim / referência</Label><Input value={form.boletim_referencia} onChange={(e) => setForm((prev) => ({ ...prev, boletim_referencia: e.target.value }))} /></div>
+          <div><Label>Ato de referência</Label><Input value={form.ato_referencia} onChange={(e) => setForm((prev) => ({ ...prev, ato_referencia: e.target.value }))} /></div>
+          <div><Label>Antiguidade (ordem)</Label><Input value={form.antiguidade_referencia_ordem} onChange={(e) => setForm((prev) => ({ ...prev, antiguidade_referencia_ordem: e.target.value }))} /></div>
+          <div className="md:col-span-2"><Label>Observações</Label><Input value={form.observacoes} onChange={(e) => setForm((prev) => ({ ...prev, observacoes: e.target.value }))} /></div>
         </div>
-
-        <datalist id="postos">{POSTOS_GRADUACOES.map((item) => <option key={item} value={item} />)}</datalist>
-        <datalist id="quadros">{QUADROS.map((item) => <option key={item} value={item} />)}</datalist>
 
         {mensagem && <p className="text-sm text-slate-700">{mensagem}</p>}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          <Button onClick={onSave} disabled={saving}>{saving ? 'Salvando...' : 'Adicionar ao histórico'}</Button>
+          <Button onClick={onSave} disabled={saving}>{saving ? 'Salvando...' : 'Adicionar promoção anterior'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

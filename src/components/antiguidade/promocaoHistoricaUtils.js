@@ -18,7 +18,28 @@ export const QUADROS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b
 
 const normalizar = (valor) => String(valor || '').trim().toLowerCase();
 
-export function resolverQuadroPromocao({ postoAnterior, postoNovo, quadroInformado, quadroAtual }) {
+const indicePosto = (posto) => POSTOS_GRADUACOES.findIndex((item) => normalizar(item) === normalizar(posto));
+
+export function getPostosHistoricosPermitidos(postoAtual) {
+  const idxAtual = indicePosto(postoAtual);
+  if (idxAtual < 0) return [];
+  return POSTOS_GRADUACOES.slice(idxAtual + 1);
+}
+
+export function getPostoAnteriorPrevisto(postoNovo) {
+  const idxNovo = indicePosto(postoNovo);
+  if (idxNovo < 0) return '';
+  return POSTOS_GRADUACOES[idxNovo + 1] || '';
+}
+
+export function isPromocaoAcimaDoPostoAtual({ postoAtual, postoNovo }) {
+  const idxAtual = indicePosto(postoAtual);
+  const idxNovo = indicePosto(postoNovo);
+  if (idxAtual < 0 || idxNovo < 0) return false;
+  return idxNovo < idxAtual;
+}
+
+export function resolverQuadroPromocao({ postoAnterior, postoNovo, quadroAtual, quadroAnteriorInformado }) {
   const anterior = normalizar(postoAnterior);
   const novo = normalizar(postoNovo);
 
@@ -26,5 +47,5 @@ export function resolverQuadroPromocao({ postoAnterior, postoNovo, quadroInforma
     return 'QAOBM';
   }
 
-  return String(quadroInformado || quadroAtual || '').trim();
+  return String(quadroAtual || quadroAnteriorInformado || '').trim();
 }
