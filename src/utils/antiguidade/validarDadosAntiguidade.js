@@ -11,10 +11,16 @@ const toNumeroValido = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
 
 export function obterHistoricoAtivoMaisRecenteCompativel(militar = {}, historicos = []) {
   const postoAtual = valorTexto(militar?.posto_graduacao);
+  const quadroAtual = valorTexto(militar?.quadro);
   const elegiveis = (historicos || []).filter((h) => {
-    if (!h || valorTexto(h.status_registro || 'ativo') !== 'ativo') return false;
+    if (!h) return false;
+    const status = valorTexto(h.status_registro || 'ativo').toLowerCase();
+    if (status && status !== 'ativo') return false;
     if (valorTexto(h.militar_id) !== valorTexto(militar?.id)) return false;
-    return !postoAtual || valorTexto(h.posto_graduacao_novo) === postoAtual;
+    if (!valorTexto(h.data_promocao)) return false;
+    if (postoAtual && valorTexto(h.posto_graduacao_novo) !== postoAtual) return false;
+    if (quadroAtual && valorTexto(h.quadro_novo) !== quadroAtual) return false;
+    return true;
   });
 
   return elegiveis.sort((a, b) => {

@@ -25,6 +25,22 @@ const FORM_INICIAL = {
   motivo_retificacao: '',
 };
 
+const valorTexto = (v) => String(v || '').trim();
+
+const montarPayloadPromocao = (form, militar) => ({
+  militar_id: militar.id,
+  posto_graduacao_novo: militar.posto_graduacao || '',
+  quadro_novo: militar.quadro || '',
+  data_promocao: form.data_promocao,
+  data_publicacao: form.data_publicacao || null,
+  boletim_referencia: form.boletim_referencia || '',
+  ato_referencia: form.ato_referencia || '',
+  antiguidade_referencia_ordem: form.antiguidade_referencia_ordem === '' ? null : Number(form.antiguidade_referencia_ordem),
+  observacoes: form.observacoes || '',
+  origem_dado: 'manual',
+  status_registro: STATUS_ATIVO,
+});
+
 export default function PromocaoAtualModal({ open, onOpenChange, militar, onSaved }) {
   const [form, setForm] = React.useState(FORM_INICIAL);
   const [registroConflitante, setRegistroConflitante] = React.useState(null);
@@ -56,10 +72,10 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
     try {
       const todos = await base44.entities.HistoricoPromocaoMilitar.list();
       const ativosCompativeis = todos.filter((h) =>
-        h.status_registro === STATUS_ATIVO
-        && h.militar_id === militar.id
-        && h.posto_graduacao_novo === (militar.posto_graduacao || '')
-        && h.quadro_novo === (militar.quadro || ''),
+        valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO
+        && String(h.militar_id || '') === String(militar.id)
+        && valorTexto(h.posto_graduacao_novo) === valorTexto(militar.posto_graduacao)
+        && valorTexto(h.quadro_novo) === valorTexto(militar.quadro),
       );
 
       const mesmoDia = ativosCompativeis.find((h) => h.data_promocao === form.data_promocao);
@@ -68,21 +84,7 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
         return;
       }
 
-      const payloadBase = {
-        militar_id: militar.id,
-        posto_graduacao_anterior: militar.posto_graduacao || '',
-        quadro_anterior: militar.quadro || '',
-        posto_graduacao_novo: militar.posto_graduacao || '',
-        quadro_novo: militar.quadro || '',
-        data_promocao: form.data_promocao,
-        data_publicacao: form.data_publicacao || null,
-        boletim_referencia: form.boletim_referencia || '',
-        ato_referencia: form.ato_referencia || '',
-        antiguidade_referencia_ordem: form.antiguidade_referencia_ordem ? Number(form.antiguidade_referencia_ordem) : null,
-        observacoes: form.observacoes || '',
-        origem_dado: 'manual',
-        status_registro: STATUS_ATIVO,
-      };
+      const payloadBase = montarPayloadPromocao(form, militar);
 
       const divergente = ativosCompativeis[0] || null;
       if (!divergente) {
