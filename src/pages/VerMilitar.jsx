@@ -19,6 +19,7 @@ import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
+import PromocaoHistoricaModal from '@/components/antiguidade/PromocaoHistoricaModal';
 import CarreiraAntiguidadePanel from '@/components/antiguidade/CarreiraAntiguidadePanel';
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import HistoricoComportamentoChart from '@/components/militar/HistoricoComportamentoChart';
@@ -119,6 +120,7 @@ export default function VerMilitar() {
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [showPromocaoAtualModal, setShowPromocaoAtualModal] = useState(false);
+  const [showPromocaoHistoricaModal, setShowPromocaoHistoricaModal] = useState(false);
   const [impedimentoForm, setImpedimentoForm] = useState({
     data_inicio: new Date().toISOString().split('T')[0],
     data_fim: '',
@@ -892,6 +894,7 @@ export default function VerMilitar() {
               historicoPromocoes={historicoPromocoes}
               canManage={isAdmin}
               onOpenPromocaoAtualModal={() => setShowPromocaoAtualModal(true)}
+              onOpenPromocaoHistoricaModal={() => setShowPromocaoHistoricaModal(true)}
               onHistoricoChanged={async () => {
                 await refetchHistoricoPromocoes();
                 await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
@@ -901,6 +904,18 @@ export default function VerMilitar() {
 
         </Tabs>
       </div>
+
+
+
+      <PromocaoHistoricaModal
+        open={showPromocaoHistoricaModal}
+        onOpenChange={setShowPromocaoHistoricaModal}
+        militar={militar}
+        onSaved={async () => {
+          await refetchHistoricoPromocoes();
+          await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+        }}
+      />
 
       <PromocaoAtualModal
         open={showPromocaoAtualModal}
