@@ -1,25 +1,94 @@
 {
   "name": "HistoricoPromocaoMilitarV2",
   "type": "object",
-  "title": "Histórico de Promoção Militar V2",
-  "description": "Entidade operacional oficial de promoção/antiguidade (piloto V2).",
+  "title": "Hist\u00f3rico de Promo\u00e7\u00e3o Militar V2",
+  "description": "Entidade operacional oficial de promo\u00e7\u00e3o/antiguidade (piloto V2).",
   "properties": {
-    "militar_id": { "type": "string", "default": "" },
-    "posto_graduacao_anterior": { "type": "string", "default": "" },
-    "quadro_anterior": { "type": "string", "default": "" },
-    "posto_graduacao_novo": { "type": "string", "default": "" },
-    "quadro_novo": { "type": "string", "default": "" },
-    "data_promocao": { "type": "date", "default": "" },
-    "data_publicacao": { "type": "date", "default": "" },
-    "boletim_referencia": { "type": "string", "default": "" },
-    "ato_referencia": { "type": "string", "default": "" },
-    "antiguidade_referencia_ordem": { "type": "number", "default": 0 },
-    "antiguidade_referencia_id": { "type": "string", "default": "" },
-    "origem_dado": { "type": "string", "default": "manual" },
-    "status_registro": { "type": "string", "default": "ativo" },
-    "motivo_retificacao": { "type": "string", "default": "" },
-    "observacoes": { "type": "string", "default": "" },
-    "created_by": { "type": "string", "default": "" },
-    "updated_by": { "type": "string", "default": "" }
-  }
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar"
+    },
+    "posto_graduacao_anterior": {
+      "type": "string",
+      "description": "Posto/gradua\u00e7\u00e3o anterior \u00e0 promo\u00e7\u00e3o"
+    },
+    "quadro_anterior": {
+      "type": "string",
+      "description": "Quadro anterior \u00e0 promo\u00e7\u00e3o"
+    },
+    "posto_graduacao_novo": {
+      "type": "string",
+      "description": "Novo posto/gradua\u00e7\u00e3o ap\u00f3s a promo\u00e7\u00e3o"
+    },
+    "quadro_novo": {
+      "type": "string",
+      "description": "Novo quadro ap\u00f3s a promo\u00e7\u00e3o"
+    },
+    "data_promocao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data efetiva da promo\u00e7\u00e3o"
+    },
+    "data_publicacao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de publica\u00e7\u00e3o do ato"
+    },
+    "boletim_referencia": {
+      "type": "string",
+      "description": "Refer\u00eancia do boletim (BG/DOEMS)"
+    },
+    "ato_referencia": {
+      "type": "string",
+      "description": "Refer\u00eancia do ato/portaria/decreto"
+    },
+    "antiguidade_referencia_ordem": {
+      "type": "number",
+      "description": "Ordem de antiguidade de refer\u00eancia no momento da promo\u00e7\u00e3o"
+    },
+    "antiguidade_referencia_id": {
+      "type": "string",
+      "description": "ID do item de antiguidade de refer\u00eancia"
+    },
+    "origem_dado": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "importacao",
+        "migracao",
+        "sistema"
+      ],
+      "default": "manual",
+      "description": "Origem do dado"
+    },
+    "status_registro": {
+      "type": "string",
+      "enum": [
+        "ativo",
+        "retificado",
+        "cancelado"
+      ],
+      "default": "ativo",
+      "description": "Status do registro"
+    },
+    "motivo_retificacao": {
+      "type": "string",
+      "description": "Motivo de retifica\u00e7\u00e3o ou cancelamento"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es adicionais"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usu\u00e1rio que criou o registro"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Usu\u00e1rio que atualizou o registro pela \u00faltima vez"
+    }
+  },
+  "required": [
+    "militar_id"
+  ]
 }
