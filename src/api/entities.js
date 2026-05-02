@@ -7,7 +7,7 @@ export const ImportacaoMilitares = base44.entities.ImportacaoMilitares;
 export const ImportacaoAlteracoesLegado = base44.entities.ImportacaoAlteracoesLegado;
 export const ImpedimentoMedalha = base44.entities.ImpedimentoMedalha;
 export const CreditoExtraFerias = base44.entities.CreditoExtraFerias;
-export const HistoricoPromocao = base44.entities.HistoricoPromocao;
+export const HistoricoPromocaoMilitar = base44.entities.HistoricoPromocaoMilitar;
 
 // auth sdk:
 export const User = base44.auth;
