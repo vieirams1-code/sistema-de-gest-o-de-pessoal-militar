@@ -1,0 +1,25 @@
+{
+  "name": "HistoricoPromocaoMilitarV2",
+  "type": "object",
+  "title": "Histórico de Promoção Militar V2",
+  "description": "Entidade operacional oficial de promoção/antiguidade (piloto V2).",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "posto_graduacao_anterior": { "type": "string", "default": "" },
+    "quadro_anterior": { "type": "string", "default": "" },
+    "posto_graduacao_novo": { "type": "string", "default": "" },
+    "quadro_novo": { "type": "string", "default": "" },
+    "data_promocao": { "type": "date", "default": "" },
+    "data_publicacao": { "type": "date", "default": "" },
+    "boletim_referencia": { "type": "string", "default": "" },
+    "ato_referencia": { "type": "string", "default": "" },
+    "antiguidade_referencia_ordem": { "type": "number", "default": 0 },
+    "antiguidade_referencia_id": { "type": "string", "default": "" },
+    "origem_dado": { "type": "string", "default": "manual" },
+    "status_registro": { "type": "string", "default": "ativo" },
+    "motivo_retificacao": { "type": "string", "default": "" },
+    "observacoes": { "type": "string", "default": "" },
+    "created_by": { "type": "string", "default": "" },
+    "updated_by": { "type": "string", "default": "" }
+  }
+}
