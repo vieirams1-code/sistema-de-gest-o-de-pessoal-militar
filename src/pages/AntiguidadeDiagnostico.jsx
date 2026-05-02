@@ -35,7 +35,7 @@ export default function AntiguidadeDiagnostico() {
       const militares = await base44.entities.Militar.filter({ status_cadastro: 'Ativo' });
       let historicos = [];
       try {
-        historicos = await base44.entities.HistoricoPromocaoMilitar.list();
+        historicos = await base44.entities.HistoricoPromocaoMilitarV2.list();
       } catch {
         historicos = [];
       }
