@@ -193,7 +193,7 @@ export default function VerMilitar() {
   });
   const { data: historicoPromocoes = [], refetch: refetchHistoricoPromocoes } = useQuery({
     queryKey: ['ver-historico-promocoes', id],
-    queryFn: () => base44.entities.HistoricoPromocao.filter({ militar_id: id }, '-data_promocao'),
+    queryFn: () => base44.entities.HistoricoPromocaoMilitar.filter({ militar_id: id }, '-data_promocao'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
 

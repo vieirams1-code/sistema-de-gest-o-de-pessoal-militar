@@ -8,7 +8,7 @@ import {
   PunicaoDisciplinar,
   ImpedimentoMedalha,
   CreditoExtraFerias,
-  HistoricoPromocao,
+  HistoricoPromocaoMilitar,
   ResetOperacionalLog,
   BaseConhecimentoProcedimento,
   AssistenteLog,
@@ -26,7 +26,7 @@ void ImportacaoAlteracoesLegado;
 void PunicaoDisciplinar;
 void ImpedimentoMedalha;
 void CreditoExtraFerias;
-void HistoricoPromocao;
+void HistoricoPromocaoMilitar;
 void ResetOperacionalLog;
 void BaseConhecimentoProcedimento;
 void AssistenteLog;

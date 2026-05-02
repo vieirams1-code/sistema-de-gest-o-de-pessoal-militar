@@ -53,7 +53,7 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
     setMensagem('');
 
     try {
-      const todos = await base44.entities.HistoricoPromocao.list();
+      const todos = await base44.entities.HistoricoPromocaoMilitar.list();
       const ativosCompativeis = todos.filter((h) =>
         h.status_registro === STATUS_ATIVO
         && h.militar_id === militar.id
@@ -82,7 +82,7 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
 
       const divergente = ativosCompativeis[0] || null;
       if (!divergente) {
-        await base44.entities.HistoricoPromocao.create(payloadBase);
+        await base44.entities.HistoricoPromocaoMilitar.create(payloadBase);
         setMensagem('Promoção atual registrada com sucesso.');
         await atualizarDiagnostico();
         await onSaved?.();
@@ -95,12 +95,12 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
         return;
       }
 
-      await base44.entities.HistoricoPromocao.update(divergente.id, {
+      await base44.entities.HistoricoPromocaoMilitar.update(divergente.id, {
         status_registro: 'retificado',
         observacoes: `${divergente.observacoes || ''} | Retificado: ${form.motivo_retificacao}`.trim(),
       });
 
-      await base44.entities.HistoricoPromocao.create({
+      await base44.entities.HistoricoPromocaoMilitar.create({
         ...payloadBase,
         observacoes: `${payloadBase.observacoes || ''} | Retificação: ${form.motivo_retificacao}`.trim(),
       });
