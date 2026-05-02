@@ -32,13 +32,16 @@ const montarPayloadPromocao = (form, militar) => ({
   posto_graduacao_novo: militar.posto_graduacao || '',
   quadro_novo: militar.quadro || '',
   data_promocao: form.data_promocao,
-  data_publicacao: form.data_publicacao || null,
+  data_publicacao: form.data_publicacao || '',
   boletim_referencia: form.boletim_referencia || '',
   ato_referencia: form.ato_referencia || '',
-  antiguidade_referencia_ordem: form.antiguidade_referencia_ordem === '' ? null : Number(form.antiguidade_referencia_ordem),
+  antiguidade_referencia_ordem: form.antiguidade_referencia_ordem === '' ? 0 : Number(form.antiguidade_referencia_ordem),
   observacoes: form.observacoes || '',
   origem_dado: 'manual',
   status_registro: STATUS_ATIVO,
+  posto_graduacao_anterior: '',
+  quadro_anterior: '',
+  antiguidade_referencia_id: '',
 });
 
 export default function PromocaoAtualModal({ open, onOpenChange, militar, onSaved }) {

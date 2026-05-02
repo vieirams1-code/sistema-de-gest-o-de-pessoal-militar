@@ -57,7 +57,23 @@ export default function CarreiraAntiguidadePanel({ militar, historicoPromocoes, 
     if (!motivo.trim()) return setErroAcao('Informe o motivo da retificação.');
     setErroAcao('');
     await base44.entities.HistoricoPromocaoMilitar.update(registro.id, { status_registro: 'retificado', motivo_retificacao: motivo, observacoes: `${registro.observacoes || ''} | Retificado: ${motivo}`.trim() });
-    await base44.entities.HistoricoPromocaoMilitar.create({ ...registro, id: undefined, status_registro: 'ativo', origem_dado: registro.origem_dado || 'manual', motivo_retificacao: motivo, observacoes: `${registro.observacoes || ''} | Novo registro por retificação: ${motivo}`.trim() });
+    await base44.entities.HistoricoPromocaoMilitar.create({
+      militar_id: registro.militar_id || militar?.id || '',
+      posto_graduacao_anterior: registro.posto_graduacao_anterior || '',
+      quadro_anterior: registro.quadro_anterior || '',
+      posto_graduacao_novo: registro.posto_graduacao_novo || militar?.posto_graduacao || '',
+      quadro_novo: registro.quadro_novo || militar?.quadro || '',
+      data_promocao: registro.data_promocao || '',
+      data_publicacao: registro.data_publicacao || '',
+      boletim_referencia: registro.boletim_referencia || '',
+      ato_referencia: registro.ato_referencia || '',
+      antiguidade_referencia_ordem: registro.antiguidade_referencia_ordem ?? 0,
+      antiguidade_referencia_id: registro.antiguidade_referencia_id || '',
+      origem_dado: registro.origem_dado || 'manual',
+      status_registro: 'ativo',
+      motivo_retificacao: motivo,
+      observacoes: `${registro.observacoes || ''} | Novo registro por retificação: ${motivo}`.trim(),
+    });
     setRetificar(null); setMotivo(''); await onHistoricoChanged?.();
   };
 
