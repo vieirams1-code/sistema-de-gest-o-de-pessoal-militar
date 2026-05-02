@@ -11,6 +11,10 @@ import validarDadosAntiguidade, { MOTIVOS } from '@/utils/antiguidade/validarDad
 
 const STATUS_BADGE = { ativo: 'bg-emerald-100 text-emerald-800', pendente: 'bg-amber-100 text-amber-800', retificado: 'bg-blue-100 text-blue-800', cancelado: 'bg-rose-100 text-rose-800' };
 const MOTIVOS_LABEL = { [MOTIVOS.SEM_DATA]: 'Sem data de promoção', [MOTIVOS.SEM_ANTERIOR]: 'Sem número de antiguidade', [MOTIVOS.EMPATE]: 'Empate não resolvido', [MOTIVOS.SEM_QUADRO]: 'Quadro incompatível' };
+const STATUS_ATIVO = 'ativo';
+
+const valorTexto = (v) => String(v || '').trim();
+const isOrdemPreenchida = (valor) => valor !== null && valor !== undefined && valor !== '' && Number.isFinite(Number(valor));
 
 export default function CarreiraAntiguidadePanel({ militar, historicoPromocoes, onOpenPromocaoAtualModal, onHistoricoChanged, canManage }) {
   const [detalhe, setDetalhe] = React.useState(null);
@@ -23,22 +27,24 @@ export default function CarreiraAntiguidadePanel({ militar, historicoPromocoes, 
   const historico = React.useMemo(() => [...(historicoPromocoes || [])].sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || ''))), [historicoPromocoes]);
 
   const isRegistroIncompleto = React.useCallback((h) => {
-    const status = String(h?.status_registro || '').trim().toLowerCase();
+    const status = valorTexto(h?.status_registro).toLowerCase();
     if (status === 'cancelado' || status === 'retificado') return false;
-    return !h?.posto_graduacao_novo || !h?.quadro_novo || !String(h?.origem_dado || '').trim();
+    return !valorTexto(h?.posto_graduacao_novo) || !valorTexto(h?.quadro_novo) || !valorTexto(h?.origem_dado);
   }, []);
 
   const ativosOuIncompletos = React.useMemo(() => historico.filter((h) => {
-    const status = String(h.status_registro || '').trim().toLowerCase();
-    const eAtivo = !status || status === 'ativo';
+    const status = valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase();
+    const eAtivo = status === STATUS_ATIVO;
     return String(h.militar_id || '') === String(militar?.id || '') && (eAtivo || isRegistroIncompleto(h));
   }), [historico, isRegistroIncompleto, militar?.id]);
 
   const promocaoAtual = React.useMemo(() => {
-    const posto = String(militar?.posto_graduacao || '').trim();
-    const quadro = String(militar?.quadro || '').trim();
-    const ativosComData = ativosOuIncompletos.filter((h) => String(h.data_promocao || '').trim());
-    const completo = ativosComData.find((h) => String(h.posto_graduacao_novo || '').trim() === posto && String(h.quadro_novo || '').trim() === quadro);
+    const posto = valorTexto(militar?.posto_graduacao);
+    const quadro = valorTexto(militar?.quadro);
+    const ativosComData = ativosOuIncompletos.filter((h) => valorTexto(h.data_promocao));
+    const completo = ativosComData.find((h) => valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO
+      && valorTexto(h.posto_graduacao_novo) === posto
+      && valorTexto(h.quadro_novo) === quadro);
     if (completo) return completo;
     if (ativosComData.length === 1) return ativosComData[0];
     return null;
@@ -69,17 +75,24 @@ export default function CarreiraAntiguidadePanel({ militar, historicoPromocoes, 
   };
 
   const diagnostico = validarDadosAntiguidade(militar || {}, historico || [], { exigeAntiguidadeAnterior: true });
-  const pendencias = diagnostico.motivos.map((m) => MOTIVOS_LABEL[m]).filter(Boolean);
   const criterios = [
     { label: 'Posto/graduação válido', ok: Boolean(militar?.posto_graduacao) },
     { label: 'Quadro compatível', ok: Boolean(militar?.quadro) },
     { label: 'Data de promoção preenchida', ok: Boolean(promocaoAtual?.data_promocao) },
-    { label: 'Número de antiguidade definido', ok: Number.isFinite(Number(promocaoAtual?.antiguidade_referencia_ordem)) },
+    { label: 'Número de antiguidade definido', ok: isOrdemPreenchida(promocaoAtual?.antiguidade_referencia_ordem) },
   ];
+  const pendencias = diagnostico.motivos
+    .filter((m) => {
+      if (m === MOTIVOS.SEM_DATA && criterios[2]?.ok) return false;
+      if (m === MOTIVOS.SEM_ANTERIOR && criterios[3]?.ok) return false;
+      return true;
+    })
+    .map((m) => MOTIVOS_LABEL[m])
+    .filter(Boolean);
 
   return <div className="space-y-4">{/* UI mantida */}
     <Card><CardHeader><CardTitle>Situação Atual</CardTitle></CardHeader><CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm"><Info label="Nome de guerra" value={militar?.nome_guerra || '—'} /><Info label="Nome completo" value={militar?.nome_completo || '—'} /><Info label="Matrícula" value={militar?.matricula || '—'} /><Info label="Posto/graduação atual" value={militar?.posto_graduacao || '—'} /><Info label="Quadro atual" value={militar?.quadro || '—'} /><Info label="Lotação atual" value={militar?.lotacao_atual || militar?.lotacao || '—'} /></CardContent></Card>
-    <Card><CardHeader className="flex flex-row justify-between items-start gap-3"><CardTitle>Dados da Promoção Atual</CardTitle>{canManage && <Button onClick={onOpenPromocaoAtualModal}>Registrar / Retificar Promoção Atual</Button>}</CardHeader><CardContent className="space-y-4 text-sm">{!promocaoAtual && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Promoção atual sem data registrada. Este militar ficará pendente na listagem de antiguidade.</div>}{promocaoAtualIncompleta && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Registro histórico com campos incompletos. Recomenda-se retificar.</div>}{haMultiplosRegistros && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Há múltiplos registros de promoção para este militar. Revise/cancele os incorretos.</div>}<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"><Info label="Data da promoção atual" value={promocaoAtual?.data_promocao || '—'} /><Info label="Nº/ordem de antiguidade" value={promocaoAtual?.antiguidade_referencia_ordem ?? '—'} /><Info label="DOEMS / Boletim / Ato" value={promocaoAtual?.boletim_referencia || promocaoAtual?.ato_referencia || '—'} /><Info label="Data da publicação" value={promocaoAtual?.data_publicacao || '—'} /><Info label="Status do registro" value={<Badge className={STATUS_BADGE[promocaoAtual?.status_registro || 'pendente']}>{promocaoAtual?.status_registro || 'pendente'}</Badge>} /></div></CardContent></Card>
+    <Card><CardHeader className="flex flex-row justify-between items-start gap-3"><CardTitle>Dados da Promoção Atual</CardTitle>{canManage && <Button onClick={onOpenPromocaoAtualModal}>Registrar / Retificar Promoção Atual</Button>}</CardHeader><CardContent className="space-y-4 text-sm">{!promocaoAtual && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Promoção atual sem data registrada. Este militar ficará pendente na listagem de antiguidade.</div>}{promocaoAtualIncompleta && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Registro histórico com campos incompletos. Recomenda-se retificar.</div>}{haMultiplosRegistros && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Há múltiplos registros de promoção para este militar. Revise/cancele os incorretos.</div>}<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"><Info label="Data da promoção atual" value={promocaoAtual?.data_promocao || '—'} /><Info label="Nº/ordem de antiguidade" value={promocaoAtual?.antiguidade_referencia_ordem ?? '—'} /><Info label="DOEMS / Boletim / Ato" value={promocaoAtual?.boletim_referencia || promocaoAtual?.ato_referencia || '—'} /><Info label="Data da publicação" value={promocaoAtual?.data_publicacao || '—'} /><Info label="Status do registro" value={<Badge className={STATUS_BADGE[promocaoAtual?.status_registro || STATUS_ATIVO]}>{promocaoAtual?.status_registro || STATUS_ATIVO}</Badge>} /></div></CardContent></Card>
     <Card><CardHeader><CardTitle>Impacto na Listagem</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><Badge className={diagnostico.status === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}>{diagnostico.status === 'ok' ? 'Apto' : 'Pendente'}</Badge><ul className="space-y-1">{criterios.map((c) => <li key={c.label} className="flex items-center gap-2">{c.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Clock3 className="w-4 h-4 text-amber-600" />}{c.label}</li>)}</ul>{pendencias.length > 0 && <div><p className="font-medium">Pendências:</p><ul className="list-disc ml-5">{pendencias.map((p) => <li key={p}>{p}</li>)}</ul></div>}<p className="text-slate-600">Aguardando snapshot rascunho.</p></CardContent></Card>
     <Card><CardHeader><CardTitle>Histórico de Promoções</CardTitle></CardHeader><CardContent className="space-y-3">{historico.map((h) => <div key={h.id} className="border rounded-md p-3 space-y-2"><div className="flex gap-2 items-center"><Badge className={STATUS_BADGE[h.status_registro] || STATUS_BADGE.pendente}>{h.status_registro || 'pendente'}</Badge>{promocaoAtual?.id === h.id && <Badge variant="outline">Registro atual</Badge>}{isRegistroIncompleto(h) && <Badge variant="outline">Registro incompleto</Badge>}</div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm"><Info label="Posto/graduação anterior" value={h.posto_graduacao_anterior || '—'} /><Info label="Posto/graduação novo" value={h.posto_graduacao_novo || '—'} /><Info label="Quadro" value={h.quadro_novo || '—'} /><Info label="Data da promoção" value={h.data_promocao || '—'} /><Info label="Nº/ordem de antiguidade" value={h.antiguidade_referencia_ordem ?? '—'} /><Info label="DOEMS / boletim / ato" value={h.boletim_referencia || h.ato_referencia || '—'} /><Info label="Observações" value={h.observacoes || '—'} /><Info label="Origem do dado" value={h.origem_dado || '—'} /></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setDetalhe(h)}><FileText className="w-4 h-4 mr-1" />Ver detalhes</Button><Button size="sm" variant="outline" disabled={!canManage} onClick={() => { setRetificar(h); setErroAcao(''); }}>Retificar</Button><Button size="sm" variant="destructive" disabled={!canManage} onClick={() => { setCancelar(h); setErroAcao(''); }}>Cancelar</Button>{canManage && isRegistroIncompleto(h) && <Button size="sm" variant="secondary" onClick={() => { setExcluir(h); setErroAcao(''); }}>Excluir registro de teste</Button>}</div></div>)}</CardContent></Card>
     <Dialog open={Boolean(detalhe)} onOpenChange={(o) => !o && setDetalhe(null)}><DialogContent><DialogHeader><DialogTitle>Detalhes do registro</DialogTitle></DialogHeader><div className="text-sm space-y-1">{detalhe && Object.entries(detalhe).map(([k, v]) => <p key={k}><strong>{k}:</strong> {String(v ?? '—')}</p>)}</div></DialogContent></Dialog>
