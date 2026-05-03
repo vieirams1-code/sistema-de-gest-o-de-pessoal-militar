@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import {
   getPostoAnteriorPrevisto,
   getPostosHistoricosPermitidos,
-  isPromocaoAcimaDoPostoAtual,
+  isPromocaoIgualOuAcimaDoPostoAtual,
   resolverQuadroPromocao,
 } from '@/components/antiguidade/promocaoHistoricaUtils';
 
@@ -67,10 +67,10 @@ export default function PromocaoHistoricaModal({ open, onOpenChange, militar, on
     if (!valorTexto(form.posto_graduacao_novo)) return setMensagem('Selecione o posto/graduação alcançado na promoção histórica.');
 
     const postoInvalido = !postosPermitidos.includes(form.posto_graduacao_novo)
-      || isPromocaoAcimaDoPostoAtual({ postoAtual: militar?.posto_graduacao, postoNovo: form.posto_graduacao_novo });
+      || isPromocaoIgualOuAcimaDoPostoAtual({ postoAtual: militar?.posto_graduacao, postoNovo: form.posto_graduacao_novo });
 
     if (postoInvalido) {
-      return setMensagem('Este fluxo registra apenas promoções anteriores. Para promoção efetiva acima do posto atual, será necessário fluxo próprio de atualização funcional.');
+      return setMensagem('Este fluxo registra apenas promoções anteriores. Não é permitido lançar posto igual ou acima do posto atual do militar.');
     }
 
     setSaving(true);
@@ -95,6 +95,19 @@ export default function PromocaoHistoricaModal({ open, onOpenChange, militar, on
 
       if (duplicado) {
         setMensagem('Duplicidade exata detectada: já existe registro ativo com mesmo posto/quadro/data.');
+        return;
+      }
+
+      const promocaoAtualAtiva = todos.find((h) =>
+        valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO
+        && String(h.militar_id || '') === String(militar.id)
+        && valorTexto(h.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao)
+        && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro)
+        && valorTexto(h.data_promocao),
+      );
+
+      if (promocaoAtualAtiva?.data_promocao && String(form.data_promocao) > String(promocaoAtualAtiva.data_promocao)) {
+        setMensagem('A data da promoção histórica anterior não pode ser posterior à data da promoção atual.');
         return;
       }
 

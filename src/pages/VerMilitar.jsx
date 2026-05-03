@@ -20,6 +20,7 @@ import AlertasContrato from '@/components/militar/AlertasContrato';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
 import PromocaoHistoricaModal from '@/components/antiguidade/PromocaoHistoricaModal';
+import PromocaoFuturaModal from '@/components/antiguidade/PromocaoFuturaModal';
 import CarreiraAntiguidadePanel from '@/components/antiguidade/CarreiraAntiguidadePanel';
 import ComportamentoTimeline from '@/components/militar/ComportamentoTimeline';
 import HistoricoComportamentoChart from '@/components/militar/HistoricoComportamentoChart';
@@ -121,6 +122,8 @@ export default function VerMilitar() {
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [showPromocaoAtualModal, setShowPromocaoAtualModal] = useState(false);
   const [showPromocaoHistoricaModal, setShowPromocaoHistoricaModal] = useState(false);
+  const [showPromocaoFuturaModal, setShowPromocaoFuturaModal] = useState(false);
+  const [promocaoFuturaEdicao, setPromocaoFuturaEdicao] = useState(null);
   const [impedimentoForm, setImpedimentoForm] = useState({
     data_inicio: new Date().toISOString().split('T')[0],
     data_fim: '',
@@ -895,6 +898,7 @@ export default function VerMilitar() {
               canManage={isAdmin}
               onOpenPromocaoAtualModal={() => setShowPromocaoAtualModal(true)}
               onOpenPromocaoHistoricaModal={() => setShowPromocaoHistoricaModal(true)}
+              onOpenPromocaoFuturaModal={(registro) => { setPromocaoFuturaEdicao(registro || null); setShowPromocaoFuturaModal(true); }}
               onHistoricoChanged={async () => {
                 await refetchHistoricoPromocoes();
                 await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
@@ -913,6 +917,22 @@ export default function VerMilitar() {
         militar={militar}
         onSaved={async () => {
           await refetchHistoricoPromocoes();
+          await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+        }}
+      />
+
+
+      <PromocaoFuturaModal
+        open={showPromocaoFuturaModal}
+        onOpenChange={(open) => {
+          setShowPromocaoFuturaModal(open);
+          if (!open) setPromocaoFuturaEdicao(null);
+        }}
+        militar={militar}
+        registroEdicao={promocaoFuturaEdicao}
+        onSaved={async () => {
+          await refetchHistoricoPromocoes();
+          await queryClient.invalidateQueries({ queryKey: ['militar', militar?.id] });
           await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
         }}
       />
