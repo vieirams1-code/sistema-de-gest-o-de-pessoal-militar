@@ -39,6 +39,13 @@ export function isPromocaoAcimaDoPostoAtual({ postoAtual, postoNovo }) {
   return idxNovo < idxAtual;
 }
 
+export function isPromocaoIgualOuAcimaDoPostoAtual({ postoAtual, postoNovo }) {
+  const idxAtual = indicePosto(postoAtual);
+  const idxNovo = indicePosto(postoNovo);
+  if (idxAtual < 0 || idxNovo < 0) return false;
+  return idxNovo <= idxAtual;
+}
+
 export function resolverQuadroPromocao({ postoAnterior, postoNovo, quadroAtual, quadroAnteriorInformado }) {
   const anterior = normalizar(postoAnterior);
   const novo = normalizar(postoNovo);
@@ -48,4 +55,17 @@ export function resolverQuadroPromocao({ postoAnterior, postoNovo, quadroAtual, 
   }
 
   return String(quadroAtual || quadroAnteriorInformado || '').trim();
+}
+
+export function getProximoPosto(postoAtual) {
+  const idxAtual = indicePosto(postoAtual);
+  if (idxAtual <= 0) return '';
+  return POSTOS_GRADUACOES[idxAtual - 1] || '';
+}
+
+export function resolverQuadroPromocaoFutura({ postoAtual, postoPrevisto, quadroAtual }) {
+  const atual = normalizar(postoAtual);
+  const previsto = normalizar(postoPrevisto);
+  if (atual === 'subtenente' && previsto === '2º tenente') return 'QAOBM';
+  return String(quadroAtual || '').trim();
 }
