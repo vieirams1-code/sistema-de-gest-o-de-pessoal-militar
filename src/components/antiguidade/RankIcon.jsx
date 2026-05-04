@@ -9,33 +9,103 @@ const normalizeRank = (rank = '') => String(rank || '')
   .trim()
   .toLowerCase();
 
-function Star({ x, y, size = 4.6, color = '#f8fafc' }) {
-  const points = `${x},${y - size} ${x + size * 0.3},${y - size * 0.3} ${x + size},${y - size * 0.3} ${x + size * 0.5},${y + size * 0.1} ${x + size * 0.68},${y + size} ${x},${y + size * 0.52} ${x - size * 0.68},${y + size} ${x - size * 0.5},${y + size * 0.1} ${x - size},${y - size * 0.3} ${x - size * 0.3},${y - size * 0.3}`;
-  return <polygon points={points} fill={color} />;
-}
+export default function RankIcon({ postoGraduacao }) {
+  const getIconProps = (rankName) => {
+    if (!rankName) return { type: 'circle' };
+    const lowerRank = normalizeRank(rankName);
 
-function Divisas({ total = 3 }) {
-  const yPositions = Array.from({ length: total }, (_, i) => 13 + i * 8);
-  return <>{yPositions.map((y) => <rect key={y} x="11" y={y} width="26" height="4" rx="2" fill="#f8fafc" />)}</>;
-}
+    if (lowerRank.includes('soldado')) return { type: 'divisas_simples', divisasList: ['gray'] };
+    if (lowerRank.includes('cabo')) return { type: 'divisas_simples', divisasList: ['gray', 'gray'] };
+    if (lowerRank.includes('3o sargento') || lowerRank.includes('terceiro sargento')) return { type: 'divisas_simples', divisasList: ['gray', 'gray', 'gray'] };
+    if (lowerRank.includes('2o sargento') || lowerRank.includes('segundo sargento')) return { type: 'divisas_simples', divisasList: ['gray', 'gray', 'gray', 'white', 'gray'] };
+    if (lowerRank.includes('1o sargento') || lowerRank.includes('primeiro sargento')) return { type: 'divisas_simples', divisasList: ['gray', 'gray', 'gray', 'white', 'gray', 'gray'] };
+    if (lowerRank.includes('subtenente')) return { type: 'triangulo_subtenente' };
 
-export default function RankIcon({ postoGraduacao, className = 'w-10 h-10' }) {
-  const rank = normalizeRank(postoGraduacao);
+    if (lowerRank.includes('aspirante')) return { type: 'stars', starsList: ['simples'] };
+    if (lowerRank.includes('2o tenente') || lowerRank.includes('segundo tenente')) return { type: 'stars', starsList: ['azul'] };
+    if (lowerRank.includes('1o tenente') || lowerRank.includes('primeiro tenente')) return { type: 'stars', starsList: ['azul', 'azul'] };
+    if (lowerRank.includes('capitao')) return { type: 'stars', starsList: ['azul', 'azul', 'azul'] };
+    if (lowerRank.includes('major')) return { type: 'stars', starsList: ['amarela', 'azul', 'azul'] };
+    if (lowerRank.includes('tenente coronel')) return { type: 'stars', starsList: ['amarela', 'amarela', 'azul'] };
+    if (lowerRank.includes('coronel')) return { type: 'stars', starsList: ['amarela', 'amarela', 'amarela'] };
 
-  let content = <rect x="10" y="9" width="28" height="30" rx="4" fill="#94a3b8" />;
-  if (rank.includes('soldado')) content = <circle cx="24" cy="24" r="7" fill="#f8fafc" />;
-  else if (rank.includes('cabo')) content = <Divisas total={2} />;
-  else if (rank.includes('3o sargento') || rank.includes('terceiro sargento')) content = <Divisas total={3} />;
-  else if (rank.includes('2o sargento') || rank.includes('segundo sargento')) content = <Divisas total={4} />;
-  else if (rank.includes('1o sargento') || rank.includes('primeiro sargento')) content = <Divisas total={5} />;
-  else if (rank.includes('subtenente')) content = <polygon points="24,10 11,36 37,36" fill="#cbd5e1" />;
-  else if (rank.includes('aspirante')) content = <Star x={24} y={24} />;
-  else if (rank.includes('2o tenente') || rank.includes('segundo tenente')) content = <><Star x={18} y={24} /><Star x={30} y={24} /></>;
-  else if (rank.includes('1o tenente') || rank.includes('primeiro tenente')) content = <><Star x={14} y={24} /><Star x={24} y={24} /><Star x={34} y={24} /></>;
-  else if (rank.includes('capitao')) content = <><Star x={18} y={19} /><Star x={30} y={19} /><Star x={18} y={30} /><Star x={30} y={30} /></>;
-  else if (rank.includes('major')) content = <><Star x={14} y={24} /><Star x={24} y={16} /><Star x={34} y={24} /><Star x={24} y={32} /></>;
-  else if (rank.includes('tenente coronel')) content = <><Star x={14} y={24} /><Star x={24} y={16} /><Star x={24} y={32} /><Star x={34} y={24} /><Star x={24} y={24} /></>;
-  else if (rank.includes('coronel')) content = <><Star x={14} y={16} /><Star x={24} y={16} /><Star x={34} y={16} /><Star x={14} y={32} /><Star x={24} y={32} /><Star x={34} y={32} /></>;
+    return { type: 'circle' };
+  };
 
-  return <div className={className}><svg viewBox="0 0 48 48" className="w-full h-full rounded-lg"><defs><linearGradient id="rankBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#0f172a" /><stop offset="100%" stopColor="#1e293b" /></linearGradient></defs><rect x="1" y="1" width="46" height="46" rx="11" fill="url(#rankBg)" stroke="#334155" strokeWidth="1.2" />{content}</svg></div>;
+  const { type, starsList, divisasList } = getIconProps(postoGraduacao);
+
+  return (
+    <div className="flex flex-col items-center justify-center w-full h-full">
+      {type === 'divisas_simples' && (
+        <svg className="w-[28px] h-[36px] drop-shadow-sm" viewBox="0 0 24 38">
+          {divisasList.map((colorName, i) => {
+            const spacing = 5;
+            const tipDiff = 9;
+            const totalHeight = (divisasList.length - 1) * spacing + tipDiff;
+            const topEdgeY = 19 - totalHeight / 2;
+            const edgeY = topEdgeY + (divisasList.length - 1 - i) * spacing;
+            const tipY = edgeY + tipDiff;
+            return (
+              <path
+                key={i}
+                d={`M 3 ${edgeY} L 12 ${tipY} L 21 ${edgeY}`}
+                stroke={colorName === 'gray' ? '#64748B' : '#FFFFFF'}
+                strokeWidth="2.5"
+                fill="none"
+                strokeLinecap="square"
+                strokeLinejoin="miter"
+                style={colorName === 'white' ? { filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.25))' } : {}}
+              />
+            );
+          })}
+        </svg>
+      )}
+
+      {type === 'triangulo_subtenente' && (
+        <svg className="w-[22px] h-[22px] drop-shadow-sm" viewBox="0 0 24 24">
+          <polygon points="12,3 22,20 2,20" fill="none" stroke="#64748B" strokeWidth="2.5" strokeLinejoin="round" />
+        </svg>
+      )}
+
+      {type === 'stars' && (
+        <div className="flex flex-row flex-nowrap justify-center items-center gap-[2px]">
+          {starsList.map((starType, i) => {
+            if (starType === 'simples') {
+              return (
+                <svg key={i} className="w-[20px] h-[20px] drop-shadow-sm" viewBox="0 0 24 24">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#EAB308" />
+                  <path d="M12 2L12 12M15.09 8.26L12 12M22 9.27L12 12M17 14.14L12 12M18.18 21.02L12 12M12 17.77L12 12M5.82 21.02L12 12M7 14.14L12 12M2 9.27L12 12M8.91 8.26L12 12" stroke="#CA8A04" strokeWidth="0.5" opacity="0.6" />
+                </svg>
+              );
+            }
+            if (starType === 'azul') {
+              return (
+                <svg key={i} className="w-[24px] h-[24px] drop-shadow-sm" viewBox="0 0 24 24">
+                  <path d="M12 1L16 9L23 12L16 15L12 23L8 15L1 12L8 9Z" fill="#94A3B8" />
+                  <path d="M12 3L14.5 9.5L20.5 12L14.5 14.5L12 21L9.5 14.5L3.5 12L9.5 9.5Z" fill="#CBD5E1" />
+                  <path d="M12 5L13.5 10.5L18 12L13.5 13.5L12 19L10.5 13.5L6 12L10.5 10.5Z" fill="#F8FAFC" />
+                  <circle cx="12" cy="12" r="5" fill="#1E3A8A" stroke="#94A3B8" strokeWidth="0.5" />
+                  <path d="M10.5 10.5L13.5 13.5M13.5 10.5L10.5 13.5" stroke="#F8FAFC" strokeWidth="1" strokeLinecap="round" />
+                </svg>
+              );
+            }
+            if (starType === 'amarela') {
+              return (
+                <svg key={i} className="w-[24px] h-[24px] drop-shadow-sm" viewBox="0 0 24 24">
+                  <path d="M12 1L14.5 8L22 8L16 12.5L18.5 20L12 15L5.5 20L8 12.5L2 8L9.5 8Z" fill="#CA8A04" />
+                  <path d="M12 3L13.5 8.5L19 8.5L14.5 12L16 17.5L12 14L8 17.5L9.5 12L5 8.5L10.5 8.5Z" fill="#FDE047" />
+                  <circle cx="12" cy="12" r="5" fill="#1E3A8A" stroke="#CA8A04" strokeWidth="0.5" />
+                  <circle cx="12" cy="12" r="3" fill="#DC2626" />
+                  <path d="M10.5 10.5L13.5 13.5M13.5 10.5L10.5 13.5" stroke="#FDE047" strokeWidth="1" strokeLinecap="round" />
+                </svg>
+              );
+            }
+            return null;
+          })}
+        </div>
+      )}
+
+      {type === 'circle' && <div className="w-3 h-3 bg-slate-300 rounded-full" />}
+    </div>
+  );
 }
