@@ -13,12 +13,19 @@ export default function PromocoesTimeline({ historico, promocaoAtual, canManage,
     <div className="flex justify-end">{canManage && <Button size="sm" variant="outline" className="border-slate-300 text-slate-700" onClick={onOpenPromocaoHistoricaModal}><History className="w-4 h-4 mr-1" />Adicionar registro histórico anterior</Button>}</div>
     {historico.map((h) => {
       const isAtual = promocaoAtual?.id === h.id;
-      const isPrevista = String(h.status_registro || '').toLowerCase() === 'previsto';
-      const cardClass = isPrevista ? 'bg-amber-50/60 border-amber-200' : isAtual ? 'bg-blue-50/60 border-blue-200' : 'bg-white border-slate-200';
+      const statusLower = String(h.status_registro || '').toLowerCase();
+      const isPrevista = statusLower === 'previsto' || statusLower === 'cancelado';
+      const cardClass = isPrevista ? 'bg-amber-50/20 border-amber-200' : isAtual ? 'bg-blue-50/40 border-blue-200' : 'bg-white border-slate-200';
 
-      return <div key={h.id} className="relative pl-16 pb-1">
-        <div className="absolute left-6 top-1 bottom-0 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
-        <div className="absolute left-0 top-1 rounded-full border border-slate-200 bg-white p-1.5 shadow-sm"><RankIcon postoGraduacao={h.posto_graduacao_novo || h.posto_graduacao_anterior} className="w-10 h-10" /></div>
+      return <div key={h.id} className="group relative pl-16 pb-1">
+        <div className={`absolute left-6 top-1 bottom-0 w-px ${isPrevista ? 'border-l-2 border-dashed border-amber-300 bg-transparent' : 'bg-gradient-to-b from-slate-300 via-slate-200 to-transparent'}`} />
+        <div className="absolute top-0 bottom-0 -left-[61px] flex justify-center w-12 h-12 z-10">
+          <div
+            className={`absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 flex items-center justify-center w-auto min-w-[2.5rem] px-2.5 h-11 rounded-full border-4 border-white shadow-sm transition-transform group-hover:scale-105 ${isAtual ? 'bg-blue-50 ring-2 ring-blue-500' : isPrevista ? 'bg-amber-50 ring-1 ring-amber-300' : 'bg-slate-50 ring-1 ring-slate-200'}`}
+          >
+            <RankIcon postoGraduacao={h.posto_graduacao_novo || h.posto_graduacao_anterior} />
+          </div>
+        </div>
         <div className={`rounded-xl border p-4 space-y-3 shadow-sm ${cardClass}`}>
           <div className="flex flex-wrap gap-2 items-center">
             <Badge className={`${STATUS_BADGE[h.status_registro] || STATUS_BADGE.pendente} border`}>{h.status_registro || 'pendente'}</Badge>
