@@ -18,6 +18,12 @@ const STATUS_ATIVO = 'ativo';
 const STATUS_PREVISTO = 'previsto';
 const valorTexto = (v) => String(v || '').trim();
 const isOrdemPreenchida = (valor) => valor !== null && valor !== undefined && valor !== '' && Number.isFinite(Number(valor));
+const formatarDataLocalISO = (date) => {
+  const ano = date.getFullYear();
+  const mes = String(date.getMonth() + 1).padStart(2, '0');
+  const dia = String(date.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+};
 
 export default function CarreiraAntiguidadePanel(props) {
   const { militar, historicoPromocoes, onOpenPromocaoAtualModal, onOpenPromocaoHistoricaModal, onOpenPromocaoFuturaModal, onHistoricoChanged, canManage } = props;
@@ -51,13 +57,13 @@ export default function CarreiraAntiguidadePanel(props) {
 
   const onEfetivar = async (registro) => {
     if (confirmacaoEfetivar !== 'EFETIVAR') return setErroAcao('Digite EFETIVAR para confirmar.');
-    const hoje = new Date();
-    const dataPromocao = registro?.data_promocao ? new Date(`${registro.data_promocao}T00:00:00`) : null;
-    if (dataPromocao && dataPromocao > hoje) return setErroAcao('Esta promoção possui data futura e ainda não pode ser efetivada. Aguarde a data prevista ou mantenha-a como promoção prevista.');
+    const hojeIso = formatarDataLocalISO(new Date());
+    if (registro?.data_promocao && registro.data_promocao > hojeIso) return setErroAcao('Esta promoção possui data futura e ainda não pode ser efetivada. Aguarde a data prevista ou mantenha-a como promoção prevista.');
     await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: STATUS_ATIVO, origem_dado: 'efetivacao' });
     await base44.entities.Militar.update(militar.id, { posto_graduacao: registro.posto_graduacao_novo, quadro: registro.quadro_novo });
     await queryClientInstance.invalidateQueries({ queryKey: ['militar', militar.id] });
     await queryClientInstance.invalidateQueries({ queryKey: ['historico-promocoes', militar.id] });
+    await queryClientInstance.invalidateQueries({ queryKey: ['ver-historico-promocoes', militar.id] });
     await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
     setEfetivar(null); setConfirmacaoEfetivar(''); setErroAcao('');
     await onHistoricoChanged?.();
