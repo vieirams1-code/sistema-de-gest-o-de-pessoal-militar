@@ -552,7 +552,7 @@ export default function Ferias() {
   }, [editDataModal]);
 
   const handleDelete = async (f) => {
-    if (!canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('excluir_ferias')) {
+    if (!canAccessAction('excluir_ferias') || !canAccessAction('admin_mode') || !modoAdmin) {
       alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
       return;
     }
@@ -588,7 +588,7 @@ export default function Ferias() {
 
   const confirmDelete = () => {
     if (!feriasToDelete) return;
-    if (!canAccessAction('admin_mode') || !modoAdmin || !canAccessAction('excluir_ferias')) {
+    if (!canAccessAction('excluir_ferias') || !canAccessAction('admin_mode') || !modoAdmin) {
       alert('Ação restrita. Exige permissão de exclusão e modo admin ativo.');
       return;
     }
@@ -1245,7 +1245,7 @@ export default function Ferias() {
                                           <span>Editar Férias</span>
                                         </DropdownMenuItem>
 
-                                        {isAdmin && (() => {
+                                        {(canAccessAction('excluir_ferias')) && (() => {
                                           const temCadeia = registrosLivro.some(
                                             (r) => r.ferias_id === f.id && TIPOS_OPERACIONAIS.includes(r.tipo_registro)
                                           );
@@ -1261,12 +1261,20 @@ export default function Ferias() {
                                               </DropdownMenuItem>
                                             );
                                           }
+                                          const escopo = validarEscopoMilitar(f?.militar_id);
+                                          const semEscopo = !escopo.permitido;
+                                          const disabled = !modoAdmin || !canAccessAction('admin_mode') || semEscopo;
+                                          const title = !canAccessAction('admin_mode')
+                                            ? 'Ação negada: sem permissão para usar o modo admin.'
+                                            : (!modoAdmin
+                                              ? 'Ative o modo admin para usar esta função.'
+                                              : (semEscopo ? escopo.motivo : ''));
                                           return (
                                             <DropdownMenuItem
-                                              disabled={!modoAdmin}
-                                              onClick={() => modoAdmin && handleDelete(f)}
-                                              className={modoAdmin ? 'text-red-600 focus:text-red-600' : 'text-slate-400'}
-                                              title={!modoAdmin ? 'Ative o modo admin para usar esta função.' : ''}
+                                              disabled={disabled}
+                                              onClick={() => !disabled && handleDelete(f)}
+                                              className={!disabled ? 'text-red-600 focus:text-red-600' : 'text-slate-400'}
+                                              title={title}
                                             >
                                               {modoAdmin ? (
                                                 <Trash2 className="w-4 h-4 mr-2" />
