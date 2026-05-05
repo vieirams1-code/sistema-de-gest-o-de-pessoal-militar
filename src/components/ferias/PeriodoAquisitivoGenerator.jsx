@@ -28,7 +28,24 @@ const ANOS_RETROSPECTIVOS = 3;
 const PERIODOS_FUTUROS = 2;
 
 function parseDateOnly(value) {
-  return new Date(`${value}T00:00:00`);
+  if (!value) return null;
+  const str = String(value).trim();
+  // Formato ISO: yyyy-MM-dd
+  const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const date = new Date(`${str}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  // Formato BR: dd/MM/yyyy
+  const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    const [, dia, mes, ano] = brMatch;
+    const date = new Date(`${ano}-${mes}-${dia}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  // Fallback: tenta parse nativo
+  const fallback = new Date(`${str}T00:00:00`);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
 function mesmaData(a, b) {
@@ -167,6 +184,8 @@ export default function PeriodoAquisitivoGenerator() {
 
     try {
       const novosPeriodos = [];
+      let militaresIgnoradosSemData = 0;
+      let militaresIgnoradosDataInvalida = 0;
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
@@ -182,11 +201,30 @@ export default function PeriodoAquisitivoGenerator() {
         return;
       }
 
+      // Refetch fresco dos períodos existentes para evitar cache stale bloquear a geração.
+      const periodosFrescos = await queryClient.fetchQuery({
+        queryKey: ['periodos-aquisitivos'],
+        queryFn: () => base44.entities.PeriodoAquisitivo.list(),
+        staleTime: 0,
+      });
+
       for (const militar of militaresAlvo) {
-        if (!militar.data_inclusao) continue;
+        if (!militar.data_inclusao) {
+          militaresIgnoradosSemData += 1;
+          continue;
+        }
 
         const dataInclusao = parseDateOnly(militar.data_inclusao);
-        const periodosDoMilitar = periodosExistentes.filter((p) => p.militar_id === militar.id);
+        if (!dataInclusao) {
+          militaresIgnoradosDataInvalida += 1;
+          console.warn('[PeriodoAquisitivoGenerator] data_inclusao em formato inválido', {
+            militar_id: militar.id,
+            nome_completo: militar.nome_completo,
+            data_inclusao: militar.data_inclusao,
+          });
+          continue;
+        }
+        const periodosDoMilitar = periodosFrescos.filter((p) => String(p.militar_id) === String(militar.id));
         const { inicio, fim } = getJanelaOperacional(dataInclusao, hoje);
 
         let dataInicio = new Date(inicio);
@@ -225,6 +263,15 @@ export default function PeriodoAquisitivoGenerator() {
         }
       }
 
+      const avisoIgnorados = [];
+      if (militaresIgnoradosDataInvalida > 0) {
+        avisoIgnorados.push(`${militaresIgnoradosDataInvalida} militar(es) ignorado(s) por data de inclusão em formato inválido`);
+      }
+      if (escopo === 'all' && militaresIgnoradosSemData > 0) {
+        avisoIgnorados.push(`${militaresIgnoradosSemData} militar(es) sem data de inclusão`);
+      }
+      const sufixoAviso = avisoIgnorados.length ? ` (${avisoIgnorados.join('; ')}).` : '';
+
       if (novosPeriodos.length > 0) {
         await base44.entities.PeriodoAquisitivo.bulkCreate(novosPeriodos);
         queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
@@ -232,17 +279,27 @@ export default function PeriodoAquisitivoGenerator() {
         setResult({
           success: true,
           count: novosPeriodos.length,
-          message: escopo === 'all'
+          message: (escopo === 'all'
             ? `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) com sucesso!`
-            : `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) para o militar selecionado.`,
+            : `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) para o militar selecionado.`) + sufixoAviso,
+        });
+      } else if (escopo === 'individual' && militaresIgnoradosDataInvalida > 0) {
+        setResult({
+          success: false,
+          message: 'Não foi possível gerar períodos: a data de inclusão do militar está em formato inválido. Corrija o cadastro do militar (formato esperado: dd/mm/aaaa ou aaaa-mm-dd) e tente novamente.',
+        });
+      } else if (escopo === 'individual' && militaresIgnoradosSemData > 0) {
+        setResult({
+          success: false,
+          message: 'Não foi possível gerar períodos: o militar não possui data de inclusão cadastrada.',
         });
       } else {
         setResult({
           success: true,
           count: 0,
-          message: escopo === 'all'
+          message: (escopo === 'all'
             ? 'Todos os períodos aquisitivos já estão atualizados.'
-            : 'O militar selecionado já está com os períodos aquisitivos atualizados.',
+            : 'O militar selecionado já está com os períodos aquisitivos atualizados.') + sufixoAviso,
         });
       }
     } catch (error) {
