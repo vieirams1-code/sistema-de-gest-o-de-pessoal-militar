@@ -1,10 +1,11 @@
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import React, { useMemo, useState } from 'react';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
+import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays } from 'date-fns';
-import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ import {
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, isLoading: loadingUser, isAccessResolved, isAdmin = false, user = {}, modoAcesso = null } = useCurrentUser();
   const hasFeriasAccess = canAccessModule('ferias');
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,47 +46,32 @@ export default function PeriodosAquisitivos() {
   const [expandedMilitares, setExpandedMilitares] = useState({});
   const [periodoGerenciado, setPeriodoGerenciado] = useState(null);
 
-  const { data: periodos = [], isLoading } = useQuery({
-    queryKey: ['periodos-aquisitivos'],
-    queryFn: () => base44.entities.PeriodoAquisitivo.list('-inicio_aquisitivo'),
+  const effectiveEmail = getEffectiveEmail();
+  const paBundleQueryKey = ['pa-bundle', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null];
+
+  const { data: paBundle, isLoading } = useQuery({
+    queryKey: paBundleQueryKey,
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
   });
 
-  const { data: ferias = [], isLoading: isLoadingFerias } = useQuery({
-    queryKey: ['ferias'],
-    queryFn: () => base44.entities.Ferias.list('-data_inicio'),
-  });
-
-  const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['registros-livro-all'],
-    queryFn: () => base44.entities.RegistroLivro.list(),
-  });
-
-  const { data: militares = [] } = useQuery({
-    queryKey: ['periodos-aquisitivos-militares'],
-    queryFn: () => base44.entities.Militar.list(),
-  });
-
-  const { data: matriculasMilitar = [] } = useQuery({
-    queryKey: ['periodos-aquisitivos-matriculas'],
-    queryFn: () => base44.entities.MatriculaMilitar.list('-created_date'),
-  });
+  const periodos = paBundle?.periodosAquisitivos || [];
+  const ferias = paBundle?.ferias || [];
+  const registrosLivro = paBundle?.registrosLivro || [];
+  const militares = paBundle?.militares || [];
+  const matriculasMilitar = paBundle?.matriculasMilitar || [];
 
 
   const updatePeriodoMutation = useMutation({
     mutationFn: ({ periodoId, payload }) => atualizarEscopado('PeriodoAquisitivo', periodoId, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+      queryClient.invalidateQueries({ queryKey: paBundleQueryKey });
     },
   });
 
   const deletePeriodoMutation = useMutation({
     mutationFn: ({ periodoId }) => excluirEscopado('PeriodoAquisitivo', periodoId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
-      queryClient.invalidateQueries({ queryKey: ['ferias'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro-all'] });
+      queryClient.invalidateQueries({ queryKey: paBundleQueryKey });
     },
   });
 
@@ -124,10 +110,16 @@ export default function PeriodosAquisitivos() {
             },
           };
         })
-        .filter((grupo) => {
+        .map((grupo) => {
           const militarId = String(grupo?.militar?.id || '');
-          if (!militarId) return true;
-          return militaresPorId.has(militarId);
+          if (!militarId || militaresPorId.has(militarId)) return grupo;
+          return {
+            ...grupo,
+            militar: {
+              ...grupo.militar,
+              nome_guerra: grupo?.militar?.nome_guerra || 'Militar não carregado',
+            },
+          };
         }),
     };
   }, [periodos, ferias, militaresPorId]);
@@ -413,7 +405,7 @@ export default function PeriodosAquisitivos() {
           {filteredPeriodosCount} período(s) encontrado(s) em {filteredMilitares.length} militar(es)
         </div>
 
-        {isLoading || isLoadingFerias ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           </div>
