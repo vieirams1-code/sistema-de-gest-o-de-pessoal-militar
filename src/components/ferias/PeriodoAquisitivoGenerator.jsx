@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
+import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,7 @@ import {
   montarIndiceMatriculas,
 } from '@/services/matriculaMilitarViewService';
 import { abreviarPostoGraduacao } from '@/components/folha-alteracoes/postoGraduacao';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const ANOS_RETROSPECTIVOS = 3;
 const PERIODOS_FUTUROS = 2;
@@ -91,21 +94,18 @@ export default function PeriodoAquisitivoGenerator() {
   const [militarSelectorOpen, setMilitarSelectorOpen] = useState(false);
   const [militarSearch, setMilitarSearch] = useState('');
   const queryClient = useQueryClient();
+  const { isAdmin = false, user = {}, modoAcesso = null } = useCurrentUser();
 
-  const { data: militares = [] } = useQuery({
-    queryKey: ['militares-ativos'],
-    queryFn: () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
+  const effectiveEmail = getEffectiveEmail();
+  const paBundleQueryKey = ['pa-bundle', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null];
+
+  const { data: paBundle = {} } = useQuery({
+    queryKey: paBundleQueryKey,
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
   });
 
-  const { data: matriculasMilitar = [] } = useQuery({
-    queryKey: ['militares-ativos-matriculas'],
-    queryFn: () => base44.entities.MatriculaMilitar.list('-created_date'),
-  });
-
-  const { data: periodosExistentes = [] } = useQuery({
-    queryKey: ['periodos-aquisitivos'],
-    queryFn: () => base44.entities.PeriodoAquisitivo.list(),
-  });
+  const militares = paBundle?.militares || [];
+  const matriculasMilitar = paBundle?.matriculasMilitar || [];
 
   const militaresOperacionais = useMemo(() => {
     const indiceMatriculas = montarIndiceMatriculas(matriculasMilitar);
@@ -202,11 +202,12 @@ export default function PeriodoAquisitivoGenerator() {
       }
 
       // Refetch fresco dos períodos existentes para evitar cache stale bloquear a geração.
-      const periodosFrescos = await queryClient.fetchQuery({
-        queryKey: ['periodos-aquisitivos'],
-        queryFn: () => base44.entities.PeriodoAquisitivo.list(),
+      const periodosFrescosBundle = await queryClient.fetchQuery({
+        queryKey: paBundleQueryKey,
+        queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
         staleTime: 0,
       });
+      const periodosFrescos = periodosFrescosBundle?.periodosAquisitivos || [];
 
       for (const militar of militaresAlvo) {
         if (!militar.data_inclusao) {
@@ -274,7 +275,7 @@ export default function PeriodoAquisitivoGenerator() {
 
       if (novosPeriodos.length > 0) {
         await base44.entities.PeriodoAquisitivo.bulkCreate(novosPeriodos);
-        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] });
+        queryClient.invalidateQueries({ queryKey: paBundleQueryKey });
 
         setResult({
           success: true,
