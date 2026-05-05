@@ -8,7 +8,7 @@ const STATUS_BADGE = { ativo: 'bg-emerald-100 text-emerald-800 border-emerald-20
 
 function Info({ label, value }) { return <div><p className="text-[11px] text-slate-500 uppercase tracking-wide">{label}</p><p className="font-medium text-slate-800">{value}</p></div>; }
 
-export default function PromocoesTimeline({ historico, promocaoAtual, canManage, isRegistroIncompativel, isRegistroIncompleto, onOpenPromocaoHistoricaModal, onDetalhe, onRetificar, onCancelar }) {
+export default function PromocoesTimeline({ historico, promocaoAtual, canManage, isRegistroIncompativel, isRegistroIncompleto, onOpenPromocaoHistoricaModal, onDetalhe, onRetificar, onEditarPrevisao, onCancelar }) {
   return <div className="space-y-4">
     <div className="flex justify-end">{canManage && <Button size="sm" variant="outline" className="border-slate-300 text-slate-700" onClick={onOpenPromocaoHistoricaModal}><History className="w-4 h-4 mr-1" />Adicionar registro histórico anterior</Button>}</div>
     {historico.map((h) => {
@@ -57,8 +57,9 @@ export default function PromocoesTimeline({ historico, promocaoAtual, canManage,
           </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" className="border-slate-300 text-slate-700" onClick={() => onDetalhe(h)}><FileText className="w-4 h-4 mr-1" />Ver detalhes</Button>
-            {!isCancelado && !isRetificado && <Button size="sm" variant="outline" className="border-slate-300 text-slate-700" disabled={!canManage} onClick={() => onRetificar(h)}>Retificar</Button>}
-            {!isCancelado && <Button size="sm" variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50" disabled={!canManage} onClick={() => onCancelar(h)}>Cancelar</Button>}
+            {isPrevista && !isCancelado && !isRetificado && <Button size="sm" variant="outline" className="border-slate-300 text-slate-700" disabled={!canManage} onClick={() => onEditarPrevisao?.(h)}>Editar previsão</Button>}
+            {!isPrevista && !isCancelado && !isRetificado && <Button size="sm" variant="outline" className="border-slate-300 text-slate-700" disabled={!canManage} onClick={() => onRetificar(h)}>Retificar</Button>}
+            {!isCancelado && !isRetificado && <Button size="sm" variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50" disabled={!canManage} onClick={() => onCancelar(h)}>Cancelar</Button>}
           </div>
         </div>
       </div>;
