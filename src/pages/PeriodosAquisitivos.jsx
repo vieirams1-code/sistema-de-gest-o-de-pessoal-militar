@@ -40,7 +40,7 @@ export default function PeriodosAquisitivos() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [militarFilter, setMilitarFilter] = useState('all');
+  const [quickFilter, setQuickFilter] = useState('all');
   const [periodoFilter, setPeriodoFilter] = useState('all');
   const [expandedMilitares, setExpandedMilitares] = useState({});
   const [periodoGerenciado, setPeriodoGerenciado] = useState(null);
@@ -137,11 +137,35 @@ export default function PeriodosAquisitivos() {
     [periodosTransformados]
   );
 
-  const militaresUnicos = [...new Map(periodosTransformados.militares.map((grupo) => [grupo.militar.id, { id: grupo.militar.id, nome: grupo.militar.nome_guerra, posto: grupo.militar.posto_graduacao }])).values()]
-    .filter((m) => m.id)
-    .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-
   const periodosUnicos = [...new Set(periodosFlat.map((p) => p.referencia).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+
+  const hoje = useMemo(() => {
+    const data = new Date();
+    data.setHours(0, 0, 0, 0);
+    return data;
+  }, []);
+
+  const getPeriodoResumoStatus = (periodo) => {
+    const alerta = getAlertaPeriodoConcessivo({
+      dataLimiteGozo: periodo.data_limite_gozo_iso,
+      hasPrevisaoValida: hasPrevisaoValidaPeriodo(periodo),
+    });
+
+    const isVencendo = alerta?.nivel === 'critico';
+    const isDisponivel = periodo.status_operacional === 'Disponível';
+
+    let isVencido = false;
+    if (periodo.data_limite_gozo_iso) {
+      const limite = new Date(`${periodo.data_limite_gozo_iso}T00:00:00`);
+      isVencido = differenceInDays(limite, hoje) < 0;
+    }
+
+    return {
+      isDisponivel,
+      isVencendo,
+      isVencido,
+    };
+  };
 
   const filteredMilitares = useMemo(
     () =>
@@ -163,9 +187,14 @@ export default function PeriodosAquisitivos() {
               grupoMilitar.militar.nome_guerra?.toLowerCase().includes(searchLower) ||
               periodo.referencia?.includes(searchTerm);
             const matchesStatus = statusFilter === 'all' || periodo.status_operacional === statusFilter;
-            const matchesMilitar = militarFilter === 'all' || grupoMilitar.militar.id === militarFilter;
             const matchesPeriodo = periodoFilter === 'all' || periodo.referencia === periodoFilter;
-            return matchesSearch && matchesStatus && matchesMilitar && matchesPeriodo;
+            const resumo = getPeriodoResumoStatus(periodo);
+            const matchesQuick =
+              quickFilter === 'all' ||
+              (quickFilter === 'disponiveis' && resumo.isDisponivel) ||
+              (quickFilter === 'vencendo' && resumo.isVencendo) ||
+              (quickFilter === 'vencidos' && resumo.isVencido);
+            return matchesSearch && matchesStatus && matchesPeriodo && matchesQuick;
           });
 
           return {
@@ -174,30 +203,25 @@ export default function PeriodosAquisitivos() {
           };
         })
         .filter((grupoMilitar) => grupoMilitar.periodos.length > 0),
-    [periodosTransformados, searchTerm, statusFilter, militarFilter, periodoFilter]
+    [periodosTransformados, searchTerm, statusFilter, periodoFilter, quickFilter]
   );
 
   const filteredPeriodosCount = filteredMilitares.reduce((total, grupo) => total + grupo.periodos.length, 0);
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
   const stats = {
-    total: periodos.length,
-    disponiveis: periodosFlat.filter((p) => p.status_operacional === 'Disponível').length,
-    vencendo: periodosFlat.filter((p) => {
-      const alerta = getAlertaPeriodoConcessivo({
-        dataLimiteGozo: p.data_limite_gozo_iso,
-        hasPrevisaoValida: hasPrevisaoValidaPeriodo(p),
-      });
-      return alerta?.nivel === 'critico';
-    }).length,
-    vencidos: periodosFlat.filter((p) => {
-      if (!p.data_limite_gozo_iso) return false;
-      const limite = new Date(`${p.data_limite_gozo_iso}T00:00:00`);
-      return differenceInDays(limite, hoje) < 0;
-    }).length,
+    total: periodosFlat.length,
+    disponiveis: periodosFlat.filter((p) => getPeriodoResumoStatus(p).isDisponivel).length,
+    vencendo: periodosFlat.filter((p) => getPeriodoResumoStatus(p).isVencendo).length,
+    vencidos: periodosFlat.filter((p) => getPeriodoResumoStatus(p).isVencido).length,
   };
+
+  const quickFilterLabel = {
+    all: 'Total',
+    disponiveis: 'Disponíveis',
+    vencendo: 'Vencendo (90d)',
+    vencidos: 'Vencidos',
+  };
+
 
   const formatProximoVencimento = (dias) => {
     if (typeof dias !== 'number') return 'Sem data limite';
@@ -278,7 +302,7 @@ export default function PeriodosAquisitivos() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <div className={`bg-white rounded-xl p-4 shadow-sm border transition-all cursor-pointer ${quickFilter === 'all' ? 'border-[#1e3a5f] bg-slate-50' : 'border-slate-100 hover:border-slate-200'}`} onClick={() => setQuickFilter('all')}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-[#1e3a5f]/10 flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-[#1e3a5f]" />
@@ -290,7 +314,10 @@ export default function PeriodosAquisitivos() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <div
+            className={`bg-white rounded-xl p-4 shadow-sm border transition-all cursor-pointer ${quickFilter === 'disponiveis' ? 'border-emerald-400 bg-emerald-50/40' : 'border-slate-100 hover:border-emerald-200'}`}
+            onClick={() => setQuickFilter((prev) => (prev === 'disponiveis' ? 'all' : 'disponiveis'))}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-emerald-600" />
@@ -302,7 +329,10 @@ export default function PeriodosAquisitivos() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <div
+            className={`bg-white rounded-xl p-4 shadow-sm border transition-all cursor-pointer ${quickFilter === 'vencendo' ? 'border-amber-400 bg-amber-50/40' : 'border-slate-100 hover:border-amber-200'}`}
+            onClick={() => setQuickFilter((prev) => (prev === 'vencendo' ? 'all' : 'vencendo'))}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
                 <AlertCircle className="w-5 h-5 text-amber-600" />
@@ -314,7 +344,10 @@ export default function PeriodosAquisitivos() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+          <div
+            className={`bg-white rounded-xl p-4 shadow-sm border transition-all cursor-pointer ${quickFilter === 'vencidos' ? 'border-red-400 bg-red-50/40' : 'border-slate-100 hover:border-red-200'}`}
+            onClick={() => setQuickFilter((prev) => (prev === 'vencidos' ? 'all' : 'vencidos'))}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
                 <AlertCircle className="w-5 h-5 text-red-600" />
@@ -338,17 +371,6 @@ export default function PeriodosAquisitivos() {
                 className="pl-10 h-10 border-slate-200"
               />
             </div>
-            <Select value={militarFilter} onValueChange={setMilitarFilter}>
-              <SelectTrigger className="w-full md:w-52 h-10 border-slate-200">
-                <SelectValue placeholder="Filtrar por Militar" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Militares</SelectItem>
-                {militaresUnicos.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.posto ? `${m.posto} ` : ''}{m.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={periodoFilter} onValueChange={setPeriodoFilter}>
               <SelectTrigger className="w-full md:w-40 h-10 border-slate-200">
                 <SelectValue placeholder="Período" />
@@ -378,6 +400,15 @@ export default function PeriodosAquisitivos() {
           </div>
         </div>
 
+        {quickFilter !== 'all' && (
+          <div className="mb-3 flex items-center gap-3 text-sm">
+            <span className="text-slate-600">Filtro rápido: <strong>{quickFilterLabel[quickFilter]}</strong></span>
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setQuickFilter('all')}>
+              Limpar filtro
+            </Button>
+          </div>
+        )}
+
         <div className="mb-4 text-sm text-slate-500">
           {filteredPeriodosCount} período(s) encontrado(s) em {filteredMilitares.length} militar(es)
         </div>
@@ -391,7 +422,7 @@ export default function PeriodosAquisitivos() {
             <Calendar className="w-16 h-16 mx-auto text-slate-300 mb-4" />
             <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhum período encontrado</h3>
             <p className="text-slate-500 mb-6">
-              {searchTerm || statusFilter !== 'all'
+              {searchTerm || statusFilter !== 'all' || periodoFilter !== 'all' || quickFilter !== 'all'
                 ? 'Tente ajustar os filtros de busca'
                 : 'Clique em "Gerar Períodos Automáticos" para começar'}
             </p>
