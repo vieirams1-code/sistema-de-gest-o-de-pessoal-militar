@@ -65,6 +65,9 @@ export default function CarreiraAntiguidadePanel(props) {
     const hojeIso = formatarDataLocalISO(new Date());
     if (registro.data_promocao > hojeIso) return setErroAcao('Esta promoção possui data futura e ainda não pode ser efetivada. Aguarde a data prevista ou mantenha-a como promoção prevista.');
 
+    const statusRegistroAnterior = registro.status_registro;
+    const origemDadoAnterior = registro.origem_dado;
+
     try {
       await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: STATUS_ATIVO, origem_dado: 'efetivacao' });
     } catch (error) {
@@ -74,7 +77,18 @@ export default function CarreiraAntiguidadePanel(props) {
     try {
       await base44.entities.Militar.update(militar.id, { posto_graduacao: registro.posto_graduacao_novo, quadro: registro.quadro_novo });
     } catch (error) {
-      return setErroAcao('A promoção foi efetivada no histórico, mas não foi possível atualizar o posto/quadro do militar. Tente novamente.');
+      try {
+        await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: statusRegistroAnterior, origem_dado: origemDadoAnterior });
+        await queryClientInstance.invalidateQueries({ queryKey: ['historico-promocoes', militar.id] });
+        await queryClientInstance.invalidateQueries({ queryKey: ['ver-historico-promocoes', militar.id] });
+        await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+        return setErroAcao('Não foi possível atualizar o posto/quadro do militar. A efetivação foi desfeita no histórico. Tente novamente.');
+      } catch (rollbackError) {
+        await queryClientInstance.invalidateQueries({ queryKey: ['historico-promocoes', militar.id] });
+        await queryClientInstance.invalidateQueries({ queryKey: ['ver-historico-promocoes', militar.id] });
+        await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+        return setErroAcao('A promoção foi marcada como efetivada no histórico, mas não foi possível atualizar o posto/quadro do militar nem desfazer a efetivação. Verifique o registro antes de tentar novamente.');
+      }
     }
 
     try {
