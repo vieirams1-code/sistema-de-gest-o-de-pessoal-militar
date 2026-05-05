@@ -57,16 +57,36 @@ export default function CarreiraAntiguidadePanel(props) {
 
   const onEfetivar = async (registro) => {
     if (confirmacaoEfetivar !== 'EFETIVAR') return setErroAcao('Digite EFETIVAR para confirmar.');
+    if (!registro?.id) return setErroAcao('Registro de promoção previsto não encontrado para efetivação.');
+    if (valorTexto(registro.status_registro).toLowerCase() !== STATUS_PREVISTO) return setErroAcao('Somente promoções previstas podem ser efetivadas.');
+    if (!registro?.data_promocao) return setErroAcao('A promoção prevista não possui data de promoção informada e não pode ser efetivada.');
+    if (!militar?.id) return setErroAcao('Não foi possível identificar o militar para efetivar a promoção.');
+
     const hojeIso = formatarDataLocalISO(new Date());
-    if (registro?.data_promocao && registro.data_promocao > hojeIso) return setErroAcao('Esta promoção possui data futura e ainda não pode ser efetivada. Aguarde a data prevista ou mantenha-a como promoção prevista.');
-    await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: STATUS_ATIVO, origem_dado: 'efetivacao' });
-    await base44.entities.Militar.update(militar.id, { posto_graduacao: registro.posto_graduacao_novo, quadro: registro.quadro_novo });
-    await queryClientInstance.invalidateQueries({ queryKey: ['militar', militar.id] });
-    await queryClientInstance.invalidateQueries({ queryKey: ['historico-promocoes', militar.id] });
-    await queryClientInstance.invalidateQueries({ queryKey: ['ver-historico-promocoes', militar.id] });
-    await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
-    setEfetivar(null); setConfirmacaoEfetivar(''); setErroAcao('');
-    await onHistoricoChanged?.();
+    if (registro.data_promocao > hojeIso) return setErroAcao('Esta promoção possui data futura e ainda não pode ser efetivada. Aguarde a data prevista ou mantenha-a como promoção prevista.');
+
+    try {
+      await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: STATUS_ATIVO, origem_dado: 'efetivacao' });
+    } catch (error) {
+      return setErroAcao('Não foi possível atualizar o histórico de promoção para efetivação. Tente novamente.');
+    }
+
+    try {
+      await base44.entities.Militar.update(militar.id, { posto_graduacao: registro.posto_graduacao_novo, quadro: registro.quadro_novo });
+    } catch (error) {
+      return setErroAcao('A promoção foi efetivada no histórico, mas não foi possível atualizar o posto/quadro do militar. Tente novamente.');
+    }
+
+    try {
+      await queryClientInstance.invalidateQueries({ queryKey: ['militar', militar.id] });
+      await queryClientInstance.invalidateQueries({ queryKey: ['historico-promocoes', militar.id] });
+      await queryClientInstance.invalidateQueries({ queryKey: ['ver-historico-promocoes', militar.id] });
+      await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+      setEfetivar(null); setConfirmacaoEfetivar(''); setErroAcao('');
+      await onHistoricoChanged?.();
+    } catch (error) {
+      return setErroAcao('A promoção foi efetivada, mas ocorreu um erro ao atualizar os dados exibidos. Recarregue a página.');
+    }
   };
 
   const onRetificar = async (registro) => { if (!motivo.trim()) return setErroAcao('Informe o motivo da retificação.'); await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: 'retificado', motivo_retificacao: motivo }); setRetificar(null); setMotivo(''); await onHistoricoChanged?.(); };
