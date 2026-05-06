@@ -1,10 +1,10 @@
-import { POSTOS_GRADUACOES, QUADROS } from '../../components/antiguidade/promocaoHistoricaUtils.js';
+import { POSTOS_GRADUACOES } from '../../components/antiguidade/promocaoHistoricaUtils.js';
 import {
-  QUADROS_FIXOS,
   isQuadroComDestaque,
   isQuadroCompativel,
   normalizarQuadroLegado,
 } from '../postoQuadroCompatibilidade.js';
+import { obterDetalheAntiguidadeQuadro } from './ordemQuadrosAntiguidade.js';
 
 export const PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL = Object.freeze({
   SEM_POSTO: 'PENDENTE_SEM_POSTO',
@@ -22,6 +22,8 @@ export const ALERTAS_PREVIA_ANTIGUIDADE_GERAL = Object.freeze({
   REGISTRO_CANCELADO_IGNORADO: 'ALERTA_REGISTRO_CANCELADO_IGNORADO',
   REGISTRO_RETIFICADO_IGNORADO: 'ALERTA_REGISTRO_RETIFICADO_IGNORADO',
   QUADRO_NORMALIZADO: 'ALERTA_QUADRO_NORMALIZADO',
+  QUADRO_AGRUPADO_PARA_ANTIGUIDADE: 'ALERTA_QUADRO_AGRUPADO_PARA_ANTIGUIDADE',
+  QUADRO_FORA_DOS_GRUPOS_ANTIGUIDADE: 'ALERTA_QUADRO_FORA_DOS_GRUPOS_ANTIGUIDADE',
   QUADRO_ESPECIAL: 'ALERTA_QUADRO_ESPECIAL',
   QAOBM_SUBTENENTE_2TEN: 'ALERTA_QAOBM_SUBTENENTE_2TEN',
   EMPATE_RESOLVIDO_POR_NOME_MATRICULA: 'ALERTA_EMPATE_RESOLVIDO_POR_NOME_MATRICULA',
@@ -93,10 +95,6 @@ const POSTO_CANONICO_POR_NORMALIZADO = new Map(
 );
 const POSTO_INDICE_POR_NORMALIZADO = new Map(
   POSTOS_GRADUACOES.map((posto, index) => [normalizarPostoGraduacao(posto), index]),
-);
-const QUADROS_ORDEM = Array.from(new Set([...(QUADROS_FIXOS || []), ...(QUADROS || [])]));
-const QUADRO_INDICE_POR_NORMALIZADO = new Map(
-  QUADROS_ORDEM.map((quadro, index) => [normalizarQuadroPreviaAntiguidade(quadro).valor, index]),
 );
 
 export function normalizarPostoGraduacao(valor) {
@@ -197,6 +195,7 @@ function indexarHistoricoPorMilitar(historicoPromocoes) {
 function escolherRegistroAtualCompativel(militar, historicos, alertas) {
   const postoMilitar = normalizarPostoGraduacao(militar?.posto_graduacao);
   const quadroMilitar = normalizarQuadroPreviaAntiguidade(militar?.quadro);
+  const detalheQuadroMilitar = obterDetalheAntiguidadeQuadro(militar?.quadro);
   const compativeis = [];
 
   historicos.forEach((registro) => {
@@ -216,8 +215,14 @@ function escolherRegistroAtualCompativel(militar, historicos, alertas) {
 
     const postoRegistro = normalizarPostoGraduacao(registro?.posto_graduacao_novo);
     const quadroRegistro = normalizarQuadroPreviaAntiguidade(registro?.quadro_novo);
+    const detalheQuadroRegistro = obterDetalheAntiguidadeQuadro(registro?.quadro_novo);
     const postoCompativel = !postoMilitar || !postoRegistro || postoRegistro === postoMilitar;
-    const quadroCompativel = !quadroMilitar.valor || !quadroRegistro.valor || quadroRegistro.valor === quadroMilitar.valor;
+    const grupoMilitar = detalheQuadroMilitar.grupoAntiguidadeQuadro;
+    const grupoRegistro = detalheQuadroRegistro.grupoAntiguidadeQuadro;
+    const quadroCompativel = !quadroMilitar.valor
+      || !quadroRegistro.valor
+      || quadroRegistro.valor === quadroMilitar.valor
+      || (grupoMilitar && grupoRegistro && grupoRegistro === grupoMilitar);
     if (postoCompativel && quadroCompativel) compativeis.push(registro);
   });
 
@@ -241,7 +246,7 @@ function escolherRegistroAtualCompativel(militar, historicos, alertas) {
   })[0] || null;
 }
 
-function montarCriterioOrdenacao({ militar, registroAtual, postoNormalizado, quadroNormalizado }) {
+function montarCriterioOrdenacao({ militar, registroAtual, postoNormalizado, detalheQuadroAntiguidade }) {
   const dataPromocaoTimestamp = toTimestamp(registroAtual?.data_promocao);
   const antiguidadeReferenciaOrdem = toNumeroValido(registroAtual?.antiguidade_referencia_ordem);
   const antiguidadeReferenciaId = valorTexto(registroAtual?.antiguidade_referencia_id);
@@ -254,10 +259,13 @@ function montarCriterioOrdenacao({ militar, registroAtual, postoNormalizado, qua
       ? POSTO_INDICE_POR_NORMALIZADO.get(postoNormalizado)
       : VALOR_AUSENTE_NUMERICO,
     postoNormalizado,
-    quadroIndice: QUADRO_INDICE_POR_NORMALIZADO.has(quadroNormalizado)
-      ? QUADRO_INDICE_POR_NORMALIZADO.get(quadroNormalizado)
-      : VALOR_AUSENTE_NUMERICO,
-    quadroNormalizado,
+    quadroOriginal: detalheQuadroAntiguidade.quadroOriginal,
+    quadroNormalizado: detalheQuadroAntiguidade.quadroNormalizado,
+    grupoAntiguidadeQuadro: detalheQuadroAntiguidade.grupoAntiguidadeQuadro,
+    quadroIndice: detalheQuadroAntiguidade.quadroIndice,
+    quadroConhecidoNaAntiguidade: detalheQuadroAntiguidade.conhecido,
+    quadroFoiAgrupadoParaAntiguidade: detalheQuadroAntiguidade.foiAgrupado,
+    quadroFoiNormalizadoParaAntiguidade: detalheQuadroAntiguidade.foiNormalizado,
     dataPromocaoTimestamp: dataPromocaoTimestamp ?? VALOR_AUSENTE_NUMERICO,
     antiguidadeReferenciaOrdem: antiguidadeReferenciaOrdem ?? VALOR_AUSENTE_NUMERICO,
     antiguidadeReferenciaId: antiguidadeReferenciaId || '',
@@ -345,6 +353,7 @@ export function calcularPreviaAntiguidadeGeral({
     const militarId = obterMilitarId(militar);
     const postoNormalizado = normalizarPostoGraduacao(militar?.posto_graduacao);
     const quadroNormalizadoInfo = normalizarQuadroPreviaAntiguidade(militar?.quadro);
+    const detalheQuadroAntiguidade = obterDetalheAntiguidadeQuadro(militar?.quadro);
     const historicos = historicoPorMilitar.get(militarId) || [];
     const registroAtual = escolherRegistroAtualCompativel(militar, historicos, alertas);
 
@@ -353,10 +362,12 @@ export function calcularPreviaAntiguidadeGeral({
     if (POSTO_INDICE_POR_NORMALIZADO.has(postoNormalizado) === false && postoNormalizado) {
       addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_FORA_DA_ORDEM);
     }
-    if (QUADRO_INDICE_POR_NORMALIZADO.has(quadroNormalizadoInfo.valor) === false && quadroNormalizadoInfo.valor) {
+    if (!detalheQuadroAntiguidade.conhecido && detalheQuadroAntiguidade.quadroNormalizado) {
       addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_FORA_DA_ORDEM);
+      addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_FORA_DOS_GRUPOS_ANTIGUIDADE);
     }
-    if (quadroNormalizadoInfo.foiNormalizado) addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_NORMALIZADO);
+    if (detalheQuadroAntiguidade.foiNormalizado) addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_NORMALIZADO);
+    if (detalheQuadroAntiguidade.foiAgrupado) addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_AGRUPADO_PARA_ANTIGUIDADE);
     if (quadroNormalizadoInfo.valor && isQuadroComDestaque(quadroNormalizadoInfo.valor)) {
       addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_ESPECIAL);
     }
@@ -384,7 +395,7 @@ export function calcularPreviaAntiguidadeGeral({
       militar,
       registroAtual,
       postoNormalizado,
-      quadroNormalizado: quadroNormalizadoInfo.valor,
+      detalheQuadroAntiguidade,
     });
 
     return {
