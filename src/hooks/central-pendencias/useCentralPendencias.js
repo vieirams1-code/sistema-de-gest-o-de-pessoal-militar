@@ -6,6 +6,7 @@ import { listarMilitarIdsEscopo } from '@/services/publicacoesPainelService';
 import { listarPublicacoesLegadoPendentesClassificacao } from '@/services/migracaoAlteracoesLegadoService';
 import { listarPendenciasPossivelDuplicidade, STATUS_POSSIVEL_DUPLICIDADE } from '@/services/militarIdentidadeService';
 import { aplicarPendenciasComportamentoEmLote } from '@/services/comportamentoService';
+import { createPageUrl } from '@/utils';
 import {
   calcularPrioridadePorPrazo,
   diferencaDias,
@@ -17,6 +18,51 @@ import {
 } from '@/utils/central-pendencias/centralPendencias.helpers';
 
 const LIMITE_PADRAO = 1000;
+
+
+function dataLocalYYYYMMDD(date = new Date()) {
+  const ano = date.getFullYear();
+  const mes = String(date.getMonth() + 1).padStart(2, '0');
+  const dia = String(date.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+function mapPromocoesPrevistasPendentes(promocoes = [], militares = []) {
+  const hojeLocal = dataLocalYYYYMMDD();
+  const militarById = new Map((militares || []).map((militar) => [String(militar?.id || ''), militar]));
+
+  return (promocoes || [])
+    .filter((item) => {
+      const statusRegistro = normalizarTexto(item?.status_registro);
+      const dataPromocao = String(item?.data_promocao || '').slice(0, 10);
+      if (statusRegistro !== 'previsto' || !dataPromocao) return false;
+      return dataPromocao <= hojeLocal;
+    })
+    .map((item) => {
+      const militar = militarById.get(String(item?.militar_id || '')) || {};
+      const nomeMilitar = militar?.nome_guerra || militar?.nome_completo || item?.militar_nome || '—';
+      const matricula = militar?.matricula || militar?.matricula_formatada || item?.matricula || '';
+      const postoAtual = militar?.posto_grad || militar?.posto_graduacao || item?.posto_grad_atual || item?.posto_graduacao_atual || '—';
+      const postoPrevisto = item?.posto_graduacao_novo || item?.posto_grad || item?.posto_graduacao || item?.posto_grad_destino || item?.posto_graduacao_destino || '—';
+      const quadroPrevisto = item?.quadro_novo || item?.quadro || item?.quadro_destino || item?.quadro_previsto || '';
+
+      return criarPendenciaBase({
+        id: `pr-prev-${item.id}`,
+        categoria: 'Promoções previstas',
+        prioridade: 'media',
+        situacao: 'Pronta para efetivação',
+        titulo: 'Promoção prevista pronta para efetivação',
+        descricao: `A promoção prevista para este militar já atingiu a data informada e pode ser conferida para efetivação na ficha do militar. Posto atual: ${postoAtual} • Posto previsto: ${postoPrevisto}${quadroPrevisto ? ` • Quadro previsto: ${quadroPrevisto}` : ''}${matricula ? ` • Matrícula: ${matricula}` : ''}`,
+        militar: nomeMilitar,
+        setor: item?.subgrupamento_nome || item?.obm_nome || militar?.subgrupamento_nome || militar?.obm_nome || '—',
+        dataReferencia: item?.data_promocao,
+        origem: 'Antiguidade/Promoções',
+        sugestaoAcao: 'Conferir dados e efetivar somente na ficha do militar (com confirmação textual EFETIVAR).',
+        origemLink: item?.militar_id ? `${createPageUrl('FichaMilitar')}?id=${item.militar_id}` : createPageUrl('Militares'),
+        origemLinkLabel: 'Abrir ficha do militar',
+      });
+    });
+}
 
 const STATUS_PUBLICACAO_PENDENTE = ['aguardando publicação', 'aguardando publicacao', 'aguardando nota'];
 const STATUS_ATESTADO_PENDENTE = ['aguardando homologação', 'aguardando homologacao', 'aguardando jiso'];
@@ -519,17 +565,20 @@ export default function useCentralPendencias() {
         listarPorEscopo({ entidade: base44?.entities?.Ferias, isAdmin, getMilitarScopeFilters, ordem: '-data_inicio' }),
         listarPorEscopo({ entidade: base44?.entities?.RegistroLivro, isAdmin, getMilitarScopeFilters }),
         listarPorEscopo({ entidade: base44?.entities?.PendenciaComportamento, isAdmin, getMilitarScopeFilters }),
+        listarPorEscopo({ entidade: base44?.entities?.HistoricoPromocaoMilitarV2, isAdmin, getMilitarScopeFilters }),
+        listarPorEscopo({ entidade: base44?.entities?.Militar, isAdmin, getMilitarScopeFilters }),
         podeVerLegadoDuplicidade ? listarPublicacoesLegadoPendentesClassificacao() : Promise.resolve([]),
         podeVerLegadoDuplicidade ? listarPendenciasPossivelDuplicidade({ status: STATUS_POSSIVEL_DUPLICIDADE.PENDENTE }) : Promise.resolve([]),
       ]);
 
-      const [pubR, atR, feR, rlR, coR, leR, duR] = resultados;
+      const [pubR, atR, feR, rlR, coR, prR, miR, leR, duR] = resultados;
 
       const errosCategorias = [];
       if (pubR.status === 'rejected') errosCategorias.push('Publicações');
       if (atR.status === 'rejected') errosCategorias.push('Atestados');
       if (feR.status === 'rejected') errosCategorias.push('Férias');
       if (coR.status === 'rejected') errosCategorias.push('Comportamento');
+      if (prR.status === 'rejected' || miR.status === 'rejected') errosCategorias.push('Antiguidade/Promoções');
       if (leR.status === 'rejected' || duR.status === 'rejected') errosCategorias.push('Legado/Outros');
 
       const pendencias = [
@@ -537,6 +586,10 @@ export default function useCentralPendencias() {
         ...mapAtestadosPendentes(atR.status === 'fulfilled' ? atR.value : []),
         ...mapFeriasPendentes(feR.status === 'fulfilled' ? feR.value : [], rlR.status === 'fulfilled' ? rlR.value : []),
         ...mapComportamentoPendencias(coR.status === 'fulfilled' ? coR.value : []),
+        ...mapPromocoesPrevistasPendentes(
+          prR.status === 'fulfilled' ? prR.value : [],
+          miR.status === 'fulfilled' ? miR.value : []
+        ),
         ...mapLegadoPendencias(leR.status === 'fulfilled' ? leR.value : [], duR.status === 'fulfilled' ? duR.value : []),
       ];
 
