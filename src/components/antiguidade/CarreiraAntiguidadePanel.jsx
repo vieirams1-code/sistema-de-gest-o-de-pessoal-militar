@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, Sparkles, ShieldCheck, ArrowUpRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock3, Sparkles, ShieldCheck, ArrowUpRight, History, CalendarPlus } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { queryClientInstance } from '@/lib/query-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import validarDadosAntiguidade, { MOTIVOS } from '@/utils/antiguidade/validarDadosAntiguidade';
 import { isPromocaoIgualOuAcimaDoPostoAtual } from '@/components/antiguidade/promocaoHistoricaUtils';
 import PromocoesTimeline from '@/components/antiguidade/PromocoesTimeline';
+import RankIcon from '@/components/antiguidade/RankIcon';
 
 const STATUS_BADGE = { ativo: 'bg-emerald-100 text-emerald-800', pendente: 'bg-amber-100 text-amber-800', retificado: 'bg-blue-100 text-blue-800', cancelado: 'bg-rose-100 text-rose-800', previsto: 'bg-indigo-100 text-indigo-800' };
 const MOTIVOS_LABEL = { [MOTIVOS.SEM_DATA]: 'Sem data de promoção', [MOTIVOS.SEM_ANTERIOR]: 'Sem número de antiguidade', [MOTIVOS.EMPATE]: 'Empate não resolvido', [MOTIVOS.SEM_QUADRO]: 'Quadro incompatível' };
@@ -37,7 +38,6 @@ export default function CarreiraAntiguidadePanel(props) {
 
   const historico = React.useMemo(() => [...(historicoPromocoes || [])].sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || ''))), [historicoPromocoes]);
   const ativos = React.useMemo(() => historico.filter((h) => valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO && String(h.militar_id || '') === String(militar?.id || '')), [historico, militar?.id]);
-  const previstos = React.useMemo(() => historico.filter((h) => valorTexto(h.status_registro).toLowerCase() === STATUS_PREVISTO && String(h.militar_id || '') === String(militar?.id || '')), [historico, militar?.id]);
 
   const promocaoAtual = React.useMemo(() => ativos.find((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao) && isOrdemPreenchida(h.antiguidade_referencia_ordem)) || null, [ativos, militar]);
 
@@ -70,20 +70,20 @@ export default function CarreiraAntiguidadePanel(props) {
 
     try {
       await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: STATUS_ATIVO, origem_dado: 'efetivacao' });
-    } catch (error) {
+    } catch {
       return setErroAcao('Não foi possível atualizar o histórico de promoção para efetivação. Tente novamente.');
     }
 
     try {
       await base44.entities.Militar.update(militar.id, { posto_graduacao: registro.posto_graduacao_novo, quadro: registro.quadro_novo });
-    } catch (error) {
+    } catch {
       try {
         await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: statusRegistroAnterior, origem_dado: origemDadoAnterior });
         await queryClientInstance.invalidateQueries({ queryKey: ['historico-promocoes', militar.id] });
         await queryClientInstance.invalidateQueries({ queryKey: ['ver-historico-promocoes', militar.id] });
         await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
         return setErroAcao('Não foi possível atualizar o posto/quadro do militar. A efetivação foi desfeita no histórico. Tente novamente.');
-      } catch (rollbackError) {
+      } catch {
         await queryClientInstance.invalidateQueries({ queryKey: ['historico-promocoes', militar.id] });
         await queryClientInstance.invalidateQueries({ queryKey: ['ver-historico-promocoes', militar.id] });
         await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
@@ -98,7 +98,7 @@ export default function CarreiraAntiguidadePanel(props) {
       await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
       setEfetivar(null); setConfirmacaoEfetivar(''); setErroAcao('');
       await onHistoricoChanged?.();
-    } catch (error) {
+    } catch {
       return setErroAcao('A promoção foi efetivada, mas ocorreu um erro ao atualizar os dados exibidos. Recarregue a página.');
     }
   };
@@ -135,20 +135,89 @@ export default function CarreiraAntiguidadePanel(props) {
       </Card>
     </div>
 
-    <Card className="bg-blue-50/70 border-blue-200 shadow-sm rounded-xl">
-      <CardHeader className="flex flex-col md:flex-row md:justify-between md:items-start gap-3 border-b border-blue-100/70">
-        <div>
-          <CardTitle className="text-base flex items-center gap-2"><Sparkles className="w-4 h-4 text-blue-700" />Dados da Promoção Atual</CardTitle>
-          <p className="text-sm text-blue-800/80 mt-1">Referência usada para cálculo e validação da antiguidade funcional.</p>
-        </div>
-        {canManage && <Button className="md:self-start gap-1.5" onClick={onOpenPromocaoAtualModal}>Registrar / Retificar Promoção Atual <ArrowUpRight className="w-4 h-4" /></Button>}
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-stretch">
+      <Card className="overflow-hidden rounded-2xl border-blue-500/30 bg-gradient-to-br from-blue-950 via-blue-800 to-sky-700 text-white shadow-lg">
+        <CardHeader className="border-b border-white/10 pb-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <Badge className="w-fit border border-white/20 bg-white/15 text-white backdrop-blur">Promoção atual válida</Badge>
+              <CardTitle className="flex items-center gap-2 text-xl lg:text-2xl">
+                <Sparkles className="w-5 h-5 text-sky-200" />
+                Referência Funcional Atual
+              </CardTitle>
+              <p className="max-w-2xl text-sm text-blue-100/90">
+                Este registro ativo é a base de cálculo da antiguidade e a referência funcional usada para validação das promoções futuras.
+              </p>
+            </div>
+            <div className="flex h-20 min-w-20 items-center justify-center rounded-2xl border border-white/20 bg-white shadow-md">
+              <RankIcon postoGraduacao={promocaoAtual?.posto_graduacao_novo || militar?.posto_graduacao} />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5 pt-5 text-sm">
+          {!promocaoAtual && <div className="flex items-start gap-2 rounded-md border border-amber-200/70 bg-amber-100 p-3 text-amber-950"><AlertTriangle className="w-4 h-4 mt-0.5" />Sem promoção atual cadastrada.</div>}
+          {haMultiplosRegistros && <div className="flex items-start gap-2 rounded-md border border-amber-200/70 bg-amber-100 p-3 text-amber-950"><AlertTriangle className="w-4 h-4 mt-0.5" />Há múltiplos registros de promoção para este militar. Revise/cancele os incorretos.</div>}
+
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-blue-100/80">Posto/graduação atual</p>
+              <h3 className="text-3xl font-bold leading-tight">{promocaoAtual?.posto_graduacao_novo || militar?.posto_graduacao || '—'}</h3>
+              <p className="mt-1 text-blue-100">Quadro {promocaoAtual?.quadro_novo || militar?.quadro || '—'}</p>
+            </div>
+            <Badge className={`${STATUS_BADGE[promocaoAtual?.status_registro || STATUS_ATIVO]} border capitalize`}>{promocaoAtual?.status_registro || STATUS_ATIVO}</Badge>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <HeroInfo label="Data da promoção" value={promocaoAtual?.data_promocao || '—'} />
+            <HeroInfo label="Nº / ordem de antiguidade" value={promocaoAtual?.antiguidade_referencia_ordem ?? '—'} />
+            <HeroInfo label="Data da publicação" value={promocaoAtual?.data_publicacao || '—'} />
+            <HeroInfo label="Docs / boletim / ato" value={promocaoAtual?.boletim_referencia || promocaoAtual?.ato_referencia || '—'} />
+            <HeroInfo label="Origem do dado" value={promocaoAtual?.origem_dado || '—'} />
+            <HeroInfo label="Validade operacional" value="Base vigente de cálculo" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2"><ArrowUpRight className="w-4 h-4 text-slate-600" />Ações operacionais</CardTitle>
+          <p className="text-sm text-slate-500">Ações separadas da linha cronológica para manter a progressão limpa.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {canManage ? <>
+            <Button className="w-full justify-start gap-2" onClick={onOpenPromocaoAtualModal}><Sparkles className="w-4 h-4" />Registrar / Retificar Promoção Atual</Button>
+            <Button variant="outline" className="w-full justify-start gap-2 border-amber-300 text-amber-900 hover:bg-amber-50" onClick={onOpenPromocaoFuturaModal}><CalendarPlus className="w-4 h-4" />Nova promoção futura</Button>
+            <Button variant="outline" className="w-full justify-start gap-2 border-slate-300 text-slate-700" onClick={onOpenPromocaoHistoricaModal}><History className="w-4 h-4" />Adicionar promoção anterior</Button>
+          </> : <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">Você possui acesso somente leitura para as ações operacionais.</div>}
+          <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs leading-5 text-blue-900">
+            <p className="font-semibold">Referência de cálculo e validação</p>
+            <p>A promoção atual permanece como base funcional; previsões futuras e histórico anterior apenas contextualizam a progressão.</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+
+    <Card className="rounded-2xl border-slate-200 shadow-sm">
+      <CardHeader className="border-b border-slate-100">
+        <CardTitle className="text-lg">Linha de Progressão Funcional</CardTitle>
+        <p className="text-sm text-slate-500">Visão cronológica das promoções do militar: histórico anterior → posto atual → promoções futuras previstas.</p>
       </CardHeader>
-      <CardContent className="space-y-4 pt-4 text-sm">{!promocaoAtual && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Sem promoção atual cadastrada.</div>}{haMultiplosRegistros && <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"><AlertTriangle className="w-4 h-4 mt-0.5" />Há múltiplos registros de promoção para este militar. Revise/cancele os incorretos.</div>}<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"><Info label="Data da promoção atual" value={promocaoAtual?.data_promocao || '—'} /><Info label="Nº/ordem de antiguidade" value={promocaoAtual?.antiguidade_referencia_ordem ?? '—'} /><Info label="DOEMS / Boletim / Ato" value={promocaoAtual?.boletim_referencia || promocaoAtual?.ato_referencia || '—'} /><Info label="Data da publicação" value={promocaoAtual?.data_publicacao || '—'} /><Info label="Status do registro" value={<Badge className={`${STATUS_BADGE[promocaoAtual?.status_registro || STATUS_ATIVO]} border`}>{promocaoAtual?.status_registro || STATUS_ATIVO}</Badge>} /></div></CardContent>
+      <CardContent className="pt-5">
+        <PromocoesTimeline
+          historico={historico}
+          promocaoAtual={promocaoAtual}
+          militar={militar}
+          canManage={canManage}
+          isRegistroIncompativel={isRegistroIncompativel}
+          isRegistroIncompleto={isRegistroIncompleto}
+          onDetalhe={setDetalhe}
+          onRetificar={(h) => { setRetificar(h); setErroAcao(''); }}
+          onEditarPrevisao={(h) => onOpenPromocaoFuturaModal?.(h)}
+          onCancelar={(h) => { setCancelar(h); setErroAcao(''); }}
+          onEfetivar={(h) => { setEfetivar(h); setErroAcao(''); }}
+        />
+      </CardContent>
     </Card>
-
-    <Card className="rounded-xl border-slate-200 shadow-sm"><CardHeader className="flex flex-col md:flex-row md:justify-between md:items-start gap-3"><CardTitle className="text-base">Promoções Futuras / Previstas</CardTitle>{canManage && <Button variant="outline" className="border-slate-300" onClick={onOpenPromocaoFuturaModal}>Nova promoção futura</Button>}</CardHeader><CardContent className="space-y-3">{previstos.length === 0 ? <div className="text-sm text-slate-500 rounded-lg border border-dashed border-slate-300 p-4">Nenhuma promoção futura prevista.</div> : <div className="overflow-hidden rounded-lg border border-slate-200">{previstos.map((h) => <div key={h.id} className="border-b border-slate-100 last:border-b-0 bg-white"><div className="grid grid-cols-1 lg:grid-cols-6 gap-3 text-sm p-3 items-center"><Info label="Posto" value={h.posto_graduacao_novo || '—'} /><Info label="Quadro" value={h.quadro_novo || '—'} /><Info label="Data prevista" value={h.data_promocao || '—'} /><Info label="Publicação" value={h.data_publicacao || '—'} /><Info label="Ato" value={h.boletim_referencia || h.ato_referencia || '—'} /><div><p className="text-[11px] text-slate-500 uppercase tracking-wide mb-1">Status</p><Badge className={`${STATUS_BADGE[h.status_registro] || STATUS_BADGE.previsto} border`}>{h.status_registro || 'previsto'}</Badge></div></div>{canManage && <div className="flex gap-2 px-3 pb-3"><Button size="sm" variant="outline" className="border-slate-300" onClick={() => onOpenPromocaoFuturaModal?.(h)}>Editar</Button><Button size="sm" variant="destructive" onClick={() => { setCancelar(h); setErroAcao(''); }}>Cancelar</Button><Button size="sm" className="bg-slate-900 hover:bg-slate-800" onClick={() => { setEfetivar(h); setErroAcao(''); }}>Efetivar Promoção</Button></div>}</div>)}</div>}</CardContent></Card>
-
-    <Card className="rounded-xl border-slate-200 shadow-sm"><CardHeader><CardTitle className="text-base">Linha do Tempo de Promoções</CardTitle></CardHeader><CardContent><PromocoesTimeline historico={historico} promocaoAtual={promocaoAtual} canManage={canManage} isRegistroIncompativel={isRegistroIncompativel} isRegistroIncompleto={isRegistroIncompleto} onOpenPromocaoHistoricaModal={onOpenPromocaoHistoricaModal} onDetalhe={setDetalhe} onRetificar={(h) => { setRetificar(h); setErroAcao(''); }} onEditarPrevisao={(h) => onOpenPromocaoFuturaModal?.(h)} onCancelar={(h) => { setCancelar(h); setErroAcao(''); }} /></CardContent></Card>
 
     <Dialog open={Boolean(detalhe)} onOpenChange={(o) => !o && setDetalhe(null)}><DialogContent><DialogHeader><DialogTitle>Detalhes do registro</DialogTitle></DialogHeader><div className="text-sm space-y-1">{detalhe && Object.entries(detalhe).map(([k, v]) => <p key={k}><strong>{k}:</strong> {String(v ?? '—')}</p>)}</div></DialogContent></Dialog>
     <Dialog open={Boolean(retificar)} onOpenChange={(o) => !o && setRetificar(null)}><DialogContent><DialogHeader><DialogTitle>Retificar promoção</DialogTitle></DialogHeader><Label>Motivo da retificação *</Label><Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setRetificar(null)}>Fechar</Button><Button onClick={() => onRetificar(retificar)}>Confirmar retificação</Button></DialogFooter></DialogContent></Dialog>
@@ -158,3 +227,5 @@ export default function CarreiraAntiguidadePanel(props) {
 }
 
 function Info({ label, value }) { return <div className="space-y-1"><p className="text-[11px] text-slate-500 uppercase tracking-wide">{label}</p><p className="font-semibold text-slate-800 leading-5">{value}</p></div>; }
+
+function HeroInfo({ label, value }) { return <div className="rounded-xl border border-white/10 bg-white/10 p-3 backdrop-blur"><p className="text-[11px] uppercase tracking-wide text-blue-100/80">{label}</p><p className="mt-1 font-semibold leading-5 text-white">{value}</p></div>; }
