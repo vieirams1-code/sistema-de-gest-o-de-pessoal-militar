@@ -111,6 +111,7 @@ const menuGroups = [
         adminOnly: true,
         children: [
           { name: 'Diagnóstico', page: 'AntiguidadeDiagnostico', icon: ClipboardList, adminOnly: true },
+          { name: 'Configuração de Quadros', page: 'AntiguidadeConfigQuadros', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
           { name: 'Importar Promoções', page: 'AntiguidadeImportarPromocoes', icon: ScrollText, adminOnly: true },
           { name: 'Prévia Geral', page: 'AntiguidadePrevia', icon: ListOrdered, adminOnly: true },
         ],

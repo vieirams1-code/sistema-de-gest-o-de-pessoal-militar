@@ -54,6 +54,7 @@ import AvaliacaoComportamento from './pages/AvaliacaoComportamento';
 import Armamentos from './pages/Armamentos';
 import ApuracaoMedalhasTempoServico from './pages/ApuracaoMedalhasTempoServico';
 import AntiguidadeDiagnostico from './pages/AntiguidadeDiagnostico';
+import AntiguidadeConfigQuadros from './pages/AntiguidadeConfigQuadros';
 import AntiguidadeImportarPromocoes from './pages/AntiguidadeImportarPromocoes';
 import AntiguidadePrevia from './pages/AntiguidadePrevia';
 import Atestados from './pages/Atestados';
@@ -114,6 +115,7 @@ export const PAGES = {
     "Armamentos": Armamentos,
     "ApuracaoMedalhasTempoServico": ApuracaoMedalhasTempoServico,
     "AntiguidadeDiagnostico": AntiguidadeDiagnostico,
+    "AntiguidadeConfigQuadros": AntiguidadeConfigQuadros,
     "AntiguidadeImportarPromocoes": AntiguidadeImportarPromocoes,
     "AntiguidadePrevia": AntiguidadePrevia,
     "Atestados": Atestados,
