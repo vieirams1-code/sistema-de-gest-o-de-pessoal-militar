@@ -112,6 +112,7 @@ const menuGroups = [
         children: [
           { name: 'Diagnóstico', page: 'AntiguidadeDiagnostico', icon: ClipboardList, adminOnly: true },
           { name: 'Importar Promoções', page: 'AntiguidadeImportarPromocoes', icon: ScrollText, adminOnly: true },
+          { name: 'Prévia Geral', page: 'AntiguidadePrevia', icon: ListOrdered, adminOnly: true },
         ],
       },
     ],

@@ -24,6 +24,7 @@ const adminOnlyPages = new Set([
   'AuditoriaComportamento',
   'AntiguidadeDiagnostico',
   'AntiguidadeImportarPromocoes',
+  'AntiguidadePrevia',
 ]);
 
 
@@ -43,6 +44,7 @@ const moduleGuardByPage = {
   ApuracaoMedalhasTempoServico: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   AntiguidadeDiagnostico: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadeImportarPromocoes: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
+  AntiguidadePrevia: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   IndicacoesDomPedroII: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   QuadroOperacional: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
