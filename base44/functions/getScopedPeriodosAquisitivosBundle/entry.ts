@@ -64,6 +64,24 @@ async function listarPorEscopoIds(base44, entityName, militarIds, orderBy) {
   return { rows: out, partialFailures };
 }
 
+async function listarMilitaresPorIds(base44, militarIds) {
+  const out = [];
+  let partialFailures = 0;
+  for (let i = 0; i < militarIds.length; i += CHUNK_MILITAR_IDS) {
+    const chunk = militarIds.slice(i, i + CHUNK_MILITAR_IDS);
+    try {
+      const rows = await fetchWithRetry(
+        () => base44.asServiceRole.entities.Militar.filter({ id: { $in: chunk } }, undefined, 1000, 0),
+        'Militar.ids'
+      );
+      out.push(...(rows || []));
+    } catch (_e) {
+      partialFailures += 1;
+    }
+  }
+  return { rows: out, partialFailures };
+}
+
 function getPeriodoResumoStatus(periodo, hoje) {
   const isDisponivel = periodo?.status === 'Disponível';
   let isVencendo = false; let isVencido = false;
@@ -113,15 +131,16 @@ Deno.serve(async (req) => {
       else {
         totalMilitaresEscopo = militarIds.length;
         const [paRes,mRes,matRes,fRes,rRes]=await Promise.all([
-          listarPorEscopoIds(base44,'PeriodoAquisitivo',militarIds,'-inicio_aquisitivo'), listarPorEscopoIds(base44,'Militar',militarIds,undefined), listarPorEscopoIds(base44,'MatriculaMilitar',militarIds,'-created_date'), listarPorEscopoIds(base44,'Ferias',militarIds,'-data_inicio'), listarPorEscopoIds(base44,'RegistroLivro',militarIds,undefined)
+          listarPorEscopoIds(base44,'PeriodoAquisitivo',militarIds,'-inicio_aquisitivo'), listarMilitaresPorIds(base44,militarIds), listarPorEscopoIds(base44,'MatriculaMilitar',militarIds,'-created_date'), listarPorEscopoIds(base44,'Ferias',militarIds,'-data_inicio'), listarPorEscopoIds(base44,'RegistroLivro',militarIds,undefined)
         ]);
         periodosAquisitivos=paRes.rows; militares=mRes.rows; matriculasMilitar=matRes.rows; ferias=fRes.rows; registrosLivro=rRes.rows;
+        if (militarIds.length > 0 && periodosAquisitivos.length > 0 && militares.length === 0) warnings.push('MILITARES_ESCOPO_NAO_CARREGADOS');
         partialFailures = paRes.partialFailures+mRes.partialFailures+matRes.partialFailures+fRes.partialFailures+rRes.partialFailures;
       }
     }
     const militaresIdsSet = new Set((militares||[]).map((m)=>String(m?.id||'')));
-    const periodosSemMilitar = (periodosAquisitivos||[]).filter((p)=>!militaresIdsSet.has(String(p?.militar_id||''))).length;
-    if (periodosSemMilitar>0) warnings.push(`PERIODOS_SEM_MILITAR:${periodosSemMilitar}`);
+    const periodosSemVinculo = (periodosAquisitivos||[]).filter((p)=>!militaresIdsSet.has(String(p?.militar_id||''))).length;
+    if (periodosSemVinculo>0) warnings.push(`PERIODOS_SEM_MILITAR:${periodosSemVinculo}`);
     if (partialFailures>0) warnings.push('PARTIAL_FAILURES');
     const hoje = new Date(); hoje.setHours(0,0,0,0);
     const counters = (periodosAquisitivos||[]).reduce((acc,periodo)=>{ const r=getPeriodoResumoStatus(periodo,hoje); acc.total+=1; if(r.isDisponivel)acc.disponiveis+=1; if(r.isVencendo)acc.vencendo90d+=1; if(r.isVencido)acc.vencidos+=1; return acc; }, { total:0, disponiveis:0, vencendo90d:0, vencidos:0 });
