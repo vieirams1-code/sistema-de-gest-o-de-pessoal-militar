@@ -129,10 +129,6 @@ function uniqueSorted(values = []) {
   );
 }
 
-function uniqueSortedByGetter(records = [], getter) {
-  return uniqueSorted(records.map(getter));
-}
-
 export default function ExtracaoEfetivo() {
   const {
     isAdmin,
@@ -158,16 +154,10 @@ export default function ExtracaoEfetivo() {
   const shouldShowLotacaoFilter = isAdmin || ['setor', 'subsetor', 'unidade'].includes(modoAcesso);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [postoFilter, setPostoFilter] = useState(TODOS_VALUE);
   const [quadroFilter, setQuadroFilter] = useState(TODOS_VALUE);
   const [statusFilter, setStatusFilter] = useState(TODOS_VALUE);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODOS_VALUE);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
 
   const lotacoesQueryKey = [
     'extracao-efetivo-lotacoes-scoped',
@@ -214,16 +204,23 @@ export default function ExtracaoEfetivo() {
     setLotacaoFilter(TODOS_VALUE);
   }, [lotacaoFilter, lotacoesIds]);
 
-  const filtrosQueryKey = {
-    statusCadastro: 'Ativo',
-    includeFoto: false,
-    limit: BACKEND_LIMIT,
-    search: debouncedSearchTerm || null,
-    postoGraduacao: postoFilter,
-    quadro: quadroFilter,
-    status: statusFilter,
-    lotacao: lotacaoFilter,
-  };
+  const [filtrosExecutados, setFiltrosExecutados] = useState(null);
+  const [executionId, setExecutionId] = useState(0);
+
+  const filtrosAtuais = useMemo(
+    () => ({
+      statusCadastro: 'Ativo',
+      includeFoto: false,
+      limit: BACKEND_LIMIT,
+      offset: 0,
+      search: searchTerm.trim() || null,
+      postoGraduacao: postoFilter,
+      quadro: quadroFilter,
+      status: statusFilter,
+      lotacao: lotacaoFilter,
+    }),
+    [lotacaoFilter, postoFilter, quadroFilter, searchTerm, statusFilter],
+  );
 
   const militaresQueryKey = [
     'extracao-efetivo-militares-scoped',
@@ -235,7 +232,8 @@ export default function ExtracaoEfetivo() {
     effectiveEmailFromStorage || 'sem-effective-email-storage',
     effectiveEmailForQuery || 'self',
     isImpersonating,
-    filtrosQueryKey,
+    filtrosExecutados || 'consulta-nao-executada',
+    executionId,
   ];
 
   const {
@@ -247,15 +245,17 @@ export default function ExtracaoEfetivo() {
     refetch,
   } = useQuery({
     queryKey: militaresQueryKey,
-    enabled: isAccessResolved,
+    enabled: isAccessResolved && Boolean(filtrosExecutados),
     queryFn: () =>
       fetchScopedMilitares({
         statusCadastro: 'Ativo',
         limit: BACKEND_LIMIT,
         offset: 0,
         includeFoto: false,
-        ...(debouncedSearchTerm ? { search: debouncedSearchTerm } : {}),
-        ...(postoFilter !== TODOS_VALUE ? { postoGraduacaoFiltros: [postoFilter] } : {}),
+        ...(filtrosExecutados?.search ? { search: filtrosExecutados.search } : {}),
+        ...(filtrosExecutados?.postoGraduacao && filtrosExecutados.postoGraduacao !== TODOS_VALUE
+          ? { postoGraduacaoFiltros: [filtrosExecutados.postoGraduacao] }
+          : {}),
       }),
     staleTime: STALE_TIME_MS,
     retry: 1,
@@ -283,11 +283,21 @@ export default function ExtracaoEfetivo() {
   );
 
   const statusDisponiveis = useMemo(
-    () => uniqueSortedByGetter(militares, (militar) => getFirstValue(militar, ['status_cadastro'])),
+    () =>
+      uniqueSorted([
+        ...Object.keys(statusBadgeClass),
+        ...militares.map((militar) => getFirstValue(militar, ['status_cadastro'])),
+      ]),
     [militares],
   );
 
-  const normalizedSearch = useMemo(() => normalizeText(searchTerm), [searchTerm]);
+  const hasExecutedExtraction = Boolean(filtrosExecutados);
+  const normalizedExecutedSearch = useMemo(
+    () => normalizeText(filtrosExecutados?.search),
+    [filtrosExecutados],
+  );
+  const filtersChangedAfterExecution =
+    hasExecutedExtraction && JSON.stringify(filtrosAtuais) !== JSON.stringify(filtrosExecutados);
 
   const filteredMilitares = useMemo(() => {
     return militares.filter((militar) => {
@@ -297,22 +307,32 @@ export default function ExtracaoEfetivo() {
       const lotacaoId = getLotacaoId(militar);
       const lotacaoNome = getLotacaoNome(militar);
 
-      if (postoFilter !== TODOS_VALUE && posto !== postoFilter) return false;
-      if (quadroFilter !== TODOS_VALUE && quadroNormalizado !== quadroFilter) return false;
-      if (statusFilter !== TODOS_VALUE && status !== statusFilter) return false;
-      if (lotacaoFilter === SEM_LOTACAO_VALUE && lotacaoNome) return false;
+      if (!filtrosExecutados) return false;
+      if (filtrosExecutados.postoGraduacao !== TODOS_VALUE && posto !== filtrosExecutados.postoGraduacao) {
+        return false;
+      }
+      if (filtrosExecutados.quadro !== TODOS_VALUE && quadroNormalizado !== filtrosExecutados.quadro) {
+        return false;
+      }
+      if (filtrosExecutados.status !== TODOS_VALUE && status !== filtrosExecutados.status) return false;
+      if (filtrosExecutados.lotacao === SEM_LOTACAO_VALUE && lotacaoNome) return false;
       if (
-        lotacaoFilter !== TODOS_VALUE &&
-        lotacaoFilter !== SEM_LOTACAO_VALUE &&
-        lotacaoId !== lotacaoFilter
+        filtrosExecutados.lotacao !== TODOS_VALUE &&
+        filtrosExecutados.lotacao !== SEM_LOTACAO_VALUE &&
+        lotacaoId !== filtrosExecutados.lotacao
       ) {
         return false;
       }
-      if (!militarMatchesSearch(militar, normalizedSearch)) return false;
+      if (!militarMatchesSearch(militar, normalizedExecutedSearch)) return false;
 
       return true;
     });
-  }, [militares, lotacaoFilter, normalizedSearch, postoFilter, quadroFilter, statusFilter]);
+  }, [filtrosExecutados, militares, normalizedExecutedSearch]);
+
+  const executeExtraction = () => {
+    setFiltrosExecutados(filtrosAtuais);
+    setExecutionId((currentExecutionId) => currentExecutionId + 1);
+  };
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -320,6 +340,11 @@ export default function ExtracaoEfetivo() {
     setQuadroFilter(TODOS_VALUE);
     setStatusFilter(TODOS_VALUE);
     setLotacaoFilter(TODOS_VALUE);
+  };
+
+  const clearExtraction = () => {
+    clearFilters();
+    setFiltrosExecutados(null);
   };
 
   if (
@@ -332,7 +357,7 @@ export default function ExtracaoEfetivo() {
 
   const totalRetornado = militares.length;
   const totalFiltrado = filteredMilitares.length;
-  const isBusy = isLoading || isFetching;
+  const isBusy = hasExecutedExtraction && (isLoading || isFetching);
   const isRateLimitError = String(error?.message || '').toLowerCase().includes('rate limit');
 
   return (
@@ -349,7 +374,7 @@ export default function ExtracaoEfetivo() {
                   Extração do Efetivo
                 </h1>
                 <p className="text-sm text-slate-500">
-                  Consulta inicial read-only baseada no escopo atual de acesso.
+                  Construtor read-only de consultas baseado no escopo atual de acesso.
                 </p>
               </div>
             </div>
@@ -372,36 +397,49 @@ export default function ExtracaoEfetivo() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="border-slate-100 shadow-sm">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="rounded-xl bg-slate-100 p-3 text-slate-700">
-                <Database className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Registros retornados</p>
-                <p className="text-3xl font-bold text-slate-800">{totalRetornado}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-slate-100 shadow-sm">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Após filtros</p>
-                <p className="text-3xl font-bold text-slate-800">{totalFiltrado}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {hasExecutedExtraction ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-slate-100 shadow-sm">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="rounded-xl bg-slate-100 p-3 text-slate-700">
+                  <Database className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Registros retornados</p>
+                  <p className="text-3xl font-bold text-slate-800">{totalRetornado}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-slate-100 shadow-sm">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Após filtros</p>
+                  <p className="text-3xl font-bold text-slate-800">{totalFiltrado}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 flex gap-3">
+            <Database className="w-5 h-5 shrink-0 mt-0.5 text-slate-400" />
+            <div>
+              <p className="font-semibold text-slate-700">Nenhuma extração executada.</p>
+              <p>
+                Configure os filtros e clique em Executar extração para carregar os totais e a
+                tabela.
+              </p>
+            </div>
+          </div>
+        )}
 
-        {totalRetornado >= BACKEND_LIMIT && (
+        {hasExecutedExtraction && totalRetornado >= BACKEND_LIMIT && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex gap-3">
             <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">Resultado inicial limitado.</p>
+              <p className="font-semibold">Resultado gerado possivelmente limitado.</p>
               <p>
                 Esta tela ainda usa limite controlado de {BACKEND_LIMIT} registros. Paginação e
                 carregamento incremental serão tratados em lote próprio.
@@ -414,7 +452,7 @@ export default function ExtracaoEfetivo() {
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <FileText className="w-4 h-4" />
-              Filtros simples
+              Filtros da extração
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
@@ -492,17 +530,55 @@ export default function ExtracaoEfetivo() {
                   </SelectContent>
                 </Select>
 
-                <Button type="button" variant="outline" onClick={clearFilters}>
-                  Limpar filtros
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    type="button"
+                    onClick={executeExtraction}
+                    disabled={!isAccessResolved || isBusy}
+                  >
+                    {isBusy ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileSearch className="w-4 h-4 mr-2" />
+                    )}
+                    Executar extração
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearExtraction}
+                    disabled={isBusy}
+                  >
+                    Limpar consulta
+                  </Button>
+                </div>
               </div>
             )}
 
             {!shouldShowLotacaoFilter && (
               <div className="flex justify-end">
-                <Button type="button" variant="outline" onClick={clearFilters}>
-                  Limpar filtros
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    type="button"
+                    onClick={executeExtraction}
+                    disabled={!isAccessResolved || isBusy}
+                  >
+                    {isBusy ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileSearch className="w-4 h-4 mr-2" />
+                    )}
+                    Executar extração
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearExtraction}
+                    disabled={isBusy}
+                  >
+                    Limpar consulta
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -513,13 +589,32 @@ export default function ExtracaoEfetivo() {
                 {lotacoesError?.message ? ` Detalhe: ${lotacoesError.message}` : ''}
               </div>
             )}
+
+            {filtersChangedAfterExecution && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                Os filtros foram alterados depois da última execução. Clique em Executar extração para
+                gerar um novo resultado com os parâmetros atuais.
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {!isAccessResolved ? (
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-12 text-center text-slate-500">
-              Resolvendo contexto de acesso para carregar a extração.
+              Resolvendo contexto de acesso para liberar a extração.
+            </CardContent>
+          </Card>
+        ) : !hasExecutedExtraction ? (
+          <Card className="border-slate-100 shadow-sm">
+            <CardContent className="p-12 text-center">
+              <FileSearch className="w-14 h-14 mx-auto text-slate-300 mb-4" />
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">
+                Configure os filtros e clique em Executar extração.
+              </h3>
+              <p className="text-sm text-slate-500">
+                Nenhum militar será carregado até a consulta escopada ser executada manualmente.
+              </p>
             </CardContent>
           </Card>
         ) : isBusy ? (
