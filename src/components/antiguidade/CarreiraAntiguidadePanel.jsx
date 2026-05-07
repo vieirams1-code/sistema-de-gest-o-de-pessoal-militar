@@ -17,6 +17,7 @@ const STATUS_BADGE = { ativo: 'bg-emerald-100 text-emerald-800', pendente: 'bg-a
 const MOTIVOS_LABEL = { [MOTIVOS.SEM_DATA]: 'Sem data de promoção', [MOTIVOS.SEM_ANTERIOR]: 'Sem número de antiguidade', [MOTIVOS.EMPATE]: 'Empate não resolvido', [MOTIVOS.SEM_QUADRO]: 'Quadro incompatível' };
 const STATUS_ATIVO = 'ativo';
 const STATUS_PREVISTO = 'previsto';
+const CONFIRMACAO_EXCLUIR_PROMOCAO = 'EXCLUIR PROMOÇÃO';
 const valorTexto = (v) => String(v || '').trim();
 const isOrdemPreenchida = (valor) => valor !== null && valor !== undefined && valor !== '' && Number.isFinite(Number(valor));
 const formatarDataLocalISO = (date) => {
@@ -32,8 +33,10 @@ export default function CarreiraAntiguidadePanel(props) {
   const [retificar, setRetificar] = React.useState(null);
   const [cancelar, setCancelar] = React.useState(null);
   const [efetivar, setEfetivar] = React.useState(null);
+  const [excluir, setExcluir] = React.useState(null);
   const [motivo, setMotivo] = React.useState('');
   const [confirmacaoEfetivar, setConfirmacaoEfetivar] = React.useState('');
+  const [confirmacaoExcluir, setConfirmacaoExcluir] = React.useState('');
   const [erroAcao, setErroAcao] = React.useState('');
 
   const historico = React.useMemo(() => [...(historicoPromocoes || [])].sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || ''))), [historicoPromocoes]);
@@ -54,6 +57,28 @@ export default function CarreiraAntiguidadePanel(props) {
     if (status === 'cancelado' || status === 'retificado') return false;
     return !valorTexto(h?.posto_graduacao_novo) || !valorTexto(h?.quadro_novo) || !valorTexto(h?.origem_dado);
   }, []);
+
+  const normalizarStatusRegistro = React.useCallback((registro) => valorTexto(registro?.status_registro).toLowerCase(), []);
+
+  const isPromocaoAtualAtivaBaseFuncional = React.useCallback((registro) => {
+    if (normalizarStatusRegistro(registro) !== STATUS_ATIVO) return false;
+    if (promocaoAtual?.id && registro?.id && String(registro.id) === String(promocaoAtual.id)) return true;
+
+    return valorTexto(registro?.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(registro?.quadro_novo) === valorTexto(militar?.quadro);
+  }, [militar?.posto_graduacao, militar?.quadro, normalizarStatusRegistro, promocaoAtual?.id]);
+
+  const podeExcluirPromocao = React.useCallback((registro) => {
+    if (!canManage) return { permitido: false, motivo: 'Apenas administradores podem excluir promoções.' };
+    if (!registro?.id) return { permitido: false, motivo: 'Registro de promoção sem identificador não pode ser excluído.' };
+    if (!militar?.id) return { permitido: false, motivo: 'Não foi possível identificar o militar da tela.' };
+    if (String(registro?.militar_id || '') !== String(militar.id)) return { permitido: false, motivo: 'O registro não pertence ao militar exibido nesta tela.' };
+
+    const status = normalizarStatusRegistro(registro);
+    if (status !== STATUS_PREVISTO && status !== STATUS_ATIVO) return { permitido: false, motivo: 'Somente promoções previstas ou promoções anteriores ativas podem ser excluídas.' };
+    if (isPromocaoAtualAtivaBaseFuncional(registro)) return { permitido: false, motivo: 'A promoção atual ativa/base funcional do militar não pode ser excluída.' };
+
+    return { permitido: true, motivo: '' };
+  }, [canManage, isPromocaoAtualAtivaBaseFuncional, militar?.id, normalizarStatusRegistro]);
 
   const onEfetivar = async (registro) => {
     if (confirmacaoEfetivar !== 'EFETIVAR') return setErroAcao('Digite EFETIVAR para confirmar.');
@@ -105,6 +130,26 @@ export default function CarreiraAntiguidadePanel(props) {
 
   const onRetificar = async (registro) => { if (!motivo.trim()) return setErroAcao('Informe o motivo da retificação.'); await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: 'retificado', motivo_retificacao: motivo }); setRetificar(null); setMotivo(''); await onHistoricoChanged?.(); };
   const onCancelar = async (registro) => { if (!motivo.trim()) return setErroAcao('Informe o motivo do cancelamento.'); await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, { status_registro: 'cancelado', motivo_retificacao: motivo }); setCancelar(null); setMotivo(''); await onHistoricoChanged?.(); };
+
+  const onExcluir = async (registro) => {
+    if (confirmacaoExcluir !== CONFIRMACAO_EXCLUIR_PROMOCAO) return setErroAcao('Digite EXCLUIR PROMOÇÃO para confirmar a exclusão.');
+
+    const elegibilidade = podeExcluirPromocao(registro);
+    if (!elegibilidade.permitido) return setErroAcao(elegibilidade.motivo);
+
+    try {
+      await base44.entities.HistoricoPromocaoMilitarV2.delete(registro.id);
+      setExcluir(null);
+      setConfirmacaoExcluir('');
+      setErroAcao('');
+      await queryClientInstance.invalidateQueries({ queryKey: ['historico-promocoes', militar.id] });
+      await queryClientInstance.invalidateQueries({ queryKey: ['ver-historico-promocoes', militar.id] });
+      await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+      await onHistoricoChanged?.();
+    } catch {
+      return setErroAcao('Não foi possível excluir a promoção. Tente novamente.');
+    }
+  };
 
   const diagnostico = validarDadosAntiguidade(militar || {}, historico || [], { exigeAntiguidadeAnterior: true });
   const criterios = [{ label: 'Posto/graduação válido', ok: Boolean(militar?.posto_graduacao) }, { label: 'Quadro compatível', ok: Boolean(militar?.quadro) }, { label: 'Data de promoção preenchida', ok: Boolean(promocaoAtual?.data_promocao) }, { label: 'Número de antiguidade definido', ok: isOrdemPreenchida(promocaoAtual?.antiguidade_referencia_ordem) }];
@@ -215,6 +260,7 @@ export default function CarreiraAntiguidadePanel(props) {
           onEditarPrevisao={(h) => onOpenPromocaoFuturaModal?.(h)}
           onCancelar={(h) => { setCancelar(h); setErroAcao(''); }}
           onEfetivar={(h) => { setEfetivar(h); setErroAcao(''); }}
+          onExcluir={(h) => { setExcluir(h); setConfirmacaoExcluir(''); setErroAcao(''); }}
         />
       </CardContent>
     </Card>
@@ -223,6 +269,7 @@ export default function CarreiraAntiguidadePanel(props) {
     <Dialog open={Boolean(retificar)} onOpenChange={(o) => !o && setRetificar(null)}><DialogContent><DialogHeader><DialogTitle>Retificar promoção</DialogTitle></DialogHeader><Label>Motivo da retificação *</Label><Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setRetificar(null)}>Fechar</Button><Button onClick={() => onRetificar(retificar)}>Confirmar retificação</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={Boolean(cancelar)} onOpenChange={(o) => !o && setCancelar(null)}><DialogContent><DialogHeader><DialogTitle>Cancelar registro/previsão</DialogTitle></DialogHeader><Label>Motivo do cancelamento *</Label><Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setCancelar(null)}>Fechar</Button><Button variant="destructive" onClick={() => onCancelar(cancelar)}>Confirmar cancelamento</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={Boolean(efetivar)} onOpenChange={(o) => !o && setEfetivar(null)}><DialogContent><DialogHeader><DialogTitle>Efetivar promoção futura</DialogTitle><DialogDescription>Esta ação atualizará o posto/graduação do militar no cadastro funcional. Deseja continuar?</DialogDescription></DialogHeader><Label>Digite EFETIVAR para confirmar</Label><Input value={confirmacaoEfetivar} onChange={(e) => setConfirmacaoEfetivar(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setEfetivar(null)}>Fechar</Button><Button onClick={() => onEfetivar(efetivar)}>Efetivar promoção</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(excluir)} onOpenChange={(o) => { if (!o) { setExcluir(null); setConfirmacaoExcluir(''); setErroAcao(''); } }}><DialogContent><DialogHeader><DialogTitle>Excluir promoção</DialogTitle><DialogDescription>Excluir remove o registro. Para preservar histórico/auditoria, use Cancelar.</DialogDescription></DialogHeader><div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><p>Esta ação é irreversível e deve ser usada apenas para erro de lançamento/cadastro indevido.</p></div></div><Label>Digite EXCLUIR PROMOÇÃO para confirmar</Label><Input value={confirmacaoExcluir} onChange={(e) => setConfirmacaoExcluir(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => { setExcluir(null); setConfirmacaoExcluir(''); setErroAcao(''); }}>Fechar</Button><Button variant="destructive" onClick={() => onExcluir(excluir)}>Excluir promoção</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 
