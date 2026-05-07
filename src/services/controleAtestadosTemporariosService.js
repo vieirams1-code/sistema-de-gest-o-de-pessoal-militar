@@ -195,19 +195,88 @@ export function agruparAtestadosPorMilitar(atestados) {
   }, {});
 }
 
-function montarMilitarBase(militar, atestados) {
+function obterValorNormalizado(...valores) {
+  for (const valor of valores) {
+    const normalizado = normalizarTexto(valor);
+    if (normalizado) return normalizado;
+  }
+  return '';
+}
+
+function obterMilitarEscopadoPorId(militarId, militaresPorId) {
+  if (!militarId || !militaresPorId) return null;
+
+  if (militaresPorId instanceof Map) {
+    return militaresPorId.get(militarId) || militaresPorId.get(String(militarId)) || null;
+  }
+
+  if (Array.isArray(militaresPorId)) {
+    return militaresPorId.find((militar) => String(militar?.id || '') === String(militarId)) || null;
+  }
+
+  return militaresPorId[militarId] || militaresPorId[String(militarId)] || null;
+}
+
+function criarMapaMilitaresPorId(militaresEscopados) {
+  if (militaresEscopados instanceof Map) return militaresEscopados;
+  if (!Array.isArray(militaresEscopados)) return null;
+
+  return new Map(
+    militaresEscopados
+      .filter((militar) => militar?.id)
+      .map((militar) => [militar.id, militar]),
+  );
+}
+
+function obterLotacaoMilitar(militar, atestado) {
+  const lotacaoObjeto = militar?.lotacao_atual || militar?.lotacaoAtual || atestado?.militar?.lotacao_atual || atestado?.militar?.lotacaoAtual;
+  return obterValorNormalizado(
+    militar?.lotacao,
+    militar?.unidade,
+    militar?.unidade_atual,
+    militar?.unidadeAtual,
+    lotacaoObjeto?.nome,
+    lotacaoObjeto?.sigla,
+    atestado?.militar_lotacao,
+    atestado?.militar_unidade,
+    atestado?.lotacao,
+    atestado?.unidade,
+    atestado?.militar?.lotacao,
+    atestado?.militar?.unidade,
+  );
+}
+
+function obterEstruturaMilitar(militar, atestado) {
+  return obterValorNormalizado(
+    militar?.estrutura,
+    militar?.estrutura_nome,
+    militar?.estruturaNome,
+    militar?.lotacao_atual?.estrutura,
+    militar?.lotacaoAtual?.estrutura,
+    atestado?.militar_estrutura,
+    atestado?.estrutura,
+    atestado?.militar?.estrutura,
+  );
+}
+
+function montarMilitarBase(militar, atestados, { militaresPorId = null } = {}) {
   const primeiro = atestados?.[0] || {};
-  const quadroOriginal = normalizarTexto(militar?.quadro || primeiro.militar_quadro || primeiro.quadro || primeiro.militar?.quadro);
+  const militarId = militar?.id || primeiro.militar_id || primeiro.militar?.id || null;
+  const militarEscopado = obterMilitarEscopadoPorId(militarId, militaresPorId);
+  const fonteMilitar = militarEscopado || militar;
+  const quadroOriginal = obterValorNormalizado(fonteMilitar?.quadro, primeiro.militar_quadro, primeiro.quadro, primeiro.militar?.quadro);
   const quadroNormalizado = normalizarQuadroControleAtestados(quadroOriginal);
 
   return {
-    id: militar?.id || primeiro.militar_id || primeiro.militar?.id || null,
-    nome: normalizarTexto(militar?.nome || primeiro.militar_nome || primeiro.militar?.nome) || 'Militar não identificado',
-    postoGraduacao: normalizarTexto(militar?.posto_graduacao || militar?.posto || primeiro.militar_posto_graduacao || primeiro.posto_graduacao || primeiro.militar?.posto_graduacao) || '-',
+    id: fonteMilitar?.id || militarId,
+    nome: obterValorNormalizado(fonteMilitar?.nome, primeiro.militar_nome, primeiro.militar?.nome) || 'Militar não identificado',
+    postoGraduacao: obterValorNormalizado(fonteMilitar?.posto_graduacao, fonteMilitar?.postoGraduacao, fonteMilitar?.posto, primeiro.militar_posto_graduacao, primeiro.militar_posto, primeiro.posto_graduacao, primeiro.posto, primeiro.militar?.posto_graduacao, primeiro.militar?.posto) || '-',
     quadro: quadroNormalizado || '-',
     quadroOriginal: quadroOriginal || '-',
-    matricula: normalizarTexto(militar?.matricula || primeiro.militar_matricula_label || primeiro.militar_matricula_atual || primeiro.militar_matricula || primeiro.matricula || primeiro.militar?.matricula) || '-',
-    lotacao: normalizarTexto(militar?.lotacao || militar?.unidade || primeiro.militar_lotacao || primeiro.lotacao || primeiro.unidade || primeiro.militar?.lotacao) || '-',
+    matricula: obterValorNormalizado(fonteMilitar?.matricula, fonteMilitar?.matricula_atual, fonteMilitar?.matriculaAtual, primeiro.militar_matricula_label, primeiro.militar_matricula_atual, primeiro.militar_matricula, primeiro.matricula, primeiro.militar?.matricula) || '-',
+    lotacao: obterLotacaoMilitar(fonteMilitar, primeiro) || '-',
+    estrutura: obterEstruturaMilitar(fonteMilitar, primeiro) || '-',
+    dadosEscopadosEncontrados: Boolean(militarEscopado),
   };
 }
 
@@ -237,9 +306,15 @@ function contarAtestadosVigentes(intervalos, dataReferencia) {
   return (intervalos || []).filter((intervalo) => intervalo.inicio <= referencia && intervalo.fim >= referencia).length;
 }
 
-export function avaliarRiscoAtestadosMilitar({ militar = null, atestados = [], dataReferencia = new Date() } = {}) {
+export function avaliarRiscoAtestadosMilitar({ militar = null, atestados = [], dataReferencia = new Date(), militaresPorId = null, militaresEscopados = null } = {}) {
   const periodos = atestados.map(normalizarPeriodoAtestado);
+  const mapaMilitaresPorId = militaresPorId || criarMapaMilitaresPorId(militaresEscopados);
+  const primeiroAtestado = atestados?.[0] || {};
+  const militarIdAtestado = primeiroAtestado.militar_id || primeiroAtestado.militar?.id || militar?.id || null;
   const lacunas = periodos.flatMap((periodo) => periodo.lacunas);
+  if (militarIdAtestado && mapaMilitaresPorId && !obterMilitarEscopadoPorId(militarIdAtestado, mapaMilitaresPorId)) {
+    lacunas.push('Dados completos do militar não encontrados no escopo carregado.');
+  }
   const intervalosValidos = periodos
     .filter((periodo) => periodo.valido)
     .map((periodo) => ({ inicio: periodo.inicio, fim: periodo.fim, atestado: periodo.atestado, atestados: [periodo.atestado] }));
@@ -247,7 +322,7 @@ export function avaliarRiscoAtestadosMilitar({ militar = null, atestados = [], d
   const maiorSequenciaContinua = calcularMaiorSequenciaContinua(intervalosMesclados);
   const diasJanela365 = calcularDiasUnicosNaJanela(intervalosMesclados, dataReferencia, 365);
   const possuiPeriodoValido = intervalosValidos.length > 0;
-  const militarBase = montarMilitarBase(militar, atestados);
+  const militarBase = montarMilitarBase(militar, atestados, { militaresPorId: mapaMilitaresPorId });
   const temporarioClassificacao = classificarTemporario(militarBase.quadro === '-' ? '' : militarBase.quadro);
   const ehTemporario = temporarioClassificacao === 'sim' && isMilitarTemporarioParaControleAtestados(militarBase);
   const statusRisco = temporarioClassificacao === 'nao_classificado'

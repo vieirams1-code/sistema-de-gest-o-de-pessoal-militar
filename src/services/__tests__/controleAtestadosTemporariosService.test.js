@@ -119,6 +119,141 @@ test('quadro ausente gera temporário não classificado', () => {
   assert.equal(resultado.alertaLegalTemporario, false);
 });
 
+test('enriquece dados do militar por militar_id usando militar escopado', () => {
+  const militaresPorId = new Map([
+    ['militar-1', {
+      id: 'militar-1',
+      nome: 'Militar Escopado',
+      posto_graduacao: '2º Ten BM',
+      quadro: 'QOETBM',
+      matricula: '123456',
+      lotacao: '1º BBM',
+      estrutura: 'Comando Operacional',
+    }],
+  ]);
+
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-1',
+      militar_nome: 'Nome do Atestado',
+      militar_posto: 'Sd BM',
+      militar_quadro: 'QOBM',
+      militar_matricula: '999999',
+      militar_lotacao: 'Lotação do Atestado',
+      data_inicio: '2026-01-01',
+      data_termino: '2026-01-05',
+    }],
+    militaresPorId,
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.militar.nome, 'Militar Escopado');
+  assert.equal(resultado.militar.postoGraduacao, '2º Ten BM');
+  assert.equal(resultado.militar.quadro, 'QOETBM');
+  assert.equal(resultado.militar.matricula, '123456');
+  assert.equal(resultado.militar.lotacao, '1º BBM');
+  assert.equal(resultado.militar.estrutura, 'Comando Operacional');
+  assert.equal(resultado.militar.dadosEscopadosEncontrados, true);
+});
+
+test('mantém fallback para dados do atestado quando militar escopado não existe', () => {
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-fora-do-mapa',
+      militar_nome: 'Militar do Atestado',
+      militar_posto: 'Cb BM',
+      militar_quadro: 'QPTBM',
+      militar_matricula: '654321',
+      militar_lotacao: '2º BBM',
+      data_inicio: '2026-01-01',
+      data_termino: '2026-01-05',
+    }],
+    militaresPorId: new Map(),
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.militar.nome, 'Militar do Atestado');
+  assert.equal(resultado.militar.postoGraduacao, 'Cb BM');
+  assert.equal(resultado.militar.quadro, 'QPTBM');
+  assert.equal(resultado.militar.matricula, '654321');
+  assert.equal(resultado.militar.lotacao, '2º BBM');
+  assert.equal(resultado.militar.dadosEscopadosEncontrados, false);
+});
+
+test('quadro vindo do militar escopado classifica temporário corretamente', () => {
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-2',
+      militar_nome: 'Militar Temporário',
+      militar_quadro: 'QOBM',
+      data_inicio: '2026-02-01',
+      data_termino: '2026-02-10',
+    }],
+    militaresPorId: new Map([['militar-2', { id: 'militar-2', nome: 'Militar Temporário Escopado', quadro: 'QOSTBM' }]]),
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.militar.quadro, 'QOSTBM');
+  assert.equal(resultado.temporarioClassificacao, 'sim');
+  assert.equal(resultado.ehTemporario, true);
+});
+
+test('quadro ausente no atestado mas presente no militar escopado permite alerta 30/60', () => {
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-3',
+      militar_nome: 'Militar sem quadro no atestado',
+      data_inicio: '2026-03-01',
+      data_termino: '2026-03-30',
+    }],
+    militaresEscopados: [{ id: 'militar-3', nome: 'Militar Enriquecido', quadro: 'QOETBM' }],
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.militar.quadro, 'QOETBM');
+  assert.equal(resultado.temporarioClassificacao, 'sim');
+  assert.equal(resultado.alertaLegalTemporario, true);
+  assert.equal(resultado.statusRisco, 'critico_continuo');
+});
+
+test('militar_id sem correspondência no mapa não quebra cálculo e gera lacuna discreta', () => {
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-nao-carregado',
+      militar_nome: 'Militar com fallback',
+      militar_quadro: 'QPTBM',
+      data_inicio: '2026-04-01',
+      data_termino: '2026-04-05',
+    }],
+    militaresPorId: new Map([['outro-id', { id: 'outro-id', nome: 'Outro Militar', quadro: 'QOETBM' }]]),
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.quantidadeAtestadosConsiderados, 1);
+  assert.equal(resultado.militar.nome, 'Militar com fallback');
+  assert.match(resultado.lacunas.join(' '), /Dados completos do militar não encontrados no escopo carregado/);
+});
+
+test('não temporário enriquecido continua sem alerta legal', () => {
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-4',
+      militar_nome: 'Militar com atestado temporário legado',
+      militar_quadro: 'QOETBM',
+      data_inicio: '2026-05-01',
+      data_termino: '2026-05-30',
+    }],
+    militaresPorId: new Map([['militar-4', { id: 'militar-4', nome: 'Militar Efetivo Escopado', quadro: 'QOBM' }]]),
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.militar.quadro, 'QOBM');
+  assert.equal(resultado.temporarioClassificacao, 'nao');
+  assert.equal(resultado.ehTemporario, false);
+  assert.equal(resultado.alertaLegalTemporario, false);
+  assert.equal(resultado.statusRisco, 'normal');
+});
+
 test('atestados sobrepostos não duplicam dias', () => {
   const intervalos = [
     normalizarPeriodoAtestado({ data_inicio: '2026-01-01', data_termino: '2026-01-10' }),

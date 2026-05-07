@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { fetchScopedAtestadosBundle } from '@/services/getScopedAtestadosBundleClient';
+import { fetchScopedMilitares } from '@/services/getScopedMilitaresClient';
 import {
   agruparAtestadosPorMilitar,
   avaliarRiscoAtestadosMilitar,
@@ -52,14 +53,14 @@ function normalizarBusca(valor) {
   return String(valor || '').trim().toLowerCase();
 }
 
-function montarAnalise(atestados) {
+function montarAnalise(atestados, militaresPorId) {
   const grupos = agruparAtestadosPorMilitar(atestados);
   const dataReferencia = new Date();
 
   return Object.entries(grupos)
     .map(([chave, atestadosMilitar]) => ({
       chave,
-      ...avaliarRiscoAtestadosMilitar({ atestados: atestadosMilitar, dataReferencia }),
+      ...avaliarRiscoAtestadosMilitar({ atestados: atestadosMilitar, dataReferencia, militaresPorId }),
     }))
     .sort((a, b) => {
       const criticoA = a.statusRisco.startsWith('critico') ? 0 : 1;
@@ -113,13 +114,50 @@ export default function ControleAtestadosTemporarios() {
   const [somenteTemporarios, setSomenteTemporarios] = useState(false);
   const [somenteCriticos, setSomenteCriticos] = useState(false);
 
-  const { data: bundle = { atestados: [], meta: {} }, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['controle-atestados-temporarios-bundle', isAdmin, modoAcesso, userEmail, effectiveUserEmail || effectiveEmail || null],
+  const contextoEscopo = useMemo(() => ({
+    isAdmin: Boolean(isAdmin),
+    modoAcesso: modoAcesso || null,
+    userEmail: userEmail || null,
+    effectiveUserEmail: effectiveUserEmail || null,
+    effectiveEmail: effectiveUserEmail || effectiveEmail || null,
+  }), [effectiveEmail, effectiveUserEmail, isAdmin, modoAcesso, userEmail]);
+
+  const {
+    data: bundle = { atestados: [], meta: {} },
+    isLoading: isLoadingAtestados,
+    isFetching: isFetchingAtestados,
+    refetch: refetchAtestados,
+  } = useQuery({
+    queryKey: ['controle-atestados-temporarios-bundle', contextoEscopo],
     queryFn: async () => fetchScopedAtestadosBundle(),
     enabled: isAccessResolved && hasControleAccess,
   });
 
-  const analises = useMemo(() => montarAnalise(bundle?.atestados || []), [bundle?.atestados]);
+  const {
+    data: militaresBundle = { militares: [], meta: {} },
+    isLoading: isLoadingMilitares,
+    isFetching: isFetchingMilitares,
+    refetch: refetchMilitares,
+  } = useQuery({
+    queryKey: ['controle-atestados-temporarios-militares', contextoEscopo],
+    queryFn: async () => fetchScopedMilitares({
+      ...contextoEscopo,
+      includeFoto: false,
+    }),
+    enabled: isAccessResolved && hasControleAccess,
+  });
+
+  const militaresEscopados = militaresBundle?.militares || [];
+  const militaresPorId = useMemo(
+    () => new Map(militaresEscopados.filter((militar) => militar?.id).map((militar) => [militar.id, militar])),
+    [militaresEscopados],
+  );
+
+  const isLoading = isLoadingAtestados || isLoadingMilitares;
+  const isFetching = isFetchingAtestados || isFetchingMilitares;
+  const refetch = () => Promise.all([refetchAtestados(), refetchMilitares()]);
+
+  const analises = useMemo(() => montarAnalise(bundle?.atestados || [], militaresPorId), [bundle?.atestados, militaresPorId]);
   const quadrosDisponiveis = useMemo(() => obterOpcoes(analises, (analise) => analise.militar.quadro), [analises]);
   const lotacoesDisponiveis = useMemo(() => obterOpcoes(analises, (analise) => analise.militar.lotacao), [analises]);
 
@@ -185,7 +223,7 @@ export default function ControleAtestadosTemporarios() {
           <ResumoCard title="Atestados vigentes" value={resumo.atestadosVigentes} icon={CalendarCheck} />
           <ResumoCard title="Dias totais na janela" value={resumo.diasTotaisJanela} icon={CalendarDays} />
           <ResumoCard title="Temporários em atenção/alerta/crítico" value={resumo.temporariosEmPrazo} icon={ShieldAlert} tone="red" />
-          <ResumoCard title="Registros com lacunas de data" value={resumo.registrosComLacunasData} icon={AlertTriangle} tone="amber" />
+          <ResumoCard title="Registros com lacunas" value={resumo.registrosComLacunasData} icon={AlertTriangle} tone="amber" />
         </div>
 
         <Card className="mb-6 border-slate-200 shadow-sm">
@@ -303,7 +341,7 @@ export default function ControleAtestadosTemporarios() {
                           </Badge>
                         </TableCell>
                         <TableCell className="min-w-72 text-xs text-slate-500">
-                          {analise.lacunas.length ? analise.lacunas.join(' ') : 'Sem lacunas de data identificadas.'}
+                          {analise.lacunas.length ? analise.lacunas.join(' ') : 'Sem lacunas identificadas.'}
                         </TableCell>
                       </TableRow>
                     ))}
