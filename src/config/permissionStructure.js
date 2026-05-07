@@ -13,6 +13,13 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_extracao_efetivo',
+        label: 'Extração do Efetivo',
+        actions: [
+          { key: 'perm_visualizar_extracao_efetivo', label: 'Visualizar Extração do Efetivo' }
+        ]
+      },
+      {
         key: 'acesso_migracao_militares',
         label: 'Migração de Militares',
         actions: [

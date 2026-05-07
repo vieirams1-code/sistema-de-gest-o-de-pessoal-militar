@@ -40,6 +40,7 @@ const moduleGuardByPage = {
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   Ferias: { moduleKey: 'ferias', moduleName: 'Férias' },
   Militares: { moduleKey: 'militares', moduleName: 'Efetivo' },
+  ExtracaoEfetivo: { moduleKey: 'extracao_efetivo', actionKey: 'visualizar_extracao_efetivo', moduleName: 'Extração do Efetivo' },
   Armamentos: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
   Medalhas: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   ApuracaoMedalhasTempoServico: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
