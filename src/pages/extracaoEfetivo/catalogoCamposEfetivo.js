@@ -1,4 +1,4 @@
-import { normalizarQuadroLegado } from '@/utils/postoQuadroCompatibilidade';
+import { normalizarQuadroLegado } from '../../utils/postoQuadroCompatibilidade.js';
 
 const MATRICULA_FIELDS = ['matricula_atual', 'matricula'];
 const LOTACAO_NOME_FIELDS = [

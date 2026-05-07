@@ -11,7 +11,8 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "publish:base44": "bash ./scripts/publish-github-base44.sh",
-    "test": "npm run lint && npm run build"
+    "test": "npm run lint && npm run build && npm run test:unit",
+    "test:unit": "node --test src/pages/extracaoEfetivo/__tests__/*.test.js"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.27",
