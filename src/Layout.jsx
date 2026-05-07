@@ -32,7 +32,6 @@ import {
   CircleAlert,
   UserCircle2,
   ListOrdered,
-  FileText,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -66,34 +65,26 @@ const menuGroups = [
         page: 'Militares',
         icon: Users,
         anyOf: [
+          { type: 'module', key: 'militares' },
           { type: 'action', key: 'visualizar_militares' },
-{
-  name: 'Efetivo',
-  page: 'Militares',
-  icon: Users,
-  permissions: [
-    { type: 'module', key: 'militares' },
-    { type: 'action', key: 'visualizar_militares' },
-    { type: 'module', key: 'extracao_efetivo' },
-    { type: 'action', key: 'visualizar_extracao_efetivo' },
-  ],
-  children: [
-    {
-      name: 'Consulta',
-      page: 'Militares',
-      icon: Users,
-      moduleKey: 'militares',
-      actionKey: 'visualizar_militares',
-    },
-    {
-      name: 'Extração',
-      page: 'ExtracaoEfetivo',
-      icon: FileSearch,
-      moduleKey: 'extracao_efetivo',
-      actionKey: 'visualizar_extracao_efetivo',
-    },
-  ],
-},
+          { type: 'module', key: 'extracao_efetivo' },
+          { type: 'action', key: 'visualizar_extracao_efetivo' },
+        ],
+        children: [
+          {
+            name: 'Consulta',
+            page: 'Militares',
+            icon: Users,
+            moduleKey: 'militares',
+            actionKey: 'visualizar_militares',
+          },
+          {
+            name: 'Extração',
+            page: 'ExtracaoEfetivo',
+            icon: FileSearch,
+            moduleKey: 'extracao_efetivo',
+            actionKey: 'visualizar_extracao_efetivo',
+          },
         ],
       },
       { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
