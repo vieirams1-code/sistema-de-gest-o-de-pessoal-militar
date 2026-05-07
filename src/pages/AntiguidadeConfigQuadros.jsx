@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
+import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,13 +36,13 @@ import {
 
 const VERSAO_REGRA_RASCUNHO = 'antiguidade.quadros.rascunho.v1';
 const OBSERVACAO_PADRAO = 'Confirmar precedência institucional.';
-const MOTIVO_INICIAL = 'Configuração inicial a partir dos quadros reais cadastrados.';
+const MOTIVO_INICIAL = 'Configuração inicial a partir dos quadros oficiais do sistema e valores reais cadastrados.';
 const TEXTO_PENDENCIA = 'Configuração pendente de confirmação institucional. Esta configuração ainda não gera listagem oficial e não cria snapshot.';
 
 const badgesInstitucionais = [
   'Rascunho controlado',
   'Pendente de confirmação institucional',
-  'Somente quadros reais de Militar.quadro',
+  'Quadros oficiais do sistema + legados reais',
   'Sem snapshot',
 ];
 
@@ -81,17 +82,63 @@ function calcularQuadrosReais(militares) {
   });
 }
 
-function sanitizarMembrosReais(membros, quadrosReaisSet) {
+function montarQuadrosDisponiveisParaConfiguracao(quadrosReais) {
+  const oficiaisSet = new Set(QUADROS_FIXOS);
+  const reaisPorValor = new Map(quadrosReais.map((quadro) => [quadro.valor, quadro]));
+  const disponiveis = QUADROS_FIXOS.map((valor, indiceOficial) => {
+    const real = reaisPorValor.get(valor);
+    return {
+      valor,
+      quantidade: real?.quantidade || 0,
+      vazio: false,
+      oficial: true,
+      legado: false,
+      origem: real ? 'opcao_sistema_e_valor_real' : 'opcao_sistema',
+      indiceOficial,
+    };
+  });
+
+  quadrosReais.forEach((quadro) => {
+    if (quadro.vazio || !texto(quadro.valor) || oficiaisSet.has(quadro.valor)) return;
+    disponiveis.push({
+      ...quadro,
+      oficial: false,
+      legado: true,
+      origem: 'legado_base',
+      indiceOficial: Number.POSITIVE_INFINITY,
+    });
+  });
+
+  quadrosReais.forEach((quadro) => {
+    if (!quadro.vazio) return;
+    disponiveis.push({
+      ...quadro,
+      oficial: false,
+      legado: false,
+      origem: 'valor_real_vazio',
+      indiceOficial: Number.POSITIVE_INFINITY,
+    });
+  });
+
+  return disponiveis.sort((a, b) => {
+    if (a.vazio !== b.vazio) return a.vazio ? 1 : -1;
+    if (a.oficial !== b.oficial) return a.oficial ? -1 : 1;
+    if (a.indiceOficial !== b.indiceOficial) return a.indiceOficial - b.indiceOficial;
+    return ordenarQuadros(a, b);
+  });
+}
+
+function sanitizarMembrosReais(membros, quadrosConfiguraveisSet) {
   if (!Array.isArray(membros)) return [];
   const vistos = new Set();
   return membros
     .map((membro) => String(membro ?? ''))
-    .filter((membro) => texto(membro) && quadrosReaisSet.has(membro) && !vistos.has(membro) && vistos.add(membro));
+    .filter((membro) => texto(membro) && quadrosConfiguraveisSet.has(membro) && !vistos.has(membro) && vistos.add(membro));
 }
 
-function normalizarGrupoConfigurado(grupo, posicao, quadrosReaisSet) {
+function normalizarGrupoConfigurado(grupo, posicao, quadrosConfiguraveisSet) {
   const nomeGrupo = texto(grupo?.nome_grupo || grupo?.grupo || grupo?.nome);
-  const membrosReais = sanitizarMembrosReais(grupo?.membros_reais || grupo?.membros, quadrosReaisSet);
+  const membrosReais = sanitizarMembrosReais(grupo?.membros_reais || grupo?.membros, quadrosConfiguraveisSet);
   return {
     id_local: texto(grupo?.id_local) || slugLocal(nomeGrupo || membrosReais[0], posicao),
     nome_grupo: nomeGrupo || membrosReais[0] || '',
@@ -105,8 +152,8 @@ function normalizarGrupoConfigurado(grupo, posicao, quadrosReaisSet) {
   };
 }
 
-function criarSugestaoInicial(quadrosReais) {
-  return quadrosReais
+function criarSugestaoInicial(quadrosDisponiveis) {
+  return quadrosDisponiveis
     .filter((quadro) => !quadro.vazio && texto(quadro.valor))
     .map((quadro, indice) => ({
       id_local: slugLocal(quadro.valor, indice),
@@ -125,19 +172,19 @@ function obterConfiguracaoAtiva(configuracoes) {
   return (configuracoes || []).find((config) => config?.ativo === true && Array.isArray(config?.ordem_quadros));
 }
 
-function montarRascunhoInicial(configuracoes, quadrosReais) {
-  const quadrosReaisSet = new Set(quadrosReais.filter((quadro) => !quadro.vazio).map((quadro) => quadro.valor));
+function montarRascunhoInicial(configuracoes, quadrosDisponiveis) {
+  const quadrosConfiguraveisSet = new Set(quadrosDisponiveis.filter((quadro) => !quadro.vazio).map((quadro) => quadro.valor));
   const configuracaoAtiva = obterConfiguracaoAtiva(configuracoes);
 
   if (configuracaoAtiva) {
     const grupos = configuracaoAtiva.ordem_quadros
-      .map((grupo, posicao) => normalizarGrupoConfigurado(grupo, posicao, quadrosReaisSet))
+      .map((grupo, posicao) => normalizarGrupoConfigurado(grupo, posicao, quadrosConfiguraveisSet))
       .filter((grupo) => grupo.ativo !== false || grupo.membros_reais.length > 0)
       .sort((a, b) => a.indice - b.indice || a.nome_grupo.localeCompare(b.nome_grupo, 'pt-BR'));
 
     return {
       configuracaoAtiva,
-      grupos: grupos.length ? grupos : criarSugestaoInicial(quadrosReais),
+      grupos: grupos.length ? grupos : criarSugestaoInicial(quadrosDisponiveis),
       motivoAlteracao: texto(grupos.find((grupo) => texto(grupo.motivo_alteracao))?.motivo_alteracao) || '',
       origem: grupos.length ? 'configuracao_ativa' : 'sugestao',
     };
@@ -145,17 +192,17 @@ function montarRascunhoInicial(configuracoes, quadrosReais) {
 
   return {
     configuracaoAtiva: null,
-    grupos: criarSugestaoInicial(quadrosReais),
+    grupos: criarSugestaoInicial(quadrosDisponiveis),
     motivoAlteracao: MOTIVO_INICIAL,
     origem: 'sugestao',
   };
 }
 
-function calcularValidacoes(grupos, quadrosReais, motivoAlteracao) {
+function calcularValidacoes(grupos, quadrosDisponiveis, motivoAlteracao) {
   const alertas = [];
   const indices = new Map();
   const membros = new Map();
-  const quadrosClassificaveis = quadrosReais.filter((quadro) => !quadro.vazio && texto(quadro.valor)).map((quadro) => quadro.valor);
+  const quadrosClassificaveis = quadrosDisponiveis.filter((quadro) => !quadro.vazio && texto(quadro.valor)).map((quadro) => quadro.valor);
   const quadrosClassificados = new Set();
 
   grupos.forEach((grupo, posicao) => {
@@ -164,7 +211,7 @@ function calcularValidacoes(grupos, quadrosReais, motivoAlteracao) {
     const membrosGrupo = Array.isArray(grupo.membros_reais) ? grupo.membros_reais.filter((membro) => texto(membro)) : [];
 
     if (!texto(grupo.nome_grupo)) alertas.push(`Grupo na posição ${posicao + 1} está sem nome.`);
-    if (membrosGrupo.length === 0) alertas.push(`${identificador} está ativo e sem membros reais.`);
+    if (membrosGrupo.length === 0) alertas.push(`${identificador} está ativo e sem quadros cobertos.`);
 
     const indiceKey = String(grupo.indice ?? '');
     if (!indiceKey || Number.isNaN(Number(indiceKey))) {
@@ -189,12 +236,12 @@ function calcularValidacoes(grupos, quadrosReais, motivoAlteracao) {
 
   membros.forEach((ocorrencias, membro) => {
     const gruposUnicos = Array.from(new Set(ocorrencias));
-    if (gruposUnicos.length > 1) alertas.push(`Membro real repetido (${membro}) nos grupos: ${gruposUnicos.join(', ')}.`);
+    if (gruposUnicos.length > 1) alertas.push(`Quadro coberto repetido (${membro}) nos grupos: ${gruposUnicos.join(', ')}.`);
   });
 
   const naoClassificados = quadrosClassificaveis.filter((quadro) => !quadrosClassificados.has(quadro));
   if (naoClassificados.length > 0) {
-    alertas.push(`Há quadros reais não classificados: ${naoClassificados.join(', ')}.`);
+    alertas.push(`Há quadros oficiais ou legados reais não classificados: ${naoClassificados.join(', ')}.`);
   }
 
   if (!texto(motivoAlteracao)) alertas.push('Motivo da alteração é obrigatório.');
@@ -236,27 +283,28 @@ export default function AntiguidadeConfigQuadros() {
   });
 
   const quadrosReais = useMemo(() => calcularQuadrosReais(militaresAtivos), [militaresAtivos]);
-  const quadrosReaisSet = useMemo(() => new Set(quadrosReais.filter((quadro) => !quadro.vazio).map((quadro) => quadro.valor)), [quadrosReais]);
+  const quadrosDisponiveis = useMemo(() => montarQuadrosDisponiveisParaConfiguracao(quadrosReais), [quadrosReais]);
+  const quadrosConfiguraveisSet = useMemo(() => new Set(quadrosDisponiveis.filter((quadro) => !quadro.vazio).map((quadro) => quadro.valor)), [quadrosDisponiveis]);
 
   useEffect(() => {
     if (militaresLoading || configuracoesLoading) return;
-    const inicial = montarRascunhoInicial(configuracoesAtivas, quadrosReais);
+    const inicial = montarRascunhoInicial(configuracoesAtivas, quadrosDisponiveis);
     setGrupos(inicial.grupos);
     setMotivoAlteracao(inicial.motivoAlteracao);
     setEstadoInicial(inicial);
-  }, [configuracoesAtivas, configuracoesLoading, militaresLoading, quadrosReais]);
+  }, [configuracoesAtivas, configuracoesLoading, militaresLoading, quadrosDisponiveis]);
 
-  const validacoes = useMemo(() => calcularValidacoes(grupos, quadrosReais, motivoAlteracao), [grupos, motivoAlteracao, quadrosReais]);
+  const validacoes = useMemo(() => calcularValidacoes(grupos, quadrosDisponiveis, motivoAlteracao), [grupos, motivoAlteracao, quadrosDisponiveis]);
   const gruposAtivos = useMemo(() => grupos.filter((grupo) => grupo.ativo !== false), [grupos]);
   const gruposOrdenados = useMemo(() => ordenarGruposPorIndice(gruposAtivos), [gruposAtivos]);
   const podeSalvar = validacoes.alertas.length === 0 && !militaresErro && !configuracoesErro;
 
   const totais = useMemo(() => ({
-    reais: quadrosReais.filter((quadro) => !quadro.vazio && texto(quadro.valor)).length,
-    classificados: Array.from(validacoes.classificados).filter((quadro) => quadrosReaisSet.has(quadro)).length,
+    disponiveis: quadrosDisponiveis.filter((quadro) => !quadro.vazio && texto(quadro.valor)).length,
+    classificados: Array.from(validacoes.classificados).filter((quadro) => quadrosConfiguraveisSet.has(quadro)).length,
     naoClassificados: validacoes.naoClassificados.length,
     grupos: gruposAtivos.length,
-  }), [gruposAtivos.length, quadrosReais, quadrosReaisSet, validacoes]);
+  }), [gruposAtivos.length, quadrosConfiguraveisSet, quadrosDisponiveis, validacoes]);
 
   const salvarMutation = useMutation({
     mutationFn: async () => {
@@ -265,7 +313,9 @@ export default function AntiguidadeConfigQuadros() {
         id_local: texto(grupo.id_local) || slugLocal(grupo.nome_grupo, posicao),
         nome_grupo: texto(grupo.nome_grupo),
         indice: Number(grupo.indice),
-        membros_reais: sanitizarMembrosReais(grupo.membros_reais, quadrosReaisSet),
+        // Neste editor, membros_reais significa valores de quadro cobertos pela configuração,
+        // incluindo opções oficiais do sistema e valores legados reais encontrados na base.
+        membros_reais: sanitizarMembrosReais(grupo.membros_reais, quadrosConfiguraveisSet),
         observacao: texto(grupo.observacao),
         ativo: true,
         pendente_confirmacao_institucional: grupo.pendente_confirmacao_institucional !== false,
@@ -281,7 +331,7 @@ export default function AntiguidadeConfigQuadros() {
       if (idConfiguracao) return base44.entities.ConfiguracaoAntiguidade.update(idConfiguracao, payloadAtualizacao);
 
       return base44.entities.ConfiguracaoAntiguidade.create({
-        nome_configuracao: 'Rascunho de configuração de quadros reais para antiguidade',
+        nome_configuracao: 'Rascunho de configuração de quadros disponíveis para antiguidade',
         ativo: true,
         versao_regra: VERSAO_REGRA_RASCUNHO,
         ordem_quadros: ordemQuadros,
@@ -321,7 +371,7 @@ export default function AntiguidadeConfigQuadros() {
   }
 
   function adicionarMembro(idLocal, membro) {
-    if (!texto(membro) || !quadrosReaisSet.has(membro)) return;
+    if (!texto(membro) || !quadrosConfiguraveisSet.has(membro)) return;
     setGrupos((atuais) => atuais.map((grupo) => {
       if (grupo.id_local !== idLocal) return grupo;
       const membros = Array.isArray(grupo.membros_reais) ? grupo.membros_reais : [];
@@ -408,7 +458,7 @@ export default function AntiguidadeConfigQuadros() {
         <AlertCircle className="h-4 w-4 text-amber-700" />
         <AlertTitle>Esta configuração ainda não gera listagem oficial e não cria snapshot.</AlertTitle>
         <AlertDescription>
-          O rascunho usa exclusivamente valores literais encontrados em Militar.quadro de militares ativos e fica pendente de confirmação institucional.
+          O rascunho usa a lista oficial de quadros do sistema mais valores literais legados encontrados em Militar.quadro de militares ativos e fica pendente de confirmação institucional.
         </AlertDescription>
       </Alert>
 
@@ -422,7 +472,7 @@ export default function AntiguidadeConfigQuadros() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
             {[
-              ['Quadros reais', totais.reais],
+              ['Quadros disponíveis', totais.disponiveis],
               ['Classificados', totais.classificados],
               ['Não classificados', totais.naoClassificados],
               ['Grupos', totais.grupos],
@@ -477,14 +527,14 @@ export default function AntiguidadeConfigQuadros() {
 
       <Card className="border-slate-200 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg text-slate-900">Quadros reais encontrados</CardTitle>
-          <p className="text-sm text-slate-600">Fonte: base44.entities.Militar.filter({"{ status_cadastro: 'Ativo' }"}) e valores distintos de militar.quadro.</p>
+          <CardTitle className="text-lg text-slate-900">Quadros disponíveis no sistema e legados encontrados</CardTitle>
+          <p className="text-sm text-slate-600">Fonte oficial: QUADROS_FIXOS de src/utils/postoQuadroCompatibilidade.js, unida aos valores distintos de Militar.quadro em militares ativos.</p>
         </CardHeader>
         <CardContent>
           {carregando ? (
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-sm font-medium text-slate-700">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando quadros reais...
+              Carregando quadros disponíveis...
             </div>
           ) : (
             <div className="overflow-auto rounded-lg border border-slate-200">
@@ -494,12 +544,14 @@ export default function AntiguidadeConfigQuadros() {
                     <TableHead>Valor do quadro</TableHead>
                     <TableHead className="text-right">Quantidade de militares</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Origem</TableHead>
+                    <TableHead>Observação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {quadrosReais.length === 0 ? (
-                    <TableRow><TableCell colSpan={3} className="py-6 text-center text-slate-500">Nenhum quadro encontrado.</TableCell></TableRow>
-                  ) : quadrosReais.map((quadro) => {
+                  {quadrosDisponiveis.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="py-6 text-center text-slate-500">Nenhum quadro encontrado.</TableCell></TableRow>
+                  ) : quadrosDisponiveis.map((quadro) => {
                     const classificado = !quadro.vazio && validacoes.classificados.has(quadro.valor);
                     return (
                       <TableRow key={quadro.valor || '__vazio__'}>
@@ -509,6 +561,20 @@ export default function AntiguidadeConfigQuadros() {
                           <Badge variant="outline" className={classificado ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-800'}>
                             {quadro.vazio ? 'não classificado' : classificado ? 'classificado' : 'não classificado'}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {quadro.origem === 'legado_base' ? (
+                            <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-800">valor legado encontrado na base</Badge>
+                          ) : quadro.origem === 'opcao_sistema_e_valor_real' ? (
+                            <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-800">opção do sistema + valor real</Badge>
+                          ) : quadro.origem === 'valor_real_vazio' ? (
+                            <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">valor real incompleto</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-800">opção do sistema</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-600">
+                          {quadro.legado && quadro.valor === 'QBMPT' ? 'Saneamento sugerido: migrar para QPTBM; pode ser coberto temporariamente pelo grupo QPTBM.' : quadro.legado ? 'Valor não está no dropdown oficial; revisar saneamento cadastral.' : quadro.oficial ? 'Disponível para configuração mesmo com quantidade 0.' : 'Não é configurável como quadro.'}
                         </TableCell>
                       </TableRow>
                     );
@@ -525,7 +591,7 @@ export default function AntiguidadeConfigQuadros() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <CardTitle className="text-lg text-slate-900">Grupos de antiguidade</CardTitle>
-              <p className="text-sm text-slate-600">Edite nomes, índices, observações e vincule somente membros reais ainda não classificados.</p>
+              <p className="text-sm text-slate-600">Edite nomes, índices, observações e vincule quadros oficiais ou legados reais ainda não classificados.</p>
             </div>
             <Button type="button" variant="outline" onClick={adicionarGrupo}>
               <Plus className="h-4 w-4" />
@@ -584,9 +650,9 @@ export default function AntiguidadeConfigQuadros() {
 
                 <div className="mt-4 space-y-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Membros reais vinculados</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quadros cobertos vinculados</p>
                     {membros.length === 0 ? (
-                      <p className="mt-2 text-sm text-slate-500">Sem membros reais vinculados.</p>
+                      <p className="mt-2 text-sm text-slate-500">Sem quadros cobertos vinculados.</p>
                     ) : (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {membros.map((membro) => (
@@ -610,10 +676,10 @@ export default function AntiguidadeConfigQuadros() {
                         event.target.value = '';
                       }}
                     >
-                      <option value="">Adicionar membro real ainda não classificado</option>
+                      <option value="">Adicionar quadro ainda não classificado</option>
                       {opcoesAdicionar.map((quadro) => <option key={`${grupo.id_local}-${quadro}`} value={quadro}>{quadro}</option>)}
                     </select>
-                    {opcoesAdicionar.length === 0 && <span className="text-sm text-slate-500">Não há membros reais livres para adicionar.</span>}
+                    {opcoesAdicionar.length === 0 && <span className="text-sm text-slate-500">Não há quadros livres para adicionar.</span>}
                   </div>
                 </div>
               </div>
@@ -625,13 +691,13 @@ export default function AntiguidadeConfigQuadros() {
       <Card className="border-slate-200 shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg text-slate-900">Não classificados</CardTitle>
-          <p className="text-sm text-slate-600">Todo valor real não vazio de Militar.quadro que ainda não esteja em nenhum grupo ativo.</p>
+          <p className="text-sm text-slate-600">Todo quadro oficial do sistema e todo valor legado real não vazio de Militar.quadro que ainda não esteja em nenhum grupo ativo.</p>
         </CardHeader>
         <CardContent>
           {validacoes.naoClassificados.length === 0 ? (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
               <CheckCircle2 className="h-4 w-4" />
-              Todos os quadros reais não vazios estão classificados.
+              Todos os quadros oficiais e legados reais não vazios estão classificados.
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
