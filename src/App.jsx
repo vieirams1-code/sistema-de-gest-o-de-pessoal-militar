@@ -40,7 +40,7 @@ const moduleGuardByPage = {
   Atestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
   CadastrarAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
-  ControleAtestadosTemporarios: { moduleKey: 'controle_atestados_temporarios', actionKey: 'visualizar_controle_atestados_temporarios', moduleName: 'Controle de Atestados Temporários' },
+  ControleAtestadosTemporarios: { moduleKey: 'controle_atestados_temporarios', actionKey: 'visualizar_controle_atestados_temporarios', moduleName: 'Controle de Atestados' },
   Ferias: { moduleKey: 'ferias', moduleName: 'Férias' },
   Militares: { moduleKey: 'militares', moduleName: 'Efetivo' },
   ExtracaoEfetivo: { moduleKey: 'extracao_efetivo', actionKey: 'visualizar_extracao_efetivo', moduleName: 'Extração do Efetivo' },

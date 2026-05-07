@@ -1,6 +1,11 @@
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 const CAMPOS_DIAS = ['dias', 'quantidade_dias', 'dias_afastamento', 'total_dias'];
+const QUADROS_TEMPORARIOS_CONTROLE_ATESTADOS = new Set(['QOETBM', 'QOSTBM', 'QPTBM']);
+const QUADROS_NAO_TEMPORARIOS_CONHECIDOS_CONTROLE_ATESTADOS = new Set(['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP', 'QBMP1A', 'QBMP1B', 'QBMP2', 'QBMP2B', 'QPBM']);
+const QUADROS_LEGADOS_CONTROLE_ATESTADOS = {
+  QBMPT: 'QPTBM',
+};
 
 function criarDataUtc(ano, mes, dia) {
   const data = new Date(Date.UTC(ano, mes - 1, dia));
@@ -28,6 +33,27 @@ function extrairNumeroDias(atestado) {
 
 function normalizarTexto(valor) {
   return String(valor || '').trim();
+}
+
+function normalizarToken(valor) {
+  return normalizarTexto(valor)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+export function normalizarQuadroControleAtestados(quadro) {
+  const normalizado = normalizarToken(quadro);
+  return QUADROS_LEGADOS_CONTROLE_ATESTADOS[normalizado] || normalizado;
+}
+
+export function isQuadroTemporario(quadro) {
+  return QUADROS_TEMPORARIOS_CONTROLE_ATESTADOS.has(normalizarQuadroControleAtestados(quadro));
+}
+
+export function isMilitarTemporarioParaControleAtestados(militar) {
+  return isQuadroTemporario(militar?.quadro || militar?.militar_quadro || militar?.quadro_militar);
 }
 
 export function parseDateOnlySeguro(value) {
@@ -171,17 +197,31 @@ export function agruparAtestadosPorMilitar(atestados) {
 
 function montarMilitarBase(militar, atestados) {
   const primeiro = atestados?.[0] || {};
+  const quadroOriginal = normalizarTexto(militar?.quadro || primeiro.militar_quadro || primeiro.quadro || primeiro.militar?.quadro);
+  const quadroNormalizado = normalizarQuadroControleAtestados(quadroOriginal);
+
   return {
     id: militar?.id || primeiro.militar_id || primeiro.militar?.id || null,
     nome: normalizarTexto(militar?.nome || primeiro.militar_nome || primeiro.militar?.nome) || 'Militar não identificado',
     postoGraduacao: normalizarTexto(militar?.posto_graduacao || militar?.posto || primeiro.militar_posto_graduacao || primeiro.posto_graduacao || primeiro.militar?.posto_graduacao) || '-',
+    quadro: quadroNormalizado || '-',
+    quadroOriginal: quadroOriginal || '-',
     matricula: normalizarTexto(militar?.matricula || primeiro.militar_matricula_label || primeiro.militar_matricula_atual || primeiro.militar_matricula || primeiro.matricula || primeiro.militar?.matricula) || '-',
     lotacao: normalizarTexto(militar?.lotacao || militar?.unidade || primeiro.militar_lotacao || primeiro.lotacao || primeiro.unidade || primeiro.militar?.lotacao) || '-',
   };
 }
 
-function classificarRisco(maiorSequenciaContinua, diasJanela365, possuiPeriodoValido) {
+function classificarTemporario(quadro) {
+  const quadroNormalizado = normalizarQuadroControleAtestados(quadro);
+  if (!quadroNormalizado) return 'nao_classificado';
+  if (isQuadroTemporario(quadroNormalizado)) return 'sim';
+  if (QUADROS_NAO_TEMPORARIOS_CONHECIDOS_CONTROLE_ATESTADOS.has(quadroNormalizado)) return 'nao';
+  return 'nao_classificado';
+}
+
+function classificarRiscoTemporario(maiorSequenciaContinua, diasJanela365, possuiPeriodoValido, ehTemporario) {
   if (!possuiPeriodoValido) return 'nao_classificado';
+  if (!ehTemporario) return 'normal';
   if (maiorSequenciaContinua >= 30) return 'critico_continuo';
   if (diasJanela365 >= 60) return 'critico_intercalado';
   if (maiorSequenciaContinua >= 25) return 'alerta_continuo';
@@ -189,6 +229,12 @@ function classificarRisco(maiorSequenciaContinua, diasJanela365, possuiPeriodoVa
   if (maiorSequenciaContinua >= 20) return 'atencao_continuo';
   if (diasJanela365 >= 40) return 'atencao_intercalado';
   return 'normal';
+}
+
+function contarAtestadosVigentes(intervalos, dataReferencia) {
+  const referencia = parseDateOnlySeguro(dataReferencia) || dataReferencia || new Date();
+  if (!(referencia instanceof Date) || Number.isNaN(referencia.getTime())) return 0;
+  return (intervalos || []).filter((intervalo) => intervalo.inicio <= referencia && intervalo.fim >= referencia).length;
 }
 
 export function avaliarRiscoAtestadosMilitar({ militar = null, atestados = [], dataReferencia = new Date() } = {}) {
@@ -201,21 +247,25 @@ export function avaliarRiscoAtestadosMilitar({ militar = null, atestados = [], d
   const maiorSequenciaContinua = calcularMaiorSequenciaContinua(intervalosMesclados);
   const diasJanela365 = calcularDiasUnicosNaJanela(intervalosMesclados, dataReferencia, 365);
   const possuiPeriodoValido = intervalosValidos.length > 0;
+  const militarBase = montarMilitarBase(militar, atestados);
+  const temporarioClassificacao = classificarTemporario(militarBase.quadro === '-' ? '' : militarBase.quadro);
+  const ehTemporario = temporarioClassificacao === 'sim' && isMilitarTemporarioParaControleAtestados(militarBase);
+  const statusRisco = temporarioClassificacao === 'nao_classificado'
+    ? 'nao_classificado'
+    : classificarRiscoTemporario(maiorSequenciaContinua, diasJanela365, possuiPeriodoValido, ehTemporario);
 
   return {
-    militar: montarMilitarBase(militar, atestados),
+    militar: militarBase,
     maiorSequenciaContinua,
     diasJanela365,
     quantidadeAtestadosConsiderados: intervalosValidos.length,
     quantidadeAtestadosRecebidos: atestados.length,
-    vinculo: 'não classificado',
-    relacaoServico: 'não classificada',
-    statusRisco: classificarRisco(maiorSequenciaContinua, diasJanela365, possuiPeriodoValido),
-    lacunas: [
-      ...lacunas,
-      'Vínculo temporário sem campo estruturado confiável.',
-      'Relação com o serviço sem campo estruturado confiável.',
-    ],
+    quantidadeAtestadosVigentes: contarAtestadosVigentes(intervalosValidos, dataReferencia),
+    temporarioClassificacao,
+    ehTemporario,
+    alertaLegalTemporario: ehTemporario && statusRisco !== 'normal' && statusRisco !== 'nao_classificado',
+    statusRisco,
+    lacunas,
     intervalos: intervalosMesclados,
   };
 }

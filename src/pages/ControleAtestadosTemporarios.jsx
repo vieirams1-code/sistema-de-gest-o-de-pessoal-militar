@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, HeartPulse, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CalendarDays, HeartPulse, RefreshCw, Search, ShieldAlert, Users } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -17,7 +17,8 @@ import {
   avaliarRiscoAtestadosMilitar,
 } from '@/services/controleAtestadosTemporariosService';
 
-const AVISO_INSTITUCIONAL = 'Este painel é um controle preventivo. Enquanto não houver campo estruturado para vínculo temporário e relação com o serviço, os resultados são indicativos e dependem de conferência administrativa.';
+const AVISO_INSTITUCIONAL = 'Painel read-only para acompanhamento de afastamentos médicos dos militares dentro do escopo do usuário. Os alertas de 30 dias ininterruptos e 60 dias intercalados são aplicados apenas aos militares classificados como quadro temporário.';
+const CRITERIO_TEMPORARIO = 'Critério atual para temporário: quadro do militar.';
 
 const STATUS_LABELS = {
   normal: 'Normal',
@@ -27,6 +28,12 @@ const STATUS_LABELS = {
   atencao_intercalado: 'Atenção intercalado',
   alerta_intercalado: 'Alerta intercalado',
   critico_intercalado: 'Crítico intercalado',
+  nao_classificado: 'Não classificado',
+};
+
+const TEMPORARIO_LABELS = {
+  sim: 'Sim',
+  nao: 'Não',
   nao_classificado: 'Não classificado',
 };
 
@@ -60,6 +67,10 @@ function montarAnalise(atestados) {
       if (criticoA !== criticoB) return criticoA - criticoB;
       return a.militar.nome.localeCompare(b.militar.nome, 'pt-BR');
     });
+}
+
+function obterOpcoes(analises, seletor) {
+  return [...new Set(analises.map(seletor).filter((valor) => valor && valor !== '-'))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
 function ResumoCard({ title, value, icon: Icon, tone = 'slate' }) {
@@ -96,8 +107,11 @@ export default function ControleAtestadosTemporarios() {
 
   const [busca, setBusca] = useState('');
   const [statusFiltro, setStatusFiltro] = useState('todos');
-  const [somenteVinculoNaoClassificado, setSomenteVinculoNaoClassificado] = useState(false);
-  const [somenteRelacaoNaoClassificada, setSomenteRelacaoNaoClassificada] = useState(false);
+  const [statusPeriodoFiltro, setStatusPeriodoFiltro] = useState('todos');
+  const [quadroFiltro, setQuadroFiltro] = useState('todos');
+  const [lotacaoFiltro, setLotacaoFiltro] = useState('todos');
+  const [somenteTemporarios, setSomenteTemporarios] = useState(false);
+  const [somenteCriticos, setSomenteCriticos] = useState(false);
 
   const { data: bundle = { atestados: [], meta: {} }, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['controle-atestados-temporarios-bundle', isAdmin, modoAcesso, userEmail, effectiveUserEmail || effectiveEmail || null],
@@ -106,6 +120,8 @@ export default function ControleAtestadosTemporarios() {
   });
 
   const analises = useMemo(() => montarAnalise(bundle?.atestados || []), [bundle?.atestados]);
+  const quadrosDisponiveis = useMemo(() => obterOpcoes(analises, (analise) => analise.militar.quadro), [analises]);
+  const lotacoesDisponiveis = useMemo(() => obterOpcoes(analises, (analise) => analise.militar.lotacao), [analises]);
 
   const analisesFiltradas = useMemo(() => {
     const termo = normalizarBusca(busca);
@@ -113,21 +129,28 @@ export default function ControleAtestadosTemporarios() {
       const textoMilitar = normalizarBusca(`${analise.militar.nome} ${analise.militar.matricula}`);
       const matchBusca = !termo || textoMilitar.includes(termo);
       const matchStatus = statusFiltro === 'todos' || analise.statusRisco === statusFiltro;
-      const matchVinculo = !somenteVinculoNaoClassificado || analise.vinculo === 'não classificado';
-      const matchRelacao = !somenteRelacaoNaoClassificada || analise.relacaoServico === 'não classificada';
-      return matchBusca && matchStatus && matchVinculo && matchRelacao;
+      const matchTemporario = !somenteTemporarios || analise.temporarioClassificacao === 'sim';
+      const matchCritico = !somenteCriticos || analise.statusRisco.startsWith('critico');
+      const matchPeriodo = statusPeriodoFiltro === 'todos'
+        || (statusPeriodoFiltro === 'vigentes' && analise.quantidadeAtestadosVigentes > 0)
+        || (statusPeriodoFiltro === 'encerrados' && analise.quantidadeAtestadosVigentes === 0);
+      const matchQuadro = quadroFiltro === 'todos' || analise.militar.quadro === quadroFiltro;
+      const matchLotacao = lotacaoFiltro === 'todos' || analise.militar.lotacao === lotacaoFiltro;
+      return matchBusca && matchStatus && matchTemporario && matchCritico && matchPeriodo && matchQuadro && matchLotacao;
     });
-  }, [analises, busca, statusFiltro, somenteRelacaoNaoClassificada, somenteVinculoNaoClassificado]);
+  }, [analises, busca, lotacaoFiltro, quadroFiltro, somenteCriticos, somenteTemporarios, statusFiltro, statusPeriodoFiltro]);
 
   const resumo = useMemo(() => ({
-    totalMilitares: analises.length,
-    criticosContinuos: analises.filter((analise) => analise.statusRisco === 'critico_continuo').length,
-    criticosIntercalados: analises.filter((analise) => analise.statusRisco === 'critico_intercalado').length,
-    naoClassificados: analises.filter((analise) => analise.vinculo === 'não classificado' || analise.relacaoServico === 'não classificada').length,
+    totalMilitaresComAtestados: analises.length,
+    totalAtestadosAnalisados: analises.reduce((total, analise) => total + analise.quantidadeAtestadosRecebidos, 0),
+    atestadosVigentes: analises.reduce((total, analise) => total + analise.quantidadeAtestadosVigentes, 0),
+    diasTotaisJanela: analises.reduce((total, analise) => total + analise.diasJanela365, 0),
+    temporariosEmPrazo: analises.filter((analise) => analise.ehTemporario && analise.statusRisco !== 'normal' && analise.statusRisco !== 'nao_classificado').length,
+    registrosComLacunasData: analises.reduce((total, analise) => total + analise.lacunas.length, 0),
   }), [analises]);
 
   if (isAccessPending) return null;
-  if (!hasControleAccess) return <AccessDenied modulo="Controle de Atestados Temporários" />;
+  if (!hasControleAccess) return <AccessDenied modulo="Controle de Atestados" />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -138,8 +161,8 @@ export default function ControleAtestadosTemporarios() {
               <HeartPulse className="h-8 w-8" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-[#1e3a5f]">Controle de Atestados Médicos Temporários</h1>
-              <p className="text-slate-500">Painel preventivo somente-leitura baseado no escopo de atestados já autorizado.</p>
+              <h1 className="text-3xl font-bold text-[#1e3a5f]">Controle de Atestados Médicos</h1>
+              <p className="text-slate-500">Painel geral de estatísticas, filtros e extratos de atestados médicos no escopo autorizado.</p>
             </div>
           </div>
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching} className="gap-2">
@@ -148,23 +171,26 @@ export default function ControleAtestadosTemporarios() {
           </Button>
         </div>
 
-        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm">
+        <div className="mb-6 space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm">
           <div className="flex gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <p className="text-sm font-medium leading-6">{AVISO_INSTITUCIONAL}</p>
           </div>
+          <p className="pl-8 text-xs font-semibold uppercase tracking-wide">{CRITERIO_TEMPORARIO}</p>
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <ResumoCard title="Militares analisados" value={resumo.totalMilitares} icon={Users} />
-          <ResumoCard title="Críticos por 30 dias contínuos" value={resumo.criticosContinuos} icon={ShieldAlert} tone="red" />
-          <ResumoCard title="Críticos por 60 dias intercalados" value={resumo.criticosIntercalados} icon={ShieldAlert} tone="red" />
-          <ResumoCard title="Vínculo/relação não classificados" value={resumo.naoClassificados} icon={AlertTriangle} tone="amber" />
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <ResumoCard title="Total de militares com atestados" value={resumo.totalMilitaresComAtestados} icon={Users} />
+          <ResumoCard title="Total de atestados analisados" value={resumo.totalAtestadosAnalisados} icon={HeartPulse} />
+          <ResumoCard title="Atestados vigentes" value={resumo.atestadosVigentes} icon={CalendarCheck} />
+          <ResumoCard title="Dias totais na janela" value={resumo.diasTotaisJanela} icon={CalendarDays} />
+          <ResumoCard title="Temporários em atenção/alerta/crítico" value={resumo.temporariosEmPrazo} icon={ShieldAlert} tone="red" />
+          <ResumoCard title="Registros com lacunas de data" value={resumo.registrosComLacunasData} icon={AlertTriangle} tone="amber" />
         </div>
 
         <Card className="mb-6 border-slate-200 shadow-sm">
-          <CardContent className="p-4">
-            <div className="grid gap-4 lg:grid-cols-[1fr_240px_auto_auto] lg:items-center">
+          <CardContent className="space-y-4 p-4">
+            <div className="grid gap-4 lg:grid-cols-[1fr_220px_180px] lg:items-center">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -185,13 +211,47 @@ export default function ControleAtestadosTemporarios() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={statusPeriodoFiltro} onValueChange={setStatusPeriodoFiltro}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vigência" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Vigentes e encerrados</SelectItem>
+                  <SelectItem value="vigentes">Somente vigentes</SelectItem>
+                  <SelectItem value="encerrados">Somente encerrados</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-[220px_220px_auto_auto] lg:items-center">
+              <Select value={quadroFiltro} onValueChange={setQuadroFiltro}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Quadro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os quadros</SelectItem>
+                  {quadrosDisponiveis.map((quadro) => (
+                    <SelectItem key={quadro} value={quadro}>{quadro}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={lotacaoFiltro} onValueChange={setLotacaoFiltro}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Lotação/unidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas as lotações</SelectItem>
+                  {lotacoesDisponiveis.map((lotacao) => (
+                    <SelectItem key={lotacao} value={lotacao}>{lotacao}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <label className="flex items-center gap-2 text-sm text-slate-600">
-                <Checkbox checked={somenteVinculoNaoClassificado} onCheckedChange={(checked) => setSomenteVinculoNaoClassificado(Boolean(checked))} />
-                Vínculo não classificado
+                <Checkbox checked={somenteTemporarios} onCheckedChange={(checked) => setSomenteTemporarios(Boolean(checked))} />
+                Somente temporários
               </label>
               <label className="flex items-center gap-2 text-sm text-slate-600">
-                <Checkbox checked={somenteRelacaoNaoClassificada} onCheckedChange={(checked) => setSomenteRelacaoNaoClassificada(Boolean(checked))} />
-                Relação não classificada
+                <Checkbox checked={somenteCriticos} onCheckedChange={(checked) => setSomenteCriticos(Boolean(checked))} />
+                Somente críticos
               </label>
             </div>
           </CardContent>
@@ -211,16 +271,16 @@ export default function ControleAtestadosTemporarios() {
                   <TableHeader>
                     <TableRow className="bg-slate-50">
                       <TableHead>Militar</TableHead>
-                      <TableHead>Posto/Graduação</TableHead>
+                      <TableHead>Posto/graduação</TableHead>
+                      <TableHead>Quadro</TableHead>
                       <TableHead>Matrícula</TableHead>
-                      <TableHead>Lotação/Unidade</TableHead>
-                      <TableHead className="text-right">Maior sequência</TableHead>
-                      <TableHead className="text-right">365 dias</TableHead>
-                      <TableHead className="text-right">Atestados</TableHead>
-                      <TableHead>Vínculo</TableHead>
-                      <TableHead>Relação com serviço</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Observações/Lacunas</TableHead>
+                      <TableHead>Lotação/unidade</TableHead>
+                      <TableHead className="text-right">Total de atestados</TableHead>
+                      <TableHead className="text-right">Maior sequência contínua</TableHead>
+                      <TableHead className="text-right">Dias na janela de 365 dias</TableHead>
+                      <TableHead>Temporário</TableHead>
+                      <TableHead>Status de prazo</TableHead>
+                      <TableHead>Lacunas</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -228,20 +288,22 @@ export default function ControleAtestadosTemporarios() {
                       <TableRow key={analise.chave}>
                         <TableCell className="font-medium text-slate-900">{analise.militar.nome}</TableCell>
                         <TableCell>{analise.militar.postoGraduacao}</TableCell>
+                        <TableCell>{analise.militar.quadro}</TableCell>
                         <TableCell>{analise.militar.matricula}</TableCell>
                         <TableCell>{analise.militar.lotacao}</TableCell>
+                        <TableCell className="text-right">{analise.quantidadeAtestadosRecebidos}</TableCell>
                         <TableCell className="text-right font-semibold">{analise.maiorSequenciaContinua}</TableCell>
                         <TableCell className="text-right font-semibold">{analise.diasJanela365}</TableCell>
-                        <TableCell className="text-right">{analise.quantidadeAtestadosConsiderados}</TableCell>
-                        <TableCell><Badge variant="outline">Vínculo: {analise.vinculo}</Badge></TableCell>
-                        <TableCell><Badge variant="outline">Relação: {analise.relacaoServico}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{TEMPORARIO_LABELS[analise.temporarioClassificacao]}</Badge>
+                        </TableCell>
                         <TableCell>
                           <Badge className={STATUS_CLASSES[analise.statusRisco] || STATUS_CLASSES.nao_classificado} variant="outline">
-                            {STATUS_LABELS[analise.statusRisco] || analise.statusRisco}
+                            {analise.temporarioClassificacao === 'nao_classificado' ? 'Não classificado' : analise.ehTemporario ? STATUS_LABELS[analise.statusRisco] : 'Sem alerta específico'}
                           </Badge>
                         </TableCell>
                         <TableCell className="min-w-72 text-xs text-slate-500">
-                          {analise.lacunas.length ? analise.lacunas.join(' ') : 'Sem lacunas identificadas.'}
+                          {analise.lacunas.length ? analise.lacunas.join(' ') : 'Sem lacunas de data identificadas.'}
                         </TableCell>
                       </TableRow>
                     ))}
