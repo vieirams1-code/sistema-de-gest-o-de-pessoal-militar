@@ -143,7 +143,8 @@ export default function PromocoesTimeline({ historico, promocaoAtual, militar, c
     const ehBaseFuncionalAtual = status === 'ativo' && valorTexto(registro?.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(registro?.quadro_novo) === valorTexto(militar?.quadro);
     if (ehBaseFuncionalAtual) return false;
     if (status === 'previsto') return true;
-    return status === 'ativo' && emPromocoesAnteriores;
+    if (status === 'ativo') return emPromocoesAnteriores;
+    return status === 'cancelado' && emPromocoesAnteriores;
   };
 
   return <div className="space-y-6">
