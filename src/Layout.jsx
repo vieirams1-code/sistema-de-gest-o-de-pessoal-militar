@@ -26,6 +26,7 @@ import {
   GitBranch,
   BookMarked,
   FileSpreadsheet,
+  FileSearch,
   FileUp,
   History,
   CircleAlert,
@@ -59,7 +60,21 @@ const menuGroups = [
   {
     title: 'Pessoal',
     items: [
-      { name: 'Efetivo', page: 'Militares', icon: Users, viewPermission: 'visualizar_militares' },
+      {
+        name: 'Efetivo',
+        page: 'Militares',
+        icon: Users,
+        anyOf: [
+          { type: 'action', key: 'visualizar_militares' },
+          { type: 'module', key: 'militares' },
+          { type: 'action', key: 'visualizar_extracao_efetivo' },
+          { type: 'module', key: 'extracao_efetivo' },
+        ],
+        children: [
+          { name: 'Consulta', page: 'Militares', icon: Users, moduleKey: 'militares', actionKey: 'visualizar_militares' },
+          { name: 'Extração', page: 'ExtracaoEfetivo', icon: FileSearch, moduleKey: 'extracao_efetivo', actionKey: 'visualizar_extracao_efetivo' },
+        ],
+      },
       { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
       { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
       { name: 'Procedimentos e Processos', page: 'ProcedimentosProcessos', icon: ClipboardList, actionKey: 'visualizar_procedimentos_processos' },

@@ -92,6 +92,7 @@ import TiposMedalha from './pages/TiposMedalha';
 import VerAtestado from './pages/VerAtestado';
 import VerMilitar from './pages/VerMilitar';
 import EstruturaOrganizacional from './pages/EstruturaOrganizacional';
+import ExtracaoEfetivo from './pages/ExtracaoEfetivo';
 import LotacaoMilitares from './pages/LotacaoMilitares';
 import Livro from './pages/Livro';
 import MigracaoMilitares from './pages/MigracaoMilitares';
@@ -153,6 +154,7 @@ export const PAGES = {
     "VerAtestado": VerAtestado,
     "VerMilitar": VerMilitar,
     "EstruturaOrganizacional": EstruturaOrganizacional,
+    "ExtracaoEfetivo": ExtracaoEfetivo,
     "LotacaoMilitares": LotacaoMilitares,
     "Livro": Livro,
     "MigracaoMilitares": MigracaoMilitares,
