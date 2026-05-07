@@ -144,7 +144,8 @@ export default function PromocoesTimeline({ historico, promocaoAtual, militar, c
     if (ehBaseFuncionalAtual) return false;
     if (status === 'previsto') return true;
     if (status === 'ativo') return emPromocoesAnteriores;
-    return status === 'cancelado' && emPromocoesAnteriores;
+    if (status === 'cancelado') return emPromocoesAnteriores;
+    return status === 'retificado' && emPromocoesAnteriores;
   };
 
   return <div className="space-y-6">
