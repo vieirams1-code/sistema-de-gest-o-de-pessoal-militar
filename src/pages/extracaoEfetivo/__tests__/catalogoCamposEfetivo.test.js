@@ -22,6 +22,21 @@ const DEFAULT_COLUMN_ORDER = Object.freeze([
 
 const ALLOWED_RENDERERS = new Set(['statusBadge']);
 
+const SELECTABLE_COLUMN_ORDER = Object.freeze([
+  'posto_graduacao',
+  'nome_guerra',
+  'nome_completo',
+  'matricula',
+  'quadro',
+  'lotacao_nome',
+  'status_cadastro',
+  'situacao_militar',
+  'funcao',
+  'condicao',
+]);
+
+const REQUIRED_COLUMN_IDS = Object.freeze(['nome_guerra', 'matricula']);
+
 const SENSITIVE_FIELD_IDS = Object.freeze([
   'religiao',
   'tipo_sanguineo',
@@ -126,6 +141,59 @@ test('colunas padrão não incluem campos proibidos nem campos sensíveis', () =
     [],
     'lista de colunas padrão não pode cruzar com forbidden fields',
   );
+});
+
+
+test('colunas selecionáveis vêm apenas da allowlist positiva e respeitam metadados seguros', () => {
+  const forbiddenFields = new Set(EXTRACAO_EFETIVO_FORBIDDEN_FIELDS);
+  const sensitiveFields = new Set(SENSITIVE_FIELD_IDS);
+  const selectableColumns = Object.values(EXTRACAO_EFETIVO_FIELDS)
+    .filter((field) => field.selectable === true)
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+  const selectableIds = selectableColumns.map((field) => field.id);
+  const defaultColumnIds = getDefaultColumnIds();
+
+  assert.deepEqual(selectableIds, SELECTABLE_COLUMN_ORDER, 'ordem visual de seleção deve ser explícita e estável');
+
+  for (const field of selectableColumns) {
+    assert.equal(EXTRACAO_EFETIVO_FIELDS[field.id], field, `${field.id} deve vir da allowlist`);
+    assert.equal(forbiddenFields.has(field.id), false, `${field.id} não pode aparecer em forbidden fields`);
+    assert.equal(sensitiveFields.has(field.id), false, `${field.id} não pode ser selecionável sensível`);
+    assert.equal(typeof field.defaultVisible, 'boolean', `${field.id} deve declarar defaultVisible booleano`);
+    assert.equal(typeof field.displayOrder, 'number', `${field.id} deve declarar displayOrder numérico`);
+    assert.equal(typeof field.category, 'string', `${field.id} deve declarar categoria textual`);
+    assert.ok(field.category.trim(), `${field.id} deve ter categoria preenchida`);
+
+    const searchableColumnText = `${field.id} ${field.label}`;
+    for (const pattern of SENSITIVE_TEXT_PATTERNS) {
+      assert.equal(pattern.test(searchableColumnText), false, `${field.id} selecionável não pode indicar dado sensível`);
+    }
+  }
+
+  assert.deepEqual(
+    selectableIds.filter((id) => forbiddenFields.has(id)),
+    [],
+    'campos proibidos não podem ser marcados como selecionáveis',
+  );
+  assert.deepEqual(
+    defaultColumnIds,
+    selectableColumns.filter((field) => field.defaultVisible).map((field) => field.id),
+    'defaultVisible deve refletir exatamente EXTRACAO_EFETIVO_DEFAULT_COLUMNS',
+  );
+});
+
+test('colunas obrigatórias são metadado explícito e fazem parte das colunas padrão', () => {
+  const defaultColumnIds = new Set(getDefaultColumnIds());
+  const requiredIds = Object.values(EXTRACAO_EFETIVO_FIELDS)
+    .filter((field) => field.required === true)
+    .map((field) => field.id);
+
+  assert.deepEqual(requiredIds, REQUIRED_COLUMN_IDS, 'colunas obrigatórias devem permanecer explícitas');
+
+  for (const fieldId of requiredIds) {
+    assert.equal(defaultColumnIds.has(fieldId), true, `${fieldId} obrigatório deve iniciar visível`);
+    assert.equal(EXTRACAO_EFETIVO_FIELDS[fieldId].selectable, true, `${fieldId} obrigatório deve ser selecionável`);
+  }
 });
 
 test('EXTRACAO_EFETIVO_FORBIDDEN_FIELDS permanece documental e fora da montagem do catálogo', () => {
