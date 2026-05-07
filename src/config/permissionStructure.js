@@ -121,6 +121,13 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_controle_atestados_temporarios',
+        label: 'Controle de Atestados Temporários',
+        actions: [
+          { key: 'perm_visualizar_controle_atestados_temporarios', label: 'Visualizar Controle de Atestados Temporários' }
+        ]
+      },
+      {
         key: 'acesso_central_pendencias',
         label: 'Central de Pendências',
         actions: [

@@ -1,0 +1,221 @@
+const MS_POR_DIA = 24 * 60 * 60 * 1000;
+
+const CAMPOS_DIAS = ['dias', 'quantidade_dias', 'dias_afastamento', 'total_dias'];
+
+function criarDataUtc(ano, mes, dia) {
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  data.setUTCHours(0, 0, 0, 0);
+  return data;
+}
+
+function adicionarDias(data, dias) {
+  if (!(data instanceof Date) || Number.isNaN(data.getTime())) return null;
+  return new Date(data.getTime() + dias * MS_POR_DIA);
+}
+
+function formatarDataIso(data) {
+  if (!(data instanceof Date) || Number.isNaN(data.getTime())) return null;
+  return data.toISOString().slice(0, 10);
+}
+
+function extrairNumeroDias(atestado) {
+  for (const campo of CAMPOS_DIAS) {
+    const valor = Number(atestado?.[campo]);
+    if (Number.isFinite(valor) && valor > 0) return Math.floor(valor);
+  }
+  return null;
+}
+
+function normalizarTexto(valor) {
+  return String(valor || '').trim();
+}
+
+export function parseDateOnlySeguro(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return criarDataUtc(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+  }
+
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, ano, mes, dia] = isoMatch;
+    const data = criarDataUtc(Number(ano), Number(mes), Number(dia));
+    return formatarDataIso(data) === `${ano}-${mes}-${dia}` ? data : null;
+  }
+
+  const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    const [, dia, mes, ano] = brMatch;
+    const data = criarDataUtc(Number(ano), Number(mes), Number(dia));
+    return formatarDataIso(data) === `${ano}-${mes}-${dia}` ? data : null;
+  }
+
+  return null;
+}
+
+export function contarDiasInclusivos(inicio, fim) {
+  const dataInicio = parseDateOnlySeguro(inicio) || inicio;
+  const dataFim = parseDateOnlySeguro(fim) || fim;
+  if (!(dataInicio instanceof Date) || !(dataFim instanceof Date)) return 0;
+  if (Number.isNaN(dataInicio.getTime()) || Number.isNaN(dataFim.getTime())) return 0;
+  if (dataFim < dataInicio) return 0;
+  return Math.floor((dataFim.getTime() - dataInicio.getTime()) / MS_POR_DIA) + 1;
+}
+
+export function normalizarPeriodoAtestado(atestado) {
+  const lacunas = [];
+  const inicio = parseDateOnlySeguro(atestado?.data_inicio);
+
+  if (!inicio) {
+    lacunas.push('Atestado ignorado por ausência de data inicial válida.');
+    return { atestado, inicio: null, fim: null, dias: 0, valido: false, lacunas };
+  }
+
+  let fim = parseDateOnlySeguro(atestado?.data_termino);
+  const diasInformados = extrairNumeroDias(atestado);
+
+  if (!fim && diasInformados) {
+    fim = adicionarDias(inicio, diasInformados - 1);
+  }
+
+  if (!fim) {
+    lacunas.push('Atestado ignorado por ausência de data final válida ou quantidade de dias.');
+    return { atestado, inicio, fim: null, dias: 0, valido: false, lacunas };
+  }
+
+  if (fim < inicio) {
+    lacunas.push('Atestado ignorado porque a data final é anterior à data inicial.');
+    return { atestado, inicio, fim, dias: 0, valido: false, lacunas };
+  }
+
+  return {
+    atestado,
+    inicio,
+    fim,
+    dias: contarDiasInclusivos(inicio, fim),
+    valido: true,
+    lacunas,
+  };
+}
+
+export function mesclarIntervalosContiguosOuSobrepostos(intervalos) {
+  const validos = (intervalos || [])
+    .map((intervalo) => ({
+      ...intervalo,
+      inicio: parseDateOnlySeguro(intervalo?.inicio) || intervalo?.inicio,
+      fim: parseDateOnlySeguro(intervalo?.fim) || intervalo?.fim,
+    }))
+    .filter((intervalo) => intervalo.inicio instanceof Date && intervalo.fim instanceof Date && intervalo.fim >= intervalo.inicio)
+    .sort((a, b) => a.inicio.getTime() - b.inicio.getTime());
+
+  return validos.reduce((mesclados, intervalo) => {
+    const ultimo = mesclados[mesclados.length - 1];
+    if (!ultimo) return [{ ...intervalo }];
+
+    const diaSeguinteAoUltimoFim = adicionarDias(ultimo.fim, 1);
+    if (intervalo.inicio <= diaSeguinteAoUltimoFim) {
+      if (intervalo.fim > ultimo.fim) ultimo.fim = intervalo.fim;
+      ultimo.atestados = [...(ultimo.atestados || []), ...(intervalo.atestados || [intervalo.atestado].filter(Boolean))];
+      return mesclados;
+    }
+
+    return [...mesclados, { ...intervalo }];
+  }, []);
+}
+
+export function calcularMaiorSequenciaContinua(intervalos) {
+  const mesclados = mesclarIntervalosContiguosOuSobrepostos(intervalos);
+  return mesclados.reduce((maior, intervalo) => Math.max(maior, contarDiasInclusivos(intervalo.inicio, intervalo.fim)), 0);
+}
+
+export function calcularDiasUnicosNaJanela(intervalos, dataReferencia, diasJanela = 365) {
+  const referencia = parseDateOnlySeguro(dataReferencia) || dataReferencia || new Date();
+  if (!(referencia instanceof Date) || Number.isNaN(referencia.getTime())) return 0;
+
+  const fimJanela = criarDataUtc(referencia.getUTCFullYear(), referencia.getUTCMonth() + 1, referencia.getUTCDate());
+  const inicioJanela = adicionarDias(fimJanela, -(diasJanela - 1));
+  const mesclados = mesclarIntervalosContiguosOuSobrepostos(intervalos);
+
+  return mesclados.reduce((total, intervalo) => {
+    const inicio = intervalo.inicio > inicioJanela ? intervalo.inicio : inicioJanela;
+    const fim = intervalo.fim < fimJanela ? intervalo.fim : fimJanela;
+    return total + contarDiasInclusivos(inicio, fim);
+  }, 0);
+}
+
+function obterIdentificadorMilitar(atestado) {
+  return atestado?.militar_id
+    || atestado?.militar?.id
+    || atestado?.militar_matricula_atual
+    || atestado?.militar_matricula_label
+    || atestado?.militar_matricula
+    || atestado?.matricula
+    || atestado?.militar_nome
+    || 'militar_sem_identificador';
+}
+
+export function agruparAtestadosPorMilitar(atestados) {
+  return (atestados || []).reduce((grupos, atestado) => {
+    const chave = obterIdentificadorMilitar(atestado);
+    if (!grupos[chave]) grupos[chave] = [];
+    grupos[chave].push(atestado);
+    return grupos;
+  }, {});
+}
+
+function montarMilitarBase(militar, atestados) {
+  const primeiro = atestados?.[0] || {};
+  return {
+    id: militar?.id || primeiro.militar_id || primeiro.militar?.id || null,
+    nome: normalizarTexto(militar?.nome || primeiro.militar_nome || primeiro.militar?.nome) || 'Militar não identificado',
+    postoGraduacao: normalizarTexto(militar?.posto_graduacao || militar?.posto || primeiro.militar_posto_graduacao || primeiro.posto_graduacao || primeiro.militar?.posto_graduacao) || '-',
+    matricula: normalizarTexto(militar?.matricula || primeiro.militar_matricula_label || primeiro.militar_matricula_atual || primeiro.militar_matricula || primeiro.matricula || primeiro.militar?.matricula) || '-',
+    lotacao: normalizarTexto(militar?.lotacao || militar?.unidade || primeiro.militar_lotacao || primeiro.lotacao || primeiro.unidade || primeiro.militar?.lotacao) || '-',
+  };
+}
+
+function classificarRisco(maiorSequenciaContinua, diasJanela365, possuiPeriodoValido) {
+  if (!possuiPeriodoValido) return 'nao_classificado';
+  if (maiorSequenciaContinua >= 30) return 'critico_continuo';
+  if (diasJanela365 >= 60) return 'critico_intercalado';
+  if (maiorSequenciaContinua >= 25) return 'alerta_continuo';
+  if (diasJanela365 >= 50) return 'alerta_intercalado';
+  if (maiorSequenciaContinua >= 20) return 'atencao_continuo';
+  if (diasJanela365 >= 40) return 'atencao_intercalado';
+  return 'normal';
+}
+
+export function avaliarRiscoAtestadosMilitar({ militar = null, atestados = [], dataReferencia = new Date() } = {}) {
+  const periodos = atestados.map(normalizarPeriodoAtestado);
+  const lacunas = periodos.flatMap((periodo) => periodo.lacunas);
+  const intervalosValidos = periodos
+    .filter((periodo) => periodo.valido)
+    .map((periodo) => ({ inicio: periodo.inicio, fim: periodo.fim, atestado: periodo.atestado, atestados: [periodo.atestado] }));
+  const intervalosMesclados = mesclarIntervalosContiguosOuSobrepostos(intervalosValidos);
+  const maiorSequenciaContinua = calcularMaiorSequenciaContinua(intervalosMesclados);
+  const diasJanela365 = calcularDiasUnicosNaJanela(intervalosMesclados, dataReferencia, 365);
+  const possuiPeriodoValido = intervalosValidos.length > 0;
+
+  return {
+    militar: montarMilitarBase(militar, atestados),
+    maiorSequenciaContinua,
+    diasJanela365,
+    quantidadeAtestadosConsiderados: intervalosValidos.length,
+    quantidadeAtestadosRecebidos: atestados.length,
+    vinculo: 'não classificado',
+    relacaoServico: 'não classificada',
+    statusRisco: classificarRisco(maiorSequenciaContinua, diasJanela365, possuiPeriodoValido),
+    lacunas: [
+      ...lacunas,
+      'Vínculo temporário sem campo estruturado confiável.',
+      'Relação com o serviço sem campo estruturado confiável.',
+    ],
+    intervalos: intervalosMesclados,
+  };
+}

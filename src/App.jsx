@@ -11,8 +11,10 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
+import ControleAtestadosTemporarios from '@/pages/ControleAtestadosTemporarios';
 
-const { Pages, Layout } = pagesConfig;
+const { Pages: ConfiguredPages, Layout } = pagesConfig;
+const Pages = { ...ConfiguredPages, ControleAtestadosTemporarios };
 const homeRoute = '/VerMilitar';
 
 const adminOnlyPages = new Set([
@@ -38,6 +40,7 @@ const moduleGuardByPage = {
   Atestados: { moduleKey: 'atestados', moduleName: 'Atestados' },
   CadastrarAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
   VerAtestado: { moduleKey: 'atestados', moduleName: 'Atestados' },
+  ControleAtestadosTemporarios: { moduleKey: 'controle_atestados_temporarios', actionKey: 'visualizar_controle_atestados_temporarios', moduleName: 'Controle de Atestados Temporários' },
   Ferias: { moduleKey: 'ferias', moduleName: 'Férias' },
   Militares: { moduleKey: 'militares', moduleName: 'Efetivo' },
   ExtracaoEfetivo: { moduleKey: 'extracao_efetivo', actionKey: 'visualizar_extracao_efetivo', moduleName: 'Extração do Efetivo' },

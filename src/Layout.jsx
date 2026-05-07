@@ -104,6 +104,7 @@ const menuGroups = [
     title: 'Atestados',
     items: [
       { name: 'Atestados', page: 'Atestados', icon: HeartPulse, viewPermission: 'visualizar_atestados' },
+      { name: 'Controle Temporários', page: 'ControleAtestadosTemporarios', icon: HeartPulse, viewPermission: 'visualizar_controle_atestados_temporarios' },
     ],
   },
   {
