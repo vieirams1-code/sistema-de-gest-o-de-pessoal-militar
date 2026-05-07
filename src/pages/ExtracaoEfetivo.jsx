@@ -6,6 +6,7 @@ import {
   FileSearch,
   FileText,
   Info,
+  ListChecks,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -16,6 +17,7 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -29,6 +31,7 @@ import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMil
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import {
   EXTRACAO_EFETIVO_DEFAULT_COLUMNS,
+  EXTRACAO_EFETIVO_FIELDS,
   getLotacaoNomeEfetivo,
   getPrimeiroValorEfetivo,
   getQuadroEfetivo,
@@ -103,6 +106,27 @@ function uniqueSorted(values = []) {
   );
 }
 
+function getDefaultColumnIds() {
+  return EXTRACAO_EFETIVO_DEFAULT_COLUMNS.map((column) => column.id);
+}
+
+function getSelectableColumns() {
+  return Object.values(EXTRACAO_EFETIVO_FIELDS)
+    .filter((field) => field.selectable === true)
+    .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+}
+
+function resolveSelectedColumns(selectedColumnIds = [], selectableColumns = []) {
+  const selectedIds = new Set(selectedColumnIds);
+  const selectedColumns = selectableColumns.filter(
+    (column) => column.required === true || selectedIds.has(column.id),
+  );
+
+  if (selectedColumns.length > 0) return selectedColumns;
+
+  return selectableColumns.filter((column) => column.required === true);
+}
+
 export default function ExtracaoEfetivo() {
   const {
     isAdmin,
@@ -132,6 +156,39 @@ export default function ExtracaoEfetivo() {
   const [quadroFilter, setQuadroFilter] = useState(TODOS_VALUE);
   const [statusFilter, setStatusFilter] = useState(TODOS_VALUE);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODOS_VALUE);
+  const [selectedColumnIds, setSelectedColumnIds] = useState(getDefaultColumnIds);
+
+  const selectableColumns = useMemo(() => getSelectableColumns(), []);
+  const selectedColumns = useMemo(
+    () => resolveSelectedColumns(selectedColumnIds, selectableColumns),
+    [selectableColumns, selectedColumnIds],
+  );
+  const selectedColumnIdsResolved = useMemo(
+    () => new Set(selectedColumns.map((column) => column.id)),
+    [selectedColumns],
+  );
+
+  const toggleSelectedColumn = (fieldId, checked) => {
+    setSelectedColumnIds((currentIds) => {
+      const column = selectableColumns.find((item) => item.id === fieldId);
+      if (!column) return currentIds;
+
+      if (checked) {
+        return currentIds.includes(fieldId) ? currentIds : [...currentIds, fieldId];
+      }
+
+      if (column.required) return currentIds;
+
+      const nextIds = currentIds.filter((currentId) => currentId !== fieldId);
+      const nextColumns = resolveSelectedColumns(nextIds, selectableColumns);
+
+      return nextColumns.length > 0 ? nextIds : currentIds;
+    });
+  };
+
+  const resetSelectedColumns = () => {
+    setSelectedColumnIds(getDefaultColumnIds());
+  };
 
   const lotacoesQueryKey = [
     'extracao-efetivo-lotacoes-scoped',
@@ -364,9 +421,9 @@ export default function ExtracaoEfetivo() {
           <div className="space-y-1">
             <p className="font-semibold">Módulo inicial com campos funcionais comuns.</p>
             <p>
-              Esta versão não inclui dados sensíveis, exportação, seleção dinâmica de colunas ou
-              cruzamentos com outros módulos. Dados protegidos e análises combinadas serão tratados
-              em lotes futuros.
+              Esta versão não inclui dados sensíveis, exportação ou cruzamentos com outros módulos.
+              A visualização de colunas usa apenas campos comuns previamente permitidos no catálogo.
+              Dados protegidos e análises combinadas serão tratados em lotes futuros.
             </p>
           </div>
         </div>
@@ -573,6 +630,61 @@ export default function ExtracaoEfetivo() {
           </CardContent>
         </Card>
 
+
+        <Card className="border-slate-100 shadow-sm">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <ListChecks className="w-4 h-4" />
+                  Colunas da tabela
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Escolha quais colunas comuns permitidas serão exibidas. Esta seleção altera apenas
+                  a visualização da tabela.
+                </p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={resetSelectedColumns}>
+                Restaurar padrão
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+              {selectableColumns.map((column) => {
+                const isChecked = selectedColumnIdsResolved.has(column.id);
+                const isLocked = column.required === true;
+
+                return (
+                  <label
+                    key={column.id}
+                    htmlFor={`coluna-${column.id}`}
+                    className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
+                  >
+                    <Checkbox
+                      id={`coluna-${column.id}`}
+                      checked={isChecked}
+                      disabled={isLocked}
+                      onCheckedChange={(checked) => toggleSelectedColumn(column.id, checked === true)}
+                      className="mt-0.5"
+                    />
+                    <span className="space-y-1">
+                      <span className="block font-medium leading-none">{column.label}</span>
+                      <span className="block text-xs text-slate-500">
+                        {isLocked ? 'Obrigatória' : column.category || 'Campo comum'}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              {selectedColumns.length} coluna{selectedColumns.length === 1 ? '' : 's'} selecionada
+              {selectedColumns.length === 1 ? '' : 's'}. Campos desconhecidos são descartados antes da renderização.
+            </div>
+          </CardContent>
+        </Card>
+
         {!isAccessResolved ? (
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-12 text-center text-slate-500">
@@ -636,7 +748,7 @@ export default function ExtracaoEfetivo() {
               <table className="min-w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {EXTRACAO_EFETIVO_DEFAULT_COLUMNS.map((column) => (
+                    {selectedColumns.map((column) => (
                       <th key={column.id} className="px-4 py-3 text-left font-semibold">
                         {column.label}
                       </th>
@@ -649,7 +761,7 @@ export default function ExtracaoEfetivo() {
                       key={militar.id || `${militar.nome_completo}-${getValorCampoEfetivo(militar, 'matricula')}`}
                       className="hover:bg-slate-50/80"
                     >
-                      {EXTRACAO_EFETIVO_DEFAULT_COLUMNS.map((column) => {
+                      {selectedColumns.map((column) => {
                         const value = getValorCampoEfetivo(militar, column.id);
 
                         return (
