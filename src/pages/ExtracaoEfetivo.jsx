@@ -27,7 +27,14 @@ import {
 } from '@/components/ui/select';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
-import { normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
+import {
+  EXTRACAO_EFETIVO_DEFAULT_COLUMNS,
+  getLotacaoNomeEfetivo,
+  getPrimeiroValorEfetivo,
+  getQuadroEfetivo,
+  getValorCampoEfetivo,
+} from '@/pages/extracaoEfetivo/catalogoCamposEfetivo';
+import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 
 const BACKEND_LIMIT = 200;
 const STALE_TIME_MS = 5 * 60 * 1000;
@@ -71,31 +78,8 @@ function textoOuTraco(value) {
   return String(value || '').trim() || '—';
 }
 
-function getFirstValue(record, keys = []) {
-  for (const key of keys) {
-    const value = record?.[key];
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      return String(value).trim();
-    }
-  }
-  return '';
-}
-
-function getLotacaoNome(militar = {}) {
-  return getFirstValue(militar, [
-    'estrutura_nome',
-    'subgrupamento_nome',
-    'grupamento_nome',
-    'lotacao_atual',
-    'lotacao_nome',
-    'lotacao',
-    'subgrupamento',
-    'unidade_nome',
-  ]);
-}
-
 function getLotacaoId(militar = {}) {
-  return getFirstValue(militar, [
+  return getPrimeiroValorEfetivo(militar, [
     'estrutura_id',
     'subgrupamento_id',
     'lotacao_id',
@@ -106,19 +90,9 @@ function getLotacaoId(militar = {}) {
 function militarMatchesSearch(militar = {}, normalizedSearch = '') {
   if (!normalizedSearch) return true;
 
-  const searchableFields = [
-    militar.posto_graduacao,
-    militar.nome_guerra,
-    militar.nome_completo,
-    militar.matricula,
-    militar.matricula_atual,
-    militar.quadro,
-    normalizarQuadroLegado(militar.quadro),
-    getLotacaoNome(militar),
-    militar.status_cadastro,
-    militar.situacao_militar,
-    militar.funcao,
-  ];
+  const searchableFields = EXTRACAO_EFETIVO_DEFAULT_COLUMNS.map((column) =>
+    getValorCampoEfetivo(militar, column.id),
+  );
 
   return searchableFields.some((field) => normalizeText(field).includes(normalizedSearch));
 }
@@ -268,7 +242,7 @@ export default function ExtracaoEfetivo() {
     () =>
       uniqueSorted([
         ...POSTO_GRADUACAO_OPTIONS,
-        ...militares.map((militar) => getFirstValue(militar, ['posto_graduacao'])),
+        ...militares.map((militar) => getValorCampoEfetivo(militar, 'posto_graduacao')),
       ]),
     [militares],
   );
@@ -277,7 +251,7 @@ export default function ExtracaoEfetivo() {
     () =>
       uniqueSorted([
         ...QUADROS_FIXOS,
-        ...militares.map((militar) => normalizarQuadroLegado(militar?.quadro) || militar?.quadro),
+        ...militares.map((militar) => getQuadroEfetivo(militar)),
       ]),
     [militares],
   );
@@ -286,7 +260,7 @@ export default function ExtracaoEfetivo() {
     () =>
       uniqueSorted([
         ...Object.keys(statusBadgeClass),
-        ...militares.map((militar) => getFirstValue(militar, ['status_cadastro'])),
+        ...militares.map((militar) => getValorCampoEfetivo(militar, 'status_cadastro')),
       ]),
     [militares],
   );
@@ -301,11 +275,11 @@ export default function ExtracaoEfetivo() {
 
   const filteredMilitares = useMemo(() => {
     return militares.filter((militar) => {
-      const posto = getFirstValue(militar, ['posto_graduacao']);
-      const quadroNormalizado = normalizarQuadroLegado(militar?.quadro) || getFirstValue(militar, ['quadro']);
-      const status = getFirstValue(militar, ['status_cadastro']);
+      const posto = getValorCampoEfetivo(militar, 'posto_graduacao');
+      const quadroNormalizado = getQuadroEfetivo(militar);
+      const status = getValorCampoEfetivo(militar, 'status_cadastro');
       const lotacaoId = getLotacaoId(militar);
-      const lotacaoNome = getLotacaoNome(militar);
+      const lotacaoNome = getLotacaoNomeEfetivo(militar);
 
       if (!filtrosExecutados) return false;
       if (filtrosExecutados.postoGraduacao !== TODOS_VALUE && posto !== filtrosExecutados.postoGraduacao) {
@@ -499,7 +473,7 @@ export default function ExtracaoEfetivo() {
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todos os status</SelectItem>
+                  <SelectItem value={TODOS_VALUE}>Todos os status retornados da base ativa</SelectItem>
                   {statusDisponiveis.map((status) => (
                     <SelectItem key={status} value={status}>
                       {status}
@@ -662,58 +636,40 @@ export default function ExtracaoEfetivo() {
               <table className="min-w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold">Posto/graduação</th>
-                    <th className="px-4 py-3 text-left font-semibold">Nome de guerra</th>
-                    <th className="px-4 py-3 text-left font-semibold">Nome completo</th>
-                    <th className="px-4 py-3 text-left font-semibold">Matrícula</th>
-                    <th className="px-4 py-3 text-left font-semibold">Quadro</th>
-                    <th className="px-4 py-3 text-left font-semibold">Lotação</th>
-                    <th className="px-4 py-3 text-left font-semibold">Status</th>
-                    <th className="px-4 py-3 text-left font-semibold">Situação militar</th>
-                    <th className="px-4 py-3 text-left font-semibold">Função</th>
+                    {EXTRACAO_EFETIVO_DEFAULT_COLUMNS.map((column) => (
+                      <th key={column.id} className="px-4 py-3 text-left font-semibold">
+                        {column.label}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
-                  {filteredMilitares.map((militar) => {
-                    const status = getFirstValue(militar, ['status_cadastro']) || 'Ativo';
+                  {filteredMilitares.map((militar) => (
+                    <tr
+                      key={militar.id || `${militar.nome_completo}-${getValorCampoEfetivo(militar, 'matricula')}`}
+                      className="hover:bg-slate-50/80"
+                    >
+                      {EXTRACAO_EFETIVO_DEFAULT_COLUMNS.map((column) => {
+                        const value = getValorCampoEfetivo(militar, column.id);
 
-                    return (
-                      <tr
-                        key={militar.id || `${militar.nome_completo}-${militar.matricula}`}
-                        className="hover:bg-slate-50/80"
-                      >
-                        <td className="px-4 py-3 font-semibold text-[#1e3a5f] whitespace-nowrap">
-                          {textoOuTraco(militar?.posto_graduacao)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {textoOuTraco(militar?.nome_guerra)}
-                        </td>
-                        <td className="px-4 py-3 min-w-60">
-                          {textoOuTraco(militar?.nome_completo)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {textoOuTraco(militar?.matricula_atual || militar?.matricula)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {textoOuTraco(normalizarQuadroLegado(militar?.quadro) || militar?.quadro)}
-                        </td>
-                        <td className="px-4 py-3 min-w-56">
-                          {textoOuTraco(getLotacaoNome(militar))}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <Badge className={`${statusBadgeClass[status] || statusBadgeClass.Ativo} border`}>
-                            {textoOuTraco(status)}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {textoOuTraco(militar?.situacao_militar)}
-                        </td>
-                        <td className="px-4 py-3 min-w-44">
-                          {textoOuTraco(militar?.funcao)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        return (
+                          <td key={column.id} className={`px-4 py-3 ${column.cellClassName || ''}`}>
+                            {column.renderAs === 'statusBadge' ? (
+                              <Badge
+                                className={`${
+                                  statusBadgeClass[value] || statusBadgeClass.Ativo
+                                } border`}
+                              >
+                                {textoOuTraco(value || 'Ativo')}
+                              </Badge>
+                            ) : (
+                              textoOuTraco(value)
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
