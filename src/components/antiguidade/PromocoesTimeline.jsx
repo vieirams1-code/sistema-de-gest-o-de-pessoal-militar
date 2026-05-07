@@ -42,7 +42,7 @@ function getCardClass(registro, destaqueAtual = false) {
   return 'border-slate-200 bg-white';
 }
 
-function RegistroActions({ registro, canManage, onDetalhe, onRetificar, onEditarPrevisao, onCancelar, onEfetivar }) {
+function RegistroActions({ registro, canManage, canExcluir, onDetalhe, onRetificar, onEditarPrevisao, onCancelar, onEfetivar, onExcluir }) {
   const status = statusRegistro(registro);
   const isPrevista = status === 'previsto';
   const isCancelado = status === 'cancelado';
@@ -56,10 +56,11 @@ function RegistroActions({ registro, canManage, onDetalhe, onRetificar, onEditar
     {isPrevista && !isCancelado && !isRetificado && onEfetivar && <Button size="sm" className="bg-slate-900 hover:bg-slate-800" disabled={!canManage} onClick={() => onEfetivar(registro)}>Efetivar Promoção</Button>}
     {!isPrevista && !isCancelado && !isRetificado && <Button size="sm" variant="outline" className="border-slate-300 text-slate-700" disabled={!canManage} onClick={() => onRetificar(registro)}>Retificar</Button>}
     {!isCancelado && !isRetificado && <Button size="sm" variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-50" disabled={!canManage} onClick={() => onCancelar(registro)}>Cancelar</Button>}
+    {canExcluir && <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => onExcluir?.(registro)}>Excluir</Button>}
   </div>;
 }
 
-function RegistroCard({ registro, canManage, isRegistroIncompativel, isRegistroIncompleto, onDetalhe, onRetificar, onEditarPrevisao, onCancelar, onEfetivar, compacto = false }) {
+function RegistroCard({ registro, canManage, canExcluir, isRegistroIncompativel, isRegistroIncompleto, onDetalhe, onRetificar, onEditarPrevisao, onCancelar, onEfetivar, onExcluir, compacto = false }) {
   const status = statusRegistro(registro);
   const isPrevista = status === 'previsto';
 
@@ -80,7 +81,7 @@ function RegistroCard({ registro, canManage, isRegistroIncompativel, isRegistroI
       <Info label="Boletim / ato" value={registro.boletim_referencia || registro.ato_referencia || '—'} />
       {!isPrevista && <Info label="Nº/ordem de antiguidade" value={registro.antiguidade_referencia_ordem ?? '—'} />}
     </div>
-    <RegistroActions registro={registro} canManage={canManage} onDetalhe={onDetalhe} onRetificar={onRetificar} onEditarPrevisao={onEditarPrevisao} onCancelar={onCancelar} onEfetivar={onEfetivar} />
+    <RegistroActions registro={registro} canManage={canManage} canExcluir={canExcluir} onDetalhe={onDetalhe} onRetificar={onRetificar} onEditarPrevisao={onEditarPrevisao} onCancelar={onCancelar} onEfetivar={onEfetivar} onExcluir={onExcluir} />
   </div>;
 }
 
@@ -128,10 +129,22 @@ function AreaHeader({ title, description, badge, badgeClass }) {
   </div>;
 }
 
-export default function PromocoesTimeline({ historico, promocaoAtual, militar, canManage, isRegistroIncompativel, isRegistroIncompleto, onDetalhe, onRetificar, onEditarPrevisao, onCancelar, onEfetivar }) {
+export default function PromocoesTimeline({ historico, promocaoAtual, militar, canManage, isRegistroIncompativel, isRegistroIncompleto, onDetalhe, onRetificar, onEditarPrevisao, onCancelar, onEfetivar, onExcluir }) {
   const registros = historico || [];
   const anteriores = registros.filter((h) => h.id !== promocaoAtual?.id && statusRegistro(h) !== 'previsto');
   const futuras = registros.filter((h) => statusRegistro(h) === 'previsto');
+  const militarId = String(militar?.id || '');
+  const promocaoAtualId = String(promocaoAtual?.id || '');
+  const podeExcluirRegistro = (registro, { emPromocoesAnteriores = false } = {}) => {
+    const status = statusRegistro(registro);
+    if (!canManage || !onExcluir || !registro?.id || !militarId) return false;
+    if (String(registro?.militar_id || '') !== militarId) return false;
+    if (String(registro.id) === promocaoAtualId) return false;
+    const ehBaseFuncionalAtual = status === 'ativo' && valorTexto(registro?.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(registro?.quadro_novo) === valorTexto(militar?.quadro);
+    if (ehBaseFuncionalAtual) return false;
+    if (status === 'previsto') return true;
+    return status === 'ativo' && emPromocoesAnteriores;
+  };
 
   return <div className="space-y-6">
     <div className="relative hidden lg:block px-[16.5%]" aria-hidden="true">
@@ -146,7 +159,7 @@ export default function PromocoesTimeline({ historico, promocaoAtual, militar, c
         <AreaHeader title="Promoções Anteriores" description="Histórico funcional anterior ao posto atual." badge="Histórico" badgeClass={SECTION_BADGE.historico} />
         {anteriores.length === 0
           ? <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">Nenhuma promoção anterior cadastrada.</div>
-          : anteriores.map((h) => <RegistroCard key={h.id} registro={h} canManage={canManage} isRegistroIncompativel={isRegistroIncompativel} isRegistroIncompleto={isRegistroIncompleto} onDetalhe={onDetalhe} onRetificar={onRetificar} onEditarPrevisao={onEditarPrevisao} onCancelar={onCancelar} compacto />)}
+          : anteriores.map((h) => <RegistroCard key={h.id} registro={h} canManage={canManage} canExcluir={podeExcluirRegistro(h, { emPromocoesAnteriores: true })} isRegistroIncompativel={isRegistroIncompativel} isRegistroIncompleto={isRegistroIncompleto} onDetalhe={onDetalhe} onRetificar={onRetificar} onEditarPrevisao={onEditarPrevisao} onCancelar={onCancelar} onExcluir={onExcluir} compacto />)}
       </section>
 
       <section className="space-y-3 rounded-2xl border-2 border-blue-200 bg-white p-4 shadow-sm">
@@ -158,7 +171,7 @@ export default function PromocoesTimeline({ historico, promocaoAtual, militar, c
         <AreaHeader title="Promoções Futuras / Previstas" description="Etapas planejadas ainda não efetivadas." badge="Previsto" badgeClass={SECTION_BADGE.previsto} />
         {futuras.length === 0
           ? <div className="rounded-xl border border-dashed border-amber-300 bg-white/80 p-4 text-sm text-slate-500">Nenhuma promoção futura prevista.</div>
-          : futuras.map((h) => <RegistroCard key={h.id} registro={h} canManage={canManage} isRegistroIncompativel={isRegistroIncompativel} isRegistroIncompleto={isRegistroIncompleto} onDetalhe={onDetalhe} onRetificar={onRetificar} onEditarPrevisao={onEditarPrevisao} onCancelar={onCancelar} onEfetivar={onEfetivar} compacto />)}
+          : futuras.map((h) => <RegistroCard key={h.id} registro={h} canManage={canManage} canExcluir={podeExcluirRegistro(h)} isRegistroIncompativel={isRegistroIncompativel} isRegistroIncompleto={isRegistroIncompleto} onDetalhe={onDetalhe} onRetificar={onRetificar} onEditarPrevisao={onEditarPrevisao} onCancelar={onCancelar} onEfetivar={onEfetivar} onExcluir={onExcluir} compacto />)}
       </section>
     </div>
   </div>;
