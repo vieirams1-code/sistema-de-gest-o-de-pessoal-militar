@@ -31,6 +31,7 @@ import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMil
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
+import SaneamentoQbmptQptbmDialog from '@/components/admin/SaneamentoQbmptQptbmDialog';
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
@@ -296,11 +297,14 @@ export default function Militares() {
               Escopo atual: {isAdmin ? 'Administrador' : (linkedMilitarEmail || userEmail || 'Usuário')}
             </p>
           </div>
-          {canAccessAction('adicionar_militares') && (
-            <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-              <Plus className="w-5 h-5 mr-2" />Novo Militar
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <SaneamentoQbmptQptbmDialog isAdmin={isAdmin} />
+            {canAccessAction('adicionar_militares') && (
+              <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                <Plus className="w-5 h-5 mr-2" />Novo Militar
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4 space-y-3">
