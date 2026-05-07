@@ -273,26 +273,20 @@ export default function AntiguidadeConfigQuadros() {
         atualizado_em: agora,
       }));
 
-      const payload = {
+      const payloadAtualizacao = {
+        ordem_quadros: ordemQuadros,
+      };
+
+      const idConfiguracao = estadoInicial?.configuracaoAtiva?.id;
+      if (idConfiguracao) return base44.entities.ConfiguracaoAntiguidade.update(idConfiguracao, payloadAtualizacao);
+
+      return base44.entities.ConfiguracaoAntiguidade.create({
         nome_configuracao: 'Rascunho de configuração de quadros reais para antiguidade',
         ativo: true,
         versao_regra: VERSAO_REGRA_RASCUNHO,
         ordem_quadros: ordemQuadros,
         observacoes: TEXTO_PENDENCIA,
-      };
-
-      let usuario = null;
-      try {
-        usuario = await base44.auth.me();
-      } catch {
-        usuario = null;
-      }
-
-      if (usuario?.email) payload.updated_by = usuario.email;
-
-      const idConfiguracao = estadoInicial?.configuracaoAtiva?.id;
-      if (idConfiguracao) return base44.entities.ConfiguracaoAntiguidade.update(idConfiguracao, payload);
-      return base44.entities.ConfiguracaoAntiguidade.create(payload);
+      });
     },
     onSuccess: async () => {
       toast({ title: 'Rascunho salvo', description: 'A configuração pendente foi gravada em ConfiguracaoAntiguidade.ordem_quadros.' });
