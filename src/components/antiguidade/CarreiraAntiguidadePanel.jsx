@@ -17,6 +17,7 @@ const STATUS_BADGE = { ativo: 'bg-emerald-100 text-emerald-800', pendente: 'bg-a
 const MOTIVOS_LABEL = { [MOTIVOS.SEM_DATA]: 'Sem data de promoção', [MOTIVOS.SEM_ANTERIOR]: 'Sem número de antiguidade', [MOTIVOS.EMPATE]: 'Empate não resolvido', [MOTIVOS.SEM_QUADRO]: 'Quadro incompatível' };
 const STATUS_ATIVO = 'ativo';
 const STATUS_PREVISTO = 'previsto';
+const STATUS_CANCELADO = 'cancelado';
 const CONFIRMACAO_EXCLUIR_PROMOCAO = 'EXCLUIR PROMOÇÃO';
 const valorTexto = (v) => String(v || '').trim();
 const isOrdemPreenchida = (valor) => valor !== null && valor !== undefined && valor !== '' && Number.isFinite(Number(valor));
@@ -67,6 +68,12 @@ export default function CarreiraAntiguidadePanel(props) {
     return valorTexto(registro?.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(registro?.quadro_novo) === valorTexto(militar?.quadro);
   }, [militar?.posto_graduacao, militar?.quadro, normalizarStatusRegistro, promocaoAtual?.id]);
 
+  const isPromocaoAnterior = React.useCallback((registro) => {
+    if (!registro?.id) return false;
+    if (promocaoAtual?.id && String(registro.id) === String(promocaoAtual.id)) return false;
+    return normalizarStatusRegistro(registro) !== STATUS_PREVISTO;
+  }, [normalizarStatusRegistro, promocaoAtual?.id]);
+
   const podeExcluirPromocao = React.useCallback((registro) => {
     if (!canManage) return { permitido: false, motivo: 'Apenas administradores podem excluir promoções.' };
     if (!registro?.id) return { permitido: false, motivo: 'Registro de promoção sem identificador não pode ser excluído.' };
@@ -74,11 +81,15 @@ export default function CarreiraAntiguidadePanel(props) {
     if (String(registro?.militar_id || '') !== String(militar.id)) return { permitido: false, motivo: 'O registro não pertence ao militar exibido nesta tela.' };
 
     const status = normalizarStatusRegistro(registro);
-    if (status !== STATUS_PREVISTO && status !== STATUS_ATIVO) return { permitido: false, motivo: 'Somente promoções previstas ou promoções anteriores ativas podem ser excluídas.' };
     if (isPromocaoAtualAtivaBaseFuncional(registro)) return { permitido: false, motivo: 'A promoção atual ativa/base funcional do militar não pode ser excluída.' };
+    if (status === STATUS_PREVISTO) return { permitido: true, motivo: '' };
 
-    return { permitido: true, motivo: '' };
-  }, [canManage, isPromocaoAtualAtivaBaseFuncional, militar?.id, normalizarStatusRegistro]);
+    const emPromocoesAnteriores = isPromocaoAnterior(registro);
+    if (status === STATUS_ATIVO && emPromocoesAnteriores) return { permitido: true, motivo: '' };
+    if (status === STATUS_CANCELADO && emPromocoesAnteriores) return { permitido: true, motivo: '' };
+
+    return { permitido: false, motivo: 'Somente promoções previstas, promoções anteriores ativas ou promoções anteriores canceladas podem ser excluídas.' };
+  }, [canManage, isPromocaoAnterior, isPromocaoAtualAtivaBaseFuncional, militar?.id, normalizarStatusRegistro]);
 
   const onEfetivar = async (registro) => {
     if (confirmacaoEfetivar !== 'EFETIVAR') return setErroAcao('Digite EFETIVAR para confirmar.');
@@ -269,7 +280,7 @@ export default function CarreiraAntiguidadePanel(props) {
     <Dialog open={Boolean(retificar)} onOpenChange={(o) => !o && setRetificar(null)}><DialogContent><DialogHeader><DialogTitle>Retificar promoção</DialogTitle></DialogHeader><Label>Motivo da retificação *</Label><Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setRetificar(null)}>Fechar</Button><Button onClick={() => onRetificar(retificar)}>Confirmar retificação</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={Boolean(cancelar)} onOpenChange={(o) => !o && setCancelar(null)}><DialogContent><DialogHeader><DialogTitle>Cancelar registro/previsão</DialogTitle></DialogHeader><Label>Motivo do cancelamento *</Label><Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setCancelar(null)}>Fechar</Button><Button variant="destructive" onClick={() => onCancelar(cancelar)}>Confirmar cancelamento</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={Boolean(efetivar)} onOpenChange={(o) => !o && setEfetivar(null)}><DialogContent><DialogHeader><DialogTitle>Efetivar promoção futura</DialogTitle><DialogDescription>Esta ação atualizará o posto/graduação do militar no cadastro funcional. Deseja continuar?</DialogDescription></DialogHeader><Label>Digite EFETIVAR para confirmar</Label><Input value={confirmacaoEfetivar} onChange={(e) => setConfirmacaoEfetivar(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => setEfetivar(null)}>Fechar</Button><Button onClick={() => onEfetivar(efetivar)}>Efetivar promoção</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={Boolean(excluir)} onOpenChange={(o) => { if (!o) { setExcluir(null); setConfirmacaoExcluir(''); setErroAcao(''); } }}><DialogContent><DialogHeader><DialogTitle>Excluir promoção</DialogTitle><DialogDescription>Excluir remove o registro. Para preservar histórico/auditoria, use Cancelar.</DialogDescription></DialogHeader><div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><p>Esta ação é irreversível e deve ser usada apenas para erro de lançamento/cadastro indevido.</p></div></div><Label>Digite EXCLUIR PROMOÇÃO para confirmar</Label><Input value={confirmacaoExcluir} onChange={(e) => setConfirmacaoExcluir(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => { setExcluir(null); setConfirmacaoExcluir(''); setErroAcao(''); }}>Fechar</Button><Button variant="destructive" onClick={() => onExcluir(excluir)}>Excluir promoção</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={Boolean(excluir)} onOpenChange={(o) => { if (!o) { setExcluir(null); setConfirmacaoExcluir(''); setErroAcao(''); } }}><DialogContent><DialogHeader><DialogTitle>Excluir promoção</DialogTitle><DialogDescription>Excluir remove o registro. Para preservar histórico/auditoria, use Cancelar.</DialogDescription></DialogHeader><div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><div className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><div className="space-y-1"><p>Esta ação é irreversível e deve ser usada apenas para erro de lançamento/cadastro indevido.</p>{normalizarStatusRegistro(excluir) === STATUS_CANCELADO && <p>Este registro já está cancelado e será removido definitivamente da timeline.</p>}</div></div></div><Label>Digite EXCLUIR PROMOÇÃO para confirmar</Label><Input value={confirmacaoExcluir} onChange={(e) => setConfirmacaoExcluir(e.target.value)} />{erroAcao && <p className="text-sm text-rose-700">{erroAcao}</p>}<DialogFooter><Button variant="outline" onClick={() => { setExcluir(null); setConfirmacaoExcluir(''); setErroAcao(''); }}>Fechar</Button><Button variant="destructive" onClick={() => onExcluir(excluir)}>Excluir promoção</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 
