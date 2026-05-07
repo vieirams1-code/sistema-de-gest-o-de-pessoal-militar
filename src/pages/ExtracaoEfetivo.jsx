@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { AlertTriangle, Database, FileSearch, Info, Search, ShieldCheck, Users } from 'lucide-react';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -30,6 +30,18 @@ const POSTO_GRADUACAO_OPTIONS = [
   '3º Sargento',
   'Cabo',
   'Soldado',
+];
+
+const SORT_OPTIONS = [
+  { value: 'posto_graduacao', label: 'Posto/Graduação' },
+  { value: 'nome_guerra', label: 'Nome de guerra' },
+  { value: 'nome_completo', label: 'Nome completo' },
+  { value: 'matricula', label: 'Matrícula' },
+  { value: 'quadro', label: 'Quadro' },
+  { value: 'lotacao', label: 'Lotação' },
+  { value: 'status', label: 'Status' },
+  { value: 'situacao_militar', label: 'Situação militar' },
+  { value: 'funcao', label: 'Função' },
 ];
 
 const statusBadgeClass = {
@@ -81,6 +93,41 @@ function uniqueSorted(values = []) {
     .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
+function getSortValue(militar = {}, sortField = 'posto_graduacao') {
+  const sortGetters = {
+    posto_graduacao: () => militar?.posto_graduacao,
+    nome_guerra: () => militar?.nome_guerra,
+    nome_completo: () => militar?.nome_completo,
+    matricula: () => militar?.matricula_atual || militar?.matricula,
+    quadro: () => militar?.quadro,
+    lotacao: () => militar?.lotacao_funcional,
+    status: () => militar?.status_cadastro,
+    situacao_militar: () => militar?.situacao_militar,
+    funcao: () => militar?.funcao,
+  };
+
+  return normalizarTexto((sortGetters[sortField] || sortGetters.posto_graduacao)());
+}
+
+function getPageOffset(meta = {}, fallbackOffset = 0, currentOffset = 0) {
+  const offsetCandidates = [meta?.nextOffset, meta?.proximoOffset, meta?.offsetProximo];
+  const foundOffset = offsetCandidates.find((value) => Number.isFinite(Number(value)) && Number(value) > currentOffset);
+  return Number.isFinite(Number(foundOffset)) ? Number(foundOffset) : fallbackOffset;
+}
+
+function pageCanHaveMore(page = {}) {
+  const meta = page?.meta || {};
+  const explicitHasMore = meta?.hasMore ?? meta?.has_more ?? meta?.temMais ?? meta?.tem_mais;
+  if (typeof explicitHasMore === 'boolean') return explicitHasMore;
+
+  const totalKnown = meta?.total ?? meta?.totalRegistros ?? meta?.total_registros;
+  if (Number.isFinite(Number(totalKnown))) {
+    return page.offset + page.militares.length < Number(totalKnown);
+  }
+
+  return page.militares.length === BACKEND_LIMIT;
+}
+
 export default function ExtracaoEfetivo() {
   const {
     isAdmin,
@@ -99,6 +146,8 @@ export default function ExtracaoEfetivo() {
   const [quadroFilter, setQuadroFilter] = useState(TODOS_VALUE);
   const [statusFilter, setStatusFilter] = useState(TODOS_VALUE);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODOS_VALUE);
+  const [sortField, setSortField] = useState('posto_graduacao');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
@@ -120,11 +169,7 @@ export default function ExtracaoEfetivo() {
       statusCadastro: 'Ativo',
       includeFoto: false,
       limit: BACKEND_LIMIT,
-      busca: debouncedSearchTerm,
-      postoGraduacao: postoGraduacaoFilter,
-      quadro: quadroFilter,
-      status: statusFilter,
-      lotacao: lotacaoFilter,
+      pagination: 'offset-limit',
     },
   ];
 
@@ -132,24 +177,30 @@ export default function ExtracaoEfetivo() {
     data: militaresData,
     isLoading,
     isFetching,
+    isFetchingNextPage,
     isError,
     error,
     refetch,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
     queryKey,
     enabled: shouldQuery,
     staleTime: STALE_TIME_MS,
     retry: 1,
     refetchOnWindowFocus: false,
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam = 0 }) => {
+      const offset = Number(pageParam) || 0;
       const { militares, meta } = await fetchScopedMilitares({
         statusCadastro: 'Ativo',
         limit: BACKEND_LIMIT,
-        offset: 0,
+        offset,
         includeFoto: false,
       });
 
       return {
+        offset,
         militares: militares.map((militar) => ({
           ...militar,
           lotacao_funcional: getLotacaoLabel(militar),
@@ -157,9 +208,15 @@ export default function ExtracaoEfetivo() {
         meta,
       };
     },
+    getNextPageParam: (lastPage) => {
+      if (!pageCanHaveMore(lastPage)) return undefined;
+      const fallbackOffset = lastPage.offset + lastPage.militares.length;
+      return getPageOffset(lastPage.meta, fallbackOffset, lastPage.offset);
+    },
   });
 
-  const militares = useMemo(() => militaresData?.militares || [], [militaresData]);
+  const pages = militaresData?.pages || [];
+  const militares = useMemo(() => pages.flatMap((page) => page?.militares || []), [pages]);
 
   const filtrosDisponiveis = useMemo(() => ({
     postos: uniqueSorted([...POSTO_GRADUACAO_OPTIONS, ...militares.map((militar) => militar?.posto_graduacao)]),
@@ -177,12 +234,26 @@ export default function ExtracaoEfetivo() {
       .filter((militar) => lotacaoFilter === TODOS_VALUE || militar?.lotacao_funcional === lotacaoFilter);
   }, [militares, debouncedSearchTerm, postoGraduacaoFilter, quadroFilter, statusFilter, lotacaoFilter]);
 
+  const sortedMilitares = useMemo(() => {
+    const directionModifier = sortDirection === 'desc' ? -1 : 1;
+    return [...filteredMilitares].sort((a, b) => {
+      const comparison = getSortValue(a, sortField).localeCompare(getSortValue(b, sortField), 'pt-BR', {
+        numeric: true,
+        sensitivity: 'base',
+      });
+      return comparison * directionModifier;
+    });
+  }, [filteredMilitares, sortField, sortDirection]);
+
   if (!loadingUser && isAccessResolved && !canAccessModule('extracao_efetivo') && !canAccessAction('visualizar_extracao_efetivo')) {
     return <AccessDenied modulo="Extração do Efetivo" />;
   }
 
   const totalRetornado = militares.length;
   const totalFiltrado = filteredMilitares.length;
+  const totalPaginasCarregadas = pages.length;
+  const podeHaverMaisRegistros = Boolean(hasNextPage);
+  const isInitialLoading = isLoading && totalRetornado === 0;
   const isRateLimitError = String(error?.message || '').toLowerCase().includes('rate limit');
 
   return (
@@ -216,15 +287,29 @@ export default function ExtracaoEfetivo() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {podeHaverMaisRegistros && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-900 flex gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold">Listagem possivelmente parcial.</p>
+              <p>
+                Foram carregados {totalRetornado} registros do seu escopo em {totalPaginasCarregadas} lote(s). Pode haver mais registros ativos;
+                use “Carregar mais” para ampliar a base antes de interpretar os filtros locais.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-5 flex items-center gap-4">
               <div className="rounded-xl bg-slate-100 p-3 text-slate-700">
                 <Database className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Registros retornados</p>
+                <p className="text-sm text-slate-500">Registros carregados</p>
                 <p className="text-3xl font-bold text-slate-800">{totalRetornado}</p>
+                <p className="text-xs text-slate-500">{totalPaginasCarregadas} lote(s) de até {BACKEND_LIMIT}</p>
               </div>
             </CardContent>
           </Card>
@@ -234,8 +319,21 @@ export default function ExtracaoEfetivo() {
                 <Users className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Após filtros</p>
+                <p className="text-sm text-slate-500">Após filtros locais</p>
                 <p className="text-3xl font-bold text-slate-800">{totalFiltrado}</p>
+                <p className="text-xs text-slate-500">Ordenados no navegador</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-100 shadow-sm">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="rounded-xl bg-amber-100 p-3 text-amber-700">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Pode haver mais registros?</p>
+                <p className="text-3xl font-bold text-slate-800">{podeHaverMaisRegistros ? 'Sim' : 'Não'}</p>
+                <p className="text-xs text-slate-500">Inferido pelo retorno paginado</p>
               </div>
             </CardContent>
           </Card>
@@ -243,7 +341,7 @@ export default function ExtracaoEfetivo() {
 
         <Card className="border-slate-100 shadow-sm">
           <CardContent className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
               <div className="relative md:col-span-2 lg:col-span-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
@@ -293,6 +391,23 @@ export default function ExtracaoEfetivo() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Select value={sortField} onValueChange={setSortField}>
+                <SelectTrigger><SelectValue placeholder="Ordenar por" /></SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={sortDirection} onValueChange={setSortDirection}>
+                <SelectTrigger><SelectValue placeholder="Direção" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascendente</SelectItem>
+                  <SelectItem value="desc">Descendente</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -301,7 +416,7 @@ export default function ExtracaoEfetivo() {
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-12 text-center text-slate-500">Resolvendo contexto de acesso para carregar a extração.</CardContent>
           </Card>
-        ) : isLoading || isFetching ? (
+        ) : isInitialLoading ? (
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-12 text-center">
               <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin mx-auto mb-4" />
@@ -330,7 +445,15 @@ export default function ExtracaoEfetivo() {
             <CardContent className="p-12 text-center">
               <Users className="w-14 h-14 mx-auto text-slate-300 mb-4" />
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Nenhum registro encontrado</h3>
-              <p className="text-sm text-slate-500">Ajuste os filtros ou verifique se há militares ativos no seu escopo.</p>
+              <p className="text-sm text-slate-500 mb-4">Ajuste os filtros ou carregue mais registros ativos do seu escopo.</p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!podeHaverMaisRegistros || isFetchingNextPage}
+                onClick={() => fetchNextPage()}
+              >
+                {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -351,7 +474,7 @@ export default function ExtracaoEfetivo() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
-                  {filteredMilitares.map((militar) => (
+                  {sortedMilitares.map((militar) => (
                     <tr key={militar.id || `${militar.nome_completo}-${militar.matricula}`} className="hover:bg-slate-50/80">
                       <td className="px-4 py-3 font-semibold text-[#1e3a5f] whitespace-nowrap">{textoOuTraco(militar?.posto_graduacao)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{textoOuTraco(militar?.nome_guerra)}</td>
@@ -371,7 +494,31 @@ export default function ExtracaoEfetivo() {
                 </tbody>
               </table>
             </div>
+            <div className="border-t border-slate-100 bg-slate-50 px-4 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-slate-600">
+                <p className="font-medium text-slate-700">
+                  {totalRetornado} carregado(s), {totalFiltrado} após filtros locais.
+                </p>
+                <p>
+                  {podeHaverMaisRegistros
+                    ? 'Ainda pode haver registros ativos não carregados dentro do seu escopo.'
+                    : 'Não há indicação de registros adicionais no retorno paginado atual.'}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!podeHaverMaisRegistros || isFetchingNextPage}
+                onClick={() => fetchNextPage()}
+              >
+                {isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+              </Button>
+            </div>
           </Card>
+        )}
+
+        {isFetching && !isInitialLoading && !isFetchingNextPage && (
+          <p className="text-xs text-slate-500 text-right">Atualizando cache escopado...</p>
         )}
       </div>
     </div>
