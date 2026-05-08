@@ -1,0 +1,30 @@
+{
+  "name": "ContratoDesignacaoMilitar",
+  "type": "object",
+  "title": "Contrato de Designação Militar",
+  "description": "Contrato de designação para militar da reserva que retorna como designado, sem alterar a data de inclusão original do militar.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "matricula_designacao": { "type": "string", "default": "" },
+    "matricula_militar_id": { "type": "string", "default": "" },
+    "data_inicio_contrato": { "type": "date", "default": "" },
+    "data_fim_contrato": { "type": "date", "default": "" },
+    "data_inclusao_para_ferias": { "type": "date", "default": "" },
+    "numero_contrato": { "type": "string", "default": "" },
+    "boletim_publicacao": { "type": "string", "default": "" },
+    "data_publicacao": { "type": "date", "default": "" },
+    "status_contrato": { "type": "string", "enum": ["ativo", "encerrado", "cancelado"], "default": "ativo" },
+    "observacoes": { "type": "string", "default": "" },
+    "tipo_designacao": { "type": "string", "default": "" },
+    "fonte_legal": { "type": "string", "default": "" },
+    "motivo_encerramento": { "type": "string", "default": "" },
+    "data_encerramento_operacional": { "type": "date", "default": "" },
+    "motivo_cancelamento": { "type": "string", "default": "" },
+    "cancelado_por": { "type": "string", "default": "" },
+    "encerrado_por": { "type": "string", "default": "" },
+    "criado_por": { "type": "string", "default": "" },
+    "atualizado_por": { "type": "string", "default": "" },
+    "origem_registro": { "type": "string", "default": "" }
+  },
+  "required": ["militar_id", "matricula_designacao", "data_inicio_contrato", "status_contrato"]
+}
