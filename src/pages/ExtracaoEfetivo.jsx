@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Database,
   FileSearch,
   FileText,
@@ -43,6 +46,8 @@ const BACKEND_LIMIT = 200;
 const STALE_TIME_MS = 5 * 60 * 1000;
 const TODOS_VALUE = '__todos__';
 const SEM_LOTACAO_VALUE = '__sem_lotacao__';
+const DEFAULT_SORT_FIELD = 'posto_graduacao';
+const DEFAULT_SORT_DIRECTION = 'asc';
 
 const POSTO_GRADUACAO_OPTIONS = [
   'Coronel',
@@ -69,6 +74,26 @@ const statusBadgeClass = {
   Falecido: 'bg-red-100 text-red-700 border-red-200',
 };
 
+const STATUS_CADASTRO_ORDER = Object.freeze(['Ativo', 'Reserva', 'Reforma', 'Inativo', 'Falecido']);
+const SITUACAO_MILITAR_OPTIONS = Object.freeze([
+  'Ativa',
+  'Reserva Remunerada',
+  'Reformado',
+  'Designado',
+  'Convocado',
+]);
+const CONDICAO_OPTIONS = Object.freeze(['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição']);
+const textCollator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+const naturalTextCollator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+
+function buildRankMap(values = []) {
+  return new Map(values.map((value, index) => [normalizeText(value), index]));
+}
+
+const postoGraduacaoRank = buildRankMap(POSTO_GRADUACAO_OPTIONS);
+const statusCadastroRank = buildRankMap(STATUS_CADASTRO_ORDER);
+const quadroRank = buildRankMap(QUADROS_FIXOS);
+
 function normalizeText(value) {
   return String(value || '')
     .normalize('NFD')
@@ -93,11 +118,42 @@ function getLotacaoId(militar = {}) {
 function militarMatchesSearch(militar = {}, normalizedSearch = '') {
   if (!normalizedSearch) return true;
 
-  const searchableFields = EXTRACAO_EFETIVO_DEFAULT_COLUMNS.map((column) =>
+  const searchableFields = Object.values(EXTRACAO_EFETIVO_FIELDS)
+    .filter((field) => field.searchable === true)
+    .map((column) =>
     getValorCampoEfetivo(militar, column.id),
   );
 
   return searchableFields.some((field) => normalizeText(field).includes(normalizedSearch));
+}
+
+function compareByRank(firstValue, secondValue, rankMap) {
+  const fallbackRank = Number.MAX_SAFE_INTEGER;
+  const firstRank = rankMap.get(normalizeText(firstValue)) ?? fallbackRank;
+  const secondRank = rankMap.get(normalizeText(secondValue)) ?? fallbackRank;
+
+  if (firstRank !== secondRank) return firstRank - secondRank;
+
+  return textCollator.compare(String(firstValue || ''), String(secondValue || ''));
+}
+
+function compareCampoEfetivo(firstRecord, secondRecord, field) {
+  const firstValue = field.accessor(firstRecord);
+  const secondValue = field.accessor(secondRecord);
+
+  switch (field.sortType) {
+    case 'postoGraduacao':
+      return compareByRank(firstValue, secondValue, postoGraduacaoRank);
+    case 'statusCadastro':
+      return compareByRank(firstValue, secondValue, statusCadastroRank);
+    case 'quadro':
+      return compareByRank(firstValue, secondValue, quadroRank);
+    case 'naturalText':
+      return naturalTextCollator.compare(String(firstValue || ''), String(secondValue || ''));
+    case 'text':
+    default:
+      return textCollator.compare(String(firstValue || ''), String(secondValue || ''));
+  }
 }
 
 function uniqueSorted(values = []) {
@@ -154,9 +210,16 @@ export default function ExtracaoEfetivo() {
   const [searchTerm, setSearchTerm] = useState('');
   const [postoFilter, setPostoFilter] = useState(TODOS_VALUE);
   const [quadroFilter, setQuadroFilter] = useState(TODOS_VALUE);
-  const [statusFilter, setStatusFilter] = useState(TODOS_VALUE);
+  const [statusFilter, setStatusFilter] = useState('Ativo');
+  const [situacaoMilitarFilter, setSituacaoMilitarFilter] = useState(TODOS_VALUE);
+  const [funcaoFilter, setFuncaoFilter] = useState(TODOS_VALUE);
+  const [condicaoFilter, setCondicaoFilter] = useState(TODOS_VALUE);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODOS_VALUE);
   const [selectedColumnIds, setSelectedColumnIds] = useState(getDefaultColumnIds);
+  const [sortConfig, setSortConfig] = useState({
+    fieldId: DEFAULT_SORT_FIELD,
+    direction: DEFAULT_SORT_DIRECTION,
+  });
 
   const selectableColumns = useMemo(() => getSelectableColumns(), []);
   const selectedColumns = useMemo(
@@ -240,7 +303,6 @@ export default function ExtracaoEfetivo() {
 
   const filtrosAtuais = useMemo(
     () => ({
-      statusCadastro: 'Ativo',
       includeFoto: false,
       limit: BACKEND_LIMIT,
       offset: 0,
@@ -248,9 +310,12 @@ export default function ExtracaoEfetivo() {
       postoGraduacao: postoFilter,
       quadro: quadroFilter,
       status: statusFilter,
+      situacaoMilitar: situacaoMilitarFilter,
+      funcao: funcaoFilter,
+      condicao: condicaoFilter,
       lotacao: lotacaoFilter,
     }),
-    [lotacaoFilter, postoFilter, quadroFilter, searchTerm, statusFilter],
+    [condicaoFilter, funcaoFilter, lotacaoFilter, postoFilter, quadroFilter, searchTerm, situacaoMilitarFilter, statusFilter],
   );
 
   const militaresQueryKey = [
@@ -279,13 +344,21 @@ export default function ExtracaoEfetivo() {
     enabled: isAccessResolved && Boolean(filtrosExecutados),
     queryFn: () =>
       fetchScopedMilitares({
-        statusCadastro: 'Ativo',
         limit: BACKEND_LIMIT,
         offset: 0,
         includeFoto: false,
         ...(filtrosExecutados?.search ? { search: filtrosExecutados.search } : {}),
         ...(filtrosExecutados?.postoGraduacao && filtrosExecutados.postoGraduacao !== TODOS_VALUE
           ? { postoGraduacaoFiltros: [filtrosExecutados.postoGraduacao] }
+          : {}),
+        ...(filtrosExecutados?.status && filtrosExecutados.status !== TODOS_VALUE
+          ? { statusCadastro: filtrosExecutados.status }
+          : {}),
+        ...(filtrosExecutados?.situacaoMilitar && filtrosExecutados.situacaoMilitar !== TODOS_VALUE
+          ? { situacaoMilitar: filtrosExecutados.situacaoMilitar }
+          : {}),
+        ...(filtrosExecutados?.lotacao && lotacoesIds.has(filtrosExecutados.lotacao)
+          ? { lotacaoFiltro: filtrosExecutados.lotacao }
           : {}),
       }),
     staleTime: STALE_TIME_MS,
@@ -322,6 +395,30 @@ export default function ExtracaoEfetivo() {
     [militares],
   );
 
+
+  const situacoesMilitaresDisponiveis = useMemo(
+    () =>
+      uniqueSorted([
+        ...SITUACAO_MILITAR_OPTIONS,
+        ...militares.map((militar) => getValorCampoEfetivo(militar, 'situacao_militar')),
+      ]),
+    [militares],
+  );
+
+  const funcoesDisponiveis = useMemo(
+    () => uniqueSorted(militares.map((militar) => getValorCampoEfetivo(militar, 'funcao'))),
+    [militares],
+  );
+
+  const condicoesDisponiveis = useMemo(
+    () =>
+      uniqueSorted([
+        ...CONDICAO_OPTIONS,
+        ...militares.map((militar) => getValorCampoEfetivo(militar, 'condicao')),
+      ]),
+    [militares],
+  );
+
   const hasExecutedExtraction = Boolean(filtrosExecutados);
   const normalizedExecutedSearch = useMemo(
     () => normalizeText(filtrosExecutados?.search),
@@ -337,6 +434,9 @@ export default function ExtracaoEfetivo() {
       const status = getValorCampoEfetivo(militar, 'status_cadastro');
       const lotacaoId = getLotacaoId(militar);
       const lotacaoNome = getLotacaoNomeEfetivo(militar);
+      const situacaoMilitar = getValorCampoEfetivo(militar, 'situacao_militar');
+      const funcao = getValorCampoEfetivo(militar, 'funcao');
+      const condicao = getValorCampoEfetivo(militar, 'condicao');
 
       if (!filtrosExecutados) return false;
       if (filtrosExecutados.postoGraduacao !== TODOS_VALUE && posto !== filtrosExecutados.postoGraduacao) {
@@ -346,6 +446,14 @@ export default function ExtracaoEfetivo() {
         return false;
       }
       if (filtrosExecutados.status !== TODOS_VALUE && status !== filtrosExecutados.status) return false;
+      if (
+        filtrosExecutados.situacaoMilitar !== TODOS_VALUE &&
+        situacaoMilitar !== filtrosExecutados.situacaoMilitar
+      ) {
+        return false;
+      }
+      if (filtrosExecutados.funcao !== TODOS_VALUE && funcao !== filtrosExecutados.funcao) return false;
+      if (filtrosExecutados.condicao !== TODOS_VALUE && condicao !== filtrosExecutados.condicao) return false;
       if (filtrosExecutados.lotacao === SEM_LOTACAO_VALUE && lotacaoNome) return false;
       if (
         filtrosExecutados.lotacao !== TODOS_VALUE &&
@@ -360,6 +468,40 @@ export default function ExtracaoEfetivo() {
     });
   }, [filtrosExecutados, militares, normalizedExecutedSearch]);
 
+  const sortedMilitares = useMemo(() => {
+    const sortField = EXTRACAO_EFETIVO_FIELDS[sortConfig.fieldId];
+
+    if (!sortField?.sortable) return filteredMilitares;
+
+    const directionFactor = sortConfig.direction === 'desc' ? -1 : 1;
+
+    return [...filteredMilitares].sort((firstRecord, secondRecord) => {
+      const result = compareCampoEfetivo(firstRecord, secondRecord, sortField);
+      return result * directionFactor;
+    });
+  }, [filteredMilitares, sortConfig]);
+
+  const toggleSort = (fieldId) => {
+    const field = EXTRACAO_EFETIVO_FIELDS[fieldId];
+    if (!field?.sortable) return;
+
+    setSortConfig((currentSort) => ({
+      fieldId,
+      direction:
+        currentSort.fieldId === fieldId && currentSort.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const getSortIcon = (fieldId) => {
+    if (sortConfig.fieldId !== fieldId) return <ArrowUpDown className="h-3.5 w-3.5" />;
+
+    return sortConfig.direction === 'asc' ? (
+      <ArrowUp className="h-3.5 w-3.5" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5" />
+    );
+  };
+
   const executeExtraction = () => {
     setFiltrosExecutados(filtrosAtuais);
     setExecutionId((currentExecutionId) => currentExecutionId + 1);
@@ -369,7 +511,10 @@ export default function ExtracaoEfetivo() {
     setSearchTerm('');
     setPostoFilter(TODOS_VALUE);
     setQuadroFilter(TODOS_VALUE);
-    setStatusFilter(TODOS_VALUE);
+    setStatusFilter('Ativo');
+    setSituacaoMilitarFilter(TODOS_VALUE);
+    setFuncaoFilter(TODOS_VALUE);
+    setCondicaoFilter(TODOS_VALUE);
     setLotacaoFilter(TODOS_VALUE);
   };
 
@@ -387,7 +532,7 @@ export default function ExtracaoEfetivo() {
   }
 
   const totalRetornado = militares.length;
-  const totalFiltrado = filteredMilitares.length;
+  const totalFiltrado = sortedMilitares.length;
   const isBusy = hasExecutedExtraction && (isLoading || isFetching);
   const isRateLimitError = String(error?.message || '').toLowerCase().includes('rate limit');
 
@@ -530,10 +675,54 @@ export default function ExtracaoEfetivo() {
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todos os status retornados da base ativa</SelectItem>
+                  <SelectItem value={TODOS_VALUE}>Todos os status (sem filtro backend)</SelectItem>
                   {statusDisponiveis.map((status) => (
                     <SelectItem key={status} value={status}>
                       {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Select value={situacaoMilitarFilter} onValueChange={setSituacaoMilitarFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Situação militar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODOS_VALUE}>Todas as situações militares</SelectItem>
+                  {situacoesMilitaresDisponiveis.map((situacao) => (
+                    <SelectItem key={situacao} value={situacao}>
+                      {situacao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={funcaoFilter} onValueChange={setFuncaoFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Função" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODOS_VALUE}>Todas as funções (refino local)</SelectItem>
+                  {funcoesDisponiveis.map((funcao) => (
+                    <SelectItem key={funcao} value={funcao}>
+                      {funcao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={condicaoFilter} onValueChange={setCondicaoFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Condição" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODOS_VALUE}>Todas as condições (refino local)</SelectItem>
+                  {condicoesDisponiveis.map((condicao) => (
+                    <SelectItem key={condicao} value={condicao}>
+                      {condicao}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -680,7 +869,7 @@ export default function ExtracaoEfetivo() {
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
               {selectedColumns.length} coluna{selectedColumns.length === 1 ? '' : 's'} selecionada
-              {selectedColumns.length === 1 ? '' : 's'}. Campos desconhecidos são descartados antes da renderização.
+              {selectedColumns.length === 1 ? '' : 's'}. Campos desconhecidos são descartados antes da renderização. A ordenação é local e atua somente sobre o resultado carregado.
             </div>
           </CardContent>
         </Card>
@@ -730,7 +919,7 @@ export default function ExtracaoEfetivo() {
               </Button>
             </CardContent>
           </Card>
-        ) : filteredMilitares.length === 0 ? (
+        ) : sortedMilitares.length === 0 ? (
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-12 text-center">
               <Users className="w-14 h-14 mx-auto text-slate-300 mb-4" />
@@ -748,15 +937,34 @@ export default function ExtracaoEfetivo() {
               <table className="min-w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {selectedColumns.map((column) => (
-                      <th key={column.id} className="px-4 py-3 text-left font-semibold">
-                        {column.label}
-                      </th>
-                    ))}
+                    {selectedColumns.map((column) => {
+                      const isSortable = column.sortable === true;
+                      const isActiveSort = sortConfig.fieldId === column.id;
+
+                      return (
+                        <th key={column.id} className="px-4 py-3 text-left font-semibold">
+                          {isSortable ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(column.id)}
+                              className={`inline-flex items-center gap-1.5 rounded-md text-left hover:text-[#1e3a5f] ${
+                                isActiveSort ? 'text-[#1e3a5f]' : ''
+                              }`}
+                              title="Ordenar localmente o resultado carregado"
+                            >
+                              <span>{column.label}</span>
+                              {getSortIcon(column.id)}
+                            </button>
+                          ) : (
+                            column.label
+                          )}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
-                  {filteredMilitares.map((militar) => (
+                  {sortedMilitares.map((militar) => (
                     <tr
                       key={militar.id || `${militar.nome_completo}-${getValorCampoEfetivo(militar, 'matricula')}`}
                       className="hover:bg-slate-50/80"

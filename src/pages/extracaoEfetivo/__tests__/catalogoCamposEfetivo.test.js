@@ -21,6 +21,22 @@ const DEFAULT_COLUMN_ORDER = Object.freeze([
 ]);
 
 const ALLOWED_RENDERERS = new Set(['statusBadge']);
+const ALLOWED_BACKEND_PARAMS = new Set([
+  'postoGraduacaoFiltros',
+  'statusCadastro',
+  'situacaoMilitar',
+  'lotacaoFiltro',
+  'search',
+]);
+const ALLOWED_SORT_TYPES = new Set([
+  'text',
+  'naturalText',
+  'postoGraduacao',
+  'statusCadastro',
+  'quadro',
+]);
+const ALLOWED_FILTER_MODES = new Set(['backend', 'client', 'hybrid']);
+const ALLOWED_FILTER_TYPES = new Set(['select', 'text']);
 
 const SELECTABLE_COLUMN_ORDER = Object.freeze([
   'posto_graduacao',
@@ -193,6 +209,59 @@ test('colunas obrigatórias são metadado explícito e fazem parte das colunas p
   for (const fieldId of requiredIds) {
     assert.equal(defaultColumnIds.has(fieldId), true, `${fieldId} obrigatório deve iniciar visível`);
     assert.equal(EXTRACAO_EFETIVO_FIELDS[fieldId].selectable, true, `${fieldId} obrigatório deve ser selecionável`);
+  }
+});
+
+
+test('metadados de ordenação e filtro permanecem restritos à allowlist segura', () => {
+  const allowlistIds = new Set(Object.keys(EXTRACAO_EFETIVO_FIELDS));
+  const forbiddenFields = new Set(EXTRACAO_EFETIVO_FORBIDDEN_FIELDS);
+  const sensitiveFields = new Set(SENSITIVE_FIELD_IDS);
+
+  for (const field of Object.values(EXTRACAO_EFETIVO_FIELDS)) {
+    assert.equal(allowlistIds.has(field.id), true, `${field.id} deve existir na allowlist antes de receber metadados`);
+    assert.equal(forbiddenFields.has(field.id), false, `${field.id} não pode ser forbidden field`);
+    assert.equal(sensitiveFields.has(field.id), false, `${field.id} não pode ser sensível`);
+
+    if (field.sortable !== undefined) {
+      assert.equal(field.sortable, true, `${field.id} sortable deve ser boolean true explícito`);
+      assert.equal(allowlistIds.has(field.id), true, `${field.id} sortable deve vir da allowlist`);
+    }
+
+    if (field.filterable !== undefined) {
+      assert.equal(field.filterable, true, `${field.id} filterable deve ser boolean true explícito`);
+      assert.equal(allowlistIds.has(field.id), true, `${field.id} filterable deve vir da allowlist`);
+      assert.equal(ALLOWED_FILTER_TYPES.has(field.filterType), true, `${field.id} usa filterType não permitido`);
+    }
+
+    if (field.searchable !== undefined) {
+      assert.equal(field.searchable, true, `${field.id} searchable deve ser boolean true explícito`);
+      assert.equal(allowlistIds.has(field.id), true, `${field.id} searchable deve vir da allowlist`);
+    }
+
+    if (field.backendParam !== undefined) {
+      assert.equal(ALLOWED_BACKEND_PARAMS.has(field.backendParam), true, `${field.id} usa backendParam não aceito`);
+    }
+
+    if (field.sortType !== undefined) {
+      assert.equal(ALLOWED_SORT_TYPES.has(field.sortType), true, `${field.id} usa sortType não permitido`);
+    }
+
+    if (field.sortRank !== undefined) {
+      assert.equal(typeof field.sortRank, 'number', `${field.id} usa sortRank não numérico`);
+    }
+
+    if (field.filterMode !== undefined) {
+      assert.equal(ALLOWED_FILTER_MODES.has(field.filterMode), true, `${field.id} usa filterMode não permitido`);
+    }
+
+    if (field.sourceFields !== undefined) {
+      assert.equal(Array.isArray(field.sourceFields), true, `${field.id} sourceFields deve ser array`);
+      for (const sourceField of field.sourceFields) {
+        assert.equal(forbiddenFields.has(sourceField), false, `${field.id} não pode mapear sourceField proibido`);
+        assert.equal(sensitiveFields.has(sourceField), false, `${field.id} não pode mapear sourceField sensível`);
+      }
+    }
   }
 });
 
