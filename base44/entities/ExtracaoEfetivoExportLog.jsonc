@@ -1,0 +1,70 @@
+{
+  "name": "ExtracaoEfetivoExportLog",
+  "type": "object",
+  "title": "Log de Exportação da Extração do Efetivo",
+  "description": "Registro persistente de auditoria pré-exportação da Extração do Efetivo, contendo somente metadados sanitizados.",
+  "properties": {
+    "acao": {
+      "type": "string",
+      "default": "exportar_extracao_efetivo"
+    },
+    "usuario_real_email": {
+      "type": "string",
+      "default": ""
+    },
+    "usuario_efetivo_email": {
+      "type": "string",
+      "default": ""
+    },
+    "is_impersonating": {
+      "type": "boolean",
+      "default": false
+    },
+    "data_hora": {
+      "type": "date",
+      "default": ""
+    },
+    "tipo_exportacao": {
+      "type": "string",
+      "enum": ["parcial", "completo"],
+      "default": "parcial"
+    },
+    "quantidade_carregada": {
+      "type": "number",
+      "default": 0
+    },
+    "quantidade_exportada": {
+      "type": "number",
+      "default": 0
+    },
+    "colunas_exportadas_json": {
+      "type": "string",
+      "default": "[]"
+    },
+    "filtros_sanitizados_json": {
+      "type": "string",
+      "default": "{}"
+    },
+    "consulta_meta_json": {
+      "type": "string",
+      "default": "{}"
+    },
+    "nome_arquivo": {
+      "type": "string",
+      "default": ""
+    },
+    "status_exportacao": {
+      "type": "string",
+      "enum": ["registrada", "bloqueada", "erro_pre_exportacao"],
+      "default": "registrada"
+    },
+    "versao": {
+      "type": "string",
+      "default": "1F-C"
+    },
+    "catalogo_version": {
+      "type": "string",
+      "default": "extracao-efetivo-catalogo-v1"
+    }
+  }
+}
