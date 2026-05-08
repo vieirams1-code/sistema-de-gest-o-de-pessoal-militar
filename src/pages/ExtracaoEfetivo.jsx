@@ -43,6 +43,9 @@ import {
   getQuadroEfetivo,
   getValorCampoEfetivo,
 } from '@/pages/extracaoEfetivo/catalogoCamposEfetivo';
+import KpiCard from '@/pages/extracaoEfetivo/components/KpiCard';
+import StatusBadge from '@/pages/extracaoEfetivo/components/StatusBadge';
+import { statusBadgeClass } from '@/pages/extracaoEfetivo/extracaoState';
 import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { exportarRegistrosParaExcel } from '@/utils/indicadosExcelExport';
 import { base44 } from '@/api/base44Client';
@@ -73,14 +76,6 @@ const POSTO_GRADUACAO_OPTIONS = [
   'Cabo',
   'Soldado',
 ];
-
-const statusBadgeClass = {
-  Ativo: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  Inativo: 'bg-slate-100 text-slate-700 border-slate-200',
-  Reserva: 'bg-amber-100 text-amber-700 border-amber-200',
-  Reforma: 'bg-blue-100 text-blue-700 border-blue-200',
-  Falecido: 'bg-red-100 text-red-700 border-red-200',
-};
 
 const STATUS_CADASTRO_ORDER = Object.freeze(['Ativo', 'Reserva', 'Reforma', 'Inativo', 'Falecido']);
 const SITUACAO_MILITAR_OPTIONS = Object.freeze([
@@ -1188,51 +1183,31 @@ export default function ExtracaoEfetivo() {
         </div>
 
         {hasExecutedExtraction ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-slate-100 shadow-sm">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="rounded-xl bg-slate-100 p-3 text-slate-700">
-                  <Database className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Registros carregados</p>
-                  <p className="text-3xl font-bold text-slate-800">{totalRetornado}</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-100 shadow-sm">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700">
-                  <Users className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Na listagem</p>
-                  <p className="text-3xl font-bold text-slate-800">{totalFiltrado}</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-100 shadow-sm">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div
-                  className={`rounded-xl p-3 ${
-                    hasMoreMilitares ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-                  }`}
-                >
-                  <ListChecks className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Carregamento</p>
-                  <p className="text-lg font-bold text-slate-800">
-                    {hasMoreMilitares ? 'Parcial' : 'Completo'}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {hasMoreMilitares
-                      ? 'Há mais registros no escopo.'
-                      : 'Não há mais registros a carregar.'}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <KpiCard
+              title="Registros carregados"
+              value={totalRetornado}
+              icon={Database}
+              iconTone="slate"
+            />
+            <KpiCard
+              title="Na listagem"
+              value={totalFiltrado}
+              icon={Users}
+              iconTone="emerald"
+            />
+            <KpiCard
+              title="Carregamento"
+              value={hasMoreMilitares ? 'Parcial' : 'Completo'}
+              description={
+                hasMoreMilitares
+                  ? 'Há mais registros no escopo.'
+                  : 'Não há mais registros a carregar.'
+              }
+              icon={ListChecks}
+              iconTone={hasMoreMilitares ? 'amber' : 'blue'}
+              valueClassName="text-lg"
+            />
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 flex gap-3">
@@ -1761,13 +1736,9 @@ export default function ExtracaoEfetivo() {
                         return (
                           <td key={column.id} className={`px-4 py-3 ${column.cellClassName || ''}`}>
                             {column.renderAs === 'statusBadge' ? (
-                              <Badge
-                                className={`${
-                                  statusBadgeClass[value] || statusBadgeClass.Ativo
-                                } border`}
-                              >
+                              <StatusBadge status={value || 'Ativo'}>
                                 {textoOuTraco(value || 'Ativo')}
-                              </Badge>
+                              </StatusBadge>
                             ) : (
                               textoOuTraco(value)
                             )}
