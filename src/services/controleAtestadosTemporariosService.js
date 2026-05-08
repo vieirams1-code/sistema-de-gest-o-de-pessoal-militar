@@ -53,7 +53,13 @@ export function isQuadroTemporario(quadro) {
 }
 
 export function isMilitarTemporarioParaControleAtestados(militar) {
-  return isQuadroTemporario(militar?.quadro || militar?.militar_quadro || militar?.quadro_militar);
+  return isQuadroTemporario(
+    militar?.quadro
+      || militar?.quadro_atual
+      || militar?.quadroAtual
+      || militar?.militar_quadro
+      || militar?.quadro_militar,
+  );
 }
 
 export function parseDateOnlySeguro(value) {
@@ -230,32 +236,82 @@ function criarMapaMilitaresPorId(militaresEscopados) {
 
 function obterLotacaoMilitar(militar, atestado) {
   const lotacaoObjeto = militar?.lotacao_atual || militar?.lotacaoAtual || atestado?.militar?.lotacao_atual || atestado?.militar?.lotacaoAtual;
+  const estruturaObjeto = militar?.estrutura || atestado?.militar?.estrutura;
+  const subgrupamentoObjeto = militar?.subgrupamento || atestado?.militar?.subgrupamento;
+  const grupamentoObjeto = militar?.grupamento || atestado?.militar?.grupamento;
+
   return obterValorNormalizado(
     militar?.lotacao,
-    militar?.unidade,
-    militar?.unidade_atual,
-    militar?.unidadeAtual,
+    militar?.lotacao_nome,
+    militar?.lotacaoNome,
     lotacaoObjeto?.nome,
     lotacaoObjeto?.sigla,
+    militar?.estrutura_nome,
+    militar?.estruturaNome,
+    estruturaObjeto?.nome,
+    estruturaObjeto?.sigla,
+    militar?.subgrupamento_nome,
+    militar?.subgrupamentoNome,
+    subgrupamentoObjeto?.nome,
+    militar?.grupamento_nome,
+    militar?.grupamentoNome,
+    grupamentoObjeto?.nome,
+    militar?.unidade,
+    militar?.unidade_nome,
+    militar?.unidadeNome,
+    militar?.unidade_atual,
+    militar?.unidadeAtual,
+    militar?.destino,
     atestado?.militar_lotacao,
     atestado?.militar_unidade,
     atestado?.lotacao,
+    atestado?.lotacao_nome,
+    atestado?.lotacaoNome,
     atestado?.unidade,
+    atestado?.unidade_nome,
+    atestado?.unidadeNome,
+    atestado?.destino,
     atestado?.militar?.lotacao,
+    atestado?.militar?.lotacao_nome,
+    atestado?.militar?.lotacaoNome,
+    atestado?.militar?.estrutura_nome,
+    atestado?.militar?.estruturaNome,
+    atestado?.militar?.subgrupamento_nome,
+    atestado?.militar?.subgrupamentoNome,
+    atestado?.militar?.grupamento_nome,
+    atestado?.militar?.grupamentoNome,
     atestado?.militar?.unidade,
+    atestado?.militar?.unidade_nome,
+    atestado?.militar?.unidadeNome,
+    atestado?.militar?.destino,
   );
 }
 
 function obterEstruturaMilitar(militar, atestado) {
+  const estruturaObjeto = militar?.estrutura || atestado?.militar?.estrutura;
+
   return obterValorNormalizado(
-    militar?.estrutura,
     militar?.estrutura_nome,
     militar?.estruturaNome,
+    estruturaObjeto?.nome,
+    militar?.estrutura_tipo,
+    militar?.estruturaTipo,
+    estruturaObjeto?.tipo,
+    typeof militar?.estrutura === 'string' ? militar.estrutura : '',
     militar?.lotacao_atual?.estrutura,
     militar?.lotacaoAtual?.estrutura,
     atestado?.militar_estrutura,
-    atestado?.estrutura,
-    atestado?.militar?.estrutura,
+    atestado?.estrutura_nome,
+    atestado?.estruturaNome,
+    atestado?.estrutura_tipo,
+    atestado?.estruturaTipo,
+    typeof atestado?.estrutura === 'string' ? atestado.estrutura : '',
+    atestado?.militar?.estrutura_nome,
+    atestado?.militar?.estruturaNome,
+    atestado?.militar?.estrutura_tipo,
+    atestado?.militar?.estruturaTipo,
+    atestado?.militar?.estrutura?.nome,
+    atestado?.militar?.estrutura?.tipo,
   );
 }
 
@@ -264,16 +320,83 @@ function montarMilitarBase(militar, atestados, { militaresPorId = null } = {}) {
   const militarId = militar?.id || primeiro.militar_id || primeiro.militar?.id || null;
   const militarEscopado = obterMilitarEscopadoPorId(militarId, militaresPorId);
   const fonteMilitar = militarEscopado || militar;
-  const quadroOriginal = obterValorNormalizado(fonteMilitar?.quadro, primeiro.militar_quadro, primeiro.quadro, primeiro.militar?.quadro);
+  const quadroOriginal = obterValorNormalizado(
+    fonteMilitar?.quadro,
+    fonteMilitar?.quadro_atual,
+    fonteMilitar?.quadroAtual,
+    fonteMilitar?.militar_quadro,
+    primeiro.militar_quadro,
+    primeiro.quadro,
+    primeiro.quadro_atual,
+    primeiro.quadroAtual,
+    primeiro.militar?.quadro,
+    primeiro.militar?.quadro_atual,
+    primeiro.militar?.quadroAtual,
+  );
   const quadroNormalizado = normalizarQuadroControleAtestados(quadroOriginal);
 
   return {
     id: fonteMilitar?.id || militarId,
-    nome: obterValorNormalizado(fonteMilitar?.nome, primeiro.militar_nome, primeiro.militar?.nome) || 'Militar não identificado',
-    postoGraduacao: obterValorNormalizado(fonteMilitar?.posto_graduacao, fonteMilitar?.postoGraduacao, fonteMilitar?.posto, primeiro.militar_posto_graduacao, primeiro.militar_posto, primeiro.posto_graduacao, primeiro.posto, primeiro.militar?.posto_graduacao, primeiro.militar?.posto) || '-',
+    nome: obterValorNormalizado(
+      fonteMilitar?.nome_completo,
+      fonteMilitar?.nomeCompleto,
+      fonteMilitar?.nome,
+      fonteMilitar?.nome_guerra,
+      fonteMilitar?.nomeGuerra,
+      primeiro.militar_nome,
+      primeiro.militar?.nome_completo,
+      primeiro.militar?.nomeCompleto,
+      primeiro.militar?.nome,
+      primeiro.militar?.nome_guerra,
+      primeiro.militar?.nomeGuerra,
+    ) || '-',
+    postoGraduacao: obterValorNormalizado(
+      fonteMilitar?.posto_graduacao,
+      fonteMilitar?.postoGraduacao,
+      fonteMilitar?.posto_grad,
+      fonteMilitar?.postoGrad,
+      fonteMilitar?.pg,
+      fonteMilitar?.posto,
+      fonteMilitar?.militar_posto,
+      primeiro.militar_posto_graduacao,
+      primeiro.militar_posto,
+      primeiro.posto_graduacao,
+      primeiro.postoGraduacao,
+      primeiro.posto_grad,
+      primeiro.postoGrad,
+      primeiro.pg,
+      primeiro.posto,
+      primeiro.militar?.posto_graduacao,
+      primeiro.militar?.postoGraduacao,
+      primeiro.militar?.posto_grad,
+      primeiro.militar?.postoGrad,
+      primeiro.militar?.pg,
+      primeiro.militar?.posto,
+    ) || '-',
     quadro: quadroNormalizado || '-',
     quadroOriginal: quadroOriginal || '-',
-    matricula: obterValorNormalizado(fonteMilitar?.matricula, fonteMilitar?.matricula_atual, fonteMilitar?.matriculaAtual, primeiro.militar_matricula_label, primeiro.militar_matricula_atual, primeiro.militar_matricula, primeiro.matricula, primeiro.militar?.matricula) || '-',
+    matricula: obterValorNormalizado(
+      fonteMilitar?.matricula,
+      fonteMilitar?.matricula_atual,
+      fonteMilitar?.matriculaAtual,
+      fonteMilitar?.matricula_funcional,
+      fonteMilitar?.matriculaFuncional,
+      fonteMilitar?.militar_matricula,
+      fonteMilitar?.militar_matricula_atual,
+      primeiro.militar_matricula_label,
+      primeiro.militar_matricula_atual,
+      primeiro.militar_matricula,
+      primeiro.matricula,
+      primeiro.matricula_atual,
+      primeiro.matriculaAtual,
+      primeiro.matricula_funcional,
+      primeiro.matriculaFuncional,
+      primeiro.militar?.matricula,
+      primeiro.militar?.matricula_atual,
+      primeiro.militar?.matriculaAtual,
+      primeiro.militar?.matricula_funcional,
+      primeiro.militar?.matriculaFuncional,
+    ) || '-',
     lotacao: obterLotacaoMilitar(fonteMilitar, primeiro) || '-',
     estrutura: obterEstruturaMilitar(fonteMilitar, primeiro) || '-',
     dadosEscopadosEncontrados: Boolean(militarEscopado),

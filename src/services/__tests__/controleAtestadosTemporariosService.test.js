@@ -180,6 +180,112 @@ test('mantém fallback para dados do atestado quando militar escopado não exist
   assert.equal(resultado.militar.dadosEscopadosEncontrados, false);
 });
 
+test('resolve aliases escopados de nome, posto, quadro, matrícula, lotação e estrutura', () => {
+  const casos = [
+    { campo: 'nome_completo', valor: 'Nome Completo Escopado', esperado: { nome: 'Nome Completo Escopado' } },
+    { campo: 'nome_guerra', valor: 'Nome Guerra Escopado', esperado: { nome: 'Nome Guerra Escopado' } },
+    { campo: 'posto_grad', valor: 'Sgt BM', esperado: { postoGraduacao: 'Sgt BM' } },
+    { campo: 'pg', valor: 'Sd BM', esperado: { postoGraduacao: 'Sd BM' } },
+    { campo: 'matricula_funcional', valor: 'MF-123', esperado: { matricula: 'MF-123' } },
+    { campo: 'estrutura_nome', valor: 'Diretoria de Saúde', esperado: { lotacao: 'Diretoria de Saúde', estrutura: 'Diretoria de Saúde' } },
+    { campo: 'subgrupamento_nome', valor: '1º SGBM', esperado: { lotacao: '1º SGBM' } },
+    { campo: 'grupamento_nome', valor: '1º GBM', esperado: { lotacao: '1º GBM' } },
+    { campo: 'unidade_nome', valor: 'Unidade Médica', esperado: { lotacao: 'Unidade Médica' } },
+    { campo: 'quadro_atual', valor: 'QOBM', esperado: { quadro: 'QOBM' } },
+  ];
+
+  for (const { campo, valor, esperado } of casos) {
+    const resultado = avaliarRiscoAtestadosMilitar({
+      atestados: [{
+        militar_id: `militar-${campo}`,
+        militar_nome: 'Nome do Atestado',
+        militar_quadro: 'QPBM',
+        data_inicio: '2026-01-01',
+        data_termino: '2026-01-05',
+      }],
+      militaresPorId: new Map([[`militar-${campo}`, { id: `militar-${campo}`, [campo]: valor }]]),
+      dataReferencia: '2026-12-31',
+    });
+
+    for (const [chave, valorEsperado] of Object.entries(esperado)) {
+      assert.equal(resultado.militar[chave], valorEsperado, `alias ${campo} deve preencher ${chave}`);
+    }
+    assert.deepEqual(resultado.lacunas, []);
+  }
+});
+
+test('QBMPT vindo de alias quadro_atual normaliza para QPTBM e mantém alerta 30/60 de temporário', () => {
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-qbmpt-alias',
+      data_inicio: '2026-01-01',
+      data_termino: '2026-01-30',
+    }],
+    militaresPorId: new Map([[
+      'militar-qbmpt-alias',
+      { id: 'militar-qbmpt-alias', nome_completo: 'Temporário Alias', quadro_atual: 'QBMPT' },
+    ]]),
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.militar.quadro, 'QPTBM');
+  assert.equal(resultado.temporarioClassificacao, 'sim');
+  assert.equal(resultado.ehTemporario, true);
+  assert.equal(resultado.alertaLegalTemporario, true);
+  assert.equal(resultado.statusRisco, 'critico_continuo');
+});
+
+test('não temporário enriquecido apenas por aliases permanece sem alerta legal', () => {
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-nao-temporario-alias',
+      militar_quadro: 'QOETBM',
+      data_inicio: '2026-02-01',
+      data_termino: '2026-03-02',
+    }],
+    militaresPorId: new Map([[
+      'militar-nao-temporario-alias',
+      {
+        id: 'militar-nao-temporario-alias',
+        nome_completo: 'Militar Efetivo Alias',
+        posto_grad: 'Maj BM',
+        quadro_atual: 'QOBM',
+        matricula_funcional: 'MF-999',
+        unidade_nome: 'Unidade Efetiva',
+      },
+    ]]),
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.militar.nome, 'Militar Efetivo Alias');
+  assert.equal(resultado.militar.postoGraduacao, 'Maj BM');
+  assert.equal(resultado.militar.quadro, 'QOBM');
+  assert.equal(resultado.militar.matricula, 'MF-999');
+  assert.equal(resultado.militar.lotacao, 'Unidade Efetiva');
+  assert.equal(resultado.temporarioClassificacao, 'nao');
+  assert.equal(resultado.ehTemporario, false);
+  assert.equal(resultado.alertaLegalTemporario, false);
+  assert.equal(resultado.statusRisco, 'normal');
+});
+
+test('ausência de aliases opcionais no militar escopado não gera lacuna indevida', () => {
+  const resultado = avaliarRiscoAtestadosMilitar({
+    atestados: [{
+      militar_id: 'militar-minimo',
+      data_inicio: '2026-07-01',
+      data_termino: '2026-07-03',
+    }],
+    militaresPorId: new Map([['militar-minimo', { id: 'militar-minimo', quadro: 'QPBM' }]]),
+    dataReferencia: '2026-12-31',
+  });
+
+  assert.equal(resultado.militar.nome, '-');
+  assert.equal(resultado.militar.postoGraduacao, '-');
+  assert.equal(resultado.militar.matricula, '-');
+  assert.equal(resultado.militar.lotacao, '-');
+  assert.deepEqual(resultado.lacunas, []);
+});
+
 test('quadro vindo do militar escopado classifica temporário corretamente', () => {
   const resultado = avaliarRiscoAtestadosMilitar({
     atestados: [{
