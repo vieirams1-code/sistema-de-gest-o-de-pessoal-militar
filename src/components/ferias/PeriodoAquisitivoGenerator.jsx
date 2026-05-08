@@ -216,7 +216,7 @@ export default function PeriodoAquisitivoGenerator() {
       const contadoresBloqueio = new Map();
       let origemMilitarDataInclusao = 0;
       let origemContratoDesignacao = 0;
-      let origemIndividual = null;
+      let origemDataBaseIndividual = null;
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
@@ -254,6 +254,7 @@ export default function PeriodoAquisitivoGenerator() {
         staleTime: 0,
       });
       const periodosFrescos = periodosFrescosBundle?.periodosAquisitivos || [];
+      // Usa contratos do refetch fresco; o fallback local cobre respostas antigas/temporárias sem o novo campo.
       const contratosDesignacaoFrescos = periodosFrescosBundle?.contratosDesignacaoMilitar || contratosDesignacaoMilitar;
       const contratosFrescosPorMilitarId = agruparContratosDesignacaoPorMilitarId(contratosDesignacaoFrescos);
 
@@ -285,7 +286,9 @@ export default function PeriodoAquisitivoGenerator() {
         } else {
           origemMilitarDataInclusao += 1;
         }
-        origemIndividual = resolucaoDataBase.origem;
+        if (escopo === 'individual') {
+          origemDataBaseIndividual = resolucaoDataBase.origem;
+        }
 
         const periodosDoMilitar = periodosFrescos.filter((p) => String(p.militar_id) === String(militar.id));
         const { inicio, fim } = getJanelaOperacional(dataInclusao, hoje);
@@ -333,7 +336,7 @@ export default function PeriodoAquisitivoGenerator() {
       const sufixoBloqueios = totalBloqueados > 0
         ? ` ${totalBloqueados} militar(es) bloqueado(s): ${resumoBloqueios}.`
         : '';
-      const mensagemOrigemIndividual = getMensagemOrigemDataBase(origemIndividual);
+      const mensagemOrigemIndividual = getMensagemOrigemDataBase(origemDataBaseIndividual);
 
       if (novosPeriodos.length > 0) {
         await base44.entities.PeriodoAquisitivo.bulkCreate(novosPeriodos);
