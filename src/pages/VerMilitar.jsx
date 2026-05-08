@@ -128,6 +128,7 @@ export default function VerMilitar() {
   const podeCriarContratoDesignacao = isAdmin || canAccessAction('criar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeEncerrarContratoDesignacao = isAdmin || canAccessAction('encerrar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+  const podePrepararLegadoAtiva = isAdmin || canAccessAction('aplicar_transicao_legado_ativa') || canAccessAction('gerir_cadeia_ferias') || canAccessAction('gerir_contratos_designacao') || (canAccessAction('visualizar_contratos_designacao') && canAccessAction('visualizar_ferias'));
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [showPromocaoAtualModal, setShowPromocaoAtualModal] = useState(false);
   const [showPromocaoHistoricaModal, setShowPromocaoHistoricaModal] = useState(false);
@@ -583,6 +584,7 @@ export default function VerMilitar() {
                     canCreate={podeCriarContratoDesignacao}
                     canEncerrar={podeEncerrarContratoDesignacao}
                     canCancelar={podeCancelarContratoDesignacao}
+                    canPrepararLegadoAtiva={podePrepararLegadoAtiva && canViewMilitar}
                     isSaving={contratoDesignacaoMutation.isPending}
                     onCreate={(data) => contratoDesignacaoMutation.mutateAsync({ operation: 'create', data })}
                     onUpdate={(contratoId, data) => contratoDesignacaoMutation.mutateAsync({ operation: 'update', id: contratoId, data })}

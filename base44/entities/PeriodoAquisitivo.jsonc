@@ -16,22 +16,22 @@
     },
     "militar_matricula": {
       "type": "string",
-      "description": "Matr\u00edcula do militar (denormalizado)"
+      "description": "Matrícula do militar (denormalizado)"
     },
     "inicio_aquisitivo": {
       "type": "string",
       "format": "date",
-      "description": "Data de in\u00edcio do per\u00edodo aquisitivo"
+      "description": "Data de início do período aquisitivo"
     },
     "fim_aquisitivo": {
       "type": "string",
       "format": "date",
-      "description": "Data de fim do per\u00edodo aquisitivo"
+      "description": "Data de fim do período aquisitivo"
     },
     "data_limite_gozo": {
       "type": "string",
       "format": "date",
-      "description": "Data limite para gozar as f\u00e9rias (24 meses ap\u00f3s fim aquisitivo)"
+      "description": "Data limite para gozar as férias (24 meses após fim aquisitivo)"
     },
     "dias_direito": {
       "type": "number",
@@ -41,7 +41,7 @@
     "dias_gozados": {
       "type": "number",
       "default": 0,
-      "description": "Quantidade de dias j\u00e1 gozados"
+      "description": "Quantidade de dias já gozados"
     },
     "dias_previstos": {
       "type": "number",
@@ -52,7 +52,7 @@
       "type": "string",
       "enum": [
         "Pendente",
-        "Dispon\u00edvel",
+        "Disponível",
         "Previsto",
         "Parcialmente Gozado",
         "Gozado",
@@ -60,20 +60,77 @@
         "Inativo"
       ],
       "default": "Pendente",
-      "description": "Status do per\u00edodo aquisitivo"
+      "description": "Status do período aquisitivo"
     },
     "ano_referencia": {
       "type": "string",
-      "description": "Ano de refer\u00eancia (ex: 2023/2024)"
+      "description": "Ano de referência (ex: 2023/2024)"
     },
     "inativo": {
       "type": "boolean",
       "default": false,
-      "description": "Per\u00edodo inativado (desconsiderado no controle)"
+      "description": "Período inativado (desconsiderado no controle)"
     },
     "observacoes": {
       "type": "string",
-      "description": "Observa\u00e7\u00f5es sobre o per\u00edodo"
+      "description": "Observações sobre o período"
+    },
+    "origem_periodo": {
+      "type": "string",
+      "enum": [
+        "ativa",
+        "designacao",
+        "legado_ativa"
+      ],
+      "description": "Origem histórica do período aquisitivo, separada do status operacional."
+    },
+    "legado_ativa": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica se o período foi classificado historicamente como legado da ativa."
+    },
+    "legado_ativa_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de marcação da transição legado da ativa."
+    },
+    "legado_ativa_por": {
+      "type": "string",
+      "description": "Usuário responsável pela marcação da transição legado da ativa."
+    },
+    "legado_ativa_contrato_designacao_id": {
+      "type": "string",
+      "description": "Contrato de designação usado como referência da transição legado da ativa."
+    },
+    "legado_ativa_data_base": {
+      "type": "string",
+      "format": "date",
+      "description": "Data-base considerada na transição legado da ativa."
+    },
+    "legado_ativa_status_anterior": {
+      "type": "string",
+      "description": "Status operacional anterior preservado para rastreabilidade."
+    },
+    "legado_ativa_inativo_anterior": {
+      "type": "boolean",
+      "description": "Valor anterior do campo inativo preservado para rastreabilidade."
+    },
+    "legado_ativa_origem_periodo_anterior": {
+      "type": "string",
+      "description": "Origem do período anterior preservada para rastreabilidade."
+    },
+    "legado_ativa_observacao": {
+      "type": "string",
+      "description": "Observação administrativa da transição legado da ativa."
+    },
+    "legado_ativa_preview_hash": {
+      "type": "string",
+      "description": "Hash opcional do relatório de prévia usado para conferência futura."
+    },
+    "excluido_da_cadeia_designacao": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica exclusão lógica da cadeia de períodos por designação, sem alterar status operacional."
     }
   },
   "required": [

@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, FileText, Plus } from 'lucide-react';
+import { AlertTriangle, FileText, Plus, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
 import EncerrarContratoDesignacaoModal from '@/components/militar/EncerrarContratoDesignacaoModal';
 import CancelarContratoDesignacaoModal from '@/components/militar/CancelarContratoDesignacaoModal';
+import TransicaoLegadoAtivaPreviewModal from '@/components/militar/TransicaoLegadoAtivaPreviewModal';
 import {
   contarContratosAtivosDesignacao,
   formatarContratoDesignacaoResumo,
@@ -34,6 +35,7 @@ export default function ContratosDesignacaoSection({
   canCreate = false,
   canEncerrar = false,
   canCancelar = false,
+  canPrepararLegadoAtiva = false,
   onCreate,
   onUpdate,
   isSaving = false,
@@ -42,6 +44,7 @@ export default function ContratosDesignacaoSection({
   const [detalhe, setDetalhe] = useState(null);
   const [encerrar, setEncerrar] = useState(null);
   const [cancelar, setCancelar] = useState(null);
+  const [previewLegadoAtiva, setPreviewLegadoAtiva] = useState(null);
 
   const ordenados = useMemo(() => ordenarContratosDesignacao(contratos), [contratos]);
   const ativo = useMemo(() => getContratoAtivoDesignacao(contratos), [contratos]);
@@ -134,6 +137,7 @@ export default function ContratosDesignacaoSection({
                 {ordenados.map((contrato) => {
                   const badge = getContratoDesignacaoStatusBadge(contrato.status_contrato);
                   const ativoContrato = normalizarStatusContratoDesignacao(contrato.status_contrato) === 'ativo';
+                  const podePrepararLegadoAtiva = ativoContrato && Boolean(contrato.data_inclusao_para_ferias) && canPrepararLegadoAtiva;
                   return (
                     <tr key={contrato.id || `${contrato.matricula_designacao}-${contrato.data_inicio_contrato}`} className="border-t border-slate-100 align-top">
                       <td className="p-3"><Badge className={badge.className}>{badge.label}</Badge></td>
@@ -148,6 +152,11 @@ export default function ContratosDesignacaoSection({
                       <td className="p-3">
                         <div className="flex flex-col gap-2 items-end">
                           <Button size="sm" variant="outline" onClick={() => setDetalhe(contrato)}>Ver detalhes</Button>
+                          {podePrepararLegadoAtiva && (
+                            <Button size="sm" variant="outline" onClick={() => setPreviewLegadoAtiva(contrato)} className="border-amber-200 text-amber-800 hover:bg-amber-50">
+                              <Wand2 className="w-4 h-4 mr-1" />Preparar transição para Legado da Ativa
+                            </Button>
+                          )}
                           {ativoContrato && canEncerrar && <Button size="sm" variant="outline" onClick={() => setEncerrar(contrato)}>Encerrar</Button>}
                           {canCancelar && normalizarStatusContratoDesignacao(contrato.status_contrato) !== 'cancelado' && <Button size="sm" variant="destructive" onClick={() => setCancelar(contrato)}>Cancelar lançamento</Button>}
                         </div>
@@ -189,6 +198,12 @@ export default function ContratosDesignacaoSection({
           contrato={cancelar}
           onSubmit={handleUpdate}
           isSubmitting={isSaving}
+        />
+        <TransicaoLegadoAtivaPreviewModal
+          open={Boolean(previewLegadoAtiva)}
+          onOpenChange={(open) => !open && setPreviewLegadoAtiva(null)}
+          militarId={militarId}
+          contrato={previewLegadoAtiva}
         />
       </CardContent>
     </Card>
