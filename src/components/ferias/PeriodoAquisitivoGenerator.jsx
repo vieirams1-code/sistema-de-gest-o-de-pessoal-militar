@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
+import { parseDateOnlyStrict } from '@/services/dateOnlyService';
+import { resolverDataBaseFerias, ORIGENS_DATA_BASE_FERIAS } from '@/services/resolverDataBaseFerias';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,25 +32,50 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 const ANOS_RETROSPECTIVOS = 3;
 const PERIODOS_FUTUROS = 2;
 
-function parseDateOnly(value) {
-  if (!value) return null;
-  const str = String(value).trim();
-  // Formato ISO: yyyy-MM-dd
-  const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) {
-    const date = new Date(`${str}T00:00:00`);
-    return Number.isNaN(date.getTime()) ? null : date;
+function agruparContratosDesignacaoPorMilitarId(contratos) {
+  return (Array.isArray(contratos) ? contratos : []).reduce((map, contrato) => {
+    if (!contrato?.militar_id) return map;
+
+    const militarId = String(contrato.militar_id);
+    const contratosDoMilitar = map.get(militarId) || [];
+    contratosDoMilitar.push(contrato);
+    map.set(militarId, contratosDoMilitar);
+    return map;
+  }, new Map());
+}
+
+function incrementarContador(contadores, codigo) {
+  contadores.set(codigo, (contadores.get(codigo) || 0) + 1);
+}
+
+function getDescricaoCodigoBloqueio(codigo) {
+  const descricoes = {
+    MILITAR_SEM_DATA_INCLUSAO: 'sem data de inclusão',
+    CONTRATO_ATIVO_SEM_DATA_BASE: 'com contrato ativo sem data-base',
+    CONTRATO_ATIVO_DUPLICADO: 'com contrato ativo duplicado',
+    DATA_BASE_FERIAS_INVALIDA: 'com data-base de férias inválida',
+    DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO: 'com data-base do contrato anterior ao início do contrato',
+  };
+
+  return descricoes[codigo] || `com bloqueio ${codigo || 'não identificado'}`;
+}
+
+function montarResumoBloqueios(contadoresBloqueio) {
+  return Array.from(contadoresBloqueio.entries())
+    .map(([codigo, total]) => `${total} ${getDescricaoCodigoBloqueio(codigo)}`)
+    .join('; ');
+}
+
+function getMensagemOrigemDataBase(origem) {
+  if (origem === ORIGENS_DATA_BASE_FERIAS.CONTRATO_DESIGNACAO) {
+    return 'Períodos gerados com base na data-base de férias do contrato de designação ativo.';
   }
-  // Formato BR: dd/MM/yyyy
-  const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (brMatch) {
-    const [, dia, mes, ano] = brMatch;
-    const date = new Date(`${ano}-${mes}-${dia}T00:00:00`);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  // Fallback: tenta parse nativo
-  const fallback = new Date(`${str}T00:00:00`);
-  return Number.isNaN(fallback.getTime()) ? null : fallback;
+
+  return 'Períodos gerados com base na data de inclusão do militar.';
+}
+
+function montarResumoOrigens(origemMilitarDataInclusao, origemContratoDesignacao) {
+  return `Origem das datas-base: ${origemMilitarDataInclusao} por data de inclusão do militar; ${origemContratoDesignacao} por contrato de designação ativo.`;
 }
 
 function mesmaData(a, b) {
@@ -106,6 +133,7 @@ export default function PeriodoAquisitivoGenerator() {
 
   const militares = paBundle?.militares || [];
   const matriculasMilitar = paBundle?.matriculasMilitar || [];
+  const contratosDesignacaoMilitar = paBundle?.contratosDesignacaoMilitar || [];
 
   const militaresOperacionais = useMemo(() => {
     const indiceMatriculas = montarIndiceMatriculas(matriculasMilitar);
@@ -184,10 +212,28 @@ export default function PeriodoAquisitivoGenerator() {
 
     try {
       const novosPeriodos = [];
-      let militaresIgnoradosSemData = 0;
-      let militaresIgnoradosDataInvalida = 0;
+      const bloqueiosGeracao = [];
+      const contadoresBloqueio = new Map();
+      let origemMilitarDataInclusao = 0;
+      let origemContratoDesignacao = 0;
+      let origemIndividual = null;
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
+
+      const registrarBloqueio = ({ militar, resolucaoDataBase, codigoBloqueio, mensagem }) => {
+        const bloqueio = {
+          militarId: militar?.id ?? militar?._id ?? null,
+          militarNome: militar?.nome_completo || militar?.nome || '',
+          codigoBloqueio: codigoBloqueio || resolucaoDataBase?.codigoBloqueio || 'DATA_BASE_FERIAS_INVALIDA',
+          mensagem: mensagem || resolucaoDataBase?.mensagem || 'Data-base de férias inválida para geração de períodos.',
+          origem: resolucaoDataBase?.origem || null,
+          contratoId: resolucaoDataBase?.contratoId || null,
+        };
+
+        bloqueiosGeracao.push(bloqueio);
+        incrementarContador(contadoresBloqueio, bloqueio.codigoBloqueio);
+        console.warn('[PeriodoAquisitivoGenerator] geração bloqueada por data-base de férias', bloqueio);
+      };
 
       const militaresAlvo = escopo === 'all'
         ? militaresSelecionaveis
@@ -208,23 +254,39 @@ export default function PeriodoAquisitivoGenerator() {
         staleTime: 0,
       });
       const periodosFrescos = periodosFrescosBundle?.periodosAquisitivos || [];
+      const contratosDesignacaoFrescos = periodosFrescosBundle?.contratosDesignacaoMilitar || contratosDesignacaoMilitar;
+      const contratosFrescosPorMilitarId = agruparContratosDesignacaoPorMilitarId(contratosDesignacaoFrescos);
 
       for (const militar of militaresAlvo) {
-        if (!militar.data_inclusao) {
-          militaresIgnoradosSemData += 1;
+        const contratosDoMilitar = contratosFrescosPorMilitarId.get(String(militar.id)) || [];
+        const resolucaoDataBase = resolverDataBaseFerias({
+          militar,
+          contratosDesignacao: contratosDoMilitar,
+        });
+
+        if (resolucaoDataBase.bloqueado) {
+          registrarBloqueio({ militar, resolucaoDataBase });
           continue;
         }
 
-        const dataInclusao = parseDateOnly(militar.data_inclusao);
+        const dataInclusao = parseDateOnlyStrict(resolucaoDataBase.dataBase);
         if (!dataInclusao) {
-          militaresIgnoradosDataInvalida += 1;
-          console.warn('[PeriodoAquisitivoGenerator] data_inclusao em formato inválido', {
-            militar_id: militar.id,
-            nome_completo: militar.nome_completo,
-            data_inclusao: militar.data_inclusao,
+          registrarBloqueio({
+            militar,
+            resolucaoDataBase,
+            codigoBloqueio: 'DATA_BASE_FERIAS_INVALIDA',
+            mensagem: 'Data-base de férias resolvida em formato inválido para geração de períodos.',
           });
           continue;
         }
+
+        if (resolucaoDataBase.origem === ORIGENS_DATA_BASE_FERIAS.CONTRATO_DESIGNACAO) {
+          origemContratoDesignacao += 1;
+        } else {
+          origemMilitarDataInclusao += 1;
+        }
+        origemIndividual = resolucaoDataBase.origem;
+
         const periodosDoMilitar = periodosFrescos.filter((p) => String(p.militar_id) === String(militar.id));
         const { inicio, fim } = getJanelaOperacional(dataInclusao, hoje);
 
@@ -236,7 +298,8 @@ export default function PeriodoAquisitivoGenerator() {
 
           const periodoExiste = periodosDoMilitar.some((p) => {
             if (!p.inicio_aquisitivo) return false;
-            return mesmaData(parseDateOnly(p.inicio_aquisitivo), dataInicio);
+            const inicioAquisitivo = parseDateOnlyStrict(p.inicio_aquisitivo);
+            return inicioAquisitivo ? mesmaData(inicioAquisitivo, dataInicio) : false;
           });
 
           if (!periodoExiste) {
@@ -264,14 +327,13 @@ export default function PeriodoAquisitivoGenerator() {
         }
       }
 
-      const avisoIgnorados = [];
-      if (militaresIgnoradosDataInvalida > 0) {
-        avisoIgnorados.push(`${militaresIgnoradosDataInvalida} militar(es) ignorado(s) por data de inclusão em formato inválido`);
-      }
-      if (escopo === 'all' && militaresIgnoradosSemData > 0) {
-        avisoIgnorados.push(`${militaresIgnoradosSemData} militar(es) sem data de inclusão`);
-      }
-      const sufixoAviso = avisoIgnorados.length ? ` (${avisoIgnorados.join('; ')}).` : '';
+      const totalBloqueados = bloqueiosGeracao.length;
+      const resumoBloqueios = montarResumoBloqueios(contadoresBloqueio);
+      const resumoOrigens = montarResumoOrigens(origemMilitarDataInclusao, origemContratoDesignacao);
+      const sufixoBloqueios = totalBloqueados > 0
+        ? ` ${totalBloqueados} militar(es) bloqueado(s): ${resumoBloqueios}.`
+        : '';
+      const mensagemOrigemIndividual = getMensagemOrigemDataBase(origemIndividual);
 
       if (novosPeriodos.length > 0) {
         await base44.entities.PeriodoAquisitivo.bulkCreate(novosPeriodos);
@@ -280,27 +342,28 @@ export default function PeriodoAquisitivoGenerator() {
         setResult({
           success: true,
           count: novosPeriodos.length,
-          message: (escopo === 'all'
-            ? `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) com sucesso!`
-            : `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) para o militar selecionado.`) + sufixoAviso,
+          message: escopo === 'all'
+            ? `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) com sucesso. ${resumoOrigens}${sufixoBloqueios}`
+            : `${novosPeriodos.length} período(s) aquisitivo(s) gerado(s) para o militar selecionado. ${mensagemOrigemIndividual}`,
         });
-      } else if (escopo === 'individual' && militaresIgnoradosDataInvalida > 0) {
+      } else if (escopo === 'individual' && totalBloqueados > 0) {
         setResult({
           success: false,
-          message: 'Não foi possível gerar períodos: a data de inclusão do militar está em formato inválido. Corrija o cadastro do militar (formato esperado: dd/mm/aaaa ou aaaa-mm-dd) e tente novamente.',
+          message: bloqueiosGeracao[0]?.mensagem || 'Não foi possível gerar períodos: data-base de férias bloqueada.',
         });
-      } else if (escopo === 'individual' && militaresIgnoradosSemData > 0) {
+      } else if (escopo === 'all' && totalBloqueados > 0 && totalBloqueados === militaresAlvo.length) {
         setResult({
           success: false,
-          message: 'Não foi possível gerar períodos: o militar não possui data de inclusão cadastrada.',
+          count: 0,
+          message: `0 período(s) aquisitivo(s) gerado(s) com sucesso. ${resumoOrigens}${sufixoBloqueios}`,
         });
       } else {
         setResult({
           success: true,
           count: 0,
-          message: (escopo === 'all'
-            ? 'Todos os períodos aquisitivos já estão atualizados.'
-            : 'O militar selecionado já está com os períodos aquisitivos atualizados.') + sufixoAviso,
+          message: escopo === 'all'
+            ? `0 período(s) aquisitivo(s) gerado(s) com sucesso. Todos os períodos aquisitivos já estão atualizados. ${resumoOrigens}${sufixoBloqueios}`
+            : `O militar selecionado já está com os períodos aquisitivos atualizados. ${mensagemOrigemIndividual}`,
         });
       }
     } catch (error) {
