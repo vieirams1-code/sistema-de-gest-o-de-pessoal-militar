@@ -16,7 +16,8 @@ export const permissionStructure = [
         key: 'acesso_extracao_efetivo',
         label: 'Extração do Efetivo',
         actions: [
-          { key: 'perm_visualizar_extracao_efetivo', label: 'Visualizar Extração do Efetivo' }
+          { key: 'perm_visualizar_extracao_efetivo', label: 'Visualizar Extração do Efetivo' },
+          { key: 'perm_exportar_extracao_efetivo', label: 'Exportar registros carregados da Extração do Efetivo', sensitive: true }
         ]
       },
       {

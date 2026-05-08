@@ -39,8 +39,17 @@ function construirSheetXml(headers, rows) {
 </worksheet>`;
 }
 
-function gerarArquivoXlsx(headers, rows) {
+function normalizarNomeAba(nomeAba) {
+  const nomeSeguro = String(nomeAba || 'Registros')
+    .replace(/[\\/?*\[\]:]/g, ' ')
+    .trim() || 'Registros';
+
+  return nomeSeguro.slice(0, 31);
+}
+
+function gerarArquivoXlsx(headers, rows, nomeAba) {
   const sheetXml = construirSheetXml(headers, rows);
+  const sheetName = normalizarNomeAba(nomeAba);
 
   const files = {
     '[Content_Types].xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -57,7 +66,7 @@ function gerarArquivoXlsx(headers, rows) {
     'xl/workbook.xml': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets>
-    <sheet name="Indicados" sheetId="1" r:id="rId1"/>
+    <sheet name="${escapeXml(sheetName)}" sheetId="1" r:id="rId1"/>
   </sheets>
 </workbook>`),
     'xl/_rels/workbook.xml.rels': strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -70,14 +79,19 @@ function gerarArquivoXlsx(headers, rows) {
   return zipSync(files, { level: 6 });
 }
 
-export function exportarIndicadosParaExcel({ camposSelecionados, registros, nomeArquivo }) {
+export function exportarRegistrosParaExcel({
+  registros = [],
+  camposSelecionados = [],
+  nomeArquivo,
+  nomeAba = 'Registros',
+}) {
   const headers = camposSelecionados.map((campo) => campo.label);
   const rows = registros.map((registro) => camposSelecionados.map((campo) => {
     const valor = campo.getValue(registro);
     return valor === null || valor === undefined ? '' : String(valor);
   }));
 
-  const data = gerarArquivoXlsx(headers, rows);
+  const data = gerarArquivoXlsx(headers, rows, nomeAba);
   const blob = new Blob([data], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
@@ -90,4 +104,13 @@ export function exportarIndicadosParaExcel({ camposSelecionados, registros, nome
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+export function exportarIndicadosParaExcel({ camposSelecionados, registros, nomeArquivo }) {
+  return exportarRegistrosParaExcel({
+    camposSelecionados,
+    registros,
+    nomeArquivo,
+    nomeAba: 'Indicados',
+  });
 }

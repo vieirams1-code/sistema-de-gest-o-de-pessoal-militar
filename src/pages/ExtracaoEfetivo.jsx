@@ -6,6 +6,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Database,
+  Download,
   FileSearch,
   FileText,
   Info,
@@ -21,6 +22,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -41,6 +43,7 @@ import {
   getValorCampoEfetivo,
 } from '@/pages/extracaoEfetivo/catalogoCamposEfetivo';
 import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
+import { exportarRegistrosParaExcel } from '@/utils/indicadosExcelExport';
 
 const BACKEND_LIMIT = 200;
 const STALE_TIME_MS = 5 * 60 * 1000;
@@ -104,6 +107,10 @@ function normalizeText(value) {
 
 function textoOuTraco(value) {
   return String(value || '').trim() || '—';
+}
+
+function hojeISO() {
+  return new Date().toISOString().split('T')[0];
 }
 
 function getLotacaoId(militar = {}) {
@@ -260,6 +267,7 @@ export default function ExtracaoEfetivo() {
     canAccessAction,
     resolvedAccessContext,
   } = useCurrentUser();
+  const { toast } = useToast();
 
   const effectiveEmailFromStorage = getEffectiveEmail();
   const effectiveEmailForQuery =
@@ -315,6 +323,9 @@ export default function ExtracaoEfetivo() {
   const resetSelectedColumns = () => {
     setSelectedColumnIds(getDefaultColumnIds());
   };
+
+  const podeVisualizarExtracao = canAccessAction('visualizar_extracao_efetivo');
+  const podeExportarExtracao = canAccessAction('exportar_extracao_efetivo');
 
   const lotacoesQueryKey = [
     'extracao-efetivo-lotacoes-scoped',
@@ -592,6 +603,63 @@ export default function ExtracaoEfetivo() {
     loadMilitaresPage({ filtros: filtrosExecutados, offset: nextOffset });
   };
 
+  const exportarRegistrosCarregados = () => {
+    if (!hasExecutedExtraction) {
+      toast({
+        title: 'Execute uma extração antes de exportar',
+        description: 'A exportação usa somente os registros já carregados na tela.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!podeVisualizarExtracao || !podeExportarExtracao) {
+      toast({
+        title: 'Exportação não autorizada',
+        description: 'Você não possui permissão para exportar a Extração do Efetivo.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!sortedMilitares.length || !selectedColumns.length) {
+      toast({
+        title: 'Sem registros exportáveis',
+        description: 'Não há registros carregados e filtrados para exportar com as colunas selecionadas.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const statusArquivo = consultaMeta?.hasMore === true ? 'parcial' : 'completo';
+    const totalCarregados = militares.length;
+    const totalExportados = sortedMilitares.length;
+
+    exportarRegistrosParaExcel({
+      registros: sortedMilitares,
+      camposSelecionados: selectedColumns.map((column) => ({
+        key: column.id,
+        label: column.label,
+        getValue: (militar) => getValorCampoEfetivo(militar, column.id),
+      })),
+      nomeArquivo: `extracao_efetivo_${hojeISO()}_${statusArquivo}_carregados-${totalCarregados}_exportados-${totalExportados}.xlsx`,
+      nomeAba: statusArquivo === 'parcial' ? 'Efetivo parcial' : 'Efetivo completo',
+    });
+
+    if (consultaMeta?.hasMore === true) {
+      toast({
+        title: 'Exportação parcial concluída',
+        description: 'Esta exportação contém apenas os registros carregados na tela. Ainda há mais registros disponíveis.',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Exportação concluída',
+      description: `${totalExportados} registro(s) carregado(s) foram exportado(s).`,
+    });
+  };
+
   const clearFilters = () => {
     setSearchTerm('');
     setPostoFilter(TODOS_VALUE);
@@ -615,7 +683,7 @@ export default function ExtracaoEfetivo() {
   if (
     !loadingUser &&
     isAccessResolved &&
-    (!canAccessModule('extracao_efetivo') || !canAccessAction('visualizar_extracao_efetivo'))
+    (!canAccessModule('extracao_efetivo') || !podeVisualizarExtracao)
   ) {
     return <AccessDenied modulo="Extração do Efetivo" />;
   }
@@ -629,6 +697,12 @@ export default function ExtracaoEfetivo() {
   const isBusy = hasExecutedExtraction && (isLoadingMilitares || isLoadingMore);
   const isInitialPageBusy = hasExecutedExtraction && isLoadingMilitares;
   const isError = Boolean(militaresError);
+  const shouldShowExportButton = Boolean(
+    hasExecutedExtraction &&
+    sortedMilitares.length > 0 &&
+    podeVisualizarExtracao &&
+    podeExportarExtracao,
+  );
   const isRateLimitError = String(militaresError?.message || '').toLowerCase().includes('rate limit');
 
   return (
@@ -650,10 +724,24 @@ export default function ExtracaoEfetivo() {
               </div>
             </div>
           </div>
-          <Badge variant="outline" className="w-fit border-blue-200 bg-blue-50 text-blue-700">
-            <ShieldCheck className="w-3.5 h-3.5 mr-1" />
-            Somente leitura
-          </Badge>
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center md:justify-end">
+            {shouldShowExportButton && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={exportarRegistrosCarregados}
+                disabled={isBusy}
+                title="Exporta somente os registros já carregados na tela"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exportar registros carregados
+              </Button>
+            )}
+            <Badge variant="outline" className="w-fit border-blue-200 bg-blue-50 text-blue-700">
+              <ShieldCheck className="w-3.5 h-3.5 mr-1" />
+              Somente leitura
+            </Badge>
+          </div>
         </div>
 
         <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4 text-sm text-blue-900 flex gap-3">
@@ -661,8 +749,8 @@ export default function ExtracaoEfetivo() {
           <div className="space-y-1">
             <p className="font-semibold">Módulo inicial com campos funcionais comuns.</p>
             <p>
-              Esta versão não inclui dados sensíveis, exportação ou cruzamentos com outros módulos.
-              A visualização de colunas usa apenas campos comuns previamente permitidos no catálogo.
+              Esta versão não inclui dados sensíveis ou cruzamentos com outros módulos.
+              A visualização e a exportação usam apenas campos comuns previamente permitidos no catálogo.
               Dados protegidos e análises combinadas serão tratados em lotes futuros.
             </p>
           </div>
