@@ -38,6 +38,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'RegistroLivro',
   'PublicacaoExOfficio',
   'CreditoExtraFerias',
+  'ContratoDesignacaoMilitar',
 ]);
 
 const OPERACOES_PERMITIDAS = new Set(['create', 'update', 'delete']);
@@ -82,6 +83,10 @@ const PERMISSIONS_MAP = {
     create: 'adicionar_publicacoes',
     update: 'editar_publicacoes',
     delete: 'excluir_publicacoes',
+  },
+  ContratoDesignacaoMilitar: {
+    create: 'criar_contrato_designacao',
+    update: 'editar_metadados_contrato_designacao',
   },
 };
 
@@ -264,6 +269,140 @@ async function listarMilitarIdsDoEscopo(base44, acessos) {
   return Array.from(ids);
 }
 
+
+function normalizarStatusContratoDesignacao(status) {
+  const normalizado = String(status || '').trim().toLowerCase();
+  if (['ativo', 'ativa'].includes(normalizado)) return 'ativo';
+  if (['encerrado', 'encerrada', 'finalizado', 'finalizada'].includes(normalizado)) return 'encerrado';
+  if (['cancelado', 'cancelada'].includes(normalizado)) return 'cancelado';
+  return normalizado;
+}
+
+function dataTime(valor) {
+  if (!valor) return 0;
+  const time = new Date(`${String(valor).slice(0, 10)}T00:00:00`).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function possuiActionContratoDesignacao(actions, ...keys) {
+  return keys.some((key) => actions?.[key] === true);
+}
+
+async function validarMatriculaContratoDesignacao(base44, data, militarId) {
+  if (!data?.matricula_militar_id) return;
+  const matriculas = await fetchWithRetry(
+    () => base44.asServiceRole.entities.MatriculaMilitar.filter({ id: String(data.matricula_militar_id) }, undefined, 1, 0),
+    `MatriculaMilitar.contrato:${data.matricula_militar_id}`,
+  );
+  const matricula = matriculas?.[0] || null;
+  if (!matricula) {
+    const erro = new Error('Matrícula vinculada ao contrato não encontrada.');
+    erro.status = 400;
+    throw erro;
+  }
+  if (String(matricula.militar_id || '') !== String(militarId || '')) {
+    const erro = new Error('matricula_militar_id deve pertencer ao mesmo militar_id do contrato.');
+    erro.status = 400;
+    throw erro;
+  }
+}
+
+async function garantirContratoAtivoUnico(base44, militarId, registroIdIgnorado = null) {
+  const ativos = await fetchWithRetry(
+    () => base44.asServiceRole.entities.ContratoDesignacaoMilitar.filter({ militar_id: militarId, status_contrato: 'ativo' }, undefined, 1000, 0),
+    `ContratoDesignacaoMilitar.ativos:${militarId}`,
+  );
+  const conflito = (ativos || []).find((contrato) => String(contrato?.id || '') !== String(registroIdIgnorado || ''));
+  if (conflito) {
+    const erro = new Error('Já existe contrato de designação ativo para este militar.');
+    erro.status = 400;
+    throw erro;
+  }
+}
+
+async function prepararContratoDesignacaoMilitar({ base44, operation, registroId, data, registroExistente, militarAlvoId, userEmail }) {
+  if (operation === 'delete') {
+    const erro = new Error('Delete físico de ContratoDesignacaoMilitar não é permitido. Use cancelamento para preservar histórico.');
+    erro.status = 400;
+    throw erro;
+  }
+
+  const nowUser = userEmail || '';
+  const statusPayload = data && Object.prototype.hasOwnProperty.call(data, 'status_contrato')
+    ? normalizarStatusContratoDesignacao(data.status_contrato)
+    : normalizarStatusContratoDesignacao(registroExistente?.status_contrato);
+
+  if (operation === 'create') {
+    const erros = [];
+    if (!data?.militar_id) erros.push('militar_id é obrigatório.');
+    if (!String(data?.matricula_designacao || '').trim()) erros.push('matricula_designacao é obrigatória.');
+    if (!data?.data_inicio_contrato) erros.push('data_inicio_contrato é obrigatória.');
+    if (!data?.status_contrato) erros.push('status_contrato é obrigatório.');
+    if (statusPayload === 'ativo' && !data?.data_inclusao_para_ferias) erros.push('data_inclusao_para_ferias é obrigatória quando status_contrato = ativo.');
+    if (!String(data?.numero_contrato || '').trim() && !String(data?.boletim_publicacao || '').trim()) erros.push('numero_contrato ou boletim_publicacao é obrigatório.');
+    if (data?.data_inicio_contrato && data?.data_fim_contrato && dataTime(data.data_fim_contrato) < dataTime(data.data_inicio_contrato)) erros.push('data_fim_contrato não pode ser anterior à data_inicio_contrato.');
+    if (erros.length) {
+      const erro = new Error(erros.join(' '));
+      erro.status = 400;
+      throw erro;
+    }
+    await validarMatriculaContratoDesignacao(base44, data, militarAlvoId);
+    if (statusPayload === 'ativo') await garantirContratoAtivoUnico(base44, militarAlvoId);
+    return { ...data, status_contrato: statusPayload, criado_por: data?.criado_por || nowUser, atualizado_por: nowUser };
+  }
+
+  if (!registroExistente) return data;
+  const statusAtual = normalizarStatusContratoDesignacao(registroExistente.status_contrato);
+  const payloadFinal = { ...(data || {}) };
+
+  if (statusPayload === 'encerrado' && statusAtual !== 'encerrado') {
+    if (statusAtual !== 'ativo') {
+      const erro = new Error('Somente contrato ativo pode ser encerrado.');
+      erro.status = 400;
+      throw erro;
+    }
+    if (!payloadFinal.data_fim_contrato && !payloadFinal.data_encerramento_operacional) {
+      const erro = new Error('Informe data_fim_contrato ou data_encerramento_operacional para encerrar o contrato.');
+      erro.status = 400;
+      throw erro;
+    }
+    if (!String(payloadFinal.motivo_encerramento || '').trim()) {
+      const erro = new Error('motivo_encerramento é obrigatório para encerrar contrato.');
+      erro.status = 400;
+      throw erro;
+    }
+    payloadFinal.status_contrato = 'encerrado';
+    payloadFinal.encerrado_por = payloadFinal.encerrado_por || nowUser;
+  } else if (statusPayload === 'cancelado' && statusAtual !== 'cancelado') {
+    if (!String(payloadFinal.motivo_cancelamento || '').trim()) {
+      const erro = new Error('motivo_cancelamento é obrigatório para cancelar contrato.');
+      erro.status = 400;
+      throw erro;
+    }
+    payloadFinal.status_contrato = 'cancelado';
+    payloadFinal.cancelado_por = payloadFinal.cancelado_por || nowUser;
+  } else if (statusPayload === 'ativo') {
+    if (!payloadFinal.data_inclusao_para_ferias && !registroExistente.data_inclusao_para_ferias) {
+      const erro = new Error('data_inclusao_para_ferias é obrigatória quando status_contrato = ativo.');
+      erro.status = 400;
+      throw erro;
+    }
+    await garantirContratoAtivoUnico(base44, militarAlvoId, registroId);
+  }
+
+  const contratoCombinado = { ...registroExistente, ...payloadFinal };
+  if (contratoCombinado.data_inicio_contrato && contratoCombinado.data_fim_contrato && dataTime(contratoCombinado.data_fim_contrato) < dataTime(contratoCombinado.data_inicio_contrato)) {
+    const erro = new Error('data_fim_contrato não pode ser anterior à data_inicio_contrato.');
+    erro.status = 400;
+    throw erro;
+  }
+
+  await validarMatriculaContratoDesignacao(base44, contratoCombinado, militarAlvoId);
+  payloadFinal.atualizado_por = nowUser;
+  payloadFinal.militar_id = militarAlvoId;
+  return payloadFinal;
+}
+
 function getEntity(base44, entityName) {
   return base44.asServiceRole.entities[entityName];
 }
@@ -321,6 +460,13 @@ Deno.serve(async (req) => {
         { status: 400 },
       );
     }
+    if (entityName === 'ContratoDesignacaoMilitar' && operation === 'delete') {
+      return Response.json(
+        { error: 'Delete físico de ContratoDesignacaoMilitar não é permitido. Use cancelamento para preservar histórico.' },
+        { status: 400 },
+      );
+    }
+
     if ((operation === 'update' || operation === 'delete') && !registroId) {
       return Response.json(
         { error: `registroId é obrigatório para operação ${operation}.` },
@@ -412,6 +558,30 @@ Deno.serve(async (req) => {
     // ---- Validação de permissão funcional (PERMISSIONS_MAP) ----
     // Admin: bypass. Não-admin: precisa ter a action mapeada.
     if (!targetIsAdmin) {
+      if (entityName === 'ContratoDesignacaoMilitar') {
+        const statusContratoPayload = normalizarStatusContratoDesignacao(data?.status_contrato);
+        let allowed = false;
+        let requiredPermission = null;
+        if (operation === 'create') {
+          requiredPermission = 'criar_contrato_designacao ou gerir_contratos_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'criar_contrato_designacao', 'gerir_contratos_designacao');
+        } else if (operation === 'update' && statusContratoPayload === 'encerrado') {
+          requiredPermission = 'encerrar_contrato_designacao ou gerir_contratos_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'encerrar_contrato_designacao', 'gerir_contratos_designacao');
+        } else if (operation === 'update' && statusContratoPayload === 'cancelado') {
+          requiredPermission = 'cancelar_contrato_designacao ou gerir_contratos_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'cancelar_contrato_designacao', 'gerir_contratos_designacao');
+        } else if (operation === 'update') {
+          requiredPermission = 'editar_metadados_contrato_designacao ou gerir_contratos_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'editar_metadados_contrato_designacao', 'gerir_contratos_designacao');
+        }
+        if (!allowed) {
+          return Response.json(
+            { error: 'Acesso negado: permissão funcional insuficiente.', requiredPermission },
+            { status: 403 },
+          );
+        }
+      } else {
       const mapaEntidade = PERMISSIONS_MAP[entityName];
       const requiredPermission = mapaEntidade ? mapaEntidade[operation] : null;
       if (!requiredPermission) {
@@ -434,6 +604,20 @@ Deno.serve(async (req) => {
           { status: 403 },
         );
       }
+      }
+    }
+
+    let dataValidada = data;
+    if (entityName === 'ContratoDesignacaoMilitar') {
+      dataValidada = await prepararContratoDesignacaoMilitar({
+        base44,
+        operation,
+        registroId,
+        data,
+        registroExistente,
+        militarAlvoId,
+        userEmail: targetEmail,
+      });
     }
 
     // ---- Execução com service role ----
@@ -442,14 +626,14 @@ Deno.serve(async (req) => {
 
     if (operation === 'create') {
       resultado = await fetchWithRetry(
-        () => entity.create(data),
+        () => entity.create(dataValidada),
         `${entityName}.create`,
       );
     } else if (operation === 'update') {
       // Em update por restrito, garantimos que militar_id permaneça o canônico.
-      const dataSegura = !targetIsAdmin && data
-        ? { ...data, militar_id: militarAlvoId }
-        : data;
+      const dataSegura = !targetIsAdmin && dataValidada
+        ? { ...dataValidada, militar_id: militarAlvoId }
+        : dataValidada;
       resultado = await fetchWithRetry(
         () => entity.update(registroId, dataSegura),
         `${entityName}.update:${registroId}`,
