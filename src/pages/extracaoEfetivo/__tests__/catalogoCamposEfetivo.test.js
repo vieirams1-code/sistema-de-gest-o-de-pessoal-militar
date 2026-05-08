@@ -208,7 +208,7 @@ test('colunas selecionáveis vêm apenas da allowlist positiva e respeitam metad
   );
 });
 
-test('colunas agregadas de Férias são frontend-only e bloqueadas para exportação', () => {
+test('colunas de Férias são apenas visuais e bloqueadas para exportação', () => {
   const feriasFieldIds = Object.keys(EXTRACAO_EFETIVO_FIELDS).filter((fieldId) => fieldId.startsWith('ferias_'));
 
   assert.deepEqual(feriasFieldIds, [
@@ -229,7 +229,7 @@ test('colunas agregadas de Férias são frontend-only e bloqueadas para exporta�
     assert.equal(field.selectable, true, `${fieldId} deve poder ser exibida na tabela`);
     assert.equal(field.defaultVisible, false, `${fieldId} não deve iniciar visível por padrão`);
     assert.equal(field.exportable, false, `${fieldId} deve permanecer bloqueada na exportação`);
-    assert.equal(field.category, 'Férias (cruzamento relacionado)', `${fieldId} deve sinalizar fonte relacionada`);
+    assert.equal(field.category, 'Férias', `${fieldId} deve usar categoria legível para a UI`);
   }
 
   assert.deepEqual(
