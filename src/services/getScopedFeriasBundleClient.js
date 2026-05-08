@@ -2,7 +2,7 @@ import { base44 } from '@/api/base44Client';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 export async function fetchScopedFeriasBundle(payload = {}) {
-  const effectiveEmail = getEffectiveEmail();
+  const effectiveEmail = payload?.effectiveEmail || getEffectiveEmail();
   const finalPayload = {
     ...(payload || {}),
     ...(effectiveEmail ? { effectiveEmail } : {}),

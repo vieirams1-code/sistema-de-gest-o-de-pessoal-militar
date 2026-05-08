@@ -49,6 +49,16 @@ const SELECTABLE_COLUMN_ORDER = Object.freeze([
   'situacao_militar',
   'funcao',
   'condicao',
+  'ferias_tem_no_periodo',
+  'ferias_em_curso',
+  'ferias_status_resumido',
+  'ferias_proxima_data_inicio',
+  'ferias_proxima_data_fim',
+  'ferias_proxima_data_retorno',
+  'ferias_total_registros_periodo',
+  'ferias_total_dias_periodo',
+  'ferias_tipo_proxima',
+  'ferias_periodo_aquisitivo_ref',
 ]);
 
 const REQUIRED_COLUMN_IDS = Object.freeze(['nome_guerra', 'matricula']);
@@ -195,6 +205,37 @@ test('colunas selecionáveis vêm apenas da allowlist positiva e respeitam metad
     defaultColumnIds,
     selectableColumns.filter((field) => field.defaultVisible).map((field) => field.id),
     'defaultVisible deve refletir exatamente EXTRACAO_EFETIVO_DEFAULT_COLUMNS',
+  );
+});
+
+test('colunas agregadas de Férias são frontend-only e bloqueadas para exportação', () => {
+  const feriasFieldIds = Object.keys(EXTRACAO_EFETIVO_FIELDS).filter((fieldId) => fieldId.startsWith('ferias_'));
+
+  assert.deepEqual(feriasFieldIds, [
+    'ferias_tem_no_periodo',
+    'ferias_em_curso',
+    'ferias_status_resumido',
+    'ferias_proxima_data_inicio',
+    'ferias_proxima_data_fim',
+    'ferias_proxima_data_retorno',
+    'ferias_total_registros_periodo',
+    'ferias_total_dias_periodo',
+    'ferias_tipo_proxima',
+    'ferias_periodo_aquisitivo_ref',
+  ]);
+
+  for (const fieldId of feriasFieldIds) {
+    const field = EXTRACAO_EFETIVO_FIELDS[fieldId];
+    assert.equal(field.selectable, true, `${fieldId} deve poder ser exibida na tabela`);
+    assert.equal(field.defaultVisible, false, `${fieldId} não deve iniciar visível por padrão`);
+    assert.equal(field.exportable, false, `${fieldId} deve permanecer bloqueada na exportação`);
+    assert.equal(field.category, 'Férias (cruzamento relacionado)', `${fieldId} deve sinalizar fonte relacionada`);
+  }
+
+  assert.deepEqual(
+    EXTRACAO_EFETIVO_DEFAULT_COLUMNS.map((column) => column.id).filter((fieldId) => fieldId.startsWith('ferias_')),
+    [],
+    'colunas de Férias não podem entrar nas colunas padrão/exportáveis de Efetivo',
   );
 });
 
