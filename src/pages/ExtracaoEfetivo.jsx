@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
+import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
 import {
   EXTRACAO_EFETIVO_DEFAULT_COLUMNS,
   EXTRACAO_EFETIVO_FIELDS,
@@ -52,6 +53,9 @@ const TODOS_VALUE = '__todos__';
 const SEM_LOTACAO_VALUE = '__sem_lotacao__';
 const DEFAULT_SORT_FIELD = 'posto_graduacao';
 const DEFAULT_SORT_DIRECTION = 'asc';
+const FERIAS_TODAS_PRESENCAS_VALUE = '__ferias_todas_presencas__';
+const FERIAS_TODOS_STATUS_VALUE = '__ferias_todos_status__';
+const FERIAS_PERIODO_PADRAO = 'proximos_30';
 
 const POSTO_GRADUACAO_OPTIONS = [
   'Coronel',
@@ -87,6 +91,21 @@ const SITUACAO_MILITAR_OPTIONS = Object.freeze([
   'Convocado',
 ]);
 const CONDICAO_OPTIONS = Object.freeze(['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição']);
+const FERIAS_STATUS_OPTIONS = Object.freeze(['Prevista', 'Autorizada', 'Em Curso', 'Interrompida', 'Gozada']);
+const FERIAS_PRESENCA_OPTIONS = Object.freeze([
+  { value: FERIAS_TODAS_PRESENCAS_VALUE, label: 'Todas as situações de férias' },
+  { value: 'com_periodo', label: 'Com férias no período' },
+  { value: 'sem_periodo', label: 'Sem férias no período' },
+  { value: 'em_curso', label: 'Férias em curso' },
+]);
+const FERIAS_PERIODO_OPTIONS = Object.freeze([
+  { value: 'hoje', label: 'Hoje' },
+  { value: 'esta_semana', label: 'Esta semana' },
+  { value: 'este_mes', label: 'Este mês' },
+  { value: 'proximos_30', label: 'Próximos 30 dias' },
+  { value: 'proximos_60', label: 'Próximos 60 dias' },
+  { value: 'proximos_90', label: 'Próximos 90 dias' },
+]);
 const textCollator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
 const naturalTextCollator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
 
@@ -112,6 +131,124 @@ function textoOuTraco(value) {
 
 function hojeISO() {
   return new Date().toISOString().split('T')[0];
+}
+
+
+function parseIsoDate(value) {
+  const normalized = String(value || '').trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
+
+  const date = new Date(`${normalized}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatIsoDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  return date.toISOString().split('T')[0];
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function getFeriasPeriodoRange(periodoValue = FERIAS_PERIODO_PADRAO) {
+  const today = parseIsoDate(hojeISO()) || new Date();
+  const start = new Date(today);
+  let end = new Date(today);
+
+  if (periodoValue === 'esta_semana') {
+    const weekday = start.getDay() || 7;
+    start.setDate(start.getDate() - weekday + 1);
+    end = addDays(start, 6);
+  } else if (periodoValue === 'este_mes') {
+    start.setDate(1);
+    end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+  } else if (periodoValue === 'proximos_60') {
+    end = addDays(start, 60);
+  } else if (periodoValue === 'proximos_90') {
+    end = addDays(start, 90);
+  } else if (periodoValue === 'proximos_30') {
+    end = addDays(start, 30);
+  }
+
+  return { start: formatIsoDate(start), end: formatIsoDate(end) };
+}
+
+function getFeriasInicio(ferias = {}) {
+  return String(ferias?.data_inicio || '').trim().slice(0, 10);
+}
+
+function getFeriasFim(ferias = {}) {
+  return String(ferias?.data_fim || ferias?.data_retorno || ferias?.data_inicio || '').trim().slice(0, 10);
+}
+
+function feriasSobrepoePeriodo(ferias = {}, range = {}) {
+  const inicio = getFeriasInicio(ferias);
+  const fim = getFeriasFim(ferias);
+  if (!inicio || !fim || !range.start || !range.end) return false;
+
+  return inicio <= range.end && fim >= range.start;
+}
+
+function calcularDiasFerias(ferias = {}) {
+  const dias = Number(ferias?.dias || ferias?.total_dias || 0);
+  if (Number.isFinite(dias) && dias > 0) return dias;
+
+  const inicio = parseIsoDate(getFeriasInicio(ferias));
+  const fim = parseIsoDate(getFeriasFim(ferias));
+  if (!inicio || !fim || fim < inicio) return 0;
+
+  return Math.floor((fim.getTime() - inicio.getTime()) / 86400000) + 1;
+}
+
+function isFeriasEmCurso(ferias = {}) {
+  const status = normalizeText(ferias?.status);
+  const today = hojeISO();
+
+  return status === 'em curso' || feriasSobrepoePeriodo(ferias, { start: today, end: today });
+}
+
+function buildFeriasResumo(feriasRelacionadas = [], periodoValue = FERIAS_PERIODO_PADRAO) {
+  const range = getFeriasPeriodoRange(periodoValue);
+  const feriasNoPeriodo = feriasRelacionadas.filter((ferias) => feriasSobrepoePeriodo(ferias, range));
+  const hoje = hojeISO();
+  const proximas = feriasNoPeriodo
+    .filter((ferias) => getFeriasInicio(ferias) >= hoje)
+    .sort((a, b) => getFeriasInicio(a).localeCompare(getFeriasInicio(b)));
+  const fallbackOrdenado = [...feriasNoPeriodo].sort((a, b) => getFeriasInicio(a).localeCompare(getFeriasInicio(b)));
+  const proximaFerias = proximas[0] || fallbackOrdenado[0] || null;
+  const statusCounts = new Map();
+
+  feriasNoPeriodo.forEach((ferias) => {
+    const status = textoOuTraco(ferias?.status);
+    statusCounts.set(status, (statusCounts.get(status) || 0) + 1);
+  });
+
+  const statusResumido = statusCounts.size
+    ? [...statusCounts.entries()]
+      .sort(([firstStatus], [secondStatus]) => {
+        const firstIndex = FERIAS_STATUS_OPTIONS.indexOf(firstStatus);
+        const secondIndex = FERIAS_STATUS_OPTIONS.indexOf(secondStatus);
+        return (firstIndex === -1 ? 99 : firstIndex) - (secondIndex === -1 ? 99 : secondIndex);
+      })
+      .map(([status, count]) => `${status}${count > 1 ? ` (${count})` : ''}`)
+      .join(', ')
+    : 'Sem férias no período';
+
+  return {
+    ferias_tem_no_periodo: feriasNoPeriodo.length > 0 ? 'Sim' : 'Não',
+    ferias_em_curso: feriasRelacionadas.some(isFeriasEmCurso) ? 'Sim' : 'Não',
+    ferias_status_resumido: statusResumido,
+    ferias_proxima_data_inicio: getFeriasInicio(proximaFerias),
+    ferias_proxima_data_fim: getFeriasFim(proximaFerias),
+    ferias_proxima_data_retorno: String(proximaFerias?.data_retorno || '').trim().slice(0, 10),
+    ferias_total_registros_periodo: String(feriasNoPeriodo.length),
+    ferias_total_dias_periodo: String(feriasNoPeriodo.reduce((total, ferias) => total + calcularDiasFerias(ferias), 0)),
+    ferias_tipo_proxima: textoOuTraco(proximaFerias?.tipo || proximaFerias?.tipo_ferias || proximaFerias?.tipo_registro),
+    ferias_periodo_aquisitivo_ref: textoOuTraco(proximaFerias?.periodo_aquisitivo_ref),
+  };
 }
 
 function getLotacaoId(militar = {}) {
@@ -345,6 +482,9 @@ export default function ExtracaoEfetivo() {
   const [funcaoFilter, setFuncaoFilter] = useState(TODOS_VALUE);
   const [condicaoFilter, setCondicaoFilter] = useState(TODOS_VALUE);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODOS_VALUE);
+  const [feriasPresencaFilter, setFeriasPresencaFilter] = useState(FERIAS_TODAS_PRESENCAS_VALUE);
+  const [feriasStatusFilter, setFeriasStatusFilter] = useState(FERIAS_TODOS_STATUS_VALUE);
+  const [feriasPeriodoFilter, setFeriasPeriodoFilter] = useState(FERIAS_PERIODO_PADRAO);
   const [selectedColumnIds, setSelectedColumnIds] = useState(getDefaultColumnIds);
   const [sortConfig, setSortConfig] = useState({
     fieldId: DEFAULT_SORT_FIELD,
@@ -444,6 +584,7 @@ export default function ExtracaoEfetivo() {
   const [isLoadingMilitares, setIsLoadingMilitares] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [militaresError, setMilitaresError] = useState(null);
+  const hasExecutedExtraction = Boolean(filtrosExecutados);
 
   const filtrosAtuais = useMemo(
     () => ({
@@ -458,9 +599,15 @@ export default function ExtracaoEfetivo() {
       funcao: funcaoFilter,
       condicao: condicaoFilter,
       lotacao: lotacaoFilter,
+      feriasPresenca: feriasPresencaFilter,
+      feriasStatus: feriasStatusFilter,
+      feriasPeriodo: feriasPeriodoFilter,
     }),
     [
       condicaoFilter,
+      feriasPeriodoFilter,
+      feriasPresencaFilter,
+      feriasStatusFilter,
       funcaoFilter,
       lotacaoFilter,
       postoFilter,
@@ -511,31 +658,78 @@ export default function ExtracaoEfetivo() {
     loadMilitaresPage({ filtros: filtrosExecutados, offset: 0, reset: true });
   }, [executionId, filtrosExecutados, isAccessResolved, loadMilitaresPage]);
 
+
+  const {
+    data: feriasBundleData = { ferias: [], meta: {} },
+    isLoading: isLoadingFeriasBundle,
+    isError: isErrorFeriasBundle,
+    error: feriasBundleError,
+  } = useQuery({
+    queryKey: [
+      'extracao-efetivo-ferias-bundle-scoped',
+      executionId,
+      effectiveEmailForQuery || 'self',
+    ],
+    enabled: hasExecutedExtraction && isAccessResolved,
+    queryFn: () => fetchScopedFeriasBundle({ effectiveEmail: effectiveEmailForQuery || undefined }),
+    staleTime: STALE_TIME_MS,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+
+  const feriasByMilitarId = useMemo(() => {
+    const indexed = new Map();
+
+    (feriasBundleData?.ferias || []).forEach((ferias) => {
+      const militarId = String(ferias?.militar_id || '').trim();
+      if (!militarId) return;
+
+      if (!indexed.has(militarId)) indexed.set(militarId, []);
+      indexed.get(militarId).push(ferias);
+    });
+
+    return indexed;
+  }, [feriasBundleData]);
+
+  const militaresComFeriasAgregadas = useMemo(() => {
+    const periodoValue = filtrosExecutados?.feriasPeriodo || FERIAS_PERIODO_PADRAO;
+
+    return militares.map((militar) => {
+      const militarId = String(militar?.id || '').trim();
+      const feriasRelacionadas = militarId ? feriasByMilitarId.get(militarId) || [] : [];
+
+      return {
+        ...militar,
+        ...buildFeriasResumo(feriasRelacionadas, periodoValue),
+      };
+    });
+  }, [feriasByMilitarId, filtrosExecutados?.feriasPeriodo, militares]);
+
   const postosDisponiveis = useMemo(
     () =>
       uniqueSorted([
         ...POSTO_GRADUACAO_OPTIONS,
-        ...militares.map((militar) => getValorCampoEfetivo(militar, 'posto_graduacao')),
+        ...militaresComFeriasAgregadas.map((militar) => getValorCampoEfetivo(militar, 'posto_graduacao')),
       ]),
-    [militares],
+    [militaresComFeriasAgregadas],
   );
 
   const quadrosDisponiveis = useMemo(
     () =>
       uniqueSorted([
         ...QUADROS_FIXOS,
-        ...militares.map((militar) => getQuadroEfetivo(militar)),
+        ...militaresComFeriasAgregadas.map((militar) => getQuadroEfetivo(militar)),
       ]),
-    [militares],
+    [militaresComFeriasAgregadas],
   );
 
   const statusDisponiveis = useMemo(
     () =>
       uniqueSorted([
         ...Object.keys(statusBadgeClass),
-        ...militares.map((militar) => getValorCampoEfetivo(militar, 'status_cadastro')),
+        ...militaresComFeriasAgregadas.map((militar) => getValorCampoEfetivo(militar, 'status_cadastro')),
       ]),
-    [militares],
+    [militaresComFeriasAgregadas],
   );
 
 
@@ -543,26 +737,37 @@ export default function ExtracaoEfetivo() {
     () =>
       uniqueSorted([
         ...SITUACAO_MILITAR_OPTIONS,
-        ...militares.map((militar) => getValorCampoEfetivo(militar, 'situacao_militar')),
+        ...militaresComFeriasAgregadas.map((militar) => getValorCampoEfetivo(militar, 'situacao_militar')),
       ]),
-    [militares],
+    [militaresComFeriasAgregadas],
   );
 
   const funcoesDisponiveis = useMemo(
-    () => uniqueSorted(militares.map((militar) => getValorCampoEfetivo(militar, 'funcao'))),
-    [militares],
+    () => uniqueSorted(militaresComFeriasAgregadas.map((militar) => getValorCampoEfetivo(militar, 'funcao'))),
+    [militaresComFeriasAgregadas],
   );
 
   const condicoesDisponiveis = useMemo(
     () =>
       uniqueSorted([
         ...CONDICAO_OPTIONS,
-        ...militares.map((militar) => getValorCampoEfetivo(militar, 'condicao')),
+        ...militaresComFeriasAgregadas.map((militar) => getValorCampoEfetivo(militar, 'condicao')),
       ]),
-    [militares],
+    [militaresComFeriasAgregadas],
   );
 
-  const hasExecutedExtraction = Boolean(filtrosExecutados);
+
+  const feriasStatusDisponiveis = useMemo(
+    () => uniqueSorted([
+      ...FERIAS_STATUS_OPTIONS,
+      ...militaresComFeriasAgregadas
+        .flatMap((militar) => String(militar?.ferias_status_resumido || '').split(','))
+        .map((status) => status.replace(/\s*\(\d+\)$/, '').trim())
+        .filter((status) => status && status !== 'Sem férias no período'),
+    ]),
+    [militaresComFeriasAgregadas],
+  );
+
   const normalizedExecutedSearch = useMemo(
     () => normalizeText(filtrosExecutados?.search),
     [filtrosExecutados],
@@ -571,7 +776,7 @@ export default function ExtracaoEfetivo() {
     hasExecutedExtraction && JSON.stringify(filtrosAtuais) !== JSON.stringify(filtrosExecutados);
 
   const filteredMilitares = useMemo(() => {
-    return militares.filter((militar) => {
+    return militaresComFeriasAgregadas.filter((militar) => {
       const posto = getValorCampoEfetivo(militar, 'posto_graduacao');
       const quadroNormalizado = getQuadroEfetivo(militar);
       const status = getValorCampoEfetivo(militar, 'status_cadastro');
@@ -580,6 +785,9 @@ export default function ExtracaoEfetivo() {
       const situacaoMilitar = getValorCampoEfetivo(militar, 'situacao_militar');
       const funcao = getValorCampoEfetivo(militar, 'funcao');
       const condicao = getValorCampoEfetivo(militar, 'condicao');
+      const temFeriasNoPeriodo = militar.ferias_tem_no_periodo === 'Sim';
+      const feriasEmCurso = militar.ferias_em_curso === 'Sim';
+      const feriasStatusResumido = String(militar.ferias_status_resumido || '');
 
       if (!filtrosExecutados) return false;
       if (filtrosExecutados.postoGraduacao !== TODOS_VALUE && posto !== filtrosExecutados.postoGraduacao) {
@@ -606,10 +814,19 @@ export default function ExtracaoEfetivo() {
         return false;
       }
       if (!militarMatchesSearch(militar, normalizedExecutedSearch)) return false;
+      if (filtrosExecutados.feriasPresenca === 'com_periodo' && !temFeriasNoPeriodo) return false;
+      if (filtrosExecutados.feriasPresenca === 'sem_periodo' && temFeriasNoPeriodo) return false;
+      if (filtrosExecutados.feriasPresenca === 'em_curso' && !feriasEmCurso) return false;
+      if (
+        filtrosExecutados.feriasStatus !== FERIAS_TODOS_STATUS_VALUE &&
+        !feriasStatusResumido.includes(filtrosExecutados.feriasStatus)
+      ) {
+        return false;
+      }
 
       return true;
     });
-  }, [filtrosExecutados, militares, normalizedExecutedSearch]);
+  }, [filtrosExecutados, militaresComFeriasAgregadas, normalizedExecutedSearch]);
 
   const sortedMilitares = useMemo(() => {
     const sortField = EXTRACAO_EFETIVO_FIELDS[sortConfig.fieldId];
@@ -681,7 +898,9 @@ export default function ExtracaoEfetivo() {
       return;
     }
 
-    if (!sortedMilitares.length || !selectedColumns.length) {
+    const exportableColumns = selectedColumns.filter((column) => column.exportable !== false);
+
+    if (!sortedMilitares.length || !exportableColumns.length) {
       toast({
         title: 'Sem registros exportáveis',
         description: 'Não há registros carregados e filtrados para exportar com as colunas selecionadas.',
@@ -701,7 +920,7 @@ export default function ExtracaoEfetivo() {
         tipo_exportacao: statusArquivo,
         quantidade_carregada: totalCarregados,
         quantidade_exportada: totalExportados,
-        colunas_exportadas: selectedColumns.map((column) => ({
+        colunas_exportadas: exportableColumns.map((column) => ({
           id: column.id,
           label: column.label,
         })),
@@ -726,7 +945,7 @@ export default function ExtracaoEfetivo() {
 
     exportarRegistrosParaExcel({
       registros: sortedMilitares,
-      camposSelecionados: selectedColumns.map((column) => ({
+      camposSelecionados: exportableColumns.map((column) => ({
         key: column.id,
         label: column.label,
         getValue: (militar) => getValorCampoEfetivo(militar, column.id),
@@ -758,6 +977,9 @@ export default function ExtracaoEfetivo() {
     setFuncaoFilter(TODOS_VALUE);
     setCondicaoFilter(TODOS_VALUE);
     setLotacaoFilter(TODOS_VALUE);
+    setFeriasPresencaFilter(FERIAS_TODAS_PRESENCAS_VALUE);
+    setFeriasStatusFilter(FERIAS_TODOS_STATUS_VALUE);
+    setFeriasPeriodoFilter(FERIAS_PERIODO_PADRAO);
   };
 
   const clearExtraction = () => {
@@ -783,7 +1005,7 @@ export default function ExtracaoEfetivo() {
   const isBuscaLimitadaPorAmostra = Boolean(
     consultaMeta?.busca_limitada_por_amostra || consultaMeta?.buscaLimitadaPorAmostra,
   );
-  const isBusy = hasExecutedExtraction && (isLoadingMilitares || isLoadingMore);
+  const isBusy = hasExecutedExtraction && (isLoadingMilitares || isLoadingMore || isLoadingFeriasBundle);
   const isInitialPageBusy = hasExecutedExtraction && isLoadingMilitares;
   const isError = Boolean(militaresError);
   const shouldShowExportButton = Boolean(
@@ -838,9 +1060,8 @@ export default function ExtracaoEfetivo() {
           <div className="space-y-1">
             <p className="font-semibold">Módulo inicial com campos funcionais comuns.</p>
             <p>
-              Esta versão não inclui dados sensíveis ou cruzamentos com outros módulos.
-              A visualização e a exportação usam apenas campos comuns previamente permitidos no catálogo.
-              Dados protegidos e análises combinadas serão tratados em lotes futuros.
+              Esta versão mantém o Efetivo como fonte âncora e inclui Férias apenas como cruzamento relacionado agregado por militar.
+              A exportação permanece limitada aos campos do Efetivo; dados protegidos, textos livres e exportação multi-fonte continuam bloqueados.
             </p>
           </div>
         </div>
@@ -930,8 +1151,8 @@ export default function ExtracaoEfetivo() {
                   : `Foram carregados ${totalRetornado} registros e o backend informou que não há mais registros a carregar.`}
               </p>
               <p className="text-xs">
-                Ordenação, quadro, função, condição e sem lotação são refinos locais e atuam somente
-                sobre os registros já carregados.
+                Ordenação, quadro, função, condição, sem lotação e filtros de Férias são refinos locais e atuam somente
+                sobre os registros já carregados. Férias depende dos registros escopados carregados e o cruzamento fica parcial quando o Efetivo está parcial.
               </p>
             </div>
           </div>
@@ -946,6 +1167,35 @@ export default function ExtracaoEfetivo() {
                 O backend indicou que a busca pode ter sido avaliada sobre uma amostra; portanto, o
                 resultado carregado pode não representar todo o universo disponível no escopo.
               </p>
+            </div>
+          </div>
+        )}
+
+
+        {hasExecutedExtraction && (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 flex gap-3">
+            <Info className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold">Férias é cruzamento relacionado, read-only e agregado.</p>
+              <p>
+                O vínculo usa somente efetivo.id ↔ ferias.militar_id e mantém uma linha por militar.
+                {isLoadingFeriasBundle ? ' Carregando registros de Férias do escopo...' : ''}
+              </p>
+              <p className="text-xs">
+                {hasMoreMilitares
+                  ? 'Como o Efetivo ainda possui mais páginas, o resumo de Férias exibido na tabela é parcial em relação aos militares já carregados.'
+                  : 'O resumo de Férias usa os registros relacionados disponíveis no escopo da extração executada.'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {hasExecutedExtraction && isErrorFeriasBundle && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Cruzamento com Férias indisponível.</p>
+              <p>{feriasBundleError?.message || 'Não foi possível carregar os registros relacionados de Férias.'}</p>
             </div>
           </div>
         )}
@@ -1055,6 +1305,56 @@ export default function ExtracaoEfetivo() {
               </Select>
             </div>
 
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-indigo-900">Filtros de Férias (cruzamento relacionado)</p>
+                <p className="text-xs text-indigo-700">
+                  Filtros frontend-only, calculados sobre férias escopadas e agregadas por militar.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Select value={feriasPresencaFilter} onValueChange={setFeriasPresencaFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Férias no período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FERIAS_PRESENCA_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={feriasStatusFilter} onValueChange={setFeriasStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status resumido" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FERIAS_TODOS_STATUS_VALUE}>Todos os status de férias</SelectItem>
+                    {feriasStatusDisponiveis.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={feriasPeriodoFilter} onValueChange={setFeriasPeriodoFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Período de férias" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FERIAS_PERIODO_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             {shouldShowLotacaoFilter && (
               <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 items-center">
                 <Select
@@ -1156,7 +1456,7 @@ export default function ExtracaoEfetivo() {
                 </div>
                 <p className="mt-1 text-sm text-slate-500">
                   Escolha quais colunas comuns permitidas serão exibidas. Esta seleção altera apenas
-                  a visualização da tabela.
+                  a visualização da tabela. Colunas de Férias são apenas agregados relacionados e não entram na exportação neste lote.
                 </p>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={resetSelectedColumns}>
@@ -1195,7 +1495,7 @@ export default function ExtracaoEfetivo() {
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
               {selectedColumns.length} coluna{selectedColumns.length === 1 ? '' : 's'} selecionada
-              {selectedColumns.length === 1 ? '' : 's'}. Campos desconhecidos são descartados antes da renderização. A ordenação é local e atua somente sobre o resultado carregado.
+              {selectedColumns.length === 1 ? '' : 's'}. Campos desconhecidos são descartados antes da renderização. A ordenação é local e atua somente sobre o resultado carregado. Colunas marcadas como Férias não são exportadas.
             </div>
           </CardContent>
         </Card>
