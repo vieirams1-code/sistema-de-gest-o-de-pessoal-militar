@@ -17,6 +17,7 @@ import {
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
 import AlertasContrato from '@/components/militar/AlertasContrato';
+import ContratosDesignacaoSection from '@/components/militar/ContratosDesignacaoSection';
 import SolicitarAtualizacaoModal from '@/components/militar/SolicitarAtualizacaoModal';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
 import PromocaoHistoricaModal from '@/components/antiguidade/PromocaoHistoricaModal';
@@ -43,6 +44,9 @@ import {
 '@/services/creditoExtraFeriasService';
 import { getSaldoConsolidadoPeriodo, isFeriasDoPeriodo } from '@/components/ferias/periodoSaldoUtils';
 import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularPeriodoAquisitivo';
+import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
+import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
+import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -117,8 +121,13 @@ export default function VerMilitar() {
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const selectedTab = searchParams.get('tab') || 'comportamento';
-  const { isAdmin, hasAccess, hasSelfAccess, canAccessAction, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, hasAccess, hasSelfAccess, canAccessAction, userEmail, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
+  const effectiveEmail = getEffectiveEmail();
+  const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
+  const podeCriarContratoDesignacao = isAdmin || canAccessAction('criar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+  const podeEncerrarContratoDesignacao = isAdmin || canAccessAction('encerrar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+  const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [showPromocaoAtualModal, setShowPromocaoAtualModal] = useState(false);
   const [showPromocaoHistoricaModal, setShowPromocaoHistoricaModal] = useState(false);
@@ -147,6 +156,29 @@ export default function VerMilitar() {
     return enriquecerMilitarComMatriculas(militar, indice);
   }, [militar, matriculasMilitar]);
   const militarMesclado = isMilitarMesclado(militarEnriquecido || militar);
+
+  const contratosDesignacaoQueryKey = ['ver-contratos-designacao', id, isAdmin, modoAcesso, userEmail, effectiveEmail || null];
+  const { data: contratosDesignacaoData = { contratos: [], meta: {} }, isLoading: isLoadingContratosDesignacao } = useQuery({
+    queryKey: contratosDesignacaoQueryKey,
+    queryFn: () => fetchScopedContratosDesignacaoMilitar({ militarId: id }),
+    enabled: !!id && isAccessResolved && podeVisualizarContratosDesignacao,
+  });
+  const contratosDesignacaoMilitar = contratosDesignacaoData.contratos || [];
+
+  const contratoDesignacaoMutation = useMutation({
+    mutationFn: ({ id: contratoId, data, operation }) => {
+      if (operation === 'create') return criarEscopado('ContratoDesignacaoMilitar', data);
+      return atualizarEscopado('ContratoDesignacaoMilitar', contratoId, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: contratosDesignacaoQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['ver-contratos-designacao', id] });
+      toast({ title: 'Contrato de designação atualizado com sucesso.' });
+    },
+    onError: (error) => {
+      toast({ title: 'Erro ao salvar contrato de designação', description: error?.message || 'Tente novamente.', variant: 'destructive' });
+    },
+  });
 
   const { data: militarDestinoMerge } = useQuery({
     queryKey: ['militar-merge-destino', militar?.merged_into_id],
@@ -542,6 +574,20 @@ export default function VerMilitar() {
                     </div>
                   }
                 </Section>
+                {podeVisualizarContratosDesignacao && (
+                  <ContratosDesignacaoSection
+                    contratos={contratosDesignacaoMilitar}
+                    matriculas={matriculasMilitar}
+                    militarId={id}
+                    isLoading={isLoadingContratosDesignacao}
+                    canCreate={podeCriarContratoDesignacao}
+                    canEncerrar={podeEncerrarContratoDesignacao}
+                    canCancelar={podeCancelarContratoDesignacao}
+                    isSaving={contratoDesignacaoMutation.isPending}
+                    onCreate={(data) => contratoDesignacaoMutation.mutateAsync({ operation: 'create', data })}
+                    onUpdate={(contratoId, data) => contratoDesignacaoMutation.mutateAsync({ operation: 'update', id: contratoId, data })}
+                  />
+                )}
                 <Section title="Dados Pessoais" icon={User}>
                   <div className="grid grid-cols-2 gap-x-4">
                     <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />

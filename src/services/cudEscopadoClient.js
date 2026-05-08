@@ -13,6 +13,7 @@ import { base44 } from '@/api/base44Client';
 //   - Atestado
 //   - RegistroLivro
 //   - PublicacaoExOfficio
+//   - ContratoDesignacaoMilitar (create/update; sem delete físico)
 //
 // Em caso de falha (403 fora do escopo, 400 payload inválido, etc.),
 // uma exceção é lançada com mensagem amigável extraída de response.data.error.
@@ -25,6 +26,7 @@ const ENTIDADES_PERMITIDAS = new Set([
   'RegistroLivro',
   'PublicacaoExOfficio',
   'CreditoExtraFerias',
+  'ContratoDesignacaoMilitar',
 ]);
 
 function assertEntidadePermitida(entityName) {
@@ -78,6 +80,9 @@ export async function atualizarEscopado(entityName, registroId, data) {
 
 export async function excluirEscopado(entityName, registroId) {
   assertEntidadePermitida(entityName);
+  if (entityName === 'ContratoDesignacaoMilitar') {
+    throw new Error('Delete físico de ContratoDesignacaoMilitar não é permitido. Use cancelamento para preservar histórico.');
+  }
   if (!registroId) throw new Error('cudEscopado: registroId é obrigatório em excluir.');
   const resp = await invocar({
     entityName,

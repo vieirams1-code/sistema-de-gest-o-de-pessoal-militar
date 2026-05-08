@@ -9,7 +9,13 @@ export const permissionStructure = [
           { key: 'perm_visualizar_militares', label: 'Visualizar Militares' },
           { key: 'perm_adicionar_militares', label: 'Adicionar Militares' },
           { key: 'perm_editar_militares', label: 'Editar Militares' },
-          { key: 'perm_excluir_militares', label: 'Excluir Militares', sensitive: true }
+          { key: 'perm_excluir_militares', label: 'Excluir Militares', sensitive: true },
+          { key: 'perm_visualizar_contratos_designacao', label: 'Visualizar Contratos de Designação' },
+          { key: 'perm_criar_contrato_designacao', label: 'Criar Contrato de Designação', sensitive: true },
+          { key: 'perm_encerrar_contrato_designacao', label: 'Encerrar Contrato de Designação', sensitive: true },
+          { key: 'perm_cancelar_contrato_designacao', label: 'Cancelar Contrato de Designação', sensitive: true },
+          { key: 'perm_editar_metadados_contrato_designacao', label: 'Editar Metadados de Contrato de Designação', sensitive: true },
+          { key: 'perm_gerir_contratos_designacao', label: 'Gerir Contratos de Designação', sensitive: true }
         ]
       },
       {
