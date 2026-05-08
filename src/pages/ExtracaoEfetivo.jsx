@@ -44,6 +44,7 @@ import {
 } from '@/pages/extracaoEfetivo/catalogoCamposEfetivo';
 import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { exportarRegistrosParaExcel } from '@/utils/indicadosExcelExport';
+import { base44 } from '@/api/base44Client';
 
 const BACKEND_LIMIT = 200;
 const STALE_TIME_MS = 5 * 60 * 1000;
@@ -232,6 +233,64 @@ function mergeMilitaresSemDuplicidade(currentMilitares = [], novosMilitares = []
   });
 
   return [...mergedByKey.values(), ...unkeyedMilitares];
+}
+
+
+function buildFiltrosSanitizadosAuditoria(filtrosExecutados) {
+  const filtros = filtrosExecutados || {};
+  const searchTamanho = String(filtros.search || '').trim().length;
+  const filterKeys = [
+    'postoGraduacao',
+    'quadro',
+    'status',
+    'situacaoMilitar',
+    'funcao',
+    'condicao',
+    'lotacao',
+  ];
+
+  return {
+    search_aplicado: searchTamanho > 0,
+    ...(searchTamanho > 0 ? { search_tamanho: searchTamanho } : {}),
+    ...filterKeys.reduce((acc, key) => {
+      const value = filtros[key];
+      acc[key] = Boolean(value && value !== TODOS_VALUE);
+      return acc;
+    }, {}),
+  };
+}
+
+function buildConsultaMetaAuditoria(consultaMeta, tipoExportacao, totalCarregados, totalExportados) {
+  return {
+    hasMore: consultaMeta?.hasMore === true,
+    limit: Number(consultaMeta?.limit || BACKEND_LIMIT),
+    offset: Number(consultaMeta?.offset || 0),
+    returned: Number(consultaMeta?.returned || totalCarregados),
+    tipo_exportacao: tipoExportacao,
+    busca_limitada_por_amostra: Boolean(
+      consultaMeta?.busca_limitada_por_amostra || consultaMeta?.buscaLimitadaPorAmostra,
+    ),
+    quantidade_carregada: totalCarregados,
+    quantidade_exportada: totalExportados,
+    escopo_resumido: {
+      tipo: String(consultaMeta?.scope_tipo || 'indefinido'),
+      aplicou_filtro_lotacao: consultaMeta?.aplicou_filtro_lotacao === true,
+      aplicou_filtro_posto: consultaMeta?.aplicou_filtro_posto === true,
+      aplicou_filtro_status: consultaMeta?.aplicou_filtro_status === true,
+      aplicou_filtro_situacao: consultaMeta?.aplicou_filtro_situacao === true,
+    },
+  };
+}
+
+async function registrarAuditoriaExportacaoEfetivo(payload) {
+  const response = await base44.functions.invoke('registrarAuditoriaExportacaoEfetivo', payload);
+  const data = response?.data ?? response ?? {};
+
+  if (data?.ok !== true) {
+    throw new Error(data?.error || 'Falha ao registrar auditoria de exportação.');
+  }
+
+  return data;
 }
 
 function buildFetchMilitaresPayload(filtrosExecutados, lotacoesIds, offset) {
@@ -603,7 +662,7 @@ export default function ExtracaoEfetivo() {
     loadMilitaresPage({ filtros: filtrosExecutados, offset: nextOffset });
   };
 
-  const exportarRegistrosCarregados = () => {
+  const exportarRegistrosCarregados = async () => {
     if (!hasExecutedExtraction) {
       toast({
         title: 'Execute uma extração antes de exportar',
@@ -634,6 +693,36 @@ export default function ExtracaoEfetivo() {
     const statusArquivo = consultaMeta?.hasMore === true ? 'parcial' : 'completo';
     const totalCarregados = militares.length;
     const totalExportados = sortedMilitares.length;
+    const nomeArquivo = `extracao_efetivo_${hojeISO()}_${statusArquivo}_carregados-${totalCarregados}_exportados-${totalExportados}.xlsx`;
+
+    try {
+      await registrarAuditoriaExportacaoEfetivo({
+        effectiveEmail: effectiveEmailForQuery || undefined,
+        tipo_exportacao: statusArquivo,
+        quantidade_carregada: totalCarregados,
+        quantidade_exportada: totalExportados,
+        colunas_exportadas: selectedColumns.map((column) => ({
+          id: column.id,
+          label: column.label,
+        })),
+        filtros_sanitizados: buildFiltrosSanitizadosAuditoria(filtrosExecutados),
+        consulta_meta: buildConsultaMetaAuditoria(
+          consultaMeta,
+          statusArquivo,
+          totalCarregados,
+          totalExportados,
+        ),
+        nome_arquivo: nomeArquivo,
+        versao: '1F-C',
+      });
+    } catch (_auditError) {
+      toast({
+        title: 'Exportação bloqueada',
+        description: 'Exportação bloqueada porque não foi possível registrar auditoria.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     exportarRegistrosParaExcel({
       registros: sortedMilitares,
@@ -642,7 +731,7 @@ export default function ExtracaoEfetivo() {
         label: column.label,
         getValue: (militar) => getValorCampoEfetivo(militar, column.id),
       })),
-      nomeArquivo: `extracao_efetivo_${hojeISO()}_${statusArquivo}_carregados-${totalCarregados}_exportados-${totalExportados}.xlsx`,
+      nomeArquivo,
       nomeAba: statusArquivo === 'parcial' ? 'Efetivo parcial' : 'Efetivo completo',
     });
 
