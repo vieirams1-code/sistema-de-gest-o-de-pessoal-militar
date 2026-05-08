@@ -467,3 +467,17 @@ export function avaliarRiscoAtestadosMilitar({ militar = null, atestados = [], d
     intervalos: intervalosMesclados,
   };
 }
+
+export function filtrarAnalisesTemporarios(analises = []) {
+  return (analises || []).filter((analise) => analise?.ehTemporario === true && isQuadroTemporario(analise?.militar?.quadro));
+}
+
+export function filtrarPorQuadroTemporario(analises = [], quadroSelecionado = 'todos') {
+  const temporarios = filtrarAnalisesTemporarios(analises);
+  const quadroNormalizado = normalizarQuadroControleAtestados(quadroSelecionado);
+
+  if (!quadroNormalizado || quadroNormalizado === 'TODOS') return temporarios;
+  if (!isQuadroTemporario(quadroNormalizado)) return [];
+
+  return temporarios.filter((analise) => normalizarQuadroControleAtestados(analise?.militar?.quadro) === quadroNormalizado);
+}
