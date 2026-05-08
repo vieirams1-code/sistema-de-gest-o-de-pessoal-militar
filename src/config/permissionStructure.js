@@ -130,9 +130,9 @@ export const permissionStructure = [
       },
       {
         key: 'acesso_controle_atestados_temporarios',
-        label: 'Controle de Atestados',
+        label: 'Controle de Atestados dos Temporários',
         actions: [
-          { key: 'perm_visualizar_controle_atestados_temporarios', label: 'Visualizar Controle de Atestados' }
+          { key: 'perm_visualizar_controle_atestados_temporarios', label: 'Visualizar Controle de Atestados dos Temporários' }
         ]
       },
       {

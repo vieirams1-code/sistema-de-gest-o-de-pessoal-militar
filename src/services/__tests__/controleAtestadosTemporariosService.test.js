@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   avaliarRiscoAtestadosMilitar,
+  filtrarAnalisesTemporarios,
+  filtrarPorQuadroTemporario,
   calcularDiasUnicosNaJanela,
   calcularMaiorSequenciaContinua,
   isMilitarTemporarioParaControleAtestados,
@@ -12,6 +14,76 @@ import {
   normalizarQuadroControleAtestados,
 } from '../controleAtestadosTemporariosService.js';
 
+
+function criarAnalise({ id, quadro, inicio = '2026-01-01', termino = '2026-01-05', lacunas = [] }) {
+  const analise = avaliarRiscoAtestadosMilitar({
+    militar: { id, nome: id, quadro },
+    atestados: [{ data_inicio: inicio, data_termino: termino }],
+    dataReferencia: '2026-12-31',
+  });
+
+  return { chave: id, ...analise, lacunas: [...analise.lacunas, ...lacunas] };
+}
+
+
+test('painel/serviço retorna somente temporários e preserva lacunas', () => {
+  const analises = [
+    criarAnalise({ id: 'qoe', quadro: 'QOETBM', lacunas: ['lacuna preservada'] }),
+    criarAnalise({ id: 'efetivo', quadro: 'QOBM' }),
+    criarAnalise({ id: 'sem-quadro', quadro: '' }),
+  ];
+
+  const resultado = filtrarAnalisesTemporarios(analises);
+
+  assert.deepEqual(resultado.map((analise) => analise.chave), ['qoe']);
+  assert.deepEqual(resultado[0].lacunas, ['lacuna preservada']);
+});
+
+test('filtro temporário inclui QOETBM, QOSTBM, QPTBM e QBMPT normalizado, excluindo não temporário', () => {
+  const analises = [
+    criarAnalise({ id: 'qoe', quadro: 'QOETBM' }),
+    criarAnalise({ id: 'qos', quadro: 'QOSTBM' }),
+    criarAnalise({ id: 'qpt', quadro: 'QPTBM' }),
+    criarAnalise({ id: 'legado', quadro: 'QBMPT' }),
+    criarAnalise({ id: 'efetivo', quadro: 'QOBM' }),
+  ];
+
+  const resultado = filtrarAnalisesTemporarios(analises);
+
+  assert.deepEqual(resultado.map((analise) => analise.chave), ['qoe', 'qos', 'qpt', 'legado']);
+  assert.deepEqual(resultado.map((analise) => analise.militar.quadro), ['QOETBM', 'QOSTBM', 'QPTBM', 'QPTBM']);
+});
+
+test('filtro por QOETBM retorna apenas QOETBM', () => {
+  const analises = [
+    criarAnalise({ id: 'qoe', quadro: 'QOETBM' }),
+    criarAnalise({ id: 'qos', quadro: 'QOSTBM' }),
+    criarAnalise({ id: 'qpt', quadro: 'QPTBM' }),
+  ];
+
+  assert.deepEqual(filtrarPorQuadroTemporario(analises, 'QOETBM').map((analise) => analise.militar.quadro), ['QOETBM']);
+});
+
+test('filtro por QOSTBM retorna apenas QOSTBM', () => {
+  const analises = [
+    criarAnalise({ id: 'qoe', quadro: 'QOETBM' }),
+    criarAnalise({ id: 'qos', quadro: 'QOSTBM' }),
+    criarAnalise({ id: 'qpt', quadro: 'QPTBM' }),
+  ];
+
+  assert.deepEqual(filtrarPorQuadroTemporario(analises, 'QOSTBM').map((analise) => analise.militar.quadro), ['QOSTBM']);
+});
+
+test('filtro por QPTBM inclui QBMPT legado normalizado', () => {
+  const analises = [
+    criarAnalise({ id: 'qoe', quadro: 'QOETBM' }),
+    criarAnalise({ id: 'qpt', quadro: 'QPTBM' }),
+    criarAnalise({ id: 'legado', quadro: 'QBMPT' }),
+  ];
+
+  assert.deepEqual(filtrarPorQuadroTemporario(analises, 'QPTBM').map((analise) => analise.chave), ['qpt', 'legado']);
+  assert.deepEqual(filtrarPorQuadroTemporario(analises, 'QBMPT').map((analise) => analise.chave), ['qpt', 'legado']);
+});
 test('QOETBM é temporário para o controle de atestados', () => {
   assert.equal(isQuadroTemporario('QOETBM'), true);
   assert.equal(isMilitarTemporarioParaControleAtestados({ quadro: 'QOETBM' }), true);
