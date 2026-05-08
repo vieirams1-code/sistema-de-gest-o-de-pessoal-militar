@@ -106,6 +106,41 @@ const FERIAS_PERIODO_OPTIONS = Object.freeze([
   { value: 'proximos_60', label: 'Próximos 60 dias' },
   { value: 'proximos_90', label: 'Próximos 90 dias' },
 ]);
+const CATEGORIA_TODAS_VALUE = '__todas_categorias__';
+const CATEGORIA_OFICIAIS_VALUE = 'oficiais';
+const CATEGORIA_PRACAS_VALUE = 'pracas';
+const OFICIAIS_POSTOS = new Set([
+  'Coronel',
+  'Tenente Coronel',
+  'Tenente-Coronel',
+  'Major',
+  'Capitão',
+  '1º Tenente',
+  '2º Tenente',
+  'Aspirante',
+]);
+const PRACAS_POSTOS = new Set([
+  'Subtenente',
+  '1º Sargento',
+  '2º Sargento',
+  '3º Sargento',
+  'Cabo',
+  'Soldado',
+]);
+const CATEGORIA_OPTIONS = Object.freeze([
+  { value: CATEGORIA_TODAS_VALUE, label: 'Todos os militares' },
+  { value: CATEGORIA_OFICIAIS_VALUE, label: 'Oficiais' },
+  { value: CATEGORIA_PRACAS_VALUE, label: 'Praças' },
+]);
+const QUICK_PRESETS = Object.freeze([
+  { id: 'ativos', label: 'Ativos' },
+  { id: 'oficiais', label: 'Oficiais' },
+  { id: 'pracas', label: 'Praças' },
+  { id: 'cabos', label: 'Cabos' },
+  { id: 'soldados', label: 'Soldados' },
+  { id: 'ferias_mes', label: 'De férias este mês' },
+  { id: 'ferias_curso', label: 'Férias em curso' },
+]);
 const textCollator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
 const naturalTextCollator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
 
@@ -377,6 +412,7 @@ function buildFiltrosSanitizadosAuditoria(filtrosExecutados) {
   const filtros = filtrosExecutados || {};
   const searchTamanho = String(filtros.search || '').trim().length;
   const filterKeys = [
+    'categoria',
     'postoGraduacao',
     'quadro',
     'status',
@@ -475,6 +511,7 @@ export default function ExtracaoEfetivo() {
   const shouldShowLotacaoFilter = isAdmin || ['setor', 'subsetor', 'unidade'].includes(modoAcesso);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [categoriaFilter, setCategoriaFilter] = useState(CATEGORIA_TODAS_VALUE);
   const [postoFilter, setPostoFilter] = useState(TODOS_VALUE);
   const [quadroFilter, setQuadroFilter] = useState(TODOS_VALUE);
   const [statusFilter, setStatusFilter] = useState('Ativo');
@@ -485,6 +522,7 @@ export default function ExtracaoEfetivo() {
   const [feriasPresencaFilter, setFeriasPresencaFilter] = useState(FERIAS_TODAS_PRESENCAS_VALUE);
   const [feriasStatusFilter, setFeriasStatusFilter] = useState(FERIAS_TODOS_STATUS_VALUE);
   const [feriasPeriodoFilter, setFeriasPeriodoFilter] = useState(FERIAS_PERIODO_PADRAO);
+  const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   const [selectedColumnIds, setSelectedColumnIds] = useState(getDefaultColumnIds);
   const [sortConfig, setSortConfig] = useState({
     fieldId: DEFAULT_SORT_FIELD,
@@ -592,6 +630,7 @@ export default function ExtracaoEfetivo() {
       limit: BACKEND_LIMIT,
       offset: 0,
       search: searchTerm.trim() || null,
+      categoria: categoriaFilter,
       postoGraduacao: postoFilter,
       quadro: quadroFilter,
       status: statusFilter,
@@ -604,6 +643,7 @@ export default function ExtracaoEfetivo() {
       feriasPeriodo: feriasPeriodoFilter,
     }),
     [
+      categoriaFilter,
       condicaoFilter,
       feriasPeriodoFilter,
       feriasPresencaFilter,
@@ -790,6 +830,12 @@ export default function ExtracaoEfetivo() {
       const feriasStatusResumido = String(militar.ferias_status_resumido || '');
 
       if (!filtrosExecutados) return false;
+      if (filtrosExecutados.categoria === CATEGORIA_OFICIAIS_VALUE && !OFICIAIS_POSTOS.has(posto)) {
+        return false;
+      }
+      if (filtrosExecutados.categoria === CATEGORIA_PRACAS_VALUE && !PRACAS_POSTOS.has(posto)) {
+        return false;
+      }
       if (filtrosExecutados.postoGraduacao !== TODOS_VALUE && posto !== filtrosExecutados.postoGraduacao) {
         return false;
       }
@@ -882,7 +928,7 @@ export default function ExtracaoEfetivo() {
   const exportarRegistrosCarregados = async () => {
     if (!hasExecutedExtraction) {
       toast({
-        title: 'Execute uma extração antes de exportar',
+        title: 'Monte uma listagem antes de exportar',
         description: 'A exportação usa somente os registros já carregados na tela.',
         variant: 'destructive',
       });
@@ -970,6 +1016,7 @@ export default function ExtracaoEfetivo() {
 
   const clearFilters = () => {
     setSearchTerm('');
+    setCategoriaFilter(CATEGORIA_TODAS_VALUE);
     setPostoFilter(TODOS_VALUE);
     setQuadroFilter(TODOS_VALUE);
     setStatusFilter('Ativo');
@@ -1015,6 +1062,81 @@ export default function ExtracaoEfetivo() {
     podeExportarExtracao,
   );
   const isRateLimitError = String(militaresError?.message || '').toLowerCase().includes('rate limit');
+  const selectedColumnsPreview = selectedColumns.slice(0, 4).map((column) => column.label).join(', ');
+  const selectedColumnsResumo = `${selectedColumns.length} coluna${selectedColumns.length === 1 ? '' : 's'} selecionada${selectedColumns.length === 1 ? '' : 's'}${selectedColumnsPreview ? `: ${selectedColumnsPreview}${selectedColumns.length > 4 ? '...' : ''}` : ''}`;
+  const selectedFeriasPeriodoLabel = FERIAS_PERIODO_OPTIONS.find((option) => option.value === feriasPeriodoFilter)?.label.toLowerCase();
+
+  const buildResumoListagem = () => {
+    const partes = [];
+    const posto = postoFilter !== TODOS_VALUE ? postoFilter : '';
+    const categoria = CATEGORIA_OPTIONS.find((option) => option.value === categoriaFilter)?.label;
+
+    if (posto) {
+      partes.push(`${posto}s`);
+    } else if (categoriaFilter !== CATEGORIA_TODAS_VALUE && categoria) {
+      partes.push(categoria);
+    } else {
+      partes.push('militares');
+    }
+
+    if (statusFilter !== TODOS_VALUE) partes.push(`${String(statusFilter).toLowerCase()}s`);
+    if (quadroFilter !== TODOS_VALUE) partes.push(`do quadro ${quadroFilter}`);
+    if (feriasPresencaFilter === 'com_periodo') {
+      partes.push(`com férias ${selectedFeriasPeriodoLabel || 'no período selecionado'}`);
+    } else if (feriasPresencaFilter === 'sem_periodo') {
+      partes.push(`sem férias ${selectedFeriasPeriodoLabel || 'no período selecionado'}`);
+    } else if (feriasPresencaFilter === 'em_curso') {
+      partes.push('com férias em curso');
+    }
+    if (feriasStatusFilter !== FERIAS_TODOS_STATUS_VALUE) {
+      partes.push(`com férias ${String(feriasStatusFilter).toLowerCase()}`);
+    }
+
+    return `Listar ${partes.join(' ')}.`;
+  };
+
+  const resumoListagem = buildResumoListagem();
+
+  const applyQuickPreset = (presetId) => {
+    if (presetId === 'ativos') {
+      setStatusFilter('Ativo');
+      return;
+    }
+
+    if (presetId === 'oficiais') {
+      setCategoriaFilter(CATEGORIA_OFICIAIS_VALUE);
+      setPostoFilter(TODOS_VALUE);
+      return;
+    }
+
+    if (presetId === 'pracas') {
+      setCategoriaFilter(CATEGORIA_PRACAS_VALUE);
+      setPostoFilter(TODOS_VALUE);
+      return;
+    }
+
+    if (presetId === 'cabos') {
+      setCategoriaFilter(CATEGORIA_TODAS_VALUE);
+      setPostoFilter('Cabo');
+      return;
+    }
+
+    if (presetId === 'soldados') {
+      setCategoriaFilter(CATEGORIA_TODAS_VALUE);
+      setPostoFilter('Soldado');
+      return;
+    }
+
+    if (presetId === 'ferias_mes') {
+      setFeriasPresencaFilter('com_periodo');
+      setFeriasPeriodoFilter('este_mes');
+      return;
+    }
+
+    if (presetId === 'ferias_curso') {
+      setFeriasPresencaFilter('em_curso');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -1030,7 +1152,7 @@ export default function ExtracaoEfetivo() {
                   Extração do Efetivo
                 </h1>
                 <p className="text-sm text-slate-500">
-                  Construtor read-only de consultas baseado no escopo atual de acesso.
+                  Monte listagens operacionais do efetivo conforme seu escopo de acesso.
                 </p>
               </div>
             </div>
@@ -1060,8 +1182,7 @@ export default function ExtracaoEfetivo() {
           <div className="space-y-1">
             <p className="font-semibold">Módulo inicial com campos funcionais comuns.</p>
             <p>
-              Esta versão mantém o Efetivo como fonte âncora e inclui Férias apenas como cruzamento relacionado agregado por militar.
-              A exportação permanece limitada aos campos do Efetivo; dados protegidos, textos livres e exportação multi-fonte continuam bloqueados.
+              Monte listas simples como cabos de férias, oficiais ativos ou militares com férias em curso. A exportação continua restrita às colunas permitidas do Efetivo.
             </p>
           </div>
         </div>
@@ -1085,7 +1206,7 @@ export default function ExtracaoEfetivo() {
                   <Users className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">Após filtros</p>
+                  <p className="text-sm text-slate-500">Na listagem</p>
                   <p className="text-3xl font-bold text-slate-800">{totalFiltrado}</p>
                 </div>
               </CardContent>
@@ -1100,7 +1221,7 @@ export default function ExtracaoEfetivo() {
                   <ListChecks className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">Estado do carregamento</p>
+                  <p className="text-sm text-slate-500">Carregamento</p>
                   <p className="text-lg font-bold text-slate-800">
                     {hasMoreMilitares ? 'Parcial' : 'Completo'}
                   </p>
@@ -1117,10 +1238,9 @@ export default function ExtracaoEfetivo() {
           <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 flex gap-3">
             <Database className="w-5 h-5 shrink-0 mt-0.5 text-slate-400" />
             <div>
-              <p className="font-semibold text-slate-700">Nenhuma extração executada.</p>
+              <p className="font-semibold text-slate-700">Nenhuma listagem montada.</p>
               <p>
-                Configure os filtros e clique em Executar extração para carregar os totais e a
-                tabela.
+                Configure quem deseja listar e clique em Montar listagem para carregar os totais e a tabela.
               </p>
             </div>
           </div>
@@ -1143,16 +1263,15 @@ export default function ExtracaoEfetivo() {
               <p className="font-semibold">
                 {hasMoreMilitares
                   ? 'Resultado parcial carregado.'
-                  : 'Resultado carregado completo.'}
+                  : 'Resultado carregado.'}
               </p>
               <p>
                 {hasMoreMilitares
                   ? `Foram carregados ${totalRetornado} registros até agora. Use Carregar mais para buscar o próximo lote de até ${BACKEND_LIMIT} registros.`
-                  : `Foram carregados ${totalRetornado} registros e o backend informou que não há mais registros a carregar.`}
+                  : `Foram carregados ${totalRetornado} registros e não há mais registros a carregar.`}
               </p>
               <p className="text-xs">
-                Ordenação, quadro, função, condição, sem lotação e filtros de Férias são refinos locais e atuam somente
-                sobre os registros já carregados. Férias depende dos registros escopados carregados e o cruzamento fica parcial quando o Efetivo está parcial.
+                Ordenação e critérios complementares atuam sobre os registros carregados. Quando ainda houver mais páginas, carregue os demais registros para completar a listagem.
               </p>
             </div>
           </div>
@@ -1164,8 +1283,7 @@ export default function ExtracaoEfetivo() {
             <div>
               <p className="font-semibold">Busca textual limitada por amostra.</p>
               <p>
-                O backend indicou que a busca pode ter sido avaliada sobre uma amostra; portanto, o
-                resultado carregado pode não representar todo o universo disponível no escopo.
+                A busca textual pode ter sido avaliada sobre uma amostra; portanto, o resultado carregado pode não representar todo o universo disponível no seu acesso.
               </p>
             </div>
           </div>
@@ -1176,15 +1294,15 @@ export default function ExtracaoEfetivo() {
           <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 flex gap-3">
             <Info className="w-5 h-5 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <p className="font-semibold">Férias é cruzamento relacionado, read-only e agregado.</p>
+              <p className="font-semibold">Férias na listagem</p>
               <p>
-                O vínculo usa somente efetivo.id ↔ ferias.militar_id e mantém uma linha por militar.
-                {isLoadingFeriasBundle ? ' Carregando registros de Férias do escopo...' : ''}
+                A tabela mantém uma linha por militar e mostra um resumo de férias quando houver informação disponível.
+                {isLoadingFeriasBundle ? ' Carregando informações de Férias...' : ''}
               </p>
               <p className="text-xs">
                 {hasMoreMilitares
-                  ? 'Como o Efetivo ainda possui mais páginas, o resumo de Férias exibido na tabela é parcial em relação aos militares já carregados.'
-                  : 'O resumo de Férias usa os registros relacionados disponíveis no escopo da extração executada.'}
+                  ? 'Como ainda há mais páginas, o resumo de Férias acompanha os militares já carregados.'
+                  : 'O resumo de Férias usa as informações disponíveis para a listagem montada.'}
               </p>
             </div>
           </div>
@@ -1194,17 +1312,39 @@ export default function ExtracaoEfetivo() {
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex gap-3">
             <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">Cruzamento com Férias indisponível.</p>
-              <p>{feriasBundleError?.message || 'Não foi possível carregar os registros relacionados de Férias.'}</p>
+              <p className="font-semibold">Informações de Férias indisponíveis.</p>
+              <p>{feriasBundleError?.message || 'Não foi possível carregar as informações de Férias.'}</p>
             </div>
           </div>
         )}
 
         <Card className="border-slate-100 shadow-sm">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <FileText className="w-4 h-4" />
-              Filtros da extração
+          <CardContent className="p-4 md:p-5 space-y-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Users className="w-4 h-4" />
+                  Quem listar?
+                </div>
+                <p className="mt-2 text-lg font-semibold text-[#1e3a5f]">{resumoListagem}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Use os atalhos abaixo para começar uma listagem operacional e ajuste os campos quando precisar.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                {QUICK_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyQuickPreset(preset.id)}
+                    className="bg-white"
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
@@ -1217,6 +1357,19 @@ export default function ExtracaoEfetivo() {
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
               </div>
+
+              <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Grupo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIA_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               <Select value={postoFilter} onValueChange={setPostoFilter}>
                 <SelectTrigger>
@@ -1232,26 +1385,12 @@ export default function ExtracaoEfetivo() {
                 </SelectContent>
               </Select>
 
-              <Select value={quadroFilter} onValueChange={setQuadroFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Quadro" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todos os quadros</SelectItem>
-                  {quadrosDisponiveis.map((quadro) => (
-                    <SelectItem key={quadro} value={quadro}>
-                      {quadro}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder="Situação no cadastro" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todos os status (sem filtro backend)</SelectItem>
+                  <SelectItem value={TODOS_VALUE}>Todas as situações</SelectItem>
                   {statusDisponiveis.map((status) => (
                     <SelectItem key={status} value={status}>
                       {status}
@@ -1261,249 +1400,255 @@ export default function ExtracaoEfetivo() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Select value={situacaoMilitarFilter} onValueChange={setSituacaoMilitarFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Situação militar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todas as situações militares</SelectItem>
-                  {situacoesMilitaresDisponiveis.map((situacao) => (
-                    <SelectItem key={situacao} value={situacao}>
-                      {situacao}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <FileText className="w-4 h-4" />
+                Critérios adicionais
+              </div>
 
-              <Select value={funcaoFilter} onValueChange={setFuncaoFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Função" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todas as funções (refino local)</SelectItem>
-                  {funcoesDisponiveis.map((funcao) => (
-                    <SelectItem key={funcao} value={funcao}>
-                      {funcao}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="rounded-xl border border-white bg-white p-3 space-y-3 shadow-sm">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">Dados do efetivo</p>
+                  <p className="text-xs text-slate-500">Refine por quadro, situação funcional, função, condição e lotação.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Select value={quadroFilter} onValueChange={setQuadroFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Quadro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={TODOS_VALUE}>Todos os quadros</SelectItem>
+                      {quadrosDisponiveis.map((quadro) => (
+                        <SelectItem key={quadro} value={quadro}>
+                          {quadro}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-              <Select value={condicaoFilter} onValueChange={setCondicaoFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Condição" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todas as condições (refino local)</SelectItem>
-                  {condicoesDisponiveis.map((condicao) => (
-                    <SelectItem key={condicao} value={condicao}>
-                      {condicao}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <Select value={situacaoMilitarFilter} onValueChange={setSituacaoMilitarFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Situação militar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={TODOS_VALUE}>Todas as situações militares</SelectItem>
+                      {situacoesMilitaresDisponiveis.map((situacao) => (
+                        <SelectItem key={situacao} value={situacao}>
+                          {situacao}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={funcaoFilter} onValueChange={setFuncaoFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Função" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={TODOS_VALUE}>Todas as funções</SelectItem>
+                      {funcoesDisponiveis.map((funcao) => (
+                        <SelectItem key={funcao} value={funcao}>
+                          {funcao}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={condicaoFilter} onValueChange={setCondicaoFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Condição" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={TODOS_VALUE}>Todas as condições</SelectItem>
+                      {condicoesDisponiveis.map((condicao) => (
+                        <SelectItem key={condicao} value={condicao}>
+                          {condicao}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {shouldShowLotacaoFilter && (
+                    <div className="md:col-span-2">
+                      <Select
+                        value={lotacaoFilter}
+                        onValueChange={setLotacaoFilter}
+                        disabled={isLoadingLotacoes || isErrorLotacoes}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Lotação" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={TODOS_VALUE}>Todas as lotações disponíveis</SelectItem>
+                          <SelectItem value={SEM_LOTACAO_VALUE}>Sem lotação informada</SelectItem>
+                          {lotacoesDisponiveis.map((lotacao) => (
+                            <SelectItem key={lotacao.id} value={lotacao.id}>
+                              {lotacao.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-indigo-900">Férias</p>
+                  <p className="text-xs text-indigo-700">Escolha presença, período e situação de férias para a listagem.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Select value={feriasPresencaFilter} onValueChange={setFeriasPresencaFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Férias no período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FERIAS_PRESENCA_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={feriasPeriodoFilter} onValueChange={setFeriasPeriodoFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Período de férias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FERIAS_PERIODO_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={feriasStatusFilter} onValueChange={setFeriasStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Situação das férias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={FERIAS_TODOS_STATUS_VALUE}>Todas as situações de férias</SelectItem>
+                      {feriasStatusDisponiveis.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-3">
-              <div>
-                <p className="text-sm font-semibold text-indigo-900">Filtros de Férias (cruzamento relacionado)</p>
-                <p className="text-xs text-indigo-700">
-                  Filtros frontend-only, calculados sobre férias escopadas e agregadas por militar.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Select value={feriasPresencaFilter} onValueChange={setFeriasPresencaFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Férias no período" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FERIAS_PRESENCA_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={feriasStatusFilter} onValueChange={setFeriasStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Status resumido" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={FERIAS_TODOS_STATUS_VALUE}>Todos os status de férias</SelectItem>
-                    {feriasStatusDisponiveis.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={feriasPeriodoFilter} onValueChange={setFeriasPeriodoFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Período de férias" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FERIAS_PERIODO_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {shouldShowLotacaoFilter && (
-              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 items-center">
-                <Select
-                  value={lotacaoFilter}
-                  onValueChange={setLotacaoFilter}
-                  disabled={isLoadingLotacoes || isErrorLotacoes}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Lotação" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={TODOS_VALUE}>Todas as lotações do escopo</SelectItem>
-                    <SelectItem value={SEM_LOTACAO_VALUE}>Sem lotação informada</SelectItem>
-                    {lotacoesDisponiveis.map((lotacao) => (
-                      <SelectItem key={lotacao.id} value={lotacao.id}>
-                        {lotacao.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button
-                    type="button"
-                    onClick={executeExtraction}
-                    disabled={!isAccessResolved || isBusy}
-                  >
-                    {isBusy ? (
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <FileSearch className="w-4 h-4 mr-2" />
-                    )}
-                    Executar extração
-                  </Button>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <ListChecks className="w-4 h-4" />
+                    O que mostrar na tabela?
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">{selectedColumnsResumo}</p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={clearExtraction}
-                    disabled={isBusy}
+                    size="sm"
+                    onClick={() => setShowColumnCustomizer((current) => !current)}
                   >
-                    Limpar consulta
+                    {showColumnCustomizer ? 'Concluir personalização' : 'Personalizar colunas'}
                   </Button>
+                  {showColumnCustomizer && (
+                    <Button type="button" variant="ghost" size="sm" onClick={resetSelectedColumns}>
+                      Restaurar padrão
+                    </Button>
+                  )}
                 </div>
               </div>
-            )}
 
-            {!shouldShowLotacaoFilter && (
-              <div className="flex justify-end">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button
-                    type="button"
-                    onClick={executeExtraction}
-                    disabled={!isAccessResolved || isBusy}
-                  >
-                    {isBusy ? (
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <FileSearch className="w-4 h-4 mr-2" />
-                    )}
-                    Executar extração
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={clearExtraction}
-                    disabled={isBusy}
-                  >
-                    Limpar consulta
-                  </Button>
+              {showColumnCustomizer && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 pt-2">
+                  {selectableColumns.map((column) => {
+                    const isChecked = selectedColumnIdsResolved.has(column.id);
+                    const isLocked = column.required === true;
+
+                    return (
+                      <label
+                        key={column.id}
+                        htmlFor={`coluna-${column.id}`}
+                        className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
+                      >
+                        <Checkbox
+                          id={`coluna-${column.id}`}
+                          checked={isChecked}
+                          disabled={isLocked}
+                          onCheckedChange={(checked) => toggleSelectedColumn(column.id, checked === true)}
+                          className="mt-0.5"
+                        />
+                        <span className="space-y-1">
+                          <span className="block font-medium leading-none">{column.label}</span>
+                          <span className="block text-xs text-slate-500">
+                            {isLocked ? 'Obrigatória' : column.category || 'Campo comum'}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <Button
+                type="button"
+                onClick={executeExtraction}
+                disabled={!isAccessResolved || isBusy}
+              >
+                {isBusy ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <FileSearch className="w-4 h-4 mr-2" />
+                )}
+                Montar listagem
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={clearExtraction}
+                disabled={isBusy}
+              >
+                Limpar listagem
+              </Button>
+            </div>
 
             {shouldShowLotacaoFilter && isErrorLotacoes && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 O filtro de lotação não pôde ser carregado com segurança pelo escopo atual. A
-                extração permanece disponível sem filtrar por lotação.
+                listagem permanece disponível sem filtrar por lotação.
                 {lotacoesError?.message ? ` Detalhe: ${lotacoesError.message}` : ''}
               </div>
             )}
 
             {filtersChangedAfterExecution && (
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-                Os filtros foram alterados depois da última execução. Clique em Executar extração para
+                Os critérios foram alterados depois da última execução. Clique em Montar listagem para
                 gerar um novo resultado com os parâmetros atuais.
               </div>
             )}
           </CardContent>
         </Card>
 
-
-        <Card className="border-slate-100 shadow-sm">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  <ListChecks className="w-4 h-4" />
-                  Colunas da tabela
-                </div>
-                <p className="mt-1 text-sm text-slate-500">
-                  Escolha quais colunas comuns permitidas serão exibidas. Esta seleção altera apenas
-                  a visualização da tabela. Colunas de Férias são apenas agregados relacionados e não entram na exportação neste lote.
-                </p>
-              </div>
-              <Button type="button" variant="outline" size="sm" onClick={resetSelectedColumns}>
-                Restaurar padrão
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-              {selectableColumns.map((column) => {
-                const isChecked = selectedColumnIdsResolved.has(column.id);
-                const isLocked = column.required === true;
-
-                return (
-                  <label
-                    key={column.id}
-                    htmlFor={`coluna-${column.id}`}
-                    className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
-                  >
-                    <Checkbox
-                      id={`coluna-${column.id}`}
-                      checked={isChecked}
-                      disabled={isLocked}
-                      onCheckedChange={(checked) => toggleSelectedColumn(column.id, checked === true)}
-                      className="mt-0.5"
-                    />
-                    <span className="space-y-1">
-                      <span className="block font-medium leading-none">{column.label}</span>
-                      <span className="block text-xs text-slate-500">
-                        {isLocked ? 'Obrigatória' : column.category || 'Campo comum'}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-              {selectedColumns.length} coluna{selectedColumns.length === 1 ? '' : 's'} selecionada
-              {selectedColumns.length === 1 ? '' : 's'}. Campos desconhecidos são descartados antes da renderização. A ordenação é local e atua somente sobre o resultado carregado. Colunas marcadas como Férias não são exportadas.
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <Database className="w-4 h-4" />
+          Resultado da listagem
+        </div>
 
         {!isAccessResolved ? (
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-12 text-center text-slate-500">
-              Resolvendo contexto de acesso para liberar a extração.
+              Resolvendo contexto de acesso para liberar a listagem.
             </CardContent>
           </Card>
         ) : !hasExecutedExtraction ? (
@@ -1511,10 +1656,10 @@ export default function ExtracaoEfetivo() {
             <CardContent className="p-12 text-center">
               <FileSearch className="w-14 h-14 mx-auto text-slate-300 mb-4" />
               <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                Configure os filtros e clique em Executar extração.
+                Configure os critérios e clique em Montar listagem.
               </h3>
               <p className="text-sm text-slate-500">
-                Nenhum militar será carregado até a consulta escopada ser executada manualmente.
+                Nenhum militar será carregado até a listagem ser montada manualmente.
               </p>
             </CardContent>
           </Card>
@@ -1522,7 +1667,7 @@ export default function ExtracaoEfetivo() {
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-12 text-center">
               <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-slate-600">Carregando efetivo escopado...</p>
+              <p className="text-slate-600">Carregando listagem...</p>
             </CardContent>
           </Card>
         ) : isError ? (
@@ -1531,11 +1676,11 @@ export default function ExtracaoEfetivo() {
               <div className="flex gap-3">
                 <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold">Não foi possível carregar a extração.</p>
+                  <p className="font-semibold">Não foi possível carregar a listagem.</p>
                   <p className="text-sm">
                     {isRateLimitError
                       ? 'Limite de requisições excedido. Aguarde alguns instantes e tente novamente.'
-                      : militaresError?.message || 'Ocorreu uma falha controlada ao consultar o efetivo escopado.'}
+                      : militaresError?.message || 'Ocorreu uma falha ao consultar o efetivo disponível para seu acesso.'}
                   </p>
                 </div>
               </div>
@@ -1569,7 +1714,7 @@ export default function ExtracaoEfetivo() {
         ) : (
           <Card className="border-slate-100 shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-              Exibindo {totalFiltrado} registro{totalFiltrado === 1 ? '' : 's'} após refinos locais,
+              Exibindo {totalFiltrado} registro{totalFiltrado === 1 ? '' : 's'} na listagem,
               de {totalRetornado} registro{totalRetornado === 1 ? '' : 's'} carregado
               {totalRetornado === 1 ? '' : 's'}. O resultado está{' '}
               {hasMoreMilitares ? 'parcial' : 'completo'}.
