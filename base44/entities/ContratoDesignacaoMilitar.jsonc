@@ -1,0 +1,126 @@
+{
+  "name": "ContratoDesignacaoMilitar",
+  "type": "object",
+  "title": "Contrato de Designação Militar",
+  "description": "Contrato de designação para militar da reserva que retorna como designado, sem alterar a data de inclusão original do militar.",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar vinculado ao contrato de designação."
+    },
+    "matricula_designacao": {
+      "type": "string",
+      "description": "Matrícula utilizada durante a designação."
+    },
+    "matricula_militar_id": {
+      "type": "string",
+      "description": "ID da matrícula militar associada à designação, quando houver."
+    },
+    "data_inicio_contrato": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de início da vigência do contrato de designação."
+    },
+    "data_fim_contrato": {
+      "type": "string",
+      "format": "date",
+      "description": "Data final prevista ou efetiva do contrato de designação."
+    },
+    "data_inclusao_para_ferias": {
+      "type": "string",
+      "format": "date",
+      "description": "Data-base para férias no contexto do contrato; obrigatória para contratos com status_contrato ativo."
+    },
+    "numero_contrato": {
+      "type": "string",
+      "description": "Número administrativo do contrato de designação."
+    },
+    "boletim_publicacao": {
+      "type": "string",
+      "description": "Boletim ou ato de publicação do contrato."
+    },
+    "data_publicacao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de publicação do contrato."
+    },
+    "status_contrato": {
+      "type": "string",
+      "enum": [
+        "ativo",
+        "encerrado",
+        "cancelado"
+      ],
+      "default": "ativo",
+      "description": "Situação operacional do contrato de designação."
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observações administrativas sobre o contrato."
+    },
+    "tipo_designacao": {
+      "type": "string",
+      "description": "Tipo ou classificação da designação."
+    },
+    "fonte_legal": {
+      "type": "string",
+      "description": "Base legal ou normativa que fundamenta a designação."
+    },
+    "motivo_encerramento": {
+      "type": "string",
+      "description": "Motivo do encerramento do contrato."
+    },
+    "data_encerramento_operacional": {
+      "type": "string",
+      "format": "date",
+      "description": "Data operacional de encerramento do contrato."
+    },
+    "motivo_cancelamento": {
+      "type": "string",
+      "description": "Motivo do cancelamento do contrato."
+    },
+    "cancelado_por": {
+      "type": "string",
+      "description": "Usuário ou identificador responsável pelo cancelamento."
+    },
+    "encerrado_por": {
+      "type": "string",
+      "description": "Usuário ou identificador responsável pelo encerramento."
+    },
+    "criado_por": {
+      "type": "string",
+      "description": "Usuário ou identificador responsável pela criação do registro."
+    },
+    "atualizado_por": {
+      "type": "string",
+      "description": "Usuário ou identificador responsável pela última atualização do registro."
+    },
+    "origem_registro": {
+      "type": "string",
+      "description": "Origem do registro: cadastro_manual, importacao_legado, saneamento, etc."
+    }
+  },
+  "required": [
+    "militar_id",
+    "matricula_designacao",
+    "data_inicio_contrato",
+    "status_contrato"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
