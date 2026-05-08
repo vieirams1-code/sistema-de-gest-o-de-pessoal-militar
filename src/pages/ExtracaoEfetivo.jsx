@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -183,14 +183,77 @@ function resolveSelectedColumns(selectedColumnIds = [], selectableColumns = []) 
   return selectableColumns.filter((column) => column.required === true);
 }
 
+function getMilitarDedupeKey(militar = {}) {
+  const id = String(militar.id || '').trim();
+  if (id) return `id:${id}`;
+
+  const matricula = String(getValorCampoEfetivo(militar, 'matricula') || '').trim();
+  if (matricula) return `matricula:${matricula}`;
+
+  const nome = normalizeText(
+    getValorCampoEfetivo(militar, 'nome_completo') || militar.nome_completo,
+  );
+  if (nome) return `nome:${nome}`;
+
+  return null;
+}
+
+function mergeMilitaresSemDuplicidade(currentMilitares = [], novosMilitares = []) {
+  const mergedByKey = new Map();
+  const unkeyedMilitares = [];
+
+  currentMilitares.forEach((militar) => {
+    const key = getMilitarDedupeKey(militar);
+    if (key) {
+      mergedByKey.set(key, militar);
+      return;
+    }
+
+    unkeyedMilitares.push(militar);
+  });
+
+  novosMilitares.forEach((militar) => {
+    const key = getMilitarDedupeKey(militar);
+    if (!key) {
+      unkeyedMilitares.push(militar);
+      return;
+    }
+
+    if (!mergedByKey.has(key)) {
+      mergedByKey.set(key, militar);
+    }
+  });
+
+  return [...mergedByKey.values(), ...unkeyedMilitares];
+}
+
+function buildFetchMilitaresPayload(filtrosExecutados, lotacoesIds, offset) {
+  return {
+    limit: BACKEND_LIMIT,
+    offset,
+    includeFoto: false,
+    ...(filtrosExecutados?.search ? { search: filtrosExecutados.search } : {}),
+    ...(filtrosExecutados?.postoGraduacao && filtrosExecutados.postoGraduacao !== TODOS_VALUE
+      ? { postoGraduacaoFiltros: [filtrosExecutados.postoGraduacao] }
+      : {}),
+    ...(filtrosExecutados?.status && filtrosExecutados.status !== TODOS_VALUE
+      ? { statusCadastro: filtrosExecutados.status }
+      : {}),
+    ...(filtrosExecutados?.situacaoMilitar && filtrosExecutados.situacaoMilitar !== TODOS_VALUE
+      ? { situacaoMilitar: filtrosExecutados.situacaoMilitar }
+      : {}),
+    ...(filtrosExecutados?.lotacao && lotacoesIds.has(filtrosExecutados.lotacao)
+      ? { lotacaoFiltro: filtrosExecutados.lotacao }
+      : {}),
+  };
+}
+
 export default function ExtracaoEfetivo() {
   const {
     isAdmin,
     modoAcesso,
     userEmail,
-    authUserEmail,
     effectiveUserEmail,
-    isImpersonating,
     isAccessResolved,
     isLoading: loadingUser,
     canAccessModule,
@@ -291,6 +354,11 @@ export default function ExtracaoEfetivo() {
     () => new Set(lotacoesDisponiveis.map((lotacao) => lotacao.id)),
     [lotacoesDisponiveis],
   );
+  const lotacoesIdsRef = useRef(lotacoesIds);
+
+  useEffect(() => {
+    lotacoesIdsRef.current = lotacoesIds;
+  }, [lotacoesIds]);
 
   useEffect(() => {
     if (lotacaoFilter === TODOS_VALUE || lotacaoFilter === SEM_LOTACAO_VALUE) return;
@@ -300,6 +368,12 @@ export default function ExtracaoEfetivo() {
 
   const [filtrosExecutados, setFiltrosExecutados] = useState(null);
   const [executionId, setExecutionId] = useState(0);
+  const [militares, setMilitares] = useState([]);
+  const [consultaMeta, setConsultaMeta] = useState({});
+  const [nextOffset, setNextOffset] = useState(0);
+  const [isLoadingMilitares, setIsLoadingMilitares] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [militaresError, setMilitaresError] = useState(null);
 
   const filtrosAtuais = useMemo(
     () => ({
@@ -315,58 +389,57 @@ export default function ExtracaoEfetivo() {
       condicao: condicaoFilter,
       lotacao: lotacaoFilter,
     }),
-    [condicaoFilter, funcaoFilter, lotacaoFilter, postoFilter, quadroFilter, searchTerm, situacaoMilitarFilter, statusFilter],
+    [
+      condicaoFilter,
+      funcaoFilter,
+      lotacaoFilter,
+      postoFilter,
+      quadroFilter,
+      searchTerm,
+      situacaoMilitarFilter,
+      statusFilter,
+    ],
   );
 
-  const militaresQueryKey = [
-    'extracao-efetivo-militares-scoped',
-    isAdmin,
-    modoAcesso || 'indefinido',
-    userEmail || 'sem-email',
-    authUserEmail || 'sem-auth-email',
-    effectiveUserEmail || 'sem-effective-user-email',
-    effectiveEmailFromStorage || 'sem-effective-email-storage',
-    effectiveEmailForQuery || 'self',
-    isImpersonating,
-    filtrosExecutados || 'consulta-nao-executada',
-    executionId,
-  ];
+  const loadMilitaresPage = useCallback(
+    async ({ filtros, offset, reset = false }) => {
+      if (!filtros) return;
 
-  const {
-    data: militaresData = { militares: [], meta: {} },
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: militaresQueryKey,
-    enabled: isAccessResolved && Boolean(filtrosExecutados),
-    queryFn: () =>
-      fetchScopedMilitares({
-        limit: BACKEND_LIMIT,
-        offset: 0,
-        includeFoto: false,
-        ...(filtrosExecutados?.search ? { search: filtrosExecutados.search } : {}),
-        ...(filtrosExecutados?.postoGraduacao && filtrosExecutados.postoGraduacao !== TODOS_VALUE
-          ? { postoGraduacaoFiltros: [filtrosExecutados.postoGraduacao] }
-          : {}),
-        ...(filtrosExecutados?.status && filtrosExecutados.status !== TODOS_VALUE
-          ? { statusCadastro: filtrosExecutados.status }
-          : {}),
-        ...(filtrosExecutados?.situacaoMilitar && filtrosExecutados.situacaoMilitar !== TODOS_VALUE
-          ? { situacaoMilitar: filtrosExecutados.situacaoMilitar }
-          : {}),
-        ...(filtrosExecutados?.lotacao && lotacoesIds.has(filtrosExecutados.lotacao)
-          ? { lotacaoFiltro: filtrosExecutados.lotacao }
-          : {}),
-      }),
-    staleTime: STALE_TIME_MS,
-    retry: 1,
-    refetchOnWindowFocus: false,
-  });
+      if (reset) {
+        setIsLoadingMilitares(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+      setMilitaresError(null);
 
-  const militares = useMemo(() => militaresData?.militares || [], [militaresData]);
+      try {
+        const data = await fetchScopedMilitares(
+          buildFetchMilitaresPayload(filtros, lotacoesIdsRef.current, offset),
+        );
+        const novosMilitares = Array.isArray(data?.militares) ? data.militares : [];
+
+        setMilitares((currentMilitares) =>
+          reset
+            ? mergeMilitaresSemDuplicidade([], novosMilitares)
+            : mergeMilitaresSemDuplicidade(currentMilitares, novosMilitares),
+        );
+        setConsultaMeta(data?.meta || {});
+        setNextOffset(offset + BACKEND_LIMIT);
+      } catch (loadError) {
+        setMilitaresError(loadError);
+      } finally {
+        setIsLoadingMilitares(false);
+        setIsLoadingMore(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!isAccessResolved || !filtrosExecutados) return;
+
+    loadMilitaresPage({ filtros: filtrosExecutados, offset: 0, reset: true });
+  }, [executionId, filtrosExecutados, isAccessResolved, loadMilitaresPage]);
 
   const postosDisponiveis = useMemo(
     () =>
@@ -503,8 +576,20 @@ export default function ExtracaoEfetivo() {
   };
 
   const executeExtraction = () => {
+    setMilitares([]);
+    setConsultaMeta({});
+    setNextOffset(0);
+    setMilitaresError(null);
     setFiltrosExecutados(filtrosAtuais);
     setExecutionId((currentExecutionId) => currentExecutionId + 1);
+  };
+
+  const loadMoreMilitares = () => {
+    if (!filtrosExecutados || consultaMeta?.hasMore !== true || isLoadingMore || isLoadingMilitares) {
+      return;
+    }
+
+    loadMilitaresPage({ filtros: filtrosExecutados, offset: nextOffset });
   };
 
   const clearFilters = () => {
@@ -521,6 +606,10 @@ export default function ExtracaoEfetivo() {
   const clearExtraction = () => {
     clearFilters();
     setFiltrosExecutados(null);
+    setMilitares([]);
+    setConsultaMeta({});
+    setNextOffset(0);
+    setMilitaresError(null);
   };
 
   if (
@@ -533,8 +622,14 @@ export default function ExtracaoEfetivo() {
 
   const totalRetornado = militares.length;
   const totalFiltrado = sortedMilitares.length;
-  const isBusy = hasExecutedExtraction && (isLoading || isFetching);
-  const isRateLimitError = String(error?.message || '').toLowerCase().includes('rate limit');
+  const hasMoreMilitares = consultaMeta?.hasMore === true;
+  const isBuscaLimitadaPorAmostra = Boolean(
+    consultaMeta?.busca_limitada_por_amostra || consultaMeta?.buscaLimitadaPorAmostra,
+  );
+  const isBusy = hasExecutedExtraction && (isLoadingMilitares || isLoadingMore);
+  const isInitialPageBusy = hasExecutedExtraction && isLoadingMilitares;
+  const isError = Boolean(militaresError);
+  const isRateLimitError = String(militaresError?.message || '').toLowerCase().includes('rate limit');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -574,14 +669,14 @@ export default function ExtracaoEfetivo() {
         </div>
 
         {hasExecutedExtraction ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-slate-100 shadow-sm">
               <CardContent className="p-5 flex items-center gap-4">
                 <div className="rounded-xl bg-slate-100 p-3 text-slate-700">
                   <Database className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">Registros retornados</p>
+                  <p className="text-sm text-slate-500">Registros carregados</p>
                   <p className="text-3xl font-bold text-slate-800">{totalRetornado}</p>
                 </div>
               </CardContent>
@@ -594,6 +689,28 @@ export default function ExtracaoEfetivo() {
                 <div>
                   <p className="text-sm text-slate-500">Após filtros</p>
                   <p className="text-3xl font-bold text-slate-800">{totalFiltrado}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-slate-100 shadow-sm">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div
+                  className={`rounded-xl p-3 ${
+                    hasMoreMilitares ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                  }`}
+                >
+                  <ListChecks className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500">Estado do carregamento</p>
+                  <p className="text-lg font-bold text-slate-800">
+                    {hasMoreMilitares ? 'Parcial' : 'Completo'}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {hasMoreMilitares
+                      ? 'Há mais registros no escopo.'
+                      : 'Não há mais registros a carregar.'}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -611,14 +728,46 @@ export default function ExtracaoEfetivo() {
           </div>
         )}
 
-        {hasExecutedExtraction && totalRetornado >= BACKEND_LIMIT && (
+        {hasExecutedExtraction && (
+          <div
+            className={`rounded-xl border p-4 text-sm flex gap-3 ${
+              hasMoreMilitares
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            }`}
+          >
+            {hasMoreMilitares ? (
+              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            ) : (
+              <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
+            )}
+            <div className="space-y-1">
+              <p className="font-semibold">
+                {hasMoreMilitares
+                  ? 'Resultado parcial carregado.'
+                  : 'Resultado carregado completo.'}
+              </p>
+              <p>
+                {hasMoreMilitares
+                  ? `Foram carregados ${totalRetornado} registros até agora. Use Carregar mais para buscar o próximo lote de até ${BACKEND_LIMIT} registros.`
+                  : `Foram carregados ${totalRetornado} registros e o backend informou que não há mais registros a carregar.`}
+              </p>
+              <p className="text-xs">
+                Ordenação, quadro, função, condição e sem lotação são refinos locais e atuam somente
+                sobre os registros já carregados.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {hasExecutedExtraction && isBuscaLimitadaPorAmostra && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex gap-3">
             <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">Resultado gerado possivelmente limitado.</p>
+              <p className="font-semibold">Busca textual limitada por amostra.</p>
               <p>
-                Esta tela ainda usa limite controlado de {BACKEND_LIMIT} registros. Paginação e
-                carregamento incremental serão tratados em lote próprio.
+                O backend indicou que a busca pode ter sido avaliada sobre uma amostra; portanto, o
+                resultado carregado pode não representar todo o universo disponível no escopo.
               </p>
             </div>
           </div>
@@ -892,7 +1041,7 @@ export default function ExtracaoEfetivo() {
               </p>
             </CardContent>
           </Card>
-        ) : isBusy ? (
+        ) : isInitialPageBusy ? (
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-12 text-center">
               <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin mx-auto mb-4" />
@@ -909,11 +1058,20 @@ export default function ExtracaoEfetivo() {
                   <p className="text-sm">
                     {isRateLimitError
                       ? 'Limite de requisições excedido. Aguarde alguns instantes e tente novamente.'
-                      : error?.message || 'Ocorreu uma falha controlada ao consultar o efetivo escopado.'}
+                      : militaresError?.message || 'Ocorreu uma falha controlada ao consultar o efetivo escopado.'}
                   </p>
                 </div>
               </div>
-              <Button variant="outline" onClick={() => refetch()}>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  loadMilitaresPage({
+                    filtros: filtrosExecutados,
+                    offset: militares.length ? nextOffset : 0,
+                    reset: militares.length === 0,
+                  })
+                }
+              >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Tentar novamente
               </Button>
@@ -933,6 +1091,12 @@ export default function ExtracaoEfetivo() {
           </Card>
         ) : (
           <Card className="border-slate-100 shadow-sm overflow-hidden">
+            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              Exibindo {totalFiltrado} registro{totalFiltrado === 1 ? '' : 's'} após refinos locais,
+              de {totalRetornado} registro{totalRetornado === 1 ? '' : 's'} carregado
+              {totalRetornado === 1 ? '' : 's'}. O resultado está{' '}
+              {hasMoreMilitares ? 'parcial' : 'completo'}.
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -992,6 +1156,26 @@ export default function ExtracaoEfetivo() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-600">
+                {hasMoreMilitares
+                  ? 'Há mais registros disponíveis para carregar neste resultado parcial.'
+                  : 'Não há mais registros a carregar para a consulta executada.'}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={loadMoreMilitares}
+                disabled={!hasMoreMilitares || isLoadingMore || isLoadingMilitares}
+              >
+                {isLoadingMore ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Database className="w-4 h-4 mr-2" />
+                )}
+                {isLoadingMore ? 'Carregando...' : 'Carregar mais'}
+              </Button>
             </div>
           </Card>
         )}
