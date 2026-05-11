@@ -1,48 +1,61 @@
 {
   "name": "ContratoDesignacaoMilitar",
   "type": "object",
-  "title": "Contrato de Designação Militar",
-  "description": "Contrato de designação para militar da reserva que retorna como designado, sem alterar a data de inclusão original do militar.",
+  "title": "Contrato de Designa\u00e7\u00e3o do Militar",
+  "description": "Contrato de designa\u00e7\u00e3o vinculado ao militar, usado como data-base futura de f\u00e9rias e correla\u00e7\u00e3o de per\u00edodos. N\u00e3o permite delete f\u00edsico \u2014 usar cancelamento para preservar hist\u00f3rico.",
   "properties": {
     "militar_id": {
       "type": "string",
-      "description": "ID do militar vinculado ao contrato de designação."
-    },
-    "matricula_designacao": {
-      "type": "string",
-      "description": "Matrícula utilizada durante a designação."
+      "description": "ID do militar vinculado ao contrato"
     },
     "matricula_militar_id": {
       "type": "string",
-      "description": "ID da matrícula militar associada à designação, quando houver."
+      "description": "ID da MatriculaMilitar existente (deve pertencer ao mesmo militar_id)"
+    },
+    "matricula_designacao": {
+      "type": "string",
+      "description": "Matr\u00edcula de designa\u00e7\u00e3o utilizada no contrato"
     },
     "data_inicio_contrato": {
       "type": "string",
       "format": "date",
-      "description": "Data de início da vigência do contrato de designação."
+      "description": "Data de in\u00edcio do contrato de designa\u00e7\u00e3o"
     },
     "data_fim_contrato": {
       "type": "string",
       "format": "date",
-      "description": "Data final prevista ou efetiva do contrato de designação."
+      "description": "Data de fim/encerramento do contrato"
+    },
+    "data_encerramento_operacional": {
+      "type": "string",
+      "format": "date",
+      "description": "Data efetiva de encerramento operacional"
     },
     "data_inclusao_para_ferias": {
       "type": "string",
       "format": "date",
-      "description": "Data-base para férias no contexto do contrato; obrigatória para contratos com status_contrato ativo."
+      "description": "Data-base futura para c\u00e1lculo de per\u00edodos aquisitivos de f\u00e9rias"
     },
     "numero_contrato": {
       "type": "string",
-      "description": "Número administrativo do contrato de designação."
+      "description": "N\u00famero/identifica\u00e7\u00e3o documental do contrato"
     },
     "boletim_publicacao": {
       "type": "string",
-      "description": "Boletim ou ato de publicação do contrato."
+      "description": "Boletim em que o contrato foi publicado"
     },
     "data_publicacao": {
       "type": "string",
       "format": "date",
-      "description": "Data de publicação do contrato."
+      "description": "Data de publica\u00e7\u00e3o do contrato"
+    },
+    "fonte_legal": {
+      "type": "string",
+      "description": "Fonte legal / base normativa do contrato"
+    },
+    "tipo_designacao": {
+      "type": "string",
+      "description": "Tipo de designa\u00e7\u00e3o (ex.: convoca\u00e7\u00e3o, prorroga\u00e7\u00e3o, designa\u00e7\u00e3o especial)"
     },
     "status_contrato": {
       "type": "string",
@@ -52,52 +65,35 @@
         "cancelado"
       ],
       "default": "ativo",
-      "description": "Situação operacional do contrato de designação."
-    },
-    "observacoes": {
-      "type": "string",
-      "description": "Observações administrativas sobre o contrato."
-    },
-    "tipo_designacao": {
-      "type": "string",
-      "description": "Tipo ou classificação da designação."
-    },
-    "fonte_legal": {
-      "type": "string",
-      "description": "Base legal ou normativa que fundamenta a designação."
+      "description": "Status atual do contrato"
     },
     "motivo_encerramento": {
       "type": "string",
-      "description": "Motivo do encerramento do contrato."
-    },
-    "data_encerramento_operacional": {
-      "type": "string",
-      "format": "date",
-      "description": "Data operacional de encerramento do contrato."
+      "description": "Motivo do encerramento (obrigat\u00f3rio ao encerrar)"
     },
     "motivo_cancelamento": {
       "type": "string",
-      "description": "Motivo do cancelamento do contrato."
-    },
-    "cancelado_por": {
-      "type": "string",
-      "description": "Usuário ou identificador responsável pelo cancelamento."
+      "description": "Motivo do cancelamento (obrigat\u00f3rio ao cancelar)"
     },
     "encerrado_por": {
       "type": "string",
-      "description": "Usuário ou identificador responsável pelo encerramento."
+      "description": "Usu\u00e1rio respons\u00e1vel pelo encerramento"
+    },
+    "cancelado_por": {
+      "type": "string",
+      "description": "Usu\u00e1rio respons\u00e1vel pelo cancelamento"
     },
     "criado_por": {
       "type": "string",
-      "description": "Usuário ou identificador responsável pela criação do registro."
+      "description": "Usu\u00e1rio que criou o contrato"
     },
     "atualizado_por": {
       "type": "string",
-      "description": "Usuário ou identificador responsável pela última atualização do registro."
+      "description": "\u00daltimo usu\u00e1rio que atualizou o contrato"
     },
-    "origem_registro": {
+    "observacoes": {
       "type": "string",
-      "description": "Origem do registro: cadastro_manual, importacao_legado, saneamento, etc."
+      "description": "Observa\u00e7\u00f5es adicionais sobre o contrato"
     }
   },
   "required": [
