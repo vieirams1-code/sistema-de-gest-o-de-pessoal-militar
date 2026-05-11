@@ -119,6 +119,10 @@
       "type": "string",
       "description": "Origem do período anterior preservada para rastreabilidade."
     },
+    "legado_ativa_excluido_da_cadeia_designacao_anterior": {
+      "type": "boolean",
+      "description": "Valor anterior de excluido_da_cadeia_designacao preservado para rollback da transição legado da ativa."
+    },
     "legado_ativa_observacao": {
       "type": "string",
       "description": "Observação administrativa da transição legado da ativa."
