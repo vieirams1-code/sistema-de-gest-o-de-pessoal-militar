@@ -69,6 +69,8 @@ const menuGroups = [
           { type: 'action', key: 'visualizar_militares' },
           { type: 'module', key: 'extracao_efetivo' },
           { type: 'action', key: 'visualizar_extracao_efetivo' },
+          { type: 'action', key: 'visualizar_contratos_designacao' },
+          { type: 'action', key: 'gerir_contratos_designacao' },
         ],
         children: [
           {
@@ -84,6 +86,15 @@ const menuGroups = [
             icon: FileSearch,
             moduleKey: 'extracao_efetivo',
             actionKey: 'visualizar_extracao_efetivo',
+          },
+          {
+            name: 'Contratos de Designação',
+            page: 'ContratosDesignacao',
+            icon: ClipboardList,
+            anyOf: [
+              { type: 'action', key: 'visualizar_contratos_designacao' },
+              { type: 'action', key: 'gerir_contratos_designacao' },
+            ],
           },
         ],
       },

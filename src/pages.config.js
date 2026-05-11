@@ -68,6 +68,7 @@ import CadastrarPunicao from './pages/CadastrarPunicao';
 import ClassificacaoPendentesLegado from './pages/ClassificacaoPendentesLegado';
 import CadastrarRegistroLivro from './pages/CadastrarRegistroLivro';
 import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
+import ContratosDesignacao from './pages/ContratosDesignacao';
 import CreditosExtraordinariosFerias from './pages/CreditosExtraordinariosFerias';
 import Configuracoes from './pages/Configuracoes';
 import DetalheComportamento from './pages/DetalheComportamento';
@@ -130,6 +131,7 @@ export const PAGES = {
     "ClassificacaoPendentesLegado": ClassificacaoPendentesLegado,
     "CadastrarRegistroLivro": CadastrarRegistroLivro,
     "ConciliacaoBoletim": ConciliacaoBoletim,
+    "ContratosDesignacao": ContratosDesignacao,
     "CreditosExtraordinariosFerias": CreditosExtraordinariosFerias,
     "Configuracoes": Configuracoes,
     "DetalheComportamento": DetalheComportamento,
