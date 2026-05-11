@@ -44,6 +44,7 @@ const moduleGuardByPage = {
   Ferias: { moduleKey: 'ferias', moduleName: 'Férias' },
   Militares: { moduleKey: 'militares', moduleName: 'Efetivo' },
   ExtracaoEfetivo: { moduleKey: 'extracao_efetivo', actionKey: 'visualizar_extracao_efetivo', moduleName: 'Extração do Efetivo' },
+  ContratosDesignacao: { moduleKey: 'militares', actionKeys: ['visualizar_contratos_designacao', 'gerir_contratos_designacao'], moduleName: 'Contratos de Designação' },
   Armamentos: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
   Medalhas: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   ApuracaoMedalhasTempoServico: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
