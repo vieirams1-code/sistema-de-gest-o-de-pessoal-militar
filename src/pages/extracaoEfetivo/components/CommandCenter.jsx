@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Briefcase, CalendarDays, Columns3, FileSearch, ListChecks, Search, SlidersHorizontal, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -74,10 +74,21 @@ function buildResumoListagem({
     partes.push(`com férias ${String(feriasStatusFilter).toLowerCase()}`);
   }
 
-  return `Listar ${partes.join(' ')}.`;
+  return `Listando ${partes.join(' ')}.`;
 }
 
-function buildCommandTokens({
+function pluralizeStatus(status = '') {
+  if (!status) return '';
+  if (status.endsWith('o')) return `${status}s`;
+  if (status.endsWith('a')) return `${status}s`;
+  return status;
+}
+
+function makeListagemToken(key, label, value, displayValue = value) {
+  return { key, label, value, displayValue };
+}
+
+function buildListagemTokens({
   searchTerm,
   categoriaFilter,
   postoFilter,
@@ -103,30 +114,33 @@ function buildCommandTokens({
   const tokens = [];
   const trimmedSearch = searchTerm.trim();
 
-  if (trimmedSearch) tokens.push({ key: 'busca', label: 'busca', value: trimmedSearch });
+  if (trimmedSearch) tokens.push(makeListagemToken('busca', 'Busca', trimmedSearch, `Busca por ${trimmedSearch}`));
   if (categoriaFilter !== categoriaTodasValue) {
-    tokens.push({ key: 'categoria', label: 'grupo', value: findLabel(categoriaOptions, categoriaFilter) });
+    const categoria = findLabel(categoriaOptions, categoriaFilter);
+    tokens.push(makeListagemToken('categoria', 'Grupo', categoria));
   }
-  if (postoFilter !== todosValue) tokens.push({ key: 'posto', label: 'posto', value: postoFilter });
-  if (quadroFilter !== todosValue) tokens.push({ key: 'quadro', label: 'quadro', value: quadroFilter });
-  if (statusFilter !== todosValue) tokens.push({ key: 'status', label: 'situação', value: statusFilter });
+  if (postoFilter !== todosValue) tokens.push(makeListagemToken('posto', 'Posto/graduação', postoFilter));
+  if (quadroFilter !== todosValue) tokens.push(makeListagemToken('quadro', 'Quadro', quadroFilter, `Quadro ${quadroFilter}`));
+  if (statusFilter !== todosValue) tokens.push(makeListagemToken('status', 'Situação', statusFilter, pluralizeStatus(statusFilter)));
   if (situacaoMilitarFilter !== todosValue) {
-    tokens.push({ key: 'situacaoMilitar', label: 'condição militar', value: situacaoMilitarFilter });
+    tokens.push(makeListagemToken('situacaoMilitar', 'Situação militar', situacaoMilitarFilter));
   }
-  if (funcaoFilter !== todosValue) tokens.push({ key: 'funcao', label: 'função', value: funcaoFilter });
-  if (condicaoFilter !== todosValue) tokens.push({ key: 'condicao', label: 'condição', value: condicaoFilter });
+  if (funcaoFilter !== todosValue) tokens.push(makeListagemToken('funcao', 'Função', funcaoFilter));
+  if (condicaoFilter !== todosValue) tokens.push(makeListagemToken('condicao', 'Condição', condicaoFilter));
 
   const lotacaoLabel = getLotacaoLabel({ lotacaoFilter, lotacoesDisponiveis, todosValue, semLotacaoValue });
-  if (lotacaoLabel) tokens.push({ key: 'lotacao', label: 'lotação', value: lotacaoLabel });
+  if (lotacaoLabel) tokens.push(makeListagemToken('lotacao', 'Lotação', lotacaoLabel));
 
   if (feriasPresencaFilter !== feriasTodasPresencasValue) {
-    tokens.push({ key: 'ferias', label: 'férias', value: findLabel(feriasPresencaOptions, feriasPresencaFilter) });
+    const feriasPresenca = findLabel(feriasPresencaOptions, feriasPresencaFilter);
+    tokens.push(makeListagemToken('ferias', 'Férias', feriasPresenca));
   }
   if (feriasPeriodoFilter) {
-    tokens.push({ key: 'periodoFerias', label: 'período', value: findLabel(feriasPeriodoOptions, feriasPeriodoFilter) });
+    const feriasPeriodo = findLabel(feriasPeriodoOptions, feriasPeriodoFilter);
+    tokens.push(makeListagemToken('periodoFerias', 'Período de férias', feriasPeriodo));
   }
   if (feriasStatusFilter !== feriasTodosStatusValue) {
-    tokens.push({ key: 'statusFerias', label: 'situação férias', value: feriasStatusFilter });
+    tokens.push(makeListagemToken('statusFerias', 'Situação das férias', feriasStatusFilter, `Férias ${String(feriasStatusFilter).toLowerCase()}`));
   }
 
   return tokens.filter((token) => token.value);
@@ -232,9 +246,9 @@ export default function CommandCenter({
     feriasTodosStatusValue,
   } = constants;
 
-  const commandTokens = useMemo(
+  const listagemTokens = useMemo(
     () =>
-      buildCommandTokens({
+      buildListagemTokens({
         ...values,
         categoriaOptions,
         feriasPresencaOptions,
@@ -292,9 +306,9 @@ export default function CommandCenter({
     ],
   );
 
-  const commandPhrase = commandTokens.length
-    ? `SELECT militares WHERE ${commandTokens.map((token) => `${token.label}="${token.value}"`).join(' AND ')}`
-    : 'SELECT militares WHERE escopo="disponível"';
+  const descricaoAcessivelListagem = listagemTokens.length
+    ? `Resumo da listagem: ${resumoListagem} Critérios aplicados: ${listagemTokens.map((token) => token.displayValue).join(', ')}.`
+    : `Resumo da listagem: ${resumoListagem} Sem filtros adicionais.`;
 
   return (
     <section className="rounded-3xl bg-[#1E293B] p-4 text-white shadow-2xl shadow-slate-900/20 md:p-6">
@@ -303,25 +317,31 @@ export default function CommandCenter({
           <div className="max-w-3xl space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">
               <SlidersHorizontal className="h-3.5 w-3.5" />
-              Command Center
+              Montagem da listagem
             </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4 font-mono text-sm leading-7 text-slate-100 md:text-base">
-              <span className="text-cyan-300">SELECT</span>{' '}
-              <span className="text-white">militares</span>{' '}
-              <span className="text-cyan-300">WHERE</span>{' '}
-              <span className="break-words text-slate-200">
-                {commandTokens.length
-                  ? commandTokens.map((token, index) => (
-                    <React.Fragment key={token.key}>
-                      {index > 0 && <span className="text-cyan-300"> AND </span>}
-                      <span>{token.label}=</span>
-                      <span className="text-emerald-300">&quot;{token.value}&quot;</span>
-                    </React.Fragment>
-                  ))
-                  : <span>escopo=<span className="text-emerald-300">&quot;disponível&quot;</span></span>}
-              </span>
+            <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/35 p-4 text-sm leading-7 text-slate-100 md:text-base">
+              <p className="text-xl font-semibold leading-snug text-white md:text-2xl">{resumoListagem}</p>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Listagem atual</p>
+                <div className="flex flex-wrap gap-2">
+                  {listagemTokens.length
+                    ? listagemTokens.map((token) => (
+                      <span
+                        key={token.key}
+                        className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-100"
+                        title={`${token.label}: ${token.value}`}
+                      >
+                        {token.displayValue}
+                      </span>
+                    ))
+                    : (
+                      <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-200">
+                        Todos os militares disponíveis
+                      </span>
+                    )}
+                </div>
+              </div>
             </div>
-            <p className="text-lg font-semibold text-white">{resumoListagem}</p>
             <p className="text-sm text-slate-300">
               Use os atalhos e os grupos abaixo para ajustar a listagem. O carregamento só começa ao montar a listagem.
             </p>
@@ -344,13 +364,14 @@ export default function CommandCenter({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {commandTokens.length ? (
-            commandTokens.map((token) => (
+          {listagemTokens.length ? (
+            listagemTokens.map((token) => (
               <span
                 key={token.key}
                 className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-100"
+                title={`${token.label}: ${token.value}`}
               >
-                <span className="text-slate-300">{token.label}</span> {token.value}
+                {token.displayValue}
               </span>
             ))
           ) : (
@@ -603,7 +624,7 @@ export default function CommandCenter({
           </div>
         )}
 
-        <span className="sr-only">{commandPhrase}</span>
+        <span className="sr-only">{descricaoAcessivelListagem}</span>
       </div>
     </section>
   );
