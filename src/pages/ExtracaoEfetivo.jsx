@@ -8,11 +8,9 @@ import {
   Database,
   Download,
   FileSearch,
-  FileText,
   Info,
   ListChecks,
   RefreshCw,
-  Search,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -21,17 +19,8 @@ import AccessDenied from '@/components/auth/AccessDenied';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
@@ -44,6 +33,7 @@ import {
   getValorCampoEfetivo,
 } from '@/pages/extracaoEfetivo/catalogoCamposEfetivo';
 import KpiCard from '@/pages/extracaoEfetivo/components/KpiCard';
+import CommandCenter from '@/pages/extracaoEfetivo/components/CommandCenter';
 import StatusBadge from '@/pages/extracaoEfetivo/components/StatusBadge';
 import { statusBadgeClass } from '@/pages/extracaoEfetivo/extracaoState';
 import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
@@ -1059,39 +1049,6 @@ export default function ExtracaoEfetivo() {
   const isRateLimitError = String(militaresError?.message || '').toLowerCase().includes('rate limit');
   const selectedColumnsPreview = selectedColumns.slice(0, 4).map((column) => column.label).join(', ');
   const selectedColumnsResumo = `${selectedColumns.length} coluna${selectedColumns.length === 1 ? '' : 's'} selecionada${selectedColumns.length === 1 ? '' : 's'}${selectedColumnsPreview ? `: ${selectedColumnsPreview}${selectedColumns.length > 4 ? '...' : ''}` : ''}`;
-  const selectedFeriasPeriodoLabel = FERIAS_PERIODO_OPTIONS.find((option) => option.value === feriasPeriodoFilter)?.label.toLowerCase();
-
-  const buildResumoListagem = () => {
-    const partes = [];
-    const posto = postoFilter !== TODOS_VALUE ? postoFilter : '';
-    const categoria = CATEGORIA_OPTIONS.find((option) => option.value === categoriaFilter)?.label;
-
-    if (posto) {
-      partes.push(`${posto}s`);
-    } else if (categoriaFilter !== CATEGORIA_TODAS_VALUE && categoria) {
-      partes.push(categoria);
-    } else {
-      partes.push('militares');
-    }
-
-    if (statusFilter !== TODOS_VALUE) partes.push(`${String(statusFilter).toLowerCase()}s`);
-    if (quadroFilter !== TODOS_VALUE) partes.push(`do quadro ${quadroFilter}`);
-    if (feriasPresencaFilter === 'com_periodo') {
-      partes.push(`com férias ${selectedFeriasPeriodoLabel || 'no período selecionado'}`);
-    } else if (feriasPresencaFilter === 'sem_periodo') {
-      partes.push(`sem férias ${selectedFeriasPeriodoLabel || 'no período selecionado'}`);
-    } else if (feriasPresencaFilter === 'em_curso') {
-      partes.push('com férias em curso');
-    }
-    if (feriasStatusFilter !== FERIAS_TODOS_STATUS_VALUE) {
-      partes.push(`com férias ${String(feriasStatusFilter).toLowerCase()}`);
-    }
-
-    return `Listar ${partes.join(' ')}.`;
-  };
-
-  const resumoListagem = buildResumoListagem();
-
   const applyQuickPreset = (presetId) => {
     if (presetId === 'ativos') {
       setStatusFilter('Ativo');
@@ -1293,327 +1250,76 @@ export default function ExtracaoEfetivo() {
           </div>
         )}
 
-        <Card className="border-slate-100 shadow-sm">
-          <CardContent className="p-4 md:p-5 space-y-5">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  <Users className="w-4 h-4" />
-                  Quem listar?
-                </div>
-                <p className="mt-2 text-lg font-semibold text-[#1e3a5f]">{resumoListagem}</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Use os atalhos abaixo para começar uma listagem operacional e ajuste os campos quando precisar.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 lg:justify-end">
-                {QUICK_PRESETS.map((preset) => (
-                  <Button
-                    key={preset.id}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => applyQuickPreset(preset.id)}
-                    className="bg-white"
-                  >
-                    {preset.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-              <div className="relative xl:col-span-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  className="pl-9"
-                  placeholder="Buscar por nome, matrícula, quadro, função..."
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                />
-              </div>
-
-              <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Grupo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIA_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={postoFilter} onValueChange={setPostoFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Posto/graduação" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todos os postos</SelectItem>
-                  {postosDisponiveis.map((posto) => (
-                    <SelectItem key={posto} value={posto}>
-                      {posto}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Situação no cadastro" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS_VALUE}>Todas as situações</SelectItem>
-                  {statusDisponiveis.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <FileText className="w-4 h-4" />
-                Critérios adicionais
-              </div>
-
-              <div className="rounded-xl border border-white bg-white p-3 space-y-3 shadow-sm">
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">Dados do efetivo</p>
-                  <p className="text-xs text-slate-500">Refine por quadro, situação funcional, função, condição e lotação.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <Select value={quadroFilter} onValueChange={setQuadroFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Quadro" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={TODOS_VALUE}>Todos os quadros</SelectItem>
-                      {quadrosDisponiveis.map((quadro) => (
-                        <SelectItem key={quadro} value={quadro}>
-                          {quadro}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={situacaoMilitarFilter} onValueChange={setSituacaoMilitarFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Situação militar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={TODOS_VALUE}>Todas as situações militares</SelectItem>
-                      {situacoesMilitaresDisponiveis.map((situacao) => (
-                        <SelectItem key={situacao} value={situacao}>
-                          {situacao}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={funcaoFilter} onValueChange={setFuncaoFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Função" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={TODOS_VALUE}>Todas as funções</SelectItem>
-                      {funcoesDisponiveis.map((funcao) => (
-                        <SelectItem key={funcao} value={funcao}>
-                          {funcao}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={condicaoFilter} onValueChange={setCondicaoFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Condição" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={TODOS_VALUE}>Todas as condições</SelectItem>
-                      {condicoesDisponiveis.map((condicao) => (
-                        <SelectItem key={condicao} value={condicao}>
-                          {condicao}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {shouldShowLotacaoFilter && (
-                    <div className="md:col-span-2">
-                      <Select
-                        value={lotacaoFilter}
-                        onValueChange={setLotacaoFilter}
-                        disabled={isLoadingLotacoes || isErrorLotacoes}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Lotação" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={TODOS_VALUE}>Todas as lotações disponíveis</SelectItem>
-                          <SelectItem value={SEM_LOTACAO_VALUE}>Sem lotação informada</SelectItem>
-                          {lotacoesDisponiveis.map((lotacao) => (
-                            <SelectItem key={lotacao.id} value={lotacao.id}>
-                              {lotacao.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 space-y-3">
-                <div>
-                  <p className="text-sm font-semibold text-indigo-900">Férias</p>
-                  <p className="text-xs text-indigo-700">Escolha presença, período e situação de férias para a listagem.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <Select value={feriasPresencaFilter} onValueChange={setFeriasPresencaFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Férias no período" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FERIAS_PRESENCA_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={feriasPeriodoFilter} onValueChange={setFeriasPeriodoFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Período de férias" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FERIAS_PERIODO_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={feriasStatusFilter} onValueChange={setFeriasStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Situação das férias" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={FERIAS_TODOS_STATUS_VALUE}>Todas as situações de férias</SelectItem>
-                      {feriasStatusDisponiveis.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <ListChecks className="w-4 h-4" />
-                    O que mostrar na tabela?
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">{selectedColumnsResumo}</p>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowColumnCustomizer((current) => !current)}
-                  >
-                    {showColumnCustomizer ? 'Concluir personalização' : 'Personalizar colunas'}
-                  </Button>
-                  {showColumnCustomizer && (
-                    <Button type="button" variant="ghost" size="sm" onClick={resetSelectedColumns}>
-                      Restaurar padrão
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {showColumnCustomizer && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 pt-2">
-                  {selectableColumns.map((column) => {
-                    const isChecked = selectedColumnIdsResolved.has(column.id);
-                    const isLocked = column.required === true;
-
-                    return (
-                      <label
-                        key={column.id}
-                        htmlFor={`coluna-${column.id}`}
-                        className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
-                      >
-                        <Checkbox
-                          id={`coluna-${column.id}`}
-                          checked={isChecked}
-                          disabled={isLocked}
-                          onCheckedChange={(checked) => toggleSelectedColumn(column.id, checked === true)}
-                          className="mt-0.5"
-                        />
-                        <span className="space-y-1">
-                          <span className="block font-medium leading-none">{column.label}</span>
-                          <span className="block text-xs text-slate-500">
-                            {isLocked ? 'Obrigatória' : column.category || 'Campo comum'}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <Button
-                type="button"
-                onClick={executeExtraction}
-                disabled={!isAccessResolved || isBusy}
-              >
-                {isBusy ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <FileSearch className="w-4 h-4 mr-2" />
-                )}
-                Montar listagem
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={clearExtraction}
-                disabled={isBusy}
-              >
-                Limpar listagem
-              </Button>
-            </div>
-
-            {shouldShowLotacaoFilter && isErrorLotacoes && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                O filtro de lotação não pôde ser carregado com segurança pelo escopo atual. A
-                listagem permanece disponível sem filtrar por lotação.
-                {lotacoesError?.message ? ` Detalhe: ${lotacoesError.message}` : ''}
-              </div>
-            )}
-
-            {filtersChangedAfterExecution && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-                Os critérios foram alterados depois da última execução. Clique em Montar listagem para
-                gerar um novo resultado com os parâmetros atuais.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <CommandCenter
+          values={{
+            searchTerm,
+            categoriaFilter,
+            postoFilter,
+            quadroFilter,
+            statusFilter,
+            situacaoMilitarFilter,
+            funcaoFilter,
+            condicaoFilter,
+            lotacaoFilter,
+            feriasPresencaFilter,
+            feriasStatusFilter,
+            feriasPeriodoFilter,
+          }}
+          setters={{
+            setSearchTerm,
+            setCategoriaFilter,
+            setPostoFilter,
+            setQuadroFilter,
+            setStatusFilter,
+            setSituacaoMilitarFilter,
+            setFuncaoFilter,
+            setCondicaoFilter,
+            setLotacaoFilter,
+            setFeriasPresencaFilter,
+            setFeriasStatusFilter,
+            setFeriasPeriodoFilter,
+          }}
+          options={{
+            categoriaOptions: CATEGORIA_OPTIONS,
+            postosDisponiveis,
+            statusDisponiveis,
+            quadrosDisponiveis,
+            situacoesMilitaresDisponiveis,
+            funcoesDisponiveis,
+            condicoesDisponiveis,
+            lotacoesDisponiveis,
+            feriasPresencaOptions: FERIAS_PRESENCA_OPTIONS,
+            feriasPeriodoOptions: FERIAS_PERIODO_OPTIONS,
+            feriasStatusDisponiveis,
+          }}
+          columnState={{
+            selectedColumnsResumo,
+            selectableColumns,
+            selectedColumnIdsResolved,
+            showColumnCustomizer,
+            setShowColumnCustomizer,
+            toggleSelectedColumn,
+            resetSelectedColumns,
+          }}
+          quickPresets={QUICK_PRESETS}
+          onQuickPreset={applyQuickPreset}
+          onExecute={executeExtraction}
+          onClear={clearExtraction}
+          isAccessResolved={isAccessResolved}
+          isBusy={isBusy}
+          filtersChangedAfterExecution={filtersChangedAfterExecution}
+          shouldShowLotacaoFilter={shouldShowLotacaoFilter}
+          isLoadingLotacoes={isLoadingLotacoes}
+          isErrorLotacoes={isErrorLotacoes}
+          lotacoesError={lotacoesError}
+          constants={{
+            todosValue: TODOS_VALUE,
+            semLotacaoValue: SEM_LOTACAO_VALUE,
+            categoriaTodasValue: CATEGORIA_TODAS_VALUE,
+            feriasTodasPresencasValue: FERIAS_TODAS_PRESENCAS_VALUE,
+            feriasTodosStatusValue: FERIAS_TODOS_STATUS_VALUE,
+          }}
+        />
 
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <Database className="w-4 h-4" />
