@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { previsualizarTransicaoLegadoAtiva } from '@/services/transicaoLegadoAtivaClient';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { aplicarTransicaoLegadoAtiva, previsualizarTransicaoLegadoAtiva } from '@/services/transicaoLegadoAtivaClient';
+
+const CONFIRMACAO_TEXTUAL = 'MARCAR LEGADO DA ATIVA';
 
 function formatDate(date) {
   if (!date) return '—';
@@ -39,6 +44,7 @@ function ListaPeriodos({ titulo, itens = [], vazio, renderExtra }) {
                 <span className="font-medium text-slate-800">{item.ano_referencia || item.periodo_ref || item.id || 'Período sem referência'}</span>
                 {item.status && <Badge variant="secondary">{item.status}</Badge>}
                 {item.motivo && <Badge variant="outline">{item.motivo}</Badge>}
+                {item.codigo && <Badge variant="outline">{item.codigo}</Badge>}
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 Fim aquisitivo: {formatDate(item.fim_aquisitivo)} • Saldo: {item.dias_saldo ?? 0} dia(s)
@@ -52,10 +58,50 @@ function ListaPeriodos({ titulo, itens = [], vazio, renderExtra }) {
   );
 }
 
+function RelatorioAplicacao({ resultado }) {
+  if (!resultado) return null;
+  const totais = resultado.totais || {};
+  const warnings = resultado.meta?.warnings || [];
+  return (
+    <section className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+      <div className="flex items-start gap-2 text-emerald-900">
+        <CheckCircle2 className="h-4 w-4 mt-0.5" />
+        <div>
+          <h4 className="font-semibold">Relatório de aplicação</h4>
+          <p className="text-sm">Aplicados: {totais.aplicados || 0} • Ignorados: {totais.ignorados || 0} • Já marcados: {totais.ja_marcados || 0} • Conflitos: {totais.conflitos || 0}</p>
+          {warnings.length > 0 && <p className="text-xs mt-1">Avisos: {warnings.join(', ')}</p>}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <ListaPeriodos titulo="Aplicados" itens={resultado.aplicados} vazio="Nenhum período aplicado nesta execução." />
+        <ListaPeriodos titulo="Ignorados" itens={resultado.ignorados} vazio="Nenhum período ignorado." />
+        <ListaPeriodos titulo="Já marcados" itens={resultado.jaMarcados} vazio="Nenhum período já estava marcado." />
+        <ListaPeriodos titulo="Conflitos" itens={resultado.conflitos} vazio="Nenhum conflito encontrado." />
+      </div>
+      {resultado.riscos?.length > 0 && (
+        <section className="rounded-lg border border-amber-200 bg-white p-3">
+          <h4 className="font-semibold text-slate-800 mb-2">Riscos/alertas retornados</h4>
+          <div className="flex flex-wrap gap-1">
+            {resultado.riscos.map((risco, index) => (
+              <Badge key={`${risco.codigo}-${risco.periodo_id || index}`} variant="outline" className={risco.bloqueante ? 'border-red-300 text-red-700' : ''}>
+                {risco.codigo}{risco.bloqueante ? ' • bloqueante' : ''}
+              </Badge>
+            ))}
+          </div>
+        </section>
+      )}
+    </section>
+  );
+}
+
 export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, militarId, contrato }) {
+  const queryClient = useQueryClient();
   const [preview, setPreview] = useState(null);
+  const [resultadoAplicacao, setResultadoAplicacao] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [confirmacaoTextual, setConfirmacaoTextual] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -64,6 +110,8 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       setLoading(true);
       setError('');
       setPreview(null);
+      setResultadoAplicacao(null);
+      setConfirmacaoTextual('');
       try {
         const data = await previsualizarTransicaoLegadoAtiva({ militarId, contratoDesignacaoId: contrato.id });
         if (active) setPreview(data);
@@ -78,6 +126,17 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   }, [open, militarId, contrato?.id]);
 
   const totais = preview?.totais || {};
+  const riscosBloqueantes = useMemo(() => (preview?.riscos || []).filter((risco) => risco.bloqueante), [preview?.riscos]);
+  const candidatosAplicaveis = Number(totais.candidatos || 0) > 0;
+  const podeAplicar = confirmacaoTextual === CONFIRMACAO_TEXTUAL && candidatosAplicaveis && riscosBloqueantes.length === 0 && !applying;
+  const motivoBloqueioAplicacao = riscosBloqueantes.length > 0
+    ? 'Há riscos bloqueantes na prévia recalculada.'
+    : !candidatosAplicaveis
+      ? 'Não há candidatos aplicáveis.'
+      : confirmacaoTextual !== CONFIRMACAO_TEXTUAL
+        ? `Digite exatamente ${CONFIRMACAO_TEXTUAL}.`
+        : '';
+
   const riscosPorPeriodo = useMemo(() => {
     const mapa = new Map();
     (preview?.riscos || []).forEach((risco) => {
@@ -88,20 +147,53 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
     return mapa;
   }, [preview?.riscos]);
 
+  async function invalidarQueriesRelacionadas() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['ver-contratos-designacao', militarId] }),
+      queryClient.invalidateQueries({ queryKey: ['ver-periodos', militarId] }),
+      queryClient.invalidateQueries({ queryKey: ['ver-ferias', militarId] }),
+      queryClient.invalidateQueries({ queryKey: ['militar', militarId] }),
+      queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+    ]);
+  }
+
+  async function handleAplicar() {
+    if (!podeAplicar) return;
+    setApplying(true);
+    setError('');
+    try {
+      const resultado = await aplicarTransicaoLegadoAtiva({
+        militarId,
+        contratoDesignacaoId: contrato.id,
+        confirmacaoTextual: confirmacaoTextual,
+        previewHash: preview?.preview_hash || preview?.meta?.previewHash,
+      });
+      setResultadoAplicacao(resultado);
+      await invalidarQueriesRelacionadas();
+    } catch (err) {
+      const status = err?.status ? ` (${err.status})` : '';
+      setError(`${err?.message || 'Erro ao aplicar transição.'}${status}`);
+      if (err?.body) setResultadoAplicacao(err.body);
+    } finally {
+      setApplying(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Prévia da transição para Legado da Ativa</DialogTitle>
           <DialogDescription>
-            Relatório de elegibilidade do contrato ativo antes de qualquer aplicação operacional.
+            Relatório de elegibilidade do contrato ativo antes da aplicação controlada.
           </DialogDescription>
         </DialogHeader>
 
-        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+        <Alert className="border-blue-200 bg-blue-50 text-blue-900">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Esta etapa é apenas uma prévia. Nenhum período será alterado.</AlertTitle>
-          <AlertDescription>Aplicação será liberada em lote posterior.</AlertDescription>
+          <AlertTitle>Aplicação operacional controlada</AlertTitle>
+          <AlertDescription>Esta ação não apaga períodos, não altera saldos e não altera férias. Os períodos candidatos serão marcados como Legado da Ativa.</AlertDescription>
         </Alert>
 
         {loading && (
@@ -113,7 +205,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
         {error && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Não foi possível gerar a prévia</AlertTitle>
+            <AlertTitle>Não foi possível concluir a operação</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
@@ -171,7 +263,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
                       <div key={periodo} className="rounded-md border border-amber-100 bg-amber-50 p-2 text-sm">
                         <p className="font-medium text-amber-900">{periodo}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {riscos.map((risco, index) => <Badge key={`${risco.codigo}-${index}`} variant="outline">{risco.codigo}{risco.bloqueante ? ' • bloqueante' : ''}</Badge>)}
+                          {riscos.map((risco, index) => <Badge key={`${risco.codigo}-${index}`} variant="outline" className={risco.bloqueante ? 'border-red-300 text-red-700' : ''}>{risco.codigo}{risco.bloqueante ? ' • bloqueante' : ''}</Badge>)}
                         </div>
                       </div>
                     ))}
@@ -179,11 +271,30 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
                 )}
               </section>
             </div>
+
+            <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <Label htmlFor="confirmacao-legado-ativa">Confirmação textual obrigatória</Label>
+              <Input
+                id="confirmacao-legado-ativa"
+                value={confirmacaoTextual}
+                onChange={(event) => setConfirmacaoTextual(event.target.value)}
+                placeholder={CONFIRMACAO_TEXTUAL}
+                disabled={applying || Boolean(resultadoAplicacao?.ok)}
+              />
+              <p className="text-xs text-slate-500">Digite exatamente: <strong>{CONFIRMACAO_TEXTUAL}</strong></p>
+              {motivoBloqueioAplicacao && !resultadoAplicacao?.ok && <p className="text-xs text-amber-700">{motivoBloqueioAplicacao}</p>}
+            </section>
+
+            <RelatorioAplicacao resultado={resultadoAplicacao} />
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange?.(false)}>Fechar</Button>
+          <Button type="button" onClick={handleAplicar} disabled={!podeAplicar || Boolean(resultadoAplicacao?.ok)}>
+            {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Aplicar transição
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
