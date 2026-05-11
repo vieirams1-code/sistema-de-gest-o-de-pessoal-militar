@@ -10,7 +10,6 @@ import {
   FileSearch,
   Info,
   ListChecks,
-  RefreshCw,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -20,7 +19,6 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Card, CardContent } from '@/components/ui/card';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import { fetchScopedFeriasBundle } from '@/services/getScopedFeriasBundleClient';
@@ -34,7 +32,7 @@ import {
 } from '@/pages/extracaoEfetivo/catalogoCamposEfetivo';
 import KpiCard from '@/pages/extracaoEfetivo/components/KpiCard';
 import CommandCenter from '@/pages/extracaoEfetivo/components/CommandCenter';
-import StatusBadge from '@/pages/extracaoEfetivo/components/StatusBadge';
+import ExtractionDataGrid from '@/pages/extracaoEfetivo/components/ExtractionDataGrid';
 import { statusBadgeClass } from '@/pages/extracaoEfetivo/extracaoState';
 import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { exportarRegistrosParaExcel } from '@/utils/indicadosExcelExport';
@@ -1321,163 +1319,34 @@ export default function ExtracaoEfetivo() {
           }}
         />
 
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <Database className="w-4 h-4" />
-          Resultado da listagem
-        </div>
-
-        {!isAccessResolved ? (
-          <Card className="border-slate-100 shadow-sm">
-            <CardContent className="p-12 text-center text-slate-500">
-              Resolvendo contexto de acesso para liberar a listagem.
-            </CardContent>
-          </Card>
-        ) : !hasExecutedExtraction ? (
-          <Card className="border-slate-100 shadow-sm">
-            <CardContent className="p-12 text-center">
-              <FileSearch className="w-14 h-14 mx-auto text-slate-300 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                Configure os critérios e clique em Montar listagem.
-              </h3>
-              <p className="text-sm text-slate-500">
-                Nenhum militar será carregado até a listagem ser montada manualmente.
-              </p>
-            </CardContent>
-          </Card>
-        ) : isInitialPageBusy ? (
-          <Card className="border-slate-100 shadow-sm">
-            <CardContent className="p-12 text-center">
-              <div className="w-10 h-10 border-4 border-slate-200 border-t-[#1e3a5f] rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-slate-600">Carregando listagem...</p>
-            </CardContent>
-          </Card>
-        ) : isError ? (
-          <Card className="border-amber-200 bg-amber-50 shadow-sm">
-            <CardContent className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-amber-900">
-              <div className="flex gap-3">
-                <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold">Não foi possível carregar a listagem.</p>
-                  <p className="text-sm">
-                    {isRateLimitError
-                      ? 'Limite de requisições excedido. Aguarde alguns instantes e tente novamente.'
-                      : militaresError?.message || 'Ocorreu uma falha ao consultar o efetivo disponível para seu acesso.'}
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  loadMilitaresPage({
-                    filtros: filtrosExecutados,
-                    offset: militares.length ? nextOffset : 0,
-                    reset: militares.length === 0,
-                  })
-                }
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Tentar novamente
-              </Button>
-            </CardContent>
-          </Card>
-        ) : sortedMilitares.length === 0 ? (
-          <Card className="border-slate-100 shadow-sm">
-            <CardContent className="p-12 text-center">
-              <Users className="w-14 h-14 mx-auto text-slate-300 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                Nenhum registro encontrado
-              </h3>
-              <p className="text-sm text-slate-500">
-                Ajuste os filtros ou verifique se há militares ativos no seu escopo.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-slate-100 shadow-sm overflow-hidden">
-            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-              Exibindo {totalFiltrado} registro{totalFiltrado === 1 ? '' : 's'} na listagem,
-              de {totalRetornado} registro{totalRetornado === 1 ? '' : 's'} carregado
-              {totalRetornado === 1 ? '' : 's'}. O resultado está{' '}
-              {hasMoreMilitares ? 'parcial' : 'completo'}.
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100 text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    {selectedColumns.map((column) => {
-                      const isSortable = column.sortable === true;
-                      const isActiveSort = sortConfig.fieldId === column.id;
-
-                      return (
-                        <th key={column.id} className="px-4 py-3 text-left font-semibold">
-                          {isSortable ? (
-                            <button
-                              type="button"
-                              onClick={() => toggleSort(column.id)}
-                              className={`inline-flex items-center gap-1.5 rounded-md text-left hover:text-[#1e3a5f] ${
-                                isActiveSort ? 'text-[#1e3a5f]' : ''
-                              }`}
-                              title="Ordenar localmente o resultado carregado"
-                            >
-                              <span>{column.label}</span>
-                              {getSortIcon(column.id)}
-                            </button>
-                          ) : (
-                            column.label
-                          )}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-slate-100">
-                  {sortedMilitares.map((militar) => (
-                    <tr
-                      key={militar.id || `${militar.nome_completo}-${getValorCampoEfetivo(militar, 'matricula')}`}
-                      className="hover:bg-slate-50/80"
-                    >
-                      {selectedColumns.map((column) => {
-                        const value = getValorCampoEfetivo(militar, column.id);
-
-                        return (
-                          <td key={column.id} className={`px-4 py-3 ${column.cellClassName || ''}`}>
-                            {column.renderAs === 'statusBadge' ? (
-                              <StatusBadge status={value || 'Ativo'}>
-                                {textoOuTraco(value || 'Ativo')}
-                              </StatusBadge>
-                            ) : (
-                              textoOuTraco(value)
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex flex-col gap-3 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-slate-600">
-                {hasMoreMilitares
-                  ? 'Há mais registros disponíveis para carregar neste resultado parcial.'
-                  : 'Não há mais registros a carregar para a consulta executada.'}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={loadMoreMilitares}
-                disabled={!hasMoreMilitares || isLoadingMore || isLoadingMilitares}
-              >
-                {isLoadingMore ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Database className="w-4 h-4 mr-2" />
-                )}
-                {isLoadingMore ? 'Carregando...' : 'Carregar mais'}
-              </Button>
-            </div>
-          </Card>
-        )}
+        <ExtractionDataGrid
+          hasExecutedExtraction={hasExecutedExtraction}
+          isAccessResolved={isAccessResolved}
+          isInitialPageBusy={isInitialPageBusy}
+          isError={isError}
+          isRateLimitError={isRateLimitError}
+          militaresError={militaresError}
+          selectedColumns={selectedColumns}
+          sortedMilitares={sortedMilitares}
+          sortConfig={sortConfig}
+          toggleSort={toggleSort}
+          getSortIcon={getSortIcon}
+          getValorCampoEfetivo={getValorCampoEfetivo}
+          textoOuTraco={textoOuTraco}
+          totalRetornado={totalRetornado}
+          totalFiltrado={totalFiltrado}
+          hasMoreMilitares={hasMoreMilitares}
+          isLoadingMore={isLoadingMore}
+          isLoadingMilitares={isLoadingMilitares}
+          loadMoreMilitares={loadMoreMilitares}
+          onRetry={() =>
+            loadMilitaresPage({
+              filtros: filtrosExecutados,
+              offset: militares.length ? nextOffset : 0,
+              reset: militares.length === 0,
+            })
+          }
+        />
       </div>
     </div>
   );
