@@ -366,41 +366,16 @@ function possuiActionContratoDesignacao(actions, ...keys) {
   return keys.some((key) => actions?.[key] === true);
 }
 
-async function validarMatriculaContratoDesignacao(base44, data, militarId) {
-  if (!data?.matricula_militar_id) {
-    const erro = new Error('matricula_militar_id da matrícula atual é obrigatório. Cadastre a matrícula atual na ficha do militar antes de registrar o contrato.');
-    erro.status = 400;
-    throw erro;
-  }
-  const matriculaMilitarId = String(data.matricula_militar_id).trim();
-  if (matriculaMilitarId.includes(':')) {
+function validarMatriculaContratoDesignacao(data) {
+  const matriculaMilitarId = String(data?.matricula_militar_id || '').trim();
+  if (matriculaMilitarId && matriculaMilitarId.includes(':')) {
     const erro = new Error('matricula_militar_id deve conter somente o ID real da matrícula, sem o formato id:matricula.');
     erro.status = 400;
     throw erro;
   }
-  const matriculas = await fetchWithRetry(
-    () => base44.asServiceRole.entities.MatriculaMilitar.filter({ id: matriculaMilitarId }, undefined, 1, 0),
-    `MatriculaMilitar.contrato:${matriculaMilitarId}`,
-  );
-  const matricula = matriculas?.[0] || null;
-  if (!matricula) {
-    const erro = new Error('Matrícula vinculada ao contrato não encontrada.');
-    erro.status = 400;
-    throw erro;
-  }
-  if (String(matricula.militar_id || '') !== String(militarId || '')) {
-    const erro = new Error('matricula_militar_id deve pertencer ao mesmo militar_id do contrato.');
-    erro.status = 400;
-    throw erro;
-  }
-  const situacao = normalizarTextoContratoDesignacao(matricula.situacao);
-  if (matricula.is_atual !== true && situacao !== 'ativa') {
-    const erro = new Error('A matrícula vinculada ao contrato deve ser a matrícula atual/ativa do militar. Cadastre ou marque a matrícula atual na ficha do militar antes de registrar o contrato.');
-    erro.status = 400;
-    throw erro;
-  }
-  return matricula;
+  return matriculaMilitarId;
 }
+
 
 async function garantirContratoAtivoUnico(base44, militarId, registroIdIgnorado = null) {
   const ativos = await fetchWithRetry(
@@ -433,10 +408,10 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
   if (operation === 'create') {
     const erros = [];
     if (!data?.militar_id) erros.push('militar_id é obrigatório.');
-    if (!String(data?.matricula_militar_id || '').trim()) erros.push('matricula_militar_id da matrícula atual é obrigatório. Cadastre a matrícula atual na ficha do militar antes de registrar o contrato.');
-    else if (String(data.matricula_militar_id).includes(':')) erros.push('matricula_militar_id deve conter somente o ID real da matrícula, sem o formato id:matricula.');
+    if (String(data?.matricula_militar_id || '').trim() && String(data.matricula_militar_id).includes(':')) erros.push('matricula_militar_id deve conter somente o ID real da matrícula, sem o formato id:matricula.');
     if (!String(data?.matricula_designacao || '').trim()) erros.push('matricula_designacao é obrigatória.');
     if (!data?.data_inicio_contrato) erros.push('data_inicio_contrato é obrigatória.');
+    if (!data?.data_inclusao_para_ferias) erros.push('data_inclusao_para_ferias é obrigatória.');
     if (!String(dadosRecebidos?.tipo_prazo_contrato || '').trim()) erros.push('tipo_prazo_contrato é obrigatório.');
     if (dadosRecebidos?.gera_direito_ferias === undefined || dadosRecebidos?.gera_direito_ferias === null || dadosRecebidos?.gera_direito_ferias === '') erros.push('gera_direito_ferias é obrigatório.');
     if (!String(dadosRecebidos?.regra_geracao_periodos || '').trim()) erros.push('regra_geracao_periodos é obrigatória.');
@@ -447,14 +422,14 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
       erro.status = 400;
       throw erro;
     }
-    const matriculaAtual = await validarMatriculaContratoDesignacao(base44, data, militarAlvoId);
+    const matriculaMilitarId = validarMatriculaContratoDesignacao(data);
     if (statusPayload === 'ativo') await garantirContratoAtivoUnico(base44, militarAlvoId);
     return {
       ...data,
       data_inclusao_para_ferias: data.data_inclusao_para_ferias || data.data_inicio_contrato || '',
       data_fim_contrato: normalizarTipoPrazoContratoDesignacao(data.tipo_prazo_contrato) === 'indeterminado' ? '' : data.data_fim_contrato,
-      matricula_militar_id: String(matriculaAtual.id),
-      matricula_designacao: String(matriculaAtual.matricula_formatada || matriculaAtual.matricula || data.matricula_designacao || ''),
+      matricula_militar_id: matriculaMilitarId,
+      matricula_designacao: String(data.matricula_designacao || ''),
       status_contrato: statusPayload,
       criado_por: data?.criado_por || nowUser,
       atualizado_por: nowUser,
@@ -520,7 +495,9 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
     throw erro;
   }
 
-  await validarMatriculaContratoDesignacao(base44, contratoCombinado, militarAlvoId);
+  if (Object.prototype.hasOwnProperty.call(payloadFinal, 'matricula_militar_id')) {
+    payloadFinal.matricula_militar_id = validarMatriculaContratoDesignacao(payloadFinal);
+  }
   payloadFinal.atualizado_por = nowUser;
   payloadFinal.militar_id = militarAlvoId;
   return payloadFinal;

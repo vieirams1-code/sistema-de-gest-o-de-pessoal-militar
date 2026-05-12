@@ -30,5 +30,5 @@
     "atualizado_por": { "type": "string", "default": "" },
     "origem_registro": { "type": "string", "default": "" }
   },
-  "required": ["militar_id", "matricula_militar_id", "matricula_designacao", "data_inicio_contrato", "tipo_prazo_contrato", "gera_direito_ferias", "regra_geracao_periodos"]
+  "required": ["militar_id", "matricula_designacao", "data_inicio_contrato", "data_inclusao_para_ferias", "tipo_prazo_contrato", "gera_direito_ferias", "regra_geracao_periodos"]
 }

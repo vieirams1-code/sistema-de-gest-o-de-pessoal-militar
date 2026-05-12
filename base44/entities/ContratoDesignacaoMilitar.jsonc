@@ -10,7 +10,7 @@
     },
     "matricula_militar_id": {
       "type": "string",
-      "description": "ID real da MatriculaMilitar atual/ativa existente (deve pertencer ao mesmo militar_id)"
+      "description": "ID real opcional da MatriculaMilitar quando disponível; o contrato não depende deste vínculo para ser salvo"
     },
     "matricula_designacao": {
       "type": "string",
@@ -123,9 +123,9 @@
   },
   "required": [
     "militar_id",
-    "matricula_militar_id",
     "matricula_designacao",
     "data_inicio_contrato",
+    "data_inclusao_para_ferias",
     "tipo_prazo_contrato",
     "gera_direito_ferias",
     "regra_geracao_periodos"
