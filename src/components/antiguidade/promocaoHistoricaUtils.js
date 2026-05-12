@@ -1,4 +1,4 @@
-import { QUADROS_FIXOS, QUADROS_OFICIAIS, normalizarQuadroLegado } from '../../utils/postoQuadroCompatibilidade.js';
+import { QUADROS_FIXOS, QUADROS_OFICIAIS } from '../../utils/postoQuadroCompatibilidade.js';
 
 export const POSTOS_GRADUACOES = [
   'Coronel',
@@ -32,7 +32,6 @@ const indicePosto = (posto) => POSTOS_GRADUACOES.findIndex((item) => normalizar(
 
 const QUADROS_PRACAS_HISTORICO_CONFIAVEL = new Set([
   ...QUADROS_FIXOS
-    .map(normalizarQuadroLegado)
     .filter((quadro) => quadro && !QUADROS_OFICIAIS.includes(quadro)),
   'QBMP',
   'QPBM',
@@ -84,7 +83,7 @@ const isTransicaoSubtenenteParaQAOBM = ({ postoAnterior, postoNovo, quadroNovo }
 );
 
 const isQuadroHistoricoPracaConfiavel = (quadro) => {
-  const quadroNormalizado = normalizarQuadroLegado(normalizarQuadroPromocao(quadro));
+  const quadroNormalizado = normalizarQuadroPromocao(quadro);
   return QUADROS_PRACAS_HISTORICO_CONFIAVEL.has(quadroNormalizado);
 };
 
