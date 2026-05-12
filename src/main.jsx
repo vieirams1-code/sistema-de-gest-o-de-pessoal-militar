@@ -9,8 +9,6 @@ import {
   ImpedimentoMedalha,
   CreditoExtraFerias,
   HistoricoPromocaoMilitarV2,
-  PromocaoColetiva,
-  PromocaoColetivaItem,
   ResetOperacionalLog,
   BaseConhecimentoProcedimento,
   AssistenteLog,
@@ -29,8 +27,6 @@ void PunicaoDisciplinar;
 void ImpedimentoMedalha;
 void CreditoExtraFerias;
 void HistoricoPromocaoMilitarV2;
-void PromocaoColetiva;
-void PromocaoColetivaItem;
 void ResetOperacionalLog;
 void BaseConhecimentoProcedimento;
 void AssistenteLog;

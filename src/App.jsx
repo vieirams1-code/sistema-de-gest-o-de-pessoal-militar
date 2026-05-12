@@ -27,7 +27,6 @@ const adminOnlyPages = new Set([
   'AntiguidadeDiagnostico',
   'AntiguidadeConfigQuadros',
   'AntiguidadeImportarPromocoes',
-  'AntiguidadePromocaoColetiva',
   'AntiguidadePrevia',
 ]);
 
@@ -52,7 +51,6 @@ const moduleGuardByPage = {
   AntiguidadeDiagnostico: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadeConfigQuadros: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadeImportarPromocoes: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
-  AntiguidadePromocaoColetiva: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadePrevia: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   IndicacoesDomPedroII: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   QuadroOperacional: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
