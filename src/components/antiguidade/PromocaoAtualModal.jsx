@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import {
   POSTOS_GRADUACOES,
   getPostoAnteriorPrevisto,
+  resolverQuadroAnteriorPromocao,
 } from '@/components/antiguidade/promocaoHistoricaUtils';
 
 const STATUS_ATIVO = 'ativo';
@@ -48,22 +49,33 @@ const normalizarOrdemAntiguidade = (ordem) => {
   return Number(ordem);
 };
 
-const montarPayloadPromocao = (form, militar) => ({
-  militar_id: militar.id,
-  posto_graduacao_novo: militar.posto_graduacao || '',
-  quadro_novo: militar.quadro || '',
-  data_promocao: form.data_promocao,
-  data_publicacao: form.data_publicacao || '',
-  boletim_referencia: form.boletim_referencia || '',
-  ato_referencia: form.ato_referencia || '',
-  antiguidade_referencia_ordem: normalizarOrdemAntiguidade(form.antiguidade_referencia_ordem),
-  observacoes: form.observacoes || '',
-  origem_dado: 'manual',
-  status_registro: STATUS_ATIVO,
-  posto_graduacao_anterior: form.posto_graduacao_anterior || '',
-  quadro_anterior: '',
-  antiguidade_referencia_id: '',
-});
+const montarPayloadPromocao = (form, militar, registrosHistoricos = []) => {
+  const postoNovo = militar.posto_graduacao || '';
+  const quadroNovo = militar.quadro || '';
+
+  return {
+    militar_id: militar.id,
+    posto_graduacao_novo: postoNovo,
+    quadro_novo: quadroNovo,
+    data_promocao: form.data_promocao,
+    data_publicacao: form.data_publicacao || '',
+    boletim_referencia: form.boletim_referencia || '',
+    ato_referencia: form.ato_referencia || '',
+    antiguidade_referencia_ordem: normalizarOrdemAntiguidade(form.antiguidade_referencia_ordem),
+    observacoes: form.observacoes || '',
+    origem_dado: 'manual',
+    status_registro: STATUS_ATIVO,
+    posto_graduacao_anterior: form.posto_graduacao_anterior || '',
+    quadro_anterior: resolverQuadroAnteriorPromocao({
+      postoAnterior: form.posto_graduacao_anterior,
+      postoNovo,
+      quadroNovo,
+      dataPromocao: form.data_promocao,
+      registrosHistoricos,
+    }),
+    antiguidade_referencia_id: '',
+  };
+};
 
 export default function PromocaoAtualModal({ open, onOpenChange, militar, onSaved }) {
   const [form, setForm] = React.useState(FORM_INICIAL);
@@ -103,9 +115,9 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
 
     try {
       const todos = await base44.entities.HistoricoPromocaoMilitarV2.list();
-      const ativosCompativeis = todos.filter((h) =>
+      const historicoMilitar = todos.filter((h) => String(h.militar_id || '') === String(militar.id));
+      const ativosCompativeis = historicoMilitar.filter((h) =>
         valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO
-        && String(h.militar_id || '') === String(militar.id)
         && valorTexto(h.posto_graduacao_novo) === valorTexto(militar.posto_graduacao)
         && valorTexto(h.quadro_novo) === valorTexto(militar.quadro),
       );
@@ -116,7 +128,7 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
         return;
       }
 
-      const payloadBase = montarPayloadPromocao(form, militar);
+      const payloadBase = montarPayloadPromocao(form, militar, historicoMilitar);
 
       const divergente = ativosCompativeis[0] || null;
       if (!divergente) {
