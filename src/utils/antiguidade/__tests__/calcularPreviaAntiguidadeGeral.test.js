@@ -213,3 +213,100 @@ test('quadro fora dos grupos de antiguidade gera alerta e mantém item no retorn
   assert.ok(item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_FORA_DOS_GRUPOS_ANTIGUIDADE));
   assert.ok(item.pendencias.includes(PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_FORA_DA_ORDEM));
 });
+
+const ordemQuadrosInvertida = [
+  { nome_grupo: 'QAOBM', indice: 0, membros_reais: ['QAOBM'], ativo: true },
+  { nome_grupo: 'QOBM', indice: 1, membros_reais: ['QOBM'], ativo: true },
+  { nome_grupo: 'QPTBM', indice: 2, membros_reais: ['QPTBM', 'QBMPT'], ativo: true },
+];
+
+test('sem config mantém fallback estático de precedência entre quadros', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [
+      militar('qaobm', { quadro: 'QAOBM' }),
+      militar('qobm', { quadro: 'QOBM' }),
+    ],
+    historicoPromocoes: [
+      promocao('p-qaobm', 'qaobm', { quadro_novo: 'QAOBM' }),
+      promocao('p-qobm', 'qobm', { quadro_novo: 'QOBM' }),
+    ],
+  });
+
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['qobm', 'qaobm']);
+  assert.deepEqual(resultado.itens.map((item) => item.criterioOrdenacao.quadroIndice), [0, 1]);
+});
+
+test('config.ordemQuadrosAntiguidade injetada altera precedência entre dois quadros', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [
+      militar('qaobm', { quadro: 'QAOBM' }),
+      militar('qobm', { quadro: 'QOBM' }),
+    ],
+    historicoPromocoes: [
+      promocao('p-qaobm', 'qaobm', { quadro_novo: 'QAOBM' }),
+      promocao('p-qobm', 'qobm', { quadro_novo: 'QOBM' }),
+    ],
+    config: { ordemQuadrosAntiguidade: ordemQuadrosInvertida },
+  });
+
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['qaobm', 'qobm']);
+  assert.deepEqual(resultado.itens.map((item) => item.criterioOrdenacao.quadroIndice), [0, 1]);
+});
+
+test('config inválida retorna ao fallback estático', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [
+      militar('qaobm', { quadro: 'QAOBM' }),
+      militar('qobm', { quadro: 'QOBM' }),
+    ],
+    historicoPromocoes: [
+      promocao('p-qaobm', 'qaobm', { quadro_novo: 'QAOBM' }),
+      promocao('p-qobm', 'qobm', { quadro_novo: 'QOBM' }),
+    ],
+    config: { ordem_quadros: 'estrutura inválida' },
+  });
+
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['qobm', 'qaobm']);
+  assert.deepEqual(resultado.itens.map((item) => item.criterioOrdenacao.quadroIndice), [0, 1]);
+});
+
+test('grupos inativos e membros vazios são ignorados na ordem injetada', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [
+      militar('qaobm', { quadro: 'QAOBM' }),
+      militar('qobm', { quadro: 'QOBM' }),
+    ],
+    historicoPromocoes: [
+      promocao('p-qaobm', 'qaobm', { quadro_novo: 'QAOBM' }),
+      promocao('p-qobm', 'qobm', { quadro_novo: 'QOBM' }),
+    ],
+    config: {
+      ordemQuadrosAntiguidade: [
+        { nome_grupo: 'QAOBM', indice: 0, membros_reais: ['QAOBM'], ativo: false },
+        { nome_grupo: 'VAZIO', indice: 1, membros_reais: ['', null, undefined], ativo: true },
+        { nome_grupo: 'QOBM', indice: 2, membros: ['QOBM'], ativo: true },
+      ],
+    },
+  });
+
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['qobm', 'qaobm']);
+  assert.equal(resultado.itens[0].criterioOrdenacao.quadroIndice, 2);
+  assert.equal(resultado.itens[1].criterioOrdenacao.quadroIndice, Number.POSITIVE_INFINITY);
+  assert.ok(resultado.itens[1].pendencias.includes(PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_FORA_DA_ORDEM));
+});
+
+test('aliases e quadros legados continuam tratados na ordem injetada', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('qbmpt', { quadro: 'QBMPT', posto_graduacao: 'Soldado' })],
+    historicoPromocoes: [
+      promocao('p-qbmpt', 'qbmpt', { posto_graduacao_novo: 'SD', quadro_novo: 'QPTBM' }),
+    ],
+    config: { ordemQuadrosAntiguidade: ordemQuadrosInvertida },
+  });
+
+  const item = resultado.itens[0];
+  assert.equal(item.criterioOrdenacao.quadroNormalizado, 'QPTBM');
+  assert.equal(item.criterioOrdenacao.grupoAntiguidadeQuadro, 'QPTBM');
+  assert.equal(item.criterioOrdenacao.quadroIndice, 2);
+  assert.ok(item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_NORMALIZADO));
+});
