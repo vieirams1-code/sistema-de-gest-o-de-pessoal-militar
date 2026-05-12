@@ -4,7 +4,10 @@ import {
   isQuadroCompativel,
   normalizarQuadroLegado,
 } from '../postoQuadroCompatibilidade.js';
-import { obterDetalheAntiguidadeQuadro } from './ordemQuadrosAntiguidade.js';
+import {
+  criarContextoOrdemQuadrosAntiguidade,
+  obterDetalheAntiguidadeQuadro,
+} from './ordemQuadrosAntiguidade.js';
 
 export const PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL = Object.freeze({
   SEM_POSTO: 'PENDENTE_SEM_POSTO',
@@ -192,10 +195,10 @@ function indexarHistoricoPorMilitar(historicoPromocoes) {
   }, new Map());
 }
 
-function escolherRegistroAtualCompativel(militar, historicos, alertas) {
+function escolherRegistroAtualCompativel(militar, historicos, alertas, contextoOrdemQuadros) {
   const postoMilitar = normalizarPostoGraduacao(militar?.posto_graduacao);
   const quadroMilitar = normalizarQuadroPreviaAntiguidade(militar?.quadro);
-  const detalheQuadroMilitar = obterDetalheAntiguidadeQuadro(militar?.quadro);
+  const detalheQuadroMilitar = obterDetalheAntiguidadeQuadro(militar?.quadro, contextoOrdemQuadros);
   const compativeis = [];
 
   historicos.forEach((registro) => {
@@ -215,7 +218,7 @@ function escolherRegistroAtualCompativel(militar, historicos, alertas) {
 
     const postoRegistro = normalizarPostoGraduacao(registro?.posto_graduacao_novo);
     const quadroRegistro = normalizarQuadroPreviaAntiguidade(registro?.quadro_novo);
-    const detalheQuadroRegistro = obterDetalheAntiguidadeQuadro(registro?.quadro_novo);
+    const detalheQuadroRegistro = obterDetalheAntiguidadeQuadro(registro?.quadro_novo, contextoOrdemQuadros);
     const postoCompativel = !postoMilitar || !postoRegistro || postoRegistro === postoMilitar;
     const grupoMilitar = detalheQuadroMilitar.grupoAntiguidadeQuadro;
     const grupoRegistro = detalheQuadroRegistro.grupoAntiguidadeQuadro;
@@ -321,6 +324,18 @@ function marcarAlertasEmpate(itens) {
   });
 }
 
+function obterOrdemQuadrosAntiguidadeConfig(config) {
+  if (Array.isArray(config?.ordemQuadrosAntiguidade)) return config.ordemQuadrosAntiguidade;
+  if (Array.isArray(config?.ordem_quadros)) return config.ordem_quadros;
+  if (Array.isArray(config?.configuracaoAntiguidade?.ordem_quadros)) {
+    return config.configuracaoAntiguidade.ordem_quadros;
+  }
+  if (Array.isArray(config?.configuracaoAntiguidade?.ordemQuadrosAntiguidade)) {
+    return config.configuracaoAntiguidade.ordemQuadrosAntiguidade;
+  }
+  return undefined;
+}
+
 function temPendenciaCritica(item) {
   return item.pendencias.includes(PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_POSTO)
     || item.pendencias.includes(PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_QUADRO)
@@ -342,6 +357,9 @@ export function calcularPreviaAntiguidadeGeral({
   config = {},
 } = {}) {
   const incluirSomenteMilitaresAtivos = config?.incluirSomenteMilitaresAtivos !== false;
+  const contextoOrdemQuadros = criarContextoOrdemQuadrosAntiguidade(
+    obterOrdemQuadrosAntiguidadeConfig(config),
+  );
   const historicoPorMilitar = indexarHistoricoPorMilitar(historicoPromocoes);
   const militaresConsiderados = (militares || []).filter((militar) => (
     incluirSomenteMilitaresAtivos ? isMilitarAtivo(militar) : true
@@ -353,9 +371,9 @@ export function calcularPreviaAntiguidadeGeral({
     const militarId = obterMilitarId(militar);
     const postoNormalizado = normalizarPostoGraduacao(militar?.posto_graduacao);
     const quadroNormalizadoInfo = normalizarQuadroPreviaAntiguidade(militar?.quadro);
-    const detalheQuadroAntiguidade = obterDetalheAntiguidadeQuadro(militar?.quadro);
+    const detalheQuadroAntiguidade = obterDetalheAntiguidadeQuadro(militar?.quadro, contextoOrdemQuadros);
     const historicos = historicoPorMilitar.get(militarId) || [];
-    const registroAtual = escolherRegistroAtualCompativel(militar, historicos, alertas);
+    const registroAtual = escolherRegistroAtualCompativel(militar, historicos, alertas, contextoOrdemQuadros);
 
     if (!postoNormalizado) addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_POSTO);
     if (!quadroNormalizadoInfo.valor) addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_QUADRO);
