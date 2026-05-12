@@ -56,6 +56,12 @@ function formatDate(value) {
   return date.toLocaleDateString('pt-BR');
 }
 
+function sanitizarIdMatricula(value) {
+  const texto = String(value ?? '').trim();
+  const posicaoSeparador = texto.indexOf(':');
+  return posicaoSeparador >= 0 ? texto.slice(0, posicaoSeparador).trim() : texto;
+}
+
 function CounterCard({ title, value, icon: Icon, color = 'slate' }) {
   const colors = {
     slate: 'bg-slate-50 text-slate-700',
@@ -91,16 +97,20 @@ function extrairMatriculasDisponiveis(militaresDisponiveis = []) {
   return militaresDisponiveis.flatMap((militar) => {
     const historico = Array.isArray(militar?.matriculas_historico) ? militar.matriculas_historico : [];
     if (historico.length > 0) {
-      return historico.map((matricula) => ({
-        ...matricula,
-        militar_id: matricula?.militar_id || militar.id,
-      }));
+      return historico
+        .map((matricula) => ({
+          ...matricula,
+          id: sanitizarIdMatricula(matricula?.id),
+          militar_id: matricula?.militar_id || militar.id,
+        }))
+        .filter((matricula) => matricula.id);
     }
 
     const matriculaFallback = militar?.matricula_atual || militar?.matricula;
-    if (!matriculaFallback) return [];
+    const matriculaFallbackId = sanitizarIdMatricula(militar?.matricula_militar_id || militar?.matricula_atual_id);
+    if (!matriculaFallback || !matriculaFallbackId) return [];
     return [{
-      id: `${militar.id}:${matriculaFallback}`,
+      id: matriculaFallbackId,
       militar_id: militar.id,
       matricula: matriculaFallback,
       matricula_formatada: matriculaFallback,
