@@ -4,6 +4,18 @@ export const STATUS_CONTRATO_DESIGNACAO = {
   CANCELADO: 'cancelado',
 };
 
+
+export const TIPO_PRAZO_CONTRATO_DESIGNACAO = {
+  INDETERMINADO: 'indeterminado',
+  DETERMINADO: 'determinado',
+};
+
+export const REGRA_GERACAO_PERIODOS_DESIGNACAO = {
+  NORMAL: 'normal',
+  BLOQUEADA: 'bloqueada',
+  MANUAL: 'manual',
+};
+
 const STATUS_ALIASES = new Map([
   ['ativo', STATUS_CONTRATO_DESIGNACAO.ATIVO],
   ['ativa', STATUS_CONTRATO_DESIGNACAO.ATIVO],
@@ -45,6 +57,52 @@ function dataTime(valor) {
   if (!valor) return 0;
   const time = new Date(`${String(valor).slice(0, 10)}T00:00:00`).getTime();
   return Number.isFinite(time) ? time : 0;
+}
+
+
+export function normalizarTipoPrazoContrato(valor) {
+  const normalizado = normalizarTexto(valor);
+  if (normalizado === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO) {
+    return TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO;
+  }
+  return TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO;
+}
+
+export function normalizarGeraDireitoFerias(valor) {
+  if (valor === null || valor === undefined) return true;
+  if (typeof valor === 'boolean') return valor;
+
+  const normalizado = normalizarTexto(valor);
+  if (normalizado === 'false' || normalizado === 'nao' || normalizado === 'no' || normalizado === '0') return false;
+  if (normalizado === 'true' || normalizado === 'sim' || normalizado === 'yes' || normalizado === '1') return true;
+
+  return true;
+}
+
+export function normalizarRegraGeracaoPeriodos(valor) {
+  const normalizado = normalizarTexto(valor);
+  if (normalizado === REGRA_GERACAO_PERIODOS_DESIGNACAO.BLOQUEADA) {
+    return REGRA_GERACAO_PERIODOS_DESIGNACAO.BLOQUEADA;
+  }
+  if (normalizado === REGRA_GERACAO_PERIODOS_DESIGNACAO.MANUAL) {
+    return REGRA_GERACAO_PERIODOS_DESIGNACAO.MANUAL;
+  }
+  return REGRA_GERACAO_PERIODOS_DESIGNACAO.NORMAL;
+}
+
+export function resolverConfiguracaoFeriasContrato(contrato = {}) {
+  const contratoSeguro = contrato || {};
+  const hasTipoPrazoContrato = Object.prototype.hasOwnProperty.call(contratoSeguro, 'tipo_prazo_contrato');
+  const hasGeraDireitoFerias = Object.prototype.hasOwnProperty.call(contratoSeguro, 'gera_direito_ferias');
+  const hasRegraGeracaoPeriodos = Object.prototype.hasOwnProperty.call(contratoSeguro, 'regra_geracao_periodos');
+
+  return {
+    tipoPrazoContrato: normalizarTipoPrazoContrato(contratoSeguro.tipo_prazo_contrato),
+    geraDireitoFerias: normalizarGeraDireitoFerias(contratoSeguro.gera_direito_ferias),
+    regraGeracaoPeriodos: normalizarRegraGeracaoPeriodos(contratoSeguro.regra_geracao_periodos),
+    motivoNaoGeraFerias: String(contratoSeguro.motivo_nao_gera_ferias || ''),
+    isContratoLegadoSemCamposNovos: !hasTipoPrazoContrato && !hasGeraDireitoFerias && !hasRegraGeracaoPeriodos,
+  };
 }
 
 export function normalizarStatusContratoDesignacao(status) {

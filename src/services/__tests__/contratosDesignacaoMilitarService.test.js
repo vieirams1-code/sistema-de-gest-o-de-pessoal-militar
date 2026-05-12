@@ -4,8 +4,12 @@ import assert from 'node:assert/strict';
 import {
   contarContratosAtivosDesignacao,
   getContratoAtivoDesignacao,
+  normalizarGeraDireitoFerias,
+  normalizarRegraGeracaoPeriodos,
   normalizarStatusContratoDesignacao,
+  normalizarTipoPrazoContrato,
   ordenarContratosDesignacao,
+  resolverConfiguracaoFeriasContrato,
   validarContratoDesignacaoPayload,
 } from '../contratosDesignacaoMilitarService.js';
 
@@ -84,4 +88,64 @@ test('impede data fim anterior à data início', () => {
 
   assert.equal(resultado.valido, false);
   assert.match(resultado.erros.join('\n'), /data_fim_contrato/);
+});
+
+
+test('contrato sem campos novos mantém compatibilidade de férias padrão', () => {
+  assert.deepEqual(resolverConfiguracaoFeriasContrato({ id: 'legado-1' }), {
+    tipoPrazoContrato: 'indeterminado',
+    geraDireitoFerias: true,
+    regraGeracaoPeriodos: 'normal',
+    motivoNaoGeraFerias: '',
+    isContratoLegadoSemCamposNovos: true,
+  });
+});
+
+test('normaliza tipo_prazo_contrato determinado', () => {
+  assert.equal(normalizarTipoPrazoContrato('determinado'), 'determinado');
+  assert.equal(resolverConfiguracaoFeriasContrato({ tipo_prazo_contrato: 'determinado' }).tipoPrazoContrato, 'determinado');
+});
+
+test('normaliza gera_direito_ferias false', () => {
+  assert.equal(normalizarGeraDireitoFerias(false), false);
+  assert.equal(normalizarGeraDireitoFerias('false'), false);
+  assert.equal(resolverConfiguracaoFeriasContrato({ gera_direito_ferias: false }).geraDireitoFerias, false);
+});
+
+test('normaliza regra_geracao_periodos bloqueada', () => {
+  assert.equal(normalizarRegraGeracaoPeriodos('bloqueada'), 'bloqueada');
+  assert.equal(resolverConfiguracaoFeriasContrato({ regra_geracao_periodos: 'bloqueada' }).regraGeracaoPeriodos, 'bloqueada');
+});
+
+test('normaliza regra_geracao_periodos manual', () => {
+  assert.equal(normalizarRegraGeracaoPeriodos('manual'), 'manual');
+  assert.equal(resolverConfiguracaoFeriasContrato({ regra_geracao_periodos: 'manual' }).regraGeracaoPeriodos, 'manual');
+});
+
+test('valores inválidos caem em defaults seguros', () => {
+  const config = resolverConfiguracaoFeriasContrato({
+    tipo_prazo_contrato: 'temporario',
+    gera_direito_ferias: 'talvez',
+    regra_geracao_periodos: 'automatica',
+  });
+
+  assert.equal(config.tipoPrazoContrato, 'indeterminado');
+  assert.equal(config.geraDireitoFerias, true);
+  assert.equal(config.regraGeracaoPeriodos, 'normal');
+});
+
+test('preserva motivo_nao_gera_ferias', () => {
+  const config = resolverConfiguracaoFeriasContrato({
+    gera_direito_ferias: false,
+    motivo_nao_gera_ferias: 'Contrato sem previsão normativa de férias.',
+  });
+
+  assert.equal(config.motivoNaoGeraFerias, 'Contrato sem previsão normativa de férias.');
+});
+
+test('detecta contrato legado apenas quando todos os campos novos estão ausentes', () => {
+  assert.equal(resolverConfiguracaoFeriasContrato({}).isContratoLegadoSemCamposNovos, true);
+  assert.equal(resolverConfiguracaoFeriasContrato({ tipo_prazo_contrato: '' }).isContratoLegadoSemCamposNovos, false);
+  assert.equal(resolverConfiguracaoFeriasContrato({ gera_direito_ferias: undefined }).isContratoLegadoSemCamposNovos, false);
+  assert.equal(resolverConfiguracaoFeriasContrato({ regra_geracao_periodos: '' }).isContratoLegadoSemCamposNovos, false);
 });

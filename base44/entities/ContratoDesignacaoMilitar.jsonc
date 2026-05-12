@@ -36,6 +36,31 @@
       "format": "date",
       "description": "Data-base futura para c\u00e1lculo de per\u00edodos aquisitivos de f\u00e9rias"
     },
+    "tipo_prazo_contrato": {
+      "type": "string",
+      "enum": [
+        "indeterminado",
+        "determinado"
+      ],
+      "description": "Tipo de prazo do contrato para regras futuras de f\u00e9rias. Ausente em registros legados deve ser interpretado como indeterminado."
+    },
+    "gera_direito_ferias": {
+      "type": "boolean",
+      "description": "Indica se o contrato gera direito a f\u00e9rias. Ausente em registros legados deve ser interpretado como true."
+    },
+    "motivo_nao_gera_ferias": {
+      "type": "string",
+      "description": "Motivo administrativo para contrato que n\u00e3o gera direito a f\u00e9rias."
+    },
+    "regra_geracao_periodos": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "bloqueada",
+        "manual"
+      ],
+      "description": "Regra futura de gera\u00e7\u00e3o de per\u00edodos aquisitivos. Ausente em registros legados deve ser interpretado como normal."
+    },
     "numero_contrato": {
       "type": "string",
       "description": "N\u00famero/identifica\u00e7\u00e3o documental do contrato"
