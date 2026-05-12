@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Briefcase, CalendarDays, Columns3, FileSearch, ListChecks, Search, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Briefcase, CalendarDays, ChevronDown, Columns3, FileSearch, ListChecks, Search, SlidersHorizontal, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -34,10 +34,36 @@ function pluralizePosto(posto = '') {
   return `${posto}s`;
 }
 
+function isGraduacaoPraca(label = '') {
+  return /sargento|subtenente|cabo|soldado/i.test(label);
+}
+
+function summarizePostos(postos = [], postosDisponiveis = []) {
+  if (!postos.length) return 'Todos os postos/graduações';
+  const todosCompativeisSelecionados = postosDisponiveis.length > 0 && postos.length === postosDisponiveis.length;
+  if (todosCompativeisSelecionados && postos.every(isGraduacaoPraca)) return 'Todas as praças';
+  if (todosCompativeisSelecionados) return 'Todos os oficiais';
+  if (postos.length === 1) return postos[0];
+  const hasOnlyPracas = postos.every(isGraduacaoPraca);
+  return `${postos.length} ${hasOnlyPracas ? 'graduações' : 'postos'}`;
+}
+
+function summarizeQuadros(quadros = []) {
+  if (!quadros.length) return 'Todos os quadros';
+  if (quadros.length === 1) return quadros[0];
+  return `${quadros.length} quadros`;
+}
+
+function summarizeList(values = [], emptyLabel, limit = 3) {
+  if (!values.length) return emptyLabel;
+  if (values.length <= limit) return values.join(', ');
+  return `${values.slice(0, limit).join(', ')} +${values.length - limit}`;
+}
+
 function buildResumoListagem({
   categoriaFilter,
-  postoFilter,
-  quadroFilter,
+  postoFilters,
+  quadroFilters,
   statusFilter,
   feriasPresencaFilter,
   feriasStatusFilter,
@@ -49,7 +75,7 @@ function buildResumoListagem({
   feriasTodosStatusValue,
 }) {
   const partes = [];
-  const posto = postoFilter !== todosValue ? postoFilter : '';
+  const posto = postoFilters?.length === 1 ? postoFilters[0] : '';
   const categoria = findLabel(categoriaOptions, categoriaFilter);
   const selectedFeriasPeriodoLabel = findLabel(feriasPeriodoOptions, feriasPeriodoFilter).toLowerCase();
 
@@ -61,8 +87,9 @@ function buildResumoListagem({
     partes.push('militares');
   }
 
+  if (!posto && postoFilters?.length > 1) partes.push(summarizePostos(postoFilters).toLowerCase());
   if (statusFilter !== todosValue) partes.push(`${String(statusFilter).toLowerCase()}s`);
-  if (quadroFilter !== todosValue) partes.push(`do quadro ${quadroFilter}`);
+  if (quadroFilters?.length) partes.push(`dos quadros ${summarizeList(quadroFilters, '').toLowerCase()}`);
   if (feriasPresencaFilter === 'com_periodo') {
     partes.push(`com férias ${selectedFeriasPeriodoLabel || 'no período selecionado'}`);
   } else if (feriasPresencaFilter === 'sem_periodo') {
@@ -91,8 +118,8 @@ function makeListagemToken(key, label, value, displayValue = value) {
 function buildListagemTokens({
   searchTerm,
   categoriaFilter,
-  postoFilter,
-  quadroFilter,
+  postoFilters,
+  quadroFilters,
   statusFilter,
   situacaoMilitarFilter,
   funcaoFilter,
@@ -119,8 +146,12 @@ function buildListagemTokens({
     const categoria = findLabel(categoriaOptions, categoriaFilter);
     tokens.push(makeListagemToken('categoria', 'Grupo', categoria));
   }
-  if (postoFilter !== todosValue) tokens.push(makeListagemToken('posto', 'Posto/graduação', postoFilter));
-  if (quadroFilter !== todosValue) tokens.push(makeListagemToken('quadro', 'Quadro', quadroFilter, `Quadro ${quadroFilter}`));
+  if (postoFilters?.length) {
+    tokens.push(makeListagemToken('posto', 'Posto/graduação', summarizeList(postoFilters, ''), summarizePostos(postoFilters)));
+  }
+  if (quadroFilters?.length) {
+    tokens.push(makeListagemToken('quadro', 'Quadro', summarizeList(quadroFilters, ''), summarizeQuadros(quadroFilters)));
+  }
   if (statusFilter !== todosValue) tokens.push(makeListagemToken('status', 'Situação', statusFilter, pluralizeStatus(statusFilter)));
   if (situacaoMilitarFilter !== todosValue) {
     tokens.push(makeListagemToken('situacaoMilitar', 'Situação militar', situacaoMilitarFilter));
@@ -144,6 +175,68 @@ function buildListagemTokens({
   }
 
   return tokens.filter((token) => token.value);
+}
+
+function ChecklistMultiSelect({ label, triggerLabel, options = [], selectedValues = [], onChange, emptyMessage = 'Nenhuma opção disponível' }) {
+  const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
+
+  const toggleValue = (value, checked) => {
+    const nextValues = checked
+      ? [...selectedValues, value]
+      : selectedValues.filter((selectedValue) => selectedValue !== value);
+    onChange(nextValues);
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-between border-slate-200 bg-white text-left font-normal text-slate-700 hover:bg-slate-50"
+        >
+          <span className="truncate">{triggerLabel}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[min(92vw,22rem)] rounded-2xl border-slate-200 p-3 shadow-xl">
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">{label}</p>
+            <p className="text-xs text-slate-500">Marque uma ou mais opções. Sem marcação significa todos.</p>
+          </div>
+          <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+            {options.length ? options.map((option) => {
+              const checked = selectedSet.has(option);
+              const id = `${label}-${option}`.replace(/\s+/g, '-').toLowerCase();
+
+              return (
+                <label
+                  key={option}
+                  htmlFor={id}
+                  className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <Checkbox
+                    id={id}
+                    checked={checked}
+                    onCheckedChange={(nextChecked) => toggleValue(option, nextChecked === true)}
+                  />
+                  <span>{option}</span>
+                </label>
+              );
+            }) : (
+              <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-500">{emptyMessage}</p>
+            )}
+          </div>
+          {selectedValues.length > 0 && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])} className="w-full">
+              Limpar seleção
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function ToolbarPopover({ icon: Icon, label, children, contentClassName = 'w-[min(92vw,42rem)]' }) {
@@ -187,8 +280,9 @@ export default function CommandCenter({
   const {
     searchTerm,
     categoriaFilter,
-    postoFilter,
-    quadroFilter,
+    postoFilters = [],
+    quadroFilters = [],
+    compatibilityNotice,
     statusFilter,
     situacaoMilitarFilter,
     funcaoFilter,
@@ -202,8 +296,8 @@ export default function CommandCenter({
   const {
     setSearchTerm,
     setCategoriaFilter,
-    setPostoFilter,
-    setQuadroFilter,
+    setPostoFilters,
+    setQuadroFilters,
     setStatusFilter,
     setSituacaoMilitarFilter,
     setFuncaoFilter,
@@ -278,8 +372,8 @@ export default function CommandCenter({
     () =>
       buildResumoListagem({
         categoriaFilter,
-        postoFilter,
-        quadroFilter,
+        postoFilters,
+        quadroFilters,
         statusFilter,
         feriasPresencaFilter,
         feriasStatusFilter,
@@ -292,8 +386,8 @@ export default function CommandCenter({
       }),
     [
       categoriaFilter,
-      postoFilter,
-      quadroFilter,
+      postoFilters,
+      quadroFilters,
       statusFilter,
       feriasPresencaFilter,
       feriasStatusFilter,
@@ -428,24 +522,20 @@ export default function CommandCenter({
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={postoFilter} onValueChange={setPostoFilter}>
-                  <SelectTrigger><SelectValue placeholder="Posto/graduação" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={todosValue}>Todos os postos</SelectItem>
-                    {postosDisponiveis.map((posto) => (
-                      <SelectItem key={posto} value={posto}>{posto}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={quadroFilter} onValueChange={setQuadroFilter}>
-                  <SelectTrigger><SelectValue placeholder="Quadro" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={todosValue}>Todos os quadros</SelectItem>
-                    {quadrosDisponiveis.map((quadro) => (
-                      <SelectItem key={quadro} value={quadro}>{quadro}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ChecklistMultiSelect
+                  label="Postos e graduações"
+                  triggerLabel={summarizePostos(postoFilters, postosDisponiveis)}
+                  options={postosDisponiveis}
+                  selectedValues={postoFilters}
+                  onChange={setPostoFilters}
+                />
+                <ChecklistMultiSelect
+                  label="Quadros"
+                  triggerLabel={summarizeQuadros(quadroFilters)}
+                  options={quadrosDisponiveis}
+                  selectedValues={quadroFilters}
+                  onChange={setQuadroFilters}
+                />
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger><SelectValue placeholder="Situação no cadastro" /></SelectTrigger>
                   <SelectContent>
@@ -465,6 +555,11 @@ export default function CommandCenter({
                   </SelectContent>
                 </Select>
               </div>
+              {compatibilityNotice && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  {compatibilityNotice}
+                </div>
+              )}
             </div>
           </ToolbarPopover>
 
