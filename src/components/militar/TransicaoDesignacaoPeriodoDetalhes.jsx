@@ -1,5 +1,8 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 function formatValue(value) {
   if (value === null || value === undefined || value === '') return '—';
@@ -7,17 +10,20 @@ function formatValue(value) {
   return String(value);
 }
 
-function ListaCodigos({ titulo, itens = [], vazio = 'Nenhum registro.' }) {
+function ListaCodigos({ titulo, itens = [], vazio = 'Nenhum registro.', danger = false }) {
   return (
     <div className="rounded-md border border-slate-200 bg-white p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{titulo}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{titulo}</p>
+        <Badge variant="outline" className={danger && itens.length > 0 ? 'border-red-300 bg-red-50 text-red-700' : ''}>{itens.length}</Badge>
+      </div>
       {itens.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">{vazio}</p>
       ) : (
         <div className="mt-2 flex flex-wrap gap-1">
           {itens.map((item, index) => {
             const codigo = item?.codigo || item?.motivo || item?.detalhe || item;
-            return <Badge key={`${titulo}-${codigo}-${index}`} variant="outline">{formatValue(codigo)}</Badge>;
+            return <Badge key={`${titulo}-${codigo}-${index}`} variant="outline" className={danger ? 'border-red-300 bg-red-50 text-red-700' : ''}>{formatValue(codigo)}</Badge>;
           })}
         </div>
       )}
@@ -25,19 +31,60 @@ function ListaCodigos({ titulo, itens = [], vazio = 'Nenhum registro.' }) {
   );
 }
 
-export default function TransicaoDesignacaoPeriodoDetalhes({ periodo = {}, decisao = null }) {
+export default function TransicaoDesignacaoPeriodoDetalhes({
+  periodo = {},
+  decisao = null,
+  onChange,
+  exigeMotivo = false,
+  exigeDocumento = false,
+  pendencias = [],
+}) {
   const dadosPeriodo = periodo.periodo || periodo;
   const ferias = periodo.feriasVinculadas || periodo.ferias_vinculadas || [];
   const riscos = periodo.riscos || [];
+  const bloqueantes = periodo.bloqueantes || [];
   const alertas = periodo.alertas || [];
   const conflitos = periodo.conflitos || [];
   const motivosSugestao = periodo.motivosSugestao || periodo.motivos_sugestao || [];
   const acoesPermitidas = periodo.acoesPermitidas || periodo.acoes_permitidas || [];
 
   return (
-    <div className="mt-3 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm lg:grid-cols-2">
       <section className="rounded-md border border-slate-200 bg-white p-3 lg:col-span-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Férias vinculadas</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor={`motivo-${periodo.periodoId || periodo.periodo_id || dadosPeriodo.id || 'periodo'}`}>Motivo/observação local</Label>
+            <Textarea
+              id={`motivo-${periodo.periodoId || periodo.periodo_id || dadosPeriodo.id || 'periodo'}`}
+              value={decisao?.motivo || ''}
+              onChange={(event) => onChange?.({ motivo: event.target.value })}
+              placeholder={exigeMotivo ? 'Obrigatório para esta decisão' : 'Motivo/observação local'}
+              className="min-h-24 bg-white"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`documento-${periodo.periodoId || periodo.periodo_id || dadosPeriodo.id || 'periodo'}`}>Documento</Label>
+            <Input
+              id={`documento-${periodo.periodoId || periodo.periodo_id || dadosPeriodo.id || 'periodo'}`}
+              value={decisao?.documento || ''}
+              onChange={(event) => onChange?.({ documento: event.target.value })}
+              placeholder={exigeDocumento ? 'Documento obrigatório' : 'Documento textual'}
+              className="bg-white"
+            />
+            {pendencias.length > 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                {pendencias.map((pendencia) => <p key={pendencia}>• {pendencia}</p>)}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-md border border-slate-200 bg-white p-3 lg:col-span-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Férias vinculadas</p>
+          <Badge variant="outline">{ferias.length}</Badge>
+        </div>
         {ferias.length === 0 ? (
           <p className="mt-2 text-slate-500">Nenhuma férias vinculada ao período.</p>
         ) : (
@@ -55,6 +102,7 @@ export default function TransicaoDesignacaoPeriodoDetalhes({ periodo = {}, decis
         )}
       </section>
 
+      <ListaCodigos titulo="Bloqueantes completos" itens={bloqueantes} vazio="Nenhum bloqueante identificado." danger />
       <ListaCodigos titulo="Riscos completos" itens={riscos} vazio="Nenhum risco identificado." />
       <ListaCodigos titulo="Alertas" itens={alertas} vazio="Nenhum alerta identificado." />
       <ListaCodigos titulo="Conflitos" itens={conflitos} vazio="Nenhum conflito identificado." />

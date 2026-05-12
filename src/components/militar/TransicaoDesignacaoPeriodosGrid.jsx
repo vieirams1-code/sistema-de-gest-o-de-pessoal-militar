@@ -2,8 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import TransicaoDesignacaoPeriodoDetalhes from './TransicaoDesignacaoPeriodoDetalhes';
 
 export const ACOES_LABELS = {
@@ -185,29 +183,21 @@ export default function TransicaoDesignacaoPeriodosGrid({ periodos = [], acoesSe
         ))}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="min-w-[1500px] w-full text-left text-sm">
+      <div className="rounded-lg border border-slate-200 bg-white">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="p-2">Período</th>
-              <th className="p-2">Aquisitivo</th>
-              <th className="p-2">Status/origem</th>
-              <th className="p-2">Saldo</th>
-              <th className="p-2">Dias</th>
-              <th className="p-2">Férias</th>
-              <th className="p-2">Situação</th>
-              <th className="p-2">Sugestão</th>
-              <th className="p-2">Riscos</th>
-              <th className="p-2">Bloqueantes</th>
-              <th className="p-2">Ação escolhida</th>
-              <th className="p-2">Motivo/observação</th>
-              <th className="p-2">Documento</th>
-              <th className="p-2">Detalhes</th>
+              <th className="w-[18%] p-3">Período / Status</th>
+              <th className="w-[14%] p-3">Saldo / Férias</th>
+              <th className="w-[18%] p-3">Situação / Alertas</th>
+              <th className="w-[16%] p-3">Sugestão</th>
+              <th className="w-[24%] p-3">Ação escolhida</th>
+              <th className="w-[10%] p-3 text-right">Detalhes</th>
             </tr>
           </thead>
           <tbody>
             {linhas.length === 0 ? (
-              <tr><td colSpan={14} className="p-4 text-center text-slate-500">Nenhum período encontrado para o filtro selecionado.</td></tr>
+              <tr><td colSpan={6} className="p-4 text-center text-slate-500">Nenhum período encontrado para o filtro selecionado.</td></tr>
             ) : linhas.map(({ item, index, key, decisao, pendencias }) => {
               const periodo = getDadosPeriodo(item);
               const acoesPermitidas = getAcoesPermitidas(item);
@@ -220,58 +210,70 @@ export default function TransicaoDesignacaoPeriodosGrid({ periodos = [], acoesSe
               const acaoEscolhida = decisao.acao || acaoSugerida || 'manter';
               const exigeMotivo = acaoExigeMotivo(item, decisao);
               const exigeDocumento = acaoExigeDocumento(item, decisao);
+              const totalAlertas = riscos.length + bloqueantes.length;
+              const referencia = periodo.ano_referencia || periodo.periodo_aquisitivo_ref || item.periodoId || item.periodo_id || index + 1;
 
               return (
                 <React.Fragment key={key}>
-                  <tr className={`border-t align-top ${pendencias.length > 0 ? 'bg-amber-50/40' : ''}`}>
-                    <td className="p-2 font-medium text-slate-800">{periodo.ano_referencia || periodo.periodo_aquisitivo_ref || item.periodoId || item.periodo_id || index + 1}</td>
-                    <td className="p-2 text-slate-600">{formatDate(periodo.inicio_aquisitivo)} até {formatDate(periodo.fim_aquisitivo)}</td>
-                    <td className="p-2 text-slate-600">{periodo.status || '—'}<br /><span className="text-xs">{periodo.origem_periodo || '—'}</span></td>
-                    <td className="p-2">{numero(periodo.dias_saldo ?? periodo.saldo ?? periodo.diasSaldo)} dia(s)</td>
-                    <td className="p-2 text-xs">Gozados: {numero(periodo.dias_gozados ?? periodo.diasGozados)}<br />Previstos: {numero(periodo.dias_previstos ?? periodo.diasPrevistos)}</td>
-                    <td className="p-2"><Badge variant="outline">{ferias.length}</Badge></td>
-                    <td className="p-2"><Badge variant="secondary">{item.situacaoAtual || item.situacao_atual || '—'}</Badge></td>
-                    <td className="p-2">{ACOES_LABELS[acaoSugerida] || acaoSugerida || '—'}</td>
-                    <td className="p-2"><div className="flex flex-wrap gap-1">{riscos.length ? riscos.map((risco) => <Badge key={risco} variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">{risco}</Badge>) : '—'}</div></td>
-                    <td className="p-2"><div className="flex flex-wrap gap-1">{bloqueantes.length ? bloqueantes.map((bloqueante) => <Badge key={bloqueante} variant="outline" className="border-red-300 bg-red-50 text-red-700">{bloqueante}</Badge>) : '—'}</div></td>
-                    <td className="p-2 min-w-52">
+                  <tr className={`border-t align-top ${bloqueado ? 'border-l-4 border-l-red-400 bg-red-50/50' : pendencias.length > 0 ? 'bg-amber-50/40' : ''}`}>
+                    <td className="p-3">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-slate-900">{referencia}</p>
+                        <p className="text-xs text-slate-600">{formatDate(periodo.inicio_aquisitivo)} até {formatDate(periodo.fim_aquisitivo)}</p>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="secondary" className="max-w-full truncate">{periodo.status || 'Sem status'}</Badge>
+                          {periodo.origem_periodo && <Badge variant="outline" className="max-w-full truncate">{periodo.origem_periodo}</Badge>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <p className="font-semibold text-slate-900">{numero(periodo.dias_saldo ?? periodo.saldo ?? periodo.diasSaldo)} dia(s)</p>
+                      <p className="text-xs text-slate-500">Gozados {numero(periodo.dias_gozados ?? periodo.diasGozados)} • Prev. {numero(periodo.dias_previstos ?? periodo.diasPrevistos)}</p>
+                      <p className="mt-1 text-xs text-slate-600">{ferias.length} férias vinculada(s)</p>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant="secondary" className="max-w-full truncate">{item.situacaoAtual || item.situacao_atual || '—'}</Badge>
+                        {bloqueantes.length > 0 && <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">{bloqueantes.length} bloqueante(s)</Badge>}
+                        {riscos.length > 0 && <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">{riscos.length} risco(s)</Badge>}
+                        {totalAlertas === 0 && <span className="text-xs text-slate-500">Sem alertas</span>}
+                      </div>
+                    </td>
+                    <td className="p-3 text-slate-700">{ACOES_LABELS[acaoSugerida] || acaoSugerida || '—'}</td>
+                    <td className="p-3">
                       <select
-                        className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm disabled:bg-slate-100"
+                        className={`h-9 w-full rounded-md border px-2 text-sm disabled:bg-slate-100 ${acaoEscolhida !== acaoSugerida ? 'border-blue-300 bg-blue-50 font-medium text-blue-900' : 'border-slate-200 bg-white'}`}
                         value={acaoEscolhida}
                         disabled={bloqueado}
                         onChange={(event) => atualizarDecisao(key, { acao: event.target.value })}
                       >
                         {(bloqueado ? ['manter'] : acoesPermitidas).map((acao) => <option key={acao} value={acao}>{ACOES_LABELS[acao] || acao}</option>)}
                       </select>
-                      {pendencias.length > 0 && (
-                        <div className="mt-1 space-y-1 text-xs text-amber-700">
-                          {pendencias.map((pendencia) => <p key={pendencia} className="flex gap-1"><AlertTriangle className="mt-0.5 h-3 w-3" />{pendencia}</p>)}
-                        </div>
-                      )}
+                      <div className="mt-1 flex flex-wrap gap-1 text-xs">
+                        {bloqueado && <span className="text-red-700">Bloqueante: somente “Manter” neste lote.</span>}
+                        {!bloqueado && (exigeMotivo || exigeDocumento) && <span className="text-amber-700">Preencha {exigeMotivo && exigeDocumento ? 'motivo e documento' : exigeMotivo ? 'motivo' : 'documento'} nos detalhes.</span>}
+                        {pendencias.length > 0 && <span className="inline-flex items-center gap-1 text-amber-700"><AlertTriangle className="h-3 w-3" />{pendencias.length} pendência(s)</span>}
+                      </div>
                     </td>
-                    <td className="p-2 min-w-56">
-                      <Textarea
-                        value={decisao.motivo || ''}
-                        onChange={(event) => atualizarDecisao(key, { motivo: event.target.value })}
-                        placeholder={exigeMotivo ? 'Obrigatório para esta decisão' : 'Motivo/observação local'}
-                        className="min-h-20"
-                      />
-                    </td>
-                    <td className="p-2 min-w-48">
-                      <Input
-                        value={decisao.documento || ''}
-                        onChange={(event) => atualizarDecisao(key, { documento: event.target.value })}
-                        placeholder={exigeDocumento ? 'Documento obrigatório' : 'Documento textual'}
-                      />
-                    </td>
-                    <td className="p-2">
+                    <td className="p-3 text-right">
                       <Button type="button" size="sm" variant="outline" onClick={() => setDetalhesAbertos((atual) => ({ ...atual, [key]: !detalhesAberto }))}>
                         {detalhesAberto ? <ChevronDown className="mr-1 h-4 w-4" /> : <ChevronRight className="mr-1 h-4 w-4" />}Detalhes
                       </Button>
                     </td>
                   </tr>
                   {detalhesAberto && (
-                    <tr className="border-t bg-slate-50"><td colSpan={14} className="p-3"><TransicaoDesignacaoPeriodoDetalhes periodo={item} decisao={decisao} /></td></tr>
+                    <tr className="border-t bg-slate-50">
+                      <td colSpan={6} className="p-3">
+                        <TransicaoDesignacaoPeriodoDetalhes
+                          periodo={item}
+                          decisao={decisao}
+                          exigeMotivo={exigeMotivo}
+                          exigeDocumento={exigeDocumento}
+                          pendencias={pendencias}
+                          onChange={(patch) => atualizarDecisao(key, patch)}
+                        />
+                      </td>
+                    </tr>
                   )}
                 </React.Fragment>
               );
