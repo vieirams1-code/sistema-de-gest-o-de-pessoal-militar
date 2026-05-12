@@ -135,6 +135,114 @@
       "type": "boolean",
       "default": false,
       "description": "Indica exclusão lógica da cadeia de períodos por designação, sem alterar status operacional."
+    },
+    "acao_transicao_designacao": {
+      "type": "string",
+      "enum": [
+        "manter",
+        "marcar_legado_ativa",
+        "excluir_cadeia_operacional",
+        "marcar_indenizado",
+        "cancelar_periodo_futuro_indevido"
+      ],
+      "description": "Ação futura selecionada para transição manual por período de designação."
+    },
+    "transicao_designacao_lote_id": {
+      "type": "string",
+      "description": "Identificador do lote de transição de designação."
+    },
+    "transicao_designacao_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da transição de designação."
+    },
+    "transicao_designacao_por": {
+      "type": "string",
+      "description": "Usuário responsável pela transição de designação."
+    },
+    "transicao_designacao_motivo": {
+      "type": "string",
+      "description": "Motivo administrativo da transição de designação."
+    },
+    "transicao_designacao_contrato_id": {
+      "type": "string",
+      "description": "Contrato de designação associado à transição."
+    },
+    "transicao_designacao_preview_hash": {
+      "type": "string",
+      "description": "Hash opcional da prévia usada na transição de designação."
+    },
+    "indenizado_transicao": {
+      "type": "boolean",
+      "description": "Indica indenização registrada durante transição de designação."
+    },
+    "indenizado_transicao_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora do registro de indenização por transição."
+    },
+    "indenizado_transicao_por": {
+      "type": "string",
+      "description": "Usuário responsável pelo registro de indenização por transição."
+    },
+    "indenizado_transicao_motivo": {
+      "type": "string",
+      "description": "Motivo da indenização registrada por transição."
+    },
+    "indenizado_transicao_documento": {
+      "type": "string",
+      "description": "Documento de referência da indenização por transição."
+    },
+    "indenizado_transicao_dias": {
+      "type": "number",
+      "description": "Quantidade de dias indenizados por transição."
+    },
+    "indenizado_transicao_observacao": {
+      "type": "string",
+      "description": "Observação sobre a indenização por transição."
+    },
+    "cancelado_transicao": {
+      "type": "boolean",
+      "description": "Indica cancelamento lógico realizado por transição de designação."
+    },
+    "cancelado_transicao_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora do cancelamento por transição."
+    },
+    "cancelado_transicao_por": {
+      "type": "string",
+      "description": "Usuário responsável pelo cancelamento por transição."
+    },
+    "cancelado_transicao_motivo": {
+      "type": "string",
+      "description": "Motivo do cancelamento por transição."
+    },
+    "cancelado_transicao_contrato_designacao_id": {
+      "type": "string",
+      "description": "Contrato de designação usado no cancelamento por transição."
+    },
+    "cancelado_transicao_data_base": {
+      "type": "string",
+      "format": "date",
+      "description": "Data-base considerada no cancelamento por transição."
+    },
+    "transicao_designacao_rollback_de_lote_id": {
+      "type": "string",
+      "description": "Lote de transição de designação revertido por rollback futuro."
+    },
+    "transicao_designacao_rollback_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora do rollback futuro da transição de designação."
+    },
+    "transicao_designacao_rollback_por": {
+      "type": "string",
+      "description": "Usuário responsável pelo rollback futuro da transição de designação."
+    },
+    "transicao_designacao_rollback_motivo": {
+      "type": "string",
+      "description": "Motivo do rollback futuro da transição de designação."
     }
   },
   "required": [
