@@ -1,15 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Eye, FileText, Search, ShieldCheck, UserRound, Wand2, XCircle } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Eye, FileText, Plus, Search, ShieldCheck, UserRound, Wand2, XCircle } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
+import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
 import TransicaoLegadoAtivaPreviewModal from '@/components/militar/TransicaoLegadoAtivaPreviewModal';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/components/ui/use-toast';
 import { createPageUrl } from '@/utils';
+import { criarEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPainelContratosDesignacao } from '@/services/getScopedPainelContratosDesignacaoClient';
 import {
   aplicarFiltrosPainelContratos,
@@ -86,12 +89,17 @@ export default function ContratosDesignacao() {
   const { isAdmin, canAccessAction, canAccessAll, permissions, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
   const canView = hasAbsoluteAccess || isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
+  const canCreate = hasAbsoluteAccess || isAdmin || canAccessAction('gerir_contratos_designacao');
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [busca, setBusca] = useState('');
   const [situacao, setSituacao] = useState(FILTRO_SITUACAO.TODOS);
   const [vencimento, setVencimento] = useState(FILTRO_VENCIMENTO.TODOS);
   const [legado, setLegado] = useState(FILTRO_LEGADO.TODOS);
   const [contratoDetalhe, setContratoDetalhe] = useState(null);
   const [contratoTransicao, setContratoTransicao] = useState(null);
+  const [novoContratoOpen, setNovoContratoOpen] = useState(false);
+  const [salvandoContrato, setSalvandoContrato] = useState(false);
 
   const query = useQuery({
     queryKey: ['painel-contratos-designacao', Boolean(isAdmin || hasAbsoluteAccess), null, userEmail || null, null],
@@ -117,6 +125,25 @@ export default function ContratosDesignacao() {
     legado,
   }), [busca, contratos, legado, legadoAtivaPorContrato, matriculasMilitar, militaresPorId, situacao, vencimento]);
 
+  const handleCreateContrato = async (payload) => {
+    setSalvandoContrato(true);
+    try {
+      await criarEscopado('ContratoDesignacaoMilitar', payload);
+      setNovoContratoOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] });
+      toast({ title: 'Contrato cadastrado', description: 'O painel foi atualizado com o novo contrato de designação.' });
+    } catch (error) {
+      toast({
+        title: 'Erro ao cadastrar contrato',
+        description: error?.message || 'Não foi possível salvar o contrato de designação.',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setSalvandoContrato(false);
+    }
+  };
+
   if (loadingUser || !isAccessResolved) return null;
   if (!canView) return <AccessDenied modulo="Contratos de Designação" />;
 
@@ -141,7 +168,7 @@ export default function ContratosDesignacao() {
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
       <div className="max-w-[1600px] mx-auto space-y-6">
-        <header className="flex flex-col gap-2">
+        <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-slate-900 text-white p-3 rounded-2xl shadow-sm"><ClipboardList size={26} /></div>
             <div>
@@ -149,6 +176,11 @@ export default function ContratosDesignacao() {
               <p className="text-slate-500">Controle centralizado de contratos ativos, vencidos, encerrados e cancelados. Nenhuma alteração automática é realizada nesta tela.</p>
             </div>
           </div>
+          {canCreate && (
+            <Button onClick={() => setNovoContratoOpen(true)} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
+              <Plus className="mr-2 h-4 w-4" />Novo contrato
+            </Button>
+          )}
         </header>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
@@ -261,6 +293,15 @@ export default function ContratosDesignacao() {
       </div>
 
 
+      <ContratoDesignacaoModal
+        open={novoContratoOpen}
+        onOpenChange={setNovoContratoOpen}
+        militares={militares}
+        matriculas={matriculasMilitar}
+        onSubmit={handleCreateContrato}
+        isSubmitting={salvandoContrato}
+      />
+
       <TransicaoLegadoAtivaPreviewModal
         open={Boolean(contratoTransicao)}
         onOpenChange={(open) => !open && setContratoTransicao(null)}
@@ -293,6 +334,9 @@ export default function ContratosDesignacao() {
                   <DetailItem label="Início" value={formatDate(contratoDetalhe.data_inicio_contrato)} />
                   <DetailItem label="Fim previsto/operacional" value={formatDate(contratoDetalhe.data_fim_contrato || contratoDetalhe.data_encerramento_operacional)} />
                   <DetailItem label="Data de inclusão para férias" value={formatDate(contratoDetalhe.data_inclusao_para_ferias)} />
+                  <DetailItem label="Tipo de prazo" value={contratoDetalhe.tipo_prazo_contrato} />
+                  <DetailItem label="Gera direito a férias" value={contratoDetalhe.gera_direito_ferias === false ? 'Não' : 'Sim'} />
+                  <DetailItem label="Regra de geração de períodos" value={contratoDetalhe.regra_geracao_periodos} />
                   <DetailItem label="Nº contrato" value={contratoDetalhe.numero_contrato} />
                   <DetailItem label="Boletim/publicação" value={contratoDetalhe.boletim_publicacao} />
                   <DetailItem label="Data publicação" value={formatDate(contratoDetalhe.data_publicacao)} />
@@ -300,6 +344,7 @@ export default function ContratosDesignacao() {
                   <DetailItem label="Tipo de designação" value={contratoDetalhe.tipo_designacao} />
                   <DetailItem label="Legado da Ativa" value={legadoInfo.aplicado ? `Aplicada (${legadoInfo.totalPeriodos} período(s))` : 'Pendente'} />
                   <DetailItem label="Última aplicação legado" value={legadoInfo.ultimaAplicacaoEm ? formatDate(legadoInfo.ultimaAplicacaoEm) : '—'} />
+                  {contratoDetalhe.gera_direito_ferias === false && <div className="md:col-span-2"><DetailItem label="Motivo para não gerar férias" value={contratoDetalhe.motivo_nao_gera_ferias} /></div>}
                   <div className="md:col-span-2"><DetailItem label="Observações" value={contratoDetalhe.observacoes} /></div>
                 </>);
               })()}

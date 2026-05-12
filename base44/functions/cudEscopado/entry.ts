@@ -270,8 +270,16 @@ async function listarMilitarIdsDoEscopo(base44, acessos) {
 }
 
 
+function normalizarTextoContratoDesignacao(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 function normalizarStatusContratoDesignacao(status) {
-  const normalizado = String(status || '').trim().toLowerCase();
+  const normalizado = normalizarTextoContratoDesignacao(status);
   if (['ativo', 'ativa'].includes(normalizado)) return 'ativo';
   if (['encerrado', 'encerrada', 'finalizado', 'finalizada'].includes(normalizado)) return 'encerrado';
   if (['cancelado', 'cancelada'].includes(normalizado)) return 'cancelado';
@@ -282,6 +290,73 @@ function dataTime(valor) {
   if (!valor) return 0;
   const time = new Date(`${String(valor).slice(0, 10)}T00:00:00`).getTime();
   return Number.isFinite(time) ? time : 0;
+}
+
+function normalizarTipoPrazoContratoDesignacao(valor) {
+  return normalizarTextoContratoDesignacao(valor) === 'determinado' ? 'determinado' : 'indeterminado';
+}
+
+function normalizarGeraDireitoFeriasContratoDesignacao(valor) {
+  if (valor === null || valor === undefined) return true;
+  if (typeof valor === 'boolean') return valor;
+  const normalizado = normalizarTextoContratoDesignacao(valor);
+  if (['false', 'nao', 'no', '0'].includes(normalizado)) return false;
+  if (['true', 'sim', 'yes', '1'].includes(normalizado)) return true;
+  return true;
+}
+
+function normalizarRegraGeracaoPeriodosContratoDesignacao(valor) {
+  const normalizado = normalizarTextoContratoDesignacao(valor);
+  if (normalizado === 'bloqueada') return 'bloqueada';
+  if (normalizado === 'manual') return 'manual';
+  return 'normal';
+}
+
+function prepararCamposFeriasContratoDesignacao(data = {}) {
+  const tipoPrazoContrato = normalizarTipoPrazoContratoDesignacao(data?.tipo_prazo_contrato);
+  if (tipoPrazoContrato === 'indeterminado') {
+    return {
+      ...data,
+      tipo_prazo_contrato: 'indeterminado',
+      gera_direito_ferias: true,
+      regra_geracao_periodos: 'normal',
+      motivo_nao_gera_ferias: '',
+    };
+  }
+
+  const geraDireitoFerias = normalizarGeraDireitoFeriasContratoDesignacao(data?.gera_direito_ferias);
+  const regraGeracaoPeriodos = normalizarRegraGeracaoPeriodosContratoDesignacao(data?.regra_geracao_periodos);
+  return {
+    ...data,
+    tipo_prazo_contrato: 'determinado',
+    gera_direito_ferias: geraDireitoFerias,
+    regra_geracao_periodos: regraGeracaoPeriodos,
+    motivo_nao_gera_ferias: geraDireitoFerias ? '' : String(data?.motivo_nao_gera_ferias || '').trim(),
+  };
+}
+
+function validarCamposFeriasContratoDesignacao(data = {}, erros = []) {
+  const tipoPrazoContrato = normalizarTipoPrazoContratoDesignacao(data?.tipo_prazo_contrato);
+  const geraDireitoFerias = tipoPrazoContrato === 'indeterminado' ? true : normalizarGeraDireitoFeriasContratoDesignacao(data?.gera_direito_ferias);
+  const regraGeracaoPeriodos = normalizarRegraGeracaoPeriodosContratoDesignacao(data?.regra_geracao_periodos);
+
+  if (tipoPrazoContrato === 'indeterminado') {
+    if (data?.gera_direito_ferias !== undefined && normalizarGeraDireitoFeriasContratoDesignacao(data.gera_direito_ferias) !== true) {
+      erros.push('Contrato indeterminado deve gerar direito a férias.');
+    }
+    if (data?.regra_geracao_periodos !== undefined && regraGeracaoPeriodos !== 'normal') {
+      erros.push('Contrato indeterminado deve usar regra_geracao_periodos normal.');
+    }
+  }
+
+  if (tipoPrazoContrato === 'determinado') {
+    if (!data?.data_fim_contrato) erros.push('data_fim_contrato é obrigatória para contrato determinado de 12 meses.');
+    if (regraGeracaoPeriodos === 'normal') erros.push('Contrato determinado deve usar regra_geracao_periodos bloqueada ou manual.');
+    if (!geraDireitoFerias && !String(data?.motivo_nao_gera_ferias || '').trim()) {
+      erros.push('motivo_nao_gera_ferias é obrigatório quando contrato determinado não gera direito a férias.');
+    }
+  }
+  return erros;
 }
 
 function possuiActionContratoDesignacao(actions, ...keys) {
@@ -321,6 +396,8 @@ async function garantirContratoAtivoUnico(base44, militarId, registroIdIgnorado 
 }
 
 async function prepararContratoDesignacaoMilitar({ base44, operation, registroId, data, registroExistente, militarAlvoId, userEmail }) {
+  data = data || {};
+  if (operation === 'create') data = prepararCamposFeriasContratoDesignacao(data);
   if (operation === 'delete') {
     const erro = new Error('Delete físico de ContratoDesignacaoMilitar não é permitido. Use cancelamento para preservar histórico.');
     erro.status = 400;
@@ -340,6 +417,7 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
     if (!data?.status_contrato) erros.push('status_contrato é obrigatório.');
     if (statusPayload === 'ativo' && !data?.data_inclusao_para_ferias) erros.push('data_inclusao_para_ferias é obrigatória quando status_contrato = ativo.');
     if (!String(data?.numero_contrato || '').trim() && !String(data?.boletim_publicacao || '').trim()) erros.push('numero_contrato ou boletim_publicacao é obrigatório.');
+    validarCamposFeriasContratoDesignacao(data, erros);
     if (data?.data_inicio_contrato && data?.data_fim_contrato && dataTime(data.data_fim_contrato) < dataTime(data.data_inicio_contrato)) erros.push('data_fim_contrato não pode ser anterior à data_inicio_contrato.');
     if (erros.length) {
       const erro = new Error(erros.join(' '));
@@ -391,6 +469,12 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
   }
 
   const contratoCombinado = { ...registroExistente, ...payloadFinal };
+  const errosFeriasContrato = validarCamposFeriasContratoDesignacao(contratoCombinado, []);
+  if (errosFeriasContrato.length) {
+    const erro = new Error(errosFeriasContrato.join(' '));
+    erro.status = 400;
+    throw erro;
+  }
   if (contratoCombinado.data_inicio_contrato && contratoCombinado.data_fim_contrato && dataTime(contratoCombinado.data_fim_contrato) < dataTime(contratoCombinado.data_inicio_contrato)) {
     const erro = new Error('data_fim_contrato não pode ser anterior à data_inicio_contrato.');
     erro.status = 400;

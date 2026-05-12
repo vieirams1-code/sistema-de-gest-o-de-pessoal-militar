@@ -149,3 +149,38 @@ test('detecta contrato legado apenas quando todos os campos novos estão ausente
   assert.equal(resolverConfiguracaoFeriasContrato({ gera_direito_ferias: undefined }).isContratoLegadoSemCamposNovos, false);
   assert.equal(resolverConfiguracaoFeriasContrato({ regra_geracao_periodos: '' }).isContratoLegadoSemCamposNovos, false);
 });
+
+test('aplica regras automáticas para contrato indeterminado', () => {
+  const payload = validarContratoDesignacaoPayload({
+    militar_id: 'm1',
+    matricula_designacao: '123',
+    data_inicio_contrato: '2026-01-01',
+    data_inclusao_para_ferias: '2026-01-01',
+    status_contrato: 'ativo',
+    numero_contrato: 'CT-1',
+    tipo_prazo_contrato: 'indeterminado',
+    gera_direito_ferias: true,
+    regra_geracao_periodos: 'normal',
+  });
+
+  assert.equal(payload.valido, true);
+});
+
+test('valida regras de férias para contrato determinado', () => {
+  const resultado = validarContratoDesignacaoPayload({
+    militar_id: 'm1',
+    matricula_designacao: '123',
+    data_inicio_contrato: '2026-01-01',
+    data_inclusao_para_ferias: '2026-01-01',
+    status_contrato: 'ativo',
+    numero_contrato: 'CT-1',
+    tipo_prazo_contrato: 'determinado',
+    gera_direito_ferias: false,
+    regra_geracao_periodos: 'normal',
+  });
+
+  assert.equal(resultado.valido, false);
+  assert.match(resultado.erros.join('\n'), /data_fim_contrato/);
+  assert.match(resultado.erros.join('\n'), /bloqueada ou manual/);
+  assert.match(resultado.erros.join('\n'), /motivo_nao_gera_ferias/);
+});
