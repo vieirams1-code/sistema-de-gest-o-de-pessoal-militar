@@ -15,7 +15,6 @@ import { createPageUrl } from '@/utils';
 import { criarEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPainelContratosDesignacao } from '@/services/getScopedPainelContratosDesignacaoClient';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
-import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewService';
 import {
   aplicarFiltrosPainelContratos,
   calcularDiasParaVencimento,
@@ -152,7 +151,7 @@ export default function ContratosDesignacao() {
         includeFoto: false,
         effectiveEmail: effectiveEmail || undefined,
       });
-      return carregarMilitaresComMatriculas(militaresEscopados);
+      return militaresEscopados;
     },
     enabled: Boolean(isAccessResolved && canCreate && novoContratoOpen),
     staleTime: 5 * 60 * 1000,

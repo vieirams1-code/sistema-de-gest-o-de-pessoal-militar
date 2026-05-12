@@ -44,20 +44,21 @@ test('valida obrigatórios de criação', () => {
   const resultado = validarContratoDesignacaoPayload({});
   assert.equal(resultado.valido, false);
   assert.match(resultado.erros.join('\n'), /militar_id/);
-  assert.match(resultado.erros.join('\n'), /matricula_militar_id/);
+  assert.doesNotMatch(resultado.erros.join('\n'), /matricula_militar_id/);
   assert.match(resultado.erros.join('\n'), /matricula_designacao/);
   assert.match(resultado.erros.join('\n'), /data_inicio_contrato/);
+  assert.match(resultado.erros.join('\n'), /data_inclusao_para_ferias/);
   assert.match(resultado.erros.join('\n'), /tipo_prazo_contrato/);
   assert.match(resultado.erros.join('\n'), /gera_direito_ferias/);
   assert.match(resultado.erros.join('\n'), /regra_geracao_periodos/);
 });
 
-test('aceita contrato sem data-base explícita e sem campos administrativos', () => {
+test('aceita contrato sem matricula_militar_id e com matrícula textual da ficha', () => {
   const resultado = validarContratoDesignacaoPayload({
     militar_id: 'm1',
-    matricula_militar_id: 'mat-1',
-    matricula_designacao: '123',
+    matricula_designacao: '031.975-023',
     data_inicio_contrato: '2026-01-01',
+    data_inclusao_para_ferias: '2026-01-01',
     tipo_prazo_contrato: 'indeterminado',
     gera_direito_ferias: true,
     regra_geracao_periodos: 'normal',
