@@ -34,7 +34,12 @@ import KpiCard from '@/pages/extracaoEfetivo/components/KpiCard';
 import CommandCenter from '@/pages/extracaoEfetivo/components/CommandCenter';
 import ExtractionDataGrid from '@/pages/extracaoEfetivo/components/ExtractionDataGrid';
 import { statusBadgeClass } from '@/pages/extracaoEfetivo/extracaoState';
-import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
+import {
+  QUADROS_FIXOS,
+  classificarPostoGraduacao,
+  classificarQuadro,
+  normalizarQuadroLegado,
+} from '@/utils/postoQuadroCompatibilidade';
 import { exportarRegistrosParaExcel } from '@/utils/indicadosExcelExport';
 import { base44 } from '@/api/base44Client';
 
@@ -92,24 +97,6 @@ const FERIAS_PERIODO_OPTIONS = Object.freeze([
 const CATEGORIA_TODAS_VALUE = '__todas_categorias__';
 const CATEGORIA_OFICIAIS_VALUE = 'oficiais';
 const CATEGORIA_PRACAS_VALUE = 'pracas';
-const OFICIAIS_POSTOS = new Set([
-  'Coronel',
-  'Tenente Coronel',
-  'Tenente-Coronel',
-  'Major',
-  'Capitão',
-  '1º Tenente',
-  '2º Tenente',
-  'Aspirante',
-]);
-const PRACAS_POSTOS = new Set([
-  'Subtenente',
-  '1º Sargento',
-  '2º Sargento',
-  '3º Sargento',
-  'Cabo',
-  'Soldado',
-]);
 const CATEGORIA_OPTIONS = Object.freeze([
   { value: CATEGORIA_TODAS_VALUE, label: 'Todos os militares' },
   { value: CATEGORIA_OFICIAIS_VALUE, label: 'Oficiais' },
@@ -134,6 +121,37 @@ function buildRankMap(values = []) {
 const postoGraduacaoRank = buildRankMap(POSTO_GRADUACAO_OPTIONS);
 const statusCadastroRank = buildRankMap(STATUS_CADASTRO_ORDER);
 const quadroRank = buildRankMap(QUADROS_FIXOS);
+
+function normalizeFilterArray(values = [], rankMap = new Map()) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean))]
+    .sort((a, b) => compareByRank(a, b, rankMap));
+}
+
+function normalizeQuadroFilterArray(values = []) {
+  return normalizeFilterArray(
+    (Array.isArray(values) ? values : []).map(normalizarQuadroLegado).filter(Boolean),
+    quadroRank,
+  );
+}
+
+function categoriaParaCarreira(categoriaFilter) {
+  if (categoriaFilter === CATEGORIA_OFICIAIS_VALUE) return 'oficial';
+  if (categoriaFilter === CATEGORIA_PRACAS_VALUE) return 'praca';
+  return null;
+}
+
+function carreiraParaCategoria(carreira) {
+  if (carreira === 'oficial') return CATEGORIA_OFICIAIS_VALUE;
+  if (carreira === 'praca') return CATEGORIA_PRACAS_VALUE;
+  return CATEGORIA_TODAS_VALUE;
+}
+
+function filterByCarreira(values = [], classifier, carreira) {
+  if (!carreira) return values;
+  return values.filter((value) => classifier(value) === carreira);
+}
 
 function normalizeText(value) {
   return String(value || '')
@@ -410,7 +428,7 @@ function buildFiltrosSanitizadosAuditoria(filtrosExecutados) {
     ...(searchTamanho > 0 ? { search_tamanho: searchTamanho } : {}),
     ...filterKeys.reduce((acc, key) => {
       const value = filtros[key];
-      acc[key] = Boolean(value && value !== TODOS_VALUE);
+      acc[key] = Array.isArray(value) ? value.length > 0 : Boolean(value && value !== TODOS_VALUE);
       return acc;
     }, {}),
   };
@@ -455,8 +473,8 @@ function buildFetchMilitaresPayload(filtrosExecutados, lotacoesIds, offset) {
     offset,
     includeFoto: false,
     ...(filtrosExecutados?.search ? { search: filtrosExecutados.search } : {}),
-    ...(filtrosExecutados?.postoGraduacao && filtrosExecutados.postoGraduacao !== TODOS_VALUE
-      ? { postoGraduacaoFiltros: [filtrosExecutados.postoGraduacao] }
+    ...(Array.isArray(filtrosExecutados?.postoGraduacao) && filtrosExecutados.postoGraduacao.length > 0
+      ? { postoGraduacaoFiltros: filtrosExecutados.postoGraduacao }
       : {}),
     ...(filtrosExecutados?.status && filtrosExecutados.status !== TODOS_VALUE
       ? { statusCadastro: filtrosExecutados.status }
@@ -495,8 +513,9 @@ export default function ExtracaoEfetivo() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState(CATEGORIA_TODAS_VALUE);
-  const [postoFilter, setPostoFilter] = useState(TODOS_VALUE);
-  const [quadroFilter, setQuadroFilter] = useState(TODOS_VALUE);
+  const [postoFilters, setPostoFiltersState] = useState([]);
+  const [quadroFilters, setQuadroFiltersState] = useState([]);
+  const [compatibilityNotice, setCompatibilityNotice] = useState('');
   const [statusFilter, setStatusFilter] = useState('Ativo');
   const [situacaoMilitarFilter, setSituacaoMilitarFilter] = useState(TODOS_VALUE);
   const [funcaoFilter, setFuncaoFilter] = useState(TODOS_VALUE);
@@ -614,8 +633,8 @@ export default function ExtracaoEfetivo() {
       offset: 0,
       search: searchTerm.trim() || null,
       categoria: categoriaFilter,
-      postoGraduacao: postoFilter,
-      quadro: quadroFilter,
+      postoGraduacao: normalizeFilterArray(postoFilters, postoGraduacaoRank),
+      quadro: normalizeQuadroFilterArray(quadroFilters),
       status: statusFilter,
       situacaoMilitar: situacaoMilitarFilter,
       funcao: funcaoFilter,
@@ -633,8 +652,8 @@ export default function ExtracaoEfetivo() {
       feriasStatusFilter,
       funcaoFilter,
       lotacaoFilter,
-      postoFilter,
-      quadroFilter,
+      postoFilters,
+      quadroFilters,
       searchTerm,
       situacaoMilitarFilter,
       statusFilter,
@@ -746,6 +765,24 @@ export default function ExtracaoEfetivo() {
     [militaresComFeriasAgregadas],
   );
 
+  const carreiraSelecionada = useMemo(() => {
+    const categoriaCarreira = categoriaParaCarreira(categoriaFilter);
+    if (categoriaCarreira) return categoriaCarreira;
+
+    const carreirasPostos = new Set(postoFilters.map(classificarPostoGraduacao).filter(Boolean));
+    return carreirasPostos.size === 1 ? [...carreirasPostos][0] : null;
+  }, [categoriaFilter, postoFilters]);
+
+  const postosCompativeisDisponiveis = useMemo(
+    () => filterByCarreira(postosDisponiveis, classificarPostoGraduacao, carreiraSelecionada),
+    [carreiraSelecionada, postosDisponiveis],
+  );
+
+  const quadrosCompativeisDisponiveis = useMemo(
+    () => uniqueSorted(filterByCarreira(quadrosDisponiveis.map(normalizarQuadroLegado), classificarQuadro, carreiraSelecionada)),
+    [carreiraSelecionada, quadrosDisponiveis],
+  );
+
   const statusDisponiveis = useMemo(
     () =>
       uniqueSorted([
@@ -801,7 +838,7 @@ export default function ExtracaoEfetivo() {
   const filteredMilitares = useMemo(() => {
     return militaresComFeriasAgregadas.filter((militar) => {
       const posto = getValorCampoEfetivo(militar, 'posto_graduacao');
-      const quadroNormalizado = getQuadroEfetivo(militar);
+      const quadroNormalizado = normalizarQuadroLegado(getQuadroEfetivo(militar));
       const status = getValorCampoEfetivo(militar, 'status_cadastro');
       const lotacaoId = getLotacaoId(militar);
       const lotacaoNome = getLotacaoNomeEfetivo(militar);
@@ -813,16 +850,16 @@ export default function ExtracaoEfetivo() {
       const feriasStatusResumido = String(militar.ferias_status_resumido || '');
 
       if (!filtrosExecutados) return false;
-      if (filtrosExecutados.categoria === CATEGORIA_OFICIAIS_VALUE && !OFICIAIS_POSTOS.has(posto)) {
+      if (filtrosExecutados.categoria === CATEGORIA_OFICIAIS_VALUE && classificarPostoGraduacao(posto) !== 'oficial') {
         return false;
       }
-      if (filtrosExecutados.categoria === CATEGORIA_PRACAS_VALUE && !PRACAS_POSTOS.has(posto)) {
+      if (filtrosExecutados.categoria === CATEGORIA_PRACAS_VALUE && classificarPostoGraduacao(posto) !== 'praca') {
         return false;
       }
-      if (filtrosExecutados.postoGraduacao !== TODOS_VALUE && posto !== filtrosExecutados.postoGraduacao) {
+      if (Array.isArray(filtrosExecutados.postoGraduacao) && filtrosExecutados.postoGraduacao.length > 0 && !filtrosExecutados.postoGraduacao.includes(posto)) {
         return false;
       }
-      if (filtrosExecutados.quadro !== TODOS_VALUE && quadroNormalizado !== filtrosExecutados.quadro) {
+      if (Array.isArray(filtrosExecutados.quadro) && filtrosExecutados.quadro.length > 0 && !filtrosExecutados.quadro.includes(quadroNormalizado)) {
         return false;
       }
       if (filtrosExecutados.status !== TODOS_VALUE && status !== filtrosExecutados.status) return false;
@@ -888,6 +925,56 @@ export default function ExtracaoEfetivo() {
       <ArrowUp className="h-3.5 w-3.5" />
     ) : (
       <ArrowDown className="h-3.5 w-3.5" />
+    );
+  };
+
+  const handleCategoriaFilterChange = (nextCategoria) => {
+    const nextCarreira = categoriaParaCarreira(nextCategoria);
+    const nextPostos = normalizeFilterArray(
+      filterByCarreira(postoFilters, classificarPostoGraduacao, nextCarreira),
+      postoGraduacaoRank,
+    );
+    const nextQuadros = normalizeQuadroFilterArray(filterByCarreira(quadroFilters, classificarQuadro, nextCarreira));
+    const removedIncompatible = nextPostos.length !== postoFilters.length || nextQuadros.length !== quadroFilters.length;
+
+    setCategoriaFilter(nextCategoria);
+    setPostoFiltersState(nextPostos);
+    setQuadroFiltersState(nextQuadros);
+    setCompatibilityNotice(removedIncompatible ? 'Opções incompatíveis foram removidas para manter a carreira selecionada.' : '');
+  };
+
+  const handlePostoFiltersChange = (nextPostos) => {
+    const normalized = normalizeFilterArray(nextPostos, postoGraduacaoRank);
+    const carreiras = new Set(normalized.map(classificarPostoGraduacao).filter(Boolean));
+    const inferredCarreira = carreiras.size === 1 ? [...carreiras][0] : null;
+    const categoriaCarreira = categoriaParaCarreira(categoriaFilter);
+    const carreiraPermitida = categoriaCarreira || inferredCarreira;
+    const compatiblePostos = normalizeFilterArray(
+      filterByCarreira(normalized, classificarPostoGraduacao, carreiraPermitida),
+      postoGraduacaoRank,
+    );
+    const compatibleQuadros = normalizeQuadroFilterArray(filterByCarreira(quadroFilters, classificarQuadro, carreiraPermitida));
+    const removedIncompatible = compatiblePostos.length !== normalized.length || compatibleQuadros.length !== quadroFilters.length;
+
+    if (!categoriaCarreira && inferredCarreira) {
+      setCategoriaFilter(carreiraParaCategoria(inferredCarreira));
+    }
+
+    setPostoFiltersState(compatiblePostos);
+    setQuadroFiltersState(compatibleQuadros);
+    setCompatibilityNotice(removedIncompatible ? 'Opções incompatíveis foram removidas para manter a carreira selecionada.' : '');
+  };
+
+  const handleQuadroFiltersChange = (nextQuadros) => {
+    const carreiraPermitida = carreiraSelecionada;
+    const normalized = normalizeQuadroFilterArray(nextQuadros);
+    const compatibleQuadros = normalizeQuadroFilterArray(filterByCarreira(normalized, classificarQuadro, carreiraPermitida));
+
+    setQuadroFiltersState(compatibleQuadros);
+    setCompatibilityNotice(
+      compatibleQuadros.length !== normalized.length
+        ? 'Quadros incompatíveis foram removidos para manter a carreira selecionada.'
+        : '',
     );
   };
 
@@ -1000,8 +1087,9 @@ export default function ExtracaoEfetivo() {
   const clearFilters = () => {
     setSearchTerm('');
     setCategoriaFilter(CATEGORIA_TODAS_VALUE);
-    setPostoFilter(TODOS_VALUE);
-    setQuadroFilter(TODOS_VALUE);
+    setPostoFiltersState([]);
+    setQuadroFiltersState([]);
+    setCompatibilityNotice('');
     setStatusFilter('Ativo');
     setSituacaoMilitarFilter(TODOS_VALUE);
     setFuncaoFilter(TODOS_VALUE);
@@ -1055,25 +1143,29 @@ export default function ExtracaoEfetivo() {
 
     if (presetId === 'oficiais') {
       setCategoriaFilter(CATEGORIA_OFICIAIS_VALUE);
-      setPostoFilter(TODOS_VALUE);
+      setPostoFiltersState([]);
+      setQuadroFiltersState((current) => normalizeQuadroFilterArray(filterByCarreira(current, classificarQuadro, 'oficial')));
       return;
     }
 
     if (presetId === 'pracas') {
       setCategoriaFilter(CATEGORIA_PRACAS_VALUE);
-      setPostoFilter(TODOS_VALUE);
+      setPostoFiltersState([]);
+      setQuadroFiltersState((current) => normalizeQuadroFilterArray(filterByCarreira(current, classificarQuadro, 'praca')));
       return;
     }
 
     if (presetId === 'cabos') {
-      setCategoriaFilter(CATEGORIA_TODAS_VALUE);
-      setPostoFilter('Cabo');
+      setCategoriaFilter(CATEGORIA_PRACAS_VALUE);
+      setPostoFiltersState(['Cabo']);
+      setQuadroFiltersState((current) => normalizeQuadroFilterArray(filterByCarreira(current, classificarQuadro, 'praca')));
       return;
     }
 
     if (presetId === 'soldados') {
-      setCategoriaFilter(CATEGORIA_TODAS_VALUE);
-      setPostoFilter('Soldado');
+      setCategoriaFilter(CATEGORIA_PRACAS_VALUE);
+      setPostoFiltersState(['Soldado']);
+      setQuadroFiltersState((current) => normalizeQuadroFilterArray(filterByCarreira(current, classificarQuadro, 'praca')));
       return;
     }
 
@@ -1252,8 +1344,9 @@ export default function ExtracaoEfetivo() {
           values={{
             searchTerm,
             categoriaFilter,
-            postoFilter,
-            quadroFilter,
+            postoFilters,
+            quadroFilters,
+            compatibilityNotice,
             statusFilter,
             situacaoMilitarFilter,
             funcaoFilter,
@@ -1265,9 +1358,9 @@ export default function ExtracaoEfetivo() {
           }}
           setters={{
             setSearchTerm,
-            setCategoriaFilter,
-            setPostoFilter,
-            setQuadroFilter,
+            setCategoriaFilter: handleCategoriaFilterChange,
+            setPostoFilters: handlePostoFiltersChange,
+            setQuadroFilters: handleQuadroFiltersChange,
             setStatusFilter,
             setSituacaoMilitarFilter,
             setFuncaoFilter,
@@ -1279,9 +1372,9 @@ export default function ExtracaoEfetivo() {
           }}
           options={{
             categoriaOptions: CATEGORIA_OPTIONS,
-            postosDisponiveis,
+            postosDisponiveis: postosCompativeisDisponiveis,
             statusDisponiveis,
-            quadrosDisponiveis,
+            quadrosDisponiveis: quadrosCompativeisDisponiveis,
             situacoesMilitaresDisponiveis,
             funcoesDisponiveis,
             condicoesDisponiveis,
