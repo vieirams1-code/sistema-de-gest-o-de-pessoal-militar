@@ -152,6 +152,7 @@ const menuGroups = [
           { name: 'Diagnóstico', page: 'AntiguidadeDiagnostico', icon: ClipboardList, adminOnly: true },
           { name: 'Configuração de Quadros', page: 'AntiguidadeConfigQuadros', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
           { name: 'Importar Promoções', page: 'AntiguidadeImportarPromocoes', icon: ScrollText, adminOnly: true },
+          { name: 'Promoções Coletivas', page: 'AntiguidadePromocaoColetiva', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
           { name: 'Prévia Geral', page: 'AntiguidadePrevia', icon: ListOrdered, adminOnly: true },
         ],
       },
