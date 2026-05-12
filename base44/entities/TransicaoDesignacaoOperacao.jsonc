@@ -1,0 +1,136 @@
+{
+  "name": "TransicaoDesignacaoOperacao",
+  "type": "object",
+  "title": "Operação de Transição Manual de Designação",
+  "description": "Registro de auditoria por período aquisitivo para futura transição manual de designação. Não executa alterações operacionais por si só.",
+  "properties": {
+    "lote_id": {
+      "type": "string",
+      "description": "ID do lote TransicaoDesignacaoLote ao qual a operação pertence."
+    },
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar relacionado à operação."
+    },
+    "contrato_designacao_id": {
+      "type": "string",
+      "description": "ID do contrato de designação relacionado à operação."
+    },
+    "periodo_aquisitivo_id": {
+      "type": "string",
+      "description": "ID do período aquisitivo alvo da operação de auditoria."
+    },
+    "acao": {
+      "type": "string",
+      "enum": [
+        "manter",
+        "marcar_legado_ativa",
+        "marcar_indenizado",
+        "excluir_cadeia_operacional",
+        "cancelar_periodo_futuro_indevido"
+      ],
+      "description": "Ação registrada para futura transição manual."
+    },
+    "acao_sugerida": {
+      "type": "string",
+      "description": "Ação sugerida pela pré-visualização."
+    },
+    "override_sugestao": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica se a ação registrada diverge da sugestão."
+    },
+    "motivo": {
+      "type": "string",
+      "description": "Motivo administrativo da operação."
+    },
+    "observacao": {
+      "type": "string",
+      "description": "Observação administrativa da operação."
+    },
+    "documento_json": {
+      "type": "string",
+      "description": "Documento de suporte em JSON serializado."
+    },
+    "estado_anterior_json": {
+      "type": "string",
+      "description": "Estado anterior capturado para auditoria em JSON serializado."
+    },
+    "estado_posterior_json": {
+      "type": "string",
+      "description": "Estado posterior capturado para auditoria em JSON serializado."
+    },
+    "riscos_json": {
+      "type": "string",
+      "description": "Riscos identificados em JSON serializado."
+    },
+    "alertas_json": {
+      "type": "string",
+      "description": "Alertas identificados em JSON serializado."
+    },
+    "conflitos_json": {
+      "type": "string",
+      "description": "Conflitos identificados em JSON serializado."
+    },
+    "bloqueantes_json": {
+      "type": "string",
+      "description": "Bloqueantes identificados em JSON serializado."
+    },
+    "status_operacao": {
+      "type": "string",
+      "enum": [
+        "registrada",
+        "aplicada",
+        "ignorada",
+        "bloqueada",
+        "falhou",
+        "revertida"
+      ],
+      "default": "registrada",
+      "description": "Status de auditoria da operação."
+    },
+    "aplicado_por": {
+      "type": "string",
+      "description": "Usuário responsável pela futura aplicação da operação."
+    },
+    "aplicado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da futura aplicação da operação."
+    },
+    "rollback_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de rollback futuro. Campo reservado; rollback não é implementado neste lote."
+    },
+    "rollback_por": {
+      "type": "string",
+      "description": "Usuário responsável por rollback futuro. Campo reservado; rollback não é implementado neste lote."
+    },
+    "rollback_motivo": {
+      "type": "string",
+      "description": "Motivo de rollback futuro. Campo reservado; rollback não é implementado neste lote."
+    }
+  },
+  "required": [
+    "lote_id",
+    "periodo_aquisitivo_id"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
