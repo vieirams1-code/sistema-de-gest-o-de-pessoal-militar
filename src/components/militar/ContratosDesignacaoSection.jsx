@@ -117,20 +117,15 @@ export default function ContratosDesignacaoSection({
             Nenhum contrato de designação cadastrado para este militar.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border border-slate-200">
-            <table className="w-full text-sm">
+          <div className="rounded-md border border-slate-200">
+            <table className="w-full table-fixed text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="p-3 text-left">Status</th>
-                  <th className="p-3 text-left">Matrícula</th>
-                  <th className="p-3 text-left">Início</th>
-                  <th className="p-3 text-left">Fim/encerramento</th>
-                  <th className="p-3 text-left">Data-base férias</th>
-                  <th className="p-3 text-left">Contrato/boletim</th>
-                  <th className="p-3 text-left">Publicação</th>
-                  <th className="p-3 text-left">Legal/tipo</th>
-                  <th className="p-3 text-left">Observações</th>
-                  <th className="p-3 text-right">Ações</th>
+                  <th className="w-[20%] p-3 text-left">Status / datas</th>
+                  <th className="w-[24%] p-3 text-left">Contrato / boletim / publicação</th>
+                  <th className="w-[20%] p-3 text-left">Legal / tipo / base</th>
+                  <th className="w-[18%] p-3 text-left">Observações</th>
+                  <th className="w-[18%] p-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -140,25 +135,37 @@ export default function ContratosDesignacaoSection({
                   const podePrepararLegadoAtiva = ativoContrato && Boolean(contrato.data_inclusao_para_ferias) && canPrepararLegadoAtiva;
                   return (
                     <tr key={contrato.id || `${contrato.matricula_designacao}-${contrato.data_inicio_contrato}`} className="border-t border-slate-100 align-top">
-                      <td className="p-3"><Badge className={badge.className}>{badge.label}</Badge></td>
-                      <td className="p-3 font-medium text-slate-700">{contrato.matricula_designacao || '—'}</td>
-                      <td className="p-3">{formatDate(contrato.data_inicio_contrato)}</td>
-                      <td className="p-3">{formatDate(contrato.data_fim_contrato || contrato.data_encerramento_operacional)}</td>
-                      <td className="p-3">{formatDate(contrato.data_inclusao_para_ferias)}</td>
-                      <td className="p-3">{contrato.numero_contrato || '—'}<br /><span className="text-xs text-slate-500">{contrato.boletim_publicacao || '—'}</span></td>
-                      <td className="p-3">{formatDate(contrato.data_publicacao)}</td>
-                      <td className="p-3">{contrato.fonte_legal || '—'}<br /><span className="text-xs text-slate-500">{contrato.tipo_designacao || '—'}</span></td>
-                      <td className="p-3 max-w-[180px]">{resumoObservacoes(contrato.observacoes)}</td>
                       <td className="p-3">
-                        <div className="flex flex-col gap-2 items-end">
+                        <div className="space-y-1">
+                          <Badge className={badge.className}>{badge.label}</Badge>
+                          <p className="font-medium text-slate-700">{contrato.matricula_designacao || '—'}</p>
+                          <p className="text-xs text-slate-500">Início: {formatDate(contrato.data_inicio_contrato)}</p>
+                          <p className="text-xs text-slate-500">Fim/enc.: {formatDate(contrato.data_fim_contrato || contrato.data_encerramento_operacional)}</p>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <p className="break-words font-medium text-slate-800">{contrato.numero_contrato || '—'}</p>
+                        <p className="break-words text-xs text-slate-500">Boletim: {contrato.boletim_publicacao || '—'}</p>
+                        <p className="text-xs text-slate-500">Publicação: {formatDate(contrato.data_publicacao)}</p>
+                      </td>
+                      <td className="p-3">
+                        <p className="break-words text-slate-700">{contrato.fonte_legal || '—'}</p>
+                        <p className="break-words text-xs text-slate-500">Tipo: {contrato.tipo_designacao || '—'}</p>
+                        <p className="text-xs text-slate-500">Data-base férias: {formatDate(contrato.data_inclusao_para_ferias)}</p>
+                      </td>
+                      <td className="p-3 text-slate-600">
+                        <p className="break-words text-xs leading-5">{resumoObservacoes(contrato.observacoes)}</p>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-col items-stretch gap-2">
                           <Button size="sm" variant="outline" onClick={() => setDetalhe(contrato)}>Ver detalhes</Button>
                           {podePrepararLegadoAtiva && (
-                            <Button size="sm" variant="outline" onClick={() => setPreviewLegadoAtiva(contrato)} className="border-amber-200 text-amber-800 hover:bg-amber-50">
-                              <Wand2 className="w-4 h-4 mr-1" />Preparar transição para Legado da Ativa
+                            <Button size="sm" variant="outline" onClick={() => setPreviewLegadoAtiva(contrato)} className="whitespace-normal border-amber-200 text-amber-800 hover:bg-amber-50">
+                              <Wand2 className="mr-1 h-4 w-4 shrink-0" />Preparar transição
                             </Button>
                           )}
                           {ativoContrato && canEncerrar && <Button size="sm" variant="outline" onClick={() => setEncerrar(contrato)}>Encerrar</Button>}
-                          {canCancelar && normalizarStatusContratoDesignacao(contrato.status_contrato) !== 'cancelado' && <Button size="sm" variant="destructive" onClick={() => setCancelar(contrato)}>Cancelar lançamento</Button>}
+                          {canCancelar && normalizarStatusContratoDesignacao(contrato.status_contrato) !== 'cancelado' && <Button size="sm" variant="destructive" onClick={() => setCancelar(contrato)}>Cancelar</Button>}
                         </div>
                       </td>
                     </tr>

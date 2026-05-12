@@ -25,10 +25,6 @@ function formatDate(date) {
   try { return new Date(`${String(date).slice(0, 10)}T00:00:00`).toLocaleDateString('pt-BR'); } catch (_e) { return date; }
 }
 
-function plural(total, singular, pluralText) {
-  return `${total || 0} ${total === 1 ? singular : pluralText}`;
-}
-
 function ListaPeriodos({ titulo, itens = [], vazio, renderExtra }) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-3">
@@ -84,23 +80,27 @@ function RelatorioAplicacao({ resultado }) {
   );
 }
 
-function CabecalhoPreview({ preview, totais }) {
+function CabecalhoPreview({ preview, previewHash }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+    <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <p className="text-xs text-slate-500">Militar</p>
-        <p className="font-semibold text-slate-800">{preview.militar?.nome || '—'}</p>
-        <p className="text-slate-500">{preview.militar?.nome_guerra || '—'} • {preview.militar?.matricula || '—'}</p>
+        <p className="text-xs font-medium text-slate-500">Militar</p>
+        <p className="truncate font-semibold text-slate-800">{preview.militar?.nome || '—'}</p>
+        <p className="truncate text-xs text-slate-500">{preview.militar?.nome_guerra || '—'} • {preview.militar?.matricula || '—'}</p>
       </div>
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <p className="text-xs text-slate-500">Contrato ativo</p>
-        <p className="font-semibold text-slate-800">{preview.contrato?.numero_contrato || 'Sem número'}</p>
-        <p className="text-slate-500">Boletim: {preview.contrato?.boletim_publicacao || '—'} • Início: {formatDate(preview.contrato?.data_inicio_contrato)}</p>
+        <p className="text-xs font-medium text-slate-500">Contrato ativo</p>
+        <p className="truncate font-semibold text-slate-800">{preview.contrato?.numero_contrato || 'Sem número'}</p>
+        <p className="truncate text-xs text-slate-500">Boletim {preview.contrato?.boletim_publicacao || '—'} • Início {formatDate(preview.contrato?.data_inicio_contrato)}</p>
       </div>
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-        <p className="text-xs text-blue-600">Data-base resolvida</p>
-        <p className="text-xl font-bold text-blue-900">{formatDate(preview.data_base)}</p>
-        <p className="text-blue-700">{plural(totais.periodos_analisados || preview.periodos?.length, 'período analisado', 'períodos analisados')}</p>
+        <p className="text-xs font-medium text-blue-600">Data-base</p>
+        <p className="font-semibold text-blue-900">{formatDate(preview.data_base)}</p>
+        <p className="text-xs text-blue-700">Base da prévia recalculada</p>
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <p className="text-xs font-medium text-slate-500">Hash da prévia</p>
+        <p className="break-all font-mono text-xs text-slate-800">{previewHash || '—'}</p>
       </div>
     </div>
   );
@@ -205,7 +205,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Prévia da transição para Legado da Ativa</DialogTitle>
           <DialogDescription>
@@ -247,12 +247,11 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
 
         {preview && (
           <div className="space-y-4">
-            <CabecalhoPreview preview={preview} totais={totais} />
+            <CabecalhoPreview preview={preview} previewHash={previewHash} />
 
             {usaFluxoPorPeriodo ? (
               <>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                  <p><strong>Hash da prévia:</strong> {previewHash || '—'}</p>
                   <p><strong>Estado preparado:</strong> confirmacaoTextual, acoesSelecionadas e previewHash permanecem locais e não são enviados para aplicação neste lote.</p>
                 </div>
                 <TransicaoDesignacaoResumoAcoes resumo={resumoDecisoes} />
