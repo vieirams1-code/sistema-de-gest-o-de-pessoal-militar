@@ -15,6 +15,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { aplicarTransicaoLegadoAtiva, previsualizarTransicaoLegadoAtiva } from '@/services/transicaoLegadoAtivaClient';
+import TransicaoDesignacaoPeriodosGrid, { calcularResumoDecisoes, criarDecisoesIniciais } from './TransicaoDesignacaoPeriodosGrid';
+import TransicaoDesignacaoResumoAcoes from './TransicaoDesignacaoResumoAcoes';
 
 const CONFIRMACAO_TEXTUAL = 'MARCAR LEGADO DA ATIVA';
 
@@ -78,19 +80,29 @@ function RelatorioAplicacao({ resultado }) {
         <ListaPeriodos titulo="Já marcados" itens={resultado.jaMarcados} vazio="Nenhum período já estava marcado." />
         <ListaPeriodos titulo="Conflitos" itens={resultado.conflitos} vazio="Nenhum conflito encontrado." />
       </div>
-      {resultado.riscos?.length > 0 && (
-        <section className="rounded-lg border border-amber-200 bg-white p-3">
-          <h4 className="font-semibold text-slate-800 mb-2">Riscos/alertas retornados</h4>
-          <div className="flex flex-wrap gap-1">
-            {resultado.riscos.map((risco, index) => (
-              <Badge key={`${risco.codigo}-${risco.periodo_id || index}`} variant="outline" className={risco.bloqueante ? 'border-red-300 text-red-700' : ''}>
-                {risco.codigo}{risco.bloqueante ? ' • bloqueante' : ''}
-              </Badge>
-            ))}
-          </div>
-        </section>
-      )}
     </section>
+  );
+}
+
+function CabecalhoPreview({ preview, totais }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <p className="text-xs text-slate-500">Militar</p>
+        <p className="font-semibold text-slate-800">{preview.militar?.nome || '—'}</p>
+        <p className="text-slate-500">{preview.militar?.nome_guerra || '—'} • {preview.militar?.matricula || '—'}</p>
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <p className="text-xs text-slate-500">Contrato ativo</p>
+        <p className="font-semibold text-slate-800">{preview.contrato?.numero_contrato || 'Sem número'}</p>
+        <p className="text-slate-500">Boletim: {preview.contrato?.boletim_publicacao || '—'} • Início: {formatDate(preview.contrato?.data_inicio_contrato)}</p>
+      </div>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+        <p className="text-xs text-blue-600">Data-base resolvida</p>
+        <p className="text-xl font-bold text-blue-900">{formatDate(preview.data_base)}</p>
+        <p className="text-blue-700">{plural(totais.periodos_analisados || preview.periodos?.length, 'período analisado', 'períodos analisados')}</p>
+      </div>
+    </div>
   );
 }
 
@@ -102,6 +114,8 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [confirmacaoTextual, setConfirmacaoTextual] = useState('');
+  const [acoesSelecionadas, setAcoesSelecionadas] = useState({});
+  const [previewHash, setPreviewHash] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -112,9 +126,15 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       setPreview(null);
       setResultadoAplicacao(null);
       setConfirmacaoTextual('');
+      setAcoesSelecionadas({});
+      setPreviewHash(null);
       try {
         const data = await previsualizarTransicaoLegadoAtiva({ militarId, contratoDesignacaoId: contrato.id });
-        if (active) setPreview(data);
+        if (active) {
+          setPreview(data);
+          setPreviewHash(data?.preview_hash || data?.meta?.previewHash || null);
+          setAcoesSelecionadas(criarDecisoesIniciais(data?.periodos || []));
+        }
       } catch (err) {
         if (active) setError(err?.message || 'Erro ao carregar prévia da transição.');
       } finally {
@@ -126,9 +146,12 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   }, [open, militarId, contrato?.id]);
 
   const totais = preview?.totais || {};
+  const periodos = preview?.periodos || [];
+  const usaFluxoPorPeriodo = periodos.length > 0;
+  const resumoDecisoes = useMemo(() => calcularResumoDecisoes(periodos, acoesSelecionadas), [periodos, acoesSelecionadas]);
   const riscosBloqueantes = useMemo(() => (preview?.riscos || []).filter((risco) => risco.bloqueante), [preview?.riscos]);
   const candidatosAplicaveis = Number(totais.candidatos || 0) > 0;
-  const podeAplicar = confirmacaoTextual === CONFIRMACAO_TEXTUAL && candidatosAplicaveis && riscosBloqueantes.length === 0 && !applying;
+  const podeAplicarLegado = !usaFluxoPorPeriodo && confirmacaoTextual === CONFIRMACAO_TEXTUAL && candidatosAplicaveis && riscosBloqueantes.length === 0 && !applying;
   const motivoBloqueioAplicacao = riscosBloqueantes.length > 0
     ? 'Há riscos bloqueantes na prévia recalculada.'
     : !candidatosAplicaveis
@@ -158,16 +181,16 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
     ]);
   }
 
-  async function handleAplicar() {
-    if (!podeAplicar) return;
+  async function handleAplicarLegado() {
+    if (!podeAplicarLegado) return;
     setApplying(true);
     setError('');
     try {
       const resultado = await aplicarTransicaoLegadoAtiva({
         militarId,
         contratoDesignacaoId: contrato.id,
-        confirmacaoTextual: confirmacaoTextual,
-        previewHash: preview?.preview_hash || preview?.meta?.previewHash,
+        confirmacaoTextual,
+        previewHash,
       });
       setResultadoAplicacao(resultado);
       await invalidarQueriesRelacionadas();
@@ -182,19 +205,31 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Prévia da transição para Legado da Ativa</DialogTitle>
           <DialogDescription>
-            Relatório de elegibilidade do contrato ativo antes da aplicação controlada.
+            Relatório de elegibilidade do contrato ativo e preparação local das decisões por período.
           </DialogDescription>
         </DialogHeader>
 
         <Alert className="border-blue-200 bg-blue-50 text-blue-900">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Aplicação operacional controlada</AlertTitle>
-          <AlertDescription>Esta ação não apaga períodos, não altera saldos e não altera férias. Os períodos candidatos serão marcados como Legado da Ativa.</AlertDescription>
+          <AlertTitle>Preservação histórica e aplicação futura</AlertTitle>
+          <AlertDescription>
+            As ações planejadas não apagarão períodos, férias, saldos ou publicações. O período permanecerá auditável; apenas seu papel operacional na cadeia de designação será ajustado no lote de aplicação.
+          </AlertDescription>
         </Alert>
+
+        {usaFluxoPorPeriodo && (
+          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Aplicação manual será liberada no próximo lote</AlertTitle>
+            <AlertDescription>
+              Esta tela prepara as decisões por período. A aplicação manual será liberada em lote posterior. As decisões, o previewHash e a confirmação textual ficam apenas em estado local nesta versão.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {loading && (
           <div className="rounded-lg border border-slate-200 p-6 text-sm text-slate-600 flex items-center gap-2">
@@ -212,89 +247,90 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
 
         {preview && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">Militar</p>
-                <p className="font-semibold text-slate-800">{preview.militar?.nome || '—'}</p>
-                <p className="text-slate-500">{preview.militar?.nome_guerra || '—'} • {preview.militar?.matricula || '—'}</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">Contrato ativo</p>
-                <p className="font-semibold text-slate-800">{preview.contrato?.numero_contrato || 'Sem número'}</p>
-                <p className="text-slate-500">Boletim: {preview.contrato?.boletim_publicacao || '—'} • Início: {formatDate(preview.contrato?.data_inicio_contrato)}</p>
-              </div>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                <p className="text-xs text-blue-600">Data-base resolvida</p>
-                <p className="text-xl font-bold text-blue-900">{formatDate(preview.data_base)}</p>
-                <p className="text-blue-700">{plural(totais.periodos_analisados, 'período analisado', 'períodos analisados')}</p>
-              </div>
-            </div>
+            <CabecalhoPreview preview={preview} totais={totais} />
 
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-center text-sm">
-              <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Candidatos</p><p className="font-bold">{totais.candidatos || 0}</p></div>
-              <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Ignorados</p><p className="font-bold">{totais.ignorados || 0}</p></div>
-              <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Já marcados</p><p className="font-bold">{totais.ja_marcados || 0}</p></div>
-              <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Saldo aberto</p><p className="font-bold">{totais.com_saldo_aberto || 0}</p></div>
-              <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Com férias</p><p className="font-bold">{totais.com_ferias_vinculadas || 0}</p></div>
-              <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Bloqueantes</p><p className="font-bold">{totais.bloqueantes || 0}</p></div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <ListaPeriodos
-                titulo="Candidatos"
-                itens={preview.candidatos}
-                vazio="Nenhum período candidato encontrado."
-                renderExtra={(item) => item.riscos?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {item.riscos.map((risco) => <Badge key={risco} variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">{risco}</Badge>)}
-                  </div>
-                )}
-              />
-              <ListaPeriodos titulo="Ignorados" itens={preview.ignorados} vazio="Nenhum período ignorado." />
-              <ListaPeriodos titulo="Já marcados" itens={preview.jaMarcados} vazio="Nenhum período já marcado como legado." />
-              <section className="rounded-lg border border-slate-200 bg-white p-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <h4 className="font-semibold text-slate-800">Riscos</h4>
-                  <Badge variant="outline">{preview.riscos.length}</Badge>
+            {usaFluxoPorPeriodo ? (
+              <>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                  <p><strong>Hash da prévia:</strong> {previewHash || '—'}</p>
+                  <p><strong>Estado preparado:</strong> confirmacaoTextual, acoesSelecionadas e previewHash permanecem locais e não são enviados para aplicação neste lote.</p>
                 </div>
-                {preview.riscos.length === 0 ? <p className="text-sm text-slate-500">Nenhum risco identificado.</p> : (
-                  <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                    {Array.from(riscosPorPeriodo.entries()).map(([periodo, riscos]) => (
-                      <div key={periodo} className="rounded-md border border-amber-100 bg-amber-50 p-2 text-sm">
-                        <p className="font-medium text-amber-900">{periodo}</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {riscos.map((risco, index) => <Badge key={`${risco.codigo}-${index}`} variant="outline" className={risco.bloqueante ? 'border-red-300 text-red-700' : ''}>{risco.codigo}{risco.bloqueante ? ' • bloqueante' : ''}</Badge>)}
-                        </div>
+                <TransicaoDesignacaoResumoAcoes resumo={resumoDecisoes} />
+                <TransicaoDesignacaoPeriodosGrid periodos={periodos} acoesSelecionadas={acoesSelecionadas} onChange={setAcoesSelecionadas} />
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-center text-sm">
+                  <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Candidatos</p><p className="font-bold">{totais.candidatos || 0}</p></div>
+                  <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Ignorados</p><p className="font-bold">{totais.ignorados || 0}</p></div>
+                  <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Já marcados</p><p className="font-bold">{totais.ja_marcados || 0}</p></div>
+                  <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Saldo aberto</p><p className="font-bold">{totais.com_saldo_aberto || 0}</p></div>
+                  <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Com férias</p><p className="font-bold">{totais.com_ferias_vinculadas || 0}</p></div>
+                  <div className="rounded-md border p-2"><p className="text-xs text-slate-500">Bloqueantes</p><p className="font-bold">{totais.bloqueantes || 0}</p></div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <ListaPeriodos
+                    titulo="Candidatos"
+                    itens={preview.candidatos}
+                    vazio="Nenhum período candidato encontrado."
+                    renderExtra={(item) => item.riscos?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {item.riscos.map((risco) => <Badge key={risco} variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">{risco}</Badge>)}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
+                    )}
+                  />
+                  <ListaPeriodos titulo="Ignorados" itens={preview.ignorados} vazio="Nenhum período ignorado." />
+                  <ListaPeriodos titulo="Já marcados" itens={preview.jaMarcados} vazio="Nenhum período já marcado como legado." />
+                  <section className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h4 className="font-semibold text-slate-800">Riscos</h4>
+                      <Badge variant="outline">{preview.riscos.length}</Badge>
+                    </div>
+                    {preview.riscos.length === 0 ? <p className="text-sm text-slate-500">Nenhum risco identificado.</p> : (
+                      <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                        {Array.from(riscosPorPeriodo.entries()).map(([periodo, riscos]) => (
+                          <div key={periodo} className="rounded-md border border-amber-100 bg-amber-50 p-2 text-sm">
+                            <p className="font-medium text-amber-900">{periodo}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {riscos.map((risco, index) => <Badge key={`${risco.codigo}-${index}`} variant="outline" className={risco.bloqueante ? 'border-red-300 text-red-700' : ''}>{risco.codigo}{risco.bloqueante ? ' • bloqueante' : ''}</Badge>)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
 
-            <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <Label htmlFor="confirmacao-legado-ativa">Confirmação textual obrigatória</Label>
-              <Input
-                id="confirmacao-legado-ativa"
-                value={confirmacaoTextual}
-                onChange={(event) => setConfirmacaoTextual(event.target.value)}
-                placeholder={CONFIRMACAO_TEXTUAL}
-                disabled={applying || Boolean(resultadoAplicacao?.ok)}
-              />
-              <p className="text-xs text-slate-500">Digite exatamente: <strong>{CONFIRMACAO_TEXTUAL}</strong></p>
-              {motivoBloqueioAplicacao && !resultadoAplicacao?.ok && <p className="text-xs text-amber-700">{motivoBloqueioAplicacao}</p>}
-            </section>
+                <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <Label htmlFor="confirmacao-legado-ativa">Confirmação textual obrigatória</Label>
+                  <Input
+                    id="confirmacao-legado-ativa"
+                    value={confirmacaoTextual}
+                    onChange={(event) => setConfirmacaoTextual(event.target.value)}
+                    placeholder={CONFIRMACAO_TEXTUAL}
+                    disabled={applying || Boolean(resultadoAplicacao?.ok)}
+                  />
+                  <p className="text-xs text-slate-500">Digite exatamente: <strong>{CONFIRMACAO_TEXTUAL}</strong></p>
+                  {motivoBloqueioAplicacao && !resultadoAplicacao?.ok && <p className="text-xs text-amber-700">{motivoBloqueioAplicacao}</p>}
+                </section>
 
-            <RelatorioAplicacao resultado={resultadoAplicacao} />
+                <RelatorioAplicacao resultado={resultadoAplicacao} />
+              </>
+            )}
           </div>
         )}
 
         <DialogFooter className="gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange?.(false)}>Fechar</Button>
-          <Button type="button" onClick={handleAplicar} disabled={!podeAplicar || Boolean(resultadoAplicacao?.ok)}>
-            {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Aplicar transição
-          </Button>
+          {usaFluxoPorPeriodo ? (
+            <Button type="button" disabled>Aplicação manual será liberada no próximo lote.</Button>
+          ) : (
+            <Button type="button" onClick={handleAplicarLegado} disabled={!podeAplicarLegado || Boolean(resultadoAplicacao?.ok)}>
+              {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Aplicar transição
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
