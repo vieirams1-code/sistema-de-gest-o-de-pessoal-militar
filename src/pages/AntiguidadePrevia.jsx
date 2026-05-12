@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ChevronDown, ChevronUp, RefreshCw, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import {
+  ALERTAS_PREVIA_ANTIGUIDADE_GERAL,
   PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL,
   calcularPreviaAntiguidadeGeral,
 } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
@@ -33,6 +34,21 @@ const pendenciasCriticas = new Set([
   PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_PROMOCAO_ATUAL_ATIVA,
   PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_DATA_PROMOCAO,
 ]);
+
+const rotulosAlertas = {
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_ANTERIOR_AUSENTE]: 'Posto anterior ausente',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_ANTERIOR_AUSENTE]: 'Quadro anterior ausente',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.ORIGEM_2TEN_AMBIGUA]: 'Origem de 2º Tenente ambígua',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.SEGUNDO_TENENTE_ORIUNDO_ASPIRANTE]: '2º Tenente oriundo de Aspirante — preserva antiguidade anterior',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.SEGUNDO_TENENTE_ORIUNDO_SUBTENENTE]: '2º Tenente oriundo de Subtenente — possível reclassificação',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REFERENCIA_ANTIGUIDADE_AUSENTE]: 'Referência de antiguidade ausente',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.ORDEM_ANTIGUIDADE_ZERO]: 'Ordem de antiguidade igual a zero',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSSIVEL_COMPARACAO_LISTAS_DISTINTAS]: 'Possível comparação entre listas distintas',
+};
+
+function rotuloAlerta(alerta) {
+  return rotulosAlertas[alerta] || alerta;
+}
 
 const resumoCards = [
   ['totalMilitaresEntrada', 'Militares na entrada'],
@@ -497,7 +513,7 @@ export default function AntiguidadePrevia() {
                                   <p className="mb-2 font-semibold text-slate-700">Alertas</p>
                                   {item.alertas?.length ? (
                                     <div className="flex flex-wrap gap-2">
-                                      {item.alertas.map((alerta) => <Badge key={alerta} variant="outline" className="border-blue-200 bg-blue-50 text-blue-800">{alerta}</Badge>)}
+                                      {item.alertas.map((alerta) => <Badge key={alerta} title={alerta} variant="outline" className="border-blue-200 bg-blue-50 text-blue-800">{rotuloAlerta(alerta)}</Badge>)}
                                     </div>
                                   ) : <p className="text-slate-500">Sem alertas.</p>}
                                 </div>

@@ -310,3 +310,125 @@ test('aliases e quadros legados continuam tratados na ordem injetada', () => {
   assert.equal(item.criterioOrdenacao.quadroIndice, 2);
   assert.ok(item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_NORMALIZADO));
 });
+
+test('diagnostica promoção atual sem posto_graduacao_anterior', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1')],
+    historicoPromocoes: [promocao('p1', '1', { posto_graduacao_anterior: '' })],
+  });
+
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_ANTERIOR_AUSENTE));
+});
+
+test('diagnostica promoção atual com quadro_anterior ausente quando há quadro novo', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1')],
+    historicoPromocoes: [promocao('p1', '1', {
+      posto_graduacao_anterior: '1º Tenente',
+      quadro_anterior: '',
+      quadro_novo: 'QOBM',
+    })],
+  });
+
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_ANTERIOR_AUSENTE));
+});
+
+test('diagnostica origem ambígua para 2º Tenente sem posto anterior', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1', { posto_graduacao: '2º Tenente', quadro: 'QOBM' })],
+    historicoPromocoes: [promocao('p1', '1', {
+      posto_graduacao_novo: '2º Tenente',
+      posto_graduacao_anterior: '',
+      quadro_novo: 'QOBM',
+    })],
+  });
+
+  const item = resultado.itens[0];
+  assert.ok(item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_ANTERIOR_AUSENTE));
+  assert.ok(item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.ORIGEM_2TEN_AMBIGUA));
+});
+
+test('diagnostica Aspirante para 2º Tenente como preservação de antiguidade anterior', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1', { posto_graduacao: '2º Tenente', quadro: 'QOBM' })],
+    historicoPromocoes: [promocao('p1', '1', {
+      posto_graduacao_novo: '2º Tenente',
+      posto_graduacao_anterior: 'Aspirante a Oficial',
+      quadro_novo: 'QOBM',
+      quadro_anterior: 'QOBM',
+    })],
+  });
+
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.SEGUNDO_TENENTE_ORIUNDO_ASPIRANTE));
+});
+
+test('diagnostica Subtenente para 2º Tenente como possível reclassificação', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1', { posto_graduacao: '2º Tenente', quadro: 'QAOBM' })],
+    historicoPromocoes: [promocao('p1', '1', {
+      posto_graduacao_novo: '2º Tenente',
+      posto_graduacao_anterior: 'Subtenente',
+      quadro_novo: 'QAOBM',
+      quadro_anterior: 'QBMP',
+      antiguidade_referencia_id: '',
+    })],
+  });
+
+  const item = resultado.itens[0];
+  assert.ok(item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.SEGUNDO_TENENTE_ORIUNDO_SUBTENENTE));
+  assert.ok(item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QAOBM_SUBTENENTE_2TEN));
+  assert.equal(item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REFERENCIA_ANTIGUIDADE_AUSENTE), false);
+});
+
+test('diagnostica referência de antiguidade ausente em promoção sem reclassificação', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1')],
+    historicoPromocoes: [promocao('p1', '1', {
+      posto_graduacao_anterior: '1º Tenente',
+      antiguidade_referencia_id: '',
+    })],
+  });
+
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REFERENCIA_ANTIGUIDADE_AUSENTE));
+});
+
+test('diagnostica antiguidade_referencia_ordem igual a zero', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1')],
+    historicoPromocoes: [promocao('p1', '1', {
+      posto_graduacao_anterior: '1º Tenente',
+      antiguidade_referencia_ordem: 0,
+    })],
+  });
+
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.ORDEM_ANTIGUIDADE_ZERO));
+});
+
+test('diagnostica possível comparação entre listas distintas sem alterar ordenação final', () => {
+  const entradaMilitares = [
+    militar('1', { nome: 'Alfa' }),
+    militar('2', { nome: 'Bravo' }),
+  ];
+  const entradaHistoricos = [
+    promocao('p1', '1', {
+      posto_graduacao_anterior: '1º Tenente',
+      quadro_anterior: 'QOBM',
+      antiguidade_referencia_ordem: 1,
+      antiguidade_referencia_id: 'lista-oficiais',
+    }),
+    promocao('p2', '2', {
+      posto_graduacao_anterior: '1º Sargento',
+      quadro_anterior: 'QBMP',
+      antiguidade_referencia_ordem: 1,
+      antiguidade_referencia_id: 'lista-pracas',
+    }),
+  ];
+
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: entradaMilitares,
+    historicoPromocoes: entradaHistoricos,
+  });
+
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['1', '2']);
+  assert.ok(resultado.itens.every((item) => item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSSIVEL_COMPARACAO_LISTAS_DISTINTAS)));
+});
