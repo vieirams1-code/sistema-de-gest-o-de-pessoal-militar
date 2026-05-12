@@ -56,6 +56,7 @@ import ApuracaoMedalhasTempoServico from './pages/ApuracaoMedalhasTempoServico';
 import AntiguidadeDiagnostico from './pages/AntiguidadeDiagnostico';
 import AntiguidadeConfigQuadros from './pages/AntiguidadeConfigQuadros';
 import AntiguidadeImportarPromocoes from './pages/AntiguidadeImportarPromocoes';
+import AntiguidadePromocaoColetiva from './pages/AntiguidadePromocaoColetiva';
 import AntiguidadePrevia from './pages/AntiguidadePrevia';
 import Atestados from './pages/Atestados';
 import CadastrarArmamento from './pages/CadastrarArmamento';
@@ -119,6 +120,7 @@ export const PAGES = {
     "AntiguidadeDiagnostico": AntiguidadeDiagnostico,
     "AntiguidadeConfigQuadros": AntiguidadeConfigQuadros,
     "AntiguidadeImportarPromocoes": AntiguidadeImportarPromocoes,
+    "AntiguidadePromocaoColetiva": AntiguidadePromocaoColetiva,
     "AntiguidadePrevia": AntiguidadePrevia,
     "Atestados": Atestados,
     "CadastrarArmamento": CadastrarArmamento,
