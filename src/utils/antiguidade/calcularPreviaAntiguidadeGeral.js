@@ -29,6 +29,14 @@ export const ALERTAS_PREVIA_ANTIGUIDADE_GERAL = Object.freeze({
   QUADRO_FORA_DOS_GRUPOS_ANTIGUIDADE: 'ALERTA_QUADRO_FORA_DOS_GRUPOS_ANTIGUIDADE',
   QUADRO_ESPECIAL: 'ALERTA_QUADRO_ESPECIAL',
   QAOBM_SUBTENENTE_2TEN: 'ALERTA_QAOBM_SUBTENENTE_2TEN',
+  POSTO_ANTERIOR_AUSENTE: 'ALERTA_POSTO_ANTERIOR_AUSENTE',
+  QUADRO_ANTERIOR_AUSENTE: 'ALERTA_QUADRO_ANTERIOR_AUSENTE',
+  ORIGEM_2TEN_AMBIGUA: 'ALERTA_ORIGEM_2TEN_AMBIGUA',
+  SEGUNDO_TENENTE_ORIUNDO_ASPIRANTE: 'ALERTA_2TEN_ORIUNDO_ASPIRANTE',
+  SEGUNDO_TENENTE_ORIUNDO_SUBTENENTE: 'ALERTA_2TEN_ORIUNDO_SUBTENENTE',
+  REFERENCIA_ANTIGUIDADE_AUSENTE: 'ALERTA_REFERENCIA_ANTIGUIDADE_AUSENTE',
+  ORDEM_ANTIGUIDADE_ZERO: 'ALERTA_ORDEM_ANTIGUIDADE_ZERO',
+  POSSIVEL_COMPARACAO_LISTAS_DISTINTAS: 'ALERTA_POSSIVEL_COMPARACAO_LISTAS_DISTINTAS',
   EMPATE_RESOLVIDO_POR_NOME_MATRICULA: 'ALERTA_EMPATE_RESOLVIDO_POR_NOME_MATRICULA',
   EMPATE_NAO_RESOLVIDO: 'ALERTA_EMPATE_NAO_RESOLVIDO',
 });
@@ -249,6 +257,81 @@ function escolherRegistroAtualCompativel(militar, historicos, alertas, contextoO
   })[0] || null;
 }
 
+
+function campoTextoNormalizado(registro, campos) {
+  return normalizarTextoPreviaAntiguidade(
+    campos.map((campo) => registro?.[campo]).filter(Boolean).join(' '),
+  );
+}
+
+function isMarcadoComoReclassificacao(registro) {
+  return campoTextoNormalizado(registro, [
+    'tipo_promocao',
+    'tipo_movimentacao',
+    'natureza',
+    'motivo',
+    'origem_dado',
+    'observacoes',
+  ]).includes('RECLASS');
+}
+
+function isPromocaoSubtenenteParaSegundoTenente(postoAnterior, postoNovo) {
+  return postoAnterior === 'SUBTENENTE' && postoNovo === '2 TENENTE';
+}
+
+function isPossivelReclassificacao(registro, postoAnterior, postoNovo) {
+  return isMarcadoComoReclassificacao(registro)
+    || isPromocaoSubtenenteParaSegundoTenente(postoAnterior, postoNovo);
+}
+
+function montarContextoReferenciaAntiguidade(registro, contextoOrdemQuadros) {
+  const detalheQuadroAnterior = obterDetalheAntiguidadeQuadro(registro?.quadro_anterior, contextoOrdemQuadros);
+  const quadroAnteriorNormalizado = normalizarQuadroPreviaAntiguidade(registro?.quadro_anterior).valor;
+  return [
+    normalizarPostoGraduacao(registro?.posto_graduacao_anterior),
+    detalheQuadroAnterior.grupoAntiguidadeQuadro || quadroAnteriorNormalizado,
+    valorTexto(registro?.antiguidade_referencia_id),
+  ].join('|');
+}
+
+function adicionarDiagnosticosPromocaoAtual(registroAtual, alertas, contextoOrdemQuadros) {
+  const postoAnteriorTexto = valorTexto(registroAtual?.posto_graduacao_anterior);
+  const quadroAnteriorTexto = valorTexto(registroAtual?.quadro_anterior);
+  const postoAnterior = normalizarPostoGraduacao(postoAnteriorTexto);
+  const postoNovo = normalizarPostoGraduacao(registroAtual?.posto_graduacao_novo);
+  const quadroNovo = normalizarQuadroPreviaAntiguidade(registroAtual?.quadro_novo).valor;
+  const antiguidadeReferenciaId = valorTexto(registroAtual?.antiguidade_referencia_id);
+  const ordem = toNumeroValido(registroAtual?.antiguidade_referencia_ordem);
+
+  if (!postoAnteriorTexto) addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_ANTERIOR_AUSENTE);
+  if (quadroNovo && !quadroAnteriorTexto) addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_ANTERIOR_AUSENTE);
+
+  if (postoNovo === '2 TENENTE') {
+    if (!postoAnterior) {
+      addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.ORIGEM_2TEN_AMBIGUA);
+    } else if (postoAnterior === 'ASPIRANTE A OFICIAL') {
+      addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.SEGUNDO_TENENTE_ORIUNDO_ASPIRANTE);
+    } else if (postoAnterior === 'SUBTENENTE') {
+      addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.SEGUNDO_TENENTE_ORIUNDO_SUBTENENTE);
+    }
+  }
+
+  if (!antiguidadeReferenciaId && !isPossivelReclassificacao(registroAtual, postoAnterior, postoNovo)) {
+    addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REFERENCIA_ANTIGUIDADE_AUSENTE);
+  }
+  if (ordem === 0) addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.ORDEM_ANTIGUIDADE_ZERO);
+
+  return {
+    postoAnteriorNormalizado: postoAnterior,
+    quadroAnteriorNormalizado: normalizarQuadroPreviaAntiguidade(registroAtual?.quadro_anterior).valor,
+    postoNovoNormalizado: postoNovo,
+    quadroNovoNormalizado: quadroNovo,
+    antiguidadeReferenciaId,
+    possivelReclassificacao: isPossivelReclassificacao(registroAtual, postoAnterior, postoNovo),
+    contextoReferenciaAntiguidade: montarContextoReferenciaAntiguidade(registroAtual, contextoOrdemQuadros),
+  };
+}
+
 function montarCriterioOrdenacao({ militar, registroAtual, postoNormalizado, detalheQuadroAntiguidade }) {
   const dataPromocaoTimestamp = toTimestamp(registroAtual?.data_promocao);
   const antiguidadeReferenciaOrdem = toNumeroValido(registroAtual?.antiguidade_referencia_ordem);
@@ -302,6 +385,34 @@ function chaveEmpateAteReferenciaId(criterio) {
     criterio.antiguidadeReferenciaOrdem,
     criterio.antiguidadeReferenciaId,
   ].join('|');
+}
+
+function chavePossivelComparacaoListasDistintas(item) {
+  const criterio = item.criterioOrdenacao;
+  return [
+    criterio.postoIndice,
+    criterio.quadroIndice,
+    criterio.dataPromocaoTimestamp,
+    criterio.antiguidadeReferenciaOrdem,
+  ].join('|');
+}
+
+function marcarAlertasPossivelComparacaoListasDistintas(itens) {
+  const grupos = new Map();
+  itens.forEach((item) => {
+    const ordemReferencia = item.criterioOrdenacao.antiguidadeReferenciaOrdem;
+    if (!Number.isFinite(ordemReferencia) || ordemReferencia === VALOR_AUSENTE_NUMERICO) return;
+    const chave = chavePossivelComparacaoListasDistintas(item);
+    if (!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push(item);
+  });
+
+  grupos.forEach((grupo) => {
+    if (grupo.length < 2) return;
+    const contextos = new Set(grupo.map((item) => item.diagnosticoAntiguidadeAnterior?.contextoReferenciaAntiguidade || ''));
+    if (contextos.size < 2) return;
+    grupo.forEach((item) => addUnico(item.alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSSIVEL_COMPARACAO_LISTAS_DISTINTAS));
+  });
 }
 
 function marcarAlertasEmpate(itens) {
@@ -393,6 +504,7 @@ export function calcularPreviaAntiguidadeGeral({
       addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_FORA_DA_ORDEM);
     }
 
+    let diagnosticoAntiguidadeAnterior = null;
     if (!registroAtual) {
       addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_PROMOCAO_ATUAL_ATIVA);
     } else {
@@ -401,10 +513,10 @@ export function calcularPreviaAntiguidadeGeral({
       if (dataPromocaoTimestamp === null) addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_DATA_PROMOCAO);
       if (ordem === null) addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_ORDEM_ANTIGUIDADE);
 
-      const postoAnterior = normalizarPostoGraduacao(registroAtual?.posto_graduacao_anterior);
-      const postoNovo = normalizarPostoGraduacao(registroAtual?.posto_graduacao_novo);
-      const quadroNovo = normalizarQuadroPreviaAntiguidade(registroAtual?.quadro_novo).valor;
-      if (postoAnterior === 'SUBTENENTE' && postoNovo === '2 TENENTE' && quadroNovo === 'QAOBM') {
+      diagnosticoAntiguidadeAnterior = adicionarDiagnosticosPromocaoAtual(registroAtual, alertas, contextoOrdemQuadros);
+      if (diagnosticoAntiguidadeAnterior.postoAnteriorNormalizado === 'SUBTENENTE'
+        && diagnosticoAntiguidadeAnterior.postoNovoNormalizado === '2 TENENTE'
+        && diagnosticoAntiguidadeAnterior.quadroNovoNormalizado === 'QAOBM') {
         addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QAOBM_SUBTENENTE_2TEN);
       }
     }
@@ -426,12 +538,14 @@ export function calcularPreviaAntiguidadeGeral({
       data_promocao: registroAtual?.data_promocao || null,
       antiguidade_referencia_ordem: toNumeroValido(registroAtual?.antiguidade_referencia_ordem),
       criterioOrdenacao,
+      diagnosticoAntiguidadeAnterior,
       pendencias,
       alertas,
       registroPromocaoAtualId: registroAtual ? obterRegistroId(registroAtual) || null : null,
     };
   }).sort(compararItens);
 
+  marcarAlertasPossivelComparacaoListasDistintas(itens);
   marcarAlertasEmpate(itens);
   itens.forEach((item, index) => {
     item.posicao = index + 1;
