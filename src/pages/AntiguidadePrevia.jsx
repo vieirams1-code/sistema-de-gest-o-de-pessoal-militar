@@ -65,6 +65,88 @@ function opcoesUnicas(itens, campo) {
     .sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
 }
 
+
+const CAMPOS_DATA_CONFIGURACAO = [
+  'updated_date',
+  'updatedAt',
+  'updated_at',
+  'data_atualizacao',
+  'dataAtualizacao',
+  'created_date',
+  'createdAt',
+  'created_at',
+  'data_criacao',
+  'dataCriacao',
+];
+
+function timestampConfiguracao(configuracao) {
+  for (const campo of CAMPOS_DATA_CONFIGURACAO) {
+    const valor = configuracao?.[campo];
+    if (!valor) continue;
+    const timestamp = Date.parse(valor);
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+  return null;
+}
+
+function dataConfiguracao(configuracao) {
+  const campo = CAMPOS_DATA_CONFIGURACAO.find((nomeCampo) => {
+    const valor = configuracao?.[nomeCampo];
+    return valor && Number.isFinite(Date.parse(valor));
+  });
+  return campo ? configuracao[campo] : null;
+}
+
+function idConfiguracao(configuracao) {
+  return valorTexto(configuracao?.id ?? configuracao?._id ?? configuracao?.uid ?? configuracao?.nome ?? configuracao?.name);
+}
+
+function compararConfiguracoes(a, b) {
+  const timestampA = timestampConfiguracao(a);
+  const timestampB = timestampConfiguracao(b);
+  if (timestampA !== null || timestampB !== null) {
+    if (timestampA !== timestampB) return (timestampB ?? Number.NEGATIVE_INFINITY) - (timestampA ?? Number.NEGATIVE_INFINITY);
+  }
+
+  return idConfiguracao(a).localeCompare(idConfiguracao(b), 'pt-BR', { numeric: true });
+}
+
+function selecionarConfiguracaoAntiguidade(configuracoes) {
+  const validas = (configuracoes || []).filter((configuracao) => (
+    configuracao?.ativo === true
+    && Array.isArray(configuracao?.ordem_quadros)
+    && configuracao.ordem_quadros.length > 0
+  ));
+
+  if (validas.length === 0) {
+    return {
+      configuracao: null,
+      metadado: {
+        origem: 'fallback',
+        totalValidas: 0,
+        criterio: 'fallback técnico padrão',
+      },
+    };
+  }
+
+  const ordenadas = [...validas].sort(compararConfiguracoes);
+  const configuracao = ordenadas[0];
+  const possuiDataConfiavel = validas.some((item) => timestampConfiguracao(item) !== null);
+
+  return {
+    configuracao,
+    metadado: {
+      origem: 'configuracao',
+      totalValidas: validas.length,
+      criterio: possuiDataConfiavel ? 'mais recente por data disponível' : 'determinístico por id/string',
+      multiplasAtivas: validas.length > 1,
+      nome: valorTexto(configuracao?.nome ?? configuracao?.name ?? configuracao?.titulo ?? configuracao?.title),
+      data: dataConfiguracao(configuracao),
+      grupos: configuracao.ordem_quadros.length,
+    },
+  };
+}
+
 function ContadorDetalhes({ tipo, itens }) {
   const quantidade = itens?.length || 0;
   const estilos = tipo === 'pendencias'
@@ -106,22 +188,34 @@ export default function AntiguidadePrevia() {
   } = useQuery({
     queryKey: ['antiguidade-previa-geral'],
     queryFn: async () => {
-      const [militares, historicos] = await Promise.all([
+      const [militares, historicos, configuracoesAntiguidade] = await Promise.all([
         base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
         base44.entities.HistoricoPromocaoMilitarV2.list(),
+        base44.entities.ConfiguracaoAntiguidade.filter({ ativo: true }),
       ]);
 
-      return { militares: militares || [], historicos: historicos || [] };
+      return {
+        militares: militares || [],
+        historicos: historicos || [],
+        configuracoesAntiguidade: configuracoesAntiguidade || [],
+      };
     },
   });
+
+  const selecaoConfiguracao = useMemo(() => (
+    selecionarConfiguracaoAntiguidade(data?.configuracoesAntiguidade)
+  ), [data?.configuracoesAntiguidade]);
 
   const resultado = useMemo(() => {
     if (!data) return null;
     return calcularPreviaAntiguidadeGeral({
       militares: data.militares,
       historicoPromocoes: data.historicos,
+      config: {
+        ordem_quadros: selecaoConfiguracao.configuracao?.ordem_quadros,
+      },
     });
-  }, [data]);
+  }, [data, selecaoConfiguracao]);
 
   const opcoesPosto = useMemo(() => opcoesUnicas(resultado?.itens, 'posto_graduacao'), [resultado]);
   const opcoesQuadro = useMemo(() => opcoesUnicas(resultado?.itens, 'quadro'), [resultado]);
@@ -161,7 +255,7 @@ export default function AntiguidadePrevia() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Falha ao carregar a prévia</AlertTitle>
           <AlertDescription>
-            Não foi possível ler Militar ou HistoricoPromocaoMilitarV2. Nenhuma escrita foi tentada. {error?.message || ''}
+            Não foi possível ler Militar, HistoricoPromocaoMilitarV2 ou ConfiguracaoAntiguidade. Nenhuma escrita foi tentada. {error?.message || ''}
           </AlertDescription>
         </Alert>
       </div>
@@ -210,6 +304,29 @@ export default function AntiguidadePrevia() {
           Esta tela calcula a listagem em memória para conferência interna. Não gera publicação, não grava snapshot e não altera dados cadastrais. O resultado depende da qualidade dos dados em Militar e HistoricoPromocaoMilitarV2.
         </AlertDescription>
       </Alert>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="border-slate-300 bg-white text-slate-700">
+            {selecaoConfiguracao.metadado.origem === 'configuracao'
+              ? 'Regra de quadros: configuração ativa'
+              : 'Regra de quadros: fallback técnico padrão'}
+          </Badge>
+          {selecaoConfiguracao.metadado.nome && <span>{selecaoConfiguracao.metadado.nome}</span>}
+          {selecaoConfiguracao.metadado.data && <span>Data: {formatarData(selecaoConfiguracao.metadado.data)}</span>}
+          <span>Grupos usados: {selecaoConfiguracao.metadado.grupos ?? 0}</span>
+        </div>
+      </div>
+
+      {selecaoConfiguracao.metadado.multiplasAtivas && (
+        <Alert className="border-slate-200 bg-slate-50 text-slate-700">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Múltiplas configurações ativas</AlertTitle>
+          <AlertDescription>
+            Foram encontradas {selecaoConfiguracao.metadado.totalValidas} configurações ativas válidas; a seleção usou o critério {selecaoConfiguracao.metadado.criterio}.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         {resumoCards.map(([campo, titulo]) => (
