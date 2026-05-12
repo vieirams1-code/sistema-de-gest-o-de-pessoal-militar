@@ -75,6 +75,19 @@ function getMatriculaTexto(matricula) {
   return matricula?.matricula_formatada || matricula?.matricula || '';
 }
 
+function sanitizarIdMatricula(value) {
+  const texto = String(value ?? '').trim();
+  const posicaoSeparador = texto.indexOf(':');
+  return posicaoSeparador >= 0 ? texto.slice(0, posicaoSeparador).trim() : texto;
+}
+
+function sanitizarFormContrato(form = {}) {
+  return {
+    ...form,
+    matricula_militar_id: sanitizarIdMatricula(form.matricula_militar_id),
+  };
+}
+
 function encontrarMatriculaAtual(matriculasMilitar = []) {
   const candidatas = (Array.isArray(matriculasMilitar) ? matriculasMilitar : []).filter((mat) => mat?.id);
   return candidatas.find((mat) => mat?.is_atual === true)
@@ -117,55 +130,65 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
     setErros([]);
     const proximoMilitarId = contrato?.militar_id || militarId || '';
     setMilitarSelecionadoId(proximoMilitarId);
-    setForm(contrato ? { ...EMPTY_FORM, ...contrato } : { ...EMPTY_FORM });
+    setForm(sanitizarFormContrato(contrato ? { ...EMPTY_FORM, ...contrato } : { ...EMPTY_FORM }));
   }, [open, contrato, militarId]);
 
   const militaresOptions = useMemo(() => (Array.isArray(militares) ? militares : []).filter((militar) => militar?.id), [militares]);
+  const militarSelectOptions = useMemo(() => militaresOptions.map((militar) => ({
+    value: String(militar.id),
+    label: formatMilitarSearchText(militar),
+    militar,
+  })), [militaresOptions]);
   const militarEscolhido = useMemo(() => militaresOptions.find((militar) => String(militar.id) === String(militarSelecionadoId)) || null, [militarSelecionadoId, militaresOptions]);
   const matriculasOptions = useMemo(() => (Array.isArray(matriculas) ? matriculas : [])
+    .map((mat) => ({ ...mat, id: sanitizarIdMatricula(mat?.id) }))
     .filter((mat) => mat?.id && (!militarSelecionadoId || String(mat?.militar_id || '') === String(militarSelecionadoId))), [matriculas, militarSelecionadoId]);
   const matriculaAtualSelecionada = useMemo(() => encontrarMatriculaAtual(matriculasOptions), [matriculasOptions]);
   const militarSemMatriculaAtual = Boolean(militarSelecionadoId) && !matriculaAtualSelecionada;
   const militaresFiltradosBusca = useMemo(() => {
     const termo = normalizarBusca(buscaMilitar);
     const termoNumerico = somenteDigitos(buscaMilitar);
-    if (!termo) return militaresOptions.slice(0, 30);
-    return militaresOptions
-      .filter((militar) => {
+    if (!termo) return militarSelectOptions.slice(0, 30);
+    return militarSelectOptions
+      .filter(({ militar, label }) => {
         const matriculasMilitar = (Array.isArray(matriculas) ? matriculas : [])
           .filter((mat) => String(mat?.militar_id || '') === String(militar.id));
-        const textoBusca = formatMilitarSearchText(militar, matriculasMilitar);
+        const textoBusca = [label, formatMilitarSearchText(militar, matriculasMilitar)].filter(Boolean).join(' ');
         return normalizarBusca(textoBusca).includes(termo)
           || (termoNumerico && somenteDigitos(textoBusca).includes(termoNumerico));
       })
       .slice(0, 30);
-  }, [buscaMilitar, matriculas, militaresOptions]);
+  }, [buscaMilitar, matriculas, militarSelectOptions]);
 
   const update = (field, value) => setForm((prev) => {
-    const next = aplicarRegraFeriasPorTipoPrazo({ ...prev, [field]: value });
+    const valorSeguro = field === 'matricula_militar_id' ? sanitizarIdMatricula(value) : value;
+    const next = aplicarRegraFeriasPorTipoPrazo({ ...prev, [field]: valorSeguro });
     if (field === 'data_inicio_contrato' && !prev.data_inclusao_para_ferias) {
-      next.data_inclusao_para_ferias = value;
+      next.data_inclusao_para_ferias = valorSeguro;
     }
     if (next.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO) {
       next.data_fim_contrato = '';
     }
-    return next;
+    return sanitizarFormContrato(next);
   });
 
   const sincronizarMatriculaAtualNoFormulario = (matriculaAtual) => {
     setForm((prev) => ({
       ...prev,
-      matricula_militar_id: matriculaAtual?.id ? String(matriculaAtual.id) : '',
+      matricula_militar_id: matriculaAtual?.id ? sanitizarIdMatricula(matriculaAtual.id) : '',
       matricula_designacao: getMatriculaTexto(matriculaAtual),
     }));
   };
 
   const handleMilitarChange = (value) => {
-    const matriculasMilitar = (Array.isArray(matriculas) ? matriculas : []).filter((mat) => mat?.id
-      && String(mat?.militar_id || '') === String(value));
+    const militarIdSelecionado = String(value || '');
+    const matriculasMilitar = (Array.isArray(matriculas) ? matriculas : [])
+      .map((mat) => ({ ...mat, id: sanitizarIdMatricula(mat?.id) }))
+      .filter((mat) => mat?.id
+        && String(mat?.militar_id || '') === militarIdSelecionado);
     const matriculaAtual = encontrarMatriculaAtual(matriculasMilitar);
 
-    setMilitarSelecionadoId(value);
+    setMilitarSelecionadoId(militarIdSelecionado);
     sincronizarMatriculaAtualNoFormulario(matriculaAtual);
     setMilitarPopoverOpen(false);
     setBuscaMilitar('');
@@ -185,17 +208,13 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
     const payload = aplicarRegraFeriasPorTipoPrazo({
       ...form,
       militar_id: militarSelecionadoId || militarId,
-      matricula_militar_id: String(matriculaAtual.id),
+      matricula_militar_id: sanitizarIdMatricula(matriculaAtual.id),
       matricula_designacao: getMatriculaTexto(matriculaAtual),
       data_inclusao_para_ferias: form.data_inclusao_para_ferias || form.data_inicio_contrato,
       status_contrato: 'ativo',
     });
     if (payload.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO) {
       payload.data_fim_contrato = '';
-    }
-    if (String(payload.matricula_militar_id || '').includes(':')) {
-      setErros(['Erro técnico: matricula_militar_id deve conter somente o ID real da matrícula, sem o formato id:matricula.']);
-      return;
     }
     const validacao = validarContratoDesignacaoPayload(payload);
     if (!validacao.valido) {
@@ -303,15 +322,15 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
                       {militaresLoading && <CommandEmpty>Carregando militares do escopo...</CommandEmpty>}
                       {!militaresLoading && <CommandEmpty>Nenhum militar ativo encontrado no seu escopo.</CommandEmpty>}
                       <CommandGroup className="max-h-72 overflow-auto">
-                        {militaresFiltradosBusca.map((militar) => (
+                        {militaresFiltradosBusca.map((option) => (
                           <CommandItem
-                            key={militar.id}
-                            value={formatMilitarSearchText(militar)}
-                            onSelect={() => handleMilitarChange(String(militar.id))}
+                            key={option.value}
+                            value={option.value}
+                            onSelect={() => handleMilitarChange(option.value)}
                             className="items-start gap-2 py-2"
                           >
-                            <Check className={cn('mt-1 h-4 w-4 shrink-0', String(militarSelecionadoId) === String(militar.id) ? 'opacity-100' : 'opacity-0')} />
-                            <MilitarSearchResult militar={militar} />
+                            <Check className={cn('mt-1 h-4 w-4 shrink-0', String(militarSelecionadoId) === option.value ? 'opacity-100' : 'opacity-0')} />
+                            <MilitarSearchResult militar={option.militar} />
                           </CommandItem>
                         ))}
                       </CommandGroup>
