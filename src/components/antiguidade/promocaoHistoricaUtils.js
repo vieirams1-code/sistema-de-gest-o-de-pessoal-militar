@@ -1,3 +1,5 @@
+import { QUADROS_FIXOS, QUADROS_OFICIAIS, normalizarQuadroLegado } from '../../utils/postoQuadroCompatibilidade.js';
+
 export const POSTOS_GRADUACOES = [
   'Coronel',
   'Tenente-Coronel',
@@ -14,7 +16,7 @@ export const POSTOS_GRADUACOES = [
   'Soldado',
 ];
 
-export const QUADROS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QOETBM', 'QOSTBM', 'QPTBM'];
+export const QUADROS = QUADROS_FIXOS;
 
 const normalizar = (valor) => String(valor || '').trim().toLowerCase();
 const valorTexto = (valor) => String(valor || '').trim();
@@ -27,6 +29,14 @@ const normalizarQuadroPromocao = (quadro) => {
 };
 
 const indicePosto = (posto) => POSTOS_GRADUACOES.findIndex((item) => normalizar(item) === normalizar(posto));
+
+const QUADROS_PRACAS_HISTORICO_CONFIAVEL = new Set([
+  ...QUADROS_FIXOS
+    .map(normalizarQuadroLegado)
+    .filter((quadro) => quadro && !QUADROS_OFICIAIS.includes(quadro)),
+  'QBMP',
+  'QPBM',
+]);
 
 export function getPostosHistoricosPermitidos(postoAtual) {
   const idxAtual = indicePosto(postoAtual);
@@ -74,8 +84,8 @@ const isTransicaoSubtenenteParaQAOBM = ({ postoAnterior, postoNovo, quadroNovo }
 );
 
 const isQuadroHistoricoPracaConfiavel = (quadro) => {
-  const quadroNormalizado = normalizarQuadroPromocao(quadro);
-  return Boolean(quadroNormalizado) && normalizar(quadroNormalizado) !== 'qaobm';
+  const quadroNormalizado = normalizarQuadroLegado(normalizarQuadroPromocao(quadro));
+  return QUADROS_PRACAS_HISTORICO_CONFIAVEL.has(quadroNormalizado);
 };
 
 const dataRegistro = (registro) => valorTexto(registro?.data_promocao);
