@@ -141,7 +141,16 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
       .slice(0, 30);
   }, [buscaMilitar, matriculas, militaresOptions]);
 
-  const update = (field, value) => setForm((prev) => aplicarRegraFeriasPorTipoPrazo({ ...prev, [field]: value }));
+  const update = (field, value) => setForm((prev) => {
+    const next = aplicarRegraFeriasPorTipoPrazo({ ...prev, [field]: value });
+    if (field === 'data_inicio_contrato' && !prev.data_inclusao_para_ferias) {
+      next.data_inclusao_para_ferias = value;
+    }
+    if (next.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO) {
+      next.data_fim_contrato = '';
+    }
+    return next;
+  });
 
   const sincronizarMatriculaAtualNoFormulario = (matriculaAtual) => {
     setForm((prev) => ({
@@ -168,9 +177,24 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
   }, [open, readOnly, contrato, militarSelecionadoId, matriculaAtualSelecionada]);
 
   const handleSubmit = async () => {
-    const payload = aplicarRegraFeriasPorTipoPrazo({ ...form, militar_id: militarSelecionadoId || militarId, status_contrato: 'ativo' });
-    if (!payload.matricula_militar_id || militarSemMatriculaAtual) {
+    const matriculaAtual = matriculaAtualSelecionada;
+    if (!matriculaAtual?.id || militarSemMatriculaAtual) {
       setErros(['Cadastre uma matrícula atual/ativa na ficha do militar antes de registrar o contrato de designação.']);
+      return;
+    }
+    const payload = aplicarRegraFeriasPorTipoPrazo({
+      ...form,
+      militar_id: militarSelecionadoId || militarId,
+      matricula_militar_id: String(matriculaAtual.id),
+      matricula_designacao: getMatriculaTexto(matriculaAtual),
+      data_inclusao_para_ferias: form.data_inclusao_para_ferias || form.data_inicio_contrato,
+      status_contrato: 'ativo',
+    });
+    if (payload.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO) {
+      payload.data_fim_contrato = '';
+    }
+    if (String(payload.matricula_militar_id || '').includes(':')) {
+      setErros(['Erro técnico: matricula_militar_id deve conter somente o ID real da matrícula, sem o formato id:matricula.']);
       return;
     }
     const validacao = validarContratoDesignacaoPayload(payload);
@@ -224,7 +248,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
               ['Matrícula de designação', form.matricula_designacao],
               ['Início do contrato', formatDate(form.data_inicio_contrato)],
               ['Fim/encerramento', formatDate(form.data_fim_contrato || form.data_encerramento_operacional)],
-              ['Data-base futura de férias', formatDate(form.data_inclusao_para_ferias)],
+              ['Data-base de férias', formatDate(form.data_inclusao_para_ferias || form.data_inicio_contrato)],
               ['Número do contrato', form.numero_contrato],
               ['Boletim de publicação', form.boletim_publicacao],
               ['Data de publicação', formatDate(form.data_publicacao)],
@@ -317,9 +341,15 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
               <Label>Data de início *</Label>
               <Input type="date" value={form.data_inicio_contrato} onChange={(e) => update('data_inicio_contrato', e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label>Data-base futura para férias *</Label>
-              <Input type="date" value={form.data_inclusao_para_ferias} onChange={(e) => update('data_inclusao_para_ferias', e.target.value)} />
+            <div className="space-y-2 md:col-span-2">
+              <details className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                <summary className="cursor-pointer text-sm font-medium text-slate-700">Data-base diferente para férias</summary>
+                <div className="mt-3 space-y-2">
+                  <Label>Data-base de férias opcional</Label>
+                  <Input type="date" value={form.data_inclusao_para_ferias} onChange={(e) => update('data_inclusao_para_ferias', e.target.value)} />
+                  <p className="text-xs text-slate-500">Se não informada, será salva igual à data de início do contrato.</p>
+                </div>
+              </details>
             </div>
             <div className="space-y-2">
               <Label>Tipo de prazo do contrato *</Label>
@@ -332,8 +362,8 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Data de fim {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO ? '*' : ''}</Label>
-              <Input type="date" value={form.data_fim_contrato} onChange={(e) => update('data_fim_contrato', e.target.value)} />
+              <Label>Data de fim {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO ? '(recomendada)' : ''}</Label>
+              <Input type="date" value={form.data_fim_contrato} onChange={(e) => update('data_fim_contrato', e.target.value)} disabled={form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO} />
             </div>
             <div className="space-y-2">
               <Label>Gera direito a férias *</Label>

@@ -63,6 +63,10 @@ function hasValor(valor) {
   return String(valor ?? '').trim().length > 0;
 }
 
+function isIdMatriculaContaminado(valor) {
+  return String(valor ?? '').includes(':');
+}
+
 export function aplicarRegraFeriasPorTipoPrazo(payload = {}) {
   const tipoPrazoContrato = normalizarTipoPrazoContrato(payload.tipo_prazo_contrato);
 
@@ -170,7 +174,6 @@ export function contarContratosAtivosDesignacao(contratos = []) {
 
 export function validarContratoDesignacaoPayload(payload = {}) {
   const erros = [];
-  const status = normalizarStatusContratoDesignacao(payload.status_contrato);
   const tipoPrazoContrato = normalizarTipoPrazoContrato(payload.tipo_prazo_contrato);
   const geraDireitoFerias = tipoPrazoContrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO
     ? true
@@ -178,16 +181,16 @@ export function validarContratoDesignacaoPayload(payload = {}) {
   const regraGeracaoPeriodos = normalizarRegraGeracaoPeriodos(payload.regra_geracao_periodos);
 
   if (!payload.militar_id) erros.push('militar_id é obrigatório.');
-  if (!String(payload.matricula_militar_id || '').trim()) erros.push('matricula_militar_id da matrícula atual é obrigatório. Cadastre a matrícula atual na ficha do militar antes de registrar o contrato.');
+  if (!String(payload.matricula_militar_id || '').trim()) {
+    erros.push('matricula_militar_id da matrícula atual é obrigatório. Cadastre a matrícula atual na ficha do militar antes de registrar o contrato.');
+  } else if (isIdMatriculaContaminado(payload.matricula_militar_id)) {
+    erros.push('Erro técnico: matricula_militar_id deve conter somente o ID real da matrícula, sem o formato id:matricula.');
+  }
   if (!String(payload.matricula_designacao || '').trim()) erros.push('matricula_designacao é obrigatória.');
   if (!payload.data_inicio_contrato) erros.push('data_inicio_contrato é obrigatória.');
-  if (!payload.status_contrato) erros.push('status_contrato é obrigatório.');
-  if (status === STATUS_CONTRATO_DESIGNACAO.ATIVO && !payload.data_inclusao_para_ferias) {
-    erros.push('data_inclusao_para_ferias é obrigatória para contrato ativo.');
-  }
-  if (!String(payload.numero_contrato || '').trim() && !String(payload.boletim_publicacao || '').trim()) {
-    erros.push('numero_contrato ou boletim_publicacao é obrigatório.');
-  }
+  if (!hasValor(payload.tipo_prazo_contrato)) erros.push('tipo_prazo_contrato é obrigatório.');
+  if (payload.gera_direito_ferias === undefined || payload.gera_direito_ferias === null || payload.gera_direito_ferias === '') erros.push('gera_direito_ferias é obrigatório.');
+  if (!hasValor(payload.regra_geracao_periodos)) erros.push('regra_geracao_periodos é obrigatória.');
 
   if (tipoPrazoContrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO) {
     if (payload.gera_direito_ferias !== undefined && normalizarGeraDireitoFerias(payload.gera_direito_ferias) !== true) {
@@ -199,9 +202,6 @@ export function validarContratoDesignacaoPayload(payload = {}) {
   }
 
   if (tipoPrazoContrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO) {
-    if (!payload.data_fim_contrato) {
-      erros.push('data_fim_contrato é obrigatória para contrato determinado de 12 meses.');
-    }
     if (regraGeracaoPeriodos === REGRA_GERACAO_PERIODOS_DESIGNACAO.NORMAL) {
       erros.push('Contrato determinado deve usar regra_geracao_periodos bloqueada ou manual.');
     }
