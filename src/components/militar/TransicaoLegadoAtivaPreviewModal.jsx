@@ -106,8 +106,10 @@ function CabecalhoPreview({ preview, previewHash }) {
   );
 }
 
-export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, militarId, contrato }) {
+export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, militarId, contrato, contratoAtivo, contratoDesignacaoId }) {
   const queryClient = useQueryClient();
+  const contratoPreview = contrato || contratoAtivo || null;
+  const contratoId = contratoDesignacaoId || contratoPreview?.id;
   const [preview, setPreview] = useState(null);
   const [resultadoAplicacao, setResultadoAplicacao] = useState(null);
   const [error, setError] = useState('');
@@ -120,7 +122,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   useEffect(() => {
     let active = true;
     async function carregarPreview() {
-      if (!open || !militarId || !contrato?.id) return;
+      if (!open || !militarId || !contratoId) return;
       setLoading(true);
       setError('');
       setPreview(null);
@@ -129,7 +131,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       setAcoesSelecionadas({});
       setPreviewHash(null);
       try {
-        const data = await previsualizarTransicaoLegadoAtiva({ militarId, contratoDesignacaoId: contrato.id });
+        const data = await previsualizarTransicaoLegadoAtiva({ militarId, contratoDesignacaoId: contratoId });
         if (active) {
           setPreview(data);
           setPreviewHash(data?.preview_hash || data?.meta?.previewHash || null);
@@ -143,7 +145,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
     }
     carregarPreview();
     return () => { active = false; };
-  }, [open, militarId, contrato?.id]);
+  }, [open, militarId, contratoId]);
 
   const totais = preview?.totais || {};
   const periodos = preview?.periodos || [];
@@ -188,7 +190,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
     try {
       const resultado = await aplicarTransicaoLegadoAtiva({
         militarId,
-        contratoDesignacaoId: contrato.id,
+        contratoDesignacaoId: contratoId,
         confirmacaoTextual,
         previewHash,
       });

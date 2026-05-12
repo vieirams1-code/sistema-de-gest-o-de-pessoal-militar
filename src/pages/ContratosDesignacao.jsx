@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Eye, FileText, Search, ShieldCheck, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Eye, FileText, Search, ShieldCheck, UserRound, Wand2, XCircle } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
+import TransicaoLegadoAtivaPreviewModal from '@/components/militar/TransicaoLegadoAtivaPreviewModal';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -90,6 +91,7 @@ export default function ContratosDesignacao() {
   const [vencimento, setVencimento] = useState(FILTRO_VENCIMENTO.TODOS);
   const [legado, setLegado] = useState(FILTRO_LEGADO.TODOS);
   const [contratoDetalhe, setContratoDetalhe] = useState(null);
+  const [contratoTransicao, setContratoTransicao] = useState(null);
 
   const query = useQuery({
     queryKey: ['painel-contratos-designacao', Boolean(isAdmin || hasAbsoluteAccess), null, userEmail || null, null],
@@ -131,6 +133,10 @@ export default function ContratosDesignacao() {
     if (dias === 0) return 'Vence hoje';
     return `${dias} dia(s)`;
   };
+  const isContratoAtivoOperacional = (contrato) => ![
+    SITUACAO_CONTRATO_DESIGNACAO.ENCERRADO,
+    SITUACAO_CONTRATO_DESIGNACAO.CANCELADO,
+  ].includes(calcularSituacaoDerivadaContrato(contrato));
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
@@ -190,48 +196,81 @@ export default function ContratosDesignacao() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-slate-600">
-                <tr>
-                  {['Situação', 'Militar', 'Matrícula atual', 'Matrícula de designação', 'Início', 'Fim previsto/operacional', 'Dias para vencimento', 'Nº contrato', 'Boletim/publicação', 'Fonte legal/tipo', 'Legado da Ativa', 'Ações'].map((col) => <th key={col} className="px-4 py-3 text-left font-semibold whitespace-nowrap">{col}</th>)}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {query.isLoading ? (
-                  <tr><td colSpan="12" className="px-4 py-12 text-center text-slate-500">Carregando contratos...</td></tr>
-                ) : contratosFiltrados.length === 0 ? (
-                  <tr><td colSpan="12" className="px-4 py-12 text-center text-slate-500">Nenhum contrato encontrado para os filtros informados.</td></tr>
-                ) : contratosFiltrados.map((contrato) => {
+        <Card className="border-slate-200 shadow-sm">
+          <CardContent className="p-4">
+            {query.isLoading ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-500">Carregando contratos...</div>
+            ) : contratosFiltrados.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-500">Nenhum contrato encontrado para os filtros informados.</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                {contratosFiltrados.map((contrato) => {
                   const militar = getMilitar(contrato);
                   const situacaoDerivada = calcularSituacaoDerivadaContrato(contrato);
-                  const ui = SITUACAO_UI[situacaoDerivada] || SITUACAO_UI.ativo;
+                  const ui = SITUACAO_UI[situacaoDerivada] || SITUACAO_UI[SITUACAO_CONTRATO_DESIGNACAO.ATIVO];
                   const legadoInfo = legadoAtivaPorContrato[String(contrato.id)] || { aplicado: false };
+                  const podeResolverPeriodos = isContratoAtivoOperacional(contrato);
+                  const acaoTransicaoLabel = legadoInfo.aplicado ? 'Revisar períodos' : 'Resolver períodos';
+
                   return (
-                    <tr key={contrato.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3"><Badge variant="outline" className={ui.className}>{ui.label}</Badge></td>
-                      <td className="px-4 py-3 min-w-56"><div className="font-semibold text-slate-900">{militar.nome_guerra || militar.nome_completo || 'Militar não localizado'}</div><div className="text-xs text-slate-500">{militar.posto_graduacao || militar.quadro || '—'}</div></td>
-                      <td className="px-4 py-3 whitespace-nowrap">{getMatriculaAtual(contrato)}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{contrato.matricula_designacao || '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{formatDate(contrato.data_inicio_contrato)}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{formatDate(contrato.data_fim_contrato || contrato.data_encerramento_operacional)}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{renderDias(contrato)}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{contrato.numero_contrato || '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{contrato.boletim_publicacao || '—'}</td>
-                      <td className="px-4 py-3 min-w-48">{[contrato.fonte_legal, contrato.tipo_designacao].filter(Boolean).join(' / ') || '—'}</td>
-                      <td className="px-4 py-3"><Badge variant="outline" className={legadoInfo.aplicado ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>{legadoInfo.aplicado ? 'Aplicada' : 'Pendente'}</Badge></td>
-                      <td className="px-4 py-3"><div className="flex items-center gap-2"><Button asChild variant="outline" size="sm"><Link to={`${createPageUrl('VerMilitar')}?id=${contrato.militar_id}`}><UserRound size={14} className="mr-1" />Ficha</Link></Button><Button type="button" variant="outline" size="sm" onClick={() => setContratoDetalhe(contrato)}><Eye size={14} className="mr-1" />Detalhes</Button></div></td>
-                    </tr>
+                    <article key={contrato.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className={ui.className}>{ui.label}</Badge>
+                            <Badge variant="outline" className={legadoInfo.aplicado ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>
+                              Legado da Ativa: {legadoInfo.aplicado ? 'Aplicado' : 'Pendente'}
+                            </Badge>
+                          </div>
+                          <h2 className="mt-2 break-words text-lg font-bold text-slate-900">{militar.nome_guerra || militar.nome_completo || 'Militar não localizado'}</h2>
+                          <p className="text-sm text-slate-500">{militar.posto_graduacao || militar.quadro || 'Posto/graduação não informado'}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 sm:justify-end">
+                          <Button asChild variant="outline" size="sm">
+                            <Link to={`${createPageUrl('VerMilitar')}?id=${contrato.militar_id}`}><UserRound size={14} className="mr-1" />Ver ficha</Link>
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setContratoDetalhe(contrato)}><Eye size={14} className="mr-1" />Detalhes</Button>
+                          {podeResolverPeriodos && (
+                            <Button type="button" variant="outline" size="sm" onClick={() => setContratoTransicao(contrato)} className="border-amber-200 text-amber-800 hover:bg-amber-50">
+                              <Wand2 size={14} className="mr-1" />{acaoTransicaoLabel}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <DetailItem label="Matrícula atual" value={getMatriculaAtual(contrato)} />
+                        <DetailItem label="Matrícula de designação" value={contrato.matricula_designacao} />
+                        <DetailItem label="Início" value={formatDate(contrato.data_inicio_contrato)} />
+                        <DetailItem label="Fim previsto/operacional" value={formatDate(contrato.data_fim_contrato || contrato.data_encerramento_operacional)} />
+                        <DetailItem label="Dias para vencimento" value={renderDias(contrato)} />
+                        <DetailItem label="Contrato/boletim/publicação" value={[contrato.numero_contrato, contrato.boletim_publicacao, formatDate(contrato.data_publicacao)].filter((value) => value && value !== '—').join(' • ')} />
+                        <div className="sm:col-span-2 lg:col-span-3">
+                          <DetailItem label="Fonte legal/tipo" value={[contrato.fonte_legal, contrato.tipo_designacao].filter(Boolean).join(' / ')} />
+                        </div>
+                      </div>
+                    </article>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            )}
+          </CardContent>
         </Card>
 
         {query.error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{query.error.message || 'Erro ao carregar painel.'}</div>}
       </div>
+
+
+      <TransicaoLegadoAtivaPreviewModal
+        open={Boolean(contratoTransicao)}
+        onOpenChange={(open) => !open && setContratoTransicao(null)}
+        militarId={contratoTransicao?.militar_id}
+        militar={contratoTransicao ? getMilitar(contratoTransicao) : null}
+        contrato={contratoTransicao}
+        contratoAtivo={contratoTransicao}
+        contratoDesignacaoId={contratoTransicao?.id}
+        canPrepararLegadoAtiva={canView}
+      />
 
       {contratoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
