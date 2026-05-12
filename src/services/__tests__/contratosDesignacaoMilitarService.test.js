@@ -47,35 +47,38 @@ test('valida obrigatórios de criação', () => {
   assert.match(resultado.erros.join('\n'), /matricula_militar_id/);
   assert.match(resultado.erros.join('\n'), /matricula_designacao/);
   assert.match(resultado.erros.join('\n'), /data_inicio_contrato/);
-  assert.match(resultado.erros.join('\n'), /status_contrato/);
+  assert.match(resultado.erros.join('\n'), /tipo_prazo_contrato/);
+  assert.match(resultado.erros.join('\n'), /gera_direito_ferias/);
+  assert.match(resultado.erros.join('\n'), /regra_geracao_periodos/);
 });
 
-test('exige data_inclusao_para_ferias para ativo', () => {
+test('aceita contrato sem data-base explícita e sem campos administrativos', () => {
   const resultado = validarContratoDesignacaoPayload({
     militar_id: 'm1',
     matricula_militar_id: 'mat-1',
     matricula_designacao: '123',
     data_inicio_contrato: '2026-01-01',
-    status_contrato: 'ativo',
-    numero_contrato: 'CT-1',
+    tipo_prazo_contrato: 'indeterminado',
+    gera_direito_ferias: true,
+    regra_geracao_periodos: 'normal',
   });
 
-  assert.equal(resultado.valido, false);
-  assert.match(resultado.erros.join('\n'), /data_inclusao_para_ferias/);
+  assert.equal(resultado.valido, true);
 });
 
-test('exige número de contrato ou boletim', () => {
+test('rejeita matricula_militar_id contaminado', () => {
   const resultado = validarContratoDesignacaoPayload({
     militar_id: 'm1',
-    matricula_militar_id: 'mat-1',
+    matricula_militar_id: 'mat-1:123',
     matricula_designacao: '123',
     data_inicio_contrato: '2026-01-01',
-    data_inclusao_para_ferias: '2026-01-01',
-    status_contrato: 'ativo',
+    tipo_prazo_contrato: 'indeterminado',
+    gera_direito_ferias: true,
+    regra_geracao_periodos: 'normal',
   });
 
   assert.equal(resultado.valido, false);
-  assert.match(resultado.erros.join('\n'), /numero_contrato ou boletim_publicacao/);
+  assert.match(resultado.erros.join('\n'), /id:matricula/);
 });
 
 test('impede data fim anterior à data início', () => {
@@ -87,6 +90,9 @@ test('impede data fim anterior à data início', () => {
     data_fim_contrato: '2026-01-01',
     data_inclusao_para_ferias: '2026-01-10',
     status_contrato: 'ativo',
+    tipo_prazo_contrato: 'indeterminado',
+    gera_direito_ferias: true,
+    regra_geracao_periodos: 'normal',
     boletim_publicacao: 'BG 1',
   });
 
@@ -186,7 +192,7 @@ test('valida regras de férias para contrato determinado', () => {
   });
 
   assert.equal(resultado.valido, false);
-  assert.match(resultado.erros.join('\n'), /data_fim_contrato/);
+  assert.doesNotMatch(resultado.erros.join('\n'), /data_fim_contrato é obrigatória/);
   assert.match(resultado.erros.join('\n'), /bloqueada ou manual/);
   assert.match(resultado.erros.join('\n'), /motivo_nao_gera_ferias/);
 });

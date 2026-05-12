@@ -126,7 +126,9 @@
     "matricula_militar_id",
     "matricula_designacao",
     "data_inicio_contrato",
-    "status_contrato"
+    "tipo_prazo_contrato",
+    "gera_direito_ferias",
+    "regra_geracao_periodos"
   ],
   "rls": {
     "read": {

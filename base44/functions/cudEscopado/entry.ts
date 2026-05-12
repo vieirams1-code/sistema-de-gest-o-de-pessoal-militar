@@ -314,9 +314,12 @@ function normalizarRegraGeracaoPeriodosContratoDesignacao(valor) {
 
 function prepararCamposFeriasContratoDesignacao(data = {}) {
   const tipoPrazoContrato = normalizarTipoPrazoContratoDesignacao(data?.tipo_prazo_contrato);
+  const dataBaseFerias = data?.data_inclusao_para_ferias || data?.data_inicio_contrato || '';
   if (tipoPrazoContrato === 'indeterminado') {
     return {
       ...data,
+      data_fim_contrato: '',
+      data_inclusao_para_ferias: dataBaseFerias,
       tipo_prazo_contrato: 'indeterminado',
       gera_direito_ferias: true,
       regra_geracao_periodos: 'normal',
@@ -328,6 +331,7 @@ function prepararCamposFeriasContratoDesignacao(data = {}) {
   const regraGeracaoPeriodos = normalizarRegraGeracaoPeriodosContratoDesignacao(data?.regra_geracao_periodos);
   return {
     ...data,
+    data_inclusao_para_ferias: dataBaseFerias,
     tipo_prazo_contrato: 'determinado',
     gera_direito_ferias: geraDireitoFerias,
     regra_geracao_periodos: regraGeracaoPeriodos,
@@ -350,7 +354,6 @@ function validarCamposFeriasContratoDesignacao(data = {}, erros = []) {
   }
 
   if (tipoPrazoContrato === 'determinado') {
-    if (!data?.data_fim_contrato) erros.push('data_fim_contrato é obrigatória para contrato determinado de 12 meses.');
     if (regraGeracaoPeriodos === 'normal') erros.push('Contrato determinado deve usar regra_geracao_periodos bloqueada ou manual.');
     if (!geraDireitoFerias && !String(data?.motivo_nao_gera_ferias || '').trim()) {
       erros.push('motivo_nao_gera_ferias é obrigatório quando contrato determinado não gera direito a férias.');
@@ -369,9 +372,15 @@ async function validarMatriculaContratoDesignacao(base44, data, militarId) {
     erro.status = 400;
     throw erro;
   }
+  const matriculaMilitarId = String(data.matricula_militar_id).trim();
+  if (matriculaMilitarId.includes(':')) {
+    const erro = new Error('matricula_militar_id deve conter somente o ID real da matrícula, sem o formato id:matricula.');
+    erro.status = 400;
+    throw erro;
+  }
   const matriculas = await fetchWithRetry(
-    () => base44.asServiceRole.entities.MatriculaMilitar.filter({ id: String(data.matricula_militar_id) }, undefined, 1, 0),
-    `MatriculaMilitar.contrato:${data.matricula_militar_id}`,
+    () => base44.asServiceRole.entities.MatriculaMilitar.filter({ id: matriculaMilitarId }, undefined, 1, 0),
+    `MatriculaMilitar.contrato:${matriculaMilitarId}`,
   );
   const matricula = matriculas?.[0] || null;
   if (!matricula) {
@@ -407,7 +416,8 @@ async function garantirContratoAtivoUnico(base44, militarId, registroIdIgnorado 
 }
 
 async function prepararContratoDesignacaoMilitar({ base44, operation, registroId, data, registroExistente, militarAlvoId, userEmail }) {
-  data = data || {};
+  const dadosRecebidos = data || {};
+  data = dadosRecebidos;
   if (operation === 'create') data = prepararCamposFeriasContratoDesignacao(data);
   if (operation === 'delete') {
     const erro = new Error('Delete físico de ContratoDesignacaoMilitar não é permitido. Use cancelamento para preservar histórico.');
@@ -424,11 +434,12 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
     const erros = [];
     if (!data?.militar_id) erros.push('militar_id é obrigatório.');
     if (!String(data?.matricula_militar_id || '').trim()) erros.push('matricula_militar_id da matrícula atual é obrigatório. Cadastre a matrícula atual na ficha do militar antes de registrar o contrato.');
+    else if (String(data.matricula_militar_id).includes(':')) erros.push('matricula_militar_id deve conter somente o ID real da matrícula, sem o formato id:matricula.');
     if (!String(data?.matricula_designacao || '').trim()) erros.push('matricula_designacao é obrigatória.');
     if (!data?.data_inicio_contrato) erros.push('data_inicio_contrato é obrigatória.');
-    if (!data?.status_contrato) erros.push('status_contrato é obrigatório.');
-    if (statusPayload === 'ativo' && !data?.data_inclusao_para_ferias) erros.push('data_inclusao_para_ferias é obrigatória quando status_contrato = ativo.');
-    if (!String(data?.numero_contrato || '').trim() && !String(data?.boletim_publicacao || '').trim()) erros.push('numero_contrato ou boletim_publicacao é obrigatório.');
+    if (!String(dadosRecebidos?.tipo_prazo_contrato || '').trim()) erros.push('tipo_prazo_contrato é obrigatório.');
+    if (dadosRecebidos?.gera_direito_ferias === undefined || dadosRecebidos?.gera_direito_ferias === null || dadosRecebidos?.gera_direito_ferias === '') erros.push('gera_direito_ferias é obrigatório.');
+    if (!String(dadosRecebidos?.regra_geracao_periodos || '').trim()) erros.push('regra_geracao_periodos é obrigatória.');
     validarCamposFeriasContratoDesignacao(data, erros);
     if (data?.data_inicio_contrato && data?.data_fim_contrato && dataTime(data.data_fim_contrato) < dataTime(data.data_inicio_contrato)) erros.push('data_fim_contrato não pode ser anterior à data_inicio_contrato.');
     if (erros.length) {
@@ -440,6 +451,8 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
     if (statusPayload === 'ativo') await garantirContratoAtivoUnico(base44, militarAlvoId);
     return {
       ...data,
+      data_inclusao_para_ferias: data.data_inclusao_para_ferias || data.data_inicio_contrato || '',
+      data_fim_contrato: normalizarTipoPrazoContratoDesignacao(data.tipo_prazo_contrato) === 'indeterminado' ? '' : data.data_fim_contrato,
       matricula_militar_id: String(matriculaAtual.id),
       matricula_designacao: String(matriculaAtual.matricula_formatada || matriculaAtual.matricula || data.matricula_designacao || ''),
       status_contrato: statusPayload,
@@ -479,12 +492,19 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
     payloadFinal.status_contrato = 'cancelado';
     payloadFinal.cancelado_por = payloadFinal.cancelado_por || nowUser;
   } else if (statusPayload === 'ativo') {
+    if (!payloadFinal.data_inclusao_para_ferias && !registroExistente.data_inclusao_para_ferias && (payloadFinal.data_inicio_contrato || registroExistente.data_inicio_contrato)) {
+      payloadFinal.data_inclusao_para_ferias = payloadFinal.data_inicio_contrato || registroExistente.data_inicio_contrato;
+    }
     if (!payloadFinal.data_inclusao_para_ferias && !registroExistente.data_inclusao_para_ferias) {
       const erro = new Error('data_inclusao_para_ferias é obrigatória quando status_contrato = ativo.');
       erro.status = 400;
       throw erro;
     }
     await garantirContratoAtivoUnico(base44, militarAlvoId, registroId);
+  }
+
+  if (normalizarTipoPrazoContratoDesignacao(payloadFinal.tipo_prazo_contrato || registroExistente.tipo_prazo_contrato) === 'indeterminado') {
+    payloadFinal.data_fim_contrato = '';
   }
 
   const contratoCombinado = { ...registroExistente, ...payloadFinal };
