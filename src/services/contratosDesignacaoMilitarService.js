@@ -178,6 +178,7 @@ export function validarContratoDesignacaoPayload(payload = {}) {
   const regraGeracaoPeriodos = normalizarRegraGeracaoPeriodos(payload.regra_geracao_periodos);
 
   if (!payload.militar_id) erros.push('militar_id é obrigatório.');
+  if (!String(payload.matricula_militar_id || '').trim()) erros.push('matricula_militar_id da matrícula atual é obrigatório. Cadastre a matrícula atual na ficha do militar antes de registrar o contrato.');
   if (!String(payload.matricula_designacao || '').trim()) erros.push('matricula_designacao é obrigatória.');
   if (!payload.data_inicio_contrato) erros.push('data_inicio_contrato é obrigatória.');
   if (!payload.status_contrato) erros.push('status_contrato é obrigatório.');

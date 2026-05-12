@@ -364,7 +364,11 @@ function possuiActionContratoDesignacao(actions, ...keys) {
 }
 
 async function validarMatriculaContratoDesignacao(base44, data, militarId) {
-  if (!data?.matricula_militar_id) return;
+  if (!data?.matricula_militar_id) {
+    const erro = new Error('matricula_militar_id da matrícula atual é obrigatório. Cadastre a matrícula atual na ficha do militar antes de registrar o contrato.');
+    erro.status = 400;
+    throw erro;
+  }
   const matriculas = await fetchWithRetry(
     () => base44.asServiceRole.entities.MatriculaMilitar.filter({ id: String(data.matricula_militar_id) }, undefined, 1, 0),
     `MatriculaMilitar.contrato:${data.matricula_militar_id}`,
@@ -380,6 +384,13 @@ async function validarMatriculaContratoDesignacao(base44, data, militarId) {
     erro.status = 400;
     throw erro;
   }
+  const situacao = normalizarTextoContratoDesignacao(matricula.situacao);
+  if (matricula.is_atual !== true && situacao !== 'ativa') {
+    const erro = new Error('A matrícula vinculada ao contrato deve ser a matrícula atual/ativa do militar. Cadastre ou marque a matrícula atual na ficha do militar antes de registrar o contrato.');
+    erro.status = 400;
+    throw erro;
+  }
+  return matricula;
 }
 
 async function garantirContratoAtivoUnico(base44, militarId, registroIdIgnorado = null) {
@@ -412,6 +423,7 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
   if (operation === 'create') {
     const erros = [];
     if (!data?.militar_id) erros.push('militar_id é obrigatório.');
+    if (!String(data?.matricula_militar_id || '').trim()) erros.push('matricula_militar_id da matrícula atual é obrigatório. Cadastre a matrícula atual na ficha do militar antes de registrar o contrato.');
     if (!String(data?.matricula_designacao || '').trim()) erros.push('matricula_designacao é obrigatória.');
     if (!data?.data_inicio_contrato) erros.push('data_inicio_contrato é obrigatória.');
     if (!data?.status_contrato) erros.push('status_contrato é obrigatório.');
@@ -424,9 +436,16 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
       erro.status = 400;
       throw erro;
     }
-    await validarMatriculaContratoDesignacao(base44, data, militarAlvoId);
+    const matriculaAtual = await validarMatriculaContratoDesignacao(base44, data, militarAlvoId);
     if (statusPayload === 'ativo') await garantirContratoAtivoUnico(base44, militarAlvoId);
-    return { ...data, status_contrato: statusPayload, criado_por: data?.criado_por || nowUser, atualizado_por: nowUser };
+    return {
+      ...data,
+      matricula_militar_id: String(matriculaAtual.id),
+      matricula_designacao: String(matriculaAtual.matricula_formatada || matriculaAtual.matricula || data.matricula_designacao || ''),
+      status_contrato: statusPayload,
+      criado_por: data?.criado_por || nowUser,
+      atualizado_por: nowUser,
+    };
   }
 
   if (!registroExistente) return data;

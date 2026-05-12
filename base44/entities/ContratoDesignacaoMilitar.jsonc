@@ -10,11 +10,11 @@
     },
     "matricula_militar_id": {
       "type": "string",
-      "description": "ID da MatriculaMilitar existente (deve pertencer ao mesmo militar_id)"
+      "description": "ID real da MatriculaMilitar atual/ativa existente (deve pertencer ao mesmo militar_id)"
     },
     "matricula_designacao": {
       "type": "string",
-      "description": "Matr\u00edcula de designa\u00e7\u00e3o utilizada no contrato"
+      "description": "Texto da matr\u00edcula atual puxada automaticamente da ficha do militar"
     },
     "data_inicio_contrato": {
       "type": "string",
@@ -123,6 +123,7 @@
   },
   "required": [
     "militar_id",
+    "matricula_militar_id",
     "matricula_designacao",
     "data_inicio_contrato",
     "status_contrato"
