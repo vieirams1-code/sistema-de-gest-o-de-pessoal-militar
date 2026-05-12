@@ -188,16 +188,30 @@ export default function AntiguidadePrevia() {
   } = useQuery({
     queryKey: ['antiguidade-previa-geral'],
     queryFn: async () => {
-      const [militares, historicos, configuracoesAntiguidade] = await Promise.all([
+      const [militares, historicos, resultadoConfiguracaoAntiguidade] = await Promise.all([
         base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
         base44.entities.HistoricoPromocaoMilitarV2.list(),
-        base44.entities.ConfiguracaoAntiguidade.filter({ ativo: true }),
+        base44.entities.ConfiguracaoAntiguidade.filter({ ativo: true })
+          .then((configuracoesAntiguidade) => ({
+            configuracoesAntiguidade: configuracoesAntiguidade || [],
+            falhaLeituraConfiguracaoAntiguidade: false,
+            erroLeituraConfiguracaoAntiguidade: '',
+          }))
+          .catch((erro) => ({
+            configuracoesAntiguidade: [],
+            falhaLeituraConfiguracaoAntiguidade: true,
+            erroLeituraConfiguracaoAntiguidade: erro?.message || 'Erro não informado',
+          })),
       ]);
 
       return {
         militares: militares || [],
         historicos: historicos || [],
-        configuracoesAntiguidade: configuracoesAntiguidade || [],
+        configuracoesAntiguidade: resultadoConfiguracaoAntiguidade.configuracoesAntiguidade,
+        metadadosConfiguracaoAntiguidade: {
+          falhaLeitura: resultadoConfiguracaoAntiguidade.falhaLeituraConfiguracaoAntiguidade,
+          erroLeitura: resultadoConfiguracaoAntiguidade.erroLeituraConfiguracaoAntiguidade,
+        },
       };
     },
   });
@@ -255,7 +269,7 @@ export default function AntiguidadePrevia() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Falha ao carregar a prévia</AlertTitle>
           <AlertDescription>
-            Não foi possível ler Militar, HistoricoPromocaoMilitarV2 ou ConfiguracaoAntiguidade. Nenhuma escrita foi tentada. {error?.message || ''}
+            Não foi possível ler Militar ou HistoricoPromocaoMilitarV2. Nenhuma escrita foi tentada. {error?.message || ''}
           </AlertDescription>
         </Alert>
       </div>
@@ -317,6 +331,16 @@ export default function AntiguidadePrevia() {
           <span>Grupos usados: {selecaoConfiguracao.metadado.grupos ?? 0}</span>
         </div>
       </div>
+
+      {data?.metadadosConfiguracaoAntiguidade?.falhaLeitura && (
+        <Alert className="border-slate-200 bg-slate-50 text-slate-700">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Configuração de quadros indisponível</AlertTitle>
+          <AlertDescription>
+            {'Não foi possível ler ConfiguracaoAntiguidade.filter({ ativo: true }); a Prévia Geral continuou usando o fallback técnico padrão de ordem de quadros. Nenhuma escrita foi tentada.'}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {selecaoConfiguracao.metadado.multiplasAtivas && (
         <Alert className="border-slate-200 bg-slate-50 text-slate-700">
