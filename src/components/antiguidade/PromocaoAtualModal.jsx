@@ -12,10 +12,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  POSTOS_GRADUACOES,
+  getPostoAnteriorPrevisto,
+} from '@/components/antiguidade/promocaoHistoricaUtils';
 
 const STATUS_ATIVO = 'ativo';
+const POSTO_2_TENENTE = '2º Tenente';
 
 const FORM_INICIAL = {
+  posto_graduacao_anterior: '',
   data_promocao: '',
   data_publicacao: '',
   boletim_referencia: '',
@@ -26,6 +32,13 @@ const FORM_INICIAL = {
 };
 
 const valorTexto = (v) => String(v || '').trim();
+
+const obterPostoAnteriorInicial = (postoAtual) => {
+  if (postoAtual === POSTO_2_TENENTE) return '';
+
+  const sugestao = getPostoAnteriorPrevisto(postoAtual);
+  return POSTOS_GRADUACOES.includes(sugestao) ? sugestao : '';
+};
 
 const normalizarOrdemAntiguidade = (ordem) => {
   if (ordem === null || ordem === undefined || String(ordem).trim() === '') {
@@ -47,7 +60,7 @@ const montarPayloadPromocao = (form, militar) => ({
   observacoes: form.observacoes || '',
   origem_dado: 'manual',
   status_registro: STATUS_ATIVO,
-  posto_graduacao_anterior: '',
+  posto_graduacao_anterior: form.posto_graduacao_anterior || '',
   quadro_anterior: '',
   antiguidade_referencia_id: '',
 });
@@ -60,11 +73,19 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
 
   React.useEffect(() => {
     if (open) {
-      setForm(FORM_INICIAL);
+      setForm({
+        ...FORM_INICIAL,
+        posto_graduacao_anterior: obterPostoAnteriorInicial(militar?.posto_graduacao),
+      });
       setRegistroConflitante(null);
       setMensagem('');
     }
-  }, [open, militar?.id]);
+  }, [open, militar?.id, militar?.posto_graduacao]);
+
+  const isSegundoTenente = militar?.posto_graduacao === POSTO_2_TENENTE;
+  const textoAuxiliarPostoAnterior = isSegundoTenente
+    ? 'A origem de 2º Tenente pode ser Aspirante a Oficial ou Subtenente. Confirme conforme boletim/ato.'
+    : 'Sugestão operacional. Confirme conforme boletim/ato.';
 
   const atualizarDiagnostico = async () => {
     await queryClientInstance.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
@@ -154,6 +175,18 @@ export default function PromocaoAtualModal({ open, onOpenChange, militar, onSave
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label>Posto/graduação anterior</Label>
+            <select
+              className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              value={form.posto_graduacao_anterior}
+              onChange={(e) => setForm((f) => ({ ...f, posto_graduacao_anterior: e.target.value }))}
+            >
+              <option value="">Não informado</option>
+              {POSTOS_GRADUACOES.map((posto) => <option key={posto} value={posto}>{posto}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">{textoAuxiliarPostoAnterior}</p>
+          </div>
           <div><Label>Data da promoção *</Label><Input type="date" value={form.data_promocao} onChange={(e) => setForm((f) => ({ ...f, data_promocao: e.target.value }))} /></div>
           <div><Label>Data da publicação</Label><Input type="date" value={form.data_publicacao} onChange={(e) => setForm((f) => ({ ...f, data_publicacao: e.target.value }))} /></div>
           <div><Label>DOEMS / boletim / referência</Label><Input value={form.boletim_referencia} onChange={(e) => setForm((f) => ({ ...f, boletim_referencia: e.target.value }))} /></div>
