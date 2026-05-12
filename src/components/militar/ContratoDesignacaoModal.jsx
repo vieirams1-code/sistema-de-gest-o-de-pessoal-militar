@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import {
   aplicarRegraFeriasPorTipoPrazo,
   REGRA_GERACAO_PERIODOS_DESIGNACAO,
@@ -37,10 +40,62 @@ function formatDate(date) {
   try { return new Date(`${String(date).slice(0, 10)}T00:00:00`).toLocaleDateString('pt-BR'); } catch (_e) { return date; }
 }
 
+function normalizarBusca(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function getMatriculaMilitar(militar) {
+  return militar?.matricula_formatada || militar?.matricula || '';
+}
+
+function formatMilitarSearchText(militar, matriculasMilitar = []) {
+  return [
+    militar?.nome_completo,
+    militar?.nome_guerra,
+    getMatriculaMilitar(militar),
+    militar?.cpf,
+    militar?.posto_graduacao,
+    ...matriculasMilitar.map((mat) => mat?.matricula_formatada || mat?.matricula),
+  ].filter(Boolean).join(' ');
+}
+
+function somenteDigitos(value) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+function MilitarSearchResult({ militar, selected = false }) {
+  const detalhes = [
+    militar?.nome_guerra ? <strong key="guerra" className="font-bold text-slate-700">{militar.nome_guerra}</strong> : null,
+    militar?.posto_graduacao || null,
+    getMatriculaMilitar(militar) || null,
+  ].filter(Boolean);
+
+  return (
+    <div className="min-w-0 flex-1 text-left">
+      <p className="truncate text-sm font-medium text-slate-900">{militar?.nome_completo || militar?.nome_guerra || 'Militar sem nome'}</p>
+      <p className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
+        {detalhes.length > 0 ? detalhes.map((item, index) => (
+          <React.Fragment key={typeof item === 'string' ? `${item}-${index}` : item.key}>
+            {index > 0 && <span className="text-slate-300">•</span>}
+            <span className="truncate">{item}</span>
+          </React.Fragment>
+        )) : 'Sem dados complementares'}
+      </p>
+      {selected && <span className="sr-only">Militar selecionado</span>}
+    </div>
+  );
+}
+
 export default function ContratoDesignacaoModal({ open, onOpenChange, militarId, militares = [], matriculas = [], militaresLoading = false, contrato = null, readOnly = false, onSubmit, isSubmitting = false }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [militarSelecionadoId, setMilitarSelecionadoId] = useState(militarId || '');
   const [erros, setErros] = useState([]);
+  const [militarPopoverOpen, setMilitarPopoverOpen] = useState(false);
+  const [buscaMilitar, setBuscaMilitar] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -54,20 +109,40 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
   const militarEscolhido = useMemo(() => militaresOptions.find((militar) => String(militar.id) === String(militarSelecionadoId)) || null, [militarSelecionadoId, militaresOptions]);
   const matriculasOptions = useMemo(() => (Array.isArray(matriculas) ? matriculas : [])
     .filter((mat) => (mat?.id || mat?.matricula) && (!militarSelecionadoId || String(mat?.militar_id || '') === String(militarSelecionadoId))), [matriculas, militarSelecionadoId]);
+  const militaresFiltradosBusca = useMemo(() => {
+    const termo = normalizarBusca(buscaMilitar);
+    const termoNumerico = somenteDigitos(buscaMilitar);
+    if (!termo) return militaresOptions.slice(0, 30);
+    return militaresOptions
+      .filter((militar) => {
+        const matriculasMilitar = (Array.isArray(matriculas) ? matriculas : [])
+          .filter((mat) => String(mat?.militar_id || '') === String(militar.id));
+        const textoBusca = formatMilitarSearchText(militar, matriculasMilitar);
+        return normalizarBusca(textoBusca).includes(termo)
+          || (termoNumerico && somenteDigitos(textoBusca).includes(termoNumerico));
+      })
+      .slice(0, 30);
+  }, [buscaMilitar, matriculas, militaresOptions]);
 
   const update = (field, value) => setForm((prev) => aplicarRegraFeriasPorTipoPrazo({ ...prev, [field]: value }));
 
   const handleMilitarChange = (value) => {
+    const matriculaAtual = (Array.isArray(matriculas) ? matriculas : []).find((mat) => (mat?.id || mat?.matricula)
+      && String(mat?.militar_id || '') === String(value)
+      && mat?.is_atual);
+
     setMilitarSelecionadoId(value);
     setForm((prev) => ({
       ...prev,
-      matricula_militar_id: '',
-      matricula_designacao: '',
+      matricula_militar_id: matriculaAtual ? String(matriculaAtual.id || matriculaAtual.matricula) : '',
+      matricula_designacao: matriculaAtual?.matricula_formatada || matriculaAtual?.matricula || '',
     }));
+    setMilitarPopoverOpen(false);
+    setBuscaMilitar('');
   };
 
   const handleMatriculaChange = (value) => {
-    const selected = matriculasOptions.find((mat) => String(mat.id) === String(value));
+    const selected = matriculasOptions.find((mat) => String(mat.id || mat.matricula) === String(value));
     setForm((prev) => ({
       ...prev,
       matricula_militar_id: value,
@@ -148,23 +223,54 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2 md:col-span-2">
-              <Label>Militar *</Label>
-              <Select
-                value={militarSelecionadoId || ''}
-                onValueChange={handleMilitarChange}
-                disabled={militaresLoading || militaresOptions.length === 0}
-              >
-                <SelectTrigger><SelectValue placeholder={militaresLoading ? 'Carregando militares do escopo...' : 'Buscar/selecionar militar'} /></SelectTrigger>
-                <SelectContent>
-                  {militaresLoading && <SelectItem value="__loading" disabled>Carregando militares do escopo...</SelectItem>}
-                  {!militaresLoading && militaresOptions.length === 0 && <SelectItem value="__empty" disabled>Nenhum militar ativo encontrado no seu escopo</SelectItem>}
-                  {!militaresLoading && militaresOptions.map((militar) => (
-                    <SelectItem key={militar.id} value={String(militar.id)}>
-                      {[militar.nome_completo || militar.nome_guerra, militar.posto_graduacao, militar.matricula].filter(Boolean).join(' • ')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Pesquisar militar *</Label>
+              <Popover open={militarPopoverOpen} onOpenChange={setMilitarPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={militarPopoverOpen}
+                    disabled={militaresLoading || militaresOptions.length === 0}
+                    className="h-auto min-h-11 w-full justify-between px-3 py-2 font-normal"
+                  >
+                    {militarEscolhido ? (
+                      <MilitarSearchResult militar={militarEscolhido} selected />
+                    ) : (
+                      <span className="text-sm text-slate-500">
+                        {militaresLoading ? 'Carregando militares do escopo...' : 'Pesquise por nome, nome de guerra, matrícula ou CPF...'}
+                      </span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[min(42rem,calc(100vw-2rem))] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Pesquise por nome, nome de guerra, matrícula ou CPF..."
+                      value={buscaMilitar}
+                      onValueChange={setBuscaMilitar}
+                    />
+                    <CommandList>
+                      {militaresLoading && <CommandEmpty>Carregando militares do escopo...</CommandEmpty>}
+                      {!militaresLoading && <CommandEmpty>Nenhum militar ativo encontrado no seu escopo.</CommandEmpty>}
+                      <CommandGroup className="max-h-72 overflow-auto">
+                        {militaresFiltradosBusca.map((militar) => (
+                          <CommandItem
+                            key={militar.id}
+                            value={formatMilitarSearchText(militar)}
+                            onSelect={() => handleMilitarChange(String(militar.id))}
+                            className="items-start gap-2 py-2"
+                          >
+                            <Check className={cn('mt-1 h-4 w-4 shrink-0', String(militarSelecionadoId) === String(militar.id) ? 'opacity-100' : 'opacity-0')} />
+                            <MilitarSearchResult militar={militar} />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               {militarEscolhido && <p className="text-xs text-slate-500">Matrículas existentes listadas abaixo para {militarEscolhido.nome_guerra || militarEscolhido.nome_completo}.</p>}
               {!militaresLoading && militaresOptions.length === 0 && <p className="text-xs text-slate-500">Não há militares ativos disponíveis para criação de contrato no seu escopo atual.</p>}
             </div>
