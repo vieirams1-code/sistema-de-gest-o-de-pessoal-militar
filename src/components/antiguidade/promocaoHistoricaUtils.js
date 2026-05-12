@@ -17,6 +17,14 @@ export const POSTOS_GRADUACOES = [
 export const QUADROS = ['QOBM', 'QAOBM', 'QOEBM', 'QOSAU', 'QBMP-1.a', 'QBMP-1.b', 'QBMP-2', 'QOETBM', 'QOSTBM', 'QPTBM'];
 
 const normalizar = (valor) => String(valor || '').trim().toLowerCase();
+const valorTexto = (valor) => String(valor || '').trim();
+
+const normalizarQuadroPromocao = (quadro) => {
+  const texto = valorTexto(quadro);
+  if (!texto) return '';
+
+  return QUADROS.find((item) => normalizar(item) === normalizar(texto)) || texto;
+};
 
 const indicePosto = (posto) => POSTOS_GRADUACOES.findIndex((item) => normalizar(item) === normalizar(posto));
 
@@ -55,6 +63,76 @@ export function resolverQuadroPromocao({ postoAnterior, postoNovo, quadroAtual, 
   }
 
   return String(quadroAtual || quadroAnteriorInformado || '').trim();
+}
+
+const isStatusAtivo = (registro) => normalizar(registro?.status_registro || 'ativo') === 'ativo';
+
+const isTransicaoSubtenenteParaQAOBM = ({ postoAnterior, postoNovo, quadroNovo }) => (
+  normalizar(postoAnterior) === 'subtenente'
+  && normalizar(postoNovo) === '2º tenente'
+  && normalizar(quadroNovo) === 'qaobm'
+);
+
+const isQuadroHistoricoPracaConfiavel = (quadro) => {
+  const quadroNormalizado = normalizarQuadroPromocao(quadro);
+  return Boolean(quadroNormalizado) && normalizar(quadroNormalizado) !== 'qaobm';
+};
+
+const dataRegistro = (registro) => valorTexto(registro?.data_promocao);
+
+const isRegistroAnteriorOuSemData = (registro, dataPromocaoReferencia) => {
+  const dataReferencia = valorTexto(dataPromocaoReferencia);
+  const data = dataRegistro(registro);
+  return !dataReferencia || !data || data < dataReferencia;
+};
+
+const ordenarMaisRecentesPrimeiro = (a, b) => dataRegistro(b).localeCompare(dataRegistro(a));
+
+const obterQuadroHistoricoAnteriorConfiavel = ({ postoAnterior, dataPromocao, registrosHistoricos = [] }) => {
+  const registrosAtivos = (registrosHistoricos || [])
+    .filter(isStatusAtivo)
+    .filter((registro) => isRegistroAnteriorOuSemData(registro, dataPromocao))
+    .sort(ordenarMaisRecentesPrimeiro);
+
+  const promocaoDoPostoAnterior = registrosAtivos.find((registro) => (
+    normalizar(registro?.posto_graduacao_novo) === normalizar(postoAnterior)
+    && isQuadroHistoricoPracaConfiavel(registro?.quadro_novo)
+  ));
+
+  if (promocaoDoPostoAnterior) {
+    return normalizarQuadroPromocao(promocaoDoPostoAnterior.quadro_novo);
+  }
+
+  const registroComQuadroAnterior = registrosAtivos.find((registro) => (
+    normalizar(registro?.posto_graduacao_anterior) === normalizar(postoAnterior)
+    && isQuadroHistoricoPracaConfiavel(registro?.quadro_anterior)
+  ));
+
+  if (registroComQuadroAnterior) {
+    return normalizarQuadroPromocao(registroComQuadroAnterior.quadro_anterior);
+  }
+
+  return '';
+};
+
+export function resolverQuadroAnteriorPromocao({
+  postoAnterior,
+  postoNovo,
+  quadroNovo,
+  dataPromocao,
+  registrosHistoricos = [],
+}) {
+  const quadroNovoNormalizado = normalizarQuadroPromocao(quadroNovo);
+
+  if (!isTransicaoSubtenenteParaQAOBM({ postoAnterior, postoNovo, quadroNovo: quadroNovoNormalizado })) {
+    return quadroNovoNormalizado;
+  }
+
+  return obterQuadroHistoricoAnteriorConfiavel({
+    postoAnterior,
+    dataPromocao,
+    registrosHistoricos,
+  });
 }
 
 export function getProximoPosto(postoAtual) {
