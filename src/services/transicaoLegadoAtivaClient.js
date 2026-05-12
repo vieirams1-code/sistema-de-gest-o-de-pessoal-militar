@@ -13,16 +13,19 @@ function criarErroAplicacao(body, fallback = 'Erro na transição Legado da Ativ
 }
 
 function normalizarRetorno(body = {}) {
+  const previewHash = body?.preview_hash || body?.meta?.previewHash || null;
   return {
     ...body,
     candidatos: normalizarArray(body?.candidatos),
+    periodos: normalizarArray(body?.periodos),
     aplicados: normalizarArray(body?.aplicados),
     ignorados: normalizarArray(body?.ignorados),
     jaMarcados: normalizarArray(body?.jaMarcados),
     conflitos: normalizarArray(body?.conflitos),
     riscos: normalizarArray(body?.riscos),
     totais: body?.totais || {},
-    meta: body?.meta || {},
+    preview_hash: previewHash,
+    meta: { ...(body?.meta || {}), previewHash },
   };
 }
 

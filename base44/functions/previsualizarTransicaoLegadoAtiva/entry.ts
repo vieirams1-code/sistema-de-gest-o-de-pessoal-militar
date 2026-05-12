@@ -7,6 +7,31 @@ const LIMIT_USUARIO_ACESSO = 1000;
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
 const STATUS_FINALIZADOS = ['Gozado', 'Inativo'];
 const STATUS_FERIAS_PREVISTA_AUTORIZADA = ['Prevista', 'Autorizada'];
+const ACOES_TRANSICAO_DESIGNACAO = {
+  MANTER: 'manter',
+  MARCAR_LEGADO_ATIVA: 'marcar_legado_ativa',
+  MARCAR_INDENIZADO: 'marcar_indenizado',
+  EXCLUIR_CADEIA_OPERACIONAL: 'excluir_cadeia_operacional',
+  CANCELAR_PERIODO_FUTURO_INDEVIDO: 'cancelar_periodo_futuro_indevido',
+};
+const RISCOS_TRANSICAO_DESIGNACAO = {
+  SALDO_ABERTO: 'saldo_aberto',
+  FERIAS_VINCULADAS: 'ferias_vinculadas',
+  FERIAS_EM_CURSO: 'ferias_em_curso',
+  FERIAS_PREVISTA_OU_AUTORIZADA: 'ferias_prevista_ou_autorizada',
+  STATUS_NAO_FINALIZADO: 'status_nao_finalizado',
+  STATUS_PAGO_NAO_PREVISTO: 'status_pago_nao_previsto',
+  PERIODO_SEM_FIM_AQUISITIVO: 'periodo_sem_fim_aquisitivo',
+  JA_LEGADO_OUTRO_CONTRATO: 'ja_legado_outro_contrato',
+  FUTURO_INDEVIDO: 'futuro_indevido',
+};
+const RISCOS_BLOQUEANTES_TRANSICAO = [
+  RISCOS_TRANSICAO_DESIGNACAO.FERIAS_EM_CURSO,
+  RISCOS_TRANSICAO_DESIGNACAO.FERIAS_PREVISTA_OU_AUTORIZADA,
+  RISCOS_TRANSICAO_DESIGNACAO.STATUS_PAGO_NAO_PREVISTO,
+  RISCOS_TRANSICAO_DESIGNACAO.PERIODO_SEM_FIM_AQUISITIVO,
+  RISCOS_TRANSICAO_DESIGNACAO.JA_LEGADO_OUTRO_CONTRATO,
+];
 
 const normalizeTipo = (value: unknown) => String(value || '').trim().toLowerCase();
 const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCase();
@@ -261,6 +286,190 @@ function classificarPrevia({ militarId, dataBase, periodos, ferias }: any) {
   };
 }
 
+
+function uniqueSorted(values: string[]) {
+  return Array.from(new Set((values || []).filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function resumirPeriodoManual(periodo: any) {
+  return {
+    id: getId(periodo),
+    militar_id: periodo?.militar_id ?? null,
+    contrato_designacao_id: periodo?.contrato_designacao_id ?? periodo?.contrato_id ?? null,
+    ano_referencia: periodo?.ano_referencia || periodo?.periodo_aquisitivo_ref || null,
+    periodo_aquisitivo_ref: periodo?.periodo_aquisitivo_ref || periodo?.ano_referencia || null,
+    inicio_aquisitivo: normalizeDateOnly(periodo?.inicio_aquisitivo) || periodo?.inicio_aquisitivo || null,
+    fim_aquisitivo: normalizeDateOnly(periodo?.fim_aquisitivo) || periodo?.fim_aquisitivo || null,
+    status: periodo?.status || null,
+    inativo: periodo?.inativo === true,
+    dias_saldo: toNumber(periodo?.dias_saldo),
+    origem_periodo: periodo?.origem_periodo || null,
+    legado_ativa: periodo?.legado_ativa === true,
+    excluido_da_cadeia_designacao: periodo?.excluido_da_cadeia_designacao === true,
+    updated_date: periodo?.updated_date || periodo?.updated_at || null,
+  };
+}
+
+function resumirFeriasManual(ferias: any) {
+  return {
+    id: getId(ferias),
+    status: ferias?.status || null,
+    periodo_aquisitivo_id: ferias?.periodo_aquisitivo_id || null,
+    periodo_aquisitivo_ref: ferias?.periodo_aquisitivo_ref || null,
+    updated_date: ferias?.updated_date || ferias?.updated_at || null,
+  };
+}
+
+function resolverAcoesPermitidasManual(situacaoAtual: string, bloqueantes: string[]) {
+  if (bloqueantes.length > 0) return [ACOES_TRANSICAO_DESIGNACAO.MANTER];
+  if (['ja_legado', 'inativo'].includes(situacaoAtual)) return [ACOES_TRANSICAO_DESIGNACAO.MANTER];
+  if (situacaoAtual === 'futuro_pos_data_base') return [ACOES_TRANSICAO_DESIGNACAO.MANTER, ACOES_TRANSICAO_DESIGNACAO.CANCELAR_PERIODO_FUTURO_INDEVIDO, ACOES_TRANSICAO_DESIGNACAO.EXCLUIR_CADEIA_OPERACIONAL];
+  if (situacaoAtual === 'anterior_data_base') return [ACOES_TRANSICAO_DESIGNACAO.MANTER, ACOES_TRANSICAO_DESIGNACAO.MARCAR_LEGADO_ATIVA, ACOES_TRANSICAO_DESIGNACAO.MARCAR_INDENIZADO, ACOES_TRANSICAO_DESIGNACAO.EXCLUIR_CADEIA_OPERACIONAL];
+  return [ACOES_TRANSICAO_DESIGNACAO.MANTER, ACOES_TRANSICAO_DESIGNACAO.EXCLUIR_CADEIA_OPERACIONAL];
+}
+
+function analisarPeriodoTransicaoManual({ periodo, feriasVinculadas, contrato, dataBase }: any) {
+  const periodoId = getId(periodo);
+  const dataBaseNormalizada = normalizeDateOnly(dataBase);
+  const fimAquisitivo = normalizeDateOnly(periodo?.fim_aquisitivo);
+  const feriasRelacionadas = (feriasVinculadas || []).filter((item: any) => feriasVinculadaAoPeriodo(item, periodo));
+  const riscos: string[] = [];
+  const alertas: any[] = [];
+  const conflitos: any[] = [];
+  const motivosSugestao: string[] = [];
+  if (toNumber(periodo?.dias_saldo) > 0) riscos.push(RISCOS_TRANSICAO_DESIGNACAO.SALDO_ABERTO);
+  if (feriasRelacionadas.length > 0) riscos.push(RISCOS_TRANSICAO_DESIGNACAO.FERIAS_VINCULADAS);
+  if (feriasRelacionadas.some((item: any) => item?.status === 'Em Curso')) riscos.push(RISCOS_TRANSICAO_DESIGNACAO.FERIAS_EM_CURSO);
+  if (feriasRelacionadas.some((item: any) => STATUS_FERIAS_PREVISTA_AUTORIZADA.includes(item?.status))) riscos.push(RISCOS_TRANSICAO_DESIGNACAO.FERIAS_PREVISTA_OU_AUTORIZADA);
+  if (periodo?.status && !STATUS_FINALIZADOS.includes(periodo.status)) riscos.push(RISCOS_TRANSICAO_DESIGNACAO.STATUS_NAO_FINALIZADO);
+  if (periodo?.status === 'Pago') riscos.push(RISCOS_TRANSICAO_DESIGNACAO.STATUS_PAGO_NAO_PREVISTO);
+
+  let situacaoAtual = 'operacional';
+  let acaoSugerida = ACOES_TRANSICAO_DESIGNACAO.MANTER;
+  if (periodo?.legado_ativa === true) {
+    situacaoAtual = 'ja_legado';
+    motivosSugestao.push('periodo_ja_marcado_como_legado_ativa');
+  } else if (!fimAquisitivo) {
+    situacaoAtual = 'sem_fim_aquisitivo';
+    riscos.push(RISCOS_TRANSICAO_DESIGNACAO.PERIODO_SEM_FIM_AQUISITIVO);
+    motivosSugestao.push('fim_aquisitivo_invalido_ou_ausente');
+  } else if (periodo?.inativo === true) {
+    situacaoAtual = 'inativo';
+    motivosSugestao.push('periodo_inativo_nao_deve_ser_alterado');
+  } else if (riscos.includes(RISCOS_TRANSICAO_DESIGNACAO.FERIAS_EM_CURSO)) {
+    situacaoAtual = 'com_ferias_em_curso';
+    motivosSugestao.push('ferias_em_curso_impede_sugestao_operacional');
+  } else if (riscos.includes(RISCOS_TRANSICAO_DESIGNACAO.FERIAS_PREVISTA_OU_AUTORIZADA)) {
+    situacaoAtual = 'com_ferias_prevista_ou_autorizada';
+    motivosSugestao.push('ferias_prevista_ou_autorizada_impede_sugestao_operacional');
+  } else if (dataBaseNormalizada && compareDateOnly(fimAquisitivo, dataBaseNormalizada) === -1) {
+    situacaoAtual = 'anterior_data_base';
+    acaoSugerida = ACOES_TRANSICAO_DESIGNACAO.MARCAR_LEGADO_ATIVA;
+    motivosSugestao.push('fim_aquisitivo_anterior_a_data_base');
+  } else if (dataBaseNormalizada && compareDateOnly(fimAquisitivo, dataBaseNormalizada) >= 0) {
+    situacaoAtual = 'futuro_pos_data_base';
+    acaoSugerida = ACOES_TRANSICAO_DESIGNACAO.CANCELAR_PERIODO_FUTURO_INDEVIDO;
+    riscos.push(RISCOS_TRANSICAO_DESIGNACAO.FUTURO_INDEVIDO);
+    motivosSugestao.push('fim_aquisitivo_maior_ou_igual_a_data_base');
+  }
+
+  const contratoIdPeriodo = periodo?.contrato_designacao_id || periodo?.contrato_id || null;
+  const contratoIdAtual = getId(contrato);
+  if (periodo?.legado_ativa === true && contratoIdPeriodo && contratoIdAtual && String(contratoIdPeriodo) !== String(contratoIdAtual)) {
+    riscos.push(RISCOS_TRANSICAO_DESIGNACAO.JA_LEGADO_OUTRO_CONTRATO);
+    conflitos.push({ codigo: RISCOS_TRANSICAO_DESIGNACAO.JA_LEGADO_OUTRO_CONTRATO });
+    situacaoAtual = 'conflito';
+  }
+
+  const riscosUnicos = uniqueSorted(riscos);
+  const bloqueantes = riscosUnicos.filter((codigo) => RISCOS_BLOQUEANTES_TRANSICAO.includes(codigo));
+  bloqueantes.forEach((codigo) => alertas.push({ codigo }));
+  if (riscosUnicos.includes(RISCOS_TRANSICAO_DESIGNACAO.SALDO_ABERTO)) alertas.push({ codigo: RISCOS_TRANSICAO_DESIGNACAO.SALDO_ABERTO });
+  const acoesPermitidas = resolverAcoesPermitidasManual(situacaoAtual, bloqueantes);
+  if (!acoesPermitidas.includes(acaoSugerida)) acaoSugerida = ACOES_TRANSICAO_DESIGNACAO.MANTER;
+
+  return {
+    periodoId,
+    periodo: resumirPeriodoManual(periodo),
+    feriasVinculadas: feriasRelacionadas.map(resumirFeriasManual),
+    situacaoAtual,
+    acaoSugerida,
+    acoesPermitidas,
+    riscos: riscosUnicos,
+    alertas,
+    conflitos,
+    bloqueantes,
+    motivosSugestao,
+    exigeMotivo: acaoSugerida !== ACOES_TRANSICAO_DESIGNACAO.MANTER && riscosUnicos.length > 0,
+    exigeDocumento: bloqueantes.length > 0,
+    overridePermitido: bloqueantes.length === 0,
+  };
+}
+
+function stableValue(value: any): any {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.keys(value).sort().reduce((acc: any, key) => {
+    acc[key] = stableValue(value[key]);
+    return acc;
+  }, {});
+}
+
+async function calcularPreviewHashTransicaoManual(payload: any) {
+  const canonical = stableValue(payload);
+  const encoded = new TextEncoder().encode(JSON.stringify(canonical));
+  const digest = await crypto.subtle.digest('SHA-256', encoded);
+  const hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `sha256:${hash}`;
+}
+
+async function analisarTransicaoDesignacaoManualBackend({ militar, contrato, periodos, ferias, dataBase }: any) {
+  const militarId = getId(militar) || contrato?.militar_id || null;
+  const periodosDoMilitar = (periodos || []).filter((periodo: any) => !militarId || String(periodo?.militar_id || militarId) === String(militarId));
+  const feriasDoMilitar = (ferias || []).filter((item: any) => !militarId || String(item?.militar_id || militarId) === String(militarId));
+  const periodosAnalise = periodosDoMilitar
+    .map((periodo: any) => analisarPeriodoTransicaoManual({ periodo, feriasVinculadas: feriasDoMilitar, contrato, dataBase }))
+    .sort((a: any, b: any) => String(a.periodo?.inicio_aquisitivo || a.periodoId || '').localeCompare(String(b.periodo?.inicio_aquisitivo || b.periodoId || '')));
+  const riscos = periodosAnalise.flatMap((item: any) => item.riscos.map((codigo: string) => ({ periodo_id: item.periodoId, periodo_ref: item.periodo?.periodo_aquisitivo_ref, codigo, bloqueante: item.bloqueantes.includes(codigo) })));
+  const alertas = periodosAnalise.flatMap((item: any) => item.alertas.map((alerta: any) => ({ periodo_id: item.periodoId, ...alerta })));
+  const conflitos = periodosAnalise.flatMap((item: any) => item.conflitos.map((conflito: any) => ({ periodo_id: item.periodoId, ...conflito })));
+  const bloqueantes = periodosAnalise.flatMap((item: any) => item.bloqueantes.map((codigo: string) => ({ periodo_id: item.periodoId, periodo_ref: item.periodo?.periodo_aquisitivo_ref, codigo })));
+  const totais = {
+    periodos_analisados: periodosAnalise.length,
+    acoes_sugeridas: periodosAnalise.reduce((acc: any, item: any) => ({ ...acc, [item.acaoSugerida]: (acc[item.acaoSugerida] || 0) + 1 }), {}),
+    riscos: riscos.length,
+    alertas: alertas.length,
+    conflitos: conflitos.length,
+    bloqueantes: bloqueantes.length,
+    com_saldo_aberto: periodosAnalise.filter((item: any) => item.riscos.includes(RISCOS_TRANSICAO_DESIGNACAO.SALDO_ABERTO)).length,
+    com_ferias_vinculadas: periodosAnalise.filter((item: any) => item.riscos.includes(RISCOS_TRANSICAO_DESIGNACAO.FERIAS_VINCULADAS)).length,
+  };
+  const hashPayload = {
+    militar_id: getId(militar),
+    contrato_designacao_id: getId(contrato),
+    data_base: dataBase,
+    periodos: periodosAnalise.map((item: any) => ({
+      periodo_id: item.periodoId,
+      inicio_aquisitivo: item.periodo?.inicio_aquisitivo || null,
+      fim_aquisitivo: item.periodo?.fim_aquisitivo || null,
+      status: item.periodo?.status || null,
+      inativo: item.periodo?.inativo === true,
+      dias_saldo: toNumber(item.periodo?.dias_saldo),
+      origem_periodo: item.periodo?.origem_periodo || null,
+      legado_ativa: item.periodo?.legado_ativa === true,
+      excluido_da_cadeia_designacao: item.periodo?.excluido_da_cadeia_designacao === true,
+      updated_date: item.periodo?.updated_date || null,
+      ferias_vinculadas: [...(item.feriasVinculadas || [])].sort((a: any, b: any) => String(a.id || '').localeCompare(String(b.id || ''))),
+      acao_sugerida: item.acaoSugerida || null,
+      riscos: uniqueSorted(item.riscos),
+      bloqueantes: uniqueSorted(item.bloqueantes),
+    })).sort((a: any, b: any) => String(a.periodo_id || '').localeCompare(String(b.periodo_id || ''))),
+    totais,
+  };
+  const previewHash = await calcularPreviewHashTransicaoManual(hashPayload);
+  return { periodos: periodosAnalise, riscos, alertas, conflitos, bloqueantes, totais, previewHash };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -339,6 +548,7 @@ Deno.serve(async (req) => {
     ]);
 
     const classificacao = classificarPrevia({ militarId, dataBase, periodos: periodos || [], ferias: ferias || [] });
+    const analiseManual = await analisarTransicaoDesignacaoManualBackend({ militar, contrato, periodos: periodos || [], ferias: ferias || [], dataBase });
 
     return Response.json({
       ok: true,
@@ -359,6 +569,8 @@ Deno.serve(async (req) => {
       },
       data_base: dataBase,
       ...classificacao,
+      periodos: analiseManual.periodos,
+      preview_hash: analiseManual.previewHash,
       meta: {
         isAdmin: targetIsAdmin,
         modoAcesso: getModoAcesso(criteriosAplicados),
@@ -366,6 +578,7 @@ Deno.serve(async (req) => {
         effectiveEmail: isImpersonating ? effectiveEmailNorm : null,
         warnings,
         totalMilitaresEscopo,
+        previewHash: analiseManual.previewHash,
       },
     });
   } catch (error) {
