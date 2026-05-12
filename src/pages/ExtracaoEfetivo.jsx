@@ -940,7 +940,7 @@ export default function ExtracaoEfetivo() {
     setCategoriaFilter(nextCategoria);
     setPostoFiltersState(nextPostos);
     setQuadroFiltersState(nextQuadros);
-    setCompatibilityNotice(removedIncompatible ? 'Opções incompatíveis foram removidas para manter a carreira selecionada.' : '');
+    setCompatibilityNotice(removedIncompatible ? 'Alguns filtros incompatíveis foram ajustados.' : '');
   };
 
   const handlePostoFiltersChange = (nextPostos) => {
@@ -962,18 +962,31 @@ export default function ExtracaoEfetivo() {
 
     setPostoFiltersState(compatiblePostos);
     setQuadroFiltersState(compatibleQuadros);
-    setCompatibilityNotice(removedIncompatible ? 'Opções incompatíveis foram removidas para manter a carreira selecionada.' : '');
+    setCompatibilityNotice(removedIncompatible ? 'Alguns filtros incompatíveis foram ajustados.' : '');
   };
 
   const handleQuadroFiltersChange = (nextQuadros) => {
-    const carreiraPermitida = carreiraSelecionada;
     const normalized = normalizeQuadroFilterArray(nextQuadros);
+    const carreirasQuadros = new Set(normalized.map(classificarQuadro).filter(Boolean));
+    const inferredCarreira = carreirasQuadros.size === 1 ? [...carreirasQuadros][0] : null;
+    const categoriaCarreira = categoriaParaCarreira(categoriaFilter);
+    const carreiraPermitida = categoriaCarreira || carreiraSelecionada || inferredCarreira;
     const compatibleQuadros = normalizeQuadroFilterArray(filterByCarreira(normalized, classificarQuadro, carreiraPermitida));
+    const compatiblePostos = normalizeFilterArray(
+      filterByCarreira(postoFilters, classificarPostoGraduacao, carreiraPermitida),
+      postoGraduacaoRank,
+    );
+    const removedIncompatible = compatibleQuadros.length !== normalized.length || compatiblePostos.length !== postoFilters.length;
 
+    if (!categoriaCarreira && inferredCarreira) {
+      setCategoriaFilter(carreiraParaCategoria(inferredCarreira));
+    }
+
+    setPostoFiltersState(compatiblePostos);
     setQuadroFiltersState(compatibleQuadros);
     setCompatibilityNotice(
-      compatibleQuadros.length !== normalized.length
-        ? 'Quadros incompatíveis foram removidos para manter a carreira selecionada.'
+      removedIncompatible
+        ? 'Alguns filtros incompatíveis foram ajustados.'
         : '',
     );
   };

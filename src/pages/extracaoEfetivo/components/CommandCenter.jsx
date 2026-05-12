@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Briefcase, CalendarDays, ChevronDown, Columns3, FileSearch, ListChecks, Search, SlidersHorizontal, UserRound } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Briefcase, CalendarDays, CheckSquare2, ChevronDown, Columns3, FileSearch, ListChecks, Search, SlidersHorizontal, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { classificarPostoGraduacao, classificarQuadro } from '@/utils/postoQuadroCompatibilidade';
 
 function findLabel(options = [], value) {
   return options.find((option) => option.value === value)?.label || '';
@@ -38,25 +39,35 @@ function isGraduacaoPraca(label = '') {
   return /sargento|subtenente|cabo|soldado/i.test(label);
 }
 
+function joinDisplayList(values = [], limit = 2) {
+  if (!values.length) return '';
+  if (values.length === 1) return values[0];
+  if (values.length <= limit) {
+    const firstItems = values.slice(0, -1).join(', ');
+    return `${firstItems} e ${values[values.length - 1]}`;
+  }
+  return `${values.slice(0, limit).join(', ')} +${values.length - limit}`;
+}
+
 function summarizePostos(postos = [], postosDisponiveis = []) {
   if (!postos.length) return 'Todos os postos/graduações';
   const todosCompativeisSelecionados = postosDisponiveis.length > 0 && postos.length === postosDisponiveis.length;
   if (todosCompativeisSelecionados && postos.every(isGraduacaoPraca)) return 'Todas as praças';
   if (todosCompativeisSelecionados) return 'Todos os oficiais';
-  if (postos.length === 1) return postos[0];
+  if (postos.length <= 2) return joinDisplayList(postos);
   const hasOnlyPracas = postos.every(isGraduacaoPraca);
-  return `${postos.length} ${hasOnlyPracas ? 'graduações' : 'postos'}`;
+  return `${postos.length} ${hasOnlyPracas ? 'graduações' : 'postos/graduações'}`;
 }
 
 function summarizeQuadros(quadros = []) {
   if (!quadros.length) return 'Todos os quadros';
-  if (quadros.length === 1) return quadros[0];
+  if (quadros.length <= 2) return joinDisplayList(quadros);
   return `${quadros.length} quadros`;
 }
 
 function summarizeList(values = [], emptyLabel, limit = 3) {
   if (!values.length) return emptyLabel;
-  if (values.length <= limit) return values.join(', ');
+  if (values.length <= limit) return joinDisplayList(values, limit);
   return `${values.slice(0, limit).join(', ')} +${values.length - limit}`;
 }
 
@@ -177,62 +188,147 @@ function buildListagemTokens({
   return tokens.filter((token) => token.value);
 }
 
-function ChecklistMultiSelect({ label, triggerLabel, options = [], selectedValues = [], onChange, emptyMessage = 'Nenhuma opção disponível' }) {
+function getCareerLabel(type) {
+  if (type === 'oficial') return 'Oficial';
+  if (type === 'praca') return 'Praça';
+  return 'Geral';
+}
+
+function getOptionCareer(type, option) {
+  if (type === 'posto') return classificarPostoGraduacao(option);
+  if (type === 'quadro') return classificarQuadro(option);
+  return null;
+}
+
+function ChecklistMultiSelect({
+  label,
+  triggerLabel,
+  options = [],
+  selectedValues = [],
+  onChange,
+  emptyMessage = 'Nenhuma opção disponível',
+  helperText = 'Marque uma ou mais opções. Sem marcação significa todos.',
+  optionType = null,
+}) {
+  const [open, setOpen] = useState(false);
   const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
 
   const toggleValue = (value, checked) => {
     const nextValues = checked
-      ? [...selectedValues, value]
+      ? [...selectedValues, value].filter((item, index, array) => array.indexOf(item) === index)
       : selectedValues.filter((selectedValue) => selectedValue !== value);
     onChange(nextValues);
+    setOpen(true);
+  };
+
+  const clearSelection = () => {
+    onChange([]);
+    setOpen(true);
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
-          className="w-full justify-between border-slate-200 bg-white text-left font-normal text-slate-700 hover:bg-slate-50"
+          className="min-h-12 w-full justify-between gap-3 border-slate-300 bg-white px-3 py-2 text-left font-normal text-slate-800 shadow-sm hover:border-blue-300 hover:bg-blue-50/40"
+          aria-label={`${label}: ${triggerLabel}`}
         >
-          <span className="truncate">{triggerLabel}</span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+          <span className="min-w-0 space-y-0.5">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</span>
+            <span className="block truncate text-sm font-semibold text-slate-900">{triggerLabel}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            {selectedValues.length > 0 && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
+                {selectedValues.length}
+              </span>
+            )}
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(92vw,22rem)] rounded-2xl border-slate-200 p-3 shadow-xl">
-        <div className="space-y-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">{label}</p>
-            <p className="text-xs text-slate-500">Marque uma ou mais opções. Sem marcação significa todos.</p>
+      <PopoverContent
+        align="start"
+        className="w-[min(94vw,36rem)] rounded-2xl border-slate-200 p-0 shadow-2xl"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
+        <div className="overflow-hidden rounded-2xl bg-white">
+          <div className="border-b border-slate-100 bg-slate-50/80 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <CheckSquare2 className="h-4 w-4 text-blue-600" />
+                  {label}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{helperText}</p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                {selectedValues.length ? `${selectedValues.length} marcado${selectedValues.length === 1 ? '' : 's'}` : 'Todos'}
+              </span>
+            </div>
+            {selectedValues.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {selectedValues.slice(0, 4).map((value) => (
+                  <span key={value} className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                    {value}
+                  </span>
+                ))}
+                {selectedValues.length > 4 && (
+                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                    +{selectedValues.length - 4}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-          <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+
+          <div className="max-h-[22rem] space-y-2 overflow-y-auto p-3 pr-2">
             {options.length ? options.map((option) => {
               const checked = selectedSet.has(option);
               const id = `${label}-${option}`.replace(/\s+/g, '-').toLowerCase();
+              const carreira = getOptionCareer(optionType, option);
 
               return (
                 <label
                   key={option}
                   htmlFor={id}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition ${
+                    checked
+                      ? 'border-blue-300 bg-blue-50 text-blue-950 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-slate-50'
+                  }`}
                 >
                   <Checkbox
                     id={id}
                     checked={checked}
                     onCheckedChange={(nextChecked) => toggleValue(option, nextChecked === true)}
+                    className="h-5 w-5 shrink-0 border-slate-400 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600"
                   />
-                  <span>{option}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold leading-5">{option}</span>
+                    {carreira && (
+                      <span className="mt-0.5 block text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
+                        Compatível com {getCareerLabel(carreira)}
+                      </span>
+                    )}
+                  </span>
                 </label>
               );
             }) : (
-              <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-500">{emptyMessage}</p>
+              <p className="rounded-xl bg-slate-50 px-3 py-3 text-sm text-slate-500">{emptyMessage}</p>
             )}
           </div>
-          {selectedValues.length > 0 && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])} className="w-full">
-              Limpar seleção
-            </Button>
-          )}
+
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 p-3">
+            <p className="text-xs text-slate-500">O menu permanece aberto para seleção contínua.</p>
+            {selectedValues.length > 0 && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
+                Limpar seleção
+              </Button>
+            )}
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -507,56 +603,80 @@ export default function CommandCenter({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <ToolbarPopover icon={Briefcase} label="Carreira">
-            <div className="space-y-4">
+          <ToolbarPopover icon={Briefcase} label="Carreira" contentClassName="w-[min(96vw,62rem)]">
+            <div className="space-y-5">
               <div>
                 <p className="font-semibold text-slate-900">Carreira</p>
-                <p className="text-sm text-slate-500">Grupo, posto, quadro e situação do militar.</p>
+                <p className="text-sm text-slate-500">Use checklists reais para combinar postos/graduações e quadros compatíveis.</p>
               </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
-                  <SelectTrigger><SelectValue placeholder="Grupo" /></SelectTrigger>
-                  <SelectContent>
-                    {categoriaOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <ChecklistMultiSelect
-                  label="Postos e graduações"
-                  triggerLabel={summarizePostos(postoFilters, postosDisponiveis)}
-                  options={postosDisponiveis}
-                  selectedValues={postoFilters}
-                  onChange={setPostoFilters}
-                />
-                <ChecklistMultiSelect
-                  label="Quadros"
-                  triggerLabel={summarizeQuadros(quadroFilters)}
-                  options={quadrosDisponiveis}
-                  selectedValues={quadroFilters}
-                  onChange={setQuadroFilters}
-                />
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger><SelectValue placeholder="Situação no cadastro" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={todosValue}>Todas as situações</SelectItem>
-                    {statusDisponiveis.map((status) => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={situacaoMilitarFilter} onValueChange={setSituacaoMilitarFilter}>
-                  <SelectTrigger><SelectValue placeholder="Situação militar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={todosValue}>Todas as situações militares</SelectItem>
-                    {situacoesMilitaresDisponiveis.map((situacao) => (
-                      <SelectItem key={situacao} value={situacao}>{situacao}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[0.9fr_1.2fr_1.2fr]">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Categoria</p>
+                  <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
+                    <SelectTrigger className="min-h-12 bg-white"><SelectValue placeholder="Grupo" /></SelectTrigger>
+                    <SelectContent>
+                      {categoriaOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Oficiais e Praças reduzem imediatamente os postos e quadros disponíveis.</p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Postos/graduações</p>
+                  <ChecklistMultiSelect
+                    label="Postos e graduações"
+                    triggerLabel={summarizePostos(postoFilters, postosDisponiveis)}
+                    options={postosDisponiveis}
+                    selectedValues={postoFilters}
+                    onChange={setPostoFilters}
+                    optionType="posto"
+                    helperText="Selecione múltiplos postos/graduações compatíveis. Ao marcar Soldado, Cabo ou oficiais, a categoria é ajustada visualmente."
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Quadros</p>
+                  <ChecklistMultiSelect
+                    label="Quadros"
+                    triggerLabel={summarizeQuadros(quadroFilters)}
+                    options={quadrosDisponiveis}
+                    selectedValues={quadroFilters}
+                    onChange={setQuadroFilters}
+                    optionType="quadro"
+                    helperText="Marque múltiplos quadros. A lista mostra apenas quadros compatíveis com a categoria/postos atuais."
+                  />
+                </div>
               </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Situação</p>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="bg-white"><SelectValue placeholder="Situação no cadastro" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={todosValue}>Todas as situações</SelectItem>
+                      {statusDisponiveis.map((status) => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={situacaoMilitarFilter} onValueChange={setSituacaoMilitarFilter}>
+                    <SelectTrigger className="bg-white"><SelectValue placeholder="Situação militar" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={todosValue}>Todas as situações militares</SelectItem>
+                      {situacoesMilitaresDisponiveis.map((situacao) => (
+                        <SelectItem key={situacao} value={situacao}>{situacao}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {compatibilityNotice && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">
                   {compatibilityNotice}
                 </div>
               )}
