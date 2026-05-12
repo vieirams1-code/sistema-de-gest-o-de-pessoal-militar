@@ -1,0 +1,27 @@
+{
+  "name": "TransicaoDesignacaoLote",
+  "type": "object",
+  "title": "Lote de Transição Manual de Designação",
+  "description": "Registro persistente de auditoria, idempotência e rastreabilidade para futura transição manual por período de designação. Não executa alterações operacionais por si só.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "contrato_designacao_id": { "type": "string", "default": "" },
+    "preview_hash": { "type": "string", "default": "" },
+    "idempotency_key": { "type": "string", "default": "" },
+    "request_hash": { "type": "string", "default": "" },
+    "status": { "type": "string", "enum": ["criado", "validando", "aplicado", "falhou_validacao", "falhou_parcial", "cancelado"], "default": "criado" },
+    "criado_por": { "type": "string", "default": "" },
+    "criado_em": { "type": "date", "default": "" },
+    "aplicado_por": { "type": "string", "default": "" },
+    "aplicado_em": { "type": "date", "default": "" },
+    "confirmacao_textual": { "type": "string", "default": "" },
+    "totais_json": { "type": "string", "default": "" },
+    "meta_json": { "type": "string", "default": "" },
+    "observacoes": { "type": "string", "default": "" },
+    "rollback_de_lote_id": { "type": "string", "default": "" },
+    "rollback_em": { "type": "date", "default": "" },
+    "rollback_por": { "type": "string", "default": "" },
+    "rollback_motivo": { "type": "string", "default": "" }
+  },
+  "required": ["militar_id", "contrato_designacao_id", "preview_hash", "idempotency_key"]
+}

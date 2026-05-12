@@ -1,0 +1,115 @@
+{
+  "name": "TransicaoDesignacaoLote",
+  "type": "object",
+  "title": "Lote de Transição Manual de Designação",
+  "description": "Registro persistente de auditoria, idempotência e rastreabilidade para futura transição manual por período de designação. Não executa alterações operacionais por si só.",
+  "properties": {
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar vinculado ao lote de transição manual."
+    },
+    "contrato_designacao_id": {
+      "type": "string",
+      "description": "ID do contrato de designação usado como referência do lote."
+    },
+    "preview_hash": {
+      "type": "string",
+      "description": "Hash da pré-visualização conferida antes da futura aplicação manual."
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Chave de idempotência para impedir reprocessamento acidental do mesmo lote."
+    },
+    "request_hash": {
+      "type": "string",
+      "description": "Hash opcional da requisição que originou o lote."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "criado",
+        "validando",
+        "aplicado",
+        "falhou_validacao",
+        "falhou_parcial",
+        "cancelado"
+      ],
+      "default": "criado",
+      "description": "Status de auditoria do lote de transição manual."
+    },
+    "criado_por": {
+      "type": "string",
+      "description": "Usuário responsável pela criação do lote."
+    },
+    "criado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de criação do lote."
+    },
+    "aplicado_por": {
+      "type": "string",
+      "description": "Usuário responsável pela futura aplicação do lote."
+    },
+    "aplicado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da futura aplicação do lote."
+    },
+    "confirmacao_textual": {
+      "type": "string",
+      "description": "Texto de confirmação informado para uma futura aplicação manual."
+    },
+    "totais_json": {
+      "type": "string",
+      "description": "Totais do lote em JSON serializado."
+    },
+    "meta_json": {
+      "type": "string",
+      "description": "Metadados técnicos do lote em JSON serializado."
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observações administrativas do lote."
+    },
+    "rollback_de_lote_id": {
+      "type": "string",
+      "description": "ID do lote original em caso de rollback futuro. Campo reservado; rollback não é implementado neste lote."
+    },
+    "rollback_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de rollback futuro. Campo reservado; rollback não é implementado neste lote."
+    },
+    "rollback_por": {
+      "type": "string",
+      "description": "Usuário responsável por rollback futuro. Campo reservado; rollback não é implementado neste lote."
+    },
+    "rollback_motivo": {
+      "type": "string",
+      "description": "Motivo de rollback futuro. Campo reservado; rollback não é implementado neste lote."
+    }
+  },
+  "required": [
+    "militar_id",
+    "contrato_designacao_id",
+    "preview_hash",
+    "idempotency_key"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {}
+      ]
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
