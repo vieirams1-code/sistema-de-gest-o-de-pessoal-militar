@@ -117,62 +117,59 @@ export default function ContratosDesignacaoSection({
             Nenhum contrato de designação cadastrado para este militar.
           </div>
         ) : (
-          <div className="rounded-md border border-slate-200">
-            <table className="w-full table-fixed text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="w-[20%] p-3 text-left">Status / datas</th>
-                  <th className="w-[24%] p-3 text-left">Contrato / boletim / publicação</th>
-                  <th className="w-[20%] p-3 text-left">Legal / tipo / base</th>
-                  <th className="w-[18%] p-3 text-left">Observações</th>
-                  <th className="w-[18%] p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ordenados.map((contrato) => {
-                  const badge = getContratoDesignacaoStatusBadge(contrato.status_contrato);
-                  const ativoContrato = normalizarStatusContratoDesignacao(contrato.status_contrato) === 'ativo';
-                  const podePrepararLegadoAtiva = ativoContrato && Boolean(contrato.data_inclusao_para_ferias) && canPrepararLegadoAtiva;
-                  return (
-                    <tr key={contrato.id || `${contrato.matricula_designacao}-${contrato.data_inicio_contrato}`} className="border-t border-slate-100 align-top">
-                      <td className="p-3">
-                        <div className="space-y-1">
-                          <Badge className={badge.className}>{badge.label}</Badge>
-                          <p className="font-medium text-slate-700">{contrato.matricula_designacao || '—'}</p>
-                          <p className="text-xs text-slate-500">Início: {formatDate(contrato.data_inicio_contrato)}</p>
-                          <p className="text-xs text-slate-500">Fim/enc.: {formatDate(contrato.data_fim_contrato || contrato.data_encerramento_operacional)}</p>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <p className="break-words font-medium text-slate-800">{contrato.numero_contrato || '—'}</p>
-                        <p className="break-words text-xs text-slate-500">Boletim: {contrato.boletim_publicacao || '—'}</p>
-                        <p className="text-xs text-slate-500">Publicação: {formatDate(contrato.data_publicacao)}</p>
-                      </td>
-                      <td className="p-3">
-                        <p className="break-words text-slate-700">{contrato.fonte_legal || '—'}</p>
-                        <p className="break-words text-xs text-slate-500">Tipo: {contrato.tipo_designacao || '—'}</p>
-                        <p className="text-xs text-slate-500">Data-base férias: {formatDate(contrato.data_inclusao_para_ferias)}</p>
-                      </td>
-                      <td className="p-3 text-slate-600">
-                        <p className="break-words text-xs leading-5">{resumoObservacoes(contrato.observacoes)}</p>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex flex-col items-stretch gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setDetalhe(contrato)}>Ver detalhes</Button>
-                          {podePrepararLegadoAtiva && (
-                            <Button size="sm" variant="outline" onClick={() => setPreviewLegadoAtiva(contrato)} className="whitespace-normal border-amber-200 text-amber-800 hover:bg-amber-50">
-                              <Wand2 className="mr-1 h-4 w-4 shrink-0" />Preparar transição
-                            </Button>
-                          )}
-                          {ativoContrato && canEncerrar && <Button size="sm" variant="outline" onClick={() => setEncerrar(contrato)}>Encerrar</Button>}
-                          {canCancelar && normalizarStatusContratoDesignacao(contrato.status_contrato) !== 'cancelado' && <Button size="sm" variant="destructive" onClick={() => setCancelar(contrato)}>Cancelar</Button>}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="rounded-md border border-slate-200 text-sm">
+            <div className="hidden grid-cols-[1fr_1.25fr_1.15fr_0.85fr] gap-3 rounded-t-md bg-slate-50 p-3 text-xs font-semibold uppercase text-slate-500 lg:grid">
+              <span>Status / datas</span>
+              <span>Contrato / boletim / publicação</span>
+              <span>Legal / tipo / base</span>
+              <span className="text-right">Ações</span>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {ordenados.map((contrato) => {
+                const badge = getContratoDesignacaoStatusBadge(contrato.status_contrato);
+                const ativoContrato = normalizarStatusContratoDesignacao(contrato.status_contrato) === 'ativo';
+                const podePrepararLegadoAtiva = ativoContrato && Boolean(contrato.data_inclusao_para_ferias) && canPrepararLegadoAtiva;
+                return (
+                  <div key={contrato.id || `${contrato.matricula_designacao}-${contrato.data_inicio_contrato}`} className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-[1fr_1.25fr_1.15fr_0.85fr] lg:items-start">
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-[11px] font-semibold uppercase text-slate-500 lg:hidden">Status / datas</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className={badge.className}>{badge.label}</Badge>
+                        <span className="break-words font-medium text-slate-700">{contrato.matricula_designacao || '—'}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">Início: {formatDate(contrato.data_inicio_contrato)} • Fim/enc.: {formatDate(contrato.data_fim_contrato || contrato.data_encerramento_operacional)}</p>
+                    </div>
+
+                    <div className="min-w-0 rounded-md bg-slate-50 p-2 lg:bg-transparent lg:p-0">
+                      <p className="text-[11px] font-semibold uppercase text-slate-500 lg:hidden">Contrato / boletim / publicação</p>
+                      <p className="break-words font-medium text-slate-800">{contrato.numero_contrato || '—'}</p>
+                      <p className="break-words text-xs text-slate-500">Boletim: {contrato.boletim_publicacao || '—'} • Publicação: {formatDate(contrato.data_publicacao)}</p>
+                    </div>
+
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-[11px] font-semibold uppercase text-slate-500 lg:hidden">Legal / tipo / base</p>
+                      <p className="break-words text-slate-700">{contrato.fonte_legal || '—'}</p>
+                      <p className="break-words text-xs text-slate-500">Tipo: {contrato.tipo_designacao || '—'} • Data-base férias: {formatDate(contrato.data_inclusao_para_ferias)}</p>
+                      <p className="break-words text-xs leading-5 text-slate-500">Obs.: {resumoObservacoes(contrato.observacoes)}</p>
+                    </div>
+
+                    <div className="min-w-0 rounded-md border border-slate-200 bg-white p-2 lg:border-0 lg:p-0">
+                      <p className="mb-2 text-[11px] font-semibold uppercase text-slate-500 lg:hidden">Ações</p>
+                      <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+                        <Button size="sm" variant="outline" onClick={() => setDetalhe(contrato)}>Ver detalhes</Button>
+                        {podePrepararLegadoAtiva && (
+                          <Button size="sm" variant="outline" onClick={() => setPreviewLegadoAtiva(contrato)} className="whitespace-normal border-amber-200 text-amber-800 hover:bg-amber-50">
+                            <Wand2 className="mr-1 h-4 w-4 shrink-0" />Preparar transição
+                          </Button>
+                        )}
+                        {ativoContrato && canEncerrar && <Button size="sm" variant="outline" onClick={() => setEncerrar(contrato)}>Encerrar</Button>}
+                        {canCancelar && normalizarStatusContratoDesignacao(contrato.status_contrato) !== 'cancelado' && <Button size="sm" variant="destructive" onClick={() => setCancelar(contrato)}>Cancelar</Button>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

@@ -175,111 +175,117 @@ export default function TransicaoDesignacaoPeriodosGrid({ periodos = [], acoesSe
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-200 bg-white p-2">
         {FILTROS.map(([value, label]) => (
-          <Button key={value} type="button" size="sm" variant={filtro === value ? 'default' : 'outline'} onClick={() => setFiltro(value)}>
+          <Button key={value} type="button" size="sm" variant={filtro === value ? 'default' : 'outline'} onClick={() => setFiltro(value)} className="h-8 text-xs">
             {label}
           </Button>
         ))}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <table className="w-full table-fixed text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="w-[18%] p-3">Período / Status</th>
-              <th className="w-[14%] p-3">Saldo / Férias</th>
-              <th className="w-[18%] p-3">Situação / Alertas</th>
-              <th className="w-[16%] p-3">Sugestão</th>
-              <th className="w-[24%] p-3">Ação escolhida</th>
-              <th className="w-[10%] p-3 text-right">Detalhes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {linhas.length === 0 ? (
-              <tr><td colSpan={6} className="p-4 text-center text-slate-500">Nenhum período encontrado para o filtro selecionado.</td></tr>
-            ) : linhas.map(({ item, index, key, decisao, pendencias }) => {
-              const periodo = getDadosPeriodo(item);
-              const acoesPermitidas = getAcoesPermitidas(item);
-              const bloqueantes = getBloqueantes(item);
-              const riscos = getRiscos(item);
-              const ferias = getFerias(item);
-              const bloqueado = bloqueantes.length > 0;
-              const detalhesAberto = Boolean(detalhesAbertos[key]);
-              const acaoSugerida = getAcaoSugerida(item);
-              const acaoEscolhida = decisao.acao || acaoSugerida || 'manter';
-              const exigeMotivo = acaoExigeMotivo(item, decisao);
-              const exigeDocumento = acaoExigeDocumento(item, decisao);
-              const totalAlertas = riscos.length + bloqueantes.length;
-              const referencia = periodo.ano_referencia || periodo.periodo_aquisitivo_ref || item.periodoId || item.periodo_id || index + 1;
+      <div className="rounded-lg border border-slate-200 bg-white text-sm">
+        <div className="hidden grid-cols-[1.1fr_0.9fr_1fr_0.9fr_1.25fr_auto] gap-3 rounded-t-lg bg-slate-50 p-3 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+          <span>Período / Status</span>
+          <span>Saldo / Férias</span>
+          <span>Situação / Alertas</span>
+          <span>Sugestão</span>
+          <span>Ação escolhida</span>
+          <span className="text-right">Detalhes</span>
+        </div>
 
-              return (
-                <React.Fragment key={key}>
-                  <tr className={`border-t align-top ${bloqueado ? 'border-l-4 border-l-red-400 bg-red-50/50' : pendencias.length > 0 ? 'bg-amber-50/40' : ''}`}>
-                    <td className="p-3">
-                      <div className="space-y-1">
-                        <p className="font-semibold text-slate-900">{referencia}</p>
-                        <p className="text-xs text-slate-600">{formatDate(periodo.inicio_aquisitivo)} até {formatDate(periodo.fim_aquisitivo)}</p>
-                        <div className="flex flex-wrap gap-1">
-                          <Badge variant="secondary" className="max-w-full truncate">{periodo.status || 'Sem status'}</Badge>
-                          {periodo.origem_periodo && <Badge variant="outline" className="max-w-full truncate">{periodo.origem_periodo}</Badge>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <p className="font-semibold text-slate-900">{numero(periodo.dias_saldo ?? periodo.saldo ?? periodo.diasSaldo)} dia(s)</p>
-                      <p className="text-xs text-slate-500">Gozados {numero(periodo.dias_gozados ?? periodo.diasGozados)} • Prev. {numero(periodo.dias_previstos ?? periodo.diasPrevistos)}</p>
-                      <p className="mt-1 text-xs text-slate-600">{ferias.length} férias vinculada(s)</p>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary" className="max-w-full truncate">{item.situacaoAtual || item.situacao_atual || '—'}</Badge>
-                        {bloqueantes.length > 0 && <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">{bloqueantes.length} bloqueante(s)</Badge>}
-                        {riscos.length > 0 && <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">{riscos.length} risco(s)</Badge>}
-                        {totalAlertas === 0 && <span className="text-xs text-slate-500">Sem alertas</span>}
-                      </div>
-                    </td>
-                    <td className="p-3 text-slate-700">{ACOES_LABELS[acaoSugerida] || acaoSugerida || '—'}</td>
-                    <td className="p-3">
-                      <select
-                        className={`h-9 w-full rounded-md border px-2 text-sm disabled:bg-slate-100 ${acaoEscolhida !== acaoSugerida ? 'border-blue-300 bg-blue-50 font-medium text-blue-900' : 'border-slate-200 bg-white'}`}
-                        value={acaoEscolhida}
-                        disabled={bloqueado}
-                        onChange={(event) => atualizarDecisao(key, { acao: event.target.value })}
-                      >
-                        {(bloqueado ? ['manter'] : acoesPermitidas).map((acao) => <option key={acao} value={acao}>{ACOES_LABELS[acao] || acao}</option>)}
-                      </select>
-                      <div className="mt-1 flex flex-wrap gap-1 text-xs">
-                        {bloqueado && <span className="text-red-700">Bloqueante: somente “Manter” neste lote.</span>}
-                        {!bloqueado && (exigeMotivo || exigeDocumento) && <span className="text-amber-700">Preencha {exigeMotivo && exigeDocumento ? 'motivo e documento' : exigeMotivo ? 'motivo' : 'documento'} nos detalhes.</span>}
-                        {pendencias.length > 0 && <span className="inline-flex items-center gap-1 text-amber-700"><AlertTriangle className="h-3 w-3" />{pendencias.length} pendência(s)</span>}
-                      </div>
-                    </td>
-                    <td className="p-3 text-right">
-                      <Button type="button" size="sm" variant="outline" onClick={() => setDetalhesAbertos((atual) => ({ ...atual, [key]: !detalhesAberto }))}>
-                        {detalhesAberto ? <ChevronDown className="mr-1 h-4 w-4" /> : <ChevronRight className="mr-1 h-4 w-4" />}Detalhes
-                      </Button>
-                    </td>
-                  </tr>
-                  {detalhesAberto && (
-                    <tr className="border-t bg-slate-50">
-                      <td colSpan={6} className="p-3">
-                        <TransicaoDesignacaoPeriodoDetalhes
-                          periodo={item}
-                          decisao={decisao}
-                          exigeMotivo={exigeMotivo}
-                          exigeDocumento={exigeDocumento}
-                          pendencias={pendencias}
-                          onChange={(patch) => atualizarDecisao(key, patch)}
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+        {linhas.length === 0 ? (
+          <div className="border-t border-slate-100 p-4 text-center text-slate-500">Nenhum período encontrado para o filtro selecionado.</div>
+        ) : linhas.map(({ item, index, key, decisao, pendencias }) => {
+          const periodo = getDadosPeriodo(item);
+          const acoesPermitidas = getAcoesPermitidas(item);
+          const bloqueantes = getBloqueantes(item);
+          const riscos = getRiscos(item);
+          const ferias = getFerias(item);
+          const bloqueado = bloqueantes.length > 0;
+          const detalhesAberto = Boolean(detalhesAbertos[key]);
+          const acaoSugerida = getAcaoSugerida(item);
+          const acaoEscolhida = decisao.acao || acaoSugerida || 'manter';
+          const exigeMotivo = acaoExigeMotivo(item, decisao);
+          const exigeDocumento = acaoExigeDocumento(item, decisao);
+          const totalAlertas = riscos.length + bloqueantes.length;
+          const referencia = periodo.ano_referencia || periodo.periodo_aquisitivo_ref || item.periodoId || item.periodo_id || index + 1;
+          const situacao = item.situacaoAtual || item.situacao_atual || '—';
+          const precisaComplemento = !bloqueado && (exigeMotivo || exigeDocumento);
+          const escolhaDiferente = acaoEscolhida !== acaoSugerida;
+
+          return (
+            <div key={key} className={`border-t border-slate-100 ${bloqueado ? 'border-l-4 border-l-red-400 bg-red-50/60' : pendencias.length > 0 ? 'bg-amber-50/40' : 'bg-white'}`}>
+              <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-[1.1fr_0.9fr_1fr_0.9fr_1.25fr_auto] lg:items-start">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Período / Status</p>
+                  <p className="break-words font-semibold text-slate-900">{referencia}</p>
+                  <p className="text-xs text-slate-600">{formatDate(periodo.inicio_aquisitivo)} até {formatDate(periodo.fim_aquisitivo)}</p>
+                  <Badge variant="secondary" className="max-w-full whitespace-normal text-left">{periodo.status || 'Sem status'}</Badge>
+                </div>
+
+                <div className="min-w-0 rounded-md bg-slate-50 p-2 lg:bg-transparent lg:p-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Saldo / Férias</p>
+                  <p className="font-semibold text-slate-900">{numero(periodo.dias_saldo ?? periodo.saldo ?? periodo.diasSaldo)} dia(s)</p>
+                  <p className="text-xs text-slate-500">{ferias.length} férias • {numero(periodo.dias_gozados ?? periodo.diasGozados)} gozados</p>
+                </div>
+
+                <div className="min-w-0 space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Situação / Alertas</p>
+                  <Badge variant="secondary" className="max-w-full whitespace-normal text-left">{situacao}</Badge>
+                  <div className="flex flex-wrap gap-1 text-xs">
+                    {bloqueantes.length > 0 && <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">{bloqueantes.length} bloqueante(s)</Badge>}
+                    {riscos.length > 0 && <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">{riscos.length} risco(s)</Badge>}
+                    {totalAlertas === 0 && <span className="text-slate-500">Sem alertas</span>}
+                  </div>
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:hidden">Sugestão</p>
+                  <p className="break-words text-slate-700">{ACOES_LABELS[acaoSugerida] || acaoSugerida || '—'}</p>
+                </div>
+
+                <div className={`min-w-0 rounded-lg border p-2 ${escolhaDiferente ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white'}`}>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ação escolhida</p>
+                    {escolhaDiferente && <Badge variant="outline" className="border-blue-300 text-blue-800">Override</Badge>}
+                  </div>
+                  <select
+                    className={`h-9 w-full min-w-0 rounded-md border px-2 text-sm disabled:bg-slate-100 ${escolhaDiferente ? 'border-blue-300 bg-white font-medium text-blue-900' : 'border-slate-200 bg-white'}`}
+                    value={acaoEscolhida}
+                    disabled={bloqueado}
+                    onChange={(event) => atualizarDecisao(key, { acao: event.target.value })}
+                  >
+                    {(bloqueado ? ['manter'] : acoesPermitidas).map((acao) => <option key={acao} value={acao}>{ACOES_LABELS[acao] || acao}</option>)}
+                  </select>
+                  <div className="mt-1 space-y-1 text-xs">
+                    {bloqueado && <p className="text-red-700">Bloqueante: somente “Manter” neste lote.</p>}
+                    {precisaComplemento && <p className="text-amber-700">Preencha {exigeMotivo && exigeDocumento ? 'motivo e documento' : exigeMotivo ? 'motivo' : 'documento'} nos detalhes.</p>}
+                    {pendencias.length > 0 && <p className="inline-flex items-center gap-1 text-amber-700"><AlertTriangle className="h-3 w-3" />{pendencias.length} pendência(s)</p>}
+                  </div>
+                </div>
+
+                <div className="flex justify-end lg:block">
+                  <Button type="button" size="sm" variant="outline" onClick={() => setDetalhesAbertos((atual) => ({ ...atual, [key]: !detalhesAberto }))} className="w-full justify-center lg:w-auto">
+                    {detalhesAberto ? <ChevronDown className="mr-1 h-4 w-4" /> : <ChevronRight className="mr-1 h-4 w-4" />}Detalhes
+                  </Button>
+                </div>
+              </div>
+
+              {detalhesAberto && (
+                <div className="border-t border-slate-100 bg-slate-50 p-3">
+                  <TransicaoDesignacaoPeriodoDetalhes
+                    periodo={item}
+                    decisao={decisao}
+                    exigeMotivo={exigeMotivo}
+                    exigeDocumento={exigeDocumento}
+                    pendencias={pendencias}
+                    onChange={(patch) => atualizarDecisao(key, patch)}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
