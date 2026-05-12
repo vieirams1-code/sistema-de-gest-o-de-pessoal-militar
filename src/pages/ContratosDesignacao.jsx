@@ -14,6 +14,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { createPageUrl } from '@/utils';
 import { criarEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPainelContratosDesignacao } from '@/services/getScopedPainelContratosDesignacaoClient';
+import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewService';
 import {
   aplicarFiltrosPainelContratos,
   calcularDiasParaVencimento,
@@ -85,8 +87,30 @@ function DetailItem({ label, value }) {
   );
 }
 
+function extrairMatriculasDisponiveis(militaresDisponiveis = []) {
+  return militaresDisponiveis.flatMap((militar) => {
+    const historico = Array.isArray(militar?.matriculas_historico) ? militar.matriculas_historico : [];
+    if (historico.length > 0) {
+      return historico.map((matricula) => ({
+        ...matricula,
+        militar_id: matricula?.militar_id || militar.id,
+      }));
+    }
+
+    const matriculaFallback = militar?.matricula_atual || militar?.matricula;
+    if (!matriculaFallback) return [];
+    return [{
+      id: `${militar.id}:${matriculaFallback}`,
+      militar_id: militar.id,
+      matricula: matriculaFallback,
+      matricula_formatada: matriculaFallback,
+      is_atual: true,
+    }];
+  });
+}
+
 export default function ContratosDesignacao() {
-  const { isAdmin, canAccessAction, canAccessAll, permissions, userEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, canAccessAction, canAccessAll, permissions, userEmail, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
   const canView = hasAbsoluteAccess || isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
   const canCreate = hasAbsoluteAccess || isAdmin || canAccessAction('gerir_contratos_designacao');
@@ -100,11 +124,30 @@ export default function ContratosDesignacao() {
   const [contratoTransicao, setContratoTransicao] = useState(null);
   const [novoContratoOpen, setNovoContratoOpen] = useState(false);
   const [salvandoContrato, setSalvandoContrato] = useState(false);
+  const effectiveEmail = getEffectiveEmail();
 
   const query = useQuery({
     queryKey: ['painel-contratos-designacao', Boolean(isAdmin || hasAbsoluteAccess), null, userEmail || null, null],
     queryFn: () => fetchScopedPainelContratosDesignacao(),
     enabled: Boolean(isAccessResolved && canView),
+  });
+
+  const militaresDisponiveisQuery = useQuery({
+    queryKey: ['contratos-designacao-militares-disponiveis', isAdmin, modoAcesso, userEmail, effectiveEmail || null],
+    queryFn: async () => {
+      const { militares: militaresEscopados = [] } = await fetchScopedMilitares({
+        statusCadastro: 'Ativo',
+        limit: 10000,
+        offset: 0,
+        includeFoto: false,
+        effectiveEmail: effectiveEmail || undefined,
+      });
+      return carregarMilitaresComMatriculas(militaresEscopados);
+    },
+    enabled: Boolean(isAccessResolved && canCreate && novoContratoOpen),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 
   const bundle = query.data || {};
@@ -113,6 +156,11 @@ export default function ContratosDesignacao() {
   const militares = bundle.militares || [];
   const matriculasMilitar = bundle.matriculasMilitar || [];
   const legadoAtivaPorContrato = bundle.legadoAtivaPorContrato || {};
+  const militaresDisponiveis = militaresDisponiveisQuery.data || [];
+  const matriculasMilitaresDisponiveis = useMemo(
+    () => extrairMatriculasDisponiveis(militaresDisponiveis),
+    [militaresDisponiveis],
+  );
 
   const militaresPorId = useMemo(() => Object.fromEntries(militares.map((m) => [String(m.id), m])), [militares]);
   const contratosFiltrados = useMemo(() => aplicarFiltrosPainelContratos(contratos, {
@@ -292,12 +340,12 @@ export default function ContratosDesignacao() {
         {query.error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{query.error.message || 'Erro ao carregar painel.'}</div>}
       </div>
 
-
       <ContratoDesignacaoModal
         open={novoContratoOpen}
         onOpenChange={setNovoContratoOpen}
-        militares={militares}
-        matriculas={matriculasMilitar}
+        militares={militaresDisponiveis}
+        matriculas={matriculasMilitaresDisponiveis}
+        militaresLoading={militaresDisponiveisQuery.isLoading || militaresDisponiveisQuery.isFetching}
         onSubmit={handleCreateContrato}
         isSubmitting={salvandoContrato}
       />
