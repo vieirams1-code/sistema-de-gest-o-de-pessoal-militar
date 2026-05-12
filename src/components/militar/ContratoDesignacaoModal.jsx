@@ -37,7 +37,7 @@ function formatDate(date) {
   try { return new Date(`${String(date).slice(0, 10)}T00:00:00`).toLocaleDateString('pt-BR'); } catch (_e) { return date; }
 }
 
-export default function ContratoDesignacaoModal({ open, onOpenChange, militarId, militares = [], matriculas = [], contrato = null, readOnly = false, onSubmit, isSubmitting = false }) {
+export default function ContratoDesignacaoModal({ open, onOpenChange, militarId, militares = [], matriculas = [], militaresLoading = false, contrato = null, readOnly = false, onSubmit, isSubmitting = false }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [militarSelecionadoId, setMilitarSelecionadoId] = useState(militarId || '');
   const [erros, setErros] = useState([]);
@@ -147,25 +147,30 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {militaresOptions.length > 0 && (
-              <div className="space-y-2 md:col-span-2">
-                <Label>Militar *</Label>
-                <Select value={militarSelecionadoId || ''} onValueChange={handleMilitarChange}>
-                  <SelectTrigger><SelectValue placeholder="Buscar/selecionar militar" /></SelectTrigger>
-                  <SelectContent>
-                    {militaresOptions.map((militar) => (
-                      <SelectItem key={militar.id} value={String(militar.id)}>
-                        {[militar.nome_completo || militar.nome_guerra, militar.posto_graduacao, militar.matricula].filter(Boolean).join(' • ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {militarEscolhido && <p className="text-xs text-slate-500">Matrículas existentes listadas abaixo para {militarEscolhido.nome_guerra || militarEscolhido.nome_completo}.</p>}
-              </div>
-            )}
+            <div className="space-y-2 md:col-span-2">
+              <Label>Militar *</Label>
+              <Select
+                value={militarSelecionadoId || ''}
+                onValueChange={handleMilitarChange}
+                disabled={militaresLoading || militaresOptions.length === 0}
+              >
+                <SelectTrigger><SelectValue placeholder={militaresLoading ? 'Carregando militares do escopo...' : 'Buscar/selecionar militar'} /></SelectTrigger>
+                <SelectContent>
+                  {militaresLoading && <SelectItem value="__loading" disabled>Carregando militares do escopo...</SelectItem>}
+                  {!militaresLoading && militaresOptions.length === 0 && <SelectItem value="__empty" disabled>Nenhum militar ativo encontrado no seu escopo</SelectItem>}
+                  {!militaresLoading && militaresOptions.map((militar) => (
+                    <SelectItem key={militar.id} value={String(militar.id)}>
+                      {[militar.nome_completo || militar.nome_guerra, militar.posto_graduacao, militar.matricula].filter(Boolean).join(' • ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {militarEscolhido && <p className="text-xs text-slate-500">Matrículas existentes listadas abaixo para {militarEscolhido.nome_guerra || militarEscolhido.nome_completo}.</p>}
+              {!militaresLoading && militaresOptions.length === 0 && <p className="text-xs text-slate-500">Não há militares ativos disponíveis para criação de contrato no seu escopo atual.</p>}
+            </div>
             <div className="space-y-2">
               <Label>Matrícula existente do militar</Label>
-              <Select value={form.matricula_militar_id || ''} onValueChange={handleMatriculaChange} disabled={!militarSelecionadoId && militaresOptions.length > 0}>
+              <Select value={form.matricula_militar_id || ''} onValueChange={handleMatriculaChange} disabled={militaresLoading || (!militarSelecionadoId && militaresOptions.length > 0)}>
                 <SelectTrigger><SelectValue placeholder="Selecionar matrícula existente" /></SelectTrigger>
                 <SelectContent>
                   {matriculasOptions.length === 0 && <SelectItem value="__empty" disabled>Nenhuma matrícula encontrada</SelectItem>}
@@ -269,7 +274,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Salvar contrato'}</Button>}
+          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting || militaresLoading}>{isSubmitting ? 'Salvando...' : 'Salvar contrato'}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
