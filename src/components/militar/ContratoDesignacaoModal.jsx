@@ -67,6 +67,21 @@ function somenteDigitos(value) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
+function normalizarSituacaoMatricula(value) {
+  return normalizarBusca(value);
+}
+
+function getMatriculaTexto(matricula) {
+  return matricula?.matricula_formatada || matricula?.matricula || '';
+}
+
+function encontrarMatriculaAtual(matriculasMilitar = []) {
+  const candidatas = (Array.isArray(matriculasMilitar) ? matriculasMilitar : []).filter((mat) => mat?.id);
+  return candidatas.find((mat) => mat?.is_atual === true)
+    || candidatas.find((mat) => normalizarSituacaoMatricula(mat?.situacao) === 'ativa')
+    || null;
+}
+
 function MilitarSearchResult({ militar, selected = false }) {
   const detalhes = [
     militar?.nome_guerra ? <strong key="guerra" className="font-bold text-slate-700">{militar.nome_guerra}</strong> : null,
@@ -108,7 +123,9 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
   const militaresOptions = useMemo(() => (Array.isArray(militares) ? militares : []).filter((militar) => militar?.id), [militares]);
   const militarEscolhido = useMemo(() => militaresOptions.find((militar) => String(militar.id) === String(militarSelecionadoId)) || null, [militarSelecionadoId, militaresOptions]);
   const matriculasOptions = useMemo(() => (Array.isArray(matriculas) ? matriculas : [])
-    .filter((mat) => (mat?.id || mat?.matricula) && (!militarSelecionadoId || String(mat?.militar_id || '') === String(militarSelecionadoId))), [matriculas, militarSelecionadoId]);
+    .filter((mat) => mat?.id && (!militarSelecionadoId || String(mat?.militar_id || '') === String(militarSelecionadoId))), [matriculas, militarSelecionadoId]);
+  const matriculaAtualSelecionada = useMemo(() => encontrarMatriculaAtual(matriculasOptions), [matriculasOptions]);
+  const militarSemMatriculaAtual = Boolean(militarSelecionadoId) && !matriculaAtualSelecionada;
   const militaresFiltradosBusca = useMemo(() => {
     const termo = normalizarBusca(buscaMilitar);
     const termoNumerico = somenteDigitos(buscaMilitar);
@@ -126,32 +143,36 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
 
   const update = (field, value) => setForm((prev) => aplicarRegraFeriasPorTipoPrazo({ ...prev, [field]: value }));
 
-  const handleMilitarChange = (value) => {
-    const matriculaAtual = (Array.isArray(matriculas) ? matriculas : []).find((mat) => (mat?.id || mat?.matricula)
-      && String(mat?.militar_id || '') === String(value)
-      && mat?.is_atual);
-
-    setMilitarSelecionadoId(value);
+  const sincronizarMatriculaAtualNoFormulario = (matriculaAtual) => {
     setForm((prev) => ({
       ...prev,
-      matricula_militar_id: matriculaAtual ? String(matriculaAtual.id || matriculaAtual.matricula) : '',
-      matricula_designacao: matriculaAtual?.matricula_formatada || matriculaAtual?.matricula || '',
+      matricula_militar_id: matriculaAtual?.id ? String(matriculaAtual.id) : '',
+      matricula_designacao: getMatriculaTexto(matriculaAtual),
     }));
+  };
+
+  const handleMilitarChange = (value) => {
+    const matriculasMilitar = (Array.isArray(matriculas) ? matriculas : []).filter((mat) => mat?.id
+      && String(mat?.militar_id || '') === String(value));
+    const matriculaAtual = encontrarMatriculaAtual(matriculasMilitar);
+
+    setMilitarSelecionadoId(value);
+    sincronizarMatriculaAtualNoFormulario(matriculaAtual);
     setMilitarPopoverOpen(false);
     setBuscaMilitar('');
   };
 
-  const handleMatriculaChange = (value) => {
-    const selected = matriculasOptions.find((mat) => String(mat.id || mat.matricula) === String(value));
-    setForm((prev) => ({
-      ...prev,
-      matricula_militar_id: value,
-      matricula_designacao: selected?.matricula_formatada || selected?.matricula || prev.matricula_designacao,
-    }));
-  };
+  useEffect(() => {
+    if (!open || readOnly || contrato || !militarSelecionadoId) return;
+    sincronizarMatriculaAtualNoFormulario(matriculaAtualSelecionada);
+  }, [open, readOnly, contrato, militarSelecionadoId, matriculaAtualSelecionada]);
 
   const handleSubmit = async () => {
     const payload = aplicarRegraFeriasPorTipoPrazo({ ...form, militar_id: militarSelecionadoId || militarId, status_contrato: 'ativo' });
+    if (!payload.matricula_militar_id || militarSemMatriculaAtual) {
+      setErros(['Cadastre uma matrícula atual/ativa na ficha do militar antes de registrar o contrato de designação.']);
+      return;
+    }
     const validacao = validarContratoDesignacaoPayload(payload);
     if (!validacao.valido) {
       setErros(validacao.erros);
@@ -178,7 +199,10 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
 
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex gap-2">
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <p>Encerrar ou cancelar contrato não altera períodos aquisitivos já existentes neste lote.</p>
+          <div className="space-y-1">
+            <p>Encerrar ou cancelar contrato não altera períodos aquisitivos já existentes neste lote.</p>
+            <p>Se este contrato gerou nova matrícula, cadastre a nova matrícula na ficha do militar antes de registrar o contrato.</p>
+          </div>
         </div>
 
         {erros.length > 0 && (
@@ -271,26 +295,23 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
                   </Command>
                 </PopoverContent>
               </Popover>
-              {militarEscolhido && <p className="text-xs text-slate-500">Matrículas existentes listadas abaixo para {militarEscolhido.nome_guerra || militarEscolhido.nome_completo}.</p>}
+              {militarEscolhido && <p className="text-xs text-slate-500">A matrícula atual do contrato será puxada da ficha de {militarEscolhido.nome_guerra || militarEscolhido.nome_completo}.</p>}
               {!militaresLoading && militaresOptions.length === 0 && <p className="text-xs text-slate-500">Não há militares ativos disponíveis para criação de contrato no seu escopo atual.</p>}
             </div>
+            {militarSemMatriculaAtual && (
+              <div className="md:col-span-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 flex gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <p>Este militar não possui matrícula atual/ativa cadastrada. Cadastre a matrícula na ficha do militar antes de registrar o contrato.</p>
+              </div>
+            )}
             <div className="space-y-2">
-              <Label>Matrícula existente do militar</Label>
-              <Select value={form.matricula_militar_id || ''} onValueChange={handleMatriculaChange} disabled={militaresLoading || (!militarSelecionadoId && militaresOptions.length > 0)}>
-                <SelectTrigger><SelectValue placeholder="Selecionar matrícula existente" /></SelectTrigger>
-                <SelectContent>
-                  {matriculasOptions.length === 0 && <SelectItem value="__empty" disabled>Nenhuma matrícula encontrada</SelectItem>}
-                  {matriculasOptions.map((mat) => (
-                    <SelectItem key={mat.id || mat.matricula} value={String(mat.id || mat.matricula)}>
-                      {mat.matricula_formatada || mat.matricula} {mat.is_atual ? '(Atual)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Matrícula atual vinculada *</Label>
+              <Input value={form.matricula_militar_id ? getMatriculaTexto(matriculaAtualSelecionada) : ''} placeholder="Puxada automaticamente da ficha do militar" readOnly disabled />
+              {form.matricula_militar_id && <p className="text-xs text-slate-500">ID da matrícula: {form.matricula_militar_id}</p>}
             </div>
             <div className="space-y-2">
               <Label>Matrícula de designação *</Label>
-              <Input value={form.matricula_designacao} onChange={(e) => update('matricula_designacao', e.target.value)} />
+              <Input value={form.matricula_designacao} placeholder="Puxada automaticamente da matrícula atual" readOnly disabled />
             </div>
             <div className="space-y-2">
               <Label>Data de início *</Label>
@@ -380,7 +401,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting || militaresLoading}>{isSubmitting ? 'Salvando...' : 'Salvar contrato'}</Button>}
+          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting || militaresLoading || militarSemMatriculaAtual}>{isSubmitting ? 'Salvando...' : 'Salvar contrato'}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

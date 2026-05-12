@@ -44,6 +44,7 @@ test('valida obrigatórios de criação', () => {
   const resultado = validarContratoDesignacaoPayload({});
   assert.equal(resultado.valido, false);
   assert.match(resultado.erros.join('\n'), /militar_id/);
+  assert.match(resultado.erros.join('\n'), /matricula_militar_id/);
   assert.match(resultado.erros.join('\n'), /matricula_designacao/);
   assert.match(resultado.erros.join('\n'), /data_inicio_contrato/);
   assert.match(resultado.erros.join('\n'), /status_contrato/);
@@ -52,6 +53,7 @@ test('valida obrigatórios de criação', () => {
 test('exige data_inclusao_para_ferias para ativo', () => {
   const resultado = validarContratoDesignacaoPayload({
     militar_id: 'm1',
+    matricula_militar_id: 'mat-1',
     matricula_designacao: '123',
     data_inicio_contrato: '2026-01-01',
     status_contrato: 'ativo',
@@ -65,6 +67,7 @@ test('exige data_inclusao_para_ferias para ativo', () => {
 test('exige número de contrato ou boletim', () => {
   const resultado = validarContratoDesignacaoPayload({
     militar_id: 'm1',
+    matricula_militar_id: 'mat-1',
     matricula_designacao: '123',
     data_inicio_contrato: '2026-01-01',
     data_inclusao_para_ferias: '2026-01-01',
@@ -78,6 +81,7 @@ test('exige número de contrato ou boletim', () => {
 test('impede data fim anterior à data início', () => {
   const resultado = validarContratoDesignacaoPayload({
     militar_id: 'm1',
+    matricula_militar_id: 'mat-1',
     matricula_designacao: '123',
     data_inicio_contrato: '2026-01-10',
     data_fim_contrato: '2026-01-01',
@@ -153,6 +157,7 @@ test('detecta contrato legado apenas quando todos os campos novos estão ausente
 test('aplica regras automáticas para contrato indeterminado', () => {
   const payload = validarContratoDesignacaoPayload({
     militar_id: 'm1',
+    matricula_militar_id: 'mat-1',
     matricula_designacao: '123',
     data_inicio_contrato: '2026-01-01',
     data_inclusao_para_ferias: '2026-01-01',
@@ -169,6 +174,7 @@ test('aplica regras automáticas para contrato indeterminado', () => {
 test('valida regras de férias para contrato determinado', () => {
   const resultado = validarContratoDesignacaoPayload({
     militar_id: 'm1',
+    matricula_militar_id: 'mat-1',
     matricula_designacao: '123',
     data_inicio_contrato: '2026-01-01',
     data_inclusao_para_ferias: '2026-01-01',
