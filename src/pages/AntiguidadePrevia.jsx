@@ -26,6 +26,7 @@ const filtroInicial = {
   somenteAptos: false,
   somenteComPendencias: false,
   somenteComAlertas: false,
+  tipoAlerta: TODOS,
 };
 
 const pendenciasCriticas = new Set([
@@ -44,6 +45,17 @@ const rotulosAlertas = {
   [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REFERENCIA_ANTIGUIDADE_AUSENTE]: 'Referência de antiguidade ausente',
   [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.ORDEM_ANTIGUIDADE_ZERO]: 'Ordem de antiguidade igual a zero',
   [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSSIVEL_COMPARACAO_LISTAS_DISTINTAS]: 'Possível comparação entre listas distintas',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.MULTIPLOS_REGISTROS_ATIVOS_COMPATIVEIS]: 'Múltiplos registros ativos compatíveis',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REGISTRO_PREVISTO_IGNORADO]: 'Registro previsto ignorado',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REGISTRO_CANCELADO_IGNORADO]: 'Registro cancelado ignorado',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REGISTRO_RETIFICADO_IGNORADO]: 'Registro retificado ignorado',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_NORMALIZADO]: 'Quadro normalizado',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_AGRUPADO_PARA_ANTIGUIDADE]: 'Quadro agrupado para antiguidade',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_FORA_DOS_GRUPOS_ANTIGUIDADE]: 'Quadro fora dos grupos de antiguidade',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_ESPECIAL]: 'Quadro especial',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.QAOBM_SUBTENENTE_2TEN]: 'QAOBM Subtenente → 2º Tenente',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.EMPATE_RESOLVIDO_POR_NOME_MATRICULA]: 'Empate resolvido por nome/matrícula',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.EMPATE_NAO_RESOLVIDO]: 'Empate não resolvido',
 };
 
 function rotuloAlerta(alerta) {
@@ -249,6 +261,27 @@ export default function AntiguidadePrevia() {
 
   const opcoesPosto = useMemo(() => opcoesUnicas(resultado?.itens, 'posto_graduacao'), [resultado]);
   const opcoesQuadro = useMemo(() => opcoesUnicas(resultado?.itens, 'quadro'), [resultado]);
+  const resumoAlertas = useMemo(() => {
+    const contagemPorTipo = resultado?.alertasPorTipo || {};
+    const tipos = Object.entries(contagemPorTipo)
+      .map(([tipo, quantidade]) => ({
+        tipo,
+        quantidade: Number(quantidade) || 0,
+        rotulo: rotuloAlerta(tipo),
+      }))
+      .filter((alerta) => alerta.tipo && alerta.quantidade > 0)
+      .sort((a, b) => {
+        if (b.quantidade !== a.quantidade) return b.quantidade - a.quantidade;
+        return a.rotulo.localeCompare(b.rotulo, 'pt-BR', { numeric: true });
+      });
+
+    return {
+      opcoes: tipos,
+      top3: tipos.slice(0, 3),
+      totalTipos: tipos.length,
+      totalMilitaresComAlertas: resultado?.resumo?.totalComAlertas ?? 0,
+    };
+  }, [resultado]);
 
   const itensFiltrados = useMemo(() => {
     const termo = normalizarBusca(filtros.busca);
@@ -267,6 +300,7 @@ export default function AntiguidadePrevia() {
       if (filtros.somenteAptos && item.pendencias?.some((pendencia) => pendenciasCriticas.has(pendencia))) return false;
       if (filtros.somenteComPendencias && (item.pendencias?.length || 0) === 0) return false;
       if (filtros.somenteComAlertas && (item.alertas?.length || 0) === 0) return false;
+      if (filtros.tipoAlerta !== TODOS && !item.alertas?.includes(filtros.tipoAlerta)) return false;
 
       return true;
     });
@@ -382,11 +416,76 @@ export default function AntiguidadePrevia() {
       </div>
 
       <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Saneamento operacional — alertas técnicos</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Painel read-only para conferência cadastral. Nenhuma alteração é feita nesta tela.
+          </p>
+
+          {resumoAlertas.totalTipos === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Nenhum alerta técnico encontrado na prévia calculada.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-blue-700">Militares com alertas</p>
+                  <p className="mt-1 text-2xl font-bold text-blue-950">{resumoAlertas.totalMilitaresComAlertas}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Tipos encontrados</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">{resumoAlertas.totalTipos}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3 sm:col-span-2">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-600">Top 3 por volume</p>
+                  <div className="flex flex-wrap gap-2">
+                    {resumoAlertas.top3.map((alerta) => (
+                      <Badge key={alerta.tipo} variant="outline" title={alerta.tipo} className="border-blue-200 bg-blue-50 text-blue-800">
+                        {alerta.rotulo}: {alerta.quantidade}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Tipos de alerta presentes</p>
+                <div className="flex flex-wrap gap-2">
+                  {resumoAlertas.opcoes.map((alerta) => {
+                    const ativo = filtros.tipoAlerta === alerta.tipo;
+                    return (
+                      <div key={alerta.tipo} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm">
+                        <span title={alerta.tipo} className="text-slate-700">{alerta.rotulo}</span>
+                        <Badge variant="secondary" className="bg-slate-100 text-slate-700">{alerta.quantidade}</Badge>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs text-blue-700 hover:text-blue-900"
+                          onClick={() => atualizarFiltro('tipoAlerta', alerta.tipo)}
+                          disabled={ativo}
+                        >
+                          {ativo ? 'Filtrado' : 'Filtrar'}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader>
           <CardTitle>Filtros da prévia</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="busca-antiguidade-previa">Nome ou matrícula</Label>
               <Input
@@ -413,6 +512,20 @@ export default function AntiguidadePrevia() {
                 <SelectContent>
                   <SelectItem value={TODOS}>Todos</SelectItem>
                   {opcoesQuadro.map((quadro) => <SelectItem key={quadro} value={quadro}>{quadro}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de alerta</Label>
+              <Select value={filtros.tipoAlerta} onValueChange={(value) => atualizarFiltro('tipoAlerta', value)}>
+                <SelectTrigger><SelectValue placeholder="Todos os alertas" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODOS}>Todos os alertas</SelectItem>
+                  {resumoAlertas.opcoes.map((alerta) => (
+                    <SelectItem key={alerta.tipo} value={alerta.tipo}>
+                      {alerta.rotulo} ({alerta.quantidade})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
