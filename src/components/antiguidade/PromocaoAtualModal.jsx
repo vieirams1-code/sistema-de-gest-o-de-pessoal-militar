@@ -27,6 +27,14 @@ const FORM_INICIAL = {
 
 const valorTexto = (v) => String(v || '').trim();
 
+const normalizarOrdemAntiguidade = (ordem) => {
+  if (ordem === null || ordem === undefined || String(ordem).trim() === '') {
+    return null;
+  }
+
+  return Number(ordem);
+};
+
 const montarPayloadPromocao = (form, militar) => ({
   militar_id: militar.id,
   posto_graduacao_novo: militar.posto_graduacao || '',
@@ -35,7 +43,7 @@ const montarPayloadPromocao = (form, militar) => ({
   data_publicacao: form.data_publicacao || '',
   boletim_referencia: form.boletim_referencia || '',
   ato_referencia: form.ato_referencia || '',
-  antiguidade_referencia_ordem: form.antiguidade_referencia_ordem === '' ? 0 : Number(form.antiguidade_referencia_ordem),
+  antiguidade_referencia_ordem: normalizarOrdemAntiguidade(form.antiguidade_referencia_ordem),
   observacoes: form.observacoes || '',
   origem_dado: 'manual',
   status_registro: STATUS_ATIVO,
