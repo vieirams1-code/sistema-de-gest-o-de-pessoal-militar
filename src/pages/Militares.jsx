@@ -110,6 +110,13 @@ const statusBadgeClass = {
   Falecido: 'bg-red-100 text-red-700 border-red-200',
 };
 
+const SITUACAO_MILITAR_BADGES = {
+  'Designado': { label: 'Designado', className: 'bg-sky-50 text-sky-700 border-sky-200' },
+  'Convocado': { label: 'Convocado', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  'Reserva Remunerada': { label: 'Reserva Remunerada', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  'Reformado': { label: 'Reformado', className: 'bg-slate-100 text-slate-600 border-slate-200' },
+};
+
 const GRADUACAO_GROUPS = [
   { key: 'oficiais', label: 'Oficiais', postos: ['Coronel', 'Tenente Coronel', 'Tenente-Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'] },
   { key: 'sargentos', label: 'Sargentos', postos: ['Subtenente', '1º Sargento', '2º Sargento', '3º Sargento'] },
@@ -141,6 +148,7 @@ export default function Militares() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
   const [militarPromocaoAtual, setMilitarPromocaoAtual] = useState(null);
+  const [mostrarInativos, setMostrarInativos] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedGroups(selectedGroups), 300);
@@ -210,6 +218,8 @@ export default function Militares() {
   // ===================================================================
   // Militares — via getScopedMilitares (sem fallback em loop)
   // ===================================================================
+  const incluirInativos = isAdmin && mostrarInativos;
+
   const militaresQueryKey = [
     'militares-consulta-rapida-scoped',
     isAdmin,
@@ -218,6 +228,7 @@ export default function Militares() {
     quadroFilter,
     debouncedSearchTerm,
     effectiveEmail || 'self',
+    incluirInativos ? 'todos' : 'ativos',
   ];
 
   const { data: militaresData, isLoading, isFetching, isError, error, refetch } = useQuery({
@@ -228,11 +239,13 @@ export default function Militares() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const payload = {
-        statusCadastro: 'Ativo',
         limit: BACKEND_LIMIT,
         offset: 0,
         includeFoto: false,
       };
+      if (!incluirInativos) {
+        payload.statusCadastro = 'Ativo';
+      }
       if (selectedPostos.length > 0) payload.postoGraduacaoFiltros = selectedPostos;
       if (debouncedSearchTerm) payload.search = debouncedSearchTerm;
       if (
@@ -256,7 +269,7 @@ export default function Militares() {
   });
 
   const militares = useMemo(() => militaresData?.militares || [], [militaresData]);
-  const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos: true });
+  const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos });
   const quadrosDisponiveis = useMemo(() => QUADROS_FIXOS.map((quadro) => ({ value: quadro, label: quadro })), []);
 
   const filteredMilitares = operacionais
@@ -353,6 +366,19 @@ export default function Militares() {
               />
             </div>
           </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2 pt-1">
+              <label className="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="rounded border-slate-300 text-[#1e3a5f] focus:ring-[#1e3a5f]"
+                  checked={mostrarInativos}
+                  onChange={(e) => setMostrarInativos(e.target.checked)}
+                />
+                Mostrar militares inativos
+              </label>
+            </div>
+          )}
         </div>
 
         {shouldShowLotacaoFilter && isErrorLotacoes && (
@@ -415,10 +441,11 @@ export default function Militares() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
               <div className="col-span-2">Graduação</div>
-              <div className="col-span-3">Nome/Nome de guerra</div>
+              <div className="col-span-2">Nome/Nome de guerra</div>
               <div className="col-span-2">Matrícula</div>
               <div className="col-span-1">Quadro</div>
-              <div className="col-span-2">Lotação</div>
+              <div className="col-span-1">Lotação</div>
+              <div className="col-span-2">Situação</div>
               <div className="col-span-1">Status</div>
               <div className="col-span-1 text-right">Ações</div>
             </div>
@@ -431,13 +458,25 @@ export default function Militares() {
                   className={`grid grid-cols-12 gap-2 px-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
                 >
                 <div className="col-span-2 font-semibold text-[#1e3a5f]">{militar.posto_graduacao || 'Sem posto'}</div>
-                <div className="col-span-3">
+                <div className="col-span-2">
                   <div className="font-medium truncate">{militar.nome_guerra || militar.nome_completo}</div>
                   <div className="text-xs text-slate-500 truncate">{militar.nome_completo}</div>
                 </div>
                 <div className="col-span-2 truncate">{militar.matricula || '—'}</div>
                 <div className="col-span-1 truncate">{militar.quadro || '—'}</div>
-                <div className="col-span-2 truncate">{militar.lotacao_atual || 'Sem lotação'}</div>
+                <div className="col-span-1 truncate">{militar.lotacao_atual || 'Sem lotação'}</div>
+                <div className="col-span-2">
+                  {SITUACAO_MILITAR_BADGES[militar.situacao_militar] ? (
+                    <Badge
+                      variant="outline"
+                      className={`${SITUACAO_MILITAR_BADGES[militar.situacao_militar].className} border text-xs font-medium`}
+                    >
+                      {SITUACAO_MILITAR_BADGES[militar.situacao_militar].label}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
+                </div>
                 <div className="col-span-1">
                   <Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>
                     {militar.status_cadastro || 'Ativo'}
