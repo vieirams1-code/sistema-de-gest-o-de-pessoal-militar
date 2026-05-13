@@ -19,6 +19,7 @@ export async function fetchScopedContratosDesignacaoMilitar(payload = {}) {
 
   return {
     contratos: Array.isArray(body?.contratos) ? body.contratos : [],
+    legadoAtivaPorContrato: body?.legadoAtivaPorContrato && typeof body.legadoAtivaPorContrato === 'object' ? body.legadoAtivaPorContrato : {},
     meta: body?.meta || {},
   };
 }

@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft, Pencil, User, FileText,
   Phone, Heart, MapPin, GraduationCap, Calendar, Mail, CreditCard,
-  Shield, Award, Send, Activity, AlertTriangle, Briefcase } from
+  Shield, Award, Send, Activity, AlertTriangle, Briefcase, ClipboardList } from
 'lucide-react';
 import { format } from 'date-fns';
 import TempoServico from '@/components/militar/TempoServico';
@@ -46,6 +46,7 @@ import { getSaldoConsolidadoPeriodo, isFeriasDoPeriodo } from '@/components/feri
 import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularPeriodoAquisitivo';
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
+import { arquivarPeriodosDesignacaoEmBloco } from '@/services/arquivarPeriodosDesignacaoEmBlocoClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
@@ -126,6 +127,7 @@ export default function VerMilitar() {
   const effectiveEmail = getEffectiveEmail();
   const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeCriarContratoDesignacao = isAdmin || canAccessAction('criar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+  const podeEditarContratoDesignacao = isAdmin || canAccessAction('editar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeEncerrarContratoDesignacao = isAdmin || canAccessAction('encerrar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeExcluirContratoDesignacao = isAdmin || canAccessAction('excluir_contrato_designacao');
@@ -166,6 +168,7 @@ export default function VerMilitar() {
     enabled: !!id && isAccessResolved && podeVisualizarContratosDesignacao,
   });
   const contratosDesignacaoMilitar = contratosDesignacaoData.contratos || [];
+  const legadoAtivaPorContrato = contratosDesignacaoData.legadoAtivaPorContrato || {};
 
   const contratoDesignacaoMutation = useMutation({
     mutationFn: ({ id: contratoId, data, operation }) => {
@@ -180,6 +183,35 @@ export default function VerMilitar() {
     },
     onError: (error) => {
       toast({ title: 'Erro ao salvar contrato de designação', description: error?.message || 'Tente novamente.', variant: 'destructive' });
+    },
+  });
+
+
+
+  const arquivarPeriodosDesignacaoMutation = useMutation({
+    mutationFn: (contrato) => arquivarPeriodosDesignacaoEmBloco({
+      militarId: contrato?.militar_id || id,
+      contratoDesignacaoId: contrato?.id,
+      confirmar: true,
+    }),
+    onSuccess: async (resultado) => {
+      const resumo = resultado?.resumo || {};
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: contratosDesignacaoQueryKey }),
+        queryClient.invalidateQueries({ queryKey: ['ver-contratos-designacao', id] }),
+        queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] }),
+        queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
+        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+        queryClient.invalidateQueries({ queryKey: ['periodos-existentes'] }),
+      ]);
+      toast({
+        title: 'Períodos arquivados logicamente',
+        description: `${resumo.arquivados || 0} arquivado(s), ${resumo.cancelados || 0} cancelado(s), ${resumo.ja_processados || 0} já processado(s).`,
+      });
+    },
+    onError: (error) => {
+      if (error?.code === 'PERIODOS_COM_FERIAS_VINCULADAS') return;
+      toast({ title: 'Erro ao arquivar períodos', description: error?.message || 'Não foi possível concluir o arquivamento lógico.', variant: 'destructive' });
     },
   });
 
@@ -545,6 +577,7 @@ export default function VerMilitar() {
             <TabsTrigger value="atestados"><FileText className="w-4 h-4 mr-1" />Atestados</TabsTrigger>
             <TabsTrigger value="medalhas"><Award className="w-4 h-4 mr-1" />Medalhas</TabsTrigger>
             <TabsTrigger value="armamentos"><Shield className="w-4 h-4 mr-1" />Armamentos</TabsTrigger>
+            {podeVisualizarContratosDesignacao && <TabsTrigger value="contratos-designacao"><ClipboardList className="w-4 h-4 mr-1" />Contratos de Designação</TabsTrigger>}
             <TabsTrigger value="antiguidade"><FileText className="w-4 h-4 mr-1" />Carreira e Antiguidade</TabsTrigger>
           </TabsList>
 
@@ -577,23 +610,6 @@ export default function VerMilitar() {
                     </div>
                   }
                 </Section>
-                {podeVisualizarContratosDesignacao && (
-                  <ContratosDesignacaoSection
-                    contratos={contratosDesignacaoMilitar}
-                    matriculas={matriculasMilitar}
-                    militarId={id}
-                    isLoading={isLoadingContratosDesignacao}
-                    canCreate={podeCriarContratoDesignacao}
-                    canEncerrar={podeEncerrarContratoDesignacao}
-                    canCancelar={podeCancelarContratoDesignacao}
-                    canExcluir={podeExcluirContratoDesignacao}
-                    canPrepararLegadoAtiva={podePrepararLegadoAtiva && canViewMilitar}
-                    isSaving={contratoDesignacaoMutation.isPending}
-                    onCreate={(data) => contratoDesignacaoMutation.mutateAsync({ operation: 'create', data })}
-                    onUpdate={(contratoId, data) => contratoDesignacaoMutation.mutateAsync({ operation: 'update', id: contratoId, data })}
-                    onDelete={(contratoId) => contratoDesignacaoMutation.mutateAsync({ operation: 'delete', id: contratoId })}
-                  />
-                )}
                 <Section title="Dados Pessoais" icon={User}>
                   <div className="grid grid-cols-2 gap-x-4">
                     <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
@@ -942,6 +958,32 @@ export default function VerMilitar() {
               )}
             </div>
           </TabsContent>
+
+
+          {podeVisualizarContratosDesignacao && (
+            <TabsContent value="contratos-designacao">
+              <ContratosDesignacaoSection
+                contratos={contratosDesignacaoMilitar}
+                militares={[militarEnriquecido || militar].filter(Boolean)}
+                matriculas={matriculasMilitar}
+                militarId={id}
+                isLoading={isLoadingContratosDesignacao}
+                canCreate={podeCriarContratoDesignacao}
+                canEdit={podeEditarContratoDesignacao}
+                canEncerrar={podeEncerrarContratoDesignacao}
+                canCancelar={podeCancelarContratoDesignacao}
+                canExcluir={podeExcluirContratoDesignacao}
+                canPrepararLegadoAtiva={podePrepararLegadoAtiva && canViewMilitar}
+                legadoAtivaPorContrato={legadoAtivaPorContrato}
+                isSaving={contratoDesignacaoMutation.isPending}
+                isArchiving={arquivarPeriodosDesignacaoMutation.isPending}
+                onCreate={(data) => contratoDesignacaoMutation.mutateAsync({ operation: 'create', data })}
+                onUpdate={(contratoId, data) => contratoDesignacaoMutation.mutateAsync({ operation: 'update', id: contratoId, data })}
+                onDelete={(contratoId) => contratoDesignacaoMutation.mutateAsync({ operation: 'delete', id: contratoId })}
+                onArchive={(contrato) => arquivarPeriodosDesignacaoMutation.mutateAsync(contrato)}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="antiguidade">
             <CarreiraAntiguidadePanel

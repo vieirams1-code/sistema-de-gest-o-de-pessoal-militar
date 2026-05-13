@@ -18,12 +18,16 @@ import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMil
 import { arquivarPeriodosDesignacaoEmBloco } from '@/services/arquivarPeriodosDesignacaoEmBlocoClient';
 import {
   aplicarFiltrosPainelContratos,
+  buscarEfeitosContratoEmPeriodos,
   calcularDiasParaVencimento,
   calcularSituacaoDerivadaContrato,
   classificarVencimentoContrato,
+  getCampoCadeiaFeriasAlterado,
+  isContratoAtivoOperacional,
   FILTRO_LEGADO,
   FILTRO_SITUACAO,
   FILTRO_VENCIMENTO,
+  MENSAGEM_CONTRATO_COM_EFEITOS,
   SITUACAO_CONTRATO_DESIGNACAO,
 } from '@/services/painelContratosDesignacaoService';
 
@@ -102,51 +106,6 @@ function DetailItem({ label, value }) {
 }
 
 
-const CAMPOS_EFEITO_CONTRATO_EM_PERIODOS = [
-  'transicao_designacao_contrato_id',
-  'legado_ativa_contrato_designacao_id',
-  'cancelado_transicao_contrato_designacao_id',
-];
-
-const CAMPOS_CADEIA_FERIAS_CONTRATO = [
-  'militar_id',
-  'data_inicio_contrato',
-  'data_inclusao_para_ferias',
-  'gera_direito_ferias',
-  'regra_geracao_periodos',
-];
-
-const MENSAGEM_CONTRATO_COM_EFEITOS = 'Este contrato já possui efeitos em períodos aquisitivos. Use cancelamento/encerramento para preservar histórico.';
-
-async function buscarEfeitosContratoEmPeriodos(contratoId) {
-  if (!contratoId) return [];
-  const resultados = await Promise.all(CAMPOS_EFEITO_CONTRATO_EM_PERIODOS.map((campo) => (
-    base44.entities.PeriodoAquisitivo.filter({ [campo]: contratoId })
-  )));
-  const porId = new Map();
-  resultados.flat().forEach((periodo) => {
-    if (periodo?.id) porId.set(String(periodo.id), periodo);
-  });
-  return Array.from(porId.values());
-}
-
-function valoresContratoDiferentes(original, payload, campo) {
-  let originalValue = original?.[campo];
-  let payloadValue = payload?.[campo];
-  if (campo === 'data_inclusao_para_ferias') {
-    originalValue = original?.data_inclusao_para_ferias || original?.data_inicio_contrato || '';
-    payloadValue = payload?.data_inclusao_para_ferias || payload?.data_inicio_contrato || '';
-  }
-  if (campo === 'gera_direito_ferias') {
-    originalValue = original?.gera_direito_ferias === false ? false : true;
-    payloadValue = payload?.gera_direito_ferias === false ? false : true;
-  }
-  if (campo === 'regra_geracao_periodos') {
-    originalValue = original?.regra_geracao_periodos || 'normal';
-    payloadValue = payload?.regra_geracao_periodos || 'normal';
-  }
-  return String(originalValue ?? '') !== String(payloadValue ?? '');
-}
 
 function extrairMatriculasDisponiveis(militaresDisponiveis = []) {
   return militaresDisponiveis.flatMap((militar) => {
@@ -319,7 +278,7 @@ export default function ContratosDesignacao() {
   const handleAbrirEdicaoContrato = async (contrato) => {
     if (!contrato) return;
     try {
-      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(contrato.id);
+      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, contrato.id);
       setContratoEdicaoBloqueiaCadeia(periodosComEfeito.length > 0);
       setContratoEdicao(contrato);
     } catch (error) {
@@ -335,10 +294,10 @@ export default function ContratosDesignacao() {
     if (!contratoEdicao?.id) return;
     setSalvandoContrato(true);
     try {
-      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(contratoEdicao.id);
+      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, contratoEdicao.id);
       const temEfeitos = periodosComEfeito.length > 0;
       if (temEfeitos) {
-        const campoAlterado = CAMPOS_CADEIA_FERIAS_CONTRATO.find((campo) => valoresContratoDiferentes(contratoEdicao, payload, campo));
+        const campoAlterado = getCampoCadeiaFeriasAlterado(contratoEdicao, payload);
         if (campoAlterado) {
           throw new Error(`Campo ${campoAlterado} bloqueado: ${MENSAGEM_CONTRATO_COM_EFEITOS}`);
         }
@@ -371,7 +330,7 @@ export default function ContratosDesignacao() {
     if (!confirmado) return;
     setExcluindoContratoId(contrato.id);
     try {
-      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(contrato.id);
+      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, contrato.id);
       if (periodosComEfeito.length > 0) {
         toast({ title: 'Exclusão bloqueada', description: MENSAGEM_CONTRATO_COM_EFEITOS, variant: 'destructive' });
         return;
@@ -406,11 +365,6 @@ export default function ContratosDesignacao() {
     if (dias === 0) return 'Vence hoje';
     return `${dias} dia(s)`;
   };
-  const isContratoAtivoOperacional = (contrato) => ![
-    SITUACAO_CONTRATO_DESIGNACAO.ENCERRADO,
-    SITUACAO_CONTRATO_DESIGNACAO.CANCELADO,
-  ].includes(calcularSituacaoDerivadaContrato(contrato));
-
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
       <div className="max-w-[1600px] mx-auto space-y-6">
