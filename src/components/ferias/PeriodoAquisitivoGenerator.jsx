@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { parseDateOnlyStrict } from '@/services/dateOnlyService';
+import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOperacionais';
 import { resolverDataBaseFerias, ORIGENS_DATA_BASE_FERIAS } from '@/services/resolverDataBaseFerias';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
@@ -292,7 +293,9 @@ export default function PeriodoAquisitivoGenerator() {
           origemDataBaseIndividual = resolucaoDataBase.origem;
         }
 
-        const periodosDoMilitar = periodosFrescos.filter((p) => String(p.militar_id) === String(militar.id));
+        const periodosDoMilitar = periodosFrescos
+          .filter((p) => String(p.militar_id) === String(militar.id))
+          .filter(isPeriodoDisponivelOperacional);
         const { inicio, fim } = getJanelaOperacional(dataInclusao, hoje);
 
         let dataInicio = new Date(inicio);
