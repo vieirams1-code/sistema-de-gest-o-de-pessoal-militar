@@ -117,6 +117,7 @@ export default function Atestados() {
       a.militar_matricula_atual?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.militar_matricula?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.medico?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.crm_medico?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.cid_10?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTipoAfastamento = tipoAfastamentoFilter === 'all' || a.tipo_afastamento === tipoAfastamentoFilter;
     const isFluxoJiso = a.necessita_jiso || a.fluxo_homologacao === 'jiso' || Number(a.dias || 0) > 15;

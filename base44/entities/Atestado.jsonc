@@ -17,6 +17,9 @@
     "medico": {
       "type": "string"
     },
+    "crm_medico": {
+      "type": "string"
+    },
     "arquivo_atestado": {
       "type": "string"
     },
