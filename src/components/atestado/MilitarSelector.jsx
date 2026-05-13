@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Search, User, X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 import { getFeriasElegiveisPorOperacao, getMensagemSemElegibilidade } from '@/components/livro/feriasOperacaoUtils';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const BACKEND_LIMIT = 100;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -33,9 +34,32 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
   }, [searchTerm]);
 
   const effectiveEmail = getEffectiveEmail();
+  const {
+    isAccessResolved,
+    isAccessError,
+    modoAcesso,
+    subgrupamentoId,
+    linkedMilitarId,
+    resolvedAccessContext,
+  } = useCurrentUser();
 
-  const { data: militares = [] } = useQuery({
-    queryKey: ['militares-ativos-selector', debouncedSearch, effectiveEmail || 'self'],
+  const accessContextKey = useMemo(() => ({
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || effectiveEmail || 'self',
+    modoAcesso: modoAcesso || 'indefinido',
+    subgrupamentoId: subgrupamentoId || null,
+    linkedMilitarId: linkedMilitarId || null,
+    isAdmin: resolvedAccessContext?.isAdmin === true,
+    hasAcessoRecord: resolvedAccessContext?.hasAcessoRecord === true,
+  }), [effectiveEmail, linkedMilitarId, modoAcesso, resolvedAccessContext, subgrupamentoId]);
+  const canRunScopedQueries = isAccessResolved && !isAccessError;
+
+  const {
+    data: militares = [],
+    isLoading: isLoadingMilitares,
+    isFetching: isFetchingMilitares,
+    isError: isErrorMilitares,
+  } = useQuery({
+    queryKey: ['militares-ativos-selector', 'buscar-ativos-operacionais', accessContextKey, { search: debouncedSearch, limit: BACKEND_LIMIT, offset: 0 }],
     queryFn: async () => {
       const { militares: lista } = await fetchScopedMilitares({
         search: debouncedSearch,
@@ -47,19 +71,49 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
       const enriquecidos = await carregarMilitaresComMatriculas(lista);
       return filtrarMilitaresOperacionais(enriquecidos, { incluirInativos: false });
     },
+    enabled: canRunScopedQueries,
+    placeholderData: keepPreviousData,
     staleTime: 2 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
   });
 
-  const { data: feriasElegibilidade = [], isLoading: isLoadingElegibilidade } = useQuery({
-    queryKey: ['militares-ativos-selector-ferias-elegibilidade', somenteElegiveis, livroOperacaoFerias, dataBase, militares.map((m) => m.id).join('|')],
+  const militarIdsKey = useMemo(() => militares.map((m) => m.id).filter(Boolean).sort().join('|'), [militares]);
+  const shouldLoadElegibilidade = canRunScopedQueries
+    && somenteElegiveis
+    && !!livroOperacaoFerias
+    && !isLoadingMilitares
+    && !isFetchingMilitares
+    && !isErrorMilitares
+    && militares.length > 0;
+
+  const {
+    data: feriasElegibilidade = [],
+    isLoading: isLoadingElegibilidade,
+    isFetching: isFetchingElegibilidade,
+    isError: isErrorElegibilidade,
+    error: erroElegibilidade,
+  } = useQuery({
+    queryKey: [
+      'militares-ativos-selector-ferias-elegibilidade',
+      'calcular-elegiveis-por-operacao',
+      accessContextKey,
+      { somenteElegiveis, livroOperacaoFerias: livroOperacaoFerias || null, dataBase: dataBase || null, militarIds: militarIdsKey },
+    ],
     queryFn: async () => {
-      if (!somenteElegiveis || !livroOperacaoFerias || militares.length === 0) return [];
-      const lotes = await Promise.all(militares.map((militar) => base44.entities.Ferias.filter({ militar_id: militar.id })));
-      return militares.filter((militar, index) => getFeriasElegiveisPorOperacao(lotes[index] || [], livroOperacaoFerias).length > 0);
+      if (!shouldLoadElegibilidade) return [];
+      const militarIds = new Set(militares.map((militar) => militar.id).filter(Boolean));
+      const todasFerias = await base44.entities.Ferias.list();
+      const feriasPorMilitar = (Array.isArray(todasFerias) ? todasFerias : []).reduce((acc, ferias) => {
+        if (!militarIds.has(ferias?.militar_id)) return acc;
+        if (!acc.has(ferias.militar_id)) acc.set(ferias.militar_id, []);
+        acc.get(ferias.militar_id).push(ferias);
+        return acc;
+      }, new Map());
+      return militares.filter((militar) => getFeriasElegiveisPorOperacao(feriasPorMilitar.get(militar.id) || [], livroOperacaoFerias).length > 0);
     },
-    enabled: somenteElegiveis && !!livroOperacaoFerias && militares.length > 0,
+    enabled: shouldLoadElegibilidade,
+    placeholderData: keepPreviousData,
     staleTime: 2 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
@@ -69,7 +123,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
   // Usa o payload `militarIds` que aplica interseção com o escopo do usuário
   // efetivo no backend — IDs fora do escopo são silenciosamente descartados.
   const { data: selectedMilitar } = useQuery({
-    queryKey: ['militar-selected', value, effectiveEmail || 'self'],
+    queryKey: ['militar-selected', 'hidratar-selecionado', accessContextKey, { militarId: value || null }],
     queryFn: async () => {
       if (!value) return null;
       const { militares: lista } = await fetchScopedMilitares({
@@ -83,19 +137,32 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
       const [enriquecido] = await carregarMilitaresComMatriculas([militar]);
       return enriquecido || militar;
     },
-    enabled: !!value,
+    enabled: canRunScopedQueries && !!value,
     staleTime: 2 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
   });
 
-  const militaresDisponiveis = useMemo(
-    () => (somenteElegiveis && livroOperacaoFerias ? feriasElegibilidade : militares),
-    [feriasElegibilidade, livroOperacaoFerias, militares, somenteElegiveis],
-  );
+  const isModoElegibilidade = somenteElegiveis && !!livroOperacaoFerias;
+  const isLoadingElegibilidadeEfetivo = isModoElegibilidade && (isLoadingElegibilidade || isFetchingElegibilidade);
+  const isLoadingMilitaresEfetivo = (!isAccessResolved && !isAccessError) || isLoadingMilitares || (isFetchingMilitares && militares.length === 0);
+  const nenhumMilitarEncontrado = canRunScopedQueries && !isLoadingMilitaresEfetivo && !isErrorMilitares && militares.length === 0;
+  const nenhumMilitarElegivel = isModoElegibilidade
+    && !isLoadingMilitaresEfetivo
+    && !isLoadingElegibilidadeEfetivo
+    && !isErrorElegibilidade
+    && militares.length > 0
+    && feriasElegibilidade.length === 0;
+
+  const militaresDisponiveis = useMemo(() => {
+    if (!isModoElegibilidade) return militares;
+    if (isErrorElegibilidade) return militares;
+    return feriasElegibilidade;
+  }, [feriasElegibilidade, isErrorElegibilidade, isModoElegibilidade, militares]);
 
   // O backend já aplica o filtro de busca; exibimos a lista como vem.
   const filteredMilitares = militaresDisponiveis;
+  const bloqueiaSelecaoPorErroElegibilidade = isModoElegibilidade && isErrorElegibilidade;
 
   const handleSelect = (militar) => {
     if (isMilitarMesclado(militar)) return;
@@ -167,7 +234,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
             <X className="w-4 h-4" />
           </Button>
         </div>
-      ) : somenteElegiveis && livroOperacaoFerias && !isLoadingElegibilidade && militaresDisponiveis.length === 0 ? (
+      ) : nenhumMilitarElegivel ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-800">{emptyState.titulo}</p>
           <p className="mt-1 text-xs text-amber-700">{emptyState.texto}</p>
@@ -191,15 +258,32 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
                 value={searchTerm}
                 onValueChange={setSearchTerm}
               />
-              <CommandEmpty>{somenteElegiveis && livroOperacaoFerias ? emptyState.titulo : 'Nenhum militar encontrado.'}</CommandEmpty>
+              <CommandEmpty>{isModoElegibilidade ? emptyState.titulo : 'Nenhum militar encontrado.'}</CommandEmpty>
               <CommandGroup className="max-h-64 overflow-auto">
-                {isLoadingElegibilidade ? (
-                  <div className="px-3 py-4 text-sm text-slate-500">Carregando militares elegíveis...</div>
-                ) : filteredMilitares.map((militar) => (
+                {isAccessError ? (
+                  <div className="px-3 py-4 text-sm text-red-600">Acesso não permitido para consultar militares.</div>
+                ) : isLoadingMilitaresEfetivo ? (
+                  <div className="px-3 py-4 text-sm text-slate-500">Carregando militares...</div>
+                ) : isErrorMilitares ? (
+                  <div className="px-3 py-4 text-sm text-red-600">Não foi possível carregar militares.</div>
+                ) : nenhumMilitarEncontrado ? (
+                  <div className="px-3 py-4 text-sm text-slate-500">Nenhum militar encontrado.</div>
+                ) : isLoadingElegibilidadeEfetivo ? (
+                  <div className="px-3 py-4 text-sm text-slate-500">Calculando elegibilidade de férias...</div>
+                ) : (
+                  <>
+                    {isErrorElegibilidade && (
+                      <div className="mx-2 my-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        Não foi possível calcular a elegibilidade de férias. A lista base foi mantida, mas a seleção fica indisponível até tentar novamente.
+                        {erroElegibilidade?.message ? ` Detalhe: ${erroElegibilidade.message}` : ''}
+                      </div>
+                    )}
+                    {filteredMilitares.map((militar) => (
                   <CommandItem
                     key={militar.id}
-                    onSelect={() => handleSelect(militar)}
-                    className="flex items-center gap-3 py-3 cursor-pointer"
+                    disabled={bloqueiaSelecaoPorErroElegibilidade}
+                    onSelect={bloqueiaSelecaoPorErroElegibilidade ? undefined : () => handleSelect(militar)}
+                    className={`flex items-center gap-3 py-3 ${bloqueiaSelecaoPorErroElegibilidade ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <div className="w-8 h-10 rounded bg-slate-100 flex-shrink-0 overflow-hidden">
                       {militar.foto ? (
@@ -220,7 +304,9 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
                       </p>
                     </div>
                   </CommandItem>
-                ))}
+                    ))}
+                  </>
+                )}
               </CommandGroup>
             </Command>
           </PopoverContent>
