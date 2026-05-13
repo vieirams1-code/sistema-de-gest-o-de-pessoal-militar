@@ -87,6 +87,7 @@ const PERMISSIONS_MAP = {
   ContratoDesignacaoMilitar: {
     create: 'criar_contrato_designacao',
     update: 'editar_metadados_contrato_designacao',
+    delete: 'excluir_contrato_designacao',
   },
 };
 
@@ -395,9 +396,7 @@ async function prepararContratoDesignacaoMilitar({ base44, operation, registroId
   data = dadosRecebidos;
   if (operation === 'create') data = prepararCamposFeriasContratoDesignacao(data);
   if (operation === 'delete') {
-    const erro = new Error('Delete físico de ContratoDesignacaoMilitar não é permitido. Use cancelamento para preservar histórico.');
-    erro.status = 400;
-    throw erro;
+    return null;
   }
 
   const nowUser = userEmail || '';
@@ -560,13 +559,6 @@ Deno.serve(async (req) => {
         { status: 400 },
       );
     }
-    if (entityName === 'ContratoDesignacaoMilitar' && operation === 'delete') {
-      return Response.json(
-        { error: 'Delete físico de ContratoDesignacaoMilitar não é permitido. Use cancelamento para preservar histórico.' },
-        { status: 400 },
-      );
-    }
-
     if ((operation === 'update' || operation === 'delete') && !registroId) {
       return Response.json(
         { error: `registroId é obrigatório para operação ${operation}.` },
@@ -674,6 +666,9 @@ Deno.serve(async (req) => {
         } else if (operation === 'update') {
           requiredPermission = 'editar_metadados_contrato_designacao ou gerir_contratos_designacao';
           allowed = possuiActionContratoDesignacao(targetPerms.actions, 'editar_metadados_contrato_designacao', 'gerir_contratos_designacao');
+        } else if (operation === 'delete') {
+          requiredPermission = 'excluir_contrato_designacao';
+          allowed = possuiActionContratoDesignacao(targetPerms.actions, 'excluir_contrato_designacao');
         }
         if (!allowed) {
           return Response.json(
@@ -739,6 +734,15 @@ Deno.serve(async (req) => {
         `${entityName}.update:${registroId}`,
       );
     } else if (operation === 'delete') {
+      if (entityName === 'ContratoDesignacaoMilitar') {
+        console.info('[cudEscopado] exclusão controlada de contrato de designação', {
+          registroId,
+          militarAlvoId,
+          targetEmail,
+          authUserEmail: authUser.email,
+          generatedAt: new Date().toISOString(),
+        });
+      }
       resultado = await fetchWithRetry(
         () => entity.delete(registroId),
         `${entityName}.delete:${registroId}`,
