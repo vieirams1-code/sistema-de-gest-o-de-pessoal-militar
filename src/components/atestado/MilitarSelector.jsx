@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
 import { Search, User, X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
@@ -15,13 +14,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { getFeriasElegiveisPorOperacao, getMensagemSemElegibilidade } from '@/components/livro/feriasOperacaoUtils';
+import { getMensagemSemElegibilidade } from '@/components/livro/feriasOperacaoUtils';
 import { carregarMilitaresComMatriculas, filtrarMilitaresOperacionais, isMilitarMesclado, resolverMatriculaAtual } from '@/services/matriculaMilitarViewService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
 const BACKEND_LIMIT = 100;
 const SEARCH_DEBOUNCE_MS = 350;
+// Desativado até existir um bundle/endpoint escopado de elegibilidade; evita Ferias.list() global e N+1 por militar.
+const ELEGIBILIDADE_FERIAS_BUNDLE_DISPONIVEL = false;
+const FERIAS_ELEGIBILIDADE_INDISPONIVEL = Object.freeze({ status: 'unavailable', militares: [] });
 
 export default function MilitarSelector({ value, onChange, onMilitarSelect, livroOperacaoFerias = null, dataBase = '', somenteElegiveis = false }) {
   const [open, setOpen] = useState(false);
@@ -79,7 +81,8 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
   });
 
   const militarIdsKey = useMemo(() => militares.map((m) => m.id).filter(Boolean).sort().join('|'), [militares]);
-  const shouldLoadElegibilidade = canRunScopedQueries
+  const shouldLoadElegibilidade = ELEGIBILIDADE_FERIAS_BUNDLE_DISPONIVEL
+    && canRunScopedQueries
     && somenteElegiveis
     && !!livroOperacaoFerias
     && !isLoadingMilitares
@@ -88,7 +91,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
     && militares.length > 0;
 
   const {
-    data: feriasElegibilidade = [],
+    data: feriasElegibilidade = FERIAS_ELEGIBILIDADE_INDISPONIVEL,
     isLoading: isLoadingElegibilidade,
     isFetching: isFetchingElegibilidade,
     isError: isErrorElegibilidade,
@@ -100,18 +103,7 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
       accessContextKey,
       { somenteElegiveis, livroOperacaoFerias: livroOperacaoFerias || null, dataBase: dataBase || null, militarIds: militarIdsKey },
     ],
-    queryFn: async () => {
-      if (!shouldLoadElegibilidade) return [];
-      const militarIds = new Set(militares.map((militar) => militar.id).filter(Boolean));
-      const todasFerias = await base44.entities.Ferias.list();
-      const feriasPorMilitar = (Array.isArray(todasFerias) ? todasFerias : []).reduce((acc, ferias) => {
-        if (!militarIds.has(ferias?.militar_id)) return acc;
-        if (!acc.has(ferias.militar_id)) acc.set(ferias.militar_id, []);
-        acc.get(ferias.militar_id).push(ferias);
-        return acc;
-      }, new Map());
-      return militares.filter((militar) => getFeriasElegiveisPorOperacao(feriasPorMilitar.get(militar.id) || [], livroOperacaoFerias).length > 0);
-    },
+    queryFn: async () => FERIAS_ELEGIBILIDADE_INDISPONIVEL,
     enabled: shouldLoadElegibilidade,
     placeholderData: keepPreviousData,
     staleTime: 2 * 60 * 1000,
@@ -144,21 +136,24 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
   });
 
   const isModoElegibilidade = somenteElegiveis && !!livroOperacaoFerias;
-  const isLoadingElegibilidadeEfetivo = isModoElegibilidade && (isLoadingElegibilidade || isFetchingElegibilidade);
+  const isElegibilidadeIndisponivel = isModoElegibilidade && feriasElegibilidade?.status === 'unavailable';
+  const militaresElegiveis = Array.isArray(feriasElegibilidade?.militares) ? feriasElegibilidade.militares : [];
+  const isLoadingElegibilidadeEfetivo = isModoElegibilidade && !isElegibilidadeIndisponivel && (isLoadingElegibilidade || isFetchingElegibilidade);
   const isLoadingMilitaresEfetivo = (!isAccessResolved && !isAccessError) || isLoadingMilitares || (isFetchingMilitares && militares.length === 0);
   const nenhumMilitarEncontrado = canRunScopedQueries && !isLoadingMilitaresEfetivo && !isErrorMilitares && militares.length === 0;
   const nenhumMilitarElegivel = isModoElegibilidade
     && !isLoadingMilitaresEfetivo
     && !isLoadingElegibilidadeEfetivo
     && !isErrorElegibilidade
+    && !isElegibilidadeIndisponivel
     && militares.length > 0
-    && feriasElegibilidade.length === 0;
+    && militaresElegiveis.length === 0;
 
   const militaresDisponiveis = useMemo(() => {
     if (!isModoElegibilidade) return militares;
-    if (isErrorElegibilidade) return militares;
-    return feriasElegibilidade;
-  }, [feriasElegibilidade, isErrorElegibilidade, isModoElegibilidade, militares]);
+    if (isErrorElegibilidade || isElegibilidadeIndisponivel) return militares;
+    return militaresElegiveis;
+  }, [isElegibilidadeIndisponivel, isErrorElegibilidade, isModoElegibilidade, militares, militaresElegiveis]);
 
   // O backend já aplica o filtro de busca; exibimos a lista como vem.
   const filteredMilitares = militaresDisponiveis;
@@ -272,6 +267,11 @@ export default function MilitarSelector({ value, onChange, onMilitarSelect, livr
                   <div className="px-3 py-4 text-sm text-slate-500">Calculando elegibilidade de férias...</div>
                 ) : (
                   <>
+                    {isElegibilidadeIndisponivel && (
+                      <div className="mx-2 my-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        A elegibilidade de férias não foi calculada nesta lista para evitar consulta global. A lista base foi mantida e a validação deve ocorrer na seleção das férias.
+                      </div>
+                    )}
                     {isErrorElegibilidade && (
                       <div className="mx-2 my-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                         Não foi possível calcular a elegibilidade de férias. A lista base foi mantida, mas a seleção fica indisponível até tentar novamente.
