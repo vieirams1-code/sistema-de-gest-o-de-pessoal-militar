@@ -309,12 +309,19 @@ Deno.serve(async (req) => {
             search,
             statusCadastro,
             situacaoMilitar,
+            condicaoMovimento,
             limit,
             offset,
             includeFoto,
             effectiveEmail,
             militarIds: militarIdsRaw,
         } = payload || {};
+
+        // Sanitização: aceita 'entrada' | 'saida'
+        const condicaoMovimentoFiltro = (() => {
+            const v = String(condicaoMovimento || '').trim().toLowerCase();
+            return v === 'entrada' || v === 'saida' ? v : null;
+        })();
 
         // Suporte a múltiplos postos via $in (Lote 1C-A) — aditivo e
         // retrocompatível com postoGraduacaoFiltro (string única).
@@ -449,6 +456,7 @@ Deno.serve(async (req) => {
         }
         if (statusCadastro) baseFilter.status_cadastro = statusCadastro;
         if (situacaoMilitar) baseFilter.situacao_militar = situacaoMilitar;
+        if (condicaoMovimentoFiltro) baseFilter.condicao_movimento = condicaoMovimentoFiltro;
 
         // 7. Aplicar escopo + lotacaoFiltro
         let militarFilter = { ...baseFilter };
@@ -749,6 +757,7 @@ Deno.serve(async (req) => {
                 postos_solicitados: postoGraduacaoFiltros ? postoGraduacaoFiltros.length : (postoGraduacaoFiltro ? 1 : 0),
                 aplicou_filtro_status: !!statusCadastro,
                 aplicou_filtro_situacao: !!situacaoMilitar,
+                aplicou_filtro_condicao_movimento: !!condicaoMovimentoFiltro,
                 busca_aplicada: buscaAplicada,
                 busca_limitada_por_amostra: buscaLimitadaPorAmostra,
                 include_foto: effIncludeFoto,

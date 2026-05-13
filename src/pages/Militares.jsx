@@ -37,7 +37,7 @@ import SaneamentoQbmptQptbmDialog from '@/components/admin/SaneamentoQbmptQptbmD
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
-const BACKEND_LIMIT = 100;
+const PAGE_SIZE = 300;
 const STALE_TIME_MS = 5 * 60 * 1000;
 
 const TIPO_ORDEM = { root: 0, setor: 1, subsetor: 2, unidade: 3 };
@@ -188,6 +188,8 @@ export default function Militares() {
   const [militarToDelete, setMilitarToDelete] = useState(null);
   const [militarPromocaoAtual, setMilitarPromocaoAtual] = useState(null);
   const [mostrarInativos, setMostrarInativos] = useState(false);
+  const [pageOffset, setPageOffset] = useState(0);
+  const [militaresAcumulados, setMilitaresAcumulados] = useState([]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedPostos(postosSelecionados), 300);
@@ -256,14 +258,27 @@ export default function Militares() {
   // ===================================================================
   const incluirInativos = isAdmin && mostrarInativos;
 
-  const militaresQueryKey = [
-    'militares-consulta-rapida-scoped',
+  // Filtros que são empurrados para o backend — quando mudam, reseta a paginação
+  const backendFiltersKey = [
     isAdmin,
     lotacaoFilter,
     selectedPostos.join('|'),
     debouncedSearchTerm,
     effectiveEmail || 'self',
     incluirInativos ? 'todos' : 'ativos',
+    movimentoFilter,
+  ].join('::');
+
+  // Reset de paginação quando filtros de backend mudam
+  useEffect(() => {
+    setPageOffset(0);
+    setMilitaresAcumulados([]);
+  }, [backendFiltersKey]);
+
+  const militaresQueryKey = [
+    'militares-consulta-rapida-scoped',
+    backendFiltersKey,
+    pageOffset,
   ];
 
   const { data: militaresData, isLoading, isFetching, isError, error, refetch } = useQuery({
@@ -274,8 +289,8 @@ export default function Militares() {
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const payload = {
-        limit: BACKEND_LIMIT,
-        offset: 0,
+        limit: PAGE_SIZE,
+        offset: pageOffset,
         includeFoto: false,
       };
       if (!incluirInativos) {
@@ -283,6 +298,7 @@ export default function Militares() {
       }
       if (selectedPostos.length > 0) payload.postoGraduacaoFiltros = selectedPostos;
       if (debouncedSearchTerm) payload.search = debouncedSearchTerm;
+      if (movimentoFilter !== MOVIMENTO_TODOS) payload.condicaoMovimento = movimentoFilter;
       if (
         shouldShowLotacaoFilter
         && lotacaoFilter !== TODAS_LOTACOES_VALUE
@@ -303,7 +319,25 @@ export default function Militares() {
     },
   });
 
-  const militares = useMemo(() => militaresData?.militares || [], [militaresData]);
+  // Acumula páginas conforme avança o offset (deduplica por id)
+  useEffect(() => {
+    if (!militaresData?.militares) return;
+    setMilitaresAcumulados((prev) => {
+      if (pageOffset === 0) return militaresData.militares;
+      const mapa = new Map();
+      prev.forEach((m) => m?.id && mapa.set(m.id, m));
+      militaresData.militares.forEach((m) => m?.id && mapa.set(m.id, m));
+      return Array.from(mapa.values());
+    });
+  }, [militaresData, pageOffset]);
+
+  const hasMoreBackend = Boolean(militaresData?.meta?.hasMore);
+  const carregarMais = () => {
+    if (isFetching || !hasMoreBackend) return;
+    setPageOffset((prev) => prev + PAGE_SIZE);
+  };
+
+  const militares = militaresAcumulados;
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos });
   const quadrosDisponiveis = useMemo(
     () => QUADROS_FIXOS.map((quadro) => ({ value: quadro, label: quadro })),
@@ -326,9 +360,9 @@ export default function Militares() {
       return cond === condicaoFilter;
     })
     .filter((m) => {
+      // Filtro de movimento já é aplicado no backend; mantém aqui como defesa
+      // adicional para os dados acumulados (não-Efetivo é pré-requisito).
       if (movimentoFilter === MOVIMENTO_TODOS) return true;
-      const cond = String(m?.condicao || '').trim();
-      if (!cond || cond === 'Efetivo') return false;
       return String(m?.condicao_movimento || '').toLowerCase() === movimentoFilter;
     })
     .filter((m) => (
@@ -484,7 +518,7 @@ export default function Militares() {
             <Users className="w-16 h-16 mx-auto text-slate-300 mb-4" />
             <h3 className="text-lg font-semibold text-slate-700 mb-2">{emptyInstruction}</h3>
           </div>
-        ) : isLoading || isFetching ? (
+        ) : isLoading || (isFetching && pageOffset === 0 && militaresAcumulados.length === 0) ? (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
             {[...Array(6)].map((_, idx) => <div key={idx} className="h-10 bg-slate-100 animate-pulse rounded mb-2" />)}
           </div>
@@ -605,6 +639,28 @@ export default function Militares() {
                 </div>
               );
             })}
+            <div className="px-3 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-t bg-slate-50/60">
+              <p className="text-xs text-slate-600">
+                Exibindo <span className="font-semibold text-slate-800">{filteredMilitares.length}</span>
+                {filteredMilitares.length !== militares.length && (
+                  <> de <span className="font-semibold text-slate-800">{militares.length}</span> carregados</>
+                )}
+                {hasMoreBackend && (
+                  <span className="ml-1 text-amber-700">• há mais resultados não carregados</span>
+                )}
+              </p>
+              {hasMoreBackend && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={carregarMais}
+                  disabled={isFetching}
+                  className="border-[#1e3a5f] text-[#1e3a5f] hover:bg-[#1e3a5f] hover:text-white"
+                >
+                  {isFetching ? 'Carregando…' : 'Carregar mais militares'}
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
