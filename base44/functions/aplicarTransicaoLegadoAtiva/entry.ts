@@ -441,7 +441,7 @@ Deno.serve(async (req) => {
     const aplicados: any[] = [];
     for (const periodo of aplicaveis) {
       const statusAnterior = periodo?.status ?? null;
-      const observacaoPadronizada = `[CD-6B] Marcado como Legado da Ativa em ${nowIso} por ${userEmailEfetivo}.\nMotivo: transição para contrato de designação ${getId(contrato)}, data-base de férias ${dataBase}.\nStatus anterior: ${statusAnterior ?? '—'}.`;
+      const observacaoPadronizada = `[CD-6B] Marcado como legado de vínculo anterior em ${nowIso} por ${userEmailEfetivo}.\nMotivo: transição para contrato de designação ${getId(contrato)}, data-base de férias ${dataBase}.\nStatus anterior: ${statusAnterior ?? '—'}.`;
       const patch = {
         origem_periodo: 'legado_ativa',
         legado_ativa: true,

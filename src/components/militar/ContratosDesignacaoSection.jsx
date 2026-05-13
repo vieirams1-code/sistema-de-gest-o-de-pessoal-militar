@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Archive, Edit3, FileText, Loader2, Plus, Wand2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, Edit3, FileText, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,11 +10,10 @@ import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModa
 import EncerrarContratoDesignacaoModal from '@/components/militar/EncerrarContratoDesignacaoModal';
 import CancelarContratoDesignacaoModal from '@/components/militar/CancelarContratoDesignacaoModal';
 import ExcluirContratoDesignacaoModal from '@/components/militar/ExcluirContratoDesignacaoModal';
-import TransicaoLegadoAtivaPreviewModal from '@/components/militar/TransicaoLegadoAtivaPreviewModal';
+import { createPageUrl } from '@/utils';
 import {
   buscarEfeitosContratoEmPeriodos,
   getCampoCadeiaFeriasAlterado,
-  isContratoAtivoOperacional,
   MENSAGEM_CONTRATO_COM_EFEITOS,
 } from '@/services/painelContratosDesignacaoService';
 import {
@@ -45,14 +45,6 @@ function DetailItem({ label, value }) {
   );
 }
 
-function formatarPeriodoBloqueante(bloqueante) {
-  const referencia = bloqueante?.referencia ? `Ref. ${bloqueante.referencia}` : 'Sem referência';
-  const periodo = bloqueante?.periodo || 'Período não informado';
-  const status = bloqueante?.status ? `status ${bloqueante.status}` : 'status não informado';
-  const quantidade = Number(bloqueante?.quantidade_ferias || 0);
-  return `${referencia} — ${periodo} — ${status} — ${quantidade} férias vinculada(s)`;
-}
-
 export default function ContratosDesignacaoSection({
   contratos = [],
   militares = [],
@@ -64,16 +56,13 @@ export default function ContratosDesignacaoSection({
   canEncerrar = false,
   canCancelar = false,
   canExcluir = false,
-  canPrepararLegadoAtiva = false,
-  legadoAtivaPorContrato = {},
   onCreate,
   onUpdate,
   onDelete,
-  onArchive,
   isSaving = false,
-  isArchiving = false,
 }) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [modalNovoOpen, setModalNovoOpen] = useState(false);
   const [detalhe, setDetalhe] = useState(null);
   const [edicao, setEdicao] = useState(null);
@@ -81,10 +70,6 @@ export default function ContratosDesignacaoSection({
   const [encerrar, setEncerrar] = useState(null);
   const [cancelar, setCancelar] = useState(null);
   const [excluir, setExcluir] = useState(null);
-  const [previewLegadoAtiva, setPreviewLegadoAtiva] = useState(null);
-  const [arquivamento, setArquivamento] = useState(null);
-  const [confirmarArquivamento, setConfirmarArquivamento] = useState(false);
-  const [arquivamentoBloqueio, setArquivamentoBloqueio] = useState(null);
 
   const ordenados = useMemo(() => ordenarContratosDesignacao(contratos), [contratos]);
   const ativo = useMemo(() => getContratoAtivoDesignacao(contratos), [contratos]);
@@ -93,6 +78,21 @@ export default function ContratosDesignacaoSection({
   const handleCreate = async (payload) => {
     await onCreate?.(payload);
     setModalNovoOpen(false);
+    toast({
+      title: 'Contrato de designação cadastrado',
+      description: 'Revise os períodos aquisitivos do militar e exclua manualmente apenas os períodos incompatíveis, quando permitido.',
+      duration: 10000,
+      action: (
+        <Button type="button" size="sm" variant="outline" onClick={() => revisarPeriodosMilitar(payload?.militar_id || militarId)}>
+          Revisar períodos aquisitivos deste militar
+        </Button>
+      ),
+    });
+  };
+
+  const revisarPeriodosMilitar = (idMilitar = militarId) => {
+    if (!idMilitar) return;
+    navigate(`${createPageUrl('PeriodosAquisitivos')}?militarId=${encodeURIComponent(idMilitar)}`);
   };
 
   const handleAbrirEdicao = async (contrato) => {
@@ -145,22 +145,6 @@ export default function ContratosDesignacaoSection({
     setExcluir(null);
   };
 
-  const handleArchive = async () => {
-    if (!arquivamento?.id || !confirmarArquivamento) return;
-    setArquivamentoBloqueio(null);
-    try {
-      await onArchive?.(arquivamento);
-      setArquivamento(null);
-      setConfirmarArquivamento(false);
-    } catch (error) {
-      if (error?.code === 'PERIODOS_COM_FERIAS_VINCULADAS') {
-        setArquivamentoBloqueio({ mensagem: error.message, bloqueantes: Array.isArray(error?.bloqueantes) ? error.bloqueantes : [] });
-        return;
-      }
-      throw error;
-    }
-  };
-
   return (
     <Card className="shadow-sm md:col-span-2">
       <CardHeader className="pb-2">
@@ -174,11 +158,16 @@ export default function ContratosDesignacaoSection({
               Registro administrativo próprio do militar. Esta seção não altera matrícula, férias, saldos, Livro, publicações ou geradores automaticamente.
             </p>
           </div>
-          {canCreate && (
-            <Button onClick={() => setModalNovoOpen(true)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
-              <Plus className="w-4 h-4 mr-2" />Novo contrato
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            {canCreate && (
+              <Button onClick={() => setModalNovoOpen(true)} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
+                <Plus className="w-4 h-4 mr-2" />Novo contrato
+              </Button>
+            )}
+            <Button type="button" variant="outline" onClick={() => revisarPeriodosMilitar()}>
+              Revisar períodos aquisitivos
             </Button>
-          )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -227,18 +216,12 @@ export default function ContratosDesignacaoSection({
               {ordenados.map((contrato) => {
                 const badge = getContratoDesignacaoStatusBadge(contrato.status_contrato);
                 const ativoContrato = normalizarStatusContratoDesignacao(contrato.status_contrato) === 'ativo';
-                const legadoInfo = legadoAtivaPorContrato[String(contrato.id)] || { aplicado: false };
-                const podeArquivarLegadoAtiva = !legadoInfo.aplicado && canPrepararLegadoAtiva && isContratoAtivoOperacional(contrato);
-                const podePrepararLegadoAtiva = ativoContrato && Boolean(contrato.data_inclusao_para_ferias) && canPrepararLegadoAtiva;
                 return (
                   <div key={contrato.id || `${contrato.matricula_designacao}-${contrato.data_inicio_contrato}`} className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-[1fr_1.25fr_1.15fr_0.9fr] lg:items-start">
                     <div className="min-w-0 space-y-1">
                       <p className="text-[11px] font-semibold uppercase text-slate-500 lg:hidden">Status / matrícula / datas</p>
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge className={badge.className}>{badge.label}</Badge>
-                        <Badge variant="outline" className={legadoInfo.aplicado ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>
-                          Legado da Ativa: {legadoInfo.aplicado ? 'Aplicado' : 'Pendente'}
-                        </Badge>
                         <span className="break-words font-medium text-slate-700">{contrato.matricula_designacao || '—'}</span>
                       </div>
                       <p className="text-xs text-slate-500">Início: {formatDate(contrato.data_inicio_contrato)} • Data-base férias: {formatDate(contrato.data_inclusao_para_ferias || contrato.data_inicio_contrato)}</p>
@@ -262,17 +245,8 @@ export default function ContratosDesignacaoSection({
                       <p className="mb-2 text-[11px] font-semibold uppercase text-slate-500 lg:hidden">Ações</p>
                       <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
                         <Button size="sm" variant="outline" onClick={() => setDetalhe(contrato)}>Ver detalhes</Button>
+                        <Button size="sm" variant="outline" onClick={() => revisarPeriodosMilitar(contrato.militar_id || militarId)}>Revisar períodos aquisitivos</Button>
                         {canEdit && <Button size="sm" variant="outline" onClick={() => handleAbrirEdicao(contrato)}><Edit3 className="mr-1 h-4 w-4" />Editar contrato</Button>}
-                        {podeArquivarLegadoAtiva && (
-                          <Button size="sm" variant="outline" onClick={() => { setArquivamento(contrato); setConfirmarArquivamento(false); setArquivamentoBloqueio(null); }} className="whitespace-normal border-amber-200 text-amber-800 hover:bg-amber-50">
-                            <Archive className="mr-1 h-4 w-4 shrink-0" />Arquivar períodos da ativa
-                          </Button>
-                        )}
-                        {podePrepararLegadoAtiva && (
-                          <Button size="sm" variant="outline" onClick={() => setPreviewLegadoAtiva(contrato)} className="whitespace-normal border-amber-200 text-amber-800 hover:bg-amber-50">
-                            <Wand2 className="mr-1 h-4 w-4 shrink-0" />Ver prévia legado
-                          </Button>
-                        )}
                         {ativoContrato && canEncerrar && <Button size="sm" variant="outline" onClick={() => setEncerrar(contrato)}>Encerrar</Button>}
                         {canCancelar && normalizarStatusContratoDesignacao(contrato.status_contrato) !== 'cancelado' && <Button size="sm" variant="destructive" onClick={() => setCancelar(contrato)}>Cancelar</Button>}
                         {canExcluir && <Button size="sm" variant="destructive" onClick={() => setExcluir(contrato)}>Excluir contrato</Button>}
@@ -335,68 +309,6 @@ export default function ContratosDesignacaoSection({
           onSubmit={handleDelete}
           isSubmitting={isSaving}
         />
-        <TransicaoLegadoAtivaPreviewModal
-          open={Boolean(previewLegadoAtiva)}
-          onOpenChange={(open) => !open && setPreviewLegadoAtiva(null)}
-          militarId={militarId}
-          contrato={previewLegadoAtiva}
-        />
-
-        {arquivamento && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
-            <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-              <div className="border-b border-slate-200 p-5">
-                <h2 className="text-xl font-bold text-slate-900">Arquivar períodos da ativa</h2>
-                <p className="mt-1 text-sm text-slate-500">Arquivamento lógico em bloco da cadeia anterior à nova data-base de férias.</p>
-              </div>
-              <div className="space-y-4 p-5">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <DetailItem label="Matrícula usada no contrato" value={arquivamento.matricula_designacao} />
-                  <DetailItem label="Contrato" value={[arquivamento.numero_contrato, arquivamento.boletim_publicacao].filter(Boolean).join(' • ')} />
-                  <DetailItem label="Início" value={formatDate(arquivamento.data_inicio_contrato)} />
-                  <DetailItem label="Nova data-base" value={formatDate(arquivamento.data_inclusao_para_ferias || arquivamento.data_inicio_contrato)} />
-                </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  Esta ação não apaga períodos, férias, Livro ou publicações. Apenas retira a cadeia antiga da operação normal.
-                </div>
-                {arquivamentoBloqueio && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
-                      <div>
-                        <p className="font-semibold">Não foi possível arquivar/excluir os períodos porque existem férias lançadas em um ou mais períodos da cadeia antiga.</p>
-                        <p className="mt-1">Exclua ou corrija as férias vinculadas antes de continuar.</p>
-                        {arquivamentoBloqueio.bloqueantes?.length > 0 && (
-                          <ul className="mt-3 list-disc space-y-1 pl-5">
-                            {arquivamentoBloqueio.bloqueantes.map((bloqueante) => (
-                              <li key={bloqueante.id || `${bloqueante.referencia}-${bloqueante.periodo}`}>{formatarPeriodoBloqueante(bloqueante)}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-4 w-4 rounded border-slate-300"
-                    checked={confirmarArquivamento}
-                    onChange={(event) => setConfirmarArquivamento(event.target.checked)}
-                  />
-                  <span>Confirmo o arquivamento lógico da cadeia anterior</span>
-                </label>
-              </div>
-              <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
-                <Button variant="outline" onClick={() => { setArquivamento(null); setConfirmarArquivamento(false); setArquivamentoBloqueio(null); }} disabled={isArchiving}>Cancelar</Button>
-                <Button onClick={handleArchive} disabled={!confirmarArquivamento || isArchiving} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
-                  {isArchiving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Archive className="mr-2 h-4 w-4" />}
-                  Arquivar períodos
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

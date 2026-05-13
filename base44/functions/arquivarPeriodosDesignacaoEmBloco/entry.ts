@@ -20,7 +20,7 @@ async function fetchWithRetry(queryFn: () => Promise<any>, label = 'query') {
       if (!RETRY_STATUS.has(status) || attempt === RETRY_MAX_ATTEMPTS) break;
       const waitMs = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 200);
       await new Promise((resolve) => setTimeout(resolve, waitMs));
-      console.warn(`[arquivarPeriodosDesignacaoEmBloco] retry step=${label} attempt=${attempt} status=${status}`);
+      console.warn(`[periodosDesignacaoBlocoDesativado] retry step=${label} attempt=${attempt} status=${status}`);
     }
   }
   throw lastError;

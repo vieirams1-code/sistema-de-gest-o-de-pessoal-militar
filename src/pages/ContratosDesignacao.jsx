@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Archive, CalendarClock, CheckCircle2, ClipboardList, Edit3, Eye, FileText, Loader2, Plus, Search, ShieldCheck, Trash2, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Edit3, Eye, FileText, Loader2, Plus, Search, Trash2, UserRound, XCircle } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
@@ -15,7 +15,6 @@ import { createPageUrl } from '@/utils';
 import { atualizarEscopado, criarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPainelContratosDesignacao } from '@/services/getScopedPainelContratosDesignacaoClient';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
-import { arquivarPeriodosDesignacaoEmBloco } from '@/services/arquivarPeriodosDesignacaoEmBlocoClient';
 import {
   aplicarFiltrosPainelContratos,
   buscarEfeitosContratoEmPeriodos,
@@ -23,8 +22,6 @@ import {
   calcularSituacaoDerivadaContrato,
   classificarVencimentoContrato,
   getCampoCadeiaFeriasAlterado,
-  isContratoAtivoOperacional,
-  FILTRO_LEGADO,
   FILTRO_SITUACAO,
   FILTRO_VENCIMENTO,
   MENSAGEM_CONTRATO_COM_EFEITOS,
@@ -38,8 +35,6 @@ const EMPTY_COUNTERS = {
   vencendo90: 0,
   vencidos: 0,
   semDataFim: 0,
-  legadoAtivaAplicada: 0,
-  legadoAtivaPendente: 0,
   encerrados: 0,
   cancelados: 0,
 };
@@ -88,14 +83,6 @@ function CounterCard({ title, value, icon: Icon, color = 'slate' }) {
   );
 }
 
-function formatarPeriodoBloqueante(bloqueante) {
-  const referencia = bloqueante?.referencia ? `Ref. ${bloqueante.referencia}` : 'Sem referência';
-  const periodo = bloqueante?.periodo || 'Período não informado';
-  const status = bloqueante?.status ? `status ${bloqueante.status}` : 'status não informado';
-  const quantidade = Number(bloqueante?.quantidade_ferias || 0);
-  return `${referencia} — ${periodo} — ${status} — ${quantidade} férias vinculada(s)`;
-}
-
 function DetailItem({ label, value }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -139,18 +126,14 @@ export default function ContratosDesignacao() {
   const canView = hasAbsoluteAccess || isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
   const canCreate = hasAbsoluteAccess || isAdmin || canAccessAction('gerir_contratos_designacao');
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [busca, setBusca] = useState('');
   const [situacao, setSituacao] = useState(FILTRO_SITUACAO.TODOS);
   const [vencimento, setVencimento] = useState(FILTRO_VENCIMENTO.TODOS);
-  const [legado, setLegado] = useState(FILTRO_LEGADO.TODOS);
   const [contratoDetalhe, setContratoDetalhe] = useState(null);
-  const [contratoArquivamento, setContratoArquivamento] = useState(null);
   const [contratoEdicao, setContratoEdicao] = useState(null);
   const [contratoEdicaoBloqueiaCadeia, setContratoEdicaoBloqueiaCadeia] = useState(false);
-  const [confirmarArquivamento, setConfirmarArquivamento] = useState(false);
-  const [arquivandoPeriodos, setArquivandoPeriodos] = useState(false);
-  const [arquivamentoBloqueio, setArquivamentoBloqueio] = useState(null);
   const [novoContratoOpen, setNovoContratoOpen] = useState(false);
   const [salvandoContrato, setSalvandoContrato] = useState(false);
   const [excluindoContratoId, setExcluindoContratoId] = useState(null);
@@ -185,7 +168,6 @@ export default function ContratosDesignacao() {
   const contratos = bundle.contratos || [];
   const militares = bundle.militares || [];
   const matriculasMilitar = bundle.matriculasMilitar || [];
-  const legadoAtivaPorContrato = bundle.legadoAtivaPorContrato || {};
   const militaresDisponiveis = militaresDisponiveisQuery.data || [];
   const militaresOpcoesContrato = useMemo(() => {
     const porId = new Map();
@@ -203,56 +185,14 @@ export default function ContratosDesignacao() {
   const contratosFiltrados = useMemo(() => aplicarFiltrosPainelContratos(contratos, {
     militaresPorId,
     matriculasMilitar,
-    legadoAtivaPorContrato,
     busca,
     situacao,
     vencimento,
-    legado,
-  }), [busca, contratos, legado, legadoAtivaPorContrato, matriculasMilitar, militaresPorId, situacao, vencimento]);
+  }), [busca, contratos, matriculasMilitar, militaresPorId, situacao, vencimento]);
 
-  const handleArquivarPeriodos = async () => {
-    if (!contratoArquivamento || !confirmarArquivamento) return;
-    setArquivandoPeriodos(true);
-    setArquivamentoBloqueio(null);
-    try {
-      const resultado = await arquivarPeriodosDesignacaoEmBloco({
-        militarId: contratoArquivamento.militar_id,
-        contratoDesignacaoId: contratoArquivamento.id,
-        confirmar: true,
-      });
-      const resumo = resultado?.resumo || {};
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] }),
-        queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
-        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
-        queryClient.invalidateQueries({ queryKey: ['periodos-existentes'] }),
-      ]);
-      setContratoArquivamento(null);
-      setConfirmarArquivamento(false);
-      toast({
-        title: 'Períodos arquivados logicamente',
-        description: `${resumo.arquivados || 0} arquivado(s), ${resumo.cancelados || 0} cancelado(s), ${resumo.ja_processados || 0} já processado(s).`,
-      });
-    } catch (error) {
-      if (error?.code === 'PERIODOS_COM_FERIAS_VINCULADAS') {
-        const bloqueantes = Array.isArray(error?.bloqueantes) ? error.bloqueantes : [];
-        setArquivamentoBloqueio({ mensagem: error.message, bloqueantes });
-        toast({
-          title: 'Arquivamento bloqueado por férias vinculadas',
-          description: 'Não foi possível arquivar/excluir os períodos porque existem férias lançadas em um ou mais períodos da cadeia antiga. Ajuste essas férias primeiro e tente novamente.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      toast({
-        title: 'Erro ao arquivar períodos',
-        description: error?.message || 'Não foi possível concluir o arquivamento lógico.',
-        variant: 'destructive',
-      });
-    } finally {
-      setArquivandoPeriodos(false);
-    }
+  const revisarPeriodosMilitar = (militarId) => {
+    if (!militarId) return;
+    navigate(`${createPageUrl('PeriodosAquisitivos')}?militarId=${encodeURIComponent(militarId)}`);
   };
 
   const handleCreateContrato = async (payload) => {
@@ -261,7 +201,16 @@ export default function ContratosDesignacao() {
       await criarEscopado('ContratoDesignacaoMilitar', payload);
       setNovoContratoOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] });
-      toast({ title: 'Contrato cadastrado', description: 'O painel foi atualizado com o novo contrato de designação.' });
+      toast({
+        title: 'Contrato cadastrado',
+        description: 'Revise os períodos aquisitivos do militar e exclua manualmente apenas os períodos incompatíveis, quando permitido.',
+        duration: 10000,
+        action: (
+          <Button type="button" size="sm" variant="outline" onClick={() => revisarPeriodosMilitar(payload?.militar_id)}>
+            Revisar períodos aquisitivos deste militar
+          </Button>
+        ),
+      });
     } catch (error) {
       toast({
         title: 'Erro ao cadastrar contrato',
@@ -383,21 +332,19 @@ export default function ContratosDesignacao() {
           )}
         </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           <CounterCard title="Ativos" value={counters.ativos} icon={CheckCircle2} color="emerald" />
           <CounterCard title="Vencendo em 30 dias" value={counters.vencendo30} icon={CalendarClock} color="amber" />
           <CounterCard title="Vencendo em 60 dias" value={counters.vencendo60} icon={CalendarClock} color="amber" />
           <CounterCard title="Vencendo em 90 dias" value={counters.vencendo90} icon={CalendarClock} color="amber" />
           <CounterCard title="Vencidos" value={counters.vencidos} icon={AlertTriangle} color="red" />
           <CounterCard title="Sem data fim" value={counters.semDataFim} icon={FileText} color="blue" />
-          <CounterCard title="Legado da Ativa aplicado" value={counters.legadoAtivaAplicada} icon={ShieldCheck} color="emerald" />
-          <CounterCard title="Legado da Ativa pendente" value={counters.legadoAtivaPendente} icon={AlertTriangle} color="amber" />
           <CounterCard title="Encerrados" value={counters.encerrados} icon={XCircle} color="slate" />
           <CounterCard title="Cancelados" value={counters.cancelados} icon={XCircle} color="rose" />
         </div>
 
         <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-4 grid grid-cols-1 lg:grid-cols-4 gap-3">
+          <CardContent className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div className="relative lg:col-span-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
               <input className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="Buscar por militar, matrícula, contrato ou boletim..." value={busca} onChange={(e) => setBusca(e.target.value)} />
@@ -420,11 +367,6 @@ export default function ContratosDesignacao() {
               <option value={FILTRO_VENCIMENTO.ACIMA_90}>Acima de 90 dias</option>
               <option value={FILTRO_VENCIMENTO.SEM_DATA_FIM}>Sem data fim</option>
             </select>
-            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" value={legado} onChange={(e) => setLegado(e.target.value)}>
-              <option value={FILTRO_LEGADO.TODOS}>Legado da Ativa: Todos</option>
-              <option value={FILTRO_LEGADO.APLICADO}>Com transição aplicada</option>
-              <option value={FILTRO_LEGADO.PENDENTE}>Sem transição aplicada</option>
-            </select>
           </CardContent>
         </Card>
 
@@ -440,8 +382,6 @@ export default function ContratosDesignacao() {
                   const militar = getMilitar(contrato);
                   const situacaoDerivada = calcularSituacaoDerivadaContrato(contrato);
                   const ui = SITUACAO_UI[situacaoDerivada] || SITUACAO_UI[SITUACAO_CONTRATO_DESIGNACAO.ATIVO];
-                  const legadoInfo = legadoAtivaPorContrato[String(contrato.id)] || { aplicado: false };
-                  const podeResolverPeriodos = canCreate && isContratoAtivoOperacional(contrato);
 
                   return (
                     <article key={contrato.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -449,9 +389,6 @@ export default function ContratosDesignacao() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="outline" className={ui.className}>{ui.label}</Badge>
-                            <Badge variant="outline" className={legadoInfo.aplicado ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>
-                              Legado da Ativa: {legadoInfo.aplicado ? 'Aplicado' : 'Pendente'}
-                            </Badge>
                           </div>
                           <h2 className="mt-2 break-words text-lg font-bold text-slate-900">{militar.nome_guerra || militar.nome_completo || 'Militar não localizado'}</h2>
                           <p className="text-sm text-slate-500">{militar.posto_graduacao || militar.quadro || 'Posto/graduação não informado'}</p>
@@ -461,12 +398,8 @@ export default function ContratosDesignacao() {
                             <Link to={`${createPageUrl('VerMilitar')}?id=${contrato.militar_id}`}><UserRound size={14} className="mr-1" />Ver ficha</Link>
                           </Button>
                           <Button type="button" variant="outline" size="sm" onClick={() => setContratoDetalhe(contrato)}><Eye size={14} className="mr-1" />Detalhes</Button>
+                          <Button type="button" variant="outline" size="sm" onClick={() => revisarPeriodosMilitar(contrato.militar_id)}>Revisar períodos aquisitivos</Button>
                           {canCreate && <Button type="button" variant="outline" size="sm" onClick={() => handleAbrirEdicaoContrato(contrato)}><Edit3 size={14} className="mr-1" />Editar contrato</Button>}
-                          {podeResolverPeriodos && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => { setContratoArquivamento(contrato); setConfirmarArquivamento(false); setArquivamentoBloqueio(null); }} className="border-amber-200 text-amber-800 hover:bg-amber-50">
-                              <Archive size={14} className="mr-1" />Arquivar períodos da ativa
-                            </Button>
-                          )}
                           {canCreate && (
                             <Button type="button" variant="outline" size="sm" onClick={() => handleExcluirContrato(contrato)} disabled={excluindoContratoId === contrato.id} className="border-rose-200 text-rose-700 hover:bg-rose-50">
                               {excluindoContratoId === contrato.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Trash2 size={14} className="mr-1" />}Excluir contrato
@@ -519,68 +452,6 @@ export default function ContratosDesignacao() {
         isSubmitting={salvandoContrato}
       />
 
-      {contratoArquivamento && (() => {
-        const militar = getMilitar(contratoArquivamento);
-        const legadoInfo = legadoAtivaPorContrato[String(contratoArquivamento.id)] || { aplicado: false, totalPeriodos: 0, ultimaAplicacaoEm: null };
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
-            <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-              <div className="border-b border-slate-200 p-5">
-                <h2 className="text-xl font-bold text-slate-900">Arquivar períodos da ativa</h2>
-                <p className="mt-1 text-sm text-slate-500">Arquivamento lógico em bloco da cadeia anterior à nova data-base de férias.</p>
-              </div>
-              <div className="space-y-4 p-5">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <DetailItem label="Militar" value={militar.nome_completo || militar.nome_guerra} />
-                  <DetailItem label="Matrícula" value={getMatriculaAtual(contratoArquivamento)} />
-                  <DetailItem label="Contrato" value={[contratoArquivamento.numero_contrato, contratoArquivamento.boletim_publicacao].filter(Boolean).join(' • ')} />
-                  <DetailItem label="Nova data-base" value={formatDate(contratoArquivamento.data_inclusao_para_ferias)} />
-                </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  Esta ação não apaga períodos, férias, Livro ou publicações. Apenas retira a cadeia antiga da operação normal.
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  Resumo prévio: {legadoInfo.aplicado ? `${legadoInfo.totalPeriodos || 0} período(s) já marcado(s) como Legado da Ativa neste contrato.` : 'pendente de arquivamento lógico para este contrato.'}
-                </div>
-                {arquivamentoBloqueio && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
-                      <div>
-                        <p className="font-semibold">Não foi possível arquivar/excluir os períodos porque existem férias lançadas em um ou mais períodos da cadeia antiga.</p>
-                        <p className="mt-1">Exclua ou corrija as férias vinculadas antes de continuar.</p>
-                        {arquivamentoBloqueio.bloqueantes?.length > 0 && (
-                          <ul className="mt-3 list-disc space-y-1 pl-5">
-                            {arquivamentoBloqueio.bloqueantes.map((bloqueante) => (
-                              <li key={bloqueante.id || `${bloqueante.referencia}-${bloqueante.periodo}`}>{formatarPeriodoBloqueante(bloqueante)}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-4 w-4 rounded border-slate-300"
-                    checked={confirmarArquivamento}
-                    onChange={(event) => setConfirmarArquivamento(event.target.checked)}
-                  />
-                  <span>Confirmo o arquivamento lógico da cadeia anterior</span>
-                </label>
-              </div>
-              <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
-                <Button variant="outline" onClick={() => { setContratoArquivamento(null); setConfirmarArquivamento(false); setArquivamentoBloqueio(null); }} disabled={arquivandoPeriodos}>Cancelar</Button>
-                <Button onClick={handleArquivarPeriodos} disabled={!confirmarArquivamento || arquivandoPeriodos} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
-                  {arquivandoPeriodos ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Archive className="mr-2 h-4 w-4" />}
-                  Arquivar períodos
-                </Button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {contratoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
@@ -592,7 +463,6 @@ export default function ContratosDesignacao() {
             <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
               {(() => {
                 const militar = getMilitar(contratoDetalhe);
-                const legadoInfo = legadoAtivaPorContrato[String(contratoDetalhe.id)] || { aplicado: false, totalPeriodos: 0, ultimaAplicacaoEm: null };
                 return (<>
                   <DetailItem label="Militar" value={militar.nome_completo || militar.nome_guerra} />
                   <DetailItem label="Matrícula atual" value={getMatriculaAtual(contratoDetalhe)} />
@@ -611,8 +481,6 @@ export default function ContratosDesignacao() {
                   <DetailItem label="Data publicação" value={formatDate(contratoDetalhe.data_publicacao)} />
                   <DetailItem label="Fonte legal" value={contratoDetalhe.fonte_legal} />
                   <DetailItem label="Tipo de designação" value={contratoDetalhe.tipo_designacao} />
-                  <DetailItem label="Legado da Ativa" value={legadoInfo.aplicado ? `Aplicada (${legadoInfo.totalPeriodos} período(s))` : 'Pendente'} />
-                  <DetailItem label="Última aplicação legado" value={legadoInfo.ultimaAplicacaoEm ? formatDate(legadoInfo.ultimaAplicacaoEm) : '—'} />
                   {contratoDetalhe.gera_direito_ferias === false && <div className="md:col-span-2"><DetailItem label="Motivo para não gerar férias" value={contratoDetalhe.motivo_nao_gera_ferias} /></div>}
                   <div className="md:col-span-2"><DetailItem label="Observações" value={contratoDetalhe.observacoes} /></div>
                 </>);

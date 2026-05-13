@@ -36,6 +36,13 @@ const EMPTY_FORM = {
   motivo_nao_gera_ferias: '',
 };
 
+const CIENCIA_PERIODOS_ITEMS = [
+  'Estou ciente de que a nova data-base poderá alterar a cadeia futura de períodos aquisitivos.',
+  'Estou ciente de que períodos incompatíveis já gerados deverão ser revisados manualmente.',
+  'Estou ciente de que períodos com férias vinculadas exigem reversão/análise antes de exclusão.',
+  'Estou ciente de que lançamentos publicados no Livro/publicações exigem atuação do administrador.',
+];
+
 function formatDate(date) {
   if (!date) return '—';
   try { return new Date(`${String(date).slice(0, 10)}T00:00:00`).toLocaleDateString('pt-BR'); } catch (_e) { return date; }
@@ -136,10 +143,12 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
   const [erros, setErros] = useState([]);
   const [militarPopoverOpen, setMilitarPopoverOpen] = useState(false);
   const [buscaMilitar, setBuscaMilitar] = useState('');
+  const [cienciaPeriodos, setCienciaPeriodos] = useState(() => CIENCIA_PERIODOS_ITEMS.map(() => false));
 
   useEffect(() => {
     if (!open) return;
     setErros([]);
+    setCienciaPeriodos(CIENCIA_PERIODOS_ITEMS.map(() => false));
     const proximoMilitarId = contrato?.militar_id || militarId || '';
     setMilitarSelecionadoId(proximoMilitarId);
     setForm(sanitizarFormContrato(contrato ? { ...EMPTY_FORM, ...contrato } : { ...EMPTY_FORM }));
@@ -176,6 +185,8 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
   }, [buscaMilitar, matriculas, militarSelectOptions]);
 
   const isEditing = Boolean(contrato?.id);
+  const exigeCienciaPeriodos = !readOnly && !isEditing;
+  const cienciaPeriodosCompleta = !exigeCienciaPeriodos || cienciaPeriodos.every(Boolean);
   const campoCadeiaBloqueado = (field) => bloqueiaCadeiaFerias && [
     'data_inicio_contrato',
     'data_inclusao_para_ferias',
@@ -226,6 +237,10 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
   }, [open, readOnly, contrato, militarSelecionadoId, militarEscolhido, matriculaAtualSelecionada]);
 
   const handleSubmit = async () => {
+    if (!cienciaPeriodosCompleta) {
+      setErros(['Confirme todos os itens de ciência sobre revisão manual de períodos aquisitivos antes de salvar.']);
+      return;
+    }
     const matriculaAtual = matriculaAtualContrato;
     const matriculaMilitarId = isEditing
       ? sanitizarIdMatricula(form.matricula_militar_id || contrato?.matricula_militar_id || matriculaAtual.id)
@@ -475,12 +490,38 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
               <Label>Observações</Label>
               <Textarea value={form.observacoes} onChange={(e) => update('observacoes', e.target.value)} />
             </div>
+
+            {exigeCienciaPeriodos && (
+              <div className="md:col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <div className="space-y-3">
+                    <p>
+                      Ao cadastrar este contrato, a data-base de férias do militar poderá ser alterada. O sistema não excluirá nem cancelará automaticamente períodos aquisitivos já gerados. Após salvar o contrato, revise os períodos aquisitivos do militar e exclua manualmente os períodos incompatíveis com a nova data-base. Períodos com férias vinculadas não devem ser excluídos sem análise prévia.
+                    </p>
+                    <div className="space-y-2">
+                      {CIENCIA_PERIODOS_ITEMS.map((texto, index) => (
+                        <label key={texto} className="flex items-start gap-3 rounded-lg border border-blue-100 bg-white/70 p-3 text-blue-950">
+                          <input
+                            type="checkbox"
+                            className="mt-1 h-4 w-4 rounded border-blue-300"
+                            checked={cienciaPeriodos[index]}
+                            onChange={(event) => setCienciaPeriodos((prev) => prev.map((checked, itemIndex) => (itemIndex === index ? event.target.checked : checked)))}
+                          />
+                          <span>{texto}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting || militaresLoading}>{isSubmitting ? 'Salvando...' : (isEditing ? 'Salvar edição' : 'Salvar contrato')}</Button>}
+          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting || militaresLoading || !cienciaPeriodosCompleta}>{isSubmitting ? 'Salvando...' : (isEditing ? 'Salvar edição' : 'Salvar contrato')}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,9 +1,9 @@
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays } from 'date-fns';
 import { createPageUrl } from '@/utils';
@@ -35,6 +35,7 @@ import {
 
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved, isAdmin = false, user = {}, modoAcesso = null } = useCurrentUser();
   const hasFeriasAccess = canAccessModule('ferias');
@@ -46,6 +47,7 @@ export default function PeriodosAquisitivos() {
   const [periodoFilter, setPeriodoFilter] = useState('all');
   const [expandedMilitares, setExpandedMilitares] = useState({});
   const [periodoGerenciado, setPeriodoGerenciado] = useState(null);
+  const militarIdFiltro = searchParams.get('militarId') || '';
 
   const effectiveEmail = getEffectiveEmail();
   const paBundleQueryKey = ['pa-bundle', Boolean(isAdmin), modoAcesso || null, user?.email || null, effectiveEmail || null];
@@ -165,6 +167,9 @@ export default function PeriodosAquisitivos() {
     () =>
       periodosTransformados.militares
         .map((grupoMilitar) => {
+          if (militarIdFiltro && String(grupoMilitar?.militar?.id || '') !== String(militarIdFiltro)) {
+            return { ...grupoMilitar, periodos: [] };
+          }
           const periodosFiltrados = grupoMilitar.periodos.filter((periodo) => {
             const searchLower = searchTerm.toLowerCase();
             const matchesMilitarTermo = militarCorrespondeBusca(
@@ -197,8 +202,13 @@ export default function PeriodosAquisitivos() {
           };
         })
         .filter((grupoMilitar) => grupoMilitar.periodos.length > 0),
-    [periodosTransformados, searchTerm, statusFilter, periodoFilter, quickFilter]
+    [periodosTransformados, militarIdFiltro, searchTerm, statusFilter, periodoFilter, quickFilter]
   );
+
+  useEffect(() => {
+    if (!militarIdFiltro) return;
+    setExpandedMilitares((prev) => ({ ...prev, [militarIdFiltro]: true }));
+  }, [militarIdFiltro]);
 
   const filteredPeriodosCount = filteredMilitares.reduce((total, grupo) => total + grupo.periodos.length, 0);
 
@@ -405,6 +415,15 @@ export default function PeriodosAquisitivos() {
             <span className="text-slate-600">Filtro rápido: <strong>{quickFilterLabel[quickFilter]}</strong></span>
             <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setQuickFilter('all')}>
               Limpar filtro
+            </Button>
+          </div>
+        )}
+
+        {militarIdFiltro && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            <span>Exibindo períodos aquisitivos do militar selecionado para revisão manual.</span>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-blue-800 hover:bg-blue-100" onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}>
+              Limpar filtro do militar
             </Button>
           </div>
         )}

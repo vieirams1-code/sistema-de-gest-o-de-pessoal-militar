@@ -46,7 +46,6 @@ import { getSaldoConsolidadoPeriodo, isFeriasDoPeriodo } from '@/components/feri
 import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularPeriodoAquisitivo';
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
-import { arquivarPeriodosDesignacaoEmBloco } from '@/services/arquivarPeriodosDesignacaoEmBlocoClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
@@ -131,7 +130,6 @@ export default function VerMilitar() {
   const podeEncerrarContratoDesignacao = isAdmin || canAccessAction('encerrar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeExcluirContratoDesignacao = isAdmin || canAccessAction('excluir_contrato_designacao');
-  const podePrepararLegadoAtiva = isAdmin || canAccessAction('aplicar_transicao_legado_ativa') || canAccessAction('gerir_cadeia_ferias') || canAccessAction('gerir_contratos_designacao') || (canAccessAction('visualizar_contratos_designacao') && canAccessAction('visualizar_ferias'));
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [showPromocaoAtualModal, setShowPromocaoAtualModal] = useState(false);
   const [showPromocaoHistoricaModal, setShowPromocaoHistoricaModal] = useState(false);
@@ -168,7 +166,6 @@ export default function VerMilitar() {
     enabled: !!id && isAccessResolved && podeVisualizarContratosDesignacao,
   });
   const contratosDesignacaoMilitar = contratosDesignacaoData.contratos || [];
-  const legadoAtivaPorContrato = contratosDesignacaoData.legadoAtivaPorContrato || {};
 
   const contratoDesignacaoMutation = useMutation({
     mutationFn: ({ id: contratoId, data, operation }) => {
@@ -179,42 +176,14 @@ export default function VerMilitar() {
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: contratosDesignacaoQueryKey });
       queryClient.invalidateQueries({ queryKey: ['ver-contratos-designacao', id] });
-      toast({ title: variables?.operation === 'delete' ? 'Contrato de designação excluído com sucesso.' : 'Contrato de designação atualizado com sucesso.' });
+      if (variables?.operation !== 'create') {
+        toast({ title: variables?.operation === 'delete' ? 'Contrato de designação excluído com sucesso.' : 'Contrato de designação atualizado com sucesso.' });
+      }
     },
     onError: (error) => {
       toast({ title: 'Erro ao salvar contrato de designação', description: error?.message || 'Tente novamente.', variant: 'destructive' });
     },
   });
-
-
-
-  const arquivarPeriodosDesignacaoMutation = useMutation({
-    mutationFn: (contrato) => arquivarPeriodosDesignacaoEmBloco({
-      militarId: contrato?.militar_id || id,
-      contratoDesignacaoId: contrato?.id,
-      confirmar: true,
-    }),
-    onSuccess: async (resultado) => {
-      const resumo = resultado?.resumo || {};
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: contratosDesignacaoQueryKey }),
-        queryClient.invalidateQueries({ queryKey: ['ver-contratos-designacao', id] }),
-        queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] }),
-        queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
-        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
-        queryClient.invalidateQueries({ queryKey: ['periodos-existentes'] }),
-      ]);
-      toast({
-        title: 'Períodos arquivados logicamente',
-        description: `${resumo.arquivados || 0} arquivado(s), ${resumo.cancelados || 0} cancelado(s), ${resumo.ja_processados || 0} já processado(s).`,
-      });
-    },
-    onError: (error) => {
-      if (error?.code === 'PERIODOS_COM_FERIAS_VINCULADAS') return;
-      toast({ title: 'Erro ao arquivar períodos', description: error?.message || 'Não foi possível concluir o arquivamento lógico.', variant: 'destructive' });
-    },
-  });
-
   const { data: militarDestinoMerge } = useQuery({
     queryKey: ['militar-merge-destino', militar?.merged_into_id],
     queryFn: async () => {
@@ -973,14 +942,10 @@ export default function VerMilitar() {
                 canEncerrar={podeEncerrarContratoDesignacao}
                 canCancelar={podeCancelarContratoDesignacao}
                 canExcluir={podeExcluirContratoDesignacao}
-                canPrepararLegadoAtiva={podePrepararLegadoAtiva && canViewMilitar}
-                legadoAtivaPorContrato={legadoAtivaPorContrato}
                 isSaving={contratoDesignacaoMutation.isPending}
-                isArchiving={arquivarPeriodosDesignacaoMutation.isPending}
                 onCreate={(data) => contratoDesignacaoMutation.mutateAsync({ operation: 'create', data })}
                 onUpdate={(contratoId, data) => contratoDesignacaoMutation.mutateAsync({ operation: 'update', id: contratoId, data })}
                 onDelete={(contratoId) => contratoDesignacaoMutation.mutateAsync({ operation: 'delete', id: contratoId })}
-                onArchive={(contrato) => arquivarPeriodosDesignacaoMutation.mutateAsync(contrato)}
               />
             </TabsContent>
           )}
