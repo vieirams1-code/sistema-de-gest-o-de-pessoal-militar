@@ -95,6 +95,7 @@ export default function TransicaoDesignacaoPeriodoDetalhes({
   const motivosSugestao = periodo.motivosSugestao || periodo.motivos_sugestao || [];
   const acoesPermitidas = periodo.acoesPermitidas || periodo.acoes_permitidas || [];
   const periodoId = periodo.periodoId || periodo.periodo_id || dadosPeriodo.id || 'periodo';
+  const isIndenizado = decisao?.acao === 'marcar_indenizado';
 
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
@@ -152,11 +153,11 @@ export default function TransicaoDesignacaoPeriodoDetalhes({
 
       <Accordion type="multiple" className="rounded-lg border border-slate-200 bg-white px-3">
         <AccordionItem value="observacao" className="border-b border-slate-200">
-          <AccordionTrigger className="py-3 text-sm font-semibold text-slate-800 hover:no-underline">Observação/documento opcional</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm font-semibold text-slate-800 hover:no-underline">Motivo, documento e dados complementares</AccordionTrigger>
           <AccordionContent>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor={`motivo-${periodoId}`}>Observação local</Label>
+                <Label htmlFor={`motivo-${periodoId}`}>Motivo/observação</Label>
                 <Textarea
                   id={`motivo-${periodoId}`}
                   value={decisao?.motivo || ''}
@@ -171,9 +172,23 @@ export default function TransicaoDesignacaoPeriodoDetalhes({
                   id={`documento-${periodoId}`}
                   value={decisao?.documento || ''}
                   onChange={(event) => onChange?.({ documento: event.target.value })}
-                  placeholder={exigeDocumento ? 'Documento obrigatório' : 'Documento opcional'}
+                  placeholder={exigeDocumento || isIndenizado ? 'Documento obrigatório' : 'Documento opcional'}
                   className="bg-white"
                 />
+                {isIndenizado && (
+                  <div className="space-y-2">
+                    <Label htmlFor={`dias-indenizados-${periodoId}`}>Dias indenizados</Label>
+                    <Input
+                      id={`dias-indenizados-${periodoId}`}
+                      type="number"
+                      min="1"
+                      value={decisao?.dias_indenizados || ''}
+                      onChange={(event) => onChange?.({ dias_indenizados: event.target.value })}
+                      placeholder="Quantidade de dias indenizados"
+                      className="bg-white"
+                    />
+                  </div>
+                )}
                 {pendencias.length > 0 && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
                     {pendencias.map((pendencia) => <p key={pendencia}>• {pendencia}</p>)}
@@ -199,6 +214,7 @@ export default function TransicaoDesignacaoPeriodoDetalhes({
                 ['Ação local', decisao?.acao],
                 ['Motivo local', decisao?.motivo],
                 ['Documento local', decisao?.documento],
+                ['Dias indenizados', decisao?.dias_indenizados],
                 ['Motivos da sugestão', motivosSugestao.map(codigoItem).join(', ')],
                 ['Atualização', dadosPeriodo.updated_date || dadosPeriodo.updated_at],
               ].map(([label, value]) => (

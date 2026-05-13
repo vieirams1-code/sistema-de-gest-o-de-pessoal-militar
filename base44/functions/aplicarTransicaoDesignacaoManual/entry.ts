@@ -5,7 +5,7 @@ const RETRY_BASE_DELAY_MS = 450;
 const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const LIMIT_USUARIO_ACESSO = 1000;
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
-const CONFIRMACAO_TEXTUAL = 'APLICAR TRANSICAO POR PERIODO';
+const CONFIRMACAO_TEXTUAL = 'APLICAR TRANSIÇÃO';
 const STATUS_FINALIZADOS = ['Gozado', 'Inativo'];
 const STATUS_FERIAS_PREVISTA_AUTORIZADA = ['Prevista', 'Autorizada'];
 const ACOES = {
@@ -315,6 +315,12 @@ Deno.serve(async (req) => {
     const periodoPorId = new Map((periodos || []).map((periodo: any) => [String(getId(periodo)), periodo]));
     const analisePorId = new Map((previa.periodos || []).map((item: any) => [String(item.periodoId), item]));
     const conflitosValidacao: any[] = [];
+    const periodoIdsAnalisados = new Set((previa.periodos || []).map((item: any) => String(item.periodoId)).filter(Boolean));
+    const periodoIdsRecebidos = new Set(acoes.map((item: any) => String(item.periodo_id)).filter(Boolean));
+    const periodosSemDecisao = Array.from(periodoIdsAnalisados).filter((periodoId) => !periodoIdsRecebidos.has(periodoId));
+    const periodosForaDaPrevia = Array.from(periodoIdsRecebidos).filter((periodoId) => !periodoIdsAnalisados.has(periodoId));
+    periodosSemDecisao.forEach((periodoId) => conflitosValidacao.push({ periodo_id: periodoId, codigo: 'decisao_obrigatoria' }));
+    periodosForaDaPrevia.forEach((periodoId) => conflitosValidacao.push({ periodo_id: periodoId, codigo: 'periodo_fora_da_previa' }));
     for (const item of acoes) {
       const periodo = periodoPorId.get(String(item.periodo_id));
       const analise = analisePorId.get(String(item.periodo_id));
@@ -322,7 +328,7 @@ Deno.serve(async (req) => {
       if (!ACOES_VALIDAS.has(item.acao)) conflitosValidacao.push({ periodo_id: item.periodo_id, codigo: 'acao_invalida', acao: item.acao });
       if (item.acao !== ACOES.MANTER && !analise.acoesPermitidas.includes(item.acao)) conflitosValidacao.push({ periodo_id: item.periodo_id, codigo: 'acao_fora_de_acoes_permitidas', acao: item.acao, acoesPermitidas: analise.acoesPermitidas });
       if (item.acao !== ACOES.MANTER && analise.bloqueantes.length > 0) conflitosValidacao.push({ periodo_id: item.periodo_id, codigo: 'periodo_com_bloqueantes', bloqueantes: analise.bloqueantes });
-      const motivoObrigatorio = [ACOES.MARCAR_INDENIZADO, ACOES.EXCLUIR_CADEIA_OPERACIONAL, ACOES.CANCELAR_PERIODO_FUTURO_INDEVIDO].includes(item.acao) || (item.acao === ACOES.MARCAR_LEGADO_ATIVA && (analise.riscos.length > 0 || item.override_sugestao));
+      const motivoObrigatorio = [ACOES.MARCAR_LEGADO_ATIVA, ACOES.MARCAR_INDENIZADO, ACOES.EXCLUIR_CADEIA_OPERACIONAL, ACOES.CANCELAR_PERIODO_FUTURO_INDEVIDO].includes(item.acao);
       if (motivoObrigatorio && !item.motivo) conflitosValidacao.push({ periodo_id: item.periodo_id, codigo: 'motivo_obrigatorio', acao: item.acao });
       if (item.acao === ACOES.MARCAR_INDENIZADO) {
         if (!documentoValido(item.documento)) conflitosValidacao.push({ periodo_id: item.periodo_id, codigo: 'documento_obrigatorio' });

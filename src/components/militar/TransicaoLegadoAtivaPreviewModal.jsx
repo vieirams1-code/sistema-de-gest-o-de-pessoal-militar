@@ -15,10 +15,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { aplicarTransicaoLegadoAtiva, previsualizarTransicaoLegadoAtiva } from '@/services/transicaoLegadoAtivaClient';
-import TransicaoDesignacaoPeriodosGrid, { calcularResumoDecisoes, criarDecisoesIniciais } from './TransicaoDesignacaoPeriodosGrid';
+import { aplicarTransicaoDesignacaoManual } from '@/services/transicaoDesignacaoManualClient';
+import TransicaoDesignacaoPeriodosGrid, { calcularResumoDecisoes, criarDecisoesIniciais, getPeriodoKey, validarDecisaoPeriodo } from './TransicaoDesignacaoPeriodosGrid';
 import TransicaoDesignacaoResumoAcoes from './TransicaoDesignacaoResumoAcoes';
 
 const CONFIRMACAO_TEXTUAL = 'MARCAR LEGADO DA ATIVA';
+const CONFIRMACAO_MANUAL_TEXTUAL = 'APLICAR TRANSIÇÃO';
 
 function formatDate(date) {
   if (!date) return '—';
@@ -60,22 +62,52 @@ function RelatorioAplicacao({ resultado }) {
   if (!resultado) return null;
   const totais = resultado.totais || {};
   const warnings = resultado.meta?.warnings || [];
+  const operacoes = Array.isArray(resultado.operacoes) ? resultado.operacoes : [];
+  const isManual = resultado.modo === 'apply_manual' || operacoes.length > 0;
+
   return (
     <section className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
       <div className="flex items-start gap-2 text-emerald-900">
         <CheckCircle2 className="h-4 w-4 mt-0.5" />
         <div>
-          <h4 className="font-semibold">Relatório de aplicação</h4>
-          <p className="text-sm">Aplicados: {totais.aplicados || 0} • Ignorados: {totais.ignorados || 0} • Já marcados: {totais.ja_marcados || 0} • Conflitos: {totais.conflitos || 0}</p>
+          <h4 className="font-semibold">Resumo do lote aplicado</h4>
+          {isManual ? (
+            <p className="text-sm">Lote: {resultado.lote?.id || '—'} • Status: {resultado.lote?.status || '—'} • Aplicadas: {totais.aplicadas || 0} • Mantidas: {totais.mantidas || 0} • Bloqueadas: {totais.bloqueadas || 0} • Conflitos: {totais.conflitos || 0}</p>
+          ) : (
+            <p className="text-sm">Aplicados: {totais.aplicados || 0} • Ignorados: {totais.ignorados || 0} • Já marcados: {totais.ja_marcados || 0} • Conflitos: {totais.conflitos || 0}</p>
+          )}
           {warnings.length > 0 && <p className="text-xs mt-1">Avisos: {warnings.join(', ')}</p>}
         </div>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <ListaPeriodos titulo="Aplicados" itens={resultado.aplicados} vazio="Nenhum período aplicado nesta execução." />
-        <ListaPeriodos titulo="Ignorados" itens={resultado.ignorados} vazio="Nenhum período ignorado." />
-        <ListaPeriodos titulo="Já marcados" itens={resultado.jaMarcados} vazio="Nenhum período já estava marcado." />
-        <ListaPeriodos titulo="Conflitos" itens={resultado.conflitos} vazio="Nenhum conflito encontrado." />
-      </div>
+      {isManual ? (
+        <div className="rounded-lg border border-emerald-100 bg-white p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h4 className="font-semibold text-slate-800">Operações registradas</h4>
+            <Badge variant="outline">{operacoes.length}</Badge>
+          </div>
+          {operacoes.length === 0 ? <p className="text-sm text-slate-500">Nenhuma operação retornada.</p> : (
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {operacoes.map((operacao, index) => (
+                <div key={operacao.id || operacao._id || `${operacao.periodo_aquisitivo_id}-${index}`} className="rounded-md border border-slate-100 bg-slate-50 p-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-slate-800">{operacao.periodo_aquisitivo_id || 'Período sem ID'}</span>
+                    <Badge variant="secondary">{operacao.acao || 'ação não informada'}</Badge>
+                    <Badge variant="outline">{operacao.status_operacao || 'registrada'}</Badge>
+                  </div>
+                  {operacao.motivo && <p className="mt-1 text-xs text-slate-500">Motivo: {operacao.motivo}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <ListaPeriodos titulo="Aplicados" itens={resultado.aplicados} vazio="Nenhum período aplicado nesta execução." />
+          <ListaPeriodos titulo="Ignorados" itens={resultado.ignorados} vazio="Nenhum período ignorado." />
+          <ListaPeriodos titulo="Já marcados" itens={resultado.jaMarcados} vazio="Nenhum período já estava marcado." />
+          <ListaPeriodos titulo="Conflitos" itens={resultado.conflitos} vazio="Nenhum conflito encontrado." />
+        </div>
+      )}
     </section>
   );
 }
@@ -118,6 +150,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   const [confirmacaoTextual, setConfirmacaoTextual] = useState('');
   const [acoesSelecionadas, setAcoesSelecionadas] = useState({});
   const [previewHash, setPreviewHash] = useState(null);
+  const [idempotencyKey, setIdempotencyKey] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -130,12 +163,14 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       setConfirmacaoTextual('');
       setAcoesSelecionadas({});
       setPreviewHash(null);
+      setIdempotencyKey('');
       try {
         const data = await previsualizarTransicaoLegadoAtiva({ militarId, contratoDesignacaoId: contratoId });
         if (active) {
           setPreview(data);
           setPreviewHash(data?.preview_hash || data?.meta?.previewHash || null);
           setAcoesSelecionadas(criarDecisoesIniciais(data?.periodos || []));
+          setIdempotencyKey(`transicao-designacao:${contratoId}:${militarId}:${Date.now()}:${Math.random().toString(36).slice(2)}`);
         }
       } catch (err) {
         if (active) setError(err?.message || 'Erro ao carregar prévia da transição.');
@@ -153,7 +188,22 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   const resumoDecisoes = useMemo(() => calcularResumoDecisoes(periodos, acoesSelecionadas), [periodos, acoesSelecionadas]);
   const riscosBloqueantes = useMemo(() => (preview?.riscos || []).filter((risco) => risco.bloqueante), [preview?.riscos]);
   const candidatosAplicaveis = Number(totais.candidatos || 0) > 0;
+  const pendenciasManual = useMemo(() => periodos.flatMap((item, index) => {
+    const key = getPeriodoKey(item, index);
+    const decisao = acoesSelecionadas[key] || {};
+    return validarDecisaoPeriodo(item, decisao).map((pendencia) => ({ key, periodo: item, pendencia }));
+  }), [periodos, acoesSelecionadas]);
+  const podeAplicarManual = usaFluxoPorPeriodo && confirmacaoTextual === CONFIRMACAO_MANUAL_TEXTUAL && periodos.length > 0 && pendenciasManual.length === 0 && Boolean(previewHash) && Boolean(idempotencyKey) && !applying;
   const podeAplicarLegado = !usaFluxoPorPeriodo && confirmacaoTextual === CONFIRMACAO_TEXTUAL && candidatosAplicaveis && riscosBloqueantes.length === 0 && !applying;
+  const motivoBloqueioManual = !periodos.length
+    ? 'Não há períodos analisados para aplicar.'
+    : pendenciasManual.length > 0
+      ? `Existem ${pendenciasManual.length} pendência(s) nas decisões por período.`
+      : confirmacaoTextual !== CONFIRMACAO_MANUAL_TEXTUAL
+        ? `Digite exatamente ${CONFIRMACAO_MANUAL_TEXTUAL}.`
+        : !previewHash
+          ? 'Hash da prévia ausente.'
+          : '';
   const motivoBloqueioAplicacao = riscosBloqueantes.length > 0
     ? 'Há riscos bloqueantes na prévia recalculada.'
     : !candidatosAplicaveis
@@ -181,6 +231,59 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
     ]);
+  }
+
+  async function invalidarQueriesTransicaoManual() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['ver-contratos-designacao', militarId] }),
+      queryClient.invalidateQueries({ queryKey: ['ver-periodos', militarId] }),
+      queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
+      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+    ]);
+  }
+
+  function montarAcoesManuais() {
+    return periodos.map((item, index) => {
+      const key = getPeriodoKey(item, index);
+      const periodo = item?.periodo || item || {};
+      const decisao = acoesSelecionadas[key] || {};
+      const acaoSugerida = item?.acaoSugerida || item?.acao_sugerida || 'manter';
+      return {
+        periodo_id: item?.periodoId || item?.periodo_id || periodo.id,
+        acao: decisao.acao || acaoSugerida || 'manter',
+        motivo: String(decisao.motivo || '').trim(),
+        observacao: String(decisao.observacao || '').trim(),
+        documento: decisao.documento || null,
+        dias_indenizados: Number(decisao.dias_indenizados || 0),
+        override_sugestao: Boolean((decisao.acao || acaoSugerida) !== acaoSugerida),
+        sugestao_original: acaoSugerida,
+      };
+    });
+  }
+
+  async function handleAplicarManual() {
+    if (!podeAplicarManual) return;
+    setApplying(true);
+    setError('');
+    try {
+      const resultado = await aplicarTransicaoDesignacaoManual({
+        militarId,
+        contratoDesignacaoId: contratoId,
+        contratoId,
+        previewHash,
+        idempotencyKey,
+        confirmacaoTextual,
+        acoes: montarAcoesManuais(),
+      });
+      setResultadoAplicacao(resultado);
+      await invalidarQueriesTransicaoManual();
+    } catch (err) {
+      const status = err?.status ? ` (${err.status})` : '';
+      setError(`${err?.message || 'Erro ao aplicar transição manual.'}${status}`);
+      if (err?.body) setResultadoAplicacao(err.body);
+    } finally {
+      setApplying(false);
+    }
   }
 
   async function handleAplicarLegado() {
@@ -224,11 +327,11 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
         </Alert>
 
         {usaFluxoPorPeriodo && (
-          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Aplicação manual será liberada no próximo lote</AlertTitle>
+          <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertTitle>Aplicação manual liberada com auditoria de lote</AlertTitle>
             <AlertDescription>
-              Esta tela prepara as decisões por período. A aplicação manual será liberada em lote posterior. As decisões, o previewHash e a confirmação textual ficam apenas em estado local nesta versão.
+              Revise todas as decisões, preencha os motivos obrigatórios, confirme com {CONFIRMACAO_MANUAL_TEXTUAL} e envie o lote para a autoridade final no backend.
             </AlertDescription>
           </Alert>
         )}
@@ -254,10 +357,24 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
             {usaFluxoPorPeriodo ? (
               <>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                  <p><strong>Estado preparado:</strong> confirmacaoTextual, acoesSelecionadas e previewHash permanecem locais e não são enviados para aplicação neste lote.</p>
+                  <p><strong>Lote manual:</strong> contrato_id, militar_id, preview_hash, idempotency_key, decisões por período e motivos serão enviados ao backend para validação final.</p>
+                  <p className="mt-1 break-all font-mono">idempotency_key: {idempotencyKey || '—'}</p>
                 </div>
                 <TransicaoDesignacaoResumoAcoes resumo={resumoDecisoes} />
                 <TransicaoDesignacaoPeriodosGrid periodos={periodos} acoesSelecionadas={acoesSelecionadas} onChange={setAcoesSelecionadas} />
+                <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <Label htmlFor="confirmacao-transicao-manual">Confirmação textual obrigatória</Label>
+                  <Input
+                    id="confirmacao-transicao-manual"
+                    value={confirmacaoTextual}
+                    onChange={(event) => setConfirmacaoTextual(event.target.value)}
+                    placeholder={CONFIRMACAO_MANUAL_TEXTUAL}
+                    disabled={applying || Boolean(resultadoAplicacao?.ok)}
+                  />
+                  <p className="text-xs text-slate-500">Digite exatamente: <strong>{CONFIRMACAO_MANUAL_TEXTUAL}</strong></p>
+                  {motivoBloqueioManual && !resultadoAplicacao?.ok && <p className="text-xs text-amber-700">{motivoBloqueioManual}</p>}
+                </section>
+                <RelatorioAplicacao resultado={resultadoAplicacao} />
               </>
             ) : (
               <>
@@ -325,7 +442,10 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
         <DialogFooter className="gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange?.(false)}>Fechar</Button>
           {usaFluxoPorPeriodo ? (
-            <Button type="button" disabled>Aplicação manual será liberada no próximo lote.</Button>
+            <Button type="button" onClick={handleAplicarManual} disabled={!podeAplicarManual || Boolean(resultadoAplicacao?.ok)}>
+              {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Aplicar transição manual
+            </Button>
           ) : (
             <Button type="button" onClick={handleAplicarLegado} disabled={!podeAplicarLegado || Boolean(resultadoAplicacao?.ok)}>
               {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
