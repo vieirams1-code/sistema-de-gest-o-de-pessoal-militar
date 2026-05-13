@@ -10,6 +10,7 @@ import PublicacaoCard from '@/components/publicacao/PublicacaoCard';
 import FamiliaPublicacaoPanel from '@/components/publicacao/FamiliaPublicacaoPanel';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { buildPublicacoesScopeKey, publicacoesQueryKeys } from '@/lib/publicacoesQueryKeys';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
@@ -309,25 +310,53 @@ export default function Publicacoes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [familiaPanel, setFamiliaPanel] = useState({ open: false, registro: null });
   const [modoAdmin, setModoAdmin] = useState(false);
-  const { user, isAdmin, canAccessModule, canAccessAction, getMilitarScopeFilters, isAccessResolved, isLoading: loadingUser } = useCurrentUser();
+  const {
+    user,
+    isAdmin,
+    modoAcesso,
+    userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+    resolvedAccessContext,
+    canAccessModule,
+    canAccessAction,
+    getMilitarScopeFilters,
+    isAccessResolved,
+    isLoading: loadingUser,
+  } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasPublicacoesAccess = canAccessModule('controle_publicacoes');
   const canCriarPublicacoes = canAccessAction('adicionar_publicacoes') || canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
+  const publicacoesScopeKey = useMemo(() => buildPublicacoesScopeKey({
+    isAdmin,
+    modoAcesso,
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail || user?.email,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+  }), [isAdmin, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, user?.email, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
+  const registrosLivroQueryKey = publicacoesQueryKeys.registrosLivro(publicacoesScopeKey);
+  const publicacoesExOfficioQueryKey = publicacoesQueryKeys.exOfficio(publicacoesScopeKey);
+  const atestadosPublicacaoQueryKey = publicacoesQueryKeys.atestados(publicacoesScopeKey);
+  const rpListaQueryKey = publicacoesQueryKeys.rpLista(publicacoesScopeKey);
 
   const { data: contratoLivro, isLoading: loadingLivro } = useQuery({
-    queryKey: ['registros-livro'],
+    queryKey: registrosLivroQueryKey,
     queryFn: () => getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const { data: publicacoesExOfficio = [], isLoading: loadingExOfficio } = useQuery({
-    queryKey: ['publicacoes-ex-officio', isAdmin],
+    queryKey: publicacoesExOfficioQueryKey,
     queryFn: () => listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
 
   const { data: atestados = [], isLoading: loadingAtestados } = useQuery({
-    queryKey: ['atestados-publicacao', isAdmin],
+    queryKey: atestadosPublicacaoQueryKey,
     queryFn: () => listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
     enabled: isAccessResolved && hasPublicacoesAccess,
   });
@@ -338,9 +367,10 @@ export default function Publicacoes() {
 
   const refrescarDadosPublicacoes = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
-      queryClient.invalidateQueries({ queryKey: ['atestados-publicacao'] }),
+      queryClient.invalidateQueries({ queryKey: registrosLivroQueryKey, exact: true }),
+      queryClient.invalidateQueries({ queryKey: publicacoesExOfficioQueryKey, exact: true }),
+      queryClient.invalidateQueries({ queryKey: atestadosPublicacaoQueryKey, exact: true }),
+      queryClient.invalidateQueries({ queryKey: rpListaQueryKey, exact: true }),
       queryClient.invalidateQueries({ queryKey: ['atestados'] }),
       queryClient.invalidateQueries({ queryKey: ['ferias'] }),
       queryClient.invalidateQueries({ queryKey: ['cards'] }),
