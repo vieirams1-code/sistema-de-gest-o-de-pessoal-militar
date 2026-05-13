@@ -38,6 +38,7 @@ export default function PeriodosAquisitivos() {
   const queryClient = useQueryClient();
   const { canAccessModule, isLoading: loadingUser, isAccessResolved, isAdmin = false, user = {}, modoAcesso = null } = useCurrentUser();
   const hasFeriasAccess = canAccessModule('ferias');
+  const isPaBundleQueryEnabled = isAccessResolved === true && !loadingUser && hasFeriasAccess;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -52,6 +53,7 @@ export default function PeriodosAquisitivos() {
   const { data: paBundle, isLoading } = useQuery({
     queryKey: paBundleQueryKey,
     queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
+    enabled: isPaBundleQueryEnabled,
   });
 
   const periodos = paBundle?.periodosAquisitivos || [];
@@ -272,7 +274,13 @@ export default function PeriodosAquisitivos() {
 
 
 
-  if (loadingUser || !isAccessResolved) return null;
+  if (loadingUser || !isAccessResolved) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
   if (!hasFeriasAccess) return <AccessDenied modulo="Férias" />;
 
   return (
