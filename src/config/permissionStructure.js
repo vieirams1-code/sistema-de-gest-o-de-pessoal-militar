@@ -17,7 +17,7 @@ export const permissionStructure = [
           { key: 'perm_excluir_contrato_designacao', label: 'Excluir Contrato de Designação', sensitive: true },
           { key: 'perm_editar_metadados_contrato_designacao', label: 'Editar Metadados de Contrato de Designação', sensitive: true },
           { key: 'perm_gerir_contratos_designacao', label: 'Gerir Contratos de Designação', sensitive: true },
-          { key: 'perm_aplicar_transicao_legado_ativa', label: 'Aplicar/Pré-visualizar Transição Legado da Ativa', sensitive: true },
+          { key: 'perm_aplicar_transicao_legado_ativa', label: 'Permissão histórica de transição de designação', sensitive: true },
           { key: 'perm_aplicar_transicao_designacao_manual', label: 'Aplicar Transição Manual por Período de Designação', sensitive: true }
         ]
       },
