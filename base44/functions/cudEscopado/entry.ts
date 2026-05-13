@@ -62,7 +62,7 @@ const PERMISSIONS_MAP = {
   PeriodoAquisitivo: {
     create: 'adicionar_ferias',
     update: 'editar_ferias',
-    delete: 'editar_ferias',
+    delete: 'excluir_ferias',
   },
   CreditoExtraFerias: {
     create: 'adicionar_ferias',

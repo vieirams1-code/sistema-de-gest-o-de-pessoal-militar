@@ -23,6 +23,7 @@ export async function fetchScopedPeriodosAquisitivosBundle(payload = {}) {
     matriculasMilitar: Array.isArray(body?.matriculasMilitar) ? body.matriculasMilitar : [],
     ferias: Array.isArray(body?.ferias) ? body.ferias : [],
     registrosLivro: Array.isArray(body?.registrosLivro) ? body.registrosLivro : [],
+    publicacoesExOfficio: Array.isArray(body?.publicacoesExOfficio) ? body.publicacoesExOfficio : [],
     contratosDesignacaoMilitar: Array.isArray(body?.contratosDesignacaoMilitar) ? body.contratosDesignacaoMilitar : [],
     counters: body?.counters || { total: 0, disponiveis: 0, vencendo90d: 0, vencidos: 0 },
     partialFailures: Number(body?.meta?.partialFailures || 0),

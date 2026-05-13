@@ -33,6 +33,17 @@ import {
   montarIndiceMatriculas,
 } from '@/services/matriculaMilitarViewService';
 
+function formatDateBR(date) {
+  if (!date) return '-';
+  const [year, month, day] = String(date).slice(0, 10).split('-');
+  if (!year || !month || !day) return date;
+  return `${day}/${month}/${year}`;
+}
+
+function normalizarStatusContrato(status) {
+  return String(status || '').trim().toLowerCase();
+}
+
 export default function PeriodosAquisitivos() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -61,6 +72,8 @@ export default function PeriodosAquisitivos() {
   const periodos = paBundle?.periodosAquisitivos || [];
   const ferias = paBundle?.ferias || [];
   const registrosLivro = paBundle?.registrosLivro || [];
+  const publicacoesExOfficio = paBundle?.publicacoesExOfficio || [];
+  const contratosDesignacaoMilitar = paBundle?.contratosDesignacaoMilitar || [];
   const militares = paBundle?.militares || [];
   const matriculasMilitar = paBundle?.matriculasMilitar || [];
 
@@ -92,6 +105,18 @@ export default function PeriodosAquisitivos() {
     () => new Map(militaresEnriquecidos.map((m) => [String(m.id), m])),
     [militaresEnriquecidos]
   );
+
+  const contratoAtivoRevisao = useMemo(() => {
+    if (!militarIdFiltro) return null;
+    return (contratosDesignacaoMilitar || [])
+      .filter((contrato) =>
+        String(contrato?.militar_id || '') === String(militarIdFiltro) &&
+        normalizarStatusContrato(contrato?.status_contrato) === 'ativo'
+      )
+      .sort((a, b) => String(b?.data_inicio_contrato || '').localeCompare(String(a?.data_inicio_contrato || '')))[0] || null;
+  }, [contratosDesignacaoMilitar, militarIdFiltro]);
+
+  const militarRevisao = militarIdFiltro ? militaresPorId.get(String(militarIdFiltro)) : null;
 
   const periodosTransformados = useMemo(() => {
     const mapeados = mapPeriodosAquisitivosPorMilitar({ periodos, ferias });
@@ -263,16 +288,8 @@ export default function PeriodosAquisitivos() {
     });
   };
 
-  const handleConfirmDelete = async ({ forceInactivate }) => {
+  const handleConfirmDelete = async () => {
     if (!periodoGerenciado?.id) throw new Error('Período inválido para exclusão.');
-
-    if (forceInactivate) {
-      await updatePeriodoMutation.mutateAsync({
-        periodoId: periodoGerenciado.id,
-        payload: { status: 'Inativo' },
-      });
-      return;
-    }
 
     await deletePeriodoMutation.mutateAsync({
       periodoId: periodoGerenciado.id,
@@ -421,7 +438,14 @@ export default function PeriodosAquisitivos() {
 
         {militarIdFiltro && (
           <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-            <span>Exibindo períodos aquisitivos do militar selecionado para revisão manual.</span>
+            <span>
+              <strong>{militarRevisao?.nome_guerra || 'Militar selecionado'}</strong>
+              {militarRevisao?.matricula_atual || militarRevisao?.matricula ? ` • Matrícula ${militarRevisao.matricula_atual || militarRevisao.matricula}` : ''}
+              {contratoAtivoRevisao?.data_inclusao_para_ferias ? ` • Data-base férias ${formatDateBR(contratoAtivoRevisao.data_inclusao_para_ferias)}` : ''}
+              {contratoAtivoRevisao?.data_inclusao_para_ferias
+                ? `. Revise manualmente os períodos incompatíveis com a data-base de férias ${formatDateBR(contratoAtivoRevisao.data_inclusao_para_ferias)}. Exclua apenas períodos sem férias, sem Livro e sem publicações.`
+                : '. Exibindo períodos aquisitivos do militar selecionado para revisão manual.'}
+            </span>
             <Button variant="ghost" size="sm" className="h-7 px-2 text-blue-800 hover:bg-blue-100" onClick={() => navigate(createPageUrl('PeriodosAquisitivos'))}>
               Limpar filtro do militar
             </Button>
@@ -518,6 +542,7 @@ export default function PeriodosAquisitivos() {
         open={Boolean(periodoGerenciado)}
         periodo={periodoGerenciado}
         registrosLivro={registrosLivro}
+        publicacoes={publicacoesExOfficio}
         saving={updatePeriodoMutation.isPending}
         deleting={deletePeriodoMutation.isPending}
         onOpenChange={(open) => {
