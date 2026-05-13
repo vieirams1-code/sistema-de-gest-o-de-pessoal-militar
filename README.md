@@ -45,6 +45,17 @@ npm run deploy:base44
 
 Se o projeto estiver usando a integração GitHub/Base44, publique as alterações no branch monitorado pelo Base44, normalmente `main`, para que a integração consuma a versão correta do repositório.
 
+
+## Publicação de functions Base44
+
+Functions novas ou alteradas em `base44/functions/*/entry.ts` precisam estar publicadas no runtime Base44 consumido pela aplicação. Se a UI retornar 404 ao invocar uma function existente no repositório, confirme se o branch monitorado pelo Base44 recebeu o código e execute o deploy completo:
+
+```bash
+npm run deploy:base44
+```
+
+Se a aplicação estiver usando `VITE_BASE44_FUNCTIONS_VERSION` ou o parâmetro `functions_version`, a function precisa existir nessa mesma versão publicada; caso contrário, remova/atualize o versionamento usado pela sessão antes de validar a chamada.
+
 ## Documentação de produto
 
 - Análise e proposta de simplificação da gestão de períodos aquisitivos: `docs/analise-gestao-periodos-aquisitivos.md`.

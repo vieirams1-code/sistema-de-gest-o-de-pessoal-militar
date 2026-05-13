@@ -1,26 +1,51 @@
-import { createClient } from '@base44/sdk';
 import { base44 } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 const FUNCTION_NAME = 'aplicarTransicaoDesignacaoManual';
+const USED_FALLBACK = false;
 
-function getStatus(error) {
-  return error?.status || error?.response?.status || error?.originalError?.response?.status || error?.data?.meta?.status || 0;
+function isDevRuntime() {
+  return Boolean(import.meta?.env?.DEV);
 }
 
-function criarClientSemVersaoFunctions() {
-  const { appId, serverUrl, token } = appParams;
-  return createClient({ appId, serverUrl, token, requiresAuth: false });
+function getStatus(error) {
+  return error?.status || error?.response?.status || error?.originalError?.response?.status || error?.data?.meta?.status || error?.response?.data?.meta?.status || 0;
+}
+
+function getErrorPayload(error) {
+  return error?.response?.data || error?.data || error?.body || null;
+}
+
+function logFunctionCall(error = null) {
+  if (!isDevRuntime()) return;
+  const status = getStatus(error);
+  const payload = getErrorPayload(error);
+  console.debug('[transicaoDesignacaoManualClient] Base44 function invoke', {
+    functionName: FUNCTION_NAME,
+    usedFallback: USED_FALLBACK,
+    status: status || undefined,
+    error: payload?.error || payload || error?.message || null,
+  });
 }
 
 async function invokeAplicacaoManual(payload) {
+  logFunctionCall();
   try {
     return await base44.functions.invoke(FUNCTION_NAME, payload);
   } catch (error) {
-    if (getStatus(error) !== 404 || !appParams.functionsVersion) throw error;
-    const base44SemVersao = criarClientSemVersaoFunctions();
-    return base44SemVersao.functions.invoke(FUNCTION_NAME, payload);
+    logFunctionCall(error);
+    const status = getStatus(error);
+    const body = getErrorPayload(error);
+    const message = body?.error || error?.message || 'Erro ao invocar função Base44.';
+    const wrapped = Object.assign(
+      new Error(
+        status === 404
+          ? `${FUNCTION_NAME}: endpoint não encontrado no runtime Base44 atual (404). Publique/deploy a função Base44 no mesmo runtime/versionamento usado pela aplicação. Erro original: ${message}`
+          : message,
+      ),
+      { status: status || undefined, body: body || undefined, cause: error },
+    );
+    throw wrapped;
   }
 }
 
@@ -29,10 +54,10 @@ function normalizarArray(value) {
 }
 
 function criarErroAplicacao(body, fallback = 'Erro ao aplicar transição manual de designação.') {
-  const error = new Error(body?.error || fallback);
-  if (body?.meta?.status) error.status = body.meta.status;
-  error.body = body || {};
-  return error;
+  return Object.assign(new Error(body?.error || fallback), {
+    status: body?.meta?.status || undefined,
+    body: body || {},
+  });
 }
 
 function normalizarRetorno(body = {}) {
@@ -47,6 +72,7 @@ function normalizarRetorno(body = {}) {
   };
 }
 
+/** @param {any} [params] */
 export async function aplicarTransicaoDesignacaoManual({
   militarId,
   contratoDesignacaoId,
@@ -77,7 +103,11 @@ export async function aplicarTransicaoDesignacaoManual({
   const response = await invokeAplicacaoManual(payload);
   const body = response?.data ?? response ?? {};
 
-  if (body?.error || body?.ok === false) throw criarErroAplicacao(body);
+  if (body?.error || body?.ok === false) {
+    const error = criarErroAplicacao(body);
+    logFunctionCall(error);
+    throw error;
+  }
 
   return normalizarRetorno(body);
 }
