@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
@@ -114,7 +114,16 @@ export default function CadastrarRegistroRP() {
   const registroId = searchParams.get('id');
   const isEditing = !!registroId;
 
-  const { canAccessModule, canAccessAction, isAccessResolved, isLoading: loadingUser, user } = useCurrentUser();
+  const {
+    canAccessModule,
+    canAccessAction,
+    isAccessResolved,
+    isLoading: loadingUser,
+    user,
+    isAdmin,
+    modoAcesso,
+    resolvedAccessContext,
+  } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAccess = canAccessModule('rp');
   const canGerirPublicacoes = canAccessAction('editar_publicacoes') || canAccessAction('admin_mode');
@@ -202,9 +211,23 @@ export default function CadastrarRegistroRP() {
   const [textoEditadoManualmente, setTextoEditadoManualmente] = useState(false);
   const isSubmittingRef = useRef(false);
 
+  const militarIdSelecionado = String(formData.militar_id || '').trim();
+  const tipoRegistroSelecionado = String(formData.tipo_registro || '').trim();
+  const escopoQueryKey = useMemo(() => ({
+    isAdmin: isAdmin === true,
+    modoAcesso: modoAcesso || 'indefinido',
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || user?.email || 'self',
+  }), [isAdmin, modoAcesso, resolvedAccessContext?.effectiveEmail, user?.email]);
+  const canRunScopedQueries = Boolean(isAccessResolved && hasAccess && canGerirPublicacoes);
+
   // Fetch existing record when editing
-  const { data: registroEdicao, isLoading: loadingRegistro } = useQuery({
-    queryKey: ['registro-rp-edicao', registroId],
+  const {
+    data: registroEdicao,
+    isLoading: loadingRegistro,
+    isFetching: fetchingRegistro,
+    isError: erroRegistroEdicao,
+  } = useQuery({
+    queryKey: ['registro-rp-edicao', registroId || null, escopoQueryKey],
     queryFn: async () => {
       // Try RegistroLivro first, then PublicacaoExOfficio
       try {
@@ -217,55 +240,139 @@ export default function CadastrarRegistroRP() {
       } catch (_) {}
       return null;
     },
-    enabled: isEditing,
+    enabled: Boolean(isEditing && registroId && canRunScopedQueries),
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch tiposCustom
-  const { data: tiposCustom = [] } = useQuery({
-    queryKey: ['tipos-publicacao-custom'],
+  const {
+    data: tiposCustom = [],
+    isLoading: loadingTiposCustom,
+    isFetching: fetchingTiposCustom,
+    isError: erroTiposCustom,
+  } = useQuery({
+    queryKey: ['tipos-publicacao-custom', escopoQueryKey],
     queryFn: () => base44.entities.TipoPublicacaoCustom.list(),
+    enabled: canRunScopedQueries,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch templates ativos
-  const { data: templatesAtivos = [] } = useQuery({
-    queryKey: ['templates-ativos'],
+  const {
+    data: templatesAtivos = [],
+    isLoading: loadingTemplatesAtivos,
+    isFetching: fetchingTemplatesAtivos,
+    isError: erroTemplatesAtivos,
+  } = useQuery({
+    queryKey: ['templates-ativos', tipoRegistroSelecionado || null, escopoQueryKey],
     queryFn: () => base44.entities.TemplateTexto.filter({ ativo: true }),
+    enabled: canRunScopedQueries,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
+  const moduloAtual = useMemo(() => {
+    if (!tipoRegistroSelecionado) return null;
+    return getModuloByTipo(tipoRegistroSelecionado, tiposCustom);
+  }, [tipoRegistroSelecionado, tiposCustom]);
+
+  const livroOperacaoFerias = useMemo(
+    () => getLivroOperacaoFerias(formData.tipo_registro),
+    [formData.tipo_registro]
+  );
+
+  const deveCarregarMilitar = Boolean(
+    canRunScopedQueries && militarIdSelecionado && (isEditing || step >= 2)
+  );
+  const deveCarregarAtestados = Boolean(
+    deveCarregarMilitar
+      && moduloAtual === MODULO_EX_OFFICIO
+      && ['Ata JISO', 'Homologação de Atestado'].includes(tipoRegistroSelecionado)
+      && step >= 3
+  );
+  const deveCarregarPublicacoes = Boolean(
+    deveCarregarMilitar
+      && moduloAtual === MODULO_EX_OFFICIO
+      && ['Apostila', 'Tornar sem Efeito'].includes(tipoRegistroSelecionado)
+      && step >= 3
+  );
+
   // Fetch militar data when selected
-  const { data: militarSelecionado } = useQuery({
-    queryKey: ['militar-rp', formData.militar_id],
-    queryFn: () => base44.entities.Militar.filter({ id: formData.militar_id }).then(r => r[0] || null),
-    enabled: !!formData.militar_id,
+  const {
+    data: militarSelecionado,
+    isLoading: loadingMilitarSelecionado,
+    isFetching: fetchingMilitarSelecionado,
+    isSuccess: militarSelecionadoCarregado,
+    isError: erroMilitarSelecionado,
+  } = useQuery({
+    queryKey: ['militar-rp', militarIdSelecionado || null, tipoRegistroSelecionado || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
+    queryFn: () => base44.entities.Militar.filter({ id: militarIdSelecionado }).then(r => r[0] || null),
+    enabled: deveCarregarMilitar,
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch atestados do militar (for ExOfficio)
-  const { data: atestadosMilitar = [] } = useQuery({
-    queryKey: ['atestados-militar-rp', formData.militar_id],
-    queryFn: () => base44.entities.Atestado.filter({ militar_id: formData.militar_id }),
-    enabled: !!formData.militar_id,
+  const {
+    data: atestadosMilitar = [],
+    isLoading: loadingAtestadosMilitar,
+    isFetching: fetchingAtestadosMilitar,
+    isSuccess: atestadosMilitarCarregados,
+    isError: erroAtestadosMilitar,
+  } = useQuery({
+    queryKey: ['atestados-militar-rp', militarIdSelecionado || null, tipoRegistroSelecionado || null, moduloAtual || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
+    queryFn: () => base44.entities.Atestado.filter({ militar_id: militarIdSelecionado }),
+    enabled: deveCarregarAtestados,
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch publicacoes do militar (for Apostila/Tornar sem Efeito)
-  const { data: publicacoesMilitar = [] } = useQuery({
-    queryKey: ['publicacoes-militar-rp', formData.militar_id],
+  const {
+    data: publicacoesMilitar = [],
+    isLoading: loadingPublicacoesMilitar,
+    isFetching: fetchingPublicacoesMilitar,
+    isSuccess: publicacoesMilitarCarregadas,
+    isError: erroPublicacoesMilitar,
+  } = useQuery({
+    queryKey: ['publicacoes-militar-rp', militarIdSelecionado || null, tipoRegistroSelecionado || null, moduloAtual || null, isEditing ? 'edicao' : 'criacao', escopoQueryKey],
     queryFn: async () => {
       const [livros, exoff] = await Promise.all([
-        base44.entities.RegistroLivro.filter({ militar_id: formData.militar_id }),
-        base44.entities.PublicacaoExOfficio.filter({ militar_id: formData.militar_id }),
+        base44.entities.RegistroLivro.filter({ militar_id: militarIdSelecionado }),
+        base44.entities.PublicacaoExOfficio.filter({ militar_id: militarIdSelecionado }),
       ]);
       return [
         ...livros.map(r => ({ ...r, origem_tipo: 'Livro', tipo_label: r.tipo_registro })),
         ...exoff.map(r => ({ ...r, origem_tipo: 'ExOfficio', tipo_label: r.tipo })),
       ].filter(p => p.numero_bg && p.data_bg);
     },
-    enabled: !!formData.militar_id,
+    enabled: deveCarregarPublicacoes,
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
-  const livroOperacaoFerias = useMemo(
-    () => getLivroOperacaoFerias(formData.tipo_registro),
-    [formData.tipo_registro]
+  const carregandoMilitar = loadingMilitarSelecionado || fetchingMilitarSelecionado;
+  const carregandoFerias = Boolean(
+    selectedTipo && moduloAtual === MODULO_LIVRO && livroOperacaoFerias && militarIdSelecionado
   );
+  const carregandoAtestados = loadingAtestadosMilitar || fetchingAtestadosMilitar;
+  const carregandoPublicacoes = loadingPublicacoesMilitar || fetchingPublicacoesMilitar;
+  const erroParcialCarregamento = Boolean(
+    erroRegistroEdicao
+      || erroTiposCustom
+      || erroTemplatesAtivos
+      || erroMilitarSelecionado
+      || erroAtestadosMilitar
+      || erroPublicacoesMilitar
+  );
+  const militarAusente = Boolean(deveCarregarMilitar && militarSelecionadoCarregado && !fetchingMilitarSelecionado && !militarSelecionado);
+  const atestadosAusentes = Boolean(deveCarregarAtestados && atestadosMilitarCarregados && !fetchingAtestadosMilitar && atestadosMilitar.length === 0);
+  const publicacoesAusentes = Boolean(deveCarregarPublicacoes && publicacoesMilitarCarregadas && !fetchingPublicacoesMilitar && publicacoesMilitar.length === 0);
 
   const tiposFiltrados = useMemo(() => {
     const sexo = militarSelecionado?.sexo;
@@ -308,11 +415,6 @@ export default function CadastrarRegistroRP() {
     setSelectedTipo(tipoEncontrado);
     setFormData(prev => ({ ...prev, tipo_registro: tipoEncontrado.value }));
   }, [searchParams, isEditing, selectedTipo, formData.tipo_registro, step, tiposFiltrados]);
-
-  const moduloAtual = useMemo(() => {
-    if (!formData.tipo_registro) return null;
-    return getModuloByTipo(formData.tipo_registro, tiposCustom);
-  }, [formData.tipo_registro, tiposCustom]);
 
   const contextoTemplate = useMemo(() => ({
     grupamento_id:
@@ -433,6 +535,59 @@ export default function CadastrarRegistroRP() {
   useEffect(() => {
     setTextoEditadoManualmente(false);
   }, [formData.tipo_registro, formData.militar_id, templateAtivoSelecionado?.id]);
+
+  useEffect(() => {
+    if (!selectedFerias || !militarIdSelecionado) return;
+    if (String(selectedFerias.militar_id || '') !== militarIdSelecionado) {
+      setSelectedFerias(null);
+      setOperacaoFeriasSelecionada(null);
+      setFormData(prev => (prev.ferias_id ? { ...prev, ferias_id: '' } : prev));
+    }
+  }, [militarIdSelecionado, selectedFerias]);
+
+  useEffect(() => {
+    if (!deveCarregarPublicacoes || !publicacoesMilitarCarregadas || fetchingPublicacoesMilitar) return;
+    const publicacaoId = formData.publicacao_referencia_id;
+    if (!publicacaoId) return;
+    const publicacaoExiste = publicacoesMilitar.some(p => p.id === publicacaoId);
+    if (publicacaoExiste) return;
+    setFormData(prev => ({
+      ...prev,
+      publicacao_referencia_id: '',
+      publicacao_referencia_origem_tipo: '',
+      publicacao_referencia_tipo_label: '',
+      publicacao_referencia_numero_bg: '',
+      publicacao_referencia_data_bg: '',
+      publicacao_referencia_nota: '',
+    }));
+  }, [
+    deveCarregarPublicacoes,
+    fetchingPublicacoesMilitar,
+    formData.publicacao_referencia_id,
+    publicacoesMilitar,
+    publicacoesMilitarCarregadas,
+  ]);
+
+  useEffect(() => {
+    if (!deveCarregarAtestados || !atestadosMilitarCarregados || fetchingAtestadosMilitar) return;
+    const idsElegiveis = new Set(atestadosMilitar.map(a => a.id));
+
+    setFormData(prev => {
+      let next = prev;
+      if (prev.atestado_homologado_id && !idsElegiveis.has(prev.atestado_homologado_id)) {
+        next = { ...next, atestado_homologado_id: '' };
+      }
+      if (Array.isArray(prev.atestados_jiso_ids) && prev.atestados_jiso_ids.some(id => !idsElegiveis.has(id))) {
+        next = { ...next, atestados_jiso_ids: prev.atestados_jiso_ids.filter(id => idsElegiveis.has(id)) };
+      }
+      return next;
+    });
+  }, [
+    atestadosMilitar,
+    atestadosMilitarCarregados,
+    deveCarregarAtestados,
+    fetchingAtestadosMilitar,
+  ]);
 
   useEffect(() => {
     if (!templateAtivoSelecionado?.template) return;
@@ -674,6 +829,18 @@ export default function CadastrarRegistroRP() {
   const canAdvanceFromStep1 = !!formData.tipo_registro && !templateObrigatorioAusente && !hasTemplateConflict;
   const canAdvanceFromStep2 = !!formData.militar_id;
   const canAdvanceFromStep3 = !!formData.data_registro;
+  const estadosCarregamentoRP = [
+    fetchingRegistro ? 'Atualizando registro em edição' : null,
+    (fetchingTiposCustom || fetchingTemplatesAtivos) ? 'Atualizando catálogo de tipos/templates' : null,
+    carregandoMilitar ? 'Carregando militar selecionado' : null,
+    carregandoFerias ? 'Férias: carregamento delegado ao seletor com escopo resolvido' : null,
+    carregandoAtestados ? 'Carregando atestados do militar' : null,
+    carregandoPublicacoes ? 'Carregando publicações do militar' : null,
+    erroParcialCarregamento ? 'Erro parcial em uma fonte de dados; os demais blocos permanecem isolados' : null,
+    militarAusente ? 'Militar selecionado não foi encontrado no escopo atual' : null,
+    atestadosAusentes ? 'Nenhum atestado elegível encontrado após o carregamento' : null,
+    publicacoesAusentes ? 'Nenhuma publicação elegível encontrada após o carregamento' : null,
+  ].filter(Boolean);
 
   if (!loadingUser && isAccessResolved && !hasAccess) {
     return <AccessDenied modulo="RP — Registro de Publicações" />;
@@ -683,7 +850,9 @@ export default function CadastrarRegistroRP() {
     return <AccessDenied modulo="Cadastro/Edição de Publicações" />;
   }
 
-  if (loadingUser || (isEditing && loadingRegistro)) {
+  const carregandoCatalogoInicial = canRunScopedQueries && (loadingTiposCustom || loadingTemplatesAtivos);
+
+  if (loadingUser || carregandoCatalogoInicial || (isEditing && loadingRegistro)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
@@ -741,6 +910,20 @@ export default function CadastrarRegistroRP() {
               })}
             </div>
           </div>
+
+          {estadosCarregamentoRP.length > 0 && (
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm shadow-sm ${erroParcialCarregamento ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-blue-200 bg-blue-50 text-blue-900'}`}
+              role={erroParcialCarregamento ? 'alert' : 'status'}
+            >
+              <p className="font-semibold">Estado do carregamento do RP</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {estadosCarregamentoRP.map(estado => (
+                  <li key={estado}>{estado}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {step === 1 && (
             <>
