@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { isDataIsoDateOnly } from '@/services/contratosDesignacaoMilitarService';
 
 // =====================================================================
 // cudEscopadoClient — Backend Hardening Lote 1
@@ -28,6 +29,26 @@ const ENTIDADES_PERMITIDAS = new Set([
   'CreditoExtraFerias',
   'ContratoDesignacaoMilitar',
 ]);
+
+
+const CAMPOS_DATA_ISO_POR_ENTIDADE = {
+  ContratoDesignacaoMilitar: [
+    'data_inicio_contrato',
+    'data_inclusao_para_ferias',
+    'data_fim_contrato',
+    'data_publicacao',
+  ],
+};
+
+function validarDatasIsoEntity(entityName, data = {}) {
+  const campos = CAMPOS_DATA_ISO_POR_ENTIDADE[entityName] || [];
+  campos.forEach((campo) => {
+    const valor = data?.[campo];
+    if (valor && !isDataIsoDateOnly(valor)) {
+      throw new Error(`cudEscopado: ${campo} deve estar no formato ISO yyyy-MM-dd.`);
+    }
+  });
+}
 
 function assertEntidadePermitida(entityName) {
   if (!ENTIDADES_PERMITIDAS.has(entityName)) {
@@ -62,6 +83,7 @@ async function invocar(payload) {
 
 export async function criarEscopado(entityName, data) {
   assertEntidadePermitida(entityName);
+  validarDatasIsoEntity(entityName, data || {});
   const resp = await invocar({ entityName, operation: 'create', data: data || {} });
   return resp?.data || resp;
 }
@@ -69,6 +91,7 @@ export async function criarEscopado(entityName, data) {
 export async function atualizarEscopado(entityName, registroId, data) {
   assertEntidadePermitida(entityName);
   if (!registroId) throw new Error('cudEscopado: registroId é obrigatório em atualizar.');
+  validarDatasIsoEntity(entityName, data || {});
   const resp = await invocar({
     entityName,
     operation: 'update',

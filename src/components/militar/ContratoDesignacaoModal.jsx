@@ -13,6 +13,7 @@ import {
   aplicarRegraFeriasPorTipoPrazo,
   REGRA_GERACAO_PERIODOS_DESIGNACAO,
   TIPO_PRAZO_CONTRATO_DESIGNACAO,
+  normalizarDataIsoDateOnly,
   validarContratoDesignacaoPayload,
 } from '@/services/contratosDesignacaoMilitarService';
 
@@ -92,6 +93,10 @@ function sanitizarFormContrato(form = {}) {
   return {
     ...form,
     matricula_militar_id: sanitizarIdMatricula(form.matricula_militar_id),
+    data_inicio_contrato: normalizarDataIsoDateOnly(form.data_inicio_contrato),
+    data_inclusao_para_ferias: normalizarDataIsoDateOnly(form.data_inclusao_para_ferias),
+    data_fim_contrato: normalizarDataIsoDateOnly(form.data_fim_contrato),
+    data_publicacao: normalizarDataIsoDateOnly(form.data_publicacao),
   };
 }
 
@@ -125,7 +130,7 @@ function MilitarSearchResult({ militar, selected = false }) {
   );
 }
 
-export default function ContratoDesignacaoModal({ open, onOpenChange, militarId, militares = [], matriculas = [], militaresLoading = false, contrato = null, readOnly = false, onSubmit, isSubmitting = false }) {
+export default function ContratoDesignacaoModal({ open, onOpenChange, militarId, militares = [], matriculas = [], militaresLoading = false, contrato = null, readOnly = false, bloqueiaCadeiaFerias = false, onSubmit, isSubmitting = false }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [militarSelecionadoId, setMilitarSelecionadoId] = useState(militarId || '');
   const [erros, setErros] = useState([]);
@@ -170,7 +175,16 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
       .slice(0, 30);
   }, [buscaMilitar, matriculas, militarSelectOptions]);
 
+  const isEditing = Boolean(contrato?.id);
+  const campoCadeiaBloqueado = (field) => bloqueiaCadeiaFerias && [
+    'data_inicio_contrato',
+    'data_inclusao_para_ferias',
+    'gera_direito_ferias',
+    'regra_geracao_periodos',
+  ].includes(field);
+
   const update = (field, value) => setForm((prev) => {
+    if (campoCadeiaBloqueado(field)) return prev;
     const valorSeguro = field === 'matricula_militar_id' ? sanitizarIdMatricula(value) : value;
     const next = aplicarRegraFeriasPorTipoPrazo({ ...prev, [field]: valorSeguro });
     if (field === 'data_inicio_contrato' && !prev.data_inclusao_para_ferias) {
@@ -213,16 +227,29 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
 
   const handleSubmit = async () => {
     const matriculaAtual = matriculaAtualContrato;
-    const payload = aplicarRegraFeriasPorTipoPrazo({
+    const matriculaMilitarId = isEditing
+      ? sanitizarIdMatricula(form.matricula_militar_id || contrato?.matricula_militar_id || matriculaAtual.id)
+      : sanitizarIdMatricula(matriculaAtual.id);
+    const matriculaDesignacao = isEditing
+      ? String(form.matricula_designacao || contrato?.matricula_designacao || matriculaAtual.texto || '')
+      : String(matriculaAtual.texto || '');
+    const payload = aplicarRegraFeriasPorTipoPrazo(sanitizarFormContrato({
       ...form,
-      militar_id: militarSelecionadoId || militarId,
-      matricula_militar_id: sanitizarIdMatricula(matriculaAtual.id),
-      matricula_designacao: matriculaAtual.texto,
+      militar_id: contrato?.militar_id || militarSelecionadoId || militarId,
+      matricula_militar_id: matriculaMilitarId,
+      matricula_designacao: matriculaDesignacao,
       data_inclusao_para_ferias: form.data_inclusao_para_ferias || form.data_inicio_contrato,
-      status_contrato: 'ativo',
-    });
+      status_contrato: form.status_contrato || 'ativo',
+    }));
     if (payload.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO) {
       payload.data_fim_contrato = '';
+    }
+    if (bloqueiaCadeiaFerias && contrato) {
+      payload.militar_id = contrato.militar_id;
+      payload.data_inicio_contrato = normalizarDataIsoDateOnly(contrato.data_inicio_contrato);
+      payload.data_inclusao_para_ferias = normalizarDataIsoDateOnly(contrato.data_inclusao_para_ferias || contrato.data_inicio_contrato);
+      payload.gera_direito_ferias = contrato.gera_direito_ferias;
+      payload.regra_geracao_periodos = contrato.regra_geracao_periodos;
     }
     const validacao = validarContratoDesignacaoPayload(payload);
     if (!validacao.valido) {
@@ -236,7 +263,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
     }
   };
 
-  const title = contrato ? 'Detalhes do Contrato de Designação' : 'Novo Contrato de Designação';
+  const title = contrato ? 'Editar Contrato de Designação' : 'Novo Contrato de Designação';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -244,7 +271,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            A data de inclusão original do militar será preservada. O contrato de designação será usado futuramente como data-base de férias, após integração da regra em lote posterior.
+            Cadastre ou edite o registro administrativo do contrato de designação. Datas são salvas em ISO yyyy-MM-dd e exibidas em dd/MM/yyyy nos detalhes.
           </DialogDescription>
         </DialogHeader>
 
@@ -252,7 +279,8 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <div className="space-y-1">
             <p>Encerrar ou cancelar contrato não altera períodos aquisitivos já existentes neste lote.</p>
-            <p>A matrícula será puxada da ficha atual do militar. Se este contrato gerou nova matrícula, cadastre-a previamente na ficha do militar para que ela seja usada neste contrato.</p>
+            <p>{isEditing ? 'A matrícula textual salva no contrato será preservada nesta edição.' : 'A matrícula será puxada da ficha atual do militar. Se este contrato gerou nova matrícula, cadastre-a previamente na ficha do militar para que ela seja usada neste contrato.'}</p>
+            {bloqueiaCadeiaFerias && <p>Este contrato já possui efeitos em períodos aquisitivos; campos que afetam a cadeia de férias estão bloqueados.</p>}
           </div>
         </div>
 
@@ -306,7 +334,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
                     variant="outline"
                     role="combobox"
                     aria-expanded={militarPopoverOpen}
-                    disabled={militaresLoading || militaresOptions.length === 0}
+                    disabled={isEditing || militaresLoading || militaresOptions.length === 0}
                     className="h-auto min-h-11 w-full justify-between px-3 py-2 font-normal"
                   >
                     {militarEscolhido ? (
@@ -347,7 +375,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
                 </PopoverContent>
               </Popover>
               {militarEscolhido && <p className="text-xs text-slate-500">A matrícula será puxada da ficha atual do militar. Se este contrato gerou nova matrícula, cadastre-a previamente na ficha do militar para que ela seja usada neste contrato.</p>}
-              {!militaresLoading && militaresOptions.length === 0 && <p className="text-xs text-slate-500">Não há militares ativos disponíveis para criação de contrato no seu escopo atual.</p>}
+              {!isEditing && !militaresLoading && militaresOptions.length === 0 && <p className="text-xs text-slate-500">Não há militares ativos disponíveis para criação de contrato no seu escopo atual.</p>}
             </div>
             <div className="space-y-2">
               <Label>Matrícula atual da ficha</Label>
@@ -360,14 +388,14 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
             </div>
             <div className="space-y-2">
               <Label>Data de início *</Label>
-              <Input type="date" value={form.data_inicio_contrato} onChange={(e) => update('data_inicio_contrato', e.target.value)} />
+              <Input type="date" value={form.data_inicio_contrato} onChange={(e) => update('data_inicio_contrato', e.target.value)} disabled={campoCadeiaBloqueado('data_inicio_contrato')} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <details className="rounded-md border border-slate-200 bg-slate-50 p-3">
                 <summary className="cursor-pointer text-sm font-medium text-slate-700">Data-base diferente para férias</summary>
                 <div className="mt-3 space-y-2">
                   <Label>Data-base de férias opcional</Label>
-                  <Input type="date" value={form.data_inclusao_para_ferias} onChange={(e) => update('data_inclusao_para_ferias', e.target.value)} />
+                  <Input type="date" value={form.data_inclusao_para_ferias} onChange={(e) => update('data_inclusao_para_ferias', e.target.value)} disabled={campoCadeiaBloqueado('data_inclusao_para_ferias')} />
                   <p className="text-xs text-slate-500">Se não informada, será salva igual à data de início do contrato.</p>
                 </div>
               </details>
@@ -391,7 +419,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
               <Select
                 value={form.gera_direito_ferias ? 'sim' : 'nao'}
                 onValueChange={(value) => update('gera_direito_ferias', value === 'sim')}
-                disabled={form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}
+                disabled={campoCadeiaBloqueado('gera_direito_ferias') || form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -406,7 +434,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
               <Select
                 value={form.regra_geracao_periodos}
                 onValueChange={(value) => update('regra_geracao_periodos', value)}
-                disabled={form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}
+                disabled={campoCadeiaBloqueado('regra_geracao_periodos') || form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -452,7 +480,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting || militaresLoading}>{isSubmitting ? 'Salvando...' : 'Salvar contrato'}</Button>}
+          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting || militaresLoading}>{isSubmitting ? 'Salvando...' : (isEditing ? 'Salvar edição' : 'Salvar contrato')}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

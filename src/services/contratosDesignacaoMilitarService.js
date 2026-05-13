@@ -53,8 +53,24 @@ function normalizarTexto(valor) {
     .toLowerCase();
 }
 
+export const ISO_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isDataIsoDateOnly(valor) {
+  if (!valor) return false;
+  const text = String(valor).trim();
+  if (!ISO_DATE_ONLY_RE.test(text)) return false;
+  const date = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text;
+}
+
+export function normalizarDataIsoDateOnly(valor) {
+  if (!valor) return '';
+  const text = String(valor).trim();
+  return ISO_DATE_ONLY_RE.test(text) ? text : '';
+}
+
 function dataTime(valor) {
-  if (!valor) return 0;
+  if (!isDataIsoDateOnly(valor)) return 0;
   const time = new Date(`${String(valor).slice(0, 10)}T00:00:00`).getTime();
   return Number.isFinite(time) ? time : 0;
 }
@@ -187,6 +203,17 @@ export function validarContratoDesignacaoPayload(payload = {}) {
   if (!String(payload.matricula_designacao || '').trim()) erros.push('matricula_designacao é obrigatória.');
   if (!payload.data_inicio_contrato) erros.push('data_inicio_contrato é obrigatória.');
   if (!payload.data_inclusao_para_ferias) erros.push('data_inclusao_para_ferias é obrigatória.');
+
+  [
+    ['data_inicio_contrato', payload.data_inicio_contrato],
+    ['data_inclusao_para_ferias', payload.data_inclusao_para_ferias],
+    ['data_fim_contrato', payload.data_fim_contrato],
+    ['data_publicacao', payload.data_publicacao],
+  ].forEach(([campo, valor]) => {
+    if (valor && !isDataIsoDateOnly(valor)) {
+      erros.push(`${campo} deve estar no formato ISO yyyy-MM-dd.`);
+    }
+  });
   if (!hasValor(payload.tipo_prazo_contrato)) erros.push('tipo_prazo_contrato é obrigatório.');
   if (payload.gera_direito_ferias === undefined || payload.gera_direito_ferias === null || payload.gera_direito_ferias === '') erros.push('gera_direito_ferias é obrigatório.');
   if (!hasValor(payload.regra_geracao_periodos)) erros.push('regra_geracao_periodos é obrigatória.');

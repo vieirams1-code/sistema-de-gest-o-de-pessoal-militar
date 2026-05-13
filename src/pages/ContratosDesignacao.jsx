@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Archive, CalendarClock, CheckCircle2, ClipboardList, Eye, FileText, Loader2, Plus, Search, ShieldCheck, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, Archive, CalendarClock, CheckCircle2, ClipboardList, Edit3, Eye, FileText, Loader2, Plus, Search, ShieldCheck, Trash2, UserRound, XCircle } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
-import { criarEscopado } from '@/services/cudEscopadoClient';
+import { atualizarEscopado, criarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPainelContratosDesignacao } from '@/services/getScopedPainelContratosDesignacaoClient';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { arquivarPeriodosDesignacaoEmBloco } from '@/services/arquivarPeriodosDesignacaoEmBlocoClient';
@@ -100,6 +101,53 @@ function DetailItem({ label, value }) {
   );
 }
 
+
+const CAMPOS_EFEITO_CONTRATO_EM_PERIODOS = [
+  'transicao_designacao_contrato_id',
+  'legado_ativa_contrato_designacao_id',
+  'cancelado_transicao_contrato_designacao_id',
+];
+
+const CAMPOS_CADEIA_FERIAS_CONTRATO = [
+  'militar_id',
+  'data_inicio_contrato',
+  'data_inclusao_para_ferias',
+  'gera_direito_ferias',
+  'regra_geracao_periodos',
+];
+
+const MENSAGEM_CONTRATO_COM_EFEITOS = 'Este contrato já possui efeitos em períodos aquisitivos. Use cancelamento/encerramento para preservar histórico.';
+
+async function buscarEfeitosContratoEmPeriodos(contratoId) {
+  if (!contratoId) return [];
+  const resultados = await Promise.all(CAMPOS_EFEITO_CONTRATO_EM_PERIODOS.map((campo) => (
+    base44.entities.PeriodoAquisitivo.filter({ [campo]: contratoId })
+  )));
+  const porId = new Map();
+  resultados.flat().forEach((periodo) => {
+    if (periodo?.id) porId.set(String(periodo.id), periodo);
+  });
+  return Array.from(porId.values());
+}
+
+function valoresContratoDiferentes(original, payload, campo) {
+  let originalValue = original?.[campo];
+  let payloadValue = payload?.[campo];
+  if (campo === 'data_inclusao_para_ferias') {
+    originalValue = original?.data_inclusao_para_ferias || original?.data_inicio_contrato || '';
+    payloadValue = payload?.data_inclusao_para_ferias || payload?.data_inicio_contrato || '';
+  }
+  if (campo === 'gera_direito_ferias') {
+    originalValue = original?.gera_direito_ferias === false ? false : true;
+    payloadValue = payload?.gera_direito_ferias === false ? false : true;
+  }
+  if (campo === 'regra_geracao_periodos') {
+    originalValue = original?.regra_geracao_periodos || 'normal';
+    payloadValue = payload?.regra_geracao_periodos || 'normal';
+  }
+  return String(originalValue ?? '') !== String(payloadValue ?? '');
+}
+
 function extrairMatriculasDisponiveis(militaresDisponiveis = []) {
   return militaresDisponiveis.flatMap((militar) => {
     const historico = Array.isArray(militar?.matriculas_historico) ? militar.matriculas_historico : [];
@@ -139,11 +187,14 @@ export default function ContratosDesignacao() {
   const [legado, setLegado] = useState(FILTRO_LEGADO.TODOS);
   const [contratoDetalhe, setContratoDetalhe] = useState(null);
   const [contratoArquivamento, setContratoArquivamento] = useState(null);
+  const [contratoEdicao, setContratoEdicao] = useState(null);
+  const [contratoEdicaoBloqueiaCadeia, setContratoEdicaoBloqueiaCadeia] = useState(false);
   const [confirmarArquivamento, setConfirmarArquivamento] = useState(false);
   const [arquivandoPeriodos, setArquivandoPeriodos] = useState(false);
   const [arquivamentoBloqueio, setArquivamentoBloqueio] = useState(null);
   const [novoContratoOpen, setNovoContratoOpen] = useState(false);
   const [salvandoContrato, setSalvandoContrato] = useState(false);
+  const [excluindoContratoId, setExcluindoContratoId] = useState(null);
   const effectiveEmail = getEffectiveEmail();
 
   const query = useQuery({
@@ -164,7 +215,7 @@ export default function ContratosDesignacao() {
       });
       return militaresEscopados;
     },
-    enabled: Boolean(isAccessResolved && canCreate && novoContratoOpen),
+    enabled: Boolean(isAccessResolved && canCreate && (novoContratoOpen || contratoEdicao)),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
@@ -177,9 +228,16 @@ export default function ContratosDesignacao() {
   const matriculasMilitar = bundle.matriculasMilitar || [];
   const legadoAtivaPorContrato = bundle.legadoAtivaPorContrato || {};
   const militaresDisponiveis = militaresDisponiveisQuery.data || [];
+  const militaresOpcoesContrato = useMemo(() => {
+    const porId = new Map();
+    [...militares, ...militaresDisponiveis].forEach((militar) => {
+      if (militar?.id) porId.set(String(militar.id), militar);
+    });
+    return Array.from(porId.values());
+  }, [militares, militaresDisponiveis]);
   const matriculasMilitaresDisponiveis = useMemo(
-    () => extrairMatriculasDisponiveis(militaresDisponiveis),
-    [militaresDisponiveis],
+    () => extrairMatriculasDisponiveis(militaresOpcoesContrato),
+    [militaresOpcoesContrato],
   );
 
   const militaresPorId = useMemo(() => Object.fromEntries(militares.map((m) => [String(m.id), m])), [militares]);
@@ -254,6 +312,81 @@ export default function ContratosDesignacao() {
       throw error;
     } finally {
       setSalvandoContrato(false);
+    }
+  };
+
+
+  const handleAbrirEdicaoContrato = async (contrato) => {
+    if (!contrato) return;
+    try {
+      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(contrato.id);
+      setContratoEdicaoBloqueiaCadeia(periodosComEfeito.length > 0);
+      setContratoEdicao(contrato);
+    } catch (error) {
+      toast({
+        title: 'Erro ao verificar efeitos do contrato',
+        description: error?.message || 'Não foi possível verificar os períodos aquisitivos antes da edição.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUpdateContrato = async (payload) => {
+    if (!contratoEdicao?.id) return;
+    setSalvandoContrato(true);
+    try {
+      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(contratoEdicao.id);
+      const temEfeitos = periodosComEfeito.length > 0;
+      if (temEfeitos) {
+        const campoAlterado = CAMPOS_CADEIA_FERIAS_CONTRATO.find((campo) => valoresContratoDiferentes(contratoEdicao, payload, campo));
+        if (campoAlterado) {
+          throw new Error(`Campo ${campoAlterado} bloqueado: ${MENSAGEM_CONTRATO_COM_EFEITOS}`);
+        }
+      }
+      await atualizarEscopado('ContratoDesignacaoMilitar', contratoEdicao.id, {
+        ...payload,
+        militar_id: contratoEdicao.militar_id,
+        matricula_militar_id: contratoEdicao.matricula_militar_id || payload.matricula_militar_id,
+        matricula_designacao: contratoEdicao.matricula_designacao || payload.matricula_designacao,
+      });
+      setContratoEdicao(null);
+      setContratoEdicaoBloqueiaCadeia(false);
+      await queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] });
+      toast({ title: 'Contrato atualizado', description: 'Os dados do contrato de designação foram salvos.' });
+    } catch (error) {
+      toast({
+        title: 'Erro ao editar contrato',
+        description: error?.message || 'Não foi possível atualizar o contrato de designação.',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setSalvandoContrato(false);
+    }
+  };
+
+  const handleExcluirContrato = async (contrato) => {
+    if (!contrato?.id) return;
+    const confirmado = window.confirm('Excluir fisicamente este contrato cadastrado por engano? Esta ação não altera ficha, férias, saldos ou publicações.');
+    if (!confirmado) return;
+    setExcluindoContratoId(contrato.id);
+    try {
+      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(contrato.id);
+      if (periodosComEfeito.length > 0) {
+        toast({ title: 'Exclusão bloqueada', description: MENSAGEM_CONTRATO_COM_EFEITOS, variant: 'destructive' });
+        return;
+      }
+      await excluirEscopado('ContratoDesignacaoMilitar', contrato.id);
+      await queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] });
+      toast({ title: 'Contrato excluído', description: 'O contrato cadastrado por engano foi removido sem afetar períodos.' });
+    } catch (error) {
+      toast({
+        title: 'Erro ao excluir contrato',
+        description: error?.message || 'Não foi possível excluir o contrato de designação.',
+        variant: 'destructive',
+      });
+    } finally {
+      setExcluindoContratoId(null);
     }
   };
 
@@ -374,9 +507,15 @@ export default function ContratosDesignacao() {
                             <Link to={`${createPageUrl('VerMilitar')}?id=${contrato.militar_id}`}><UserRound size={14} className="mr-1" />Ver ficha</Link>
                           </Button>
                           <Button type="button" variant="outline" size="sm" onClick={() => setContratoDetalhe(contrato)}><Eye size={14} className="mr-1" />Detalhes</Button>
+                          {canCreate && <Button type="button" variant="outline" size="sm" onClick={() => handleAbrirEdicaoContrato(contrato)}><Edit3 size={14} className="mr-1" />Editar contrato</Button>}
                           {podeResolverPeriodos && (
                             <Button type="button" variant="outline" size="sm" onClick={() => { setContratoArquivamento(contrato); setConfirmarArquivamento(false); setArquivamentoBloqueio(null); }} className="border-amber-200 text-amber-800 hover:bg-amber-50">
                               <Archive size={14} className="mr-1" />Arquivar períodos da ativa
+                            </Button>
+                          )}
+                          {canCreate && (
+                            <Button type="button" variant="outline" size="sm" onClick={() => handleExcluirContrato(contrato)} disabled={excluindoContratoId === contrato.id} className="border-rose-200 text-rose-700 hover:bg-rose-50">
+                              {excluindoContratoId === contrato.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Trash2 size={14} className="mr-1" />}Excluir contrato
                             </Button>
                           )}
                         </div>
@@ -407,13 +546,24 @@ export default function ContratosDesignacao() {
       <ContratoDesignacaoModal
         open={novoContratoOpen}
         onOpenChange={setNovoContratoOpen}
-        militares={militaresDisponiveis}
+        militares={militaresOpcoesContrato}
         matriculas={matriculasMilitaresDisponiveis}
         militaresLoading={militaresDisponiveisQuery.isLoading || militaresDisponiveisQuery.isFetching}
         onSubmit={handleCreateContrato}
         isSubmitting={salvandoContrato}
       />
 
+      <ContratoDesignacaoModal
+        open={Boolean(contratoEdicao)}
+        onOpenChange={(open) => { if (!open) { setContratoEdicao(null); setContratoEdicaoBloqueiaCadeia(false); } }}
+        contrato={contratoEdicao}
+        militares={militaresOpcoesContrato}
+        matriculas={matriculasMilitaresDisponiveis}
+        militaresLoading={militaresDisponiveisQuery.isLoading || militaresDisponiveisQuery.isFetching}
+        bloqueiaCadeiaFerias={contratoEdicaoBloqueiaCadeia}
+        onSubmit={handleUpdateContrato}
+        isSubmitting={salvandoContrato}
+      />
 
       {contratoArquivamento && (() => {
         const militar = getMilitar(contratoArquivamento);
