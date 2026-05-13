@@ -44,7 +44,7 @@ import {
 '@/services/creditoExtraFeriasService';
 import { getSaldoConsolidadoPeriodo, isFeriasDoPeriodo } from '@/components/ferias/periodoSaldoUtils';
 import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularPeriodoAquisitivo';
-import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
+import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
@@ -128,6 +128,7 @@ export default function VerMilitar() {
   const podeCriarContratoDesignacao = isAdmin || canAccessAction('criar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeEncerrarContratoDesignacao = isAdmin || canAccessAction('encerrar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeCancelarContratoDesignacao = isAdmin || canAccessAction('cancelar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
+  const podeExcluirContratoDesignacao = isAdmin || canAccessAction('excluir_contrato_designacao');
   const podePrepararLegadoAtiva = isAdmin || canAccessAction('aplicar_transicao_legado_ativa') || canAccessAction('gerir_cadeia_ferias') || canAccessAction('gerir_contratos_designacao') || (canAccessAction('visualizar_contratos_designacao') && canAccessAction('visualizar_ferias'));
   const [showSolicitacao, setShowSolicitacao] = useState(false);
   const [showPromocaoAtualModal, setShowPromocaoAtualModal] = useState(false);
@@ -169,12 +170,13 @@ export default function VerMilitar() {
   const contratoDesignacaoMutation = useMutation({
     mutationFn: ({ id: contratoId, data, operation }) => {
       if (operation === 'create') return criarEscopado('ContratoDesignacaoMilitar', data);
+      if (operation === 'delete') return excluirEscopado('ContratoDesignacaoMilitar', contratoId);
       return atualizarEscopado('ContratoDesignacaoMilitar', contratoId, data);
     },
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: contratosDesignacaoQueryKey });
       queryClient.invalidateQueries({ queryKey: ['ver-contratos-designacao', id] });
-      toast({ title: 'Contrato de designação atualizado com sucesso.' });
+      toast({ title: variables?.operation === 'delete' ? 'Contrato de designação excluído com sucesso.' : 'Contrato de designação atualizado com sucesso.' });
     },
     onError: (error) => {
       toast({ title: 'Erro ao salvar contrato de designação', description: error?.message || 'Tente novamente.', variant: 'destructive' });
@@ -584,10 +586,12 @@ export default function VerMilitar() {
                     canCreate={podeCriarContratoDesignacao}
                     canEncerrar={podeEncerrarContratoDesignacao}
                     canCancelar={podeCancelarContratoDesignacao}
+                    canExcluir={podeExcluirContratoDesignacao}
                     canPrepararLegadoAtiva={podePrepararLegadoAtiva && canViewMilitar}
                     isSaving={contratoDesignacaoMutation.isPending}
                     onCreate={(data) => contratoDesignacaoMutation.mutateAsync({ operation: 'create', data })}
                     onUpdate={(contratoId, data) => contratoDesignacaoMutation.mutateAsync({ operation: 'update', id: contratoId, data })}
+                    onDelete={(contratoId) => contratoDesignacaoMutation.mutateAsync({ operation: 'delete', id: contratoId })}
                   />
                 )}
                 <Section title="Dados Pessoais" icon={User}>

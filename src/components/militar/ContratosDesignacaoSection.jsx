@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
 import EncerrarContratoDesignacaoModal from '@/components/militar/EncerrarContratoDesignacaoModal';
 import CancelarContratoDesignacaoModal from '@/components/militar/CancelarContratoDesignacaoModal';
+import ExcluirContratoDesignacaoModal from '@/components/militar/ExcluirContratoDesignacaoModal';
 import TransicaoLegadoAtivaPreviewModal from '@/components/militar/TransicaoLegadoAtivaPreviewModal';
 import {
   contarContratosAtivosDesignacao,
@@ -35,15 +36,18 @@ export default function ContratosDesignacaoSection({
   canCreate = false,
   canEncerrar = false,
   canCancelar = false,
+  canExcluir = false,
   canPrepararLegadoAtiva = false,
   onCreate,
   onUpdate,
+  onDelete,
   isSaving = false,
 }) {
   const [modalNovoOpen, setModalNovoOpen] = useState(false);
   const [detalhe, setDetalhe] = useState(null);
   const [encerrar, setEncerrar] = useState(null);
   const [cancelar, setCancelar] = useState(null);
+  const [excluir, setExcluir] = useState(null);
   const [previewLegadoAtiva, setPreviewLegadoAtiva] = useState(null);
 
   const ordenados = useMemo(() => ordenarContratosDesignacao(contratos), [contratos]);
@@ -60,6 +64,12 @@ export default function ContratosDesignacaoSection({
     await onUpdate?.(contrato.id, payload);
     setEncerrar(null);
     setCancelar(null);
+  };
+
+  const handleDelete = async (contrato) => {
+    if (!contrato?.id) return;
+    await onDelete?.(contrato.id);
+    setExcluir(null);
   };
 
   return (
@@ -164,6 +174,7 @@ export default function ContratosDesignacaoSection({
                         )}
                         {ativoContrato && canEncerrar && <Button size="sm" variant="outline" onClick={() => setEncerrar(contrato)}>Encerrar</Button>}
                         {canCancelar && normalizarStatusContratoDesignacao(contrato.status_contrato) !== 'cancelado' && <Button size="sm" variant="destructive" onClick={() => setCancelar(contrato)}>Cancelar</Button>}
+                        {canExcluir && <Button size="sm" variant="destructive" onClick={() => setExcluir(contrato)}>Excluir contrato</Button>}
                       </div>
                     </div>
                   </div>
@@ -201,6 +212,13 @@ export default function ContratosDesignacaoSection({
           onOpenChange={(open) => !open && setCancelar(null)}
           contrato={cancelar}
           onSubmit={handleUpdate}
+          isSubmitting={isSaving}
+        />
+        <ExcluirContratoDesignacaoModal
+          open={Boolean(excluir)}
+          onOpenChange={(open) => !open && setExcluir(null)}
+          contrato={excluir}
+          onSubmit={handleDelete}
           isSubmitting={isSaving}
         />
         <TransicaoLegadoAtivaPreviewModal
