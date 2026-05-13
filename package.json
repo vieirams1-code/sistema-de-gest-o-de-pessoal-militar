@@ -14,7 +14,9 @@
     "entities:push": "npx base44@latest entities push",
     "deploy:base44": "npx base44@latest deploy",
     "test": "npm run lint && npm run build && npm run test:unit",
-    "test:unit": "node --test src/pages/extracaoEfetivo/__tests__/*.test.js"
+    "test:unit": "node --test src/pages/extracaoEfetivo/__tests__/*.test.js",
+    "validate:transicao-designacao-runtime": "node scripts/validate-transicao-designacao-runtime.mjs",
+    "publish:transicao-designacao-runtime": "npm run validate:transicao-designacao-runtime && npm run entities:push && npm run deploy:base44"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.27",
