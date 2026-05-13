@@ -47,7 +47,7 @@ function getAcaoSugerida(item) {
   return item?.acaoSugerida || item?.acao_sugerida || 'manter';
 }
 
-function getPeriodoKey(item, index) {
+export function getPeriodoKey(item, index) {
   const periodo = getDadosPeriodo(item);
   return String(item?.periodoId || item?.periodo_id || periodo.id || periodo.periodo_aquisitivo_ref || periodo.ano_referencia || index);
 }
@@ -64,9 +64,16 @@ function getFerias(item) {
   return item?.feriasVinculadas || item?.ferias_vinculadas || [];
 }
 
+export const ACOES_COM_MOTIVO_OBRIGATORIO = new Set([
+  'marcar_legado_ativa',
+  'marcar_indenizado',
+  'excluir_cadeia_operacional',
+  'cancelar_periodo_futuro_indevido',
+]);
+
 export function acaoExigeMotivo(periodo, decisao) {
   if (!decisao?.acao || decisao.acao === 'manter') return false;
-  return Boolean(periodo?.exigeMotivo || periodo?.exige_motivo || getRiscos(periodo).length > 0 || decisao.acao !== getAcaoSugerida(periodo));
+  return ACOES_COM_MOTIVO_OBRIGATORIO.has(decisao.acao) || Boolean(periodo?.exigeMotivo || periodo?.exige_motivo || getRiscos(periodo).length > 0 || decisao.acao !== getAcaoSugerida(periodo));
 }
 
 export function acaoExigeDocumento(periodo, decisao) {
@@ -84,6 +91,10 @@ export function validarDecisaoPeriodo(periodo, decisao) {
   if (bloqueantes.length > 0 && decisao?.acao !== 'manter') pendencias.push('Período com bloqueante só pode ser mantido neste lote.');
   if (acaoExigeMotivo(periodo, decisao) && !String(decisao?.motivo || '').trim()) pendencias.push('Informe motivo/observação.');
   if (acaoExigeDocumento(periodo, decisao) && !String(decisao?.documento || '').trim()) pendencias.push('Informe documento.');
+  if (decisao?.acao === 'marcar_indenizado') {
+    if (!String(decisao?.documento || '').trim()) pendencias.push('Informe documento para indenização.');
+    if (!(Number(decisao?.dias_indenizados || 0) > 0)) pendencias.push('Informe dias indenizados.');
+  }
 
   return pendencias;
 }
@@ -151,6 +162,7 @@ export function criarDecisoesIniciais(periodos = []) {
       acao: bloqueado ? 'manter' : (acoesPermitidas.includes(sugerida) ? sugerida : 'manter'),
       motivo: '',
       documento: '',
+      dias_indenizados: 0,
     };
     return acc;
   }, {});

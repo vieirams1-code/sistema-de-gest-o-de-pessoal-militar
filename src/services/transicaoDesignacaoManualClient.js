@@ -27,6 +27,7 @@ function normalizarRetorno(body = {}) {
 export async function aplicarTransicaoDesignacaoManual({
   militarId,
   contratoDesignacaoId,
+  contratoId,
   previewHash,
   idempotencyKey,
   confirmacaoTextual,
@@ -36,11 +37,17 @@ export async function aplicarTransicaoDesignacaoManual({
   const payload = {
     militar_id: militarId,
     contrato_designacao_id: contratoDesignacaoId,
+    contrato_id: contratoId || contratoDesignacaoId,
     preview_hash: previewHash,
     idempotency_key: idempotencyKey,
     confirmacao_textual: confirmacaoTextual,
     acoes: Array.isArray(acoes) ? acoes : [],
   };
+  payload.decisoes_por_periodo = payload.acoes;
+  payload.motivos = payload.acoes.reduce((acc, acao) => {
+    if (acao?.periodo_id && acao?.motivo) acc[acao.periodo_id] = acao.motivo;
+    return acc;
+  }, {});
   if (effectiveEmail) payload.effectiveEmail = effectiveEmail;
 
   const response = await base44.functions.invoke('aplicarTransicaoDesignacaoManual', payload);
