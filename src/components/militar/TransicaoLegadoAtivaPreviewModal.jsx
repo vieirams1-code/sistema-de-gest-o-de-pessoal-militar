@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -365,19 +364,6 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
                 <TransicaoDesignacaoResumoAcoes resumo={resumoDecisoes} />
                 <TransicaoDesignacaoPeriodosGrid periodos={periodos} acoesSelecionadas={acoesSelecionadas} onChange={setAcoesSelecionadas} />
                 {motivoBloqueioManual && !resultadoAplicacao?.ok && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{motivoBloqueioManual}</p>}
-                <Accordion type="single" collapsible className="rounded-lg border border-slate-200 bg-white px-3">
-                  <AccordionItem value="detalhes-tecnicos" className="border-0">
-                    <AccordionTrigger className="py-3 text-sm font-semibold text-slate-700 hover:no-underline">Modo avançado</AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-2 text-xs text-slate-600">
-                        <p>Detalhes técnicos preservados para auditoria e suporte.</p>
-                        <p className="break-all font-mono">preview_hash: {previewHash || '—'}</p>
-                        <p className="break-all font-mono">idempotency_key: {idempotencyKey || '—'}</p>
-                        <p>Operações previstas: {resumoDecisoes.total || 0}</p>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
                 <RelatorioAplicacao resultado={resultadoAplicacao} />
               </>
             ) : (
