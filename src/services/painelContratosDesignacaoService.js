@@ -37,6 +37,64 @@ export const FILTRO_LEGADO = {
   PENDENTE: 'pendente',
 };
 
+
+export const CAMPOS_EFEITO_CONTRATO_EM_PERIODOS = [
+  'transicao_designacao_contrato_id',
+  'legado_ativa_contrato_designacao_id',
+  'cancelado_transicao_contrato_designacao_id',
+];
+
+export const CAMPOS_CADEIA_FERIAS_CONTRATO = [
+  'militar_id',
+  'data_inicio_contrato',
+  'data_inclusao_para_ferias',
+  'gera_direito_ferias',
+  'regra_geracao_periodos',
+];
+
+export const MENSAGEM_CONTRATO_COM_EFEITOS = 'Este contrato já possui efeitos em períodos aquisitivos. Use cancelamento/encerramento para preservar histórico.';
+
+export async function buscarEfeitosContratoEmPeriodos(base44, contratoId) {
+  if (!contratoId) return [];
+  const resultados = await Promise.all(CAMPOS_EFEITO_CONTRATO_EM_PERIODOS.map((campo) => (
+    base44.entities.PeriodoAquisitivo.filter({ [campo]: contratoId })
+  )));
+  const porId = new Map();
+  resultados.flat().forEach((periodo) => {
+    if (periodo?.id) porId.set(String(periodo.id), periodo);
+  });
+  return Array.from(porId.values());
+}
+
+export function valoresContratoDiferentes(original, payload, campo) {
+  let originalValue = original?.[campo];
+  let payloadValue = payload?.[campo];
+  if (campo === 'data_inclusao_para_ferias') {
+    originalValue = original?.data_inclusao_para_ferias || original?.data_inicio_contrato || '';
+    payloadValue = payload?.data_inclusao_para_ferias || payload?.data_inicio_contrato || '';
+  }
+  if (campo === 'gera_direito_ferias') {
+    originalValue = original?.gera_direito_ferias === false ? false : true;
+    payloadValue = payload?.gera_direito_ferias === false ? false : true;
+  }
+  if (campo === 'regra_geracao_periodos') {
+    originalValue = original?.regra_geracao_periodos || 'normal';
+    payloadValue = payload?.regra_geracao_periodos || 'normal';
+  }
+  return String(originalValue ?? '') !== String(payloadValue ?? '');
+}
+
+export function getCampoCadeiaFeriasAlterado(original, payload) {
+  return CAMPOS_CADEIA_FERIAS_CONTRATO.find((campo) => valoresContratoDiferentes(original, payload, campo)) || null;
+}
+
+export function isContratoAtivoOperacional(contrato) {
+  return ![
+    SITUACAO_CONTRATO_DESIGNACAO.ENCERRADO,
+    SITUACAO_CONTRATO_DESIGNACAO.CANCELADO,
+  ].includes(calcularSituacaoDerivadaContrato(contrato));
+}
+
 export function normalizarTextoPainelContratos(valor) {
   return String(valor || '')
     .normalize('NFD')

@@ -6,6 +6,31 @@ const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const LIMIT_USUARIO_ACESSO = 1000;
 const CAMPOS_USUARIO_ACESSO = ['id', 'user_email', 'ativo', 'tipo_acesso', 'grupamento_id', 'subgrupamento_id', 'militar_id', 'perfil_id'];
 
+const CAMPOS_PERIODO_LEGADO = [
+  'id',
+  'militar_id',
+  'legado_ativa',
+  'legado_ativa_contrato_designacao_id',
+  'legado_ativa_em',
+  'updated_date',
+  'created_date',
+];
+
+function montarLegado(periodos) {
+  return (Array.isArray(periodos) ? periodos : []).reduce((acc, periodo) => {
+    if (!periodo?.legado_ativa || !periodo?.legado_ativa_contrato_designacao_id) return acc;
+    const contratoId = String(periodo.legado_ativa_contrato_designacao_id);
+    const atual = acc[contratoId] || { aplicado: false, totalPeriodos: 0, ultimaAplicacaoEm: null };
+    const aplicacao = periodo.legado_ativa_em || periodo.updated_date || periodo.created_date || null;
+    acc[contratoId] = {
+      aplicado: true,
+      totalPeriodos: atual.totalPeriodos + 1,
+      ultimaAplicacaoEm: !atual.ultimaAplicacaoEm || (aplicacao && aplicacao > atual.ultimaAplicacaoEm) ? aplicacao : atual.ultimaAplicacaoEm,
+    };
+    return acc;
+  }, {});
+}
+
 const normalizeTipo = (t) => String(t || '').trim().toLowerCase();
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 
@@ -198,9 +223,16 @@ Deno.serve(async (req) => {
       () => base44.asServiceRole.entities.ContratoDesignacaoMilitar.filter({ militar_id: militarId }, '-data_inicio_contrato', 1000, 0),
       `ContratoDesignacaoMilitar.militar:${militarId}`,
     );
+    const periodosLegado = await fetchWithRetry(
+      () => base44.asServiceRole.entities.PeriodoAquisitivo.filter({ militar_id: militarId, legado_ativa: true }, '-legado_ativa_em', 1000, 0, CAMPOS_PERIODO_LEGADO),
+      `PeriodoAquisitivo.legado:${militarId}`,
+    );
+    const contratoIds = new Set((contratos || []).map((c) => String(c?.id || '')).filter(Boolean));
+    const legadoAtivaPorContrato = montarLegado((periodosLegado || []).filter((p) => contratoIds.has(String(p?.legado_ativa_contrato_designacao_id || ''))));
 
     return Response.json({
       contratos: contratos || [],
+      legadoAtivaPorContrato,
       meta: {
         isAdmin: targetIsAdmin,
         modoAcesso: getModoAcesso(criteriosAplicados),
