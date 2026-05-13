@@ -25,13 +25,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { aplicarTransicaoLegadoAtiva, previsualizarTransicaoLegadoAtiva } from '@/services/transicaoLegadoAtivaClient';
-import { aplicarTransicaoDesignacaoManual } from '@/services/transicaoDesignacaoManualClient';
-import TransicaoDesignacaoPeriodosGrid, { calcularResumoDecisoes, criarDecisoesIniciais, getMotivoPadraoTransicao, getPeriodoKey, validarDecisaoPeriodo } from './TransicaoDesignacaoPeriodosGrid';
-import TransicaoDesignacaoResumoAcoes from './TransicaoDesignacaoResumoAcoes';
+import { previsualizarTransicaoLegadoAtiva } from '@/services/transicaoLegadoAtivaClient';
+import { arquivarPeriodosDesignacaoEmBloco } from '@/services/arquivarPeriodosDesignacaoEmBlocoClient';
 
-const CONFIRMACAO_TEXTUAL = 'MARCAR LEGADO DA ATIVA';
-const CONFIRMACAO_MANUAL_TEXTUAL = 'APLICAR TRANSIÇÃO';
+const CONFIRMACAO_TEXTUAL = 'ARQUIVAR PERÍODOS DA ATIVA';
 
 function formatDate(date) {
   if (!date) return '—';
@@ -71,54 +68,45 @@ function ListaPeriodos({ titulo, itens = [], vazio, renderExtra }) {
 
 function RelatorioAplicacao({ resultado }) {
   if (!resultado) return null;
-  const totais = resultado.totais || {};
+  const resumo = resultado.resumo || resultado.totais || {};
+  const detalhes = Array.isArray(resultado.detalhes) ? resultado.detalhes : [];
   const warnings = resultado.meta?.warnings || [];
-  const operacoes = Array.isArray(resultado.operacoes) ? resultado.operacoes : [];
-  const isManual = resultado.modo === 'apply_manual' || operacoes.length > 0;
 
   return (
     <section className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
       <div className="flex items-start gap-2 text-emerald-900">
         <CheckCircle2 className="h-4 w-4 mt-0.5" />
         <div>
-          <h4 className="font-semibold">Transição aplicada com sucesso.</h4>
-          {isManual ? (
-            <p className="text-sm">Total de períodos tratados: {operacoes.length || (Number(totais.aplicadas || 0) + Number(totais.mantidas || 0) + Number(totais.bloqueadas || 0))} • Lote: {resultado.lote?.id || '—'} • Operações registradas: {operacoes.length}</p>
-          ) : (
-            <p className="text-sm">Aplicados: {totais.aplicados || 0} • Ignorados: {totais.ignorados || 0} • Já marcados: {totais.ja_marcados || 0} • Conflitos: {totais.conflitos || 0}</p>
-          )}
+          <h4 className="font-semibold">Legado da Ativa: Aplicado.</h4>
+          <p className="text-sm">
+            Arquivados: {resumo.arquivados || 0} • Cancelados: {resumo.cancelados || 0} • Já processados: {resumo.ja_processados || 0} • Ignorados: {resumo.ignorados || 0}
+          </p>
           {warnings.length > 0 && <p className="text-xs mt-1">Avisos: {warnings.join(', ')}</p>}
         </div>
       </div>
-      {isManual ? (
-        <div className="rounded-lg border border-emerald-100 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h4 className="font-semibold text-slate-800">Operações registradas</h4>
-            <Badge variant="outline">{operacoes.length}</Badge>
-          </div>
-          {operacoes.length === 0 ? <p className="text-sm text-slate-500">Nenhuma operação retornada.</p> : (
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {operacoes.map((operacao, index) => (
-                <div key={operacao.id || operacao._id || `${operacao.periodo_aquisitivo_id}-${index}`} className="rounded-md border border-slate-100 bg-slate-50 p-2 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-slate-800">{operacao.periodo_aquisitivo_id || 'Período sem ID'}</span>
-                    <Badge variant="secondary">{operacao.acao || 'ação não informada'}</Badge>
-                    <Badge variant="outline">{operacao.status_operacao || 'registrada'}</Badge>
-                  </div>
-                  {operacao.motivo && <p className="mt-1 text-xs text-slate-500">Motivo: {operacao.motivo}</p>}
+
+      <div className="rounded-lg border border-emerald-100 bg-white p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h4 className="font-semibold text-slate-800">Detalhes do arquivamento lógico</h4>
+          <Badge variant="outline">{detalhes.length}</Badge>
+        </div>
+        {detalhes.length === 0 ? <p className="text-sm text-slate-500">Nenhum detalhe retornado.</p> : (
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {detalhes.map((item, index) => (
+              <div key={item.id || `${item.acao || 'detalhe'}-${index}`} className="rounded-md border border-slate-100 bg-slate-50 p-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-slate-800">{item.ano_referencia || item.periodo_aquisitivo_ref || item.id || 'Período sem referência'}</span>
+                  <Badge variant="secondary">{item.acao || 'sem ação'}</Badge>
+                  {item.status && <Badge variant="outline">{item.status}</Badge>}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <ListaPeriodos titulo="Aplicados" itens={resultado.aplicados} vazio="Nenhum período aplicado nesta execução." />
-          <ListaPeriodos titulo="Ignorados" itens={resultado.ignorados} vazio="Nenhum período ignorado." />
-          <ListaPeriodos titulo="Já marcados" itens={resultado.jaMarcados} vazio="Nenhum período já estava marcado." />
-          <ListaPeriodos titulo="Conflitos" itens={resultado.conflitos} vazio="Nenhum conflito encontrado." />
-        </div>
-      )}
+                <p className="text-xs text-slate-500 mt-1">
+                  {formatDate(item.inicio_aquisitivo)} a {formatDate(item.fim_aquisitivo)}{item.motivo ? ` • ${item.motivo}` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -162,9 +150,6 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [confirmacaoTextual, setConfirmacaoTextual] = useState('');
-  const [acoesSelecionadas, setAcoesSelecionadas] = useState({});
-  const [previewHash, setPreviewHash] = useState(null);
-  const [idempotencyKey, setIdempotencyKey] = useState('');
   const [confirmacaoManualAberta, setConfirmacaoManualAberta] = useState(false);
 
   useEffect(() => {
@@ -176,17 +161,11 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       setPreview(null);
       setResultadoAplicacao(null);
       setConfirmacaoTextual('');
-      setAcoesSelecionadas({});
-      setPreviewHash(null);
-      setIdempotencyKey('');
       setConfirmacaoManualAberta(false);
       try {
         const data = await previsualizarTransicaoLegadoAtiva({ militarId, contratoDesignacaoId: contratoId });
         if (active) {
           setPreview(data);
-          setPreviewHash(data?.preview_hash || data?.meta?.previewHash || null);
-          setAcoesSelecionadas(criarDecisoesIniciais(data?.periodos || []));
-          setIdempotencyKey(`transicao-designacao:${contratoId}:${militarId}:${Date.now()}:${Math.random().toString(36).slice(2)}`);
         }
       } catch (err) {
         if (active) setError(err?.message || 'Erro ao carregar prévia da transição.');
@@ -201,27 +180,19 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   const totais = preview?.totais || {};
   const periodos = preview?.periodos || [];
   const usaFluxoPorPeriodo = periodos.length > 0;
-  const resumoDecisoes = useMemo(() => calcularResumoDecisoes(periodos, acoesSelecionadas), [periodos, acoesSelecionadas]);
+  const resumoDecisoes = useMemo(() => ({
+    total: periodos.length,
+    cancelar_periodo_futuro_indevido: periodos.filter((item) => String(item?.acaoSugerida || item?.acao_sugerida || '').includes('cancelar')).length,
+    marcar_legado_ativa: periodos.filter((item) => String(item?.acaoSugerida || item?.acao_sugerida || '').includes('legado')).length,
+    manter: periodos.filter((item) => String(item?.acaoSugerida || item?.acao_sugerida || '').includes('manter')).length,
+  }), [periodos]);
   const riscosBloqueantes = useMemo(() => (preview?.riscos || []).filter((risco) => risco.bloqueante), [preview?.riscos]);
-  const candidatosAplicaveis = Number(totais.candidatos || 0) > 0;
-  const pendenciasManual = useMemo(() => periodos.flatMap((item, index) => {
-    const key = getPeriodoKey(item, index);
-    const decisao = acoesSelecionadas[key] || {};
-    return validarDecisaoPeriodo(item, decisao).map((pendencia) => ({ key, periodo: item, pendencia }));
-  }), [periodos, acoesSelecionadas]);
-  const podeAplicarManual = usaFluxoPorPeriodo && periodos.length > 0 && pendenciasManual.length === 0 && Boolean(previewHash) && Boolean(idempotencyKey) && !applying;
-  const podeAplicarLegado = !usaFluxoPorPeriodo && confirmacaoTextual === CONFIRMACAO_TEXTUAL && candidatosAplicaveis && riscosBloqueantes.length === 0 && !applying;
-  const motivoBloqueioManual = !periodos.length
-    ? 'Não há períodos analisados para aplicar.'
-    : pendenciasManual.length > 0
-      ? `Existem ${pendenciasManual.length} pendência(s) nas decisões por período.`
-      : !previewHash
-        ? 'Hash da prévia ausente.'
-        : '';
+  const candidatosAplicaveis = usaFluxoPorPeriodo || Number(totais.candidatos || 0) > 0;
+  const podeAplicarArquivamento = confirmacaoTextual === CONFIRMACAO_TEXTUAL && candidatosAplicaveis && riscosBloqueantes.length === 0 && !applying;
   const motivoBloqueioAplicacao = riscosBloqueantes.length > 0
     ? 'Há riscos bloqueantes na prévia recalculada.'
     : !candidatosAplicaveis
-      ? 'Não há candidatos aplicáveis.'
+      ? 'Não há períodos da cadeia antiga para arquivar/cancelar.'
       : confirmacaoTextual !== CONFIRMACAO_TEXTUAL
         ? `Digite exatamente ${CONFIRMACAO_TEXTUAL}.`
         : '';
@@ -242,81 +213,29 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       queryClient.invalidateQueries({ queryKey: ['ver-periodos', militarId] }),
       queryClient.invalidateQueries({ queryKey: ['ver-ferias', militarId] }),
       queryClient.invalidateQueries({ queryKey: ['militar', militarId] }),
+      queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] }),
       queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
       queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+      queryClient.invalidateQueries({ queryKey: ['periodos-existentes'] }),
     ]);
   }
 
-  async function invalidarQueriesTransicaoManual() {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['ver-contratos-designacao', militarId] }),
-      queryClient.invalidateQueries({ queryKey: ['ver-periodos', militarId] }),
-      queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
-      queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
-    ]);
-  }
-
-  function montarAcoesManuais() {
-    return periodos.map((item, index) => {
-      const key = getPeriodoKey(item, index);
-      const periodo = item?.periodo || item || {};
-      const decisao = acoesSelecionadas[key] || {};
-      const acaoSugerida = item?.acaoSugerida || item?.acao_sugerida || 'manter';
-      return {
-        periodo_id: item?.periodoId || item?.periodo_id || periodo.id,
-        acao: decisao.acao || acaoSugerida || 'manter',
-        motivo: String(decisao.motivo || getMotivoPadraoTransicao(decisao.acao || acaoSugerida || 'manter')).trim(),
-        observacao: String(decisao.observacao || '').trim(),
-        documento: decisao.documento || null,
-        dias_indenizados: Number(decisao.dias_indenizados || 0),
-        override_sugestao: Boolean((decisao.acao || acaoSugerida) !== acaoSugerida),
-        sugestao_original: acaoSugerida,
-      };
-    });
-  }
-
-  async function handleAplicarManual() {
-    if (!podeAplicarManual) return;
+  async function handleAplicarArquivamento() {
+    if (!podeAplicarArquivamento) return;
     setApplying(true);
     setError('');
     try {
-      const resultado = await aplicarTransicaoDesignacaoManual({
+      const resultado = await arquivarPeriodosDesignacaoEmBloco({
         militarId,
         contratoDesignacaoId: contratoId,
-        contratoId,
-        previewHash,
-        idempotencyKey,
-        confirmacaoTextual: CONFIRMACAO_MANUAL_TEXTUAL,
-        acoes: montarAcoesManuais(),
+        confirmar: true,
       });
       setResultadoAplicacao(resultado);
       setConfirmacaoManualAberta(false);
-      await invalidarQueriesTransicaoManual();
-    } catch (err) {
-      const status = err?.status ? ` (${err.status})` : '';
-      setError(`${err?.message || 'Erro ao aplicar transição manual.'}${status}`);
-      if (err?.body) setResultadoAplicacao(err.body);
-    } finally {
-      setApplying(false);
-    }
-  }
-
-  async function handleAplicarLegado() {
-    if (!podeAplicarLegado) return;
-    setApplying(true);
-    setError('');
-    try {
-      const resultado = await aplicarTransicaoLegadoAtiva({
-        militarId,
-        contratoDesignacaoId: contratoId,
-        confirmacaoTextual,
-        previewHash,
-      });
-      setResultadoAplicacao(resultado);
       await invalidarQueriesRelacionadas();
     } catch (err) {
       const status = err?.status ? ` (${err.status})` : '';
-      setError(`${err?.message || 'Erro ao aplicar transição.'}${status}`);
+      setError(`${err?.message || 'Erro ao arquivar períodos da ativa.'}${status}`);
       if (err?.body) setResultadoAplicacao(err.body);
     } finally {
       setApplying(false);
@@ -361,9 +280,32 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
 
             {usaFluxoPorPeriodo ? (
               <>
-                <TransicaoDesignacaoResumoAcoes resumo={resumoDecisoes} />
-                <TransicaoDesignacaoPeriodosGrid periodos={periodos} acoesSelecionadas={acoesSelecionadas} onChange={setAcoesSelecionadas} />
-                {motivoBloqueioManual && !resultadoAplicacao?.ok && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{motivoBloqueioManual}</p>}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <ListaPeriodos
+                    titulo="Períodos anteriores a arquivar como legado"
+                    itens={periodos.filter((item) => String(item?.acaoSugerida || item?.acao_sugerida || '').includes('legado'))}
+                    vazio="Nenhum período anterior identificado."
+                    renderExtra={(item) => <p className="mt-1 text-xs text-slate-500">Ação: {item.acaoSugerida || item.acao_sugerida || 'marcar_legado_ativa'}</p>}
+                  />
+                  <ListaPeriodos
+                    titulo="Períodos futuros indevidos a cancelar"
+                    itens={periodos.filter((item) => String(item?.acaoSugerida || item?.acao_sugerida || '').includes('cancelar'))}
+                    vazio="Nenhum período futuro indevido identificado."
+                    renderExtra={(item) => <p className="mt-1 text-xs text-slate-500">Ação: {item.acaoSugerida || item.acao_sugerida || 'cancelar_futuro_indevido'}</p>}
+                  />
+                </div>
+                <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <Label htmlFor="confirmacao-legado-ativa-manual">Confirmação textual obrigatória</Label>
+                  <Input
+                    id="confirmacao-legado-ativa-manual"
+                    value={confirmacaoTextual}
+                    onChange={(event) => setConfirmacaoTextual(event.target.value)}
+                    placeholder={CONFIRMACAO_TEXTUAL}
+                    disabled={applying || Boolean(resultadoAplicacao?.ok)}
+                  />
+                  <p className="text-xs text-slate-500">Digite exatamente: <strong>{CONFIRMACAO_TEXTUAL}</strong></p>
+                  {motivoBloqueioAplicacao && !resultadoAplicacao?.ok && <p className="text-xs text-amber-700">{motivoBloqueioAplicacao}</p>}
+                </section>
                 <RelatorioAplicacao resultado={resultadoAplicacao} />
               </>
             ) : (
@@ -431,34 +373,27 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
 
         <DialogFooter className="gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange?.(false)}>Fechar</Button>
-          {usaFluxoPorPeriodo ? (
-            <AlertDialog open={confirmacaoManualAberta} onOpenChange={setConfirmacaoManualAberta}>
-              <AlertDialogTrigger asChild>
-                <Button type="button" disabled={!podeAplicarManual || Boolean(resultadoAplicacao?.ok)}>
+          <AlertDialog open={confirmacaoManualAberta} onOpenChange={setConfirmacaoManualAberta}>
+            <AlertDialogTrigger asChild>
+              <Button type="button" disabled={!podeAplicarArquivamento || Boolean(resultadoAplicacao?.ok)}>
+                {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Arquivar períodos da ativa
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Arquivar períodos da ativa</AlertDialogTitle>
+                <AlertDialogDescription>Deseja arquivar logicamente a cadeia antiga e cancelar períodos futuros indevidos deste contrato?</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={applying}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleAplicarArquivamento} disabled={applying}>
                   {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Aplicar transição
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Aplicar transição</AlertDialogTitle>
-                  <AlertDialogDescription>Deseja aplicar a transição de períodos para este contrato?</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={applying}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleAplicarManual} disabled={applying}>
-                    {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Aplicar transição
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <Button type="button" onClick={handleAplicarLegado} disabled={!podeAplicarLegado || Boolean(resultadoAplicacao?.ok)}>
-              {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Aplicar transição
-            </Button>
-          )}
+                  Arquivar períodos da ativa
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </DialogFooter>
       </DialogContent>
     </Dialog>
