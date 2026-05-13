@@ -5,6 +5,7 @@ import { Plus, FileText, Filter, CalendarRange, ShieldAlert, BookOpenText } from
 import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
+import { buildPublicacoesScopeKey, publicacoesQueryKeys } from '@/lib/publicacoesQueryKeys';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { Button } from '@/components/ui/button';
 import { calcularMetricasPublicacao, listarAtestadosPublicacaoEscopo, listarPublicacoesExOfficioEscopo } from '@/services/publicacoesPainelService';
@@ -42,12 +43,34 @@ function formatOperationalSummary({ inconsistentes = 0, aguardandoPublicacao = 0
 }
 
 export default function RP() {
-  const { canAccessModule, isAccessResolved, isLoading: loadingUser, isAdmin, getMilitarScopeFilters } = useCurrentUser();
+  const {
+    canAccessModule,
+    isAccessResolved,
+    isLoading: loadingUser,
+    isAdmin,
+    modoAcesso,
+    userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+    resolvedAccessContext,
+    getMilitarScopeFilters,
+  } = useCurrentUser();
 
   const hasAccess = canAccessModule('rp');
+  const rpScopeKey = useMemo(() => buildPublicacoesScopeKey({
+    isAdmin,
+    modoAcesso,
+    effectiveEmail: resolvedAccessContext?.effectiveEmail || userEmail,
+    linkedMilitarId,
+    subgrupamentoId,
+    subgrupamentoTipo,
+    unidadesFilhas,
+  }), [isAdmin, modoAcesso, resolvedAccessContext?.effectiveEmail, userEmail, linkedMilitarId, subgrupamentoId, subgrupamentoTipo, unidadesFilhas]);
 
   const { data: registrosBrutos = [], isLoading } = useQuery({
-    queryKey: ['registro-rp-lista', isAdmin],
+    queryKey: publicacoesQueryKeys.rpLista(rpScopeKey),
     queryFn: async () => {
       const [contratoLivro, publicacoesExOfficio, atestados] = await Promise.all([
         getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
