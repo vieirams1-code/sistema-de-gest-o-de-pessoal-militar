@@ -83,6 +83,14 @@ function CounterCard({ title, value, icon: Icon, color = 'slate' }) {
   );
 }
 
+function formatarPeriodoBloqueante(bloqueante) {
+  const referencia = bloqueante?.referencia ? `Ref. ${bloqueante.referencia}` : 'Sem referência';
+  const periodo = bloqueante?.periodo || 'Período não informado';
+  const status = bloqueante?.status ? `status ${bloqueante.status}` : 'status não informado';
+  const quantidade = Number(bloqueante?.quantidade_ferias || 0);
+  return `${referencia} — ${periodo} — ${status} — ${quantidade} férias vinculada(s)`;
+}
+
 function DetailItem({ label, value }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -133,6 +141,7 @@ export default function ContratosDesignacao() {
   const [contratoArquivamento, setContratoArquivamento] = useState(null);
   const [confirmarArquivamento, setConfirmarArquivamento] = useState(false);
   const [arquivandoPeriodos, setArquivandoPeriodos] = useState(false);
+  const [arquivamentoBloqueio, setArquivamentoBloqueio] = useState(null);
   const [novoContratoOpen, setNovoContratoOpen] = useState(false);
   const [salvandoContrato, setSalvandoContrato] = useState(false);
   const effectiveEmail = getEffectiveEmail();
@@ -187,6 +196,7 @@ export default function ContratosDesignacao() {
   const handleArquivarPeriodos = async () => {
     if (!contratoArquivamento || !confirmarArquivamento) return;
     setArquivandoPeriodos(true);
+    setArquivamentoBloqueio(null);
     try {
       const resultado = await arquivarPeriodosDesignacaoEmBloco({
         militarId: contratoArquivamento.militar_id,
@@ -207,6 +217,17 @@ export default function ContratosDesignacao() {
         description: `${resumo.arquivados || 0} arquivado(s), ${resumo.cancelados || 0} cancelado(s), ${resumo.ja_processados || 0} já processado(s).`,
       });
     } catch (error) {
+      if (error?.code === 'PERIODOS_COM_FERIAS_VINCULADAS') {
+        const bloqueantes = Array.isArray(error?.bloqueantes) ? error.bloqueantes : [];
+        setArquivamentoBloqueio({ mensagem: error.message, bloqueantes });
+        toast({
+          title: 'Arquivamento bloqueado por férias vinculadas',
+          description: 'Não foi possível arquivar/excluir os períodos porque existem férias lançadas em um ou mais períodos da cadeia antiga. Ajuste essas férias primeiro e tente novamente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       toast({
         title: 'Erro ao arquivar períodos',
         description: error?.message || 'Não foi possível concluir o arquivamento lógico.',
@@ -354,7 +375,7 @@ export default function ContratosDesignacao() {
                           </Button>
                           <Button type="button" variant="outline" size="sm" onClick={() => setContratoDetalhe(contrato)}><Eye size={14} className="mr-1" />Detalhes</Button>
                           {podeResolverPeriodos && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => { setContratoArquivamento(contrato); setConfirmarArquivamento(false); }} className="border-amber-200 text-amber-800 hover:bg-amber-50">
+                            <Button type="button" variant="outline" size="sm" onClick={() => { setContratoArquivamento(contrato); setConfirmarArquivamento(false); setArquivamentoBloqueio(null); }} className="border-amber-200 text-amber-800 hover:bg-amber-50">
                               <Archive size={14} className="mr-1" />Arquivar períodos da ativa
                             </Button>
                           )}
@@ -417,6 +438,24 @@ export default function ContratosDesignacao() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                   Resumo prévio: {legadoInfo.aplicado ? `${legadoInfo.totalPeriodos || 0} período(s) já marcado(s) como Legado da Ativa neste contrato.` : 'pendente de arquivamento lógico para este contrato.'}
                 </div>
+                {arquivamentoBloqueio && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900" role="alert">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+                      <div>
+                        <p className="font-semibold">Não foi possível arquivar/excluir os períodos porque existem férias lançadas em um ou mais períodos da cadeia antiga.</p>
+                        <p className="mt-1">Exclua ou corrija as férias vinculadas antes de continuar.</p>
+                        {arquivamentoBloqueio.bloqueantes?.length > 0 && (
+                          <ul className="mt-3 list-disc space-y-1 pl-5">
+                            {arquivamentoBloqueio.bloqueantes.map((bloqueante) => (
+                              <li key={bloqueante.id || `${bloqueante.referencia}-${bloqueante.periodo}`}>{formatarPeriodoBloqueante(bloqueante)}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm text-slate-700">
                   <input
                     type="checkbox"
@@ -428,7 +467,7 @@ export default function ContratosDesignacao() {
                 </label>
               </div>
               <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
-                <Button variant="outline" onClick={() => { setContratoArquivamento(null); setConfirmarArquivamento(false); }} disabled={arquivandoPeriodos}>Cancelar</Button>
+                <Button variant="outline" onClick={() => { setContratoArquivamento(null); setConfirmarArquivamento(false); setArquivamentoBloqueio(null); }} disabled={arquivandoPeriodos}>Cancelar</Button>
                 <Button onClick={handleArquivarPeriodos} disabled={!confirmarArquivamento || arquivandoPeriodos} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
                   {arquivandoPeriodos ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Archive className="mr-2 h-4 w-4" />}
                   Arquivar períodos

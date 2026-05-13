@@ -6,8 +6,10 @@ function normalizarArray(value) {
 }
 
 function criarErroArquivamento(body, fallback = 'Erro ao arquivar períodos da ativa.') {
-  const error = new Error(body?.error || fallback);
+  const error = new Error(body?.mensagem || body?.error || fallback);
   if (body?.meta?.status) error.status = body.meta.status;
+  if (body?.code) error.code = body.code;
+  error.bloqueantes = normalizarArray(body?.bloqueantes);
   error.body = body || {};
   return error;
 }
@@ -21,7 +23,14 @@ export async function arquivarPeriodosDesignacaoEmBloco({ militarId, contratoDes
   };
   if (effectiveEmail) payload.effectiveEmail = effectiveEmail;
 
-  const response = await base44.functions.invoke('arquivarPeriodosDesignacaoEmBloco', payload);
+  let response;
+  try {
+    response = await base44.functions.invoke('arquivarPeriodosDesignacaoEmBloco', payload);
+  } catch (error) {
+    const body = error?.response?.data || error?.data || error?.body || null;
+    if (body) throw criarErroArquivamento(body, error?.message);
+    throw error;
+  }
   const body = response?.data ?? response ?? {};
 
   if (body?.error || body?.ok === false) throw criarErroArquivamento(body);

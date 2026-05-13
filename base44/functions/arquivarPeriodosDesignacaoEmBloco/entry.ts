@@ -100,8 +100,9 @@ function normalizarStatusContratoDesignacao(status: unknown) {
 
 function feriasVinculadaAoPeriodo(ferias: any, periodo: any) {
   const periodoId = getId(periodo);
-  if (periodoId && String(ferias?.periodo_aquisitivo_id || '') === String(periodoId)) return true;
-  if (ferias?.periodo_aquisitivo_ref && periodo?.ano_referencia && String(ferias.periodo_aquisitivo_ref) === String(periodo.ano_referencia)) return true;
+  const periodoRef = periodo?.periodo_aquisitivo_ref || periodo?.ano_referencia || null;
+  if (periodoId && String(ferias?.periodo_aquisitivo_id || '').trim() === String(periodoId).trim()) return true;
+  if (periodoRef && String(ferias?.periodo_aquisitivo_ref || '').trim() === String(periodoRef).trim()) return true;
   return false;
 }
 
@@ -131,6 +132,10 @@ function isFuturoIndevido(periodo: any, contrato: any, dataBase: string) {
   return compareDateOnly(inicio, dataBase) >= 0 || compareDateOnly(fim, dataBase) >= 0;
 }
 
+function quantidadeFeriasVinculadas(ferias: any[], periodo: any) {
+  return (ferias || []).filter((item: any) => feriasVinculadaAoPeriodo(item, periodo)).length;
+}
+
 function resumoPeriodo(periodo: any, extra: Record<string, unknown> = {}) {
   return {
     id: getId(periodo),
@@ -141,6 +146,16 @@ function resumoPeriodo(periodo: any, extra: Record<string, unknown> = {}) {
     inativo: periodo?.inativo === true,
     origem_periodo: periodo?.origem_periodo || null,
     ...extra,
+  };
+}
+
+function resumoBloqueante(periodo: any, quantidadeFerias: number) {
+  return {
+    id: getId(periodo),
+    periodo: [normalizeDateOnly(periodo?.inicio_aquisitivo) || periodo?.inicio_aquisitivo, normalizeDateOnly(periodo?.fim_aquisitivo) || periodo?.fim_aquisitivo].filter(Boolean).join(' a ') || null,
+    referencia: periodo?.periodo_aquisitivo_ref || periodo?.ano_referencia || null,
+    status: periodo?.status || null,
+    quantidade_ferias: quantidadeFerias,
   };
 }
 
@@ -190,6 +205,30 @@ Deno.serve(async (req) => {
       fetchWithRetry(() => base44.asServiceRole.entities.Ferias.filter({ militar_id: militarId }, undefined, 1000, 0), `Ferias:${militarId}`),
     ]);
 
+    const periodosAlvo = (periodos || [])
+      .map((periodo: any) => {
+        const fim = normalizeDateOnly(periodo?.fim_aquisitivo);
+        const anterior = fim ? compareDateOnly(fim, dataBase) === -1 : false;
+        const futuroIndevido = isFuturoIndevido(periodo, contrato, dataBase);
+        const jaProcessado = isJaProcessado(periodo, contratoDesignacaoId, dataBase);
+        return { periodo, fim, anterior, futuroIndevido, jaProcessado };
+      })
+      .filter((item: any) => (item.anterior || item.futuroIndevido) && !item.jaProcessado);
+
+    const bloqueantes = periodosAlvo
+      .map((item: any) => ({ periodo: item.periodo, quantidadeFerias: quantidadeFeriasVinculadas(ferias || [], item.periodo) }))
+      .filter((item: any) => item.quantidadeFerias > 0)
+      .map((item: any) => resumoBloqueante(item.periodo, item.quantidadeFerias));
+
+    if (bloqueantes.length > 0) {
+      const mensagem = 'Existem férias lançadas em períodos que precisam ser ajustados. Exclua ou corrija essas férias antes de arquivar/excluir os períodos.';
+      return erro(mensagem, 409, {
+        code: 'PERIODOS_COM_FERIAS_VINCULADAS',
+        mensagem,
+        bloqueantes,
+      });
+    }
+
     const nowIso = new Date().toISOString();
     const userEmailEfetivo = normalizeEmail(targetEmail) || authEmail || null;
     const detalhes: any[] = [];
@@ -200,8 +239,6 @@ Deno.serve(async (req) => {
       const fim = normalizeDateOnly(periodo?.fim_aquisitivo);
       const anterior = fim ? compareDateOnly(fim, dataBase) === -1 : false;
       const futuroIndevido = isFuturoIndevido(periodo, contrato, dataBase);
-      const feriasRelacionadas = (ferias || []).filter((item: any) => feriasVinculadaAoPeriodo(item, periodo));
-      const temFerias = feriasRelacionadas.length > 0;
 
       if (!anterior && !futuroIndevido) {
         resumo.ignorados += 1;
@@ -237,15 +274,7 @@ Deno.serve(async (req) => {
 
         await fetchWithRetry(() => base44.asServiceRole.entities.PeriodoAquisitivo.update(periodoId, patch), `PeriodoAquisitivo.arquivar:${periodoId}`);
         resumo.arquivados += 1;
-        if (temFerias) resumo.com_ferias_vinculadas += 1;
-        detalhes.push(resumoPeriodo(periodo, { acao: 'arquivar_legado_ativa', ferias_vinculadas: feriasRelacionadas.length }));
-        continue;
-      }
-
-      if (futuroIndevido && temFerias) {
-        resumo.ignorados += 1;
-        resumo.com_ferias_vinculadas += 1;
-        detalhes.push(resumoPeriodo(periodo, { acao: 'ignorado', motivo: 'futuro_indevido_com_ferias_vinculadas', ferias_vinculadas: feriasRelacionadas.length }));
+        detalhes.push(resumoPeriodo(periodo, { acao: 'arquivar_legado_ativa', ferias_vinculadas: 0 }));
         continue;
       }
 
