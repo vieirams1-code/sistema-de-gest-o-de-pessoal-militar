@@ -26,6 +26,8 @@ import {
   getLotacaoAtualMilitar,
   militarCorrespondeBusca,
 } from '@/services/matriculaMilitarViewService';
+import MultiSelectFiltro from '@/components/militar/MultiSelectFiltro';
+import CondicaoBadge from '@/components/militar/CondicaoBadge';
 import { excluirMilitarComDependencias } from '@/services/militarExclusaoService';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
@@ -117,12 +119,46 @@ const SITUACAO_MILITAR_BADGES = {
   'Reformado': { label: 'Reformado', className: 'bg-slate-100 text-slate-600 border-slate-200' },
 };
 
-const GRADUACAO_GROUPS = [
-  { key: 'oficiais', label: 'Oficiais', postos: ['Coronel', 'Tenente Coronel', 'Tenente-Coronel', 'Major', 'Capitão', '1º Tenente', '2º Tenente', 'Aspirante'] },
-  { key: 'sargentos', label: 'Sargentos', postos: ['Subtenente', '1º Sargento', '2º Sargento', '3º Sargento'] },
-  { key: 'cabos', label: 'Cabos', postos: ['Cabo'] },
-  { key: 'soldados', label: 'Soldados', postos: ['Soldado'] },
+const POSTOS_GRADUACOES_OPCOES = [
+  { value: 'Coronel', label: 'Coronel' },
+  { value: 'Tenente Coronel', label: 'Tenente Coronel' },
+  { value: 'Major', label: 'Major' },
+  { value: 'Capitão', label: 'Capitão' },
+  { value: '1º Tenente', label: '1º Tenente' },
+  { value: '2º Tenente', label: '2º Tenente' },
+  { value: 'Aspirante', label: 'Aspirante' },
+  { value: 'Subtenente', label: 'Subtenente' },
+  { value: '1º Sargento', label: '1º Sargento' },
+  { value: '2º Sargento', label: '2º Sargento' },
+  { value: '3º Sargento', label: '3º Sargento' },
+  { value: 'Cabo', label: 'Cabo' },
+  { value: 'Soldado', label: 'Soldado' },
 ];
+
+const SITUACOES_OPCOES = [
+  { value: 'Ativa', label: 'Ativa' },
+  { value: 'Designado', label: 'Designado' },
+  { value: 'Convocado', label: 'Convocado' },
+  { value: 'Reserva Remunerada', label: 'Reserva Remunerada' },
+  { value: 'Reformado', label: 'Reformado' },
+];
+
+const CONDICOES_TODAS = '__todas_condicoes__';
+const CONDICOES_OPCOES = ['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição'];
+
+const MOVIMENTO_TODOS = 'todos';
+const MOVIMENTO_OPCOES = [
+  { value: MOVIMENTO_TODOS, label: 'Entradas e saídas' },
+  { value: 'entrada', label: 'Somente entradas' },
+  { value: 'saida', label: 'Somente saídas' },
+];
+
+function militarCorrespondeOrigemDestino(militar, termo) {
+  const q = String(termo || '').trim().toLowerCase();
+  if (!q) return true;
+  const texto = String(militar?.condicao_origem_destino || militar?.destino || '').toLowerCase();
+  return texto.includes(q);
+}
 
 export default function Militares() {
   const navigate = useNavigate();
@@ -141,29 +177,29 @@ export default function Militares() {
 
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('q') || '');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(() => searchParams.get('q') || '');
-  const [selectedGroups, setSelectedGroups] = useState([]);
-  const [debouncedGroups, setDebouncedGroups] = useState([]);
+  const [postosSelecionados, setPostosSelecionados] = useState([]);
+  const [debouncedPostos, setDebouncedPostos] = useState([]);
+  const [quadrosSelecionados, setQuadrosSelecionados] = useState([]);
+  const [situacoesSelecionadas, setSituacoesSelecionadas] = useState([]);
+  const [condicaoFilter, setCondicaoFilter] = useState(CONDICOES_TODAS);
+  const [movimentoFilter, setMovimentoFilter] = useState(MOVIMENTO_TODOS);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODAS_LOTACOES_VALUE);
-  const [quadroFilter, setQuadroFilter] = useState('todos');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [militarToDelete, setMilitarToDelete] = useState(null);
   const [militarPromocaoAtual, setMilitarPromocaoAtual] = useState(null);
   const [mostrarInativos, setMostrarInativos] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedGroups(selectedGroups), 300);
+    const t = setTimeout(() => setDebouncedPostos(postosSelecionados), 300);
     return () => clearTimeout(t);
-  }, [selectedGroups]);
+  }, [postosSelecionados]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  const selectedPostos = useMemo(() => {
-    const postos = GRADUACAO_GROUPS.filter((g) => debouncedGroups.includes(g.key)).flatMap((g) => g.postos);
-    return [...new Set(postos)];
-  }, [debouncedGroups]);
+  const selectedPostos = debouncedPostos;
 
   const effectiveEmail = getEffectiveEmail();
   const shouldQuery = isAccessResolved;
@@ -225,7 +261,6 @@ export default function Militares() {
     isAdmin,
     lotacaoFilter,
     selectedPostos.join('|'),
-    quadroFilter,
     debouncedSearchTerm,
     effectiveEmail || 'self',
     incluirInativos ? 'todos' : 'ativos',
@@ -270,14 +305,36 @@ export default function Militares() {
 
   const militares = useMemo(() => militaresData?.militares || [], [militaresData]);
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos });
-  const quadrosDisponiveis = useMemo(() => QUADROS_FIXOS.map((quadro) => ({ value: quadro, label: quadro })), []);
+  const quadrosDisponiveis = useMemo(
+    () => QUADROS_FIXOS.map((quadro) => ({ value: quadro, label: quadro })),
+    [],
+  );
 
   const filteredMilitares = operacionais
     .filter((m) => {
-      if (quadroFilter === 'todos') return true;
-      return normalizarQuadroLegado(m?.quadro) === quadroFilter;
+      if (quadrosSelecionados.length === 0) return true;
+      return quadrosSelecionados.includes(normalizarQuadroLegado(m?.quadro));
     })
-    .filter((m) => militarCorrespondeBusca(m, searchTerm));
+    .filter((m) => {
+      if (situacoesSelecionadas.length === 0) return true;
+      const situacao = String(m?.situacao_militar || 'Ativa');
+      return situacoesSelecionadas.includes(situacao);
+    })
+    .filter((m) => {
+      if (condicaoFilter === CONDICOES_TODAS) return true;
+      const cond = String(m?.condicao || '').trim() || 'Efetivo';
+      return cond === condicaoFilter;
+    })
+    .filter((m) => {
+      if (movimentoFilter === MOVIMENTO_TODOS) return true;
+      const cond = String(m?.condicao || '').trim();
+      if (!cond || cond === 'Efetivo') return false;
+      return String(m?.condicao_movimento || '').toLowerCase() === movimentoFilter;
+    })
+    .filter((m) => (
+      militarCorrespondeBusca(m, searchTerm)
+      || militarCorrespondeOrigemDestino(m, searchTerm)
+    ));
 
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
@@ -321,54 +378,82 @@ export default function Militares() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {GRADUACAO_GROUPS.map((group) => (
-              <Button
-                key={group.key}
-                size="sm"
-                variant={selectedGroups.includes(group.key) ? 'default' : 'outline'}
-                onClick={() => setSelectedGroups((prev) =>
-                  prev.includes(group.key) ? prev.filter((k) => k !== group.key) : [...prev, group.key]
-                )}
-                className={selectedGroups.includes(group.key) ? 'bg-[#1e3a5f]' : ''}
-              >
-                {group.label}
-              </Button>
-            ))}
-          </div>
-          <div className="flex flex-col md:flex-row gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {shouldShowLotacaoFilter && (
-              <HierarchicalLotacaoSelect
-                tree={lotacoesTree}
-                value={lotacaoFilter}
-                onChange={setLotacaoFilter}
-                placeholder="Todas as lotações"
-              />
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1 block">Lotação</label>
+                <HierarchicalLotacaoSelect
+                  tree={lotacoesTree}
+                  value={lotacaoFilter}
+                  onChange={setLotacaoFilter}
+                  placeholder="Todas as lotações"
+                />
+              </div>
             )}
-            <Select value={quadroFilter} onValueChange={setQuadroFilter}>
-              <SelectTrigger className="md:w-56">
-                <SelectValue placeholder="Selecione um quadro" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os quadros</SelectItem>
-                {quadrosDisponiveis.map((quadro) => (
-                  <SelectItem key={quadro.value} value={quadro.value}>{quadro.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="relative flex-1">
+            <MultiSelectFiltro
+              label="Postos/Graduações"
+              placeholder="Todos"
+              options={POSTOS_GRADUACOES_OPCOES}
+              value={postosSelecionados}
+              onChange={setPostosSelecionados}
+              triggerClassName="w-full"
+            />
+            <MultiSelectFiltro
+              label="Quadros"
+              placeholder="Todos"
+              options={quadrosDisponiveis}
+              value={quadrosSelecionados}
+              onChange={setQuadrosSelecionados}
+              triggerClassName="w-full"
+            />
+            <MultiSelectFiltro
+              label="Situação Militar"
+              placeholder="Todas"
+              options={SITUACOES_OPCOES}
+              value={situacoesSelecionadas}
+              onChange={setSituacoesSelecionadas}
+              triggerClassName="w-full"
+            />
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Condição</label>
+              <Select value={condicaoFilter} onValueChange={setCondicaoFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CONDICOES_TODAS}>Todas</SelectItem>
+                  {CONDICOES_OPCOES.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Movimento</label>
+              <Select value={movimentoFilter} onValueChange={setMovimentoFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOVIMENTO_OPCOES.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex flex-col md:flex-row gap-3 items-end">
+            <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
                 className="pl-9"
-                placeholder="Buscar nome ou matrícula..."
+                placeholder="Buscar nome, matrícula, origem ou destino..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-          </div>
-          {isAdmin && (
-            <div className="flex items-center gap-2 pt-1">
-              <label className="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+            {isAdmin && (
+              <label className="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none whitespace-nowrap">
                 <input
                   type="checkbox"
                   className="rounded border-slate-300 text-[#1e3a5f] focus:ring-[#1e3a5f]"
@@ -377,8 +462,8 @@ export default function Militares() {
                 />
                 Mostrar militares inativos
               </label>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {shouldShowLotacaoFilter && isErrorLotacoes && (
@@ -429,7 +514,10 @@ export default function Militares() {
                 pagina: 'Militares',
                 lotacaoFilter,
                 selectedPostos,
-                quadroFilter,
+                quadrosSelecionados,
+                situacoesSelecionadas,
+                condicaoFilter,
+                movimentoFilter,
                 debouncedSearchTerm,
                 meta: militaresData?.meta || null,
                 totalRetornado: militaresData?.totalRetornado || 0,
@@ -440,13 +528,14 @@ export default function Militares() {
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
-              <div className="col-span-2">Graduação</div>
-              <div className="col-span-2">Nome/Nome de guerra</div>
-              <div className="col-span-2">Matrícula</div>
+              <div className={mostrarInativos ? 'col-span-2' : 'col-span-2'}>Graduação</div>
+              <div className={mostrarInativos ? 'col-span-2' : 'col-span-2'}>Nome/Nome de guerra</div>
+              <div className="col-span-1">Matrícula</div>
               <div className="col-span-1">Quadro</div>
               <div className="col-span-1">Lotação</div>
-              <div className="col-span-2">Situação</div>
-              <div className="col-span-1">Status</div>
+              <div className={mostrarInativos ? 'col-span-1' : 'col-span-2'}>Situação</div>
+              <div className="col-span-2">Condição</div>
+              {mostrarInativos && <div className="col-span-1">Status Cadastro</div>}
               <div className="col-span-1 text-right">Ações</div>
             </div>
             {filteredMilitares.map((militar) => {
@@ -462,10 +551,10 @@ export default function Militares() {
                   <div className="font-medium truncate">{militar.nome_guerra || militar.nome_completo}</div>
                   <div className="text-xs text-slate-500 truncate">{militar.nome_completo}</div>
                 </div>
-                <div className="col-span-2 truncate">{militar.matricula || '—'}</div>
+                <div className="col-span-1 truncate">{militar.matricula || '—'}</div>
                 <div className="col-span-1 truncate">{militar.quadro || '—'}</div>
                 <div className="col-span-1 truncate">{militar.lotacao_atual || 'Sem lotação'}</div>
-                <div className="col-span-2">
+                <div className={mostrarInativos ? 'col-span-1' : 'col-span-2'}>
                   {SITUACAO_MILITAR_BADGES[militar.situacao_militar] ? (
                     <Badge
                       variant="outline"
@@ -477,11 +566,16 @@ export default function Militares() {
                     <span className="text-xs text-slate-400">—</span>
                   )}
                 </div>
-                <div className="col-span-1">
-                  <Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>
-                    {militar.status_cadastro || 'Ativo'}
-                  </Badge>
+                <div className="col-span-2 min-w-0">
+                  <CondicaoBadge militar={militar} />
                 </div>
+                {mostrarInativos && (
+                  <div className="col-span-1">
+                    <Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>
+                      {militar.status_cadastro || 'Ativo'}
+                    </Badge>
+                  </div>
+                )}
                 <div className="col-span-1 flex justify-end gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}>
                     <Eye className="w-4 h-4" />

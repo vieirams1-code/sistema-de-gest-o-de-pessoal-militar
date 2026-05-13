@@ -31,6 +31,8 @@ const initialFormData = {
   lotacao: '',
   condicao: '',
   destino: '',
+  condicao_movimento: '',
+  condicao_origem_destino: '',
   nome_guerra: '',
   matricula: '',
   subgrupamento_id: '',
@@ -265,6 +267,23 @@ export default function CadastrarMilitar() {
       return;
     }
 
+    const condicaoNaoEfetiva = ['Adido', 'Agregado', 'Cedido', 'À Disposição'].includes(formData.condicao);
+    if (condicaoNaoEfetiva) {
+      if (!formData.condicao_movimento) {
+        window.alert('Informe o Movimento da Condição (Entrada ou Saída).');
+        return;
+      }
+      const textoOrigemDestino = String(formData.condicao_origem_destino || '').trim();
+      if (!textoOrigemDestino) {
+        window.alert(
+          formData.condicao_movimento === 'saida'
+            ? 'Informe o destino (órgão/unidade) da condição.'
+            : 'Informe a origem (órgão/unidade) da condição.',
+        );
+        return;
+      }
+    }
+
     setLoading(true);
 
     const dataToSave = {
@@ -275,6 +294,12 @@ export default function CadastrarMilitar() {
       altura: formData.altura ? parseFloat(formData.altura) : null,
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
+
+    // Quando condição é Efetivo (ou vazia), limpa campos relacionados a movimento
+    if (!condicaoNaoEfetiva) {
+      dataToSave.condicao_movimento = '';
+      dataToSave.condicao_origem_destino = '';
+    }
 
     // Preencher subgrupamento automaticamente para usuários não-admin
     if (!editId && !isAdmin && subgrupamentoId) {
@@ -449,7 +474,7 @@ export default function CadastrarMilitar() {
                   name="funcao"
                 />
                 <FormField
-                  label="Condição"
+                  label="Condição do Militar"
                   name="condicao"
                   value={formData.condicao}
                   onChange={handleChange}
@@ -457,13 +482,41 @@ export default function CadastrarMilitar() {
                   options={['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição']}
                 />
                 {['Adido', 'Agregado', 'Cedido', 'À Disposição'].includes(formData.condicao) && (
-                  <FormField
-                    label="Destino"
-                    name="destino"
-                    value={formData.destino}
-                    onChange={handleChange}
-                    className="md:col-span-2"
-                  />
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700">
+                        Movimento da Condição
+                        <span className="text-red-500 ml-1">*</span>
+                      </label>
+                      <Select
+                        value={formData.condicao_movimento || ''}
+                        onValueChange={(v) => handleChange('condicao_movimento', v)}
+                      >
+                        <SelectTrigger className="h-10 border-slate-200 focus:border-[#1e3a5f] focus:ring-[#1e3a5f]/20">
+                          <SelectValue placeholder="Selecione o movimento..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="entrada">Entrada (veio de outro órgão)</SelectItem>
+                          <SelectItem value="saida">Saída (foi para outro órgão)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <FormField
+                      label={formData.condicao_movimento === 'saida' ? 'Destino' : 'Origem'}
+                      name="condicao_origem_destino"
+                      value={formData.condicao_origem_destino || formData.destino || ''}
+                      onChange={handleChange}
+                      className="md:col-span-2"
+                      required
+                      hint={
+                        formData.condicao_movimento === 'saida'
+                          ? 'Informe o órgão/unidade de destino.'
+                          : formData.condicao_movimento === 'entrada'
+                            ? 'Informe o órgão/unidade de origem.'
+                            : 'Selecione antes o Movimento da Condição.'
+                      }
+                    />
+                  </>
                 )}
               </div>
             </div>

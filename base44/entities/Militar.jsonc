@@ -1,0 +1,332 @@
+{
+  "name": "Militar",
+  "type": "object",
+  "properties": {
+    "nome_completo": {
+      "type": "string",
+      "description": "Nome completo do militar"
+    },
+    "foto": {
+      "type": "string",
+      "description": "URL da foto do militar"
+    },
+    "status_cadastro": {
+      "type": "string",
+      "enum": [
+        "Ativo",
+        "Inativo"
+      ],
+      "default": "Ativo"
+    },
+    "situacao_militar": {
+      "type": "string",
+      "enum": [
+        "Ativa",
+        "Reserva Remunerada",
+        "Reformado",
+        "Designado",
+        "Convocado"
+      ],
+      "default": "Ativa"
+    },
+    "funcao": {
+      "type": "string"
+    },
+    "lotacao": {
+      "type": "string"
+    },
+    "condicao": {
+      "type": "string",
+      "enum": [
+        "Efetivo",
+        "Adido",
+        "Agregado",
+        "Cedido",
+        "\u00c0 Disposi\u00e7\u00e3o"
+      ]
+    },
+    "destino": {
+      "type": "string",
+      "description": "Campo legado \u2014 substitu\u00eddo por condicao_origem_destino. Mantido para compatibilidade."
+    },
+    "condicao_movimento": {
+      "type": "string",
+      "enum": [
+        "entrada",
+        "saida"
+      ],
+      "description": "Movimento da condi\u00e7\u00e3o do militar. 'entrada' indica que veio de outro \u00f3rg\u00e3o; 'saida' indica que foi para outro \u00f3rg\u00e3o. N\u00e3o se aplica quando condicao = Efetivo."
+    },
+    "condicao_origem_destino": {
+      "type": "string",
+      "description": "Texto livre da origem (quando movimento = entrada) ou destino (quando movimento = saida) da condi\u00e7\u00e3o. N\u00e3o se aplica quando condicao = Efetivo."
+    },
+    "nome_guerra": {
+      "type": "string"
+    },
+    "matricula": {
+      "type": "string"
+    },
+    "posto_graduacao": {
+      "type": "string",
+      "enum": [
+        "Coronel",
+        "Tenente Coronel",
+        "Major",
+        "Capit\u00e3o",
+        "1\u00ba Tenente",
+        "2\u00ba Tenente",
+        "Aspirante",
+        "Subtenente",
+        "1\u00ba Sargento",
+        "2\u00ba Sargento",
+        "3\u00ba Sargento",
+        "Cabo",
+        "Soldado"
+      ]
+    },
+    "quadro": {
+      "type": "string",
+      "enum": [
+        "QOBM",
+        "QAOBM",
+        "QOEBM",
+        "QOSAU",
+        "QBMP-1.a",
+        "QBMP-1.b",
+        "QBMP-2",
+        "QBMPT"
+      ]
+    },
+    "data_inclusao": {
+      "type": "string",
+      "format": "date"
+    },
+    "comportamento": {
+      "type": "string",
+      "enum": [
+        "Excepcional",
+        "\u00d3timo",
+        "Bom",
+        "Insuficiente",
+        "MAU"
+      ],
+      "default": "Bom"
+    },
+    "data_nascimento": {
+      "type": "string",
+      "format": "date"
+    },
+    "sexo": {
+      "type": "string",
+      "enum": [
+        "Masculino",
+        "Feminino"
+      ]
+    },
+    "estado_civil": {
+      "type": "string",
+      "enum": [
+        "Solteiro(a)",
+        "Casado(a)",
+        "Divorciado(a)",
+        "Vi\u00favo(a)",
+        "Uni\u00e3o Est\u00e1vel"
+      ]
+    },
+    "tipo_sanguineo": {
+      "type": "string",
+      "enum": [
+        "A+",
+        "A-",
+        "B+",
+        "B-",
+        "AB+",
+        "AB-",
+        "O+",
+        "O-"
+      ]
+    },
+    "religiao": {
+      "type": "string"
+    },
+    "escolaridade": {
+      "type": "string",
+      "enum": [
+        "Ensino Fundamental Incompleto",
+        "Ensino Fundamental Completo",
+        "Ensino M\u00e9dio Incompleto",
+        "Ensino M\u00e9dio Completo",
+        "Ensino Superior Incompleto",
+        "Ensino Superior Completo",
+        "P\u00f3s-Gradua\u00e7\u00e3o",
+        "Mestrado",
+        "Doutorado"
+      ]
+    },
+    "curso_superior": {
+      "type": "string"
+    },
+    "pos_graduacao": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mestrado": {
+      "type": "string"
+    },
+    "doutorado": {
+      "type": "string"
+    },
+    "naturalidade": {
+      "type": "string"
+    },
+    "naturalidade_uf": {
+      "type": "string"
+    },
+    "nome_pai": {
+      "type": "string"
+    },
+    "nome_mae": {
+      "type": "string"
+    },
+    "rg": {
+      "type": "string"
+    },
+    "orgao_expedidor_rg": {
+      "type": "string"
+    },
+    "uf_rg": {
+      "type": "string"
+    },
+    "cnh_categoria": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "AB",
+        "C",
+        "D",
+        "E",
+        "AC",
+        "AD",
+        "AE"
+      ]
+    },
+    "cnh_validade": {
+      "type": "string",
+      "format": "date"
+    },
+    "cnh_numero": {
+      "type": "string"
+    },
+    "cpf": {
+      "type": "string"
+    },
+    "banco": {
+      "type": "string"
+    },
+    "agencia": {
+      "type": "string"
+    },
+    "conta": {
+      "type": "string"
+    },
+    "email_particular": {
+      "type": "string",
+      "format": "email"
+    },
+    "telefone": {
+      "type": "string"
+    },
+    "email_funcional": {
+      "type": "string",
+      "format": "email"
+    },
+    "altura": {
+      "type": "number"
+    },
+    "peso": {
+      "type": "number"
+    },
+    "etnia": {
+      "type": "string",
+      "enum": [
+        "Branca",
+        "Preta",
+        "Parda",
+        "Amarela",
+        "Ind\u00edgena"
+      ]
+    },
+    "logradouro": {
+      "type": "string"
+    },
+    "numero_endereco": {
+      "type": "string"
+    },
+    "cep": {
+      "type": "string"
+    },
+    "bairro": {
+      "type": "string"
+    },
+    "cidade": {
+      "type": "string"
+    },
+    "uf": {
+      "type": "string"
+    },
+    "complemento": {
+      "type": "string"
+    },
+    "habilidades": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "grupamento_id": {
+      "type": "string",
+      "description": "Campo legado \u2014 ID do grupamento ao qual o militar pertence"
+    },
+    "grupamento_nome": {
+      "type": "string",
+      "description": "Campo legado \u2014 Nome do grupamento (denormalizado)"
+    },
+    "subgrupamento_id": {
+      "type": "string",
+      "description": "Campo legado \u2014 ID do subgrupamento ao qual o militar pertence"
+    },
+    "subgrupamento_nome": {
+      "type": "string",
+      "description": "Campo legado \u2014 Nome do subgrupamento (denormalizado)"
+    },
+    "estrutura_id": {
+      "type": "string",
+      "description": "ID do n\u00f3 da estrutura organizacional (Subgrupamento) ao qual o militar est\u00e1 lotado. Suporta os 3 n\u00edveis: Grupamento, Subgrupamento ou Unidade."
+    },
+    "estrutura_nome": {
+      "type": "string",
+      "description": "Nome do n\u00f3 da estrutura (denormalizado)"
+    },
+    "estrutura_tipo": {
+      "type": "string",
+      "enum": [
+        "Grupamento",
+        "Subgrupamento",
+        "Unidade"
+      ],
+      "description": "Tipo do n\u00f3 da estrutura ao qual o militar est\u00e1 lotado"
+    },
+    "link_alteracoes_anteriores": {
+      "type": "string",
+      "description": "Link para pasta no Drive com altera\u00e7\u00f5es anteriores do militar"
+    }
+  },
+  "required": [
+    "nome_completo",
+    "matricula"
+  ]
+}
