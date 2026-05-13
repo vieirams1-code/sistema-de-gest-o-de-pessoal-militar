@@ -28,6 +28,7 @@ const initialFormData = {
   militar_matricula_atual: '',
   militar_matricula_vinculo: '',
   medico: '',
+  crm_medico: '',
   arquivo_atestado: '',
   tipo_afastamento: 'Afastamento Total',
   cid_10: '',
@@ -248,13 +249,23 @@ export default function CadastrarAtestado() {
           {/* Dados do Atestado */}
           <FormSection title="Dados do Atestado" icon={FileText}>
             <div className="space-y-4">
-              <FormField
-                label="Nome do Médico"
-                name="medico"
-                value={formData.medico}
-                onChange={handleChange}
-                placeholder="Dr(a)..."
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  label="Nome do Médico"
+                  name="medico"
+                  value={formData.medico}
+                  onChange={handleChange}
+                  placeholder="Dr(a)..."
+                />
+
+                <FormField
+                  label="CRM do Médico"
+                  name="crm_medico"
+                  value={formData.crm_medico}
+                  onChange={handleChange}
+                  placeholder="Ex.: CRM/UF 123456"
+                />
+              </div>
 
               <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-lg">
                 <Checkbox

@@ -613,10 +613,13 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
           </div>
         )}
 
-        {(atestado.medico || atestado.observacoes) && (
+        {(atestado.medico || atestado.crm_medico || atestado.observacoes) && (
           <div className="grid grid-cols-1 gap-2 text-sm">
             {atestado.medico && (
               <p className="text-slate-700"><span className="text-slate-500">Médico:</span> {atestado.medico}</p>
+            )}
+            {atestado.crm_medico && (
+              <p className="text-slate-700"><span className="text-slate-500">CRM:</span> {atestado.crm_medico}</p>
             )}
             {atestado.observacoes && (
               <p className="text-slate-700 whitespace-pre-wrap"><span className="text-slate-500">Observações:</span> {atestado.observacoes}</p>

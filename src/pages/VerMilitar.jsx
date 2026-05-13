@@ -794,7 +794,7 @@ export default function VerMilitar() {
                     <Badge className={a.status === 'Ativo' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}>{a.status}</Badge>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    {formatDate(a.data_inicio)} — {a.dias} dias — Dr(a). {a.medico || '—'}
+                    {formatDate(a.data_inicio)} — {a.dias} dias — Dr(a). {a.medico || '—'}{a.crm_medico ? ` — CRM: ${a.crm_medico}` : ''}
                   </p>
                 </div>
               )}

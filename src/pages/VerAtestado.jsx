@@ -288,10 +288,11 @@ export default function VerAtestado() {
         {/* Content Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Dados do Médico */}
-          {(atestado.medico || atestado.tipo) && (
+          {(atestado.medico || atestado.crm_medico || atestado.tipo) && (
             <Section title="Informações Médicas" icon={Stethoscope}>
               <div className="space-y-2">
                 <InfoItem label="Médico Responsável" value={atestado.medico} />
+                <InfoItem label="CRM do Médico" value={atestado.crm_medico} />
                 <InfoItem label="Tipo de Atestado" value={atestado.tipo} />
                 {atestado.acompanhado && atestado.grau_parentesco && (
                   <InfoItem label="Grau de Parentesco" value={atestado.grau_parentesco} />
