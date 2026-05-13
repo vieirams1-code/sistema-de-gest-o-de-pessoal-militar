@@ -26,6 +26,8 @@ import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/ferias
 import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
 import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOperacionais';
+import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
+import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {
@@ -68,29 +70,45 @@ export default function CadastrarFerias() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
   const queryClient = useQueryClient();
-  const { canAccessModule, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const {
+    isAdmin,
+    modoAcesso,
+    userEmail,
+    canAccessModule,
+    isLoading: loadingUser,
+    isAccessResolved,
+  } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasFeriasAccess = canAccessModule('ferias');
-
+  const effectiveEmail = getEffectiveEmail();
 
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [opcaoFracao, setOpcaoFracao] = useState(0);
   const [fracoes, setFracoes] = useState([{ dias: 30, data_inicio: '', data_fim: '', data_retorno: '' }]);
 
-  // Carregar férias existentes do militar para validação
-  const { data: feriasExistentes = [] } = useQuery({
-    queryKey: ['ferias-existentes', formData.militar_id],
-    queryFn: () => base44.entities.Ferias.filter({ militar_id: formData.militar_id }),
-    enabled: !!formData.militar_id
+  // Bundle escopado de períodos aquisitivos e férias do militar para evitar cache vazio/race condition.
+  const { data: paBundle, isLoading: loadingPaBundle } = useQuery({
+    queryKey: [
+      'cadastrar-ferias-pa-bundle',
+      Boolean(isAdmin),
+      modoAcesso || null,
+      userEmail || null,
+      effectiveEmail || null,
+      formData.militar_id || null
+    ],
+    queryFn: () => fetchScopedPeriodosAquisitivosBundle(),
+    enabled: isAccessResolved && hasFeriasAccess && !!formData.militar_id,
+    refetchOnMount: 'always',
+    staleTime: 0,
+    placeholderData: undefined
   });
 
-  // Períodos aquisitivos ativos do militar
-  const { data: periodosExistentes = [] } = useQuery({
-    queryKey: ['periodos-existentes', formData.militar_id],
-    queryFn: () => base44.entities.PeriodoAquisitivo.filter({ militar_id: formData.militar_id }),
-    enabled: !!formData.militar_id
-  });
+  const periodosExistentes = (paBundle?.periodosAquisitivos || [])
+    .filter(p => String(p.militar_id) === String(formData.militar_id));
+
+  const feriasExistentes = (paBundle?.ferias || [])
+    .filter(f => String(f.militar_id) === String(formData.militar_id));
 
   // Só períodos disponíveis operacionalmente para novas férias.
   const periodosAtivos = periodosExistentes.filter(isPeriodoDisponivelOperacional);
@@ -103,7 +121,7 @@ export default function CadastrarFerias() {
       const list = await base44.entities.Ferias.filter({ id: editId });
       return list[0] || null;
     },
-    enabled: !!editId
+    enabled: !!editId && isAccessResolved && hasFeriasAccess
   });
 
   React.useEffect(() => {
@@ -384,9 +402,15 @@ export default function CadastrarFerias() {
                         <SelectValue placeholder="Escolha o período aquisitivo..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {opcaoAnos.map(ano => (
-                          <SelectItem key={ano} value={ano}>{ano}</SelectItem>
-                        ))}
+                        {loadingPaBundle ? (
+                          <SelectItem value="__loading-periodos" disabled>Carregando períodos aquisitivos...</SelectItem>
+                        ) : opcaoAnos.length > 0 ? (
+                          opcaoAnos.map(ano => (
+                            <SelectItem key={ano} value={ano}>{ano}</SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="__empty-periodos" disabled>Nenhum período aquisitivo disponível para este militar no escopo atual.</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     {formData.periodo_aquisitivo_ref && periodosJaCadastrados.includes(formData.periodo_aquisitivo_ref) && (
