@@ -13,6 +13,8 @@ export const CODIGOS_BLOQUEIO_DATA_BASE_FERIAS = Object.freeze({
   CONTRATO_ATIVO_DUPLICADO: 'CONTRATO_ATIVO_DUPLICADO',
   DATA_BASE_FERIAS_INVALIDA: 'DATA_BASE_FERIAS_INVALIDA',
   DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO: 'DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO',
+  CONTRATO_ATIVO_NAO_GERA_FERIAS: 'CONTRATO_ATIVO_NAO_GERA_FERIAS',
+  CONTRATO_ATIVO_GERACAO_BLOQUEADA: 'CONTRATO_ATIVO_GERACAO_BLOQUEADA',
 });
 
 export const ORIGENS_DATA_BASE_FERIAS = Object.freeze({
@@ -117,6 +119,24 @@ export function resolverDataBaseFerias({ militar, contratosDesignacao = [], opti
   if (contratosAtivos.length === 1) {
     const contratoAtivo = contratosAtivos[0];
     const contratoId = getRegistroId(contratoAtivo);
+
+    if (contratoAtivo?.gera_direito_ferias === false) {
+      return criarRetorno({
+        bloqueado: true,
+        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_NAO_GERA_FERIAS,
+        mensagem: 'Contrato de designação ativo configurado para não gerar direito a férias.',
+        warnings,
+      });
+    }
+
+    if (String(contratoAtivo?.regra_geracao_periodos || '').trim().toLowerCase() === 'bloqueada') {
+      return criarRetorno({
+        bloqueado: true,
+        codigoBloqueio: CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_GERACAO_BLOQUEADA,
+        mensagem: 'Contrato de designação ativo está com regra de geração de períodos bloqueada.',
+        warnings,
+      });
+    }
 
     if (!contratoAtivo?.data_inclusao_para_ferias) {
       return criarRetorno({

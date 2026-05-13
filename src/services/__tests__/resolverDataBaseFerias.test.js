@@ -74,6 +74,30 @@ test('um contrato ativo válido usa data_inclusao_para_ferias', () => {
   assertShape(resultado);
 });
 
+
+
+test('contrato ativo com gera_direito_ferias false bloqueia geração automática', () => {
+  const resultado = resolverDataBaseFerias({
+    militar: militar(),
+    contratosDesignacao: [contrato({ gera_direito_ferias: false })],
+  });
+
+  assert.equal(resultado.bloqueado, true);
+  assert.equal(resultado.codigoBloqueio, CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_NAO_GERA_FERIAS);
+  assertShape(resultado);
+});
+
+test('contrato ativo com regra_geracao_periodos bloqueada bloqueia geração automática', () => {
+  const resultado = resolverDataBaseFerias({
+    militar: militar(),
+    contratosDesignacao: [contrato({ regra_geracao_periodos: 'bloqueada' })],
+  });
+
+  assert.equal(resultado.bloqueado, true);
+  assert.equal(resultado.codigoBloqueio, CODIGOS_BLOQUEIO_DATA_BASE_FERIAS.CONTRATO_ATIVO_GERACAO_BLOQUEADA);
+  assertShape(resultado);
+});
+
 test('contrato ativo sem data-base bloqueia', () => {
   const resultado = resolverDataBaseFerias({
     militar: militar(),

@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Eye, FileText, Plus, Search, ShieldCheck, UserRound, Wand2, XCircle } from 'lucide-react';
+import { AlertTriangle, Archive, CalendarClock, CheckCircle2, ClipboardList, Eye, FileText, Loader2, Plus, Search, ShieldCheck, UserRound, XCircle } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
-import TransicaoLegadoAtivaPreviewModal from '@/components/militar/TransicaoLegadoAtivaPreviewModal';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import { createPageUrl } from '@/utils';
 import { criarEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedPainelContratosDesignacao } from '@/services/getScopedPainelContratosDesignacaoClient';
 import { fetchScopedMilitares, getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { arquivarPeriodosDesignacaoEmBloco } from '@/services/arquivarPeriodosDesignacaoEmBlocoClient';
 import {
   aplicarFiltrosPainelContratos,
   calcularDiasParaVencimento,
@@ -130,7 +130,9 @@ export default function ContratosDesignacao() {
   const [vencimento, setVencimento] = useState(FILTRO_VENCIMENTO.TODOS);
   const [legado, setLegado] = useState(FILTRO_LEGADO.TODOS);
   const [contratoDetalhe, setContratoDetalhe] = useState(null);
-  const [contratoTransicao, setContratoTransicao] = useState(null);
+  const [contratoArquivamento, setContratoArquivamento] = useState(null);
+  const [confirmarArquivamento, setConfirmarArquivamento] = useState(false);
+  const [arquivandoPeriodos, setArquivandoPeriodos] = useState(false);
   const [novoContratoOpen, setNovoContratoOpen] = useState(false);
   const [salvandoContrato, setSalvandoContrato] = useState(false);
   const effectiveEmail = getEffectiveEmail();
@@ -181,6 +183,39 @@ export default function ContratosDesignacao() {
     vencimento,
     legado,
   }), [busca, contratos, legado, legadoAtivaPorContrato, matriculasMilitar, militaresPorId, situacao, vencimento]);
+
+  const handleArquivarPeriodos = async () => {
+    if (!contratoArquivamento || !confirmarArquivamento) return;
+    setArquivandoPeriodos(true);
+    try {
+      const resultado = await arquivarPeriodosDesignacaoEmBloco({
+        militarId: contratoArquivamento.militar_id,
+        contratoDesignacaoId: contratoArquivamento.id,
+        confirmar: true,
+      });
+      const resumo = resultado?.resumo || {};
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] }),
+        queryClient.invalidateQueries({ queryKey: ['pa-bundle'] }),
+        queryClient.invalidateQueries({ queryKey: ['periodos-aquisitivos'] }),
+        queryClient.invalidateQueries({ queryKey: ['periodos-existentes'] }),
+      ]);
+      setContratoArquivamento(null);
+      setConfirmarArquivamento(false);
+      toast({
+        title: 'Períodos arquivados logicamente',
+        description: `${resumo.arquivados || 0} arquivado(s), ${resumo.cancelados || 0} cancelado(s), ${resumo.ja_processados || 0} já processado(s).`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao arquivar períodos',
+        description: error?.message || 'Não foi possível concluir o arquivamento lógico.',
+        variant: 'destructive',
+      });
+    } finally {
+      setArquivandoPeriodos(false);
+    }
+  };
 
   const handleCreateContrato = async (payload) => {
     setSalvandoContrato(true);
@@ -298,8 +333,7 @@ export default function ContratosDesignacao() {
                   const situacaoDerivada = calcularSituacaoDerivadaContrato(contrato);
                   const ui = SITUACAO_UI[situacaoDerivada] || SITUACAO_UI[SITUACAO_CONTRATO_DESIGNACAO.ATIVO];
                   const legadoInfo = legadoAtivaPorContrato[String(contrato.id)] || { aplicado: false };
-                  const podeResolverPeriodos = isContratoAtivoOperacional(contrato);
-                  const acaoTransicaoLabel = legadoInfo.aplicado ? 'Revisar períodos' : 'Resolver períodos';
+                  const podeResolverPeriodos = canCreate && isContratoAtivoOperacional(contrato);
 
                   return (
                     <article key={contrato.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -320,8 +354,8 @@ export default function ContratosDesignacao() {
                           </Button>
                           <Button type="button" variant="outline" size="sm" onClick={() => setContratoDetalhe(contrato)}><Eye size={14} className="mr-1" />Detalhes</Button>
                           {podeResolverPeriodos && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => setContratoTransicao(contrato)} className="border-amber-200 text-amber-800 hover:bg-amber-50">
-                              <Wand2 size={14} className="mr-1" />{acaoTransicaoLabel}
+                            <Button type="button" variant="outline" size="sm" onClick={() => { setContratoArquivamento(contrato); setConfirmarArquivamento(false); }} className="border-amber-200 text-amber-800 hover:bg-amber-50">
+                              <Archive size={14} className="mr-1" />Arquivar períodos da ativa
                             </Button>
                           )}
                         </div>
@@ -359,16 +393,51 @@ export default function ContratosDesignacao() {
         isSubmitting={salvandoContrato}
       />
 
-      <TransicaoLegadoAtivaPreviewModal
-        open={Boolean(contratoTransicao)}
-        onOpenChange={(open) => !open && setContratoTransicao(null)}
-        militarId={contratoTransicao?.militar_id}
-        militar={contratoTransicao ? getMilitar(contratoTransicao) : null}
-        contrato={contratoTransicao}
-        contratoAtivo={contratoTransicao}
-        contratoDesignacaoId={contratoTransicao?.id}
-        canPrepararLegadoAtiva={canView}
-      />
+
+      {contratoArquivamento && (() => {
+        const militar = getMilitar(contratoArquivamento);
+        const legadoInfo = legadoAtivaPorContrato[String(contratoArquivamento.id)] || { aplicado: false, totalPeriodos: 0, ultimaAplicacaoEm: null };
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
+            <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
+              <div className="border-b border-slate-200 p-5">
+                <h2 className="text-xl font-bold text-slate-900">Arquivar períodos da ativa</h2>
+                <p className="mt-1 text-sm text-slate-500">Arquivamento lógico em bloco da cadeia anterior à nova data-base de férias.</p>
+              </div>
+              <div className="space-y-4 p-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <DetailItem label="Militar" value={militar.nome_completo || militar.nome_guerra} />
+                  <DetailItem label="Matrícula" value={getMatriculaAtual(contratoArquivamento)} />
+                  <DetailItem label="Contrato" value={[contratoArquivamento.numero_contrato, contratoArquivamento.boletim_publicacao].filter(Boolean).join(' • ')} />
+                  <DetailItem label="Nova data-base" value={formatDate(contratoArquivamento.data_inclusao_para_ferias)} />
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Esta ação não apaga períodos, férias, Livro ou publicações. Apenas retira a cadeia antiga da operação normal.
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  Resumo prévio: {legadoInfo.aplicado ? `${legadoInfo.totalPeriodos || 0} período(s) já marcado(s) como Legado da Ativa neste contrato.` : 'pendente de arquivamento lógico para este contrato.'}
+                </div>
+                <label className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-slate-300"
+                    checked={confirmarArquivamento}
+                    onChange={(event) => setConfirmarArquivamento(event.target.checked)}
+                  />
+                  <span>Confirmo o arquivamento lógico da cadeia anterior</span>
+                </label>
+              </div>
+              <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
+                <Button variant="outline" onClick={() => { setContratoArquivamento(null); setConfirmarArquivamento(false); }} disabled={arquivandoPeriodos}>Cancelar</Button>
+                <Button onClick={handleArquivarPeriodos} disabled={!confirmarArquivamento || arquivandoPeriodos} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
+                  {arquivandoPeriodos ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Archive className="mr-2 h-4 w-4" />}
+                  Arquivar períodos
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {contratoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
