@@ -25,45 +25,140 @@ const STATUS_OPTIONS = [
   'Inativo',
 ];
 
-function getVinculosResumo(periodo, registrosLivro = []) {
-  const periodoId = String(periodo?.id || '').trim();
-  const periodoRef = String(periodo?.referencia || '').trim();
-  const militarId = String(periodo?.militar_id || '').trim();
+const TIPOS_CADEIA_FERIAS = new Set([
+  'Saída Férias',
+  'Retorno Férias',
+  'Interrupção de Férias',
+  'Nova Saída / Retomada',
+]);
+
+const ESTADO_SEGURANCA = {
+  SEGURO: 'SEGURO_PARA_EXCLUIR',
+  REVERSAO: 'EXIGE_REVERSAO',
+  BLOQUEIO_TOTAL: 'BLOQUEIO_ADMINISTRATIVO_TOTAL',
+};
+
+function normalizarTexto(valor) {
+  return String(valor ?? '').trim();
+}
+
+function contemReferenciaTextual(registro = {}, periodoRef = '') {
+  if (!periodoRef) return false;
+  return [
+    registro?.periodo_aquisitivo,
+    registro?.periodo_aquisitivo_ref,
+    registro?.ano_referencia,
+    registro?.documento_referencia,
+    registro?.documento_texto,
+    registro?.texto_publicacao,
+    registro?.nota_para_bg,
+    registro?.observacoes,
+    registro?.texto_base,
+    registro?.texto_complemento,
+  ]
+    .map((valor) => normalizarTexto(valor))
+    .some((valor) => valor === periodoRef || valor.includes(periodoRef));
+}
+
+function getFeriasIds(periodo = {}) {
+  return new Set((periodo?.fracoes || []).map((fracao) => normalizarTexto(fracao?.id)).filter(Boolean));
+}
+
+function registroLivroDoPeriodo(registro = {}, { periodoId, periodoRef, militarId, feriasIds }) {
+  const registroMilitarId = normalizarTexto(registro?.militar_id);
+  if (registroMilitarId && militarId && registroMilitarId !== militarId) return false;
+
+  const matchFerias = normalizarTexto(registro?.ferias_id) && feriasIds.has(normalizarTexto(registro?.ferias_id));
+  const matchId = periodoId && (
+    normalizarTexto(registro?.periodo_aquisitivo_id) === periodoId ||
+    normalizarTexto(registro?.periodo_id) === periodoId ||
+    normalizarTexto(registro?.referencia_id) === periodoId
+  );
+  const matchRef = contemReferenciaTextual(registro, periodoRef);
+
+  return Boolean(matchFerias || matchId || matchRef);
+}
+
+function publicacaoDoPeriodo(publicacao = {}, { periodoId, periodoRef, militarId, feriasIds, registroLivroIds }) {
+  const publicacaoMilitarId = normalizarTexto(publicacao?.militar_id);
+  if (publicacaoMilitarId && militarId && publicacaoMilitarId !== militarId) return false;
+
+  const feriasRefs = [
+    publicacao?.ferias_id,
+    publicacao?.ferias_interrompida_id,
+    publicacao?.gozo_ferias_id,
+    publicacao?.gozo_id,
+  ].map(normalizarTexto).filter(Boolean);
+
+  const registroRefs = [
+    publicacao?.registro_livro_id,
+    publicacao?.livro_id,
+    publicacao?.referencia_id,
+  ].map(normalizarTexto).filter(Boolean);
+
+  const matchPeriodo = periodoId && (
+    normalizarTexto(publicacao?.periodo_aquisitivo_id) === periodoId ||
+    normalizarTexto(publicacao?.periodo_id) === periodoId
+  );
+  const matchFerias = feriasRefs.some((id) => feriasIds.has(id));
+  const matchRegistro = registroRefs.some((id) => registroLivroIds.has(id));
+  const matchRef = contemReferenciaTextual(publicacao, periodoRef);
+
+  return Boolean(matchPeriodo || matchFerias || matchRegistro || matchRef);
+}
+
+function getVinculosResumo(periodo, registrosLivro = [], publicacoes = []) {
+  const periodoId = normalizarTexto(periodo?.id);
+  const periodoRef = normalizarTexto(periodo?.referencia);
+  const militarId = normalizarTexto(periodo?.militar_id || periodo?.raw?.militar_id);
+  const feriasIds = getFeriasIds(periodo);
 
   const feriasVinculadas = Number(periodo?.fracoes?.length || 0) > 0;
   const usoOperacional = Number(periodo?.dias_gozados || 0) > 0 || Number(periodo?.dias_previstos || 0) > 0;
 
-  const livroVinculado = registrosLivro.some((registro) => {
-    const registroMilitarId = String(registro?.militar_id || '').trim();
-    if (registroMilitarId && militarId && registroMilitarId !== militarId) return false;
+  const registrosDoPeriodo = (registrosLivro || []).filter((registro) =>
+    registroLivroDoPeriodo(registro, { periodoId, periodoRef, militarId, feriasIds })
+  );
+  const registroLivroIds = new Set(registrosDoPeriodo.map((registro) => normalizarTexto(registro?.id)).filter(Boolean));
+  const livroVinculado = registrosDoPeriodo.length > 0;
+  const cadeiaAdministrativa = registrosDoPeriodo.some((registro) => TIPOS_CADEIA_FERIAS.has(normalizarTexto(registro?.tipo_registro)));
 
-    const matchId = periodoId && (
-      String(registro?.periodo_aquisitivo_id || '').trim() === periodoId ||
-      String(registro?.periodo_id || '').trim() === periodoId ||
-      String(registro?.referencia_id || '').trim() === periodoId
-    );
+  const publicacoesDoPeriodo = (publicacoes || []).filter((publicacao) =>
+    publicacaoDoPeriodo(publicacao, { periodoId, periodoRef, militarId, feriasIds, registroLivroIds })
+  );
+  const publicacaoVinculada = publicacoesDoPeriodo.length > 0;
+  const vinculoAdministrativo = Boolean(
+    periodo?.raw?.transicao_designacao_lote_id ||
+    periodo?.raw?.transicao_designacao_contrato_id ||
+    periodo?.raw?.legado_ativa_contrato_designacao_id ||
+    periodo?.raw?.cancelado_transicao_contrato_id ||
+    periodo?.raw?.excluido_da_cadeia_designacao
+  );
 
-    const matchRef = periodoRef && (
-      !String(registro?.periodo_aquisitivo_id || '').trim() &&
-      !String(registro?.periodo_id || '').trim() &&
-      !String(registro?.referencia_id || '').trim() &&
-      (
-        String(registro?.periodo_aquisitivo || '').trim() === periodoRef ||
-        String(registro?.periodo_aquisitivo_ref || '').trim() === periodoRef ||
-        String(registro?.ano_referencia || '').trim() === periodoRef
-      )
-    );
+  const bloqueioAdministrativo = livroVinculado || publicacaoVinculada || cadeiaAdministrativa || vinculoAdministrativo;
+  const estado = bloqueioAdministrativo
+    ? ESTADO_SEGURANCA.BLOQUEIO_TOTAL
+    : feriasVinculadas || usoOperacional
+      ? ESTADO_SEGURANCA.REVERSAO
+      : ESTADO_SEGURANCA.SEGURO;
 
-    return Boolean(matchId || matchRef);
-  });
-
-  return { feriasVinculadas, usoOperacional, livroVinculado };
+  return {
+    estado,
+    feriasVinculadas,
+    usoOperacional,
+    livroVinculado,
+    publicacaoVinculada,
+    cadeiaAdministrativa,
+    vinculoAdministrativo,
+    registrosLivroCount: registrosDoPeriodo.length,
+    publicacoesCount: publicacoesDoPeriodo.length,
+  };
 }
-
 export default function GerenciarPeriodoModal({
   open,
   periodo,
   registrosLivro,
+  publicacoes,
   saving,
   deleting,
   onOpenChange,
@@ -80,6 +175,7 @@ export default function GerenciarPeriodoModal({
   });
   const [feedback, setFeedback] = useState(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [confirmacaoExclusao, setConfirmacaoExclusao] = useState('');
 
   useEffect(() => {
     if (!periodo) return;
@@ -90,26 +186,54 @@ export default function GerenciarPeriodoModal({
       status: periodo.status_operacional || 'Pendente',
     });
     setFeedback(null);
+    setShowConfirmDelete(false);
+    setConfirmacaoExclusao('');
   }, [periodo]);
 
   const vinculos = useMemo(
-    () => getVinculosResumo(periodo, registrosLivro),
-    [periodo, registrosLivro]
+    () => getVinculosResumo(periodo, registrosLivro, publicacoes),
+    [periodo, registrosLivro, publicacoes]
   );
 
-  const exclusaoBloqueada = vinculos.feriasVinculadas || vinculos.livroVinculado || vinculos.usoOperacional;
-  const periodoAutomatico = Boolean(
-    periodo?.criado_automaticamente ||
-    `${periodo?.origem_periodo || ''}`.toLowerCase().includes('auto')
-  );
+  const exclusaoPermitida = vinculos.estado === ESTADO_SEGURANCA.SEGURO;
+  const confirmacaoEsperada = `EXCLUIR ${periodo?.referencia || ''}`.trim();
+  const confirmacaoValida = normalizarTexto(confirmacaoExclusao).toUpperCase() === confirmacaoEsperada.toUpperCase();
 
   const motivoExclusao = useMemo(() => {
     const motivos = [];
     if (vinculos.feriasVinculadas) motivos.push('férias vinculadas');
-    if (vinculos.livroVinculado) motivos.push('registros no Livro');
+    if (vinculos.livroVinculado) motivos.push(`Livro (${vinculos.registrosLivroCount})`);
+    if (vinculos.publicacaoVinculada) motivos.push(`Publicação Ex Officio (${vinculos.publicacoesCount})`);
+    if (vinculos.cadeiaAdministrativa) motivos.push('cadeia administrativa de férias');
+    if (vinculos.vinculoAdministrativo) motivos.push('vínculo administrativo');
     if (vinculos.usoOperacional) motivos.push('uso operacional do período');
     return motivos;
   }, [vinculos]);
+
+  const estadoSegurancaUi = useMemo(() => {
+    if (vinculos.estado === ESTADO_SEGURANCA.SEGURO) {
+      return {
+        className: 'border-emerald-200 bg-emerald-50',
+        textClassName: 'text-emerald-800',
+        titulo: 'Seguro para excluir',
+        descricao: 'Nenhuma férias, Livro, publicação ou uso operacional foi identificado. A exclusão física pode ser feita com confirmação textual.',
+      };
+    }
+    if (vinculos.estado === ESTADO_SEGURANCA.REVERSAO) {
+      return {
+        className: 'border-amber-200 bg-amber-50',
+        textClassName: 'text-amber-800',
+        titulo: 'Exige reversão',
+        descricao: `Exclusão bloqueada: ${motivoExclusao.join(', ')}. Reverta ou remova as férias vinculadas antes de tentar excluir o período.`,
+      };
+    }
+    return {
+      className: 'border-red-200 bg-red-50',
+      textClassName: 'text-red-800',
+      titulo: 'Bloqueio administrativo total',
+      descricao: `Exclusão e inativação bloqueadas: ${motivoExclusao.join(', ')}. Acione o administrador para análise administrativa sem alterar Livro ou publicações.`,
+    };
+  }, [motivoExclusao, vinculos.estado]);
 
   const handleSalvarEdicao = async () => {
     setFeedback(null);
@@ -146,15 +270,15 @@ export default function GerenciarPeriodoModal({
     setShowConfirmDelete(false);
 
     try {
-      await onConfirmDelete?.({ forceInactivate: periodoAutomatico || exclusaoBloqueada });
+      if (!exclusaoPermitida) throw new Error('Exclusão bloqueada por vínculo operacional/administrativo.');
+      if (!confirmacaoValida) throw new Error(`Digite ${confirmacaoEsperada} para confirmar a exclusão física.`);
+      await onConfirmDelete?.();
       setFeedback({
         type: 'success',
-        message: periodoAutomatico || exclusaoBloqueada
-          ? 'Período inativado com sucesso.'
-          : 'Período excluído com sucesso.',
+        message: 'Período excluído com sucesso.',
       });
     } catch (error) {
-      setFeedback({ type: 'error', message: error?.message || 'Falha ao excluir/inativar período.' });
+      setFeedback({ type: 'error', message: error?.message || 'Falha ao excluir período.' });
     }
   };
 
@@ -220,20 +344,11 @@ export default function GerenciarPeriodoModal({
 
             <div className="border-t pt-4 space-y-2">
               <p className="text-sm font-medium text-slate-700">Exclusão segura</p>
-              {exclusaoBloqueada && (
-                <Alert className="border-amber-200 bg-amber-50">
-                  <AlertDescription className="text-amber-800">
-                    Exclusão bloqueada: este período possui {motivoExclusao.join(', ')}. A ação permitida é apenas inativar.
-                  </AlertDescription>
-                </Alert>
-              )}
-              {!exclusaoBloqueada && periodoAutomatico && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <AlertDescription className="text-blue-800">
-                    Período identificado como automático. Para manter integridade, será aplicada inativação em vez de exclusão física.
-                  </AlertDescription>
-                </Alert>
-              )}
+              <Alert className={estadoSegurancaUi.className}>
+                <AlertDescription className={estadoSegurancaUi.textClassName}>
+                  <strong>{estadoSegurancaUi.titulo}.</strong> {estadoSegurancaUi.descricao}
+                </AlertDescription>
+              </Alert>
 
               <div className="flex justify-between gap-2 flex-wrap">
                 <Button variant="outline" onClick={() => onOpenFerias?.(periodo)}>
@@ -241,10 +356,13 @@ export default function GerenciarPeriodoModal({
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => setShowConfirmDelete(true)}
-                  disabled={saving || deleting}
+                  onClick={() => {
+                    setConfirmacaoExclusao('');
+                    setShowConfirmDelete(true);
+                  }}
+                  disabled={saving || deleting || !exclusaoPermitida}
                 >
-                  {periodoAutomatico || exclusaoBloqueada ? 'Inativar período' : 'Excluir período'}
+                  Excluir período
                 </Button>
               </div>
             </div>
@@ -255,17 +373,26 @@ export default function GerenciarPeriodoModal({
       <AlertDialog open={showConfirmDelete} onOpenChange={setShowConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar ação destrutiva</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar exclusão física</AlertDialogTitle>
             <AlertDialogDescription>
-              {periodoAutomatico || exclusaoBloqueada
-                ? 'Este período será inativado e deixará de ser considerado em operações ativas. Deseja continuar?'
-                : 'Este período será excluído definitivamente. Esta ação não pode ser desfeita. Deseja continuar?'}
+              Este período será excluído definitivamente. Esta ação não exclui férias, Livro ou publicações e não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-slate-700">
+              Para confirmar, digite <strong>{confirmacaoEsperada}</strong>.
+            </p>
+            <Input
+              value={confirmacaoExclusao}
+              onChange={(e) => setConfirmacaoExclusao(e.target.value)}
+              placeholder={confirmacaoEsperada}
+              disabled={deleting}
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleExcluir} className="bg-red-600 hover:bg-red-700" disabled={deleting}>
-              {deleting ? 'Processando...' : 'Confirmar'}
+            <AlertDialogAction onClick={handleExcluir} className="bg-red-600 hover:bg-red-700" disabled={deleting || !exclusaoPermitida || !confirmacaoValida}>
+              {deleting ? 'Processando...' : 'Excluir definitivamente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

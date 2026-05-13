@@ -106,6 +106,7 @@ function mapPeriodo(periodo, feriasRelacionadas = [], hoje) {
 
   return {
     id: periodo.id,
+    militar_id: periodo?.militar_id || null,
     referencia: getReferenciaPeriodo(periodo),
     aquisitivo: `${formatDateBR(periodo?.inicio_aquisitivo)} a ${formatDateBR(periodo?.fim_aquisitivo)}`,
     data_inicio_aquisitivo: periodo?.inicio_aquisitivo || null,
