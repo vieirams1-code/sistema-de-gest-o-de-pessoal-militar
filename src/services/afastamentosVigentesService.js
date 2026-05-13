@@ -125,7 +125,34 @@ function mapRegistroLivroVigentes(registros, hoje) {
     }));
 }
 
-export function buildAfastamentosVigentes({ atestados = [], ferias = [], registrosLivro = [], hoje = new Date() } = {}) {
+function isMilitarLtipVigente(militar, hoje) {
+  if (String(militar?.condicao || '').trim() !== 'LTIP') return false;
+  const inicio = parseDateOnly(militar?.ltip_data_inicio);
+  if (!inicio || inicio > hoje) return false;
+  const fim = parseDateOnly(militar?.ltip_data_fim);
+  if (!fim) return true;
+  return hoje <= fim;
+}
+
+function mapLtipVigentes(militares, hoje) {
+  return (militares || [])
+    .filter((m) => isMilitarLtipVigente(m, hoje))
+    .map((m) => ({
+      id: `ltip:${m.id}`,
+      entidadeId: m.id,
+      militarId: m.id || null,
+      militarNome: m.nome_completo || m.nome_guerra || 'Militar não identificado',
+      postoGraduacao: m.posto_graduacao || '-',
+      tipoAfastamento: 'LTIP',
+      origem: 'LTIP',
+      dataInicio: m.ltip_data_inicio || null,
+      dataTermino: m.ltip_data_fim || null,
+      status: 'Em Curso',
+      statusDetalhado: 'LTIP',
+    }));
+}
+
+export function buildAfastamentosVigentes({ atestados = [], ferias = [], registrosLivro = [], militaresLtip = [], hoje = new Date() } = {}) {
   const hojeNormalizado = new Date(hoje);
   hojeNormalizado.setHours(0, 0, 0, 0);
 
@@ -133,6 +160,7 @@ export function buildAfastamentosVigentes({ atestados = [], ferias = [], registr
     ...mapAtestadosVigentes(atestados, hojeNormalizado),
     ...mapFeriasVigentes(ferias),
     ...mapRegistroLivroVigentes(registrosLivro, hojeNormalizado),
+    ...mapLtipVigentes(militaresLtip, hojeNormalizado),
   ];
 
   const deduplicados = Array.from(

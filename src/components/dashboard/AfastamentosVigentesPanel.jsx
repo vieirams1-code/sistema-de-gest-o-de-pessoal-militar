@@ -61,10 +61,22 @@ export default function AfastamentosVigentesPanel() {
     enabled: scopedReady,
   });
 
+  const { data: militaresLtip = [] } = useQuery({
+    queryKey: ['painel-afastamentos-ltip', scopeKey],
+    queryFn: async () => {
+      const lista = await base44.entities.Militar.filter({ condicao: 'LTIP' }, '-ltip_data_inicio', 500);
+      return filtrarPorMilitarIdsPermitidos(
+        lista.map((m) => ({ ...m, militar_id: m.id })),
+        scopedIds,
+      );
+    },
+    enabled: scopedReady,
+  });
+
   const afastamentos = useMemo(() => {
-    const base = buildAfastamentosVigentes({ atestados, ferias, registrosLivro });
+    const base = buildAfastamentosVigentes({ atestados, ferias, registrosLivro, militaresLtip });
     return [...base].sort(sortAfastamentosByRetorno);
-  }, [atestados, ferias, registrosLivro]);
+  }, [atestados, ferias, registrosLivro, militaresLtip]);
 
   const tipoOptions = useMemo(() => getTipoOptions(afastamentos), [afastamentos]);
   const origemOptions = useMemo(() => getOrigemOptions(afastamentos), [afastamentos]);

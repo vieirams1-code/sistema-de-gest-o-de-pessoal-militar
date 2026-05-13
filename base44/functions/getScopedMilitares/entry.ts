@@ -30,6 +30,11 @@ const CAMPOS_BASE_MILITAR = [
     'comportamento',
     'funcao',
     'condicao',
+    'condicao_movimento',
+    'condicao_origem_destino',
+    'destino',
+    'ltip_data_inicio',
+    'ltip_data_fim',
 ];
 
 const CAMPOS_USUARIO_ACESSO = [

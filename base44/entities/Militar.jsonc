@@ -42,7 +42,8 @@
         "Adido",
         "Agregado",
         "Cedido",
-        "\u00c0 Disposi\u00e7\u00e3o"
+        "\u00c0 Disposi\u00e7\u00e3o",
+        "LTIP"
       ]
     },
     "destino": {
@@ -55,11 +56,21 @@
         "entrada",
         "saida"
       ],
-      "description": "Movimento da condi\u00e7\u00e3o do militar. 'entrada' indica que veio de outro \u00f3rg\u00e3o; 'saida' indica que foi para outro \u00f3rg\u00e3o. N\u00e3o se aplica quando condicao = Efetivo."
+      "description": "Movimento da condi\u00e7\u00e3o do militar. 'entrada' indica que veio de outro \u00f3rg\u00e3o; 'saida' indica que foi para outro \u00f3rg\u00e3o. N\u00e3o se aplica quando condicao = Efetivo ou LTIP."
     },
     "condicao_origem_destino": {
       "type": "string",
-      "description": "Texto livre da origem (quando movimento = entrada) ou destino (quando movimento = saida) da condi\u00e7\u00e3o. N\u00e3o se aplica quando condicao = Efetivo."
+      "description": "Texto livre da origem (quando movimento = entrada) ou destino (quando movimento = saida) da condi\u00e7\u00e3o. N\u00e3o se aplica quando condicao = Efetivo ou LTIP."
+    },
+    "ltip_data_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio da LTIP (Licen\u00e7a para Tratamento de Interesse Particular). Obrigat\u00f3ria quando condicao = LTIP."
+    },
+    "ltip_data_fim": {
+      "type": "string",
+      "format": "date",
+      "description": "Data prevista de retorno/fim da LTIP. Obrigat\u00f3ria quando condicao = LTIP."
     },
     "nome_guerra": {
       "type": "string"

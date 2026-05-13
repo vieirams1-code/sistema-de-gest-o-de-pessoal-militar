@@ -144,7 +144,7 @@ const SITUACOES_OPCOES = [
 ];
 
 const CONDICOES_TODAS = '__todas_condicoes__';
-const CONDICOES_OPCOES = ['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição'];
+const CONDICOES_OPCOES = ['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição', 'LTIP'];
 
 const MOVIMENTO_TODOS = 'todos';
 const MOVIMENTO_OPCOES = [

@@ -33,6 +33,8 @@ const initialFormData = {
   destino: '',
   condicao_movimento: '',
   condicao_origem_destino: '',
+  ltip_data_inicio: '',
+  ltip_data_fim: '',
   nome_guerra: '',
   matricula: '',
   subgrupamento_id: '',
@@ -268,6 +270,8 @@ export default function CadastrarMilitar() {
     }
 
     const condicaoNaoEfetiva = ['Adido', 'Agregado', 'Cedido', 'À Disposição'].includes(formData.condicao);
+    const condicaoLtip = formData.condicao === 'LTIP';
+
     if (condicaoNaoEfetiva) {
       if (!formData.condicao_movimento) {
         window.alert('Informe o Movimento da Condição (Entrada ou Saída).');
@@ -284,6 +288,17 @@ export default function CadastrarMilitar() {
       }
     }
 
+    if (condicaoLtip) {
+      if (!formData.ltip_data_inicio || !formData.ltip_data_fim) {
+        window.alert('Para LTIP, informe a data de início e a data de retorno.');
+        return;
+      }
+      if (formData.ltip_data_fim < formData.ltip_data_inicio) {
+        window.alert('A data de retorno da LTIP deve ser igual ou posterior à data de início.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     const dataToSave = {
@@ -295,10 +310,15 @@ export default function CadastrarMilitar() {
       peso: formData.peso ? parseFloat(formData.peso) : null
     };
 
-    // Quando condição é Efetivo (ou vazia), limpa campos relacionados a movimento
+    // Quando condição não usa Movimento (Efetivo, LTIP, vazia), limpa campos relacionados
     if (!condicaoNaoEfetiva) {
       dataToSave.condicao_movimento = '';
       dataToSave.condicao_origem_destino = '';
+    }
+    // Quando condição não é LTIP, limpa as datas da LTIP
+    if (!condicaoLtip) {
+      dataToSave.ltip_data_inicio = '';
+      dataToSave.ltip_data_fim = '';
     }
 
     // Preencher subgrupamento automaticamente para usuários não-admin
@@ -479,8 +499,29 @@ export default function CadastrarMilitar() {
                   value={formData.condicao}
                   onChange={handleChange}
                   type="select"
-                  options={['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição']}
+                  options={['Efetivo', 'Adido', 'Agregado', 'Cedido', 'À Disposição', 'LTIP']}
                 />
+                {formData.condicao === 'LTIP' && (
+                  <>
+                    <FormField
+                      label="LTIP — Data de Início"
+                      name="ltip_data_inicio"
+                      value={formData.ltip_data_inicio}
+                      onChange={handleChange}
+                      type="date"
+                      required
+                    />
+                    <FormField
+                      label="LTIP — Data de Retorno"
+                      name="ltip_data_fim"
+                      value={formData.ltip_data_fim}
+                      onChange={handleChange}
+                      type="date"
+                      required
+                      hint="O militar será considerado em afastamento durante o período."
+                    />
+                  </>
+                )}
                 {['Adido', 'Agregado', 'Cedido', 'À Disposição'].includes(formData.condicao) && (
                   <>
                     <div className="space-y-1.5">
