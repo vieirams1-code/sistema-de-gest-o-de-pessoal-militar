@@ -55,6 +55,8 @@ function getDescricaoCodigoBloqueio(codigo) {
     CONTRATO_ATIVO_DUPLICADO: 'com contrato ativo duplicado',
     DATA_BASE_FERIAS_INVALIDA: 'com data-base de férias inválida',
     DATA_BASE_CONTRATO_ANTERIOR_INICIO_CONTRATO: 'com data-base do contrato anterior ao início do contrato',
+    CONTRATO_ATIVO_NAO_GERA_FERIAS: 'com contrato ativo que não gera férias',
+    CONTRATO_ATIVO_GERACAO_BLOQUEADA: 'com geração automática bloqueada pelo contrato',
   };
 
   return descricoes[codigo] || `com bloqueio ${codigo || 'não identificado'}`;
@@ -394,7 +396,7 @@ export default function PeriodoAquisitivoGenerator() {
           <DialogTitle>Gerar Períodos Aquisitivos</DialogTitle>
           <DialogDescription>
             Gere períodos aquisitivos automaticamente para todos os militares operacionais
-            ou apenas para um militar específico, com base na data de inclusão.
+            ou apenas para um militar específico, respeitando contratos de designação ativos e a data-base de férias resolvida.
           </DialogDescription>
         </DialogHeader>
 

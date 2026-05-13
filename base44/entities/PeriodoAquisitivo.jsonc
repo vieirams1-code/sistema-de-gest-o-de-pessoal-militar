@@ -143,7 +143,9 @@
         "marcar_legado_ativa",
         "excluir_cadeia_operacional",
         "marcar_indenizado",
-        "cancelar_periodo_futuro_indevido"
+        "cancelar_periodo_futuro_indevido",
+        "arquivar_legado_ativa",
+        "cancelar_futuro_indevido"
       ],
       "description": "Ação futura selecionada para transição manual por período de designação."
     },

@@ -25,6 +25,7 @@ import { validarDiasNoSaldoPeriodo } from '@/components/ferias/periodoSaldoUtils
 import { sincronizarPeriodoAquisitivoDaFerias } from '@/components/ferias/feriasService';
 import { DIAS_BASE_PADRAO } from '@/components/ferias/periodoSaldoUtils';
 import { criarEscopado, atualizarEscopado } from '@/services/cudEscopadoClient';
+import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOperacionais';
 
 // Gera opções de período aquisitivo: ano corrente + 1 próximo
 const gerarOpcoesAnos = () => {
@@ -91,8 +92,8 @@ export default function CadastrarFerias() {
     enabled: !!formData.militar_id
   });
 
-  // Só períodos ativos (não inativados)
-  const periodosAtivos = periodosExistentes.filter(p => !p.inativo && p.status !== 'Inativo');
+  // Só períodos disponíveis operacionalmente para novas férias.
+  const periodosAtivos = periodosExistentes.filter(isPeriodoDisponivelOperacional);
 
   // Carregar férias para edição
   const { data: editingFerias, isLoading: loadingEdit } = useQuery({
