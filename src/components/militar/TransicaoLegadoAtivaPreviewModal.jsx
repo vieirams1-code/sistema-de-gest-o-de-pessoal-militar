@@ -1,8 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,7 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { aplicarTransicaoLegadoAtiva, previsualizarTransicaoLegadoAtiva } from '@/services/transicaoLegadoAtivaClient';
 import { aplicarTransicaoDesignacaoManual } from '@/services/transicaoDesignacaoManualClient';
-import TransicaoDesignacaoPeriodosGrid, { calcularResumoDecisoes, criarDecisoesIniciais, getPeriodoKey, validarDecisaoPeriodo } from './TransicaoDesignacaoPeriodosGrid';
+import TransicaoDesignacaoPeriodosGrid, { calcularResumoDecisoes, criarDecisoesIniciais, getMotivoPadraoTransicao, getPeriodoKey, validarDecisaoPeriodo } from './TransicaoDesignacaoPeriodosGrid';
 import TransicaoDesignacaoResumoAcoes from './TransicaoDesignacaoResumoAcoes';
 
 const CONFIRMACAO_TEXTUAL = 'MARCAR LEGADO DA ATIVA';
@@ -70,9 +82,9 @@ function RelatorioAplicacao({ resultado }) {
       <div className="flex items-start gap-2 text-emerald-900">
         <CheckCircle2 className="h-4 w-4 mt-0.5" />
         <div>
-          <h4 className="font-semibold">Resumo do lote aplicado</h4>
+          <h4 className="font-semibold">Transição aplicada com sucesso.</h4>
           {isManual ? (
-            <p className="text-sm">Lote: {resultado.lote?.id || '—'} • Status: {resultado.lote?.status || '—'} • Aplicadas: {totais.aplicadas || 0} • Mantidas: {totais.mantidas || 0} • Bloqueadas: {totais.bloqueadas || 0} • Conflitos: {totais.conflitos || 0}</p>
+            <p className="text-sm">Total de períodos tratados: {operacoes.length || (Number(totais.aplicadas || 0) + Number(totais.mantidas || 0) + Number(totais.bloqueadas || 0))} • Lote: {resultado.lote?.id || '—'} • Operações registradas: {operacoes.length}</p>
           ) : (
             <p className="text-sm">Aplicados: {totais.aplicados || 0} • Ignorados: {totais.ignorados || 0} • Já marcados: {totais.ja_marcados || 0} • Conflitos: {totais.conflitos || 0}</p>
           )}
@@ -112,29 +124,32 @@ function RelatorioAplicacao({ resultado }) {
   );
 }
 
-function CabecalhoPreview({ preview, previewHash }) {
+function CabecalhoPreview({ preview, resumo = {} }) {
   return (
-    <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <p className="text-xs font-medium text-slate-500">Militar</p>
-        <p className="truncate font-semibold text-slate-800">{preview.militar?.nome || '—'}</p>
-        <p className="truncate text-xs text-slate-500">{preview.militar?.nome_guerra || '—'} • {preview.militar?.matricula || '—'}</p>
+    <section className="space-y-3">
+      <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-xs font-medium text-slate-500">Militar</p>
+          <p className="truncate font-semibold text-slate-800">{preview.militar?.nome || '—'}</p>
+          <p className="truncate text-xs text-slate-500">Matrícula {preview.militar?.matricula || '—'}</p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-xs font-medium text-slate-500">Contrato</p>
+          <p className="truncate font-semibold text-slate-800">{preview.contrato?.numero_contrato || 'Sem número'}</p>
+          <p className="truncate text-xs text-slate-500">Início {formatDate(preview.contrato?.data_inicio_contrato)}</p>
+        </div>
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+          <p className="text-xs font-medium text-blue-600">Nova data-base</p>
+          <p className="font-semibold text-blue-900">{formatDate(preview.data_base)}</p>
+          <p className="text-xs text-blue-700">Contrato de designação</p>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-xs font-medium text-slate-500">Períodos analisados</p>
+          <p className="font-semibold text-slate-800">{resumo.total || 0}</p>
+          <p className="text-xs text-slate-500">Cancelados {resumo.cancelar_periodo_futuro_indevido || 0} • Legado {resumo.marcar_legado_ativa || 0} • Mantidos {resumo.manter || 0}</p>
+        </div>
       </div>
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <p className="text-xs font-medium text-slate-500">Contrato ativo</p>
-        <p className="truncate font-semibold text-slate-800">{preview.contrato?.numero_contrato || 'Sem número'}</p>
-        <p className="truncate text-xs text-slate-500">Boletim {preview.contrato?.boletim_publicacao || '—'} • Início {formatDate(preview.contrato?.data_inicio_contrato)}</p>
-      </div>
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-        <p className="text-xs font-medium text-blue-600">Data-base</p>
-        <p className="font-semibold text-blue-900">{formatDate(preview.data_base)}</p>
-        <p className="text-xs text-blue-700">Base da prévia recalculada</p>
-      </div>
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <p className="text-xs font-medium text-slate-500">Hash da prévia</p>
-        <p className="break-all font-mono text-xs text-slate-800">{previewHash || '—'}</p>
-      </div>
-    </div>
+    </section>
   );
 }
 
@@ -151,6 +166,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
   const [acoesSelecionadas, setAcoesSelecionadas] = useState({});
   const [previewHash, setPreviewHash] = useState(null);
   const [idempotencyKey, setIdempotencyKey] = useState('');
+  const [confirmacaoManualAberta, setConfirmacaoManualAberta] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -164,6 +180,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       setAcoesSelecionadas({});
       setPreviewHash(null);
       setIdempotencyKey('');
+      setConfirmacaoManualAberta(false);
       try {
         const data = await previsualizarTransicaoLegadoAtiva({ militarId, contratoDesignacaoId: contratoId });
         if (active) {
@@ -193,17 +210,15 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
     const decisao = acoesSelecionadas[key] || {};
     return validarDecisaoPeriodo(item, decisao).map((pendencia) => ({ key, periodo: item, pendencia }));
   }), [periodos, acoesSelecionadas]);
-  const podeAplicarManual = usaFluxoPorPeriodo && confirmacaoTextual === CONFIRMACAO_MANUAL_TEXTUAL && periodos.length > 0 && pendenciasManual.length === 0 && Boolean(previewHash) && Boolean(idempotencyKey) && !applying;
+  const podeAplicarManual = usaFluxoPorPeriodo && periodos.length > 0 && pendenciasManual.length === 0 && Boolean(previewHash) && Boolean(idempotencyKey) && !applying;
   const podeAplicarLegado = !usaFluxoPorPeriodo && confirmacaoTextual === CONFIRMACAO_TEXTUAL && candidatosAplicaveis && riscosBloqueantes.length === 0 && !applying;
   const motivoBloqueioManual = !periodos.length
     ? 'Não há períodos analisados para aplicar.'
     : pendenciasManual.length > 0
       ? `Existem ${pendenciasManual.length} pendência(s) nas decisões por período.`
-      : confirmacaoTextual !== CONFIRMACAO_MANUAL_TEXTUAL
-        ? `Digite exatamente ${CONFIRMACAO_MANUAL_TEXTUAL}.`
-        : !previewHash
-          ? 'Hash da prévia ausente.'
-          : '';
+      : !previewHash
+        ? 'Hash da prévia ausente.'
+        : '';
   const motivoBloqueioAplicacao = riscosBloqueantes.length > 0
     ? 'Há riscos bloqueantes na prévia recalculada.'
     : !candidatosAplicaveis
@@ -251,7 +266,7 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
       return {
         periodo_id: item?.periodoId || item?.periodo_id || periodo.id,
         acao: decisao.acao || acaoSugerida || 'manter',
-        motivo: String(decisao.motivo || '').trim(),
+        motivo: String(decisao.motivo || getMotivoPadraoTransicao(decisao.acao || acaoSugerida || 'manter')).trim(),
         observacao: String(decisao.observacao || '').trim(),
         documento: decisao.documento || null,
         dias_indenizados: Number(decisao.dias_indenizados || 0),
@@ -272,10 +287,11 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
         contratoId,
         previewHash,
         idempotencyKey,
-        confirmacaoTextual,
+        confirmacaoTextual: CONFIRMACAO_MANUAL_TEXTUAL,
         acoes: montarAcoesManuais(),
       });
       setResultadoAplicacao(resultado);
+      setConfirmacaoManualAberta(false);
       await invalidarQueriesTransicaoManual();
     } catch (err) {
       const status = err?.status ? ` (${err.status})` : '';
@@ -326,16 +342,6 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
           </AlertDescription>
         </Alert>
 
-        {usaFluxoPorPeriodo && (
-          <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900">
-            <CheckCircle2 className="h-4 w-4" />
-            <AlertTitle>Aplicação manual liberada com auditoria de lote</AlertTitle>
-            <AlertDescription>
-              Revise todas as decisões, preencha os motivos obrigatórios, confirme com {CONFIRMACAO_MANUAL_TEXTUAL} e envie o lote para a autoridade final no backend.
-            </AlertDescription>
-          </Alert>
-        )}
-
         {loading && (
           <div className="rounded-lg border border-slate-200 p-6 text-sm text-slate-600 flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando prévia...
@@ -352,28 +358,26 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
 
         {preview && (
           <div className="space-y-4">
-            <CabecalhoPreview preview={preview} previewHash={previewHash} />
+            <CabecalhoPreview preview={preview} resumo={resumoDecisoes} />
 
             {usaFluxoPorPeriodo ? (
               <>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                  <p><strong>Lote manual:</strong> contrato_id, militar_id, preview_hash, idempotency_key, decisões por período e motivos serão enviados ao backend para validação final.</p>
-                  <p className="mt-1 break-all font-mono">idempotency_key: {idempotencyKey || '—'}</p>
-                </div>
                 <TransicaoDesignacaoResumoAcoes resumo={resumoDecisoes} />
                 <TransicaoDesignacaoPeriodosGrid periodos={periodos} acoesSelecionadas={acoesSelecionadas} onChange={setAcoesSelecionadas} />
-                <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <Label htmlFor="confirmacao-transicao-manual">Confirmação textual obrigatória</Label>
-                  <Input
-                    id="confirmacao-transicao-manual"
-                    value={confirmacaoTextual}
-                    onChange={(event) => setConfirmacaoTextual(event.target.value)}
-                    placeholder={CONFIRMACAO_MANUAL_TEXTUAL}
-                    disabled={applying || Boolean(resultadoAplicacao?.ok)}
-                  />
-                  <p className="text-xs text-slate-500">Digite exatamente: <strong>{CONFIRMACAO_MANUAL_TEXTUAL}</strong></p>
-                  {motivoBloqueioManual && !resultadoAplicacao?.ok && <p className="text-xs text-amber-700">{motivoBloqueioManual}</p>}
-                </section>
+                {motivoBloqueioManual && !resultadoAplicacao?.ok && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{motivoBloqueioManual}</p>}
+                <Accordion type="single" collapsible className="rounded-lg border border-slate-200 bg-white px-3">
+                  <AccordionItem value="detalhes-tecnicos" className="border-0">
+                    <AccordionTrigger className="py-3 text-sm font-semibold text-slate-700 hover:no-underline">Modo avançado</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-2 text-xs text-slate-600">
+                        <p>Detalhes técnicos preservados para auditoria e suporte.</p>
+                        <p className="break-all font-mono">preview_hash: {previewHash || '—'}</p>
+                        <p className="break-all font-mono">idempotency_key: {idempotencyKey || '—'}</p>
+                        <p>Operações previstas: {resumoDecisoes.total || 0}</p>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
                 <RelatorioAplicacao resultado={resultadoAplicacao} />
               </>
             ) : (
@@ -442,10 +446,27 @@ export default function TransicaoLegadoAtivaPreviewModal({ open, onOpenChange, m
         <DialogFooter className="gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange?.(false)}>Fechar</Button>
           {usaFluxoPorPeriodo ? (
-            <Button type="button" onClick={handleAplicarManual} disabled={!podeAplicarManual || Boolean(resultadoAplicacao?.ok)}>
-              {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Aplicar transição manual
-            </Button>
+            <AlertDialog open={confirmacaoManualAberta} onOpenChange={setConfirmacaoManualAberta}>
+              <AlertDialogTrigger asChild>
+                <Button type="button" disabled={!podeAplicarManual || Boolean(resultadoAplicacao?.ok)}>
+                  {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Aplicar transição
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Aplicar transição</AlertDialogTitle>
+                  <AlertDialogDescription>Deseja aplicar a transição de períodos para este contrato?</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={applying}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleAplicarManual} disabled={applying}>
+                    {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Aplicar transição
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           ) : (
             <Button type="button" onClick={handleAplicarLegado} disabled={!podeAplicarLegado || Boolean(resultadoAplicacao?.ok)}>
               {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
