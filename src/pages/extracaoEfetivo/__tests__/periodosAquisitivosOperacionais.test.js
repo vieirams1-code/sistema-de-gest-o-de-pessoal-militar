@@ -22,15 +22,19 @@ test('helper considera indisponíveis períodos arquivados/cancelados/inativos',
   assert.equal(isPeriodoDisponivelOperacional({ status: 'Disponível' }), true);
 });
 
-test('generator filtra duplicidade apenas por períodos operacionais disponíveis do militar', async () => {
+test('generator centraliza a janela e a duplicidade no helper de geração automática', async () => {
   const conteudo = await read('components/ferias/PeriodoAquisitivoGenerator.jsx');
 
   assert.match(
     conteudo,
-    /import \{ isPeriodoDisponivelOperacional \} from '@\/services\/periodosAquisitivosOperacionais';/,
+    /calcularPeriodosAquisitivosParaGeracao/,
   );
   assert.match(
     conteudo,
-    /const periodosDoMilitar = periodosFrescos\s*\.filter\(\(p\) => String\(p\.militar_id\) === String\(militar\.id\)\)\s*\.filter\(isPeriodoDisponivelOperacional\);/,
+    /periodoAquisitivoJaExiste/,
+  );
+  assert.doesNotMatch(
+    conteudo,
+    /PERIODOS_FUTUROS|ANOS_RETROSPECTIVOS/,
   );
 });
