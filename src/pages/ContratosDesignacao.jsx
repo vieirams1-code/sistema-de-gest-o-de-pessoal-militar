@@ -1,14 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Edit3, Eye, FileText, Loader2, Plus, Search, Trash2, UserRound, XCircle } from 'lucide-react';
+import { ArrowRight, CalendarClock, Edit3, Eye, Loader2, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 
 import AccessDenied from '@/components/auth/AccessDenied';
 import ContratoDesignacaoModal from '@/components/militar/ContratoDesignacaoModal';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -61,25 +61,20 @@ function sanitizarIdMatricula(value) {
   return posicaoSeparador >= 0 ? texto.slice(0, posicaoSeparador).trim() : texto;
 }
 
-function CounterCard({ title, value, icon: Icon, color = 'slate' }) {
-  const colors = {
-    slate: 'bg-slate-50 text-slate-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
-    red: 'bg-red-50 text-red-700',
-    blue: 'bg-blue-50 text-blue-700',
-    rose: 'bg-rose-50 text-rose-700',
+function CounterCard({ title, value, tone = 'slate' }) {
+  const tones = {
+    emerald: 'bg-emerald-500',
+    amber: 'bg-amber-400',
+    red: 'bg-red-500',
+    blue: 'bg-blue-500',
+    slate: 'bg-slate-700',
   };
   return (
-    <Card className="border-slate-200 shadow-sm">
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className={`p-2.5 rounded-xl ${colors[color] || colors.slate}`}><Icon size={20} /></div>
-        <div>
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="text-2xl font-bold text-slate-900">{value || 0}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
+      <div className={`absolute inset-y-0 left-0 w-1.5 ${tones[tone] || tones.slate}`} />
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+      <p className="mt-1 text-2xl font-bold leading-none text-slate-950">{value || 0}</p>
+    </div>
   );
 }
 
@@ -317,39 +312,36 @@ export default function ContratosDesignacao() {
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
       <div className="max-w-[1600px] mx-auto space-y-6">
-        <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-slate-900 text-white p-3 rounded-2xl shadow-sm"><ClipboardList size={26} /></div>
+        <header className="rounded-xl border-b border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">Contratos de Designação</h1>
-              <p className="text-slate-500">Controle centralizado de contratos ativos, vencidos, encerrados e cancelados. Nenhuma alteração automática é realizada nesta tela.</p>
+              <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">Gestão administrativa</p>
+              <h1 className="text-3xl font-bold text-slate-950">Contratos de Designação</h1>
+              <p className="mt-1 max-w-3xl text-sm text-slate-500">Controle centralizado de contratos ativos, vencidos e encerrados, preservando os fluxos administrativos existentes.</p>
             </div>
+            {canCreate && (
+              <Button onClick={() => setNovoContratoOpen(true)} className="bg-blue-600 text-white hover:bg-blue-700">
+                <Plus className="mr-2 h-4 w-4" />Novo contrato
+              </Button>
+            )}
           </div>
-          {canCreate && (
-            <Button onClick={() => setNovoContratoOpen(true)} className="bg-[#1e3a5f] text-white hover:bg-[#2d4a6f]">
-              <Plus className="mr-2 h-4 w-4" />Novo contrato
-            </Button>
-          )}
         </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          <CounterCard title="Ativos" value={counters.ativos} icon={CheckCircle2} color="emerald" />
-          <CounterCard title="Vencendo em 30 dias" value={counters.vencendo30} icon={CalendarClock} color="amber" />
-          <CounterCard title="Vencendo em 60 dias" value={counters.vencendo60} icon={CalendarClock} color="amber" />
-          <CounterCard title="Vencendo em 90 dias" value={counters.vencendo90} icon={CalendarClock} color="amber" />
-          <CounterCard title="Vencidos" value={counters.vencidos} icon={AlertTriangle} color="red" />
-          <CounterCard title="Sem data fim" value={counters.semDataFim} icon={FileText} color="blue" />
-          <CounterCard title="Encerrados" value={counters.encerrados} icon={XCircle} color="slate" />
-          <CounterCard title="Cancelados" value={counters.cancelados} icon={XCircle} color="rose" />
-        </div>
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <CounterCard title="Ativos" value={counters.ativos} tone="emerald" />
+          <CounterCard title="Sem data fim" value={counters.semDataFim} tone="blue" />
+          <CounterCard title="Vencendo" value={(counters.vencendo30 || 0) + (counters.vencendo60 || 0) + (counters.vencendo90 || 0)} tone="amber" />
+          <CounterCard title="Vencidos" value={counters.vencidos} tone="red" />
+          <CounterCard title="Encerrados" value={counters.encerrados} tone="slate" />
+        </section>
 
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="relative lg:col-span-1">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="grid grid-cols-1 gap-3 border-b border-slate-200 bg-white p-4 lg:grid-cols-[minmax(18rem,1fr)_14rem_14rem]">
+            <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-              <input className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="Buscar por militar, matrícula, contrato ou boletim..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+              <input className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-100" placeholder="Buscar por militar, matrícula, contrato ou boletim..." value={busca} onChange={(e) => setBusca(e.target.value)} />
             </div>
-            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" value={situacao} onChange={(e) => setSituacao(e.target.value)}>
+            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700" value={situacao} onChange={(e) => setSituacao(e.target.value)}>
               <option value={FILTRO_SITUACAO.TODOS}>Situação: Todos</option>
               <option value={FILTRO_SITUACAO.ATIVOS}>Ativos</option>
               <option value={FILTRO_SITUACAO.ATIVOS_VENCENDO}>Ativos vencendo</option>
@@ -358,7 +350,7 @@ export default function ContratosDesignacao() {
               <option value={FILTRO_SITUACAO.CANCELADOS}>Cancelados</option>
               <option value={FILTRO_SITUACAO.SEM_DATA_FIM}>Sem data fim</option>
             </select>
-            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" value={vencimento} onChange={(e) => setVencimento(e.target.value)}>
+            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700" value={vencimento} onChange={(e) => setVencimento(e.target.value)}>
               <option value={FILTRO_VENCIMENTO.TODOS}>Vencimento: Todos</option>
               <option value={FILTRO_VENCIMENTO.VENCIDOS}>Vencidos</option>
               <option value={FILTRO_VENCIMENTO.ATE_30}>Até 30 dias</option>
@@ -367,65 +359,111 @@ export default function ContratosDesignacao() {
               <option value={FILTRO_VENCIMENTO.ACIMA_90}>Acima de 90 dias</option>
               <option value={FILTRO_VENCIMENTO.SEM_DATA_FIM}>Sem data fim</option>
             </select>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-4">
-            {query.isLoading ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-500">Carregando contratos...</div>
-            ) : contratosFiltrados.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-500">Nenhum contrato encontrado para os filtros informados.</div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                {contratosFiltrados.map((contrato) => {
-                  const militar = getMilitar(contrato);
-                  const situacaoDerivada = calcularSituacaoDerivadaContrato(contrato);
-                  const ui = SITUACAO_UI[situacaoDerivada] || SITUACAO_UI[SITUACAO_CONTRATO_DESIGNACAO.ATIVO];
+          {query.isLoading ? (
+            <div className="px-4 py-12 text-center text-sm text-slate-500">Carregando contratos...</div>
+          ) : contratosFiltrados.length === 0 ? (
+            <div className="px-4 py-12 text-center text-sm text-slate-500">Nenhum contrato encontrado para os filtros informados.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                  <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3">Militar / Identificação</th>
+                    <th className="px-4 py-3">Período do Contrato</th>
+                    <th className="px-4 py-3">Publicação</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {contratosFiltrados.map((contrato) => {
+                    const militar = getMilitar(contrato);
+                    const situacaoDerivada = calcularSituacaoDerivadaContrato(contrato);
+                    const ui = SITUACAO_UI[situacaoDerivada] || SITUACAO_UI[SITUACAO_CONTRATO_DESIGNACAO.ATIVO];
+                    const nomeMilitar = militar.nome_completo || militar.nome_guerra || 'Militar não localizado';
+                    const matriculaAtual = getMatriculaAtual(contrato);
+                    const fimContrato = contrato.data_fim_contrato || contrato.data_encerramento_operacional;
+                    const dataBaseFerias = contrato.data_inclusao_para_ferias && contrato.data_inclusao_para_ferias !== contrato.data_inicio_contrato
+                      ? formatDate(contrato.data_inclusao_para_ferias)
+                      : null;
 
-                  return (
-                    <article key={contrato.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className={ui.className}>{ui.label}</Badge>
+                    return (
+                      <tr key={contrato.id} className="align-top hover:bg-slate-50/70">
+                        <td className="min-w-[18rem] px-4 py-4">
+                          <div className="space-y-1.5">
+                            <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">{militar.posto_graduacao || militar.quadro || 'Posto/graduação'}</Badge>
+                            <p className="font-semibold text-slate-950">{nomeMilitar}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                              <span>Matrícula {matriculaAtual}</span>
+                              <Link className="font-semibold text-blue-700 hover:text-blue-800" to={`${createPageUrl('VerMilitar')}?id=${contrato.militar_id}`}>Ver ficha</Link>
+                            </div>
                           </div>
-                          <h2 className="mt-2 break-words text-lg font-bold text-slate-900">{militar.nome_guerra || militar.nome_completo || 'Militar não localizado'}</h2>
-                          <p className="text-sm text-slate-500">{militar.posto_graduacao || militar.quadro || 'Posto/graduação não informado'}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 sm:justify-end">
-                          <Button asChild variant="outline" size="sm">
-                            <Link to={`${createPageUrl('VerMilitar')}?id=${contrato.militar_id}`}><UserRound size={14} className="mr-1" />Ver ficha</Link>
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => setContratoDetalhe(contrato)}><Eye size={14} className="mr-1" />Detalhes</Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => revisarPeriodosMilitar(contrato.militar_id)}>Revisar períodos aquisitivos</Button>
-                          {canCreate && <Button type="button" variant="outline" size="sm" onClick={() => handleAbrirEdicaoContrato(contrato)}><Edit3 size={14} className="mr-1" />Editar contrato</Button>}
-                          {canCreate && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => handleExcluirContrato(contrato)} disabled={excluindoContratoId === contrato.id} className="border-rose-200 text-rose-700 hover:bg-rose-50">
-                              {excluindoContratoId === contrato.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Trash2 size={14} className="mr-1" />}Excluir contrato
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <DetailItem label="Matrícula atual" value={getMatriculaAtual(contrato)} />
-                        <DetailItem label="Matrícula de designação" value={contrato.matricula_designacao} />
-                        <DetailItem label="Início" value={formatDate(contrato.data_inicio_contrato)} />
-                        <DetailItem label="Fim previsto/operacional" value={formatDate(contrato.data_fim_contrato || contrato.data_encerramento_operacional)} />
-                        <DetailItem label="Dias para vencimento" value={renderDias(contrato)} />
-                        <DetailItem label="Contrato/boletim/publicação" value={[contrato.numero_contrato, contrato.boletim_publicacao, formatDate(contrato.data_publicacao)].filter((value) => value && value !== '—').join(' • ')} />
-                        <div className="sm:col-span-2 lg:col-span-3">
-                          <DetailItem label="Fonte legal/tipo" value={[contrato.fonte_legal, contrato.tipo_designacao].filter(Boolean).join(' / ')} />
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        </td>
+                        <td className="min-w-[17rem] px-4 py-4">
+                          <div className="flex flex-wrap items-center gap-2 font-medium text-slate-800">
+                            <span>{formatDate(contrato.data_inicio_contrato)}</span>
+                            <ArrowRight className="h-4 w-4 text-slate-400" />
+                            <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">{fimContrato ? formatDate(fimContrato) : 'Indeterminado'}</Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">{dataBaseFerias ? `Data-base férias: ${dataBaseFerias}` : `Vencimento: ${renderDias(contrato)}`}</p>
+                        </td>
+                        <td className="min-w-[12rem] px-4 py-4">
+                          <p className="font-medium text-slate-900">{contrato.boletim_publicacao || contrato.numero_contrato || '—'}</p>
+                          <p className="text-xs text-slate-500">{contrato.data_publicacao ? formatDate(contrato.data_publicacao) : 'Data não informada'}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Badge variant="outline" className={`${ui.className} rounded-full px-2.5 py-1`}>
+                            {situacaoDerivada === SITUACAO_CONTRATO_DESIGNACAO.ATIVO && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-emerald-500" />}
+                            {ui.label}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            {canCreate && (
+                              <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={() => handleAbrirEdicaoContrato(contrato)} aria-label="Editar contrato">
+                                <Edit3 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button type="button" variant="outline" size="icon" className="h-8 w-8" aria-label="Mais opções">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem onSelect={() => setContratoDetalhe(contrato)}>
+                                  <Eye className="h-4 w-4" />Detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => revisarPeriodosMilitar(contrato.militar_id)}>
+                                  <CalendarClock className="h-4 w-4" />Revisar períodos
+                                </DropdownMenuItem>
+                                {canCreate && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-red-600 focus:text-red-700"
+                                      disabled={excluindoContratoId === contrato.id}
+                                      onSelect={() => handleExcluirContrato(contrato)}
+                                    >
+                                      {excluindoContratoId === contrato.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                      Excluir contrato
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         {query.error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{query.error.message || 'Erro ao carregar painel.'}</div>}
       </div>

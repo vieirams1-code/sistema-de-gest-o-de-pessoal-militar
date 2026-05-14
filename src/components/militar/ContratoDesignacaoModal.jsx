@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Check, ChevronsUpDown } from 'lucide-react';
+import { AlertTriangle, Check, ChevronsUpDown, LockKeyhole } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import {
   REGRA_GERACAO_PERIODOS_DESIGNACAO,
   TIPO_PRAZO_CONTRATO_DESIGNACAO,
   normalizarDataIsoDateOnly,
+  derivarDataBaseFeriasDaDataInicio,
   validarContratoDesignacaoPayload,
 } from '@/services/contratosDesignacaoMilitarService';
 
@@ -199,7 +200,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
     const valorSeguro = field === 'matricula_militar_id' ? sanitizarIdMatricula(value) : value;
     const next = aplicarRegraFeriasPorTipoPrazo({ ...prev, [field]: valorSeguro });
     if (field === 'data_inicio_contrato' && !prev.data_inclusao_para_ferias) {
-      next.data_inclusao_para_ferias = valorSeguro;
+      next.data_inclusao_para_ferias = derivarDataBaseFeriasDaDataInicio(valorSeguro);
     }
     if (next.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO) {
       next.data_fim_contrato = '';
@@ -253,7 +254,7 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
       militar_id: contrato?.militar_id || militarSelecionadoId || militarId,
       matricula_militar_id: matriculaMilitarId,
       matricula_designacao: matriculaDesignacao,
-      data_inclusao_para_ferias: form.data_inclusao_para_ferias || form.data_inicio_contrato,
+      data_inclusao_para_ferias: form.data_inclusao_para_ferias || derivarDataBaseFeriasDaDataInicio(form.data_inicio_contrato),
       status_contrato: form.status_contrato || 'ativo',
     }));
     if (payload.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO) {
@@ -282,15 +283,15 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border-0 bg-white p-0 shadow-2xl">
+        <DialogHeader className="border-b border-slate-200 px-6 py-5">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             Cadastre ou edite o registro administrativo do contrato de designação. Datas são salvas em ISO yyyy-MM-dd e exibidas em dd/MM/yyyy nos detalhes.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex gap-2">
+        <div className="mx-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex gap-2">
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <div className="space-y-1">
             <p>Encerrar ou cancelar contrato não altera períodos aquisitivos já existentes neste lote.</p>
@@ -339,166 +340,200 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 md:col-span-2">
-              <Label>Pesquisar militar *</Label>
-              <Popover open={militarPopoverOpen} onOpenChange={setMilitarPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={militarPopoverOpen}
-                    disabled={isEditing || militaresLoading || militaresOptions.length === 0}
-                    className="h-auto min-h-11 w-full justify-between px-3 py-2 font-normal"
-                  >
-                    {militarEscolhido ? (
-                      <MilitarSearchResult militar={militarEscolhido} selected />
-                    ) : (
-                      <span className="text-sm text-slate-500">
-                        {militaresLoading ? 'Carregando militares do escopo...' : 'Pesquise por nome, nome de guerra, matrícula ou CPF...'}
-                      </span>
-                    )}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[min(42rem,calc(100vw-2rem))] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Pesquise por nome, nome de guerra, matrícula ou CPF..."
-                      value={buscaMilitar}
-                      onValueChange={setBuscaMilitar}
-                    />
-                    <CommandList>
-                      {militaresLoading && <CommandEmpty>Carregando militares do escopo...</CommandEmpty>}
-                      {!militaresLoading && <CommandEmpty>Nenhum militar ativo encontrado no seu escopo.</CommandEmpty>}
-                      <CommandGroup className="max-h-72 overflow-auto">
-                        {militaresFiltradosBusca.map((option) => (
-                          <CommandItem
-                            key={option.value}
-                            value={option.value}
-                            onSelect={() => handleMilitarChange(option.value)}
-                            className="items-start gap-2 py-2"
-                          >
-                            <Check className={cn('mt-1 h-4 w-4 shrink-0', String(militarSelecionadoId) === option.value ? 'opacity-100' : 'opacity-0')} />
-                            <MilitarSearchResult militar={option.militar} />
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              {militarEscolhido && <p className="text-xs text-slate-500">A matrícula será puxada da ficha atual do militar. Se este contrato gerou nova matrícula, cadastre-a previamente na ficha do militar para que ela seja usada neste contrato.</p>}
-              {!isEditing && !militaresLoading && militaresOptions.length === 0 && <p className="text-xs text-slate-500">Não há militares ativos disponíveis para criação de contrato no seu escopo atual.</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Matrícula atual da ficha</Label>
-              <Input value={form.matricula_designacao} placeholder="Puxada automaticamente da ficha do militar" readOnly disabled />
-              {form.matricula_militar_id && <p className="text-xs text-slate-500">ID operacional disponível: {form.matricula_militar_id}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Matrícula de designação *</Label>
-              <Input value={form.matricula_designacao} placeholder="Puxada automaticamente da ficha atual do militar" readOnly disabled />
-            </div>
-            <div className="space-y-2">
-              <Label>Data de início *</Label>
-              <Input type="date" value={form.data_inicio_contrato} onChange={(e) => update('data_inicio_contrato', e.target.value)} disabled={campoCadeiaBloqueado('data_inicio_contrato')} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <details className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                <summary className="cursor-pointer text-sm font-medium text-slate-700">Data-base diferente para férias</summary>
-                <div className="mt-3 space-y-2">
-                  <Label>Data-base de férias opcional</Label>
-                  <Input type="date" value={form.data_inclusao_para_ferias} onChange={(e) => update('data_inclusao_para_ferias', e.target.value)} disabled={campoCadeiaBloqueado('data_inclusao_para_ferias')} />
-                  <p className="text-xs text-slate-500">Se não informada, será salva igual à data de início do contrato.</p>
-                </div>
-              </details>
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo de prazo do contrato *</Label>
-              <Select value={form.tipo_prazo_contrato} onValueChange={(value) => update('tipo_prazo_contrato', value)}>
-                <SelectTrigger><SelectValue placeholder="Selecionar tipo de prazo" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}>Indeterminado</SelectItem>
-                  <SelectItem value={TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO}>Determinado (12 meses)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Data de fim {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO ? '(recomendada)' : ''}</Label>
-              <Input type="date" value={form.data_fim_contrato} onChange={(e) => update('data_fim_contrato', e.target.value)} disabled={form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO} />
-            </div>
-            <div className="space-y-2">
-              <Label>Gera direito a férias *</Label>
-              <Select
-                value={form.gera_direito_ferias ? 'sim' : 'nao'}
-                onValueChange={(value) => update('gera_direito_ferias', value === 'sim')}
-                disabled={campoCadeiaBloqueado('gera_direito_ferias') || form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sim">Sim</SelectItem>
-                  <SelectItem value="nao">Não</SelectItem>
-                </SelectContent>
-              </Select>
-              {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO && <p className="text-xs text-slate-500">Contratos indeterminados geram direito a férias automaticamente.</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Regra de geração de períodos *</Label>
-              <Select
-                value={form.regra_geracao_periodos}
-                onValueChange={(value) => update('regra_geracao_periodos', value)}
-                disabled={campoCadeiaBloqueado('regra_geracao_periodos') || form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO && <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.NORMAL}>Normal</SelectItem>}
-                  <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.BLOQUEADA}>Bloqueada</SelectItem>
-                  <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.MANUAL}>Manual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {!form.gera_direito_ferias && (
-              <div className="space-y-2 md:col-span-2">
-                <Label>Motivo para não gerar férias *</Label>
-                <Textarea value={form.motivo_nao_gera_ferias} onChange={(e) => update('motivo_nao_gera_ferias', e.target.value)} />
+          <div className="space-y-5 px-6 pb-2">
+            <section className="space-y-3">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Dados do Militar</h3>
+                <p className="text-xs text-slate-500">Selecione o militar pelo componente de pesquisa; matrículas são resolvidas pela ficha.</p>
               </div>
-            )}
+              {isEditing && militarEscolhido ? (
+                <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <LockKeyhole className="mt-1 h-4 w-4 text-slate-500" />
+                  <div className="grid flex-1 gap-2 text-sm sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <p className="text-xs font-medium text-slate-500">Nome completo</p>
+                      <p className="font-semibold text-slate-950">{militarEscolhido.nome_completo || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">Nome de guerra</p>
+                      <p className="font-medium text-slate-800">{militarEscolhido.nome_guerra || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">Posto/graduação</p>
+                      <p className="font-medium text-slate-800">{militarEscolhido.posto_graduacao || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">Matrícula</p>
+                      <p className="font-medium text-slate-800">{form.matricula_designacao || getMatriculaMilitar(militarEscolhido) || '—'}</p>
+                    </div>
+                    <p className="text-xs text-slate-500 sm:col-span-2">Militar bloqueado para edição direta neste modal.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Pesquisar militar *</Label>
+                  <Popover open={militarPopoverOpen} onOpenChange={setMilitarPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={militarPopoverOpen}
+                        disabled={isEditing || militaresLoading || militaresOptions.length === 0}
+                        className="h-auto min-h-11 w-full justify-between px-3 py-2 font-normal"
+                      >
+                        {militarEscolhido ? (
+                          <MilitarSearchResult militar={militarEscolhido} selected />
+                        ) : (
+                          <span className="text-sm text-slate-500">
+                            {militaresLoading ? 'Carregando militares do escopo...' : 'Pesquise por nome, nome de guerra, matrícula ou CPF...'}
+                          </span>
+                        )}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[min(42rem,calc(100vw-2rem))] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Pesquise por nome, nome de guerra, matrícula ou CPF..."
+                          value={buscaMilitar}
+                          onValueChange={setBuscaMilitar}
+                        />
+                        <CommandList>
+                          {militaresLoading && <CommandEmpty>Carregando militares do escopo...</CommandEmpty>}
+                          {!militaresLoading && <CommandEmpty>Nenhum militar ativo encontrado no seu escopo.</CommandEmpty>}
+                          <CommandGroup className="max-h-72 overflow-auto">
+                            {militaresFiltradosBusca.map((option) => (
+                              <CommandItem
+                                key={option.value}
+                                value={option.value}
+                                onSelect={() => handleMilitarChange(option.value)}
+                                className="items-start gap-2 py-2"
+                              >
+                                <Check className={cn('mt-1 h-4 w-4 shrink-0', String(militarSelecionadoId) === option.value ? 'opacity-100' : 'opacity-0')} />
+                                <MilitarSearchResult militar={option.militar} />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {militarEscolhido && <p className="text-xs text-slate-500">A matrícula será puxada da ficha atual do militar.</p>}
+                  {!isEditing && !militaresLoading && militaresOptions.length === 0 && <p className="text-xs text-slate-500">Não há militares ativos disponíveis para criação de contrato no seu escopo atual.</p>}
+                </div>
+              )}
+            </section>
 
-            <div className="space-y-2">
-              <Label>Número do contrato</Label>
-              <Input value={form.numero_contrato} onChange={(e) => update('numero_contrato', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Boletim de publicação</Label>
-              <Input value={form.boletim_publicacao} onChange={(e) => update('boletim_publicacao', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Data de publicação</Label>
-              <Input type="date" value={form.data_publicacao} onChange={(e) => update('data_publicacao', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo de designação</Label>
-              <Input value={form.tipo_designacao} onChange={(e) => update('tipo_designacao', e.target.value)} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Fonte legal</Label>
-              <Input value={form.fonte_legal} onChange={(e) => update('fonte_legal', e.target.value)} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Observações</Label>
-              <Textarea value={form.observacoes} onChange={(e) => update('observacoes', e.target.value)} />
-            </div>
+            <hr className="border-slate-200" />
+
+            <section className="space-y-3">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Prazos e Regras</h3>
+                <p className="text-xs text-slate-500">Datas e configurações que alimentam a cadeia de férias.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Data de início *</Label>
+                  <Input type="date" value={form.data_inicio_contrato} onChange={(e) => update('data_inicio_contrato', e.target.value)} disabled={campoCadeiaBloqueado('data_inicio_contrato')} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo de prazo *</Label>
+                  <Select value={form.tipo_prazo_contrato} onValueChange={(value) => update('tipo_prazo_contrato', value)}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar tipo de prazo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}>Indeterminado</SelectItem>
+                      <SelectItem value={TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO}>Determinado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Data de fim {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.DETERMINADO ? '*' : ''}</Label>
+                  <Input type="date" value={form.data_fim_contrato} onChange={(e) => update('data_fim_contrato', e.target.value)} disabled={form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Gera direito a férias</Label>
+                  <Select value="sim" disabled>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="sim">Sim</SelectItem></SelectContent>
+                  </Select>
+                  <p className="text-xs text-slate-500">Contratos indeterminados geram férias automaticamente.</p>
+                </div>
+                <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:col-span-2">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-700">Configurar data-base diferente para férias</summary>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Data-base de férias opcional</Label>
+                      <Input type="date" value={form.data_inclusao_para_ferias} onChange={(e) => update('data_inclusao_para_ferias', e.target.value)} disabled={campoCadeiaBloqueado('data_inclusao_para_ferias')} />
+                      <p className="text-xs text-slate-500">Se não informada, será salva igual à data de início do contrato.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Regra de geração de períodos *</Label>
+                      <Select
+                        value={form.regra_geracao_periodos}
+                        onValueChange={(value) => update('regra_geracao_periodos', value)}
+                        disabled={campoCadeiaBloqueado('regra_geracao_periodos') || form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {form.tipo_prazo_contrato === TIPO_PRAZO_CONTRATO_DESIGNACAO.INDETERMINADO && <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.NORMAL}>Normal</SelectItem>}
+                          <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.BLOQUEADA}>Bloqueada</SelectItem>
+                          <SelectItem value={REGRA_GERACAO_PERIODOS_DESIGNACAO.MANUAL}>Manual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </details>
+                {!form.gera_direito_ferias && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Motivo para não gerar férias *</Label>
+                    <Textarea value={form.motivo_nao_gera_ferias} onChange={(e) => update('motivo_nao_gera_ferias', e.target.value)} />
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <hr className="border-slate-200" />
+
+            <section className="space-y-3">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Dados de Publicação</h3>
+                <p className="text-xs text-slate-500">Identificação administrativa e observações do contrato.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Número do contrato</Label>
+                  <Input value={form.numero_contrato} onChange={(e) => update('numero_contrato', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Boletim de publicação</Label>
+                  <Input value={form.boletim_publicacao} onChange={(e) => update('boletim_publicacao', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data de publicação</Label>
+                  <Input type="date" value={form.data_publicacao} onChange={(e) => update('data_publicacao', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo de designação</Label>
+                  <Input value={form.tipo_designacao} onChange={(e) => update('tipo_designacao', e.target.value)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Fonte legal</Label>
+                  <Input value={form.fonte_legal} onChange={(e) => update('fonte_legal', e.target.value)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Observações</Label>
+                  <Textarea value={form.observacoes} onChange={(e) => update('observacoes', e.target.value)} />
+                </div>
+              </div>
+            </section>
 
             {exigeCienciaPeriodos && (
-              <div className="md:col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <div className="space-y-3">
-                    <p>
-                      Ao cadastrar este contrato, a data-base de férias do militar poderá ser alterada. O sistema não excluirá nem cancelará automaticamente períodos aquisitivos já gerados. Após salvar o contrato, revise os períodos aquisitivos do militar e exclua manualmente os períodos incompatíveis com a nova data-base. Períodos com férias vinculadas não devem ser excluídos sem análise prévia.
-                    </p>
+                    <p>Ao cadastrar este contrato, a data-base de férias do militar poderá alterar a cadeia futura de períodos aquisitivos. Após salvar, revise os períodos do militar quando necessário.</p>
                     <div className="space-y-2">
                       {CIENCIA_PERIODOS_ITEMS.map((texto, index) => (
                         <label key={texto} className="flex items-start gap-3 rounded-lg border border-blue-100 bg-white/70 p-3 text-blue-950">
@@ -519,9 +554,9 @@ export default function ContratoDesignacaoModal({ open, onOpenChange, militarId,
           </div>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          {!readOnly && <Button onClick={handleSubmit} disabled={isSubmitting || militaresLoading || !cienciaPeriodosCompleta}>{isSubmitting ? 'Salvando...' : (isEditing ? 'Salvar edição' : 'Salvar contrato')}</Button>}
+        <DialogFooter className="mt-2 border-t border-slate-200 bg-slate-50 px-6 py-4">
+          <Button variant="outline" className="border-slate-300 text-slate-700" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          {!readOnly && <Button className="bg-slate-900 text-white hover:bg-slate-800" onClick={handleSubmit} disabled={isSubmitting || militaresLoading || !cienciaPeriodosCompleta}>{isSubmitting ? 'Salvando...' : (isEditing ? 'Salvar edição' : 'Salvar contrato')}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

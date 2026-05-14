@@ -4,7 +4,6 @@ export const STATUS_CONTRATO_DESIGNACAO = {
   CANCELADO: 'cancelado',
 };
 
-
 export const TIPO_PRAZO_CONTRATO_DESIGNACAO = {
   INDETERMINADO: 'indeterminado',
   DETERMINADO: 'determinado',
@@ -89,6 +88,11 @@ function hasValor(valor) {
 
 function isIdMatriculaContaminado(valor) {
   return String(valor ?? '').includes(':');
+}
+
+export function derivarDataBaseFeriasDaDataInicio(dataInicio) {
+  const inicioNormalizado = normalizarDataIsoDateOnly(dataInicio);
+  return inicioNormalizado || '';
 }
 
 export function aplicarRegraFeriasPorTipoPrazo(payload = {}) {
