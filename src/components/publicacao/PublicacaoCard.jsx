@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 import { ArrowLeft, ArrowRight, Calendar, Check, ChevronDown, ChevronUp, Copy, FileText, Pause, Save, Shield, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getRPTipoLabel } from '@/components/rp/rpTiposConfig';
+import { getLivroTextoPublicacaoRegistro } from '@/components/livro/livroService';
 import {
   calcularStatusPublicacaoRegistro,
   STATUS_PUBLICACAO,
@@ -84,6 +86,9 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   });
 
   const origemTipo = detectarOrigemTipo(registro);
+  const isRegistroLivro = origemTipo === 'livro';
+  const textoPublicacaoPersistido = registro.texto_publicacao || '';
+  const canLoadTextoLivro = Boolean(isRegistroLivro && registro.id && !textoPublicacaoPersistido && registro.texto_publicacao_lazy_disponivel !== false);
   const currentStatus = registro.status_calculado || calcularStatusPublicacaoRegistro(registro);
   const tipoVisual = getTipoVisual(registro.tipo_registro || registro.tipo || '');
   const TipoIcon = tipoVisual.icon;
@@ -97,6 +102,20 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   );
   const podeExcluir = !isPublicado && canAccessAction('admin_mode') && modoAdmin;
   const podeExcluirDesabilitado = !isPublicado && canAccessAction('admin_mode') && !modoAdmin;
+  const {
+    data: textoLivroLazy,
+    isFetching: isTextoPublicacaoFetching,
+    refetch: refetchTextoPublicacao,
+  } = useQuery({
+    queryKey: ['publicacoes', 'livro', 'texto-publicacao', registro.id],
+    queryFn: () => getLivroTextoPublicacaoRegistro({ registroId: registro.id }),
+    enabled: canLoadTextoLivro && showTextoPublicacao,
+    staleTime: 5 * 60 * 1000,
+  });
+  const textoPublicacaoResolvido = textoPublicacaoPersistido || textoLivroLazy?.texto_publicacao || '';
+  const textoPublicacaoDisplay = isTextoPublicacaoFetching && !textoPublicacaoResolvido
+    ? 'Gerando texto...'
+    : textoPublicacaoResolvido || 'Nenhum texto de publicação gerado para este registro.';
 
   const handleSaveBg = () => {
     onUpdate(registro.id, bgData, origemTipo);
@@ -104,7 +123,14 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
   };
 
   const handleCopyTextoPublicacao = async () => {
-    const texto = registro.texto_publicacao || 'Nenhum texto de publicação gerado para este registro.';
+    let texto = textoPublicacaoResolvido;
+
+    if (!texto && canLoadTextoLivro) {
+      const resultado = await refetchTextoPublicacao();
+      texto = resultado?.data?.texto_publicacao || '';
+    }
+
+    texto = texto || 'Nenhum texto de publicação gerado para este registro.';
 
     try {
       await navigator.clipboard.writeText(texto);
@@ -195,7 +221,12 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               <FileText className="mr-2 h-4 w-4" /> Família
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setShowTextoPublicacao((prev) => !prev)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTextoPublicacao((prev) => !prev)}
+            disabled={isTextoPublicacaoFetching && !showTextoPublicacao}
+          >
             {showTextoPublicacao ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
             {showTextoPublicacao ? 'Recolher texto' : 'Expandir texto'}
           </Button>
@@ -221,6 +252,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
                 size="sm"
                 className="h-7 px-2 text-xs text-slate-600 hover:text-slate-900"
                 onClick={handleCopyTextoPublicacao}
+                disabled={isTextoPublicacaoFetching && !textoPublicacaoResolvido}
               >
                 {isTextoCopiado ? (
                   <>
@@ -236,7 +268,7 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
               </Button>
             </div>
             <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
-              {registro.texto_publicacao || 'Nenhum texto de publicação gerado para este registro.'}
+              {textoPublicacaoDisplay}
             </p>
           </div>
         )}

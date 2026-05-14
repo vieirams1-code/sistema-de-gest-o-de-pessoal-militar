@@ -1,1 +1,1 @@
-export { getLivroRegistrosContrato, getLivroMetricasRPContrato } from './livroService.js';
+export { getLivroRegistrosContrato, getLivroMetricasRPContrato, getLivroTextoPublicacaoRegistro } from './livroService.js';
