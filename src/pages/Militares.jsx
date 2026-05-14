@@ -35,6 +35,7 @@ import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
 import SaneamentoQbmptQptbmDialog from '@/components/admin/SaneamentoQbmptQptbmDialog';
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
+import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -266,7 +267,6 @@ export default function Militares() {
     debouncedSearchTerm,
     effectiveEmail || 'self',
     incluirInativos ? 'todos' : 'ativos',
-    movimentoFilter,
   ].join('::');
 
   // Reset de paginação quando filtros de backend mudam
@@ -298,7 +298,6 @@ export default function Militares() {
       }
       if (selectedPostos.length > 0) payload.postoGraduacaoFiltros = selectedPostos;
       if (debouncedSearchTerm) payload.search = debouncedSearchTerm;
-      if (movimentoFilter !== MOVIMENTO_TODOS) payload.condicaoMovimento = movimentoFilter;
       if (
         shouldShowLotacaoFilter
         && lotacaoFilter !== TODAS_LOTACOES_VALUE
@@ -360,10 +359,8 @@ export default function Militares() {
       return cond === condicaoFilter;
     })
     .filter((m) => {
-      // Filtro de movimento já é aplicado no backend; mantém aqui como defesa
-      // adicional para os dados acumulados (não-Efetivo é pré-requisito).
       if (movimentoFilter === MOVIMENTO_TODOS) return true;
-      return String(m?.condicao_movimento || '').toLowerCase() === movimentoFilter;
+      return resolveMovimentoCondicao(m) === movimentoFilter;
     })
     .filter((m) => (
       militarCorrespondeBusca(m, searchTerm)
