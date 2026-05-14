@@ -1,6 +1,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight, Check, AlertTriangle } from 'lucide-react';
+import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
 
 function formatDateBR(dateStr) {
   if (!dateStr) return null;
@@ -29,8 +30,10 @@ function formatDateBR(dateStr) {
 export default function CondicaoBadge({ militar = {} }) {
   const condicao = String(militar?.condicao || '').trim();
 
+  const movimento = resolveMovimentoCondicao(militar);
+
   // --- LTIP: tratado como saída fixa, mostra data de retorno ---
-  if (condicao === 'LTIP') {
+  if (condicao === 'LTIP' && movimento === 'saida') {
     const dataFim = formatDateBR(militar?.ltip_data_fim);
     return (
       <div className="flex flex-col gap-1 min-w-0">
@@ -60,7 +63,6 @@ export default function CondicaoBadge({ militar = {} }) {
     );
   }
 
-  const movimento = String(militar?.condicao_movimento || '').trim().toLowerCase();
   const origemDestino = String(militar?.condicao_origem_destino || militar?.destino || '').trim();
 
   if (movimento === 'entrada') {
