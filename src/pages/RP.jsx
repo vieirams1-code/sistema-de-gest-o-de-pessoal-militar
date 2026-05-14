@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, FileText, Filter, CalendarRange, ShieldAlert, BookOpenText } from 'lucide-react';
 
-import { getLivroRegistrosContrato } from '@/components/livro/livroService';
+import { getLivroMetricasRPContrato } from '@/components/livro/livroService';
 import { createPageUrl } from '@/utils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { buildPublicacoesScopeKey, publicacoesQueryKeys } from '@/lib/publicacoesQueryKeys';
@@ -73,12 +73,12 @@ export default function RP() {
     queryKey: publicacoesQueryKeys.rpLista(rpScopeKey),
     queryFn: async () => {
       const [contratoLivro, publicacoesExOfficio, atestados] = await Promise.all([
-        getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilters }),
+        getLivroMetricasRPContrato({ isAdmin, getMilitarScopeFilters }),
         listarPublicacoesExOfficioEscopo({ isAdmin, getMilitarScopeFilters }),
         listarAtestadosPublicacaoEscopo({ isAdmin, getMilitarScopeFilters }),
       ]);
 
-      const registrosLivro = (contratoLivro?.registros_livro || []).map((registro) => ({
+      const registrosLivro = (contratoLivro?.registros_livro_metricas || []).map((registro) => ({
         ...registro,
         origem_tipo: 'livro',
         status_calculado: mapStatusContratoParaControle(registro.status_codigo),
