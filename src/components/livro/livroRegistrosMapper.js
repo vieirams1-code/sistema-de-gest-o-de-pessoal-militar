@@ -313,6 +313,8 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
 
     return {
       id: registro.id,
+      ferias_id: registro?.ferias_id || feriasRegistro?.id || null,
+      periodo_aquisitivo_id: registro?.periodo_aquisitivo_id || feriasRegistro?.periodo_aquisitivo_id || periodoRegistro?.id || null,
       tipo_codigo: toCodigo(registro?.tipo_registro),
       tipo_label: getTipoLabel(registro?.tipo_registro),
       origem: registro?.origem || (registro?.ferias_id ? 'Automática' : 'Manual'),
