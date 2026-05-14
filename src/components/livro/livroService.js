@@ -1,5 +1,5 @@
 import { base44 } from '@/api/base44Client';
-import { mapLivroRegistrosPresenter } from '@/components/livro/livroRegistrosMapper';
+import { getTextoPublicacaoRegistro, mapLivroRegistrosPresenter } from '@/components/livro/livroRegistrosMapper';
 import { mapLivroRegistrosMetricasRP } from '@/components/livro/livroMetricasMapper';
 
 function emptyLivroPresenterContrato() {
@@ -44,14 +44,13 @@ export async function getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilter
   }
 
   if (isAdmin) {
-    const [registros, militares, ferias, periodos, templates] = await Promise.all([
+    const [registros, militares, ferias, periodos] = await Promise.all([
       base44.entities.RegistroLivro.list('-created_date'),
       base44.entities.Militar.list(),
       base44.entities.Ferias.list(),
       base44.entities.PeriodoAquisitivo.list(),
-      base44.entities.TemplateTexto.filter({ ativo: true, modulo: 'Livro' }),
     ]);
-    return mapLivroRegistrosPresenter({ registros, militares, ferias, periodos, templates });
+    return mapLivroRegistrosPresenter({ registros, militares, ferias, periodos });
   }
 
   const scopeFilters = getMilitarScopeFilters();
@@ -67,11 +66,10 @@ export async function getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilter
     return emptyLivroPresenterContrato();
   }
 
-  const [registrosArrays, feriasArrays, periodosArrays, templates] = await Promise.all([
+  const [registrosArrays, feriasArrays, periodosArrays] = await Promise.all([
     Promise.all(militarIds.map((id) => base44.entities.RegistroLivro.filter({ militar_id: id }, '-created_date'))),
     Promise.all(militarIds.map((id) => base44.entities.Ferias.filter({ militar_id: id }))),
     Promise.all(militarIds.map((id) => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }))),
-    base44.entities.TemplateTexto.filter({ ativo: true, modulo: 'Livro' }),
   ]);
 
   const registros = sortByCreatedDateDesc(deduplicateById(registrosArrays));
@@ -83,8 +81,39 @@ export async function getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilter
     militares,
     ferias,
     periodos,
-    templates,
   });
+}
+
+export async function getLivroTextoPublicacaoRegistro({ registroId } = {}) {
+  if (!registroId) return { texto_publicacao: '' };
+
+  const registros = await base44.entities.RegistroLivro.filter({ id: registroId });
+  const registro = registros?.[0];
+  if (!registro) return { texto_publicacao: '' };
+  if (registro?.texto_publicacao) return { texto_publicacao: registro.texto_publicacao, congelado: true };
+
+  const [militares, ferias, templates] = await Promise.all([
+    registro?.militar_id ? base44.entities.Militar.filter({ id: registro.militar_id }) : Promise.resolve([]),
+    registro?.ferias_id ? base44.entities.Ferias.filter({ id: registro.ferias_id }) : Promise.resolve([]),
+    base44.entities.TemplateTexto.filter({ ativo: true, modulo: 'Livro' }),
+  ]);
+
+  const feriasRegistro = ferias?.[0] || null;
+  const periodoAquisitivoId = registro?.periodo_aquisitivo_id || feriasRegistro?.periodo_aquisitivo_id;
+  const periodos = periodoAquisitivoId
+    ? await base44.entities.PeriodoAquisitivo.filter({ id: periodoAquisitivoId })
+    : [];
+
+  return {
+    texto_publicacao: getTextoPublicacaoRegistro({
+      registro,
+      ferias: feriasRegistro,
+      periodo: periodos?.[0] || null,
+      militar: militares?.[0] || null,
+      templatesAtivosLivro: (templates || []).filter((template) => template?.ativo !== false),
+    }),
+    congelado: false,
+  };
 }
 
 /**

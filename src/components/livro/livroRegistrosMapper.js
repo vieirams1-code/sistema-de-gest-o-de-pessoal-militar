@@ -149,7 +149,7 @@ function mapPublicacao(registro) {
   };
 }
 
-function getTextoPublicacaoRegistro({
+export function getTextoPublicacaoRegistro({
   registro,
   ferias,
   periodo,
@@ -274,7 +274,7 @@ function mapMilitar(registro, militar) {
   };
 }
 
-export function mapLivroRegistrosPresenter({ registros = [], militares = [], ferias = [], periodos = [], templates = [] } = {}) {
+export function mapLivroRegistrosPresenter({ registros = [], militares = [], ferias = [], periodos = [] } = {}) {
   const militarById = new Map(militares.map((item) => [item.id, item]));
   const feriasById = new Map(ferias.map((item) => [item.id, item]));
   const periodoById = new Map(periodos.map((item) => [item.id, item]));
@@ -286,7 +286,6 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
     return acc;
   }, {});
 
-  const templatesAtivosLivro = templates.filter((template) => template?.ativo !== false);
 
   const registrosLivro = registros.map((registro) => {
     const militar = militarById.get(registro?.militar_id);
@@ -300,13 +299,12 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
     const statusCodigo = getStatusCodigo(registro, inconsistencia);
     const cadeiaRaw = registro?.ferias_id ? registrosPorFerias[registro.ferias_id] || [] : [];
     const { cadeia, cadeia_eventos } = mapCadeiaEventos(registro, cadeiaRaw);
-    const textoPublicacao = getTextoPublicacaoRegistro({
-      registro,
-      ferias: feriasRegistro,
-      periodo: periodoRegistro,
-      militar,
-      templatesAtivosLivro,
-    });
+    const textoPublicacaoPersistido = registro?.texto_publicacao || null;
+    const textoPublicacaoLazyDisponivel = Boolean(
+      textoPublicacaoPersistido ||
+      registro?.documento_texto ||
+      resolverTipoFeriasCanonico(registro?.tipo_registro)
+    );
 
     return {
       id: registro.id,
@@ -332,7 +330,8 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
         cadeiaInfo: cadeia,
       }),
       publicacao: mapPublicacao(registro),
-      texto_publicacao: textoPublicacao,
+      texto_publicacao: textoPublicacaoPersistido,
+      texto_publicacao_lazy_disponivel: textoPublicacaoLazyDisponivel,
       inconsistencia,
       cadeia_eventos,
     };
