@@ -432,3 +432,58 @@ test('diagnostica possível comparação entre listas distintas sem alterar orde
   assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['1', '2']);
   assert.ok(resultado.itens.every((item) => item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSSIVEL_COMPARACAO_LISTAS_DISTINTAS)));
 });
+
+test('D11-B diagnostica sequência hierárquica regressiva sem alterar seleção do registro atual', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1', { posto_graduacao: '1º Sargento', quadro: 'QBMP-1.a' })],
+    historicoPromocoes: [promocao('p1', '1', {
+      posto_graduacao_anterior: 'Subtenente',
+      posto_graduacao_novo: '1º Sargento',
+      quadro_anterior: 'QBMP-1.a',
+      quadro_novo: 'QBMP-1.a',
+    })],
+  });
+
+  assert.equal(resultado.itens[0].registroPromocaoAtualId, 'p1');
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.SEQUENCIA_HIERARQUICA_REGRESSIVA));
+});
+
+test('D11-B diagnostica posto/quadro incompatível apenas como alerta operacional', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1', { posto_graduacao: 'Subtenente', quadro: 'QOBM' })],
+    historicoPromocoes: [promocao('p1', '1', {
+      posto_graduacao_novo: 'Subtenente',
+      quadro_novo: 'QOBM',
+    })],
+  });
+
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_QUADRO_INCOMPATIVEL));
+});
+
+test('D11-B diagnostica histórico ativo sem data de promoção sem criar nova pendência operacional', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1')],
+    historicoPromocoes: [promocao('p1', '1', { data_promocao: '' })],
+  });
+
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.HISTORICO_ATIVO_SEM_DATA_PROMOCAO));
+  assert.ok(resultado.itens[0].pendencias.includes(PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.SEM_DATA_PROMOCAO));
+});
+
+test('D11-B diagnostica regressão cronológica de posto sem alterar ordenação final', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [
+      militar('1', { nome: 'Alfa', posto_graduacao: 'Capitão' }),
+      militar('2', { nome: 'Bravo', posto_graduacao: 'Capitão' }),
+    ],
+    historicoPromocoes: [
+      promocao('p1-antiga', '1', { posto_graduacao_novo: 'Capitão', data_promocao: '2020-01-01' }),
+      promocao('p1-regressiva', '1', { posto_graduacao_novo: '1º Tenente', data_promocao: '2021-01-01' }),
+      promocao('p1-atual', '1', { posto_graduacao_novo: 'Capitão', data_promocao: '2022-01-01' }),
+      promocao('p2-atual', '2', { posto_graduacao_novo: 'Capitão', data_promocao: '2023-01-01' }),
+    ],
+  });
+
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['1', '2']);
+  assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REGRESSAO_CRONOLOGICA_POSTO));
+});
