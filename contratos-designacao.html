@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestão de Contratos de Designação de Militares</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <i class="ph ph-shield-star text-lg text-blue-600"></i>
+              <span>Gestão de pessoal militar</span>
+            </div>
+            <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Contratos de designação</h1>
+            <p class="mt-1 max-w-2xl text-sm text-slate-500">Controle contratos ativos, prazos, publicações e regras funcionais em uma visão tabular de alta densidade.</p>
+          </div>
+          <button type="button" data-open-modal class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100">
+            <i class="ph ph-plus text-lg"></i>
+            Novo contrato
+          </button>
+        </div>
+
+        <section class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Indicadores de contratos">
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            <div class="flex h-full"><span class="w-1.5 bg-green-500"></span><div class="flex-1 px-4 py-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Ativos</p><p class="mt-1 text-2xl font-extrabold text-slate-950">128</p></div></div>
+          </div>
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            <div class="flex h-full"><span class="w-1.5 bg-blue-500"></span><div class="flex-1 px-4 py-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Sem data fim</p><p class="mt-1 text-2xl font-extrabold text-slate-950">86</p></div></div>
+          </div>
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            <div class="flex h-full"><span class="w-1.5 bg-yellow-400"></span><div class="flex-1 px-4 py-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Vencendo</p><p class="mt-1 text-2xl font-extrabold text-slate-950">12</p></div></div>
+          </div>
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            <div class="flex h-full"><span class="w-1.5 bg-red-500"></span><div class="flex-1 px-4 py-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Vencidos</p><p class="mt-1 text-2xl font-extrabold text-slate-950">4</p></div></div>
+          </div>
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            <div class="flex h-full"><span class="w-1.5 bg-slate-700"></span><div class="flex-1 px-4 py-3"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Encerrados</p><p class="mt-1 text-2xl font-extrabold text-slate-950">39</p></div></div>
+          </div>
+        </section>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 p-4 sm:p-5">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 class="text-base font-bold text-slate-950">Listagem de contratos</h2>
+              <p class="text-sm text-slate-500">Visualize militares designados e edite regras contratuais rapidamente.</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-3 lg:w-[680px]">
+              <label class="relative sm:col-span-1 lg:col-span-1">
+                <span class="sr-only">Buscar militar</span>
+                <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400"></i>
+                <input type="search" placeholder="Buscar por nome ou matrícula" class="h-10 w-full rounded-lg border border-slate-200 bg-slate-50/50 py-2 pl-10 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" />
+              </label>
+              <label>
+                <span class="sr-only">Situação</span>
+                <select class="h-10 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50">
+                  <option>Situação: todas</option>
+                  <option>Ativo</option>
+                  <option>Vencendo</option>
+                  <option>Vencido</option>
+                  <option>Encerrado</option>
+                </select>
+              </label>
+              <label>
+                <span class="sr-only">Vencimento</span>
+                <select class="h-10 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50">
+                  <option>Vencimento: todos</option>
+                  <option>Sem data fim</option>
+                  <option>Próximos 30 dias</option>
+                  <option>Próximos 90 dias</option>
+                  <option>Vencidos</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th scope="col" class="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">Militar / Identificação</th>
+                <th scope="col" class="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">Período do contrato</th>
+                <th scope="col" class="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">Publicação</th>
+                <th scope="col" class="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">Status</th>
+                <th scope="col" class="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 bg-white">
+              <tr class="transition hover:bg-slate-50/80">
+                <td class="px-4 py-3">
+                  <div class="flex flex-col">
+                    <div class="flex items-center gap-2">
+                      <span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-500">SUBTENENTE</span>
+                      <span class="font-semibold text-slate-900">Francisco Ivan Fernandes</span>
+                    </div>
+                    <div class="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                      <span>Matrícula: <strong class="text-slate-700">071.711-025</strong></span>
+                      <span class="text-slate-300">•</span>
+                      <button class="text-blue-600 hover:underline">Ver ficha</button>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2 whitespace-nowrap text-slate-700">
+                    <span class="font-medium">12/02/2024</span>
+                    <i class="ph ph-arrow-right text-slate-400"></i>
+                    <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Indeterminado</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3"><p class="font-semibold text-slate-800">DOEMS 9663</p><p class="mt-0.5 text-xs text-slate-500">Publicado em 14/02/2024</p></td>
+                <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800"><span class="h-1.5 w-1.5 rounded-full bg-green-600"></span>Ativo</span></td>
+                <td class="px-4 py-3 text-right"><div class="flex justify-end gap-1"><button data-open-modal class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Editar contrato"><i class="ph ph-pencil-simple text-lg"></i></button><button class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Mais opções"><i class="ph ph-dots-three-vertical text-lg"></i></button></div></td>
+              </tr>
+              <tr class="transition hover:bg-slate-50/80">
+                <td class="px-4 py-3"><div class="flex flex-col"><div class="flex items-center gap-2"><span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-500">2º SARGENTO</span><span class="font-semibold text-slate-900">Mariana Lopes de Araújo</span></div><div class="mt-1 flex items-center gap-2 text-xs text-slate-500"><span>Matrícula: <strong class="text-slate-700">089.223-441</strong></span><span class="text-slate-300">•</span><button class="text-blue-600 hover:underline">Ver ficha</button></div></div></td>
+                <td class="px-4 py-3"><div class="flex items-center gap-2 whitespace-nowrap text-slate-700"><span class="font-medium">01/08/2025</span><i class="ph ph-arrow-right text-slate-400"></i><span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">31/07/2026</span></div></td>
+                <td class="px-4 py-3"><p class="font-semibold text-slate-800">DOEMS 9812</p><p class="mt-0.5 text-xs text-slate-500">Publicado em 02/08/2025</p></td>
+                <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800"><span class="h-1.5 w-1.5 rounded-full bg-green-600"></span>Ativo</span></td>
+                <td class="px-4 py-3 text-right"><div class="flex justify-end gap-1"><button data-open-modal class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Editar contrato"><i class="ph ph-pencil-simple text-lg"></i></button><button class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Mais opções"><i class="ph ph-dots-three-vertical text-lg"></i></button></div></td>
+              </tr>
+              <tr class="transition hover:bg-slate-50/80">
+                <td class="px-4 py-3"><div class="flex flex-col"><div class="flex items-center gap-2"><span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-500">CABO</span><span class="font-semibold text-slate-900">Rafael Nascimento Pereira</span></div><div class="mt-1 flex items-center gap-2 text-xs text-slate-500"><span>Matrícula: <strong class="text-slate-700">104.552-019</strong></span><span class="text-slate-300">•</span><button class="text-blue-600 hover:underline">Ver ficha</button></div></div></td>
+                <td class="px-4 py-3"><div class="flex items-center gap-2 whitespace-nowrap text-slate-700"><span class="font-medium">18/03/2026</span><i class="ph ph-arrow-right text-slate-400"></i><span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">Indeterminado</span></div></td>
+                <td class="px-4 py-3"><p class="font-semibold text-slate-800">DOEMS 9904</p><p class="mt-0.5 text-xs text-slate-500">Publicado em 20/03/2026</p></td>
+                <td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800"><span class="h-1.5 w-1.5 rounded-full bg-green-600"></span>Ativo</span></td>
+                <td class="px-4 py-3 text-right"><div class="flex justify-end gap-1"><button data-open-modal class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Editar contrato"><i class="ph ph-pencil-simple text-lg"></i></button><button class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Mais opções"><i class="ph ph-dots-three-vertical text-lg"></i></button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <span>Exibindo 3 de 128 contratos</span>
+          <div class="flex items-center gap-2"><button class="rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50">Anterior</button><button class="rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-600 hover:bg-slate-50">Próxima</button></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="contractModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl shadow-slate-900/20">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
+          <div>
+            <h2 id="modalTitle" class="text-lg font-bold text-slate-950">Editar contrato de designação</h2>
+            <p class="mt-1 text-sm text-slate-500">Atualize prazos, publicação e regras do contrato selecionado.</p>
+          </div>
+          <button type="button" data-close-modal class="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar modal"><i class="ph ph-x text-xl"></i></button>
+        </div>
+
+        <div class="border-y border-yellow-200 bg-yellow-50 px-5 py-3 text-sm text-yellow-900 sm:px-6">
+          <div class="flex gap-2"><i class="ph ph-warning-circle mt-0.5 text-lg text-yellow-600"></i><p><strong>Atenção:</strong> contratos só devem ser encerrados após conferência da publicação e dos efeitos funcionais vinculados. Alterações podem recalcular férias e registros de designação.</p></div>
+        </div>
+
+        <form class="overflow-y-auto">
+          <div class="space-y-6 px-5 py-5 sm:px-6">
+            <section>
+              <div class="mb-3"><h3 class="text-sm font-bold uppercase tracking-wide text-slate-700">1. Dados do militar</h3><p class="mt-1 text-sm text-slate-500">Pesquise o militar para novo cadastro ou confira os dados bloqueados em modo edição.</p></div>
+              <label class="mb-2 block text-sm font-semibold text-slate-700" for="militarSearch">Pesquisar militar</label>
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div class="flex items-start gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200"><i class="ph ph-user-focus text-xl"></i></div>
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2"><span class="text-base font-bold text-slate-950">Francisco Ivan Fernandes</span><span class="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-600">SUBTENENTE</span></div>
+                      <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500"><span>Nome de guerra: <strong class="text-slate-700">Fernandes</strong></span><span>Matrícula: <strong class="text-slate-700">071.711-025</strong></span></div>
+                    </div>
+                  </div>
+                  <div class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 ring-1 ring-slate-200"><i class="ph ph-lock-key"></i>Bloqueado para edição direta</div>
+                </div>
+                <input id="militarSearch" type="text" class="sr-only" value="Francisco Ivan Fernandes" readonly />
+              </div>
+            </section>
+
+            <hr class="border-slate-200" />
+
+            <section>
+              <div class="mb-4"><h3 class="text-sm font-bold uppercase tracking-wide text-slate-700">2. Prazos e regras</h3><p class="mt-1 text-sm text-slate-500">Defina vigência e impactos automáticos sobre férias.</p></div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">Data de início</span><input type="date" value="2024-02-12" class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50" /></label>
+                <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">Tipo de prazo</span><select class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50"><option>Indeterminado</option><option>Determinado</option></select></label>
+                <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">Data de fim <span class="font-normal text-slate-400">(se houver)</span></span><input type="date" class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50" /></label>
+                <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">Gera direito a férias</span><select disabled class="h-10 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500"><option>Sim</option></select><span class="mt-1 block text-xs text-slate-500">Contratos indeterminados geram férias automaticamente.</span></label>
+              </div>
+              <details class="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                <summary class="cursor-pointer text-sm font-semibold text-slate-700">Configurações avançadas</summary>
+                <div class="mt-3 grid gap-4 md:grid-cols-2"><label class="block"><span class="mb-1.5 block text-sm font-medium text-slate-700">Configurar data-base diferente para férias</span><input type="date" class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50" /></label><p class="self-end text-xs leading-5 text-slate-500">Use somente quando houver determinação administrativa expressa para data-base divergente da data de início.</p></div>
+              </details>
+            </section>
+
+            <hr class="border-slate-200" />
+
+            <section>
+              <div class="mb-4"><h3 class="text-sm font-bold uppercase tracking-wide text-slate-700">3. Dados de publicação</h3><p class="mt-1 text-sm text-slate-500">Registre o instrumento e o boletim que formalizam a designação.</p></div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">Número do contrato</span><input type="text" value="CTD-2024-0012" class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50" /></label>
+                <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">Boletim de publicação</span><input type="text" value="DOEMS 9663" placeholder="Ex: DOEMS 9663" class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" /></label>
+                <label class="block md:col-span-2"><span class="mb-1.5 block text-sm font-semibold text-slate-700">Observações</span><textarea rows="4" placeholder="Inclua informações complementares relevantes para auditoria e histórico do contrato." class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50"></textarea></label>
+              </div>
+            </section>
+          </div>
+
+          <div class="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+            <button type="button" data-close-modal class="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">Cancelar</button>
+            <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-200">Salvar edição</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const modal = document.getElementById('contractModal');
+      const openButtons = document.querySelectorAll('[data-open-modal]');
+      const closeButtons = document.querySelectorAll('[data-close-modal]');
+
+      function openModal() {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.classList.add('overflow-hidden');
+      }
+
+      function closeModal() {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.body.classList.remove('overflow-hidden');
+      }
+
+      openButtons.forEach((button) => button.addEventListener('click', openModal));
+      closeButtons.forEach((button) => button.addEventListener('click', closeModal));
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeModal();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeModal();
+      });
+    </script>
+  </body>
+</html>
