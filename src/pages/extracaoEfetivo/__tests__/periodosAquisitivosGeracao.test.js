@@ -49,3 +49,15 @@ test('checagem de duplicidade considera período existente do mesmo militar por 
     anoReferencia: '2027/2028',
   }), false);
 });
+
+test('rotina de geração automática não cria mais de um período futuro', () => {
+  const hoje = '2026-05-14';
+  const periodos = calcularPeriodosAquisitivosParaGeracao({
+    dataBase: '2017-10-09',
+    hoje,
+  });
+
+  const futuros = periodos.filter((periodo) => periodo.inicio_aquisitivo > hoje);
+  assert.equal(futuros.length, 1);
+  assert.equal(futuros[0].inicio_aquisitivo, '2026-10-09');
+});
