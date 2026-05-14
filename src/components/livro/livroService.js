@@ -44,13 +44,12 @@ export async function getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilter
   }
 
   if (isAdmin) {
-    const [registros, militares, ferias, periodos] = await Promise.all([
+    const [registros, militares, ferias] = await Promise.all([
       base44.entities.RegistroLivro.list('-created_date'),
       base44.entities.Militar.list(),
       base44.entities.Ferias.list(),
-      base44.entities.PeriodoAquisitivo.list(),
     ]);
-    return mapLivroRegistrosPresenter({ registros, militares, ferias, periodos });
+    return mapLivroRegistrosPresenter({ registros, militares, ferias, periodos: [] });
   }
 
   const scopeFilters = getMilitarScopeFilters();
@@ -66,21 +65,19 @@ export async function getLivroRegistrosContrato({ isAdmin, getMilitarScopeFilter
     return emptyLivroPresenterContrato();
   }
 
-  const [registrosArrays, feriasArrays, periodosArrays] = await Promise.all([
+  const [registrosArrays, feriasArrays] = await Promise.all([
     Promise.all(militarIds.map((id) => base44.entities.RegistroLivro.filter({ militar_id: id }, '-created_date'))),
     Promise.all(militarIds.map((id) => base44.entities.Ferias.filter({ militar_id: id }))),
-    Promise.all(militarIds.map((id) => base44.entities.PeriodoAquisitivo.filter({ militar_id: id }))),
   ]);
 
   const registros = sortByCreatedDateDesc(deduplicateById(registrosArrays));
   const ferias = deduplicateById(feriasArrays);
-  const periodos = deduplicateById(periodosArrays);
 
   return mapLivroRegistrosPresenter({
     registros,
     militares,
     ferias,
-    periodos,
+    periodos: [],
   });
 }
 

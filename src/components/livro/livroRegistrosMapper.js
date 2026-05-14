@@ -275,11 +275,16 @@ function mapMilitar(registro, militar) {
 }
 
 export function mapLivroRegistrosPresenter({ registros = [], militares = [], ferias = [], periodos = [] } = {}) {
-  const militarById = new Map(militares.map((item) => [item.id, item]));
-  const feriasById = new Map(ferias.map((item) => [item.id, item]));
-  const periodoById = new Map(periodos.map((item) => [item.id, item]));
+  const registrosLista = Array.isArray(registros) ? registros : [];
+  const militaresLista = Array.isArray(militares) ? militares : [];
+  const feriasLista = Array.isArray(ferias) ? ferias : [];
+  const periodosLista = Array.isArray(periodos) ? periodos : [];
 
-  const registrosPorFerias = registros.reduce((acc, item) => {
+  const militarById = new Map(militaresLista.map((item) => [item.id, item]));
+  const feriasById = new Map(feriasLista.map((item) => [item.id, item]));
+  const periodoById = new Map(periodosLista.map((item) => [item.id, item]));
+
+  const registrosPorFerias = registrosLista.reduce((acc, item) => {
     if (!item?.ferias_id) return acc;
     if (!acc[item.ferias_id]) acc[item.ferias_id] = [];
     acc[item.ferias_id].push(item);
@@ -287,7 +292,7 @@ export function mapLivroRegistrosPresenter({ registros = [], militares = [], fer
   }, {});
 
 
-  const registrosLivro = registros.map((registro) => {
+  const registrosLivro = registrosLista.map((registro) => {
     const militar = militarById.get(registro?.militar_id);
     const feriasRegistro = registro?.ferias_id ? feriasById.get(registro.ferias_id) : null;
     const periodoRegistro =
