@@ -27,6 +27,11 @@ import {
   MENSAGEM_CONTRATO_COM_EFEITOS,
   SITUACAO_CONTRATO_DESIGNACAO,
 } from '@/services/painelContratosDesignacaoService';
+import {
+  buscarEfeitosContratoDesignacaoComCache,
+  limparCacheEfeitosContratoDesignacao,
+  isRateLimitError,
+} from '@/services/contratosDesignacaoMilitarService';
 
 const EMPTY_COUNTERS = {
   ativos: 0,
@@ -152,7 +157,7 @@ export default function ContratosDesignacao() {
       });
       return militaresEscopados;
     },
-    enabled: Boolean(isAccessResolved && canCreate && (novoContratoOpen || contratoEdicao)),
+    enabled: Boolean(isAccessResolved && canCreate && novoContratoOpen),
     staleTime: 5 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
@@ -219,30 +224,27 @@ export default function ContratosDesignacao() {
   };
 
 
-  const handleAbrirEdicaoContrato = async (contrato) => {
+  const buscarEfeitosContratoControlado = (contratoId) => buscarEfeitosContratoDesignacaoComCache(
+    contratoId,
+    (id) => buscarEfeitosContratoEmPeriodos(base44, id),
+  );
+
+  const handleAbrirEdicaoContrato = (contrato) => {
     if (!contrato) return;
-    try {
-      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, contrato.id);
-      setContratoEdicaoBloqueiaCadeia(periodosComEfeito.length > 0);
-      setContratoEdicao(contrato);
-    } catch (error) {
-      toast({
-        title: 'Erro ao verificar efeitos do contrato',
-        description: error?.message || 'Não foi possível verificar os períodos aquisitivos antes da edição.',
-        variant: 'destructive',
-      });
-    }
+    setContratoEdicaoBloqueiaCadeia(false);
+    setContratoEdicao(contrato);
   };
 
   const handleUpdateContrato = async (payload) => {
     if (!contratoEdicao?.id) return;
     setSalvandoContrato(true);
     try {
-      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, contratoEdicao.id);
-      const temEfeitos = periodosComEfeito.length > 0;
-      if (temEfeitos) {
-        const campoAlterado = getCampoCadeiaFeriasAlterado(contratoEdicao, payload);
-        if (campoAlterado) {
+      const campoAlterado = getCampoCadeiaFeriasAlterado(contratoEdicao, payload);
+      if (campoAlterado) {
+        const periodosComEfeito = await buscarEfeitosContratoControlado(contratoEdicao.id);
+        const temEfeitos = periodosComEfeito.length > 0;
+        setContratoEdicaoBloqueiaCadeia(temEfeitos);
+        if (temEfeitos) {
           throw new Error(`Campo ${campoAlterado} bloqueado: ${MENSAGEM_CONTRATO_COM_EFEITOS}`);
         }
       }
@@ -254,12 +256,13 @@ export default function ContratosDesignacao() {
       });
       setContratoEdicao(null);
       setContratoEdicaoBloqueiaCadeia(false);
+      limparCacheEfeitosContratoDesignacao(contratoEdicao.id);
       await queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] });
       toast({ title: 'Contrato atualizado', description: 'Os dados do contrato de designação foram salvos.' });
     } catch (error) {
       toast({
-        title: 'Erro ao editar contrato',
-        description: error?.message || 'Não foi possível atualizar o contrato de designação.',
+        title: isRateLimitError(error) ? 'Verificação temporariamente indisponível' : 'Erro ao editar contrato',
+        description: isRateLimitError(error) ? 'Aguarde alguns instantes e tente salvar novamente.' : (error?.message || 'Não foi possível atualizar o contrato de designação.'),
         variant: 'destructive',
       });
       throw error;
@@ -274,18 +277,19 @@ export default function ContratosDesignacao() {
     if (!confirmado) return;
     setExcluindoContratoId(contrato.id);
     try {
-      const periodosComEfeito = await buscarEfeitosContratoEmPeriodos(base44, contrato.id);
+      const periodosComEfeito = await buscarEfeitosContratoControlado(contrato.id);
       if (periodosComEfeito.length > 0) {
         toast({ title: 'Exclusão bloqueada', description: MENSAGEM_CONTRATO_COM_EFEITOS, variant: 'destructive' });
         return;
       }
       await excluirEscopado('ContratoDesignacaoMilitar', contrato.id);
+      limparCacheEfeitosContratoDesignacao(contrato.id);
       await queryClient.invalidateQueries({ queryKey: ['painel-contratos-designacao'] });
       toast({ title: 'Contrato excluído', description: 'O contrato cadastrado por engano foi removido sem afetar períodos.' });
     } catch (error) {
       toast({
-        title: 'Erro ao excluir contrato',
-        description: error?.message || 'Não foi possível excluir o contrato de designação.',
+        title: isRateLimitError(error) ? 'Verificação temporariamente indisponível' : 'Erro ao excluir contrato',
+        description: isRateLimitError(error) ? 'Aguarde alguns instantes e tente excluir novamente.' : (error?.message || 'Não foi possível excluir o contrato de designação.'),
         variant: 'destructive',
       });
     } finally {

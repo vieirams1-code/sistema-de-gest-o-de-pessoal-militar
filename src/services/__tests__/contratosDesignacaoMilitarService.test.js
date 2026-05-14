@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buscarEfeitosContratoDesignacaoComCache,
   contarContratosAtivosDesignacao,
   getContratoAtivoDesignacao,
+  limparCacheEfeitosContratoDesignacao,
   normalizarGeraDireitoFerias,
   normalizarRegraGeracaoPeriodos,
   normalizarStatusContratoDesignacao,
@@ -196,4 +198,51 @@ test('valida regras de férias para contrato determinado', () => {
   assert.doesNotMatch(resultado.erros.join('\n'), /data_fim_contrato é obrigatória/);
   assert.match(resultado.erros.join('\n'), /bloqueada ou manual/);
   assert.match(resultado.erros.join('\n'), /motivo_nao_gera_ferias/);
+});
+
+
+test('memoiza verificação de efeitos do contrato por contrato_id e deduplica chamadas simultâneas', async () => {
+  limparCacheEfeitosContratoDesignacao();
+  let chamadas = 0;
+  const buscarEfeitos = async (contratoId) => {
+    chamadas += 1;
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    return [{ id: `periodo-${contratoId}` }];
+  };
+
+  const [primeiro, segundo] = await Promise.all([
+    buscarEfeitosContratoDesignacaoComCache('contrato-1', buscarEfeitos),
+    buscarEfeitosContratoDesignacaoComCache('contrato-1', buscarEfeitos),
+  ]);
+  const terceiro = await buscarEfeitosContratoDesignacaoComCache('contrato-1', buscarEfeitos);
+
+  assert.deepEqual(primeiro, [{ id: 'periodo-contrato-1' }]);
+  assert.equal(segundo, primeiro);
+  assert.equal(terceiro, primeiro);
+  assert.equal(chamadas, 1);
+  limparCacheEfeitosContratoDesignacao();
+});
+
+test('não reaproveita erro de rate limit na verificação de efeitos do contrato', async () => {
+  limparCacheEfeitosContratoDesignacao();
+  let chamadas = 0;
+  const buscarEfeitos = async () => {
+    chamadas += 1;
+    if (chamadas === 1) {
+      const erro = new Error('Rate limit exceeded');
+      erro.status = 429;
+      throw erro;
+    }
+    return [];
+  };
+
+  await assert.rejects(
+    buscarEfeitosContratoDesignacaoComCache('contrato-429', buscarEfeitos),
+    /Rate limit exceeded/,
+  );
+  const resultado = await buscarEfeitosContratoDesignacaoComCache('contrato-429', buscarEfeitos);
+
+  assert.deepEqual(resultado, []);
+  assert.equal(chamadas, 2);
+  limparCacheEfeitosContratoDesignacao();
 });

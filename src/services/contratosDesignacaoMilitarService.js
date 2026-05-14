@@ -29,6 +29,53 @@ const STATUS_ALIASES = new Map([
   ['cancelled', STATUS_CONTRATO_DESIGNACAO.CANCELADO],
 ]);
 
+const efeitosContratoDesignacaoCache = new Map();
+const efeitosContratoDesignacaoEmAndamento = new Map();
+
+function normalizarContratoIdCache(contratoId) {
+  return String(contratoId ?? '').trim();
+}
+
+export function limparCacheEfeitosContratoDesignacao(contratoId) {
+  if (contratoId === undefined || contratoId === null || contratoId === '') {
+    efeitosContratoDesignacaoCache.clear();
+    efeitosContratoDesignacaoEmAndamento.clear();
+    return;
+  }
+  const chave = normalizarContratoIdCache(contratoId);
+  efeitosContratoDesignacaoCache.delete(chave);
+  efeitosContratoDesignacaoEmAndamento.delete(chave);
+}
+
+export function isRateLimitError(error) {
+  const status = error?.status || error?.statusCode || error?.response?.status;
+  const mensagem = String(error?.message || error?.error || '').toLowerCase();
+  return status === 429 || mensagem.includes('rate limit') || mensagem.includes('too many requests');
+}
+
+export async function buscarEfeitosContratoDesignacaoComCache(contratoId, buscarEfeitos) {
+  const chave = normalizarContratoIdCache(contratoId);
+  if (!chave) return [];
+  if (efeitosContratoDesignacaoCache.has(chave)) {
+    return efeitosContratoDesignacaoCache.get(chave);
+  }
+  if (efeitosContratoDesignacaoEmAndamento.has(chave)) {
+    return efeitosContratoDesignacaoEmAndamento.get(chave);
+  }
+  const consulta = Promise.resolve()
+    .then(() => buscarEfeitos?.(chave))
+    .then((periodos) => {
+      const resultado = Array.isArray(periodos) ? periodos : [];
+      efeitosContratoDesignacaoCache.set(chave, resultado);
+      return resultado;
+    })
+    .finally(() => {
+      efeitosContratoDesignacaoEmAndamento.delete(chave);
+    });
+  efeitosContratoDesignacaoEmAndamento.set(chave, consulta);
+  return consulta;
+}
+
 const STATUS_BADGES = {
   [STATUS_CONTRATO_DESIGNACAO.ATIVO]: {
     label: 'Ativo',
