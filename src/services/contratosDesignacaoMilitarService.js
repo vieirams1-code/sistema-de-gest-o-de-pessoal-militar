@@ -54,6 +54,7 @@ function normalizarTexto(valor) {
 }
 
 export const ISO_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const BR_DATE_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
 
 export function isDataIsoDateOnly(valor) {
   if (!valor) return false;
@@ -66,7 +67,14 @@ export function isDataIsoDateOnly(valor) {
 export function normalizarDataIsoDateOnly(valor) {
   if (!valor) return '';
   const text = String(valor).trim();
-  return ISO_DATE_ONLY_RE.test(text) ? text : '';
+  if (ISO_DATE_ONLY_RE.test(text)) return text;
+
+  const brMatch = text.match(BR_DATE_RE);
+  if (!brMatch) return '';
+
+  const [, day, month, year] = brMatch;
+  const normalized = `${year}-${month}-${day}`;
+  return isDataIsoDateOnly(normalized) ? normalized : '';
 }
 
 function dataTime(valor) {
