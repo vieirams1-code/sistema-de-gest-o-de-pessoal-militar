@@ -48,6 +48,23 @@ function extractFunctionBody(source, functionName) {
   assert.fail(`não foi possível extrair corpo de ${functionName}`);
 }
 
+
+test('Publicações não carrega Ferias na carga inicial do Livro', async () => {
+  const source = await read('components/livro/livroService.js');
+  const getLivroRegistrosContrato = extractFunctionBody(source, 'getLivroRegistrosContrato');
+
+  assert.ok(!getLivroRegistrosContrato.includes('Ferias.list('));
+  assert.ok(!getLivroRegistrosContrato.includes('Ferias.filter({ militar_id'));
+  assert.match(getLivroRegistrosContrato, /ferias:\s*\[\]/);
+});
+
+test('Texto lazy do Livro continua resolvendo Ferias por ferias_id sob demanda', async () => {
+  const source = await read('components/livro/livroService.js');
+  const getLivroTextoPublicacaoRegistro = extractFunctionBody(source, 'getLivroTextoPublicacaoRegistro');
+
+  assert.match(getLivroTextoPublicacaoRegistro, /registro\?\.ferias_id \? base44\.entities\.Ferias\.filter\(\{ id: registro\.ferias_id \}\)/);
+});
+
 test('Publicações não carrega PeriodoAquisitivo na carga inicial do Livro', async () => {
   const source = await read('components/livro/livroService.js');
   const getLivroRegistrosContrato = extractFunctionBody(source, 'getLivroRegistrosContrato');
@@ -72,7 +89,7 @@ test('Presenter preserva ferias_id e periodo_aquisitivo_id top-level mesmo sem F
     registros: [
       {
         id: 'registro-livro-1',
-        tipo_registro: 'Saída de Férias',
+        tipo_registro: 'Saída Férias',
         ferias_id: 'ferias-123',
         periodo_aquisitivo_id: 'periodo-2026',
         militar_id: 'militar-1',
@@ -91,6 +108,8 @@ test('Presenter preserva ferias_id e periodo_aquisitivo_id top-level mesmo sem F
   assert.equal(registroFinal.periodo_aquisitivo_id, 'periodo-2026');
   assert.equal(registroFinal.vinculos.ferias, null);
   assert.equal(registroFinal.vinculos.periodo, null);
+  assert.equal(registroFinal.tipo_codigo, 'saida_ferias');
+  assert.equal(registroFinal.texto_publicacao_lazy_disponivel, true);
 });
 
 test('Presenter mantém compatibilidade com vinculos.ferias quando Ferias segue carregada', async (t) => {
@@ -135,4 +154,17 @@ test('Publicações normaliza Livro priorizando ferias_id e periodo_aquisitivo_i
 
   assert.match(source, /ferias_id:\s*origemTipo === 'livro' \? \(registro\.ferias_id \|\| registro\?\.vinculos\?\.ferias\?\.id\)/);
   assert.match(source, /periodo_aquisitivo_id:\s*origemTipo === 'livro' \? \(registro\.periodo_aquisitivo_id \|\| registro\?\.vinculos\?\.periodo\?\.id\)/);
+});
+
+
+test('Publicações identifica férias operacionais pelo tipo mais ferias_id top-level', async () => {
+  const source = await read('pages/Publicacoes.jsx');
+  const isFeriasOperacional = source.slice(
+    source.indexOf('function isFeriasOperacional'),
+    source.indexOf('function normalizarOrigemTipoRegistro')
+  );
+
+  assert.match(isFeriasOperacional, /registro\.ferias_id \|\| registro\?\.vinculos\?\.ferias\?\.id/);
+  assert.match(isFeriasOperacional, /TIPOS_FERIAS\.includes\(registro\.tipo_registro\)/);
+  assert.match(isFeriasOperacional, /'saida_ferias', 'interrupcao_de_ferias', 'nova_saida_retomada', 'retorno_ferias'/);
 });
