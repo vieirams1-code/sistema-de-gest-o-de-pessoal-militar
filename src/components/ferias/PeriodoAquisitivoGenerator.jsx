@@ -2,7 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { fetchScopedPeriodosAquisitivosBundle } from '@/services/getScopedPeriodosAquisitivosBundleClient';
 import { parseDateOnlyStrict } from '@/services/dateOnlyService';
-import { isPeriodoDisponivelOperacional } from '@/services/periodosAquisitivosOperacionais';
+import {
+  calcularPeriodosAquisitivosParaGeracao,
+  montarChavePeriodoAquisitivo,
+  periodoAquisitivoJaExiste,
+} from '@/services/periodosAquisitivosGeracao';
 import { resolverDataBaseFerias, ORIGENS_DATA_BASE_FERIAS } from '@/services/resolverDataBaseFerias';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { DIAS_BASE_PADRAO } from './periodoSaldoUtils';
@@ -12,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Calendar, Zap, CheckCircle, AlertCircle, Loader2, Check, ChevronsUpDown } from 'lucide-react';
-import { addYears, addMonths, format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -30,8 +33,6 @@ import {
 import { abreviarPostoGraduacao } from '@/components/folha-alteracoes/postoGraduacao';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 
-const ANOS_RETROSPECTIVOS = 3;
-const PERIODOS_FUTUROS = 2;
 
 function agruparContratosDesignacaoPorMilitarId(contratos) {
   return (Array.isArray(contratos) ? contratos : []).reduce((map, contrato) => {
@@ -79,40 +80,6 @@ function getMensagemOrigemDataBase(origem) {
 
 function montarResumoOrigens(origemMilitarDataInclusao, origemContratoDesignacao) {
   return `Origem das datas-base: ${origemMilitarDataInclusao} por data de inclusão do militar; ${origemContratoDesignacao} por contrato de designação ativo.`;
-}
-
-function mesmaData(a, b) {
-  return a.getTime() === b.getTime();
-}
-
-function getAniversarioFuncionalNoAno(dataInclusao, anoAlvo) {
-  const mes = dataInclusao.getMonth();
-  const dia = dataInclusao.getDate();
-  const ultimoDiaDoMes = new Date(anoAlvo, mes + 1, 0).getDate();
-  const diaAjustado = Math.min(dia, ultimoDiaDoMes);
-  const aniversario = new Date(anoAlvo, mes, diaAjustado);
-
-  aniversario.setHours(0, 0, 0, 0);
-  return aniversario;
-}
-
-function getInicioPeriodoAtual(dataInclusao, hoje) {
-  const aniversarioNoAnoAtual = getAniversarioFuncionalNoAno(dataInclusao, hoje.getFullYear());
-
-  const inicio = hoje >= aniversarioNoAnoAtual
-    ? aniversarioNoAnoAtual
-    : getAniversarioFuncionalNoAno(dataInclusao, hoje.getFullYear() - 1);
-
-  return inicio < dataInclusao ? new Date(dataInclusao) : inicio;
-}
-
-function getJanelaOperacional(dataInclusao, hoje) {
-  const inicioPeriodoAtual = getInicioPeriodoAtual(dataInclusao, hoje);
-  const inicioJanela = addYears(inicioPeriodoAtual, -ANOS_RETROSPECTIVOS);
-  const inicioUtil = inicioJanela < dataInclusao ? new Date(dataInclusao) : inicioJanela;
-  const fimJanela = addYears(inicioPeriodoAtual, PERIODOS_FUTUROS);
-
-  return { inicio: inicioUtil, fim: fimJanela };
 }
 
 export default function PeriodoAquisitivoGenerator() {
@@ -293,45 +260,46 @@ export default function PeriodoAquisitivoGenerator() {
           origemDataBaseIndividual = resolucaoDataBase.origem;
         }
 
-        const periodosDoMilitar = periodosFrescos
-          .filter((p) => String(p.militar_id) === String(militar.id))
-          .filter(isPeriodoDisponivelOperacional);
-        const { inicio, fim } = getJanelaOperacional(dataInclusao, hoje);
+        const candidatosGeracao = calcularPeriodosAquisitivosParaGeracao({
+          dataBase: dataInclusao,
+          hoje,
+        });
 
-        let dataInicio = new Date(inicio);
-
-        while (dataInicio <= fim) {
-          const dataFimPeriodo = addYears(dataInicio, 1);
-          dataFimPeriodo.setDate(dataFimPeriodo.getDate() - 1);
-
-          const periodoExiste = periodosDoMilitar.some((p) => {
-            if (!p.inicio_aquisitivo) return false;
-            const inicioAquisitivo = parseDateOnlyStrict(p.inicio_aquisitivo);
-            return inicioAquisitivo ? mesmaData(inicioAquisitivo, dataInicio) : false;
+        for (const candidato of candidatosGeracao) {
+          const chaveCandidato = montarChavePeriodoAquisitivo({
+            militarId: militar.id,
+            inicioAquisitivo: candidato.inicio_aquisitivo,
+            anoReferencia: candidato.ano_referencia,
           });
+          const periodoExiste = periodoAquisitivoJaExiste({
+            periodosExistentes: periodosFrescos,
+            militarId: militar.id,
+            inicioAquisitivo: candidato.inicio_aquisitivo,
+            anoReferencia: candidato.ano_referencia,
+          }) || novosPeriodos.some((periodo) => montarChavePeriodoAquisitivo({
+            militarId: periodo.militar_id,
+            inicioAquisitivo: periodo.inicio_aquisitivo,
+            anoReferencia: periodo.ano_referencia,
+          }) === chaveCandidato);
 
           if (!periodoExiste) {
-            const dataLimiteGozo = addMonths(dataFimPeriodo, 24);
-
             novosPeriodos.push({
               militar_id: militar.id,
               militar_nome: militar.nome_completo,
               militar_posto: militar.posto_graduacao,
               militar_matricula: militar.matricula_atual || militar.matricula || '',
-              inicio_aquisitivo: format(dataInicio, 'yyyy-MM-dd'),
-              fim_aquisitivo: format(dataFimPeriodo, 'yyyy-MM-dd'),
-              data_limite_gozo: format(dataLimiteGozo, 'yyyy-MM-dd'),
+              inicio_aquisitivo: candidato.inicio_aquisitivo,
+              fim_aquisitivo: candidato.fim_aquisitivo,
+              data_limite_gozo: candidato.data_limite_gozo,
               dias_base: DIAS_BASE_PADRAO,
               dias_total: DIAS_BASE_PADRAO,
               dias_gozados: 0,
               dias_previstos: 0,
               dias_saldo: DIAS_BASE_PADRAO,
               status: 'Disponível',
-              ano_referencia: `${format(dataInicio, 'yyyy')}/${format(dataFimPeriodo, 'yyyy')}`,
+              ano_referencia: candidato.ano_referencia,
             });
           }
-
-          dataInicio = addYears(dataInicio, 1);
         }
       }
 
