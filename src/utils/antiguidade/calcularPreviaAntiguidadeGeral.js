@@ -39,6 +39,10 @@ export const ALERTAS_PREVIA_ANTIGUIDADE_GERAL = Object.freeze({
   POSSIVEL_COMPARACAO_LISTAS_DISTINTAS: 'ALERTA_POSSIVEL_COMPARACAO_LISTAS_DISTINTAS',
   EMPATE_RESOLVIDO_POR_NOME_MATRICULA: 'ALERTA_EMPATE_RESOLVIDO_POR_NOME_MATRICULA',
   EMPATE_NAO_RESOLVIDO: 'ALERTA_EMPATE_NAO_RESOLVIDO',
+  SEQUENCIA_HIERARQUICA_REGRESSIVA: 'ALERTA_SEQUENCIA_HIERARQUICA_REGRESSIVA',
+  POSTO_QUADRO_INCOMPATIVEL: 'ALERTA_POSTO_QUADRO_INCOMPATIVEL',
+  HISTORICO_ATIVO_SEM_DATA_PROMOCAO: 'ALERTA_HISTORICO_ATIVO_SEM_DATA_PROMOCAO',
+  REGRESSAO_CRONOLOGICA_POSTO: 'ALERTA_REGRESSAO_CRONOLOGICA_POSTO',
 });
 
 const VALOR_AUSENTE_NUMERICO = Number.POSITIVE_INFINITY;
@@ -162,6 +166,13 @@ function isRegistroAtivo(registro) {
   return STATUS_ATIVO.has(normalizarStatus(registro?.status_registro));
 }
 
+function isRegistroAtivoOperacional(registro) {
+  return isRegistroAtivo(registro)
+    && !isRegistroCancelado(registro)
+    && !isRegistroRetificado(registro)
+    && !isRegistroPrevisto(registro);
+}
+
 function isMilitarAtivo(militar) {
   if (militar?.ativo === false) return false;
   const status = normalizarTextoPreviaAntiguidade(
@@ -181,6 +192,12 @@ function toNumeroValido(valor) {
   if (valor === null || valor === undefined || valor === '') return null;
   const numero = Number(valor);
   return Number.isFinite(numero) ? numero : null;
+}
+
+function obterIndicePostoNormalizado(postoNormalizado) {
+  return POSTO_INDICE_POR_NORMALIZADO.has(postoNormalizado)
+    ? POSTO_INDICE_POR_NORMALIZADO.get(postoNormalizado)
+    : null;
 }
 
 function addUnico(lista, valor) {
@@ -284,6 +301,56 @@ function isPossivelReclassificacao(registro, postoAnterior, postoNovo) {
     || isPromocaoSubtenenteParaSegundoTenente(postoAnterior, postoNovo);
 }
 
+function isSequenciaHierarquicaRegressiva(postoAnterior, postoNovo) {
+  const indiceAnterior = obterIndicePostoNormalizado(postoAnterior);
+  const indiceNovo = obterIndicePostoNormalizado(postoNovo);
+  if (indiceAnterior === null || indiceNovo === null) return false;
+  return indiceNovo > indiceAnterior;
+}
+
+function isPostoQuadroIncompativel(postoGraduacao, quadro) {
+  return Boolean(postoGraduacao && quadro && !isQuadroCompativel(postoGraduacao, quadro));
+}
+
+function adicionarAlertasOperacionaisHistorico(historicos, alertas) {
+  const registrosAtivos = (historicos || []).filter(isRegistroAtivoOperacional);
+
+  if (registrosAtivos.some((registro) => toTimestamp(registro?.data_promocao) === null)) {
+    addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.HISTORICO_ATIVO_SEM_DATA_PROMOCAO);
+  }
+
+  const registrosComData = registrosAtivos
+    .map((registro) => ({
+      registro,
+      timestamp: toTimestamp(registro?.data_promocao),
+      postoNovo: normalizarPostoGraduacao(registro?.posto_graduacao_novo),
+    }))
+    .filter((item) => item.timestamp !== null && obterIndicePostoNormalizado(item.postoNovo) !== null)
+    .sort((a, b) => {
+      if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+      return obterRegistroId(a.registro).localeCompare(obterRegistroId(b.registro), 'pt-BR', { numeric: true });
+    });
+
+  let melhorIndicePostoAlcancado = null;
+  for (const item of registrosComData) {
+    const indicePosto = obterIndicePostoNormalizado(item.postoNovo);
+    if (melhorIndicePostoAlcancado !== null && indicePosto > melhorIndicePostoAlcancado) {
+      addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REGRESSAO_CRONOLOGICA_POSTO);
+      return;
+    }
+    melhorIndicePostoAlcancado = melhorIndicePostoAlcancado === null
+      ? indicePosto
+      : Math.min(melhorIndicePostoAlcancado, indicePosto);
+  }
+}
+
+function adicionarAlertasPostoQuadroRegistro(registro, alertas) {
+  if (isPostoQuadroIncompativel(registro?.posto_graduacao_novo, registro?.quadro_novo)
+    || isPostoQuadroIncompativel(registro?.posto_graduacao_anterior, registro?.quadro_anterior)) {
+    addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_QUADRO_INCOMPATIVEL);
+  }
+}
+
 function montarContextoReferenciaAntiguidade(registro, contextoOrdemQuadros) {
   const detalheQuadroAnterior = obterDetalheAntiguidadeQuadro(registro?.quadro_anterior, contextoOrdemQuadros);
   const quadroAnteriorNormalizado = normalizarQuadroPreviaAntiguidade(registro?.quadro_anterior).valor;
@@ -320,6 +387,10 @@ function adicionarDiagnosticosPromocaoAtual(registroAtual, alertas, contextoOrde
     addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REFERENCIA_ANTIGUIDADE_AUSENTE);
   }
   if (ordem === 0) addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.ORDEM_ANTIGUIDADE_ZERO);
+  if (isSequenciaHierarquicaRegressiva(postoAnterior, postoNovo)) {
+    addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.SEQUENCIA_HIERARQUICA_REGRESSIVA);
+  }
+  adicionarAlertasPostoQuadroRegistro(registroAtual, alertas);
 
   return {
     postoAnteriorNormalizado: postoAnterior,
@@ -502,7 +573,9 @@ export function calcularPreviaAntiguidadeGeral({
     }
     if (postoNormalizado && quadroNormalizadoInfo.valor && !isQuadroCompativel(militar?.posto_graduacao, quadroNormalizadoInfo.valor)) {
       addUnico(pendencias, PENDENCIAS_PREVIA_ANTIGUIDADE_GERAL.QUADRO_FORA_DA_ORDEM);
+      addUnico(alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_QUADRO_INCOMPATIVEL);
     }
+    adicionarAlertasOperacionaisHistorico(historicos, alertas);
 
     let diagnosticoAntiguidadeAnterior = null;
     if (!registroAtual) {
