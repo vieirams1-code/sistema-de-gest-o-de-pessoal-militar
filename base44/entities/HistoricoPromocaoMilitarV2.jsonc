@@ -8,6 +8,10 @@
       "type": "string",
       "description": "ID do militar"
     },
+    "promocao_id": {
+      "type": "string",
+      "description": "ID opcional da Promoção/Lote ao qual este histórico individual pertence"
+    },
     "posto_graduacao_anterior": {
       "type": "string",
       "description": "Posto/gradua\u00e7\u00e3o anterior \u00e0 promo\u00e7\u00e3o"

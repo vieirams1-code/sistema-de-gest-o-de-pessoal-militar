@@ -1,0 +1,129 @@
+{
+  "name": "Promocao",
+  "type": "object",
+  "title": "Promoção",
+  "description": "Lote ou agrupamento estrutural de registros individuais de promoção.",
+  "properties": {
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "historica",
+        "prevista",
+        "atual"
+      ],
+      "description": "Tipo de promoção representada pelo lote"
+    },
+    "natureza": {
+      "type": "string",
+      "enum": [
+        "individual",
+        "coletiva"
+      ],
+      "description": "Natureza individual ou coletiva da promoção"
+    },
+    "posto_graduacao": {
+      "type": "string",
+      "description": "Posto/graduação de referência da promoção"
+    },
+    "quadro": {
+      "type": "string",
+      "description": "Quadro de referência da promoção"
+    },
+    "data_promocao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data efetiva da promoção"
+    },
+    "data_publicacao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de publicação do ato"
+    },
+    "boletim_referencia": {
+      "type": "string",
+      "description": "Referência do boletim (BG/DOEMS)"
+    },
+    "ato_referencia": {
+      "type": "string",
+      "description": "Referência do ato/portaria/decreto"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "rascunho",
+        "ativa",
+        "prevista",
+        "cancelada"
+      ],
+      "description": "Status operacional do lote de promoção"
+    },
+    "origem": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "coletiva",
+        "importacao",
+        "agrupamento",
+        "sistema"
+      ],
+      "description": "Origem do lote de promoção"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observações adicionais"
+    },
+    "chave_agrupamento": {
+      "type": "string",
+      "description": "Chave textual de agrupamento da promoção"
+    },
+    "hash_agrupamento": {
+      "type": "string",
+      "description": "Hash de integridade do agrupamento"
+    },
+    "total_militares_vinculados": {
+      "type": "number",
+      "default": 0,
+      "description": "Quantidade de históricos individuais vinculados ao lote"
+    },
+    "criado_por": {
+      "type": "string",
+      "description": "Usuário que criou o lote"
+    },
+    "criado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de criação do lote"
+    },
+    "atualizado_por": {
+      "type": "string",
+      "description": "Usuário que atualizou o lote pela última vez"
+    },
+    "atualizado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da última atualização do lote"
+    },
+    "cancelado_por": {
+      "type": "string",
+      "description": "Usuário que cancelou o lote"
+    },
+    "cancelado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de cancelamento do lote"
+    },
+    "motivo_cancelamento": {
+      "type": "string",
+      "description": "Motivo do cancelamento"
+    }
+  },
+  "required": [
+    "tipo",
+    "natureza",
+    "posto_graduacao",
+    "quadro",
+    "data_promocao",
+    "status",
+    "origem"
+  ]
+}
