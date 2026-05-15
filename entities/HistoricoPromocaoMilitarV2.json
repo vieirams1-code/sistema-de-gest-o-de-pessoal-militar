@@ -5,6 +5,7 @@
   "description": "Entidade operacional oficial de promoção/antiguidade (piloto V2).",
   "properties": {
     "militar_id": { "type": "string", "default": "" },
+    "promocao_id": { "type": "string", "default": "" },
     "posto_graduacao_anterior": { "type": "string", "default": "" },
     "quadro_anterior": { "type": "string", "default": "" },
     "posto_graduacao_novo": { "type": "string", "default": "" },
