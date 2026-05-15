@@ -9,6 +9,9 @@ import { gerarPreviaImportacao, parseArquivoPromocoes } from '@/utils/antiguidad
 import {
   POSTOS_GRADUACOES,
   PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO,
+  PROMOCAO_COLETIVA_TIPO_HISTORICO,
+  PROMOCAO_COLETIVA_TIPO_PREVISTO,
+  PROMOCAO_HISTORICA_TEXTO_CONFIRMACAO,
   QUADROS,
   prepararRegistroPromocaoColetiva,
   selecionarCandidatosPromocaoColetiva,
@@ -18,6 +21,7 @@ import {
 const STATUS_ATIVO = 'ativo';
 
 const DEFAULT_COLETIVA_FORM = {
+  tipo_lancamento: PROMOCAO_COLETIVA_TIPO_PREVISTO,
   posto_graduacao_anterior: '',
   posto_graduacao_novo: '',
   quadro_novo: '',
@@ -160,10 +164,17 @@ export default function AntiguidadeImportarPromocoes() {
   };
 
 
+  const tipoColetivaHistorico = coletivaForm.tipo_lancamento === PROMOCAO_COLETIVA_TIPO_HISTORICO;
+  const textoConfirmacaoColetiva = tipoColetivaHistorico
+    ? PROMOCAO_HISTORICA_TEXTO_CONFIRMACAO
+    : PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO;
+  const rotuloTipoColetiva = tipoColetivaHistorico ? 'históricos ativos' : 'previstos';
+
   const candidatosColetiva = React.useMemo(() => selecionarCandidatosPromocaoColetiva({
     militares,
     postoOrigem: coletivaForm.posto_graduacao_anterior,
-  }), [militares, coletivaForm.posto_graduacao_anterior]);
+    tipoLancamento: coletivaForm.tipo_lancamento,
+  }), [militares, coletivaForm.posto_graduacao_anterior, coletivaForm.tipo_lancamento]);
 
   React.useEffect(() => {
     if (aba !== 'coletiva') return;
@@ -180,9 +191,9 @@ export default function AntiguidadeImportarPromocoes() {
   }, [aba]);
 
   const linhasColetiva = React.useMemo(() => candidatosColetiva
-    .filter((m) => selecionadosColetiva.includes(m.id))
     .map((militar) => ({
       militar,
+      selecionado: selecionadosColetiva.includes(militar.id),
       validacao: validarLinhaPromocaoColetiva({
         militar,
         form: coletivaForm,
@@ -191,25 +202,29 @@ export default function AntiguidadeImportarPromocoes() {
       }),
     })), [candidatosColetiva, coletivaForm, historicosColetiva, ordensColetiva, selecionadosColetiva]);
 
+  const linhasSelecionadasColetiva = React.useMemo(() => linhasColetiva.filter((linha) => linha.selecionado), [linhasColetiva]);
+
   const resumoColetiva = React.useMemo(() => ({
-    selecionados: linhasColetiva.length,
-    aptos: linhasColetiva.filter((linha) => linha.validacao.apto).length,
-    bloqueados: linhasColetiva.filter((linha) => !linha.validacao.apto).length,
-  }), [linhasColetiva]);
+    selecionados: linhasSelecionadasColetiva.length,
+    aptos: linhasSelecionadasColetiva.filter((linha) => linha.validacao.apto).length,
+    bloqueados: linhasSelecionadasColetiva.filter((linha) => !linha.validacao.apto).length,
+  }), [linhasSelecionadasColetiva]);
 
   const atualizarCampoColetiva = (campo, valor) => {
     setFeedbackColetiva(null);
     setColetivaForm((f) => ({ ...f, [campo]: valor }));
   };
 
-  const removerDaColetiva = (militarId) => {
-    setSelecionadosColetiva((ids) => ids.filter((id) => id !== militarId));
+  const alternarSelecaoColetiva = (militarId) => {
+    setSelecionadosColetiva((ids) => (ids.includes(militarId)
+      ? ids.filter((id) => id !== militarId)
+      : [...ids, militarId]));
   };
 
   const gravarColetiva = async () => {
     setFeedbackColetiva(null);
-    if (confirmacaoColetiva !== PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO) {
-      setFeedbackColetiva({ erro: `Digite exatamente: ${PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO}` });
+    if (confirmacaoColetiva !== textoConfirmacaoColetiva) {
+      setFeedbackColetiva({ erro: `Digite exatamente: ${textoConfirmacaoColetiva}` });
       return;
     }
 
@@ -261,7 +276,7 @@ export default function AntiguidadeImportarPromocoes() {
       const historicosDepois = await base44.entities.HistoricoPromocaoMilitarV2.list();
       setHistoricosColetiva(historicosDepois);
     } catch (e) {
-      setFeedbackColetiva({ erro: e?.message || 'Erro ao gravar promoção coletiva prevista.' });
+      setFeedbackColetiva({ erro: e?.message || `Erro ao gravar promoção coletiva ${tipoColetivaHistorico ? 'histórica' : 'prevista'}.` });
     } finally {
       setGravandoColetiva(false);
     }
@@ -282,8 +297,22 @@ export default function AntiguidadeImportarPromocoes() {
 
 
     {aba === 'coletiva' && <>
-      <Card><CardHeader><CardTitle>Promoção Coletiva V1 — lançamento previsto</CardTitle></CardHeader><CardContent className="space-y-4">
-        <p className="text-sm text-slate-700">Esta V1 cria somente registros previstos em HistoricoPromocaoMilitarV2. Não atualiza Militar e não efetiva cadastro funcional.</p>
+      <Card><CardHeader><CardTitle>Promoção Coletiva — lançamento previsto ou histórico</CardTitle></CardHeader><CardContent className="space-y-4">
+        <p className="text-sm text-slate-700">Este fluxo cria registros em HistoricoPromocaoMilitarV2 com origem coletiva. Não atualiza Militar, não efetiva cadastro funcional, não altera a Prévia Geral e não cria snapshot/lista oficial.</p>
+        <div>
+          <Label>Tipo de lançamento</Label>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            <label className={`border rounded-md p-3 cursor-pointer ${!tipoColetivaHistorico ? 'bg-slate-100 border-slate-400' : ''}`}>
+              <input className="mr-2" type="radio" name="tipo_lancamento_coletiva" value={PROMOCAO_COLETIVA_TIPO_PREVISTO} checked={!tipoColetivaHistorico} onChange={(e) => atualizarCampoColetiva('tipo_lancamento', e.target.value)} />
+              <strong>Previsto/futuro</strong> — grava status_registro = "previsto".
+            </label>
+            <label className={`border rounded-md p-3 cursor-pointer ${tipoColetivaHistorico ? 'bg-amber-50 border-amber-400' : ''}`}>
+              <input className="mr-2" type="radio" name="tipo_lancamento_coletiva" value={PROMOCAO_COLETIVA_TIPO_HISTORICO} checked={tipoColetivaHistorico} onChange={(e) => atualizarCampoColetiva('tipo_lancamento', e.target.value)} />
+              <strong>Histórico/passado</strong> — grava status_registro = "ativo" sem alterar cadastro atual.
+            </label>
+          </div>
+        </div>
+        {tipoColetivaHistorico && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">Promoção histórica aceita militares hoje em posto superior ao destino histórico. O posto de origem é referência do ato; divergências com o posto atual geram alerta, não bloqueio.</p>}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div><Label>Posto/graduação de origem</Label><Input list="postos-promocao-coletiva" value={coletivaForm.posto_graduacao_anterior} onChange={(e) => atualizarCampoColetiva('posto_graduacao_anterior', e.target.value)} /></div>
           <div><Label>Posto/graduação de destino</Label><Input list="postos-promocao-coletiva" value={coletivaForm.posto_graduacao_novo} onChange={(e) => atualizarCampoColetiva('posto_graduacao_novo', e.target.value)} /></div>
@@ -304,14 +333,14 @@ export default function AntiguidadeImportarPromocoes() {
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>Candidatos elegíveis</CardTitle></CardHeader><CardContent className="space-y-3">
-        <div className="overflow-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th>Militar</th><th>Matrícula</th><th>Posto atual</th><th>Quadro atual</th><th>Lotação</th><th>Quadro anterior a gravar</th><th>Ordem</th><th>Alertas/Bloqueios</th><th>Ações</th></tr></thead><tbody>{linhasColetiva.map(({ militar, validacao }) => <tr key={militar.id} className={`border-b align-top ${validacao.apto ? '' : 'bg-red-50'}`}><td>{militar.nome_completo || militar.nome_guerra || 'Sem nome'}</td><td>{militar.matricula || '—'}</td><td>{militar.posto_graduacao || '—'}</td><td>{militar.quadro || '—'}</td><td>{militar.lotacao || '—'}</td><td>{validacao.quadroAnterior || '—'}</td><td><Input className="h-8 w-24" value={ordensColetiva[militar.id] || ''} onChange={(e) => setOrdensColetiva((o) => ({ ...o, [militar.id]: e.target.value }))} /></td><td>{validacao.bloqueios.map((b) => <div key={b} className="text-red-700">Bloqueio: {b}</div>)}{validacao.alertas.map((a) => <div key={a} className="text-amber-700">Alerta: {a}</div>)}</td><td><Button size="sm" variant="outline" onClick={() => removerDaColetiva(militar.id)}>Remover</Button></td></tr>)}</tbody></table></div>
-        {!linhasColetiva.length && <p className="text-sm text-slate-600">Informe o posto de origem para listar militares ativos elegíveis.</p>}
+        <div className="overflow-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th>Selecionar</th><th>Militar</th><th>Matrícula</th><th>Posto atual</th><th>Quadro atual</th><th>Lotação</th><th>Quadro anterior a gravar</th><th>Ordem</th><th>Alertas/Bloqueios</th><th>Ações</th></tr></thead><tbody>{linhasColetiva.map(({ militar, validacao, selecionado }) => <tr key={militar.id} className={`border-b align-top ${!selecionado ? 'bg-slate-50 text-slate-500' : validacao.apto ? '' : 'bg-red-50'}`}><td><input type="checkbox" checked={selecionado} onChange={() => alternarSelecaoColetiva(militar.id)} aria-label={`Selecionar ${militar.nome_completo || militar.nome_guerra || militar.id}`} /></td><td>{militar.nome_completo || militar.nome_guerra || 'Sem nome'}</td><td>{militar.matricula || '—'}</td><td>{militar.posto_graduacao || '—'}</td><td>{militar.quadro || '—'}</td><td>{militar.lotacao || '—'}</td><td>{validacao.quadroAnterior || '—'}</td><td><Input className="h-8 w-24" value={ordensColetiva[militar.id] || ''} onChange={(e) => setOrdensColetiva((o) => ({ ...o, [militar.id]: e.target.value }))} /></td><td>{validacao.bloqueios.map((b) => <div key={b} className="text-red-700">Bloqueio: {b}</div>)}{validacao.alertas.map((a) => <div key={a} className="text-amber-700">Alerta: {a}</div>)}</td><td><Button size="sm" variant="outline" onClick={() => alternarSelecaoColetiva(militar.id)}>{selecionado ? 'Remover' : 'Selecionar'}</Button></td></tr>)}</tbody></table></div>
+        {!linhasColetiva.length && <p className="text-sm text-slate-600">Informe o posto de origem para listar militares ativos elegíveis. No tipo histórico, o filtro por posto atual é apenas auxiliar e não bloqueia militares atualmente mais graduados.</p>}
       </CardContent></Card>
 
-      <Card><CardHeader><CardTitle>Confirmação e gravação prevista</CardTitle></CardHeader><CardContent className="space-y-3">
-        <p className="text-sm text-slate-700">Digite exatamente <strong>{PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO}</strong> para criar somente promoções previstas.</p>
-        <Input value={confirmacaoColetiva} onChange={(e) => setConfirmacaoColetiva(e.target.value)} placeholder={PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO} />
-        <Button disabled={gravandoColetiva || resumoColetiva.aptos === 0} onClick={gravarColetiva}>{gravandoColetiva ? 'Gravando...' : 'Criar registros previstos'}</Button>
+      <Card><CardHeader><CardTitle>Confirmação e gravação {tipoColetivaHistorico ? 'histórica' : 'prevista'}</CardTitle></CardHeader><CardContent className="space-y-3">
+        <p className="text-sm text-slate-700">Digite exatamente <strong>{textoConfirmacaoColetiva}</strong> para criar somente registros {rotuloTipoColetiva}. Nenhum lançamento coletivo altera Militar ou a Prévia Geral.</p>
+        <Input value={confirmacaoColetiva} onChange={(e) => setConfirmacaoColetiva(e.target.value)} placeholder={textoConfirmacaoColetiva} />
+        <Button disabled={gravandoColetiva || resumoColetiva.aptos === 0} onClick={gravarColetiva}>{gravandoColetiva ? 'Gravando...' : `Criar registros ${rotuloTipoColetiva}`}</Button>
         {feedbackColetiva?.erro && <p className="text-sm text-red-700">{feedbackColetiva.erro}</p>}
         {feedbackColetiva?.resumo && <div className="text-sm text-green-800 space-y-1"><p>Resumo: selecionados {feedbackColetiva.resumo.totalSelecionado}, aptos {feedbackColetiva.resumo.totalApto}, bloqueados {feedbackColetiva.resumo.totalBloqueado}, criados {feedbackColetiva.resumo.totalCriado}, falhas {feedbackColetiva.resumo.falhas}.</p>{feedbackColetiva.falhas?.map((falha) => <div key={falha} className="text-red-700">{falha}</div>)}</div>}
       </CardContent></Card>
