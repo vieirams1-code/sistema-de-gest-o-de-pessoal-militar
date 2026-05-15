@@ -1,4 +1,8 @@
-import { QUADROS_FIXOS, QUADROS_OFICIAIS } from '../../utils/postoQuadroCompatibilidade.js';
+import {
+  QUADROS_FIXOS,
+  QUADROS_OFICIAIS,
+  isQuadroCompativel,
+} from '../../utils/postoQuadroCompatibilidade.js';
 
 export const POSTOS_GRADUACOES = [
   'Coronel',
@@ -157,9 +161,13 @@ export function resolverQuadroPromocaoFutura({ postoAtual, postoPrevisto, quadro
   return String(quadroAtual || '').trim();
 }
 
+export const PROMOCAO_COLETIVA_TIPO_PREVISTO = 'previsto';
+export const PROMOCAO_COLETIVA_TIPO_HISTORICO = 'historico';
 export const PROMOCAO_COLETIVA_STATUS_PREVISTO = 'previsto';
+export const PROMOCAO_COLETIVA_STATUS_ATIVO = 'ativo';
 export const PROMOCAO_COLETIVA_ORIGEM = 'coletiva';
 export const PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO = 'CONFIRMAR PROMOÇÃO COLETIVA';
+export const PROMOCAO_HISTORICA_TEXTO_CONFIRMACAO = 'CONFIRMAR PROMOÇÃO HISTÓRICA';
 
 export const isQuadroQBMPT = (valor) => normalizar(valor) === 'qbmpt';
 
@@ -169,13 +177,18 @@ const statusCadastroAtivo = (militar) => normalizar(militar?.status_cadastro) ==
 
 const getHistoricosDoMilitar = (historicos = [], militarId) => (historicos || []).filter((registro) => registro?.militar_id === militarId);
 
-export function selecionarCandidatosPromocaoColetiva({ militares = [], postoOrigem = '' }) {
+export function selecionarCandidatosPromocaoColetiva({
+  militares = [],
+  postoOrigem = '',
+  tipoLancamento = PROMOCAO_COLETIVA_TIPO_PREVISTO,
+}) {
   if (!valorTexto(postoOrigem)) return [];
+  const isHistorico = tipoLancamento === PROMOCAO_COLETIVA_TIPO_HISTORICO;
   const ids = new Set();
   return (militares || []).filter((militar) => {
     if (!militar?.id || ids.has(militar.id)) return false;
     if (!statusCadastroAtivo(militar)) return false;
-    if (postoOrigem && !mesmoValor(militar.posto_graduacao, postoOrigem)) return false;
+    if (!isHistorico && postoOrigem && !mesmoValor(militar.posto_graduacao, postoOrigem)) return false;
     ids.add(militar.id);
     return true;
   });
@@ -209,6 +222,8 @@ export function validarLinhaPromocaoColetiva({ militar, form, historicos = [], o
   const quadroNovo = valorTexto(form?.quadro_novo);
   const dataPromocao = valorTexto(form?.data_promocao);
   const quadroAnterior = resolverQuadroAnteriorPromocaoColetiva({ militar, form, historicos });
+  const tipoLancamento = form?.tipo_lancamento || PROMOCAO_COLETIVA_TIPO_PREVISTO;
+  const isHistorico = tipoLancamento === PROMOCAO_COLETIVA_TIPO_HISTORICO;
 
   if (!militarId) bloqueios.push('Militar sem ID.');
   if (!postoAnterior) bloqueios.push('Posto/graduação de origem ausente.');
@@ -217,29 +232,48 @@ export function validarLinhaPromocaoColetiva({ militar, form, historicos = [], o
   if (!quadroNovo) bloqueios.push('Quadro novo ausente.');
   if (!dataPromocao) bloqueios.push('Data da promoção ausente.');
   if ([postoAnterior, postoNovo, quadroAnterior, quadroNovo].some(isQuadroQBMPT)) bloqueios.push('QBMPT não é aceito. Saneie o quadro para QPTBM ou valor válido antes do lançamento.');
+  if (quadroNovo && !isQuadroCompativel(postoNovo, quadroNovo)) bloqueios.push('Quadro novo incompatível com posto/graduação novo.');
+  if (isHistorico && mesmoValor(postoNovo, militar?.posto_graduacao)) bloqueios.push('Posto novo igual ao posto atual do cadastro. Use Corrigir promoção atual fora deste lote.');
 
   const historicosMilitar = getHistoricosDoMilitar(historicos, militarId);
-  const igual = (registro) => (
+  const mesmoPostoQuadro = (registro) => (
     mesmoValor(registro?.posto_graduacao_novo, postoNovo)
     && mesmoValor(registro?.quadro_novo, quadroNovo)
+  );
+  const igual = (registro) => (
+    mesmoPostoQuadro(registro)
     && valorTexto(registro?.data_promocao) === dataPromocao
   );
-  const previstoIgual = historicosMilitar.find((registro) => isStatusPrevisto(registro) && igual(registro));
-  if (previstoIgual) bloqueios.push('Já existe registro previsto igual para este militar/posto/quadro/data.');
+  const mesmoAtoDataPostoQuadro = (registro) => (
+    igual(registro)
+    && mesmoValor(registro?.ato_referencia, form?.ato_referencia)
+  );
+  const previstoIgual = historicosMilitar.find((registro) => (
+    isStatusPrevisto(registro) && (isHistorico ? mesmoAtoDataPostoQuadro(registro) : igual(registro))
+  ));
+  if (previstoIgual) bloqueios.push(isHistorico
+    ? 'Já existe registro previsto para o mesmo ato/data/posto/quadro.'
+    : 'Já existe registro previsto igual para este militar/posto/quadro/data.');
   const ativoIgual = historicosMilitar.find((registro) => isStatusAtivo(registro) && igual(registro));
   if (ativoIgual) bloqueios.push('Já existe registro ativo igual para este militar/posto/quadro/data.');
   const ativoConflitante = historicosMilitar.find((registro) => (
     isStatusAtivo(registro)
-    && mesmoValor(registro?.posto_graduacao_novo, postoNovo)
-    && mesmoValor(registro?.quadro_novo, quadroNovo)
+    && mesmoPostoQuadro(registro)
     && valorTexto(registro?.data_promocao) !== dataPromocao
   ));
-  if (ativoConflitante) bloqueios.push('Já existe registro ativo conflitante para este militar/posto/quadro com data diferente.');
+  if (ativoConflitante) bloqueios.push(isHistorico
+    ? 'Já existe registro ativo para este militar/posto/quadro, mesmo com data diferente.'
+    : 'Já existe registro ativo conflitante para este militar/posto/quadro com data diferente.');
 
+  if (isHistorico && postoAnterior && !mesmoValor(militar?.posto_graduacao, postoAnterior)) alertas.push('Posto atual do cadastro não corresponde ao posto de origem informado.');
+  if (isHistorico && isPromocaoAcimaDoPostoAtual({ postoAtual: postoNovo, postoNovo: militar?.posto_graduacao })) alertas.push('Militar atual já está em posto superior ao posto novo histórico.');
   if (!valorTexto(ordem)) alertas.push('Ordem de antiguidade ausente.');
   if (!quadroAnterior) alertas.push('Quadro anterior ausente.');
   if (!historicosMilitar.length) alertas.push('Histórico anterior incompleto.');
   if (isTransicaoSubtenenteParaQAOBM({ postoAnterior, postoNovo, quadroNovo }) && !quadroAnterior) alertas.push('Possível QAOBM sem quadro anterior confiável.');
+  const historicoMaisRecente = historicosMilitar.filter(isStatusAtivo).sort(ordenarMaisRecentesPrimeiro)[0];
+  if (isHistorico && historicoMaisRecente?.data_promocao && dataPromocao > historicoMaisRecente.data_promocao) alertas.push('Data histórica posterior à promoção mais recente já cadastrada.');
+  if (isHistorico) alertas.push('Criação de histórico pode não afetar promoção atual.');
 
   return { bloqueios, alertas, apto: bloqueios.length === 0, quadroAnterior };
 }
@@ -259,7 +293,9 @@ export function prepararRegistroPromocaoColetiva({ militar, form, historicos = [
     antiguidade_referencia_ordem: valorTexto(ordem) ? Number(ordem) : null,
     antiguidade_referencia_id: '',
     origem_dado: PROMOCAO_COLETIVA_ORIGEM,
-    status_registro: PROMOCAO_COLETIVA_STATUS_PREVISTO,
+    status_registro: form?.tipo_lancamento === PROMOCAO_COLETIVA_TIPO_HISTORICO
+      ? PROMOCAO_COLETIVA_STATUS_ATIVO
+      : PROMOCAO_COLETIVA_STATUS_PREVISTO,
     observacoes: valorTexto(form?.observacoes),
   };
 }
