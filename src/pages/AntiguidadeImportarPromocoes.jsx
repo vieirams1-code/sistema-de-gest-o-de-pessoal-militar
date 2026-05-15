@@ -6,8 +6,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { gerarPreviaImportacao, parseArquivoPromocoes } from '@/utils/antiguidade/importarPromocoes';
+import {
+  POSTOS_GRADUACOES,
+  PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO,
+  QUADROS,
+  prepararRegistroPromocaoColetiva,
+  selecionarCandidatosPromocaoColetiva,
+  validarLinhaPromocaoColetiva,
+} from '@/components/antiguidade/promocaoHistoricaUtils';
 
 const STATUS_ATIVO = 'ativo';
+
+const DEFAULT_COLETIVA_FORM = {
+  posto_graduacao_anterior: '',
+  posto_graduacao_novo: '',
+  quadro_novo: '',
+  data_promocao: '',
+  data_publicacao: '',
+  boletim_referencia: '',
+  ato_referencia: '',
+  observacoes: '',
+};
 
 const DEFAULT_FORM = {
   militar_id: '',
@@ -31,8 +50,16 @@ export default function AntiguidadeImportarPromocoes() {
   const [feedbackManual, setFeedbackManual] = React.useState('');
   const [motivoRetificacao, setMotivoRetificacao] = React.useState('');
 
+  const [coletivaForm, setColetivaForm] = React.useState(DEFAULT_COLETIVA_FORM);
+  const [historicosColetiva, setHistoricosColetiva] = React.useState([]);
+  const [selecionadosColetiva, setSelecionadosColetiva] = React.useState([]);
+  const [ordensColetiva, setOrdensColetiva] = React.useState({});
+  const [confirmacaoColetiva, setConfirmacaoColetiva] = React.useState('');
+  const [gravandoColetiva, setGravandoColetiva] = React.useState(false);
+  const [feedbackColetiva, setFeedbackColetiva] = React.useState(null);
+
   React.useEffect(() => {
-    if (aba !== 'manual') return;
+    if (!['manual', 'coletiva'].includes(aba)) return;
     const carregar = async () => {
       const militaresAtivos = await base44.entities.Militar.filter({ status_cadastro: 'Ativo' });
       setMilitares(militaresAtivos);
@@ -132,16 +159,162 @@ export default function AntiguidadeImportarPromocoes() {
     await carregarHistorico(registro.militar_id);
   };
 
+
+  const candidatosColetiva = React.useMemo(() => selecionarCandidatosPromocaoColetiva({
+    militares,
+    postoOrigem: coletivaForm.posto_graduacao_anterior,
+  }), [militares, coletivaForm.posto_graduacao_anterior]);
+
+  React.useEffect(() => {
+    if (aba !== 'coletiva') return;
+    setSelecionadosColetiva(candidatosColetiva.map((m) => m.id));
+  }, [aba, candidatosColetiva]);
+
+  React.useEffect(() => {
+    if (aba !== 'coletiva') return;
+    const carregarHistoricosColetiva = async () => {
+      const todos = await base44.entities.HistoricoPromocaoMilitarV2.list();
+      setHistoricosColetiva(todos);
+    };
+    carregarHistoricosColetiva();
+  }, [aba]);
+
+  const linhasColetiva = React.useMemo(() => candidatosColetiva
+    .filter((m) => selecionadosColetiva.includes(m.id))
+    .map((militar) => ({
+      militar,
+      validacao: validarLinhaPromocaoColetiva({
+        militar,
+        form: coletivaForm,
+        historicos: historicosColetiva,
+        ordem: ordensColetiva[militar.id],
+      }),
+    })), [candidatosColetiva, coletivaForm, historicosColetiva, ordensColetiva, selecionadosColetiva]);
+
+  const resumoColetiva = React.useMemo(() => ({
+    selecionados: linhasColetiva.length,
+    aptos: linhasColetiva.filter((linha) => linha.validacao.apto).length,
+    bloqueados: linhasColetiva.filter((linha) => !linha.validacao.apto).length,
+  }), [linhasColetiva]);
+
+  const atualizarCampoColetiva = (campo, valor) => {
+    setFeedbackColetiva(null);
+    setColetivaForm((f) => ({ ...f, [campo]: valor }));
+  };
+
+  const removerDaColetiva = (militarId) => {
+    setSelecionadosColetiva((ids) => ids.filter((id) => id !== militarId));
+  };
+
+  const gravarColetiva = async () => {
+    setFeedbackColetiva(null);
+    if (confirmacaoColetiva !== PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO) {
+      setFeedbackColetiva({ erro: `Digite exatamente: ${PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO}` });
+      return;
+    }
+
+    setGravandoColetiva(true);
+    try {
+      const historicosAtualizados = await base44.entities.HistoricoPromocaoMilitarV2.list();
+      setHistoricosColetiva(historicosAtualizados);
+      const linhasRevalidadas = candidatosColetiva
+        .filter((m) => selecionadosColetiva.includes(m.id))
+        .map((militar) => ({
+          militar,
+          validacao: validarLinhaPromocaoColetiva({
+            militar,
+            form: coletivaForm,
+            historicos: historicosAtualizados,
+            ordem: ordensColetiva[militar.id],
+          }),
+        }));
+      const aptas = linhasRevalidadas.filter((linha) => linha.validacao.apto);
+      const falhas = [];
+      let criados = 0;
+
+      for (const linha of aptas) {
+        try {
+          await base44.entities.HistoricoPromocaoMilitarV2.create(prepararRegistroPromocaoColetiva({
+            militar: linha.militar,
+            form: coletivaForm,
+            historicos: historicosAtualizados,
+            ordem: ordensColetiva[linha.militar.id],
+          }));
+          criados += 1;
+        } catch (e) {
+          falhas.push(`${linha.militar.nome_completo || linha.militar.id}: ${e?.message || 'erro ao criar'}`);
+        }
+      }
+
+      await atualizarDiagnostico();
+      setFeedbackColetiva({
+        resumo: {
+          totalSelecionado: linhasRevalidadas.length,
+          totalApto: aptas.length,
+          totalBloqueado: linhasRevalidadas.length - aptas.length,
+          totalCriado: criados,
+          falhas: falhas.length,
+        },
+        falhas,
+      });
+      setConfirmacaoColetiva('');
+      const historicosDepois = await base44.entities.HistoricoPromocaoMilitarV2.list();
+      setHistoricosColetiva(historicosDepois);
+    } catch (e) {
+      setFeedbackColetiva({ erro: e?.message || 'Erro ao gravar promoção coletiva prevista.' });
+    } finally {
+      setGravandoColetiva(false);
+    }
+  };
+
   return <div className="p-6 space-y-6">
     <h1 className="text-2xl font-bold text-[#1e3a5f]">Promoções de Antiguidade</h1>
     <div className="flex gap-2">
       <Button variant={aba === 'importacao' ? 'default' : 'outline'} onClick={() => setAba('importacao')}>Importação</Button>
       <Button variant={aba === 'manual' ? 'default' : 'outline'} onClick={() => setAba('manual')}>Registrar promoção atual</Button>
+      <Button variant={aba === 'coletiva' ? 'default' : 'outline'} onClick={() => setAba('coletiva')}>Promoção Coletiva</Button>
     </div>
 
     {aba === 'importacao' && <>{/* existing */}
       <Card><CardHeader><CardTitle>Arquivo de importação</CardTitle></CardHeader><CardContent className="space-y-4"><input type="file" accept=".csv,.xlsx" onChange={(e) => setArquivo(e.target.files?.[0] || null)} /><div><Button disabled={!arquivo || processando} onClick={processarPrevia}>{processando ? 'Processando...' : 'Processar prévia (dry-run)'}</Button></div>{erro && <p className="text-red-600 text-sm">{erro}</p>}</CardContent></Card>
       {previa && <Card><CardHeader><CardTitle>Resumo da prévia</CardTitle></CardHeader><CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">{Object.entries(previa.resumo).map(([k, v]) => <div key={k}><strong>{k}</strong>: {v}</div>)}<div className="col-span-full mt-2"><Button onClick={importarValidos} disabled={importando || previa.resumo.prontosImportar === 0}>{importando ? 'Importando...' : 'Importar registros válidos'}</Button></div>{resultado && <p className="col-span-full text-green-700 font-semibold">Importação concluída. Registros criados: {resultado.criados}</p>}</CardContent></Card>}
+    </>}
+
+
+    {aba === 'coletiva' && <>
+      <Card><CardHeader><CardTitle>Promoção Coletiva V1 — lançamento previsto</CardTitle></CardHeader><CardContent className="space-y-4">
+        <p className="text-sm text-slate-700">Esta V1 cria somente registros previstos em HistoricoPromocaoMilitarV2. Não atualiza Militar e não efetiva cadastro funcional.</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div><Label>Posto/graduação de origem</Label><Input list="postos-promocao-coletiva" value={coletivaForm.posto_graduacao_anterior} onChange={(e) => atualizarCampoColetiva('posto_graduacao_anterior', e.target.value)} /></div>
+          <div><Label>Posto/graduação de destino</Label><Input list="postos-promocao-coletiva" value={coletivaForm.posto_graduacao_novo} onChange={(e) => atualizarCampoColetiva('posto_graduacao_novo', e.target.value)} /></div>
+          <div><Label>Quadro novo</Label><Input list="quadros-promocao-coletiva" value={coletivaForm.quadro_novo} onChange={(e) => atualizarCampoColetiva('quadro_novo', e.target.value)} /></div>
+          <div><Label>Data da promoção</Label><Input type="date" value={coletivaForm.data_promocao} onChange={(e) => atualizarCampoColetiva('data_promocao', e.target.value)} /></div>
+          <div><Label>Data da publicação</Label><Input type="date" value={coletivaForm.data_publicacao} onChange={(e) => atualizarCampoColetiva('data_publicacao', e.target.value)} /></div>
+          <div><Label>Boletim</Label><Input value={coletivaForm.boletim_referencia} onChange={(e) => atualizarCampoColetiva('boletim_referencia', e.target.value)} /></div>
+          <div><Label>Ato</Label><Input value={coletivaForm.ato_referencia} onChange={(e) => atualizarCampoColetiva('ato_referencia', e.target.value)} /></div>
+          <div className="md:col-span-2"><Label>Observações</Label><Input value={coletivaForm.observacoes} onChange={(e) => atualizarCampoColetiva('observacoes', e.target.value)} /></div>
+        </div>
+        <datalist id="postos-promocao-coletiva">{POSTOS_GRADUACOES.map((posto) => <option key={posto} value={posto} />)}</datalist>
+        <datalist id="quadros-promocao-coletiva">{QUADROS.filter((quadro) => quadro !== 'QBMPT').map((quadro) => <option key={quadro} value={quadro} />)}</datalist>
+        <div className="grid grid-cols-3 gap-3 text-sm">
+          <div><strong>Selecionados:</strong> {resumoColetiva.selecionados}</div>
+          <div><strong>Aptos:</strong> {resumoColetiva.aptos}</div>
+          <div><strong>Bloqueados:</strong> {resumoColetiva.bloqueados}</div>
+        </div>
+      </CardContent></Card>
+
+      <Card><CardHeader><CardTitle>Candidatos elegíveis</CardTitle></CardHeader><CardContent className="space-y-3">
+        <div className="overflow-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th>Militar</th><th>Matrícula</th><th>Posto atual</th><th>Quadro atual</th><th>Lotação</th><th>Quadro anterior a gravar</th><th>Ordem</th><th>Alertas/Bloqueios</th><th>Ações</th></tr></thead><tbody>{linhasColetiva.map(({ militar, validacao }) => <tr key={militar.id} className={`border-b align-top ${validacao.apto ? '' : 'bg-red-50'}`}><td>{militar.nome_completo || militar.nome_guerra || 'Sem nome'}</td><td>{militar.matricula || '—'}</td><td>{militar.posto_graduacao || '—'}</td><td>{militar.quadro || '—'}</td><td>{militar.lotacao || '—'}</td><td>{validacao.quadroAnterior || '—'}</td><td><Input className="h-8 w-24" value={ordensColetiva[militar.id] || ''} onChange={(e) => setOrdensColetiva((o) => ({ ...o, [militar.id]: e.target.value }))} /></td><td>{validacao.bloqueios.map((b) => <div key={b} className="text-red-700">Bloqueio: {b}</div>)}{validacao.alertas.map((a) => <div key={a} className="text-amber-700">Alerta: {a}</div>)}</td><td><Button size="sm" variant="outline" onClick={() => removerDaColetiva(militar.id)}>Remover</Button></td></tr>)}</tbody></table></div>
+        {!linhasColetiva.length && <p className="text-sm text-slate-600">Informe o posto de origem para listar militares ativos elegíveis.</p>}
+      </CardContent></Card>
+
+      <Card><CardHeader><CardTitle>Confirmação e gravação prevista</CardTitle></CardHeader><CardContent className="space-y-3">
+        <p className="text-sm text-slate-700">Digite exatamente <strong>{PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO}</strong> para criar somente promoções previstas.</p>
+        <Input value={confirmacaoColetiva} onChange={(e) => setConfirmacaoColetiva(e.target.value)} placeholder={PROMOCAO_COLETIVA_TEXTO_CONFIRMACAO} />
+        <Button disabled={gravandoColetiva || resumoColetiva.aptos === 0} onClick={gravarColetiva}>{gravandoColetiva ? 'Gravando...' : 'Criar registros previstos'}</Button>
+        {feedbackColetiva?.erro && <p className="text-sm text-red-700">{feedbackColetiva.erro}</p>}
+        {feedbackColetiva?.resumo && <div className="text-sm text-green-800 space-y-1"><p>Resumo: selecionados {feedbackColetiva.resumo.totalSelecionado}, aptos {feedbackColetiva.resumo.totalApto}, bloqueados {feedbackColetiva.resumo.totalBloqueado}, criados {feedbackColetiva.resumo.totalCriado}, falhas {feedbackColetiva.resumo.falhas}.</p>{feedbackColetiva.falhas?.map((falha) => <div key={falha} className="text-red-700">{falha}</div>)}</div>}
+      </CardContent></Card>
     </>}
 
     {aba === 'manual' && <>
