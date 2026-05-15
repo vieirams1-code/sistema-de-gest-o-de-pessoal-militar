@@ -53,6 +53,13 @@ export const permissionStructure = [
         ]
       },
       {
+        key: 'acesso_antiguidade',
+        label: 'Antiguidade',
+        actions: [
+          { key: 'perm_visualizar_rastreamento_promocoes', label: 'Visualizar Rastreamento de Promoções' }
+        ]
+      },
+      {
         key: 'acesso_folha_alteracoes',
         label: 'Folha de Alterações',
         actions: [

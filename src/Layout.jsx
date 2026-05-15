@@ -147,12 +147,16 @@ const menuGroups = [
         name: 'Antiguidade',
         page: 'AntiguidadeDiagnostico',
         icon: ListOrdered,
-        adminOnly: true,
+        anyOf: [
+          { type: 'module', key: 'antiguidade' },
+          { type: 'action', key: 'visualizar_rastreamento_promocoes' },
+        ],
         children: [
           { name: 'Diagnóstico', page: 'AntiguidadeDiagnostico', icon: ClipboardList, adminOnly: true },
           { name: 'Configuração de Quadros', page: 'AntiguidadeConfigQuadros', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
           { name: 'Importar Promoções', page: 'AntiguidadeImportarPromocoes', icon: ScrollText, adminOnly: true },
           { name: 'Prévia Geral', page: 'AntiguidadePrevia', icon: ListOrdered, adminOnly: true },
+          { name: 'Rastreamento de Promoções', page: 'RastreamentoPromocoes', icon: FileSearch, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
         ],
       },
     ],
