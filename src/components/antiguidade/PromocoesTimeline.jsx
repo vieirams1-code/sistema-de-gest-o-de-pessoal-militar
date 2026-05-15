@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pencil } from 'lucide-react';
+import { FilePenLine, Pencil, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RankIcon from './RankIcon';
 
@@ -21,14 +21,20 @@ function InsigniaBox({ postoGraduacao, destaque = false }) {
   </div>;
 }
 
-function BotaoEditar({ canManage, onClick }) {
-  if (!canManage) return null;
-  return <Button size="sm" variant="outline" className="gap-2 border-slate-300 text-slate-700" onClick={onClick}>
-    <Pencil className="h-4 w-4" />Editar
-  </Button>;
+function AcoesRegistro({ canManage, registro, onCorrigir, onRetificar }) {
+  if (!canManage || !registro?.id) return null;
+
+  return <div className="flex flex-wrap gap-2 md:justify-end">
+    <Button size="sm" variant="outline" className="gap-2 border-slate-300 text-slate-700" onClick={() => onCorrigir?.(registro)}>
+      <Pencil className="h-4 w-4" />Corrigir cadastro
+    </Button>
+    <Button size="sm" variant="outline" className="gap-2 border-amber-300 text-amber-800" onClick={() => onRetificar?.(registro)}>
+      <FilePenLine className="h-4 w-4" />Retificar ato
+    </Button>
+  </div>;
 }
 
-function PromocaoAtualCard({ promocaoAtual, militar, canManage, onEditarAtual }) {
+function PromocaoAtualCard({ promocaoAtual, militar, canManage, onRegistrarAtual, onCorrigir, onRetificar }) {
   const postoAtual = promocaoAtual?.posto_graduacao_novo || militar?.posto_graduacao;
 
   return <section className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
@@ -44,7 +50,13 @@ function PromocaoAtualCard({ promocaoAtual, militar, canManage, onEditarAtual })
           {!promocaoAtual && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Sem promoção atual cadastrada.</p>}
         </div>
       </div>
-      <BotaoEditar canManage={canManage} onClick={onEditarAtual} />
+      {promocaoAtual ? (
+        <AcoesRegistro canManage={canManage} registro={promocaoAtual} onCorrigir={onCorrigir} onRetificar={onRetificar} />
+      ) : canManage ? (
+        <Button size="sm" variant="outline" className="gap-2 border-slate-300 text-slate-700" onClick={onRegistrarAtual}>
+          <RotateCcw className="h-4 w-4" />Registrar promoção atual
+        </Button>
+      ) : null}
     </div>
 
     <div className="mt-4 grid grid-cols-1 gap-3 border-t border-blue-100 pt-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -56,7 +68,7 @@ function PromocaoAtualCard({ promocaoAtual, militar, canManage, onEditarAtual })
   </section>;
 }
 
-function PromocaoAnteriorItem({ registro, canManage, onEditar }) {
+function PromocaoAnteriorItem({ registro, canManage, onCorrigir, onRetificar }) {
   const posto = registro?.posto_graduacao_novo || registro?.posto_graduacao_anterior;
 
   return <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -75,12 +87,12 @@ function PromocaoAnteriorItem({ registro, canManage, onEditar }) {
           </div>
         </div>
       </div>
-      <BotaoEditar canManage={canManage} onClick={() => onEditar?.(registro)} />
+      <AcoesRegistro canManage={canManage} registro={registro} onCorrigir={onCorrigir} onRetificar={onRetificar} />
     </div>
   </article>;
 }
 
-export default function PromocoesTimeline({ historico, promocaoAtual, militar, canManage, onEditarAtual, onEditarPromocao }) {
+export default function PromocoesTimeline({ historico, promocaoAtual, militar, canManage, onRegistrarAtual, onCorrigirPromocao, onRetificarPromocao }) {
   const anteriores = (historico || []).filter((registro) => {
     if (!registro?.id) return false;
     if (promocaoAtual?.id && String(registro.id) === String(promocaoAtual.id)) return false;
@@ -88,7 +100,7 @@ export default function PromocoesTimeline({ historico, promocaoAtual, militar, c
   });
 
   return <div className="space-y-5">
-    <PromocaoAtualCard promocaoAtual={promocaoAtual} militar={militar} canManage={canManage} onEditarAtual={onEditarAtual} />
+    <PromocaoAtualCard promocaoAtual={promocaoAtual} militar={militar} canManage={canManage} onRegistrarAtual={onRegistrarAtual} onCorrigir={onCorrigirPromocao} onRetificar={onRetificarPromocao} />
 
     <section className="space-y-3">
       <div>
@@ -97,7 +109,7 @@ export default function PromocoesTimeline({ historico, promocaoAtual, militar, c
       </div>
       {anteriores.length === 0
         ? <div className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Nenhuma promoção anterior cadastrada.</div>
-        : <div className="space-y-3">{anteriores.map((registro) => <PromocaoAnteriorItem key={registro.id} registro={registro} canManage={canManage} onEditar={onEditarPromocao} />)}</div>}
+        : <div className="space-y-3">{anteriores.map((registro) => <PromocaoAnteriorItem key={registro.id} registro={registro} canManage={canManage} onCorrigir={onCorrigirPromocao} onRetificar={onRetificarPromocao} />)}</div>}
     </section>
   </div>;
 }
