@@ -1,6 +1,7 @@
 import React from 'react';
-import { FilePenLine, Pencil, RotateCcw } from 'lucide-react';
+import { FilePenLine, MoreHorizontal, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import RankIcon from './RankIcon';
 
 const STATUS_PREVISTO = 'previsto';
@@ -21,20 +22,38 @@ function InsigniaBox({ postoGraduacao, destaque = false }) {
   </div>;
 }
 
-function AcoesRegistro({ canManage, registro, onCorrigir, onRetificar }) {
+function AcoesRegistro({ canManage, registro, onCorrigir, onRetificar, onExcluir }) {
   if (!canManage || !registro?.id) return null;
 
   return <div className="flex flex-wrap gap-2 md:justify-end">
     <Button size="sm" variant="outline" className="gap-2 border-slate-300 text-slate-700" onClick={() => onCorrigir?.(registro)}>
       <Pencil className="h-4 w-4" />Corrigir cadastro
     </Button>
-    <Button size="sm" variant="outline" className="gap-2 border-amber-300 text-amber-800" onClick={() => onRetificar?.(registro)}>
-      <FilePenLine className="h-4 w-4" />Retificar ato
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="ghost" className="gap-2 text-slate-600">
+          <MoreHorizontal className="h-4 w-4" />Mais ações
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel>Ações avançadas</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => onRetificar?.(registro)} className="items-start gap-2 text-amber-800">
+          <FilePenLine className="mt-0.5 h-4 w-4" />
+          <span>
+            <span className="block font-medium">Retificar ato oficial</span>
+            <span className="block text-xs text-slate-500">Cria cadeia de retificação.</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onExcluir?.(registro)} className="text-rose-700 focus:text-rose-700">
+          <Trash2 className="h-4 w-4" />Excluir registro
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   </div>;
 }
 
-function PromocaoAtualCard({ promocaoAtual, militar, canManage, onRegistrarAtual, onCorrigir, onRetificar }) {
+function PromocaoAtualCard({ promocaoAtual, militar, canManage, onRegistrarAtual, onCorrigir, onRetificar, onExcluir }) {
   const postoAtual = promocaoAtual?.posto_graduacao_novo || militar?.posto_graduacao;
 
   return <section className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
@@ -51,7 +70,7 @@ function PromocaoAtualCard({ promocaoAtual, militar, canManage, onRegistrarAtual
         </div>
       </div>
       {promocaoAtual ? (
-        <AcoesRegistro canManage={canManage} registro={promocaoAtual} onCorrigir={onCorrigir} onRetificar={onRetificar} />
+        <AcoesRegistro canManage={canManage} registro={promocaoAtual} onCorrigir={onCorrigir} onRetificar={onRetificar} onExcluir={onExcluir} />
       ) : canManage ? (
         <Button size="sm" variant="outline" className="gap-2 border-slate-300 text-slate-700" onClick={onRegistrarAtual}>
           <RotateCcw className="h-4 w-4" />Registrar promoção atual
@@ -68,7 +87,7 @@ function PromocaoAtualCard({ promocaoAtual, militar, canManage, onRegistrarAtual
   </section>;
 }
 
-function PromocaoAnteriorItem({ registro, canManage, onCorrigir, onRetificar }) {
+function PromocaoAnteriorItem({ registro, canManage, onCorrigir, onRetificar, onExcluir }) {
   const posto = registro?.posto_graduacao_novo || registro?.posto_graduacao_anterior;
 
   return <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -87,12 +106,12 @@ function PromocaoAnteriorItem({ registro, canManage, onCorrigir, onRetificar }) 
           </div>
         </div>
       </div>
-      <AcoesRegistro canManage={canManage} registro={registro} onCorrigir={onCorrigir} onRetificar={onRetificar} />
+      <AcoesRegistro canManage={canManage} registro={registro} onCorrigir={onCorrigir} onRetificar={onRetificar} onExcluir={onExcluir} />
     </div>
   </article>;
 }
 
-export default function PromocoesTimeline({ historico, promocaoAtual, militar, canManage, onRegistrarAtual, onCorrigirPromocao, onRetificarPromocao }) {
+export default function PromocoesTimeline({ historico, promocaoAtual, militar, canManage, onRegistrarAtual, onCorrigirPromocao, onRetificarPromocao, onExcluirPromocao }) {
   const anteriores = (historico || []).filter((registro) => {
     if (!registro?.id) return false;
     if (promocaoAtual?.id && String(registro.id) === String(promocaoAtual.id)) return false;
@@ -100,7 +119,7 @@ export default function PromocoesTimeline({ historico, promocaoAtual, militar, c
   });
 
   return <div className="space-y-5">
-    <PromocaoAtualCard promocaoAtual={promocaoAtual} militar={militar} canManage={canManage} onRegistrarAtual={onRegistrarAtual} onCorrigir={onCorrigirPromocao} onRetificar={onRetificarPromocao} />
+    <PromocaoAtualCard promocaoAtual={promocaoAtual} militar={militar} canManage={canManage} onRegistrarAtual={onRegistrarAtual} onCorrigir={onCorrigirPromocao} onRetificar={onRetificarPromocao} onExcluir={onExcluirPromocao} />
 
     <section className="space-y-3">
       <div>
@@ -109,7 +128,7 @@ export default function PromocoesTimeline({ historico, promocaoAtual, militar, c
       </div>
       {anteriores.length === 0
         ? <div className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">Nenhuma promoção anterior cadastrada.</div>
-        : <div className="space-y-3">{anteriores.map((registro) => <PromocaoAnteriorItem key={registro.id} registro={registro} canManage={canManage} onCorrigir={onCorrigirPromocao} onRetificar={onRetificarPromocao} />)}</div>}
+        : <div className="space-y-3">{anteriores.map((registro) => <PromocaoAnteriorItem key={registro.id} registro={registro} canManage={canManage} onCorrigir={onCorrigirPromocao} onRetificar={onRetificarPromocao} onExcluir={onExcluirPromocao} />)}</div>}
     </section>
   </div>;
 }
