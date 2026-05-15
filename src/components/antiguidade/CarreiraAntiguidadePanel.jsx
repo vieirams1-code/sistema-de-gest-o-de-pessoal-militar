@@ -110,9 +110,6 @@ export default function CarreiraAntiguidadePanel(props) {
 
   const excluirRegistro = async () => {
     if (!registroExclusao?.id) return setErroExclusao('Registro de promoção não encontrado para exclusão.');
-    if (isPromocaoAtualUnicaUsadaNaPrevia(registroExclusao)) {
-      return setErroExclusao('Este parece ser o único registro atual compatível usado pela Prévia Geral. Use Cancelar e prefira corrigir cadastro ou cancelar logicamente quando precisar preservar a cadeia.');
-    }
     if (confirmacaoExclusao !== TEXTO_CONFIRMACAO_EXCLUSAO) {
       return setErroExclusao(`Digite exatamente ${TEXTO_CONFIRMACAO_EXCLUSAO} para confirmar a exclusão física.`);
     }
@@ -288,8 +285,8 @@ export default function CarreiraAntiguidadePanel(props) {
         </DialogHeader>
 
         <div className="space-y-4 text-sm">
-          {isPromocaoAtualUnicaUsadaNaPrevia(registroExclusao) ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800">
-            Não é seguro excluir: este parece ser o único registro atual compatível usado pela Prévia Geral. Clique em Cancelar e use Corrigir cadastro ou um fluxo menos destrutivo.
+          {isPromocaoAtualUnicaUsadaNaPrevia(registroExclusao) ? <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 font-medium text-rose-800">
+            Atenção: este registro pode alimentar a Prévia Geral. Excluir pode gerar pendência até que outro registro correto seja cadastrado.
           </div> : <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
             Confirme somente se o registro for duplicado, teste ou lançamento equivocado. Origem do dado: <strong>{registroExclusao?.origem_dado || 'não informada'}</strong>.
           </div>}
@@ -310,7 +307,7 @@ export default function CarreiraAntiguidadePanel(props) {
 
         <DialogFooter>
           <Button variant="outline" onClick={fecharExclusaoRegistro}>Cancelar</Button>
-          <Button variant="destructive" onClick={excluirRegistro} disabled={excluindoRegistro || isPromocaoAtualUnicaUsadaNaPrevia(registroExclusao)}>{excluindoRegistro ? 'Excluindo...' : 'Excluir registro'}</Button>
+          <Button variant="destructive" onClick={excluirRegistro} disabled={excluindoRegistro}>{excluindoRegistro ? 'Excluindo...' : 'Excluir registro'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
