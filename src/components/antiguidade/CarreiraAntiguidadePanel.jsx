@@ -14,6 +14,7 @@ const STATUS_ATIVO = 'ativo';
 const STATUS_RETIFICADO = 'retificado';
 const ACAO_CORRIGIR = 'corrigir';
 const ACAO_RETIFICAR = 'retificar';
+const TEXTO_CONFIRMACAO_EXCLUSAO = 'EXCLUIR PROMOÇÃO';
 
 const valorTexto = (v) => String(v || '').trim();
 const isOrdemPreenchida = (valor) => valor !== null && valor !== undefined && valor !== '' && Number.isFinite(Number(valor));
@@ -56,13 +57,18 @@ export default function CarreiraAntiguidadePanel(props) {
   const [motivo, setMotivo] = React.useState('');
   const [erroAcao, setErroAcao] = React.useState('');
   const [salvandoAcao, setSalvandoAcao] = React.useState(false);
+  const [registroExclusao, setRegistroExclusao] = React.useState(null);
+  const [confirmacaoExclusao, setConfirmacaoExclusao] = React.useState('');
+  const [erroExclusao, setErroExclusao] = React.useState('');
+  const [excluindoRegistro, setExcluindoRegistro] = React.useState(false);
 
   const historico = React.useMemo(() => [...(historicoPromocoes || [])].sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || ''))), [historicoPromocoes]);
   const ativos = React.useMemo(() => historico.filter((h) => valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO && String(h.militar_id || '') === String(militar?.id || '')), [historico, militar?.id]);
 
   const promocaoAtual = React.useMemo(() => ativos.find((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao) && isOrdemPreenchida(h.antiguidade_referencia_ordem)) || null, [ativos, militar]);
 
-  const haMultiplosRegistrosAtuais = ativos.filter((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao)).length > 1;
+  const registrosAtuaisCompativeis = React.useMemo(() => ativos.filter((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao)), [ativos, militar]);
+  const haMultiplosRegistrosAtuais = registrosAtuaisCompativeis.length > 1;
 
   const abrirAcaoRegistro = (tipo, registro) => {
     setAcaoRegistro({ tipo, registro });
@@ -78,6 +84,51 @@ export default function CarreiraAntiguidadePanel(props) {
     setMotivo('');
     setErroAcao('');
     setSalvandoAcao(false);
+  };
+
+  const abrirExclusaoRegistro = (registro) => {
+    setRegistroExclusao(registro);
+    setConfirmacaoExclusao('');
+    setErroExclusao('');
+    setExcluindoRegistro(false);
+  };
+
+  const fecharExclusaoRegistro = () => {
+    setRegistroExclusao(null);
+    setConfirmacaoExclusao('');
+    setErroExclusao('');
+    setExcluindoRegistro(false);
+  };
+
+  const isPromocaoAtualUnicaUsadaNaPrevia = (registro) => {
+    if (!registro?.id) return false;
+    const isAtualCompativel = valorTexto(registro.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao)
+      && valorTexto(registro.quadro_novo) === valorTexto(militar?.quadro)
+      && valorTexto(registro.data_promocao);
+    return isAtualCompativel && registrosAtuaisCompativeis.length <= 1;
+  };
+
+  const excluirRegistro = async () => {
+    if (!registroExclusao?.id) return setErroExclusao('Registro de promoção não encontrado para exclusão.');
+    if (isPromocaoAtualUnicaUsadaNaPrevia(registroExclusao)) {
+      return setErroExclusao('Este parece ser o único registro atual compatível usado pela Prévia Geral. Use Cancelar e prefira corrigir cadastro ou cancelar logicamente quando precisar preservar a cadeia.');
+    }
+    if (confirmacaoExclusao !== TEXTO_CONFIRMACAO_EXCLUSAO) {
+      return setErroExclusao(`Digite exatamente ${TEXTO_CONFIRMACAO_EXCLUSAO} para confirmar a exclusão física.`);
+    }
+
+    setExcluindoRegistro(true);
+    setErroExclusao('');
+
+    try {
+      await base44.entities.HistoricoPromocaoMilitarV2.delete(registroExclusao.id);
+      fecharExclusaoRegistro();
+      await onHistoricoChanged?.();
+    } catch {
+      setErroExclusao('Não foi possível excluir o registro. Verifique se há bloqueio técnico e use Cancelar como alternativa menos destrutiva.');
+    } finally {
+      setExcluindoRegistro(false);
+    }
   };
 
   const salvarAcaoRegistro = async () => {
@@ -172,6 +223,7 @@ export default function CarreiraAntiguidadePanel(props) {
           onRegistrarAtual={onOpenPromocaoAtualModal}
           onCorrigirPromocao={(registro) => abrirAcaoRegistro(ACAO_CORRIGIR, registro)}
           onRetificarPromocao={(registro) => abrirAcaoRegistro(ACAO_RETIFICAR, registro)}
+          onExcluirPromocao={abrirExclusaoRegistro}
         />
       </CardContent>
     </Card>
@@ -179,7 +231,7 @@ export default function CarreiraAntiguidadePanel(props) {
     <Dialog open={Boolean(acaoRegistro)} onOpenChange={(open) => { if (!open) fecharAcaoRegistro(); }}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>{acaoEhRetificacao ? 'Retificar ato' : 'Corrigir cadastro'}</DialogTitle>
+          <DialogTitle>{acaoEhRetificacao ? 'Retificar ato oficial' : 'Corrigir cadastro'}</DialogTitle>
           <DialogDescription>
             {acaoEhRetificacao
               ? 'Retificação oficial: exige motivo, marca o registro antigo como retificado e cria novo registro ativo quando o ato original estava ativo.'
@@ -221,7 +273,44 @@ export default function CarreiraAntiguidadePanel(props) {
 
         <DialogFooter>
           <Button variant="outline" onClick={fecharAcaoRegistro}>Cancelar</Button>
-          <Button onClick={salvarAcaoRegistro} disabled={salvandoAcao}>{salvandoAcao ? 'Salvando...' : (acaoEhRetificacao ? 'Retificar ato' : 'Corrigir cadastro')}</Button>
+          <Button onClick={salvarAcaoRegistro} disabled={salvandoAcao}>{salvandoAcao ? 'Salvando...' : (acaoEhRetificacao ? 'Retificar ato oficial' : 'Corrigir cadastro')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={Boolean(registroExclusao)} onOpenChange={(open) => { if (!open) fecharExclusaoRegistro(); }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Excluir registro de promoção</DialogTitle>
+          <DialogDescription>
+            Exclusão física indicada apenas para duplicados, testes ou lançamento equivocado durante saneamento. Esta ação remove o registro e não substitui o cancelamento lógico quando for necessário preservar histórico.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 text-sm">
+          {isPromocaoAtualUnicaUsadaNaPrevia(registroExclusao) ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800">
+            Não é seguro excluir: este parece ser o único registro atual compatível usado pela Prévia Geral. Clique em Cancelar e use Corrigir cadastro ou um fluxo menos destrutivo.
+          </div> : <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+            Confirme somente se o registro for duplicado, teste ou lançamento equivocado. Origem do dado: <strong>{registroExclusao?.origem_dado || 'não informada'}</strong>.
+          </div>}
+
+          <div className="rounded-lg border border-slate-200 p-3">
+            <p><strong>Posto/graduação:</strong> {registroExclusao?.posto_graduacao_novo || '—'}</p>
+            <p><strong>Data da promoção:</strong> {registroExclusao?.data_promocao || '—'}</p>
+            <p><strong>Publicação / ato:</strong> {registroExclusao?.boletim_referencia || registroExclusao?.ato_referencia || '—'}</p>
+          </div>
+
+          <div>
+            <Label>Digite EXCLUIR PROMOÇÃO para confirmar</Label>
+            <Input value={confirmacaoExclusao} onChange={(e) => setConfirmacaoExclusao(e.target.value)} placeholder={TEXTO_CONFIRMACAO_EXCLUSAO} />
+          </div>
+
+          {erroExclusao && <p className="text-sm text-rose-700">{erroExclusao}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={fecharExclusaoRegistro}>Cancelar</Button>
+          <Button variant="destructive" onClick={excluirRegistro} disabled={excluindoRegistro || isPromocaoAtualUnicaUsadaNaPrevia(registroExclusao)}>{excluindoRegistro ? 'Excluindo...' : 'Excluir registro'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
