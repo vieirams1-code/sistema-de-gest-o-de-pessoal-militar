@@ -179,10 +179,12 @@ export default function AntiguidadeImportarPromocoes() {
     tipoLancamento: coletivaForm.tipo_lancamento,
   }), [militares, coletivaForm.posto_graduacao_anterior, coletivaForm.tipo_lancamento]);
 
+  const candidatosColetivaIds = React.useMemo(() => new Set(candidatosColetiva.map((m) => m.id)), [candidatosColetiva]);
+
   React.useEffect(() => {
     if (aba !== 'coletiva') return;
-    setSelecionadosColetiva(candidatosColetiva.map((m) => m.id));
-  }, [aba, candidatosColetiva]);
+    setSelecionadosColetiva((ids) => ids.filter((id) => candidatosColetivaIds.has(id)));
+  }, [aba, candidatosColetivaIds]);
 
   React.useEffect(() => {
     if (aba !== 'coletiva') return;
@@ -253,6 +255,14 @@ export default function AntiguidadeImportarPromocoes() {
       : [...ids, militarId]));
   };
 
+  const selecionarTodosCandidatosColetiva = () => {
+    setSelecionadosColetiva(candidatosColetiva.map((militar) => militar.id));
+  };
+
+  const limparSelecaoColetiva = () => {
+    setSelecionadosColetiva([]);
+  };
+
   const atualizarCopiaOrdemPromocaoAnterior = (marcado) => {
     atualizarCampoColetiva('copiar_ordem_promocao_anterior', marcado);
     if (!marcado) setAlertasCopiaOrdemColetiva({});
@@ -281,6 +291,11 @@ export default function AntiguidadeImportarPromocoes() {
           }),
         }));
       const aptas = linhasRevalidadas.filter((linha) => linha.validacao.apto);
+      if (aptas.length === 0) {
+        setFeedbackColetiva({ erro: 'Selecione ao menos 1 militar apto antes de criar a promoção coletiva.' });
+        return;
+      }
+
       const falhas = [];
       let criados = 0;
 
@@ -368,12 +383,19 @@ export default function AntiguidadeImportarPromocoes() {
         <datalist id="quadros-promocao-coletiva">{QUADROS.filter((quadro) => quadro !== 'QBMPT').map((quadro) => <option key={quadro} value={quadro} />)}</datalist>
         <div className="grid grid-cols-3 gap-3 text-sm">
           <div><strong>Selecionados:</strong> {resumoColetiva.selecionados}</div>
-          <div><strong>Aptos:</strong> {resumoColetiva.aptos}</div>
-          <div><strong>Bloqueados:</strong> {resumoColetiva.bloqueados}</div>
+          <div><strong>Aptos selecionados:</strong> {resumoColetiva.aptos}</div>
+          <div><strong>Bloqueados selecionados:</strong> {resumoColetiva.bloqueados}</div>
         </div>
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>Candidatos elegíveis</CardTitle></CardHeader><CardContent className="space-y-3">
+        <div className="flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 md:flex-row md:items-center md:justify-between">
+          <span><strong>Seleção manual obrigatória:</strong> candidatos carregam desmarcados. Revise a lista e marque somente quem deve entrar na promoção.</span>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={selecionarTodosCandidatosColetiva} disabled={!candidatosColetiva.length}>Selecionar todos listados</Button>
+            <Button type="button" variant="outline" onClick={limparSelecaoColetiva} disabled={selecionadosColetiva.length === 0}>Limpar seleção</Button>
+          </div>
+        </div>
         <div className="overflow-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th>Selecionar</th><th>Militar</th><th>Matrícula</th><th>Posto atual</th><th>Quadro atual</th><th>Lotação</th><th>Quadro anterior a gravar</th><th>Ordem</th><th>Alertas/Bloqueios</th><th>Ações</th></tr></thead><tbody>{linhasColetiva.map(({ militar, validacao, selecionado }) => <tr key={militar.id} className={`border-b align-top ${!selecionado ? 'bg-slate-50 text-slate-500' : validacao.apto ? '' : 'bg-red-50'}`}><td><input type="checkbox" checked={selecionado} onChange={() => alternarSelecaoColetiva(militar.id)} aria-label={`Selecionar ${militar.nome_completo || militar.nome_guerra || militar.id}`} /></td><td>{militar.nome_completo || militar.nome_guerra || 'Sem nome'}</td><td>{militar.matricula || '—'}</td><td>{militar.posto_graduacao || '—'}</td><td>{militar.quadro || '—'}</td><td>{militar.lotacao || '—'}</td><td>{validacao.quadroAnterior || '—'}</td><td><Input className="h-8 w-24" value={ordensColetiva[militar.id] || ''} onChange={(e) => setOrdensColetiva((o) => ({ ...o, [militar.id]: e.target.value }))} /></td><td>{alertasCopiaOrdemColetiva[militar.id] && <div className="text-amber-700">Alerta: {alertasCopiaOrdemColetiva[militar.id]}</div>}{validacao.bloqueios.map((b) => <div key={b} className="text-red-700">Bloqueio: {b}</div>)}{validacao.alertas.map((a) => <div key={a} className="text-amber-700">Alerta: {a}</div>)}</td><td><Button size="sm" variant="outline" onClick={() => alternarSelecaoColetiva(militar.id)}>{selecionado ? 'Remover' : 'Selecionar'}</Button></td></tr>)}</tbody></table></div>
         {!linhasColetiva.length && <p className="text-sm text-slate-600">Informe o posto de origem para listar militares ativos elegíveis. No tipo histórico, o filtro por posto atual é apenas auxiliar e não bloqueia militares atualmente mais graduados.</p>}
       </CardContent></Card>
