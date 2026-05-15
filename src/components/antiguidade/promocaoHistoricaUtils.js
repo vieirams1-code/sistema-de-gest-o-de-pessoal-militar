@@ -99,6 +99,13 @@ const isRegistroAnteriorOuSemData = (registro, dataPromocaoReferencia) => {
   return !dataReferencia || !data || data < dataReferencia;
 };
 
+const isOrdemAntiguidadeValida = (ordem) => {
+  const numero = Number(ordem);
+  return Number.isFinite(numero) && numero > 0;
+};
+
+const isStatusCanceladoOuRetificado = (registro) => ['cancelado', 'retificado'].includes(normalizar(registro?.status_registro));
+
 const ordenarMaisRecentesPrimeiro = (a, b) => dataRegistro(b).localeCompare(dataRegistro(a));
 
 const obterQuadroHistoricoAnteriorConfiavel = ({ postoAnterior, dataPromocao, registrosHistoricos = [] }) => {
@@ -211,6 +218,61 @@ export function resolverQuadroAnteriorPromocaoColetiva({ militar, form, historic
 
   const quadroAtual = valorTexto(militar?.quadro);
   return isQuadroQBMPT(quadroAtual) ? '' : quadroAtual;
+}
+
+export function resolverCopiaOrdemPromocaoAnterior({ militar, form, historicos = [] }) {
+  const militarId = militar?.id || '';
+  const postoNovo = valorTexto(form?.posto_graduacao_novo);
+  const quadroNovo = normalizarQuadroPromocao(form?.quadro_novo);
+  const dataPromocao = valorTexto(form?.data_promocao);
+
+  if (!militarId || !postoNovo || !quadroNovo || !dataPromocao) {
+    return { ordem: '', alerta: 'Ordem anterior não pôde ser copiada', motivo: 'dados_incompletos' };
+  }
+
+  if (normalizar(quadroNovo) === 'qaobm') {
+    return { ordem: '', alerta: 'Ordem anterior não pôde ser copiada', motivo: 'qaobm_ambiguo' };
+  }
+
+  if (!isQuadroCompativel(postoNovo, quadroNovo)) {
+    return { ordem: '', alerta: 'Ordem anterior não pôde ser copiada', motivo: 'quadro_incompativel' };
+  }
+
+  const candidatos = getHistoricosDoMilitar(historicos, militarId)
+    .filter((registro) => isStatusAtivo(registro))
+    .filter((registro) => !isStatusPrevisto(registro))
+    .filter((registro) => !isStatusCanceladoOuRetificado(registro))
+    .filter((registro) => dataRegistro(registro) && dataRegistro(registro) < dataPromocao)
+    .filter((registro) => isOrdemAntiguidadeValida(registro?.antiguidade_referencia_ordem))
+    .sort(ordenarMaisRecentesPrimeiro);
+
+  if (!candidatos.length) {
+    return { ordem: '', alerta: 'Ordem anterior não pôde ser copiada', motivo: 'sem_ordem_anterior' };
+  }
+
+  const dataMaisRecente = dataRegistro(candidatos[0]);
+  const candidatosMaisRecentes = candidatos.filter((registro) => dataRegistro(registro) === dataMaisRecente);
+  if (candidatosMaisRecentes.length !== 1) {
+    return { ordem: '', alerta: 'Ordem anterior não pôde ser copiada', motivo: 'multiplos_candidatos' };
+  }
+
+  const anterior = candidatosMaisRecentes[0];
+  const quadroAnterior = normalizarQuadroPromocao(anterior?.quadro_novo || anterior?.quadro_anterior);
+  const postoAnterior = valorTexto(anterior?.posto_graduacao_novo || anterior?.posto_graduacao_anterior);
+
+  if (!quadroAnterior || normalizar(quadroAnterior) === 'qaobm') {
+    return { ordem: '', alerta: 'Ordem anterior não pôde ser copiada', motivo: 'qaobm_ambiguo' };
+  }
+
+  if (!mesmoValor(quadroAnterior, quadroNovo)) {
+    return { ordem: '', alerta: 'Ordem anterior não pôde ser copiada', motivo: 'mudanca_real_quadro' };
+  }
+
+  if (!isQuadroCompativel(postoAnterior, quadroAnterior) || !isQuadroCompativel(postoNovo, quadroAnterior)) {
+    return { ordem: '', alerta: 'Ordem anterior não pôde ser copiada', motivo: 'quadro_incompativel' };
+  }
+
+  return { ordem: Number(anterior.antiguidade_referencia_ordem), alerta: '', motivo: '' };
 }
 
 export function validarLinhaPromocaoColetiva({ militar, form, historicos = [], ordem = '' }) {

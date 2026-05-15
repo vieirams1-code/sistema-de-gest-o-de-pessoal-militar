@@ -6,6 +6,7 @@ import {
   PROMOCAO_COLETIVA_TIPO_HISTORICO,
   PROMOCAO_COLETIVA_TIPO_PREVISTO,
   prepararRegistroPromocaoColetiva,
+  resolverCopiaOrdemPromocaoAnterior,
   resolverQuadroAnteriorPromocao,
   selecionarCandidatosPromocaoColetiva,
   validarLinhaPromocaoColetiva,
@@ -206,4 +207,172 @@ test('promoção coletiva bloqueia duplicidade prevista e ativa igual', () => {
   assert.ok(prevista.bloqueios.some((bloqueio) => bloqueio.includes('previsto igual')));
   assert.equal(ativa.apto, false);
   assert.ok(ativa.bloqueios.some((bloqueio) => bloqueio.includes('ativo igual')));
+});
+
+
+test('copia ordem anterior segura para promoção coletiva histórica de 3º para 2º Sargento', () => {
+  const militar = { ...militarAtivo, id: 'sgt-1', posto_graduacao: '1º Sargento', quadro: 'QPTBM' };
+  const form = {
+    ...formHistorico,
+    posto_graduacao_anterior: '3º Sargento',
+    posto_graduacao_novo: '2º Sargento',
+    quadro_novo: 'QPTBM',
+    data_promocao: '2020-01-01',
+  };
+
+  const copia = resolverCopiaOrdemPromocaoAnterior({
+    militar,
+    form,
+    historicos: [{
+      militar_id: militar.id,
+      status_registro: 'ativo',
+      posto_graduacao_novo: '3º Sargento',
+      quadro_novo: 'QPTBM',
+      data_promocao: '2018-01-01',
+      antiguidade_referencia_ordem: 1,
+    }],
+  });
+
+  assert.equal(copia.ordem, 1);
+  assert.equal(copia.alerta, '');
+});
+
+test('copia ordem anterior segura para promoção coletiva histórica de 2º para 1º Sargento', () => {
+  const militar = { ...militarAtivo, id: 'sgt-2', posto_graduacao: '1º Sargento', quadro: 'QPTBM' };
+  const form = {
+    ...formHistorico,
+    posto_graduacao_anterior: '2º Sargento',
+    posto_graduacao_novo: '1º Sargento',
+    quadro_novo: 'QPTBM',
+    data_promocao: '2022-01-01',
+  };
+
+  const copia = resolverCopiaOrdemPromocaoAnterior({
+    militar,
+    form,
+    historicos: [
+      {
+        militar_id: militar.id,
+        status_registro: 'ativo',
+        posto_graduacao_novo: '3º Sargento',
+        quadro_novo: 'QPTBM',
+        data_promocao: '2018-01-01',
+        antiguidade_referencia_ordem: 9,
+      },
+      {
+        militar_id: militar.id,
+        status_registro: 'ativo',
+        posto_graduacao_novo: '2º Sargento',
+        quadro_novo: 'QPTBM',
+        data_promocao: '2020-01-01',
+        antiguidade_referencia_ordem: 3,
+      },
+    ],
+  });
+
+  assert.equal(copia.ordem, 3);
+  assert.equal(copia.alerta, '');
+});
+
+test('não copia ordem para QAOBM ambíguo', () => {
+  const copia = resolverCopiaOrdemPromocaoAnterior({
+    militar: militarAtivo,
+    form: formHistorico,
+    historicos: [{
+      militar_id: militarAtivo.id,
+      status_registro: 'ativo',
+      posto_graduacao_novo: 'Subtenente',
+      quadro_novo: 'QPTBM',
+      data_promocao: '2020-01-01',
+      antiguidade_referencia_ordem: 2,
+    }],
+  });
+
+  assert.equal(copia.ordem, '');
+  assert.equal(copia.alerta, 'Ordem anterior não pôde ser copiada');
+  assert.equal(copia.motivo, 'qaobm_ambiguo');
+});
+
+test('não copia ordem quando não há ordem anterior válida', () => {
+  const militar = { ...militarAtivo, id: 'sem-ordem', posto_graduacao: '2º Sargento', quadro: 'QPTBM' };
+  const form = {
+    ...formHistorico,
+    posto_graduacao_anterior: '3º Sargento',
+    posto_graduacao_novo: '2º Sargento',
+    quadro_novo: 'QPTBM',
+    data_promocao: '2020-01-01',
+  };
+
+  const copia = resolverCopiaOrdemPromocaoAnterior({
+    militar,
+    form,
+    historicos: [{
+      militar_id: militar.id,
+      status_registro: 'ativo',
+      posto_graduacao_novo: '3º Sargento',
+      quadro_novo: 'QPTBM',
+      data_promocao: '2018-01-01',
+      antiguidade_referencia_ordem: 0,
+    }],
+  });
+
+  assert.equal(copia.ordem, '');
+  assert.equal(copia.alerta, 'Ordem anterior não pôde ser copiada');
+  assert.equal(copia.motivo, 'sem_ordem_anterior');
+});
+
+test('não copia ordem quando há múltiplos candidatos anteriores na mesma data', () => {
+  const militar = { ...militarAtivo, id: 'duplicado', posto_graduacao: '2º Sargento', quadro: 'QPTBM' };
+  const form = {
+    ...formHistorico,
+    posto_graduacao_anterior: '3º Sargento',
+    posto_graduacao_novo: '2º Sargento',
+    quadro_novo: 'QPTBM',
+    data_promocao: '2020-01-01',
+  };
+
+  const copia = resolverCopiaOrdemPromocaoAnterior({
+    militar,
+    form,
+    historicos: [1, 2].map((ordem) => ({
+      militar_id: militar.id,
+      status_registro: 'ativo',
+      posto_graduacao_novo: '3º Sargento',
+      quadro_novo: 'QPTBM',
+      data_promocao: '2018-01-01',
+      antiguidade_referencia_ordem: ordem,
+    })),
+  });
+
+  assert.equal(copia.ordem, '');
+  assert.equal(copia.alerta, 'Ordem anterior não pôde ser copiada');
+  assert.equal(copia.motivo, 'multiplos_candidatos');
+});
+
+test('não copia ordem quando há mudança real de quadro', () => {
+  const militar = { ...militarAtivo, id: 'mudanca-quadro', posto_graduacao: '2º Sargento', quadro: 'QBMP-1.a' };
+  const form = {
+    ...formHistorico,
+    posto_graduacao_anterior: '3º Sargento',
+    posto_graduacao_novo: '2º Sargento',
+    quadro_novo: 'QBMP-1.a',
+    data_promocao: '2020-01-01',
+  };
+
+  const copia = resolverCopiaOrdemPromocaoAnterior({
+    militar,
+    form,
+    historicos: [{
+      militar_id: militar.id,
+      status_registro: 'ativo',
+      posto_graduacao_novo: '3º Sargento',
+      quadro_novo: 'QPTBM',
+      data_promocao: '2018-01-01',
+      antiguidade_referencia_ordem: 4,
+    }],
+  });
+
+  assert.equal(copia.ordem, '');
+  assert.equal(copia.alerta, 'Ordem anterior não pôde ser copiada');
+  assert.equal(copia.motivo, 'mudanca_real_quadro');
 });
