@@ -1,19 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ClipboardCopy, Eye, RefreshCw, Search } from 'lucide-react';
+import { ClipboardCopy, Eye, PlusCircle, RefreshCw, Search } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
 
 const STATUS_OPERACIONAIS = new Set(['ativo', 'previsto']);
 const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'retificado', 'retificada', 'cancelada']);
+const TEXTO_CONFIRMACAO_CRIAR_PROMOCAO = 'CRIAR PROMOÇÃO';
 
 function texto(valor) {
   return String(valor ?? '').trim();
@@ -93,6 +96,64 @@ function chaveAgrupamento(registro) {
     registro?.boletim_referencia,
     registro?.ato_referencia,
   ].map((valor) => normalizar(valor) || '∅').join('|');
+}
+
+function hashAgrupamento(chave) {
+  let hash = 2166136261;
+  for (let index = 0; index < chave.length; index += 1) {
+    hash ^= chave.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `agr-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+function valorPromocao(valor) {
+  const limpo = texto(valor);
+  return limpo === '—' ? '' : limpo;
+}
+
+function diagnosticarCriacaoPromocao(grupo) {
+  if (!grupo) return { bloqueado: true, motivo: 'Agrupamento não selecionado.' };
+
+  const totalRegistros = grupo.registros?.length || 0;
+  const apenasAtivos = grupo.ativos === totalRegistros && totalRegistros > 0;
+  const apenasPrevistos = grupo.previstos === totalRegistros && totalRegistros > 0;
+
+  if (!apenasAtivos && !apenasPrevistos) {
+    return {
+      bloqueado: true,
+      motivo: 'Agrupamento misto ou com registros cancelados/retificados. Este lote permite criar Promoção somente quando todos os registros do agrupamento são ativos ou todos são previstos.',
+    };
+  }
+
+  const tipo = apenasPrevistos ? 'prevista' : 'historica';
+  const status = apenasPrevistos ? 'prevista' : 'ativa';
+  const chave = grupo.key;
+  const hash = hashAgrupamento(chave);
+
+  return {
+    bloqueado: false,
+    payload: {
+      tipo,
+      natureza: 'coletiva',
+      posto_graduacao: valorPromocao(grupo.posto),
+      quadro: valorPromocao(grupo.quadro),
+      data_promocao: valorPromocao(grupo.data_promocao),
+      data_publicacao: valorPromocao(grupo.data_publicacao),
+      boletim_referencia: valorPromocao(grupo.boletim_referencia),
+      ato_referencia: valorPromocao(grupo.ato_referencia),
+      status,
+      origem: 'agrupamento',
+      observacoes: [
+        'Criada a partir de agrupamento detectado no Rastreamento de Promoções.',
+        'Nenhum HistoricoPromocaoMilitarV2 foi vinculado nesta etapa.',
+        `Registros detectados: ${totalRegistros}. Militares únicos no agrupamento: ${grupo.totalMilitares}.`,
+      ].join(' '),
+      chave_agrupamento: chave,
+      hash_agrupamento: hash,
+      total_militares_vinculados: 0,
+    },
+  };
 }
 
 function classificarConfianca({ totalMilitares, duplicidades, totalComReferencia, ativos, previstos }) {
@@ -272,9 +333,14 @@ export default function RastreamentoPromocoes() {
   const [filtroGrupo, setFiltroGrupo] = useState('');
   const [filtroConfianca, setFiltroConfianca] = useState('todas');
   const [grupoDetalhe, setGrupoDetalhe] = useState(null);
+  const [grupoCriacao, setGrupoCriacao] = useState(null);
+  const [confirmacaoCriacao, setConfirmacaoCriacao] = useState('');
+  const [promocaoExistente, setPromocaoExistente] = useState(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['rastreamento-promocoes-readonly'],
+    queryKey: ['rastreamento-promocoes'],
     queryFn: async () => {
       const [militares, historicos] = await Promise.all([
         base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
@@ -283,6 +349,75 @@ export default function RastreamentoPromocoes() {
       return montarRastreamento(militares || [], historicos || []);
     },
   });
+
+  const diagnosticoCriacao = useMemo(() => diagnosticarCriacaoPromocao(grupoCriacao), [grupoCriacao]);
+  const promocaoRevisao = diagnosticoCriacao.payload || null;
+  const podeConfirmarCriacao = Boolean(
+    promocaoRevisao
+    && !diagnosticoCriacao.bloqueado
+    && confirmacaoCriacao === TEXTO_CONFIRMACAO_CRIAR_PROMOCAO,
+  );
+
+  const abrirCriacaoPromocao = (grupo) => {
+    setGrupoCriacao(grupo);
+    setConfirmacaoCriacao('');
+    setPromocaoExistente(null);
+  };
+
+  const fecharCriacaoPromocao = () => {
+    setGrupoCriacao(null);
+    setConfirmacaoCriacao('');
+    setPromocaoExistente(null);
+  };
+
+  const criarPromocaoMutation = useMutation({
+    mutationFn: async (payload) => {
+      const [porChave, porHash] = await Promise.all([
+        base44.entities.Promocao.filter({ chave_agrupamento: payload.chave_agrupamento }),
+        base44.entities.Promocao.filter({ hash_agrupamento: payload.hash_agrupamento }),
+      ]);
+      const existente = [...(porChave || []), ...(porHash || [])].find(Boolean);
+
+      if (existente) {
+        const erro = new Error('Já existe Promoção para esta chave/hash de agrupamento.');
+        erro.promocaoExistente = existente;
+        throw erro;
+      }
+
+      const agora = new Date().toISOString();
+      const usuario = await base44.auth.me();
+      return base44.entities.Promocao.create({
+        ...payload,
+        criado_por: usuario?.email || usuario?.full_name || '',
+        criado_em: agora,
+        atualizado_por: usuario?.email || usuario?.full_name || '',
+        atualizado_em: agora,
+      });
+    },
+    onSuccess: (promocao) => {
+      toast({ title: 'Promoção criada', description: `Promoção ${promocao?.id ? `ID ${promocao.id}` : ''} criada sem vincular históricos.` });
+      fecharCriacaoPromocao();
+      queryClient.invalidateQueries({ queryKey: ['rastreamento-promocoes'] });
+    },
+    onError: (mutationError) => {
+      if (mutationError?.promocaoExistente) {
+        setPromocaoExistente(mutationError.promocaoExistente);
+        toast({
+          title: 'Duplicidade bloqueada',
+          description: 'Já existe Promoção com a mesma chave ou hash de agrupamento. Abra/verifique a promoção existente antes de prosseguir.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({ title: 'Falha ao criar Promoção', description: mutationError?.message || 'Não foi possível criar a Promoção.', variant: 'destructive' });
+    },
+  });
+
+  const confirmarCriacaoPromocao = () => {
+    if (!podeConfirmarCriacao || !promocaoRevisao) return;
+    setPromocaoExistente(null);
+    criarPromocaoMutation.mutate(promocaoRevisao);
+  };
 
   const gruposFiltrados = useMemo(() => {
     const termo = normalizar(filtroGrupo);
@@ -319,7 +454,7 @@ export default function RastreamentoPromocoes() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">Antiguidade</p>
           <h1 className="text-2xl font-bold text-[#1e3a5f]">Rastreamento de Promoções</h1>
-          <p className="mt-1 max-w-3xl text-sm text-slate-600">Painel 100% read-only para identificar lacunas, agrupamentos e militares ativos sem vínculo adequado em HistoricoPromocaoMilitarV2.</p>
+          <p className="mt-1 max-w-3xl text-sm text-slate-600">Painel para identificar lacunas, agrupamentos e militares ativos sem vínculo adequado em HistoricoPromocaoMilitarV2, com criação controlada apenas da entidade Promoção.</p>
         </div>
         <Button type="button" variant="outline" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> Atualizar
@@ -327,8 +462,8 @@ export default function RastreamentoPromocoes() {
       </div>
 
       <Alert>
-        <AlertTitle>Modo somente leitura</AlertTitle>
-        <AlertDescription>Esta tela apenas consulta Militar ativo e HistoricoPromocaoMilitarV2. Não cria Promoção, não adiciona promocao_id, não vincula registros e não altera Militar, histórico, prévia geral, ordenação ou snapshots.</AlertDescription>
+        <AlertTitle>Criação limitada à entidade Promoção</AlertTitle>
+        <AlertDescription>Esta tela permite criar somente a entidade Promoção a partir de agrupamento homogêneo. Não adiciona promocao_id, não vincula HistoricoPromocaoMilitarV2 e não altera Militar, histórico, prévia geral, ordenação ou snapshots.</AlertDescription>
       </Alert>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -383,7 +518,7 @@ export default function RastreamentoPromocoes() {
           <div className="overflow-auto rounded-lg border">
             <table className="w-full min-w-[1120px] text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <tr><th className="p-3">Grupo</th><th className="p-3">Promoção</th><th className="p-3">Publicação</th><th className="p-3">Refs.</th><th className="p-3">Total</th><th className="p-3">Com ordem</th><th className="p-3">Sem ordem</th><th className="p-3">Ativos</th><th className="p-3">Previstos</th><th className="p-3">Cancel./Retif.</th><th className="p-3">Duplic.</th><th className="p-3">Confiança</th><th className="p-3">Detalhes</th></tr>
+                <tr><th className="p-3">Grupo</th><th className="p-3">Promoção</th><th className="p-3">Publicação</th><th className="p-3">Refs.</th><th className="p-3">Total</th><th className="p-3">Com ordem</th><th className="p-3">Sem ordem</th><th className="p-3">Ativos</th><th className="p-3">Previstos</th><th className="p-3">Cancel./Retif.</th><th className="p-3">Duplic.</th><th className="p-3">Confiança</th><th className="p-3">Ações</th></tr>
               </thead>
               <tbody>
                 {gruposFiltrados.map((grupo) => (
@@ -400,7 +535,7 @@ export default function RastreamentoPromocoes() {
                     <td className="p-3">{grupo.canceladosRetificados}</td>
                     <td className="p-3">{grupo.duplicidades}</td>
                     <td className="p-3"><Badge variant={confiancaVariant(grupo.confianca)}>{grupo.confianca}</Badge></td>
-                    <td className="p-3"><Button type="button" size="sm" variant="outline" onClick={() => setGrupoDetalhe(grupo)}><Eye className="mr-2 h-4 w-4" />Ver</Button></td>
+                    <td className="p-3"><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setGrupoDetalhe(grupo)}><Eye className="mr-2 h-4 w-4" />Ver</Button><Button type="button" size="sm" onClick={() => abrirCriacaoPromocao(grupo)}><PlusCircle className="mr-2 h-4 w-4" />Criar Promoção</Button></div></td>
                   </tr>
                 ))}
                 {gruposFiltrados.length === 0 && <tr><td colSpan={13} className="p-6 text-center text-slate-500">Nenhum agrupamento encontrado.</td></tr>}
@@ -438,6 +573,83 @@ export default function RastreamentoPromocoes() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={Boolean(grupoCriacao)} onOpenChange={(open) => !open && fecharCriacaoPromocao()}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader><DialogTitle>Criar Promoção a partir do agrupamento</DialogTitle></DialogHeader>
+          {grupoCriacao && (
+            <div className="space-y-4">
+              <Alert variant={diagnosticoCriacao.bloqueado ? 'destructive' : 'default'}>
+                <AlertTitle>{diagnosticoCriacao.bloqueado ? 'Criação bloqueada' : 'Revisão obrigatória'}</AlertTitle>
+                <AlertDescription>
+                  {diagnosticoCriacao.bloqueado
+                    ? diagnosticoCriacao.motivo
+                    : 'Revise os dados abaixo. A confirmação criará somente Promoção, sem vincular históricos e sem alterar Militar, Prévia Geral, ordenação ou snapshots.'}
+                </AlertDescription>
+              </Alert>
+
+              {promocaoExistente && (
+                <Alert variant="destructive">
+                  <AlertTitle>Duplicidade encontrada</AlertTitle>
+                  <AlertDescription>
+                    Já existe Promoção com a mesma chave/hash de agrupamento. Abra/verifique a promoção existente
+                    {promocaoExistente.id ? ` (ID ${promocaoExistente.id})` : ''} antes de tentar criar uma nova.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {promocaoRevisao && (
+                <>
+                  <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                    {[
+                      ['Tipo', promocaoRevisao.tipo],
+                      ['Natureza', promocaoRevisao.natureza],
+                      ['Posto/graduação', promocaoRevisao.posto_graduacao],
+                      ['Quadro', promocaoRevisao.quadro],
+                      ['Data promoção', dataFormatada(promocaoRevisao.data_promocao)],
+                      ['Data publicação', dataFormatada(promocaoRevisao.data_publicacao)],
+                      ['Boletim referência', promocaoRevisao.boletim_referencia],
+                      ['Ato referência', promocaoRevisao.ato_referencia],
+                      ['Status', promocaoRevisao.status],
+                      ['Origem', promocaoRevisao.origem],
+                      ['Chave agrupamento', promocaoRevisao.chave_agrupamento],
+                      ['Hash agrupamento', promocaoRevisao.hash_agrupamento],
+                      ['Total militares vinculados', promocaoRevisao.total_militares_vinculados],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border bg-slate-50 p-3">
+                        <span className="text-xs uppercase text-slate-500">{label}</span>
+                        <p className="mt-1 break-words font-medium text-slate-900">{valorOuTraco(value)}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <Label>Observações</Label>
+                    <Textarea value={promocaoRevisao.observacoes} readOnly rows={3} className="mt-1 bg-slate-50" />
+                  </div>
+
+                  <div>
+                    <Label>Digite {TEXTO_CONFIRMACAO_CRIAR_PROMOCAO} para confirmar</Label>
+                    <Input
+                      value={confirmacaoCriacao}
+                      onChange={(event) => setConfirmacaoCriacao(event.target.value)}
+                      placeholder={TEXTO_CONFIRMACAO_CRIAR_PROMOCAO}
+                      disabled={diagnosticoCriacao.bloqueado || criarPromocaoMutation.isPending}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">Sem esse texto exato, nenhuma Promoção será criada.</p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={fecharCriacaoPromocao} disabled={criarPromocaoMutation.isPending}>Cancelar</Button>
+            <Button type="button" onClick={confirmarCriacaoPromocao} disabled={!podeConfirmarCriacao || criarPromocaoMutation.isPending}>
+              {criarPromocaoMutation.isPending ? 'Criando...' : 'Criar Promoção'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(grupoDetalhe)} onOpenChange={(open) => !open && setGrupoDetalhe(null)}>
         <DialogContent className="max-w-5xl">
