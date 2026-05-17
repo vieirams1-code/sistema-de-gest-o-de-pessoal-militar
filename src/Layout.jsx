@@ -157,6 +157,7 @@ const menuGroups = [
           { name: 'Importar Promoções', page: 'AntiguidadeImportarPromocoes', icon: ScrollText, adminOnly: true },
           { name: 'Prévia Geral', page: 'AntiguidadePrevia', icon: ListOrdered, adminOnly: true },
           { name: 'Rastreamento de Promoções', page: 'RastreamentoPromocoes', icon: FileSearch, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
+          { name: 'Promoções', page: 'Promocoes', icon: ListOrdered, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
         ],
       },
     ],
