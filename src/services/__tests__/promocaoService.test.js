@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  avaliarAlertasTurmaOperacional,
   avaliarCompatibilidadePromocao,
   buscarCandidatosProvaveis,
   filtrarCandidatosCompativeis,
   montarDiagnosticoMilitaresPromocao,
+  montarPatchPromocaoMilitar,
+  montarPayloadAdicaoManualTurma,
   motivosBloqueioVinculoProvavel,
   podeVincularProvavelAdministrativamente,
+  validarSalvarTurmaOperacional,
 } from '../promocaoService.js';
 
 const promocao = {
@@ -167,4 +171,93 @@ test('provável com data de promoção divergente ou bloqueios graves não pode 
   assert.equal(podeVincularProvavelAdministrativamente(retificado, promocao), false);
   assert.equal(podeVincularProvavelAdministrativamente(vinculadoOutra, promocao), false);
   assert.equal(podeVincularProvavelAdministrativamente(semMilitar, promocao), false);
+});
+
+
+test('patch de edição da turma altera somente campos operacionais de PromocaoMilitar', () => {
+  const patchOrdem = montarPatchPromocaoMilitar({
+    id: 'pm1',
+    promocao_id: 'promo-1',
+    militar_id: 'm1',
+    ordem: 7,
+    selecionado: true,
+    status: 'elegivel',
+    justificativa: '',
+    observacao: '',
+    publicado: false,
+  });
+
+  assert.deepEqual(Object.keys(patchOrdem).sort(), ['justificativa', 'observacao', 'ordem', 'selecionado', 'status']);
+  assert.equal(patchOrdem.ordem, 7);
+  assert.equal(patchOrdem.selecionado, true);
+  assert.equal(patchOrdem.status, 'elegivel');
+  assert.equal(Object.hasOwn(patchOrdem, 'militar_id'), false);
+  assert.equal(Object.hasOwn(patchOrdem, 'historico_promocao_v2_id'), false);
+});
+
+test('bloqueado ou cancelado sem justificativa bloqueia salvar turma', () => {
+  const validacao = validarSalvarTurmaOperacional([
+    { id: 'pm1', militar_id: 'm1', ordem: 1, selecionado: false, status: 'bloqueado', justificativa: '' },
+  ]);
+
+  assert.equal(validacao.valido, false);
+  assert.deepEqual(validacao.bloqueios, ['bloqueado/cancelado sem justificativa']);
+});
+
+test('ordem duplicada entre selecionados bloqueia salvar turma', () => {
+  const validacao = validarSalvarTurmaOperacional([
+    { id: 'pm1', militar_id: 'm1', ordem: 1, selecionado: true, status: 'selecionado', justificativa: '' },
+    { id: 'pm2', militar_id: 'm2', ordem: 1, selecionado: true, status: 'selecionado', justificativa: '' },
+  ]);
+
+  assert.equal(validacao.valido, false);
+  assert.deepEqual(validacao.bloqueios, ['ordem duplicada entre selecionados']);
+});
+
+test('ordem vazia gera alerta visual, mas não bloqueia salvar', () => {
+  const turma = [{ id: 'pm1', militar_id: 'm1', ordem: '', selecionado: true, status: 'selecionado', justificativa: '' }];
+  const alertas = avaliarAlertasTurmaOperacional(turma);
+  const validacao = validarSalvarTurmaOperacional(turma);
+
+  assert.deepEqual(alertas.alertasPorId.get('pm1'), ['sem ordem']);
+  assert.equal(validacao.valido, true);
+});
+
+test('duplicidade de militar na turma bloqueia salvar', () => {
+  const validacao = validarSalvarTurmaOperacional([
+    { id: 'pm1', militar_id: 'm1', ordem: 1, selecionado: true, status: 'selecionado' },
+    { id: 'pm2', militar_id: 'm1', ordem: 2, selecionado: true, status: 'selecionado' },
+  ]);
+
+  assert.equal(validacao.valido, false);
+  assert.deepEqual(validacao.bloqueios, ['militar duplicado na turma']);
+});
+
+test('payload de adicionar candidato cria apenas PromocaoMilitar em rascunho operacional', () => {
+  const payload = montarPayloadAdicaoManualTurma({
+    promocao,
+    historico: { id: 'h1', militar_id: 'm1' },
+    usuario: { email: 'operador@example.test' },
+  });
+
+  assert.equal(payload.promocao_id, 'promo-1');
+  assert.equal(payload.militar_id, 'm1');
+  assert.equal(payload.status, 'elegivel');
+  assert.equal(payload.selecionado, false);
+  assert.equal(payload.publicado, false);
+  assert.equal(payload.origem, 'adicao_manual');
+  assert.equal(payload.usuario_vinculo, 'operador@example.test');
+  assert.equal(Object.hasOwn(payload, 'status_registro'), false);
+  assert.equal(Object.hasOwn(payload, 'posto_graduacao'), false);
+});
+
+test('alertas cobrem publicado sem histórico e publicado desselecionado', () => {
+  const alertas = avaliarAlertasTurmaOperacional([
+    { id: 'pm1', militar_id: 'm1', ordem: 1, selecionado: false, status: 'publicado', publicado: true, historico_promocao_v2_id: '' },
+  ]);
+
+  assert.deepEqual(alertas.alertasPorId.get('pm1'), [
+    'publicado mas selecionado = false',
+    'status publicado sem historico_promocao_v2_id',
+  ]);
 });

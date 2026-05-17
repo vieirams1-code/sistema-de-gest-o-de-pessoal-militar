@@ -21,6 +21,137 @@ export const POSTOS_GRADUACOES_PROMOCAO = [
 const STATUS_OPERACIONAIS = new Set(['ativo', 'previsto']);
 const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'cancelada', 'retificado', 'retificada']);
 
+export const STATUS_TURMA_OPERACIONAL = [
+  'elegivel',
+  'selecionado',
+  'bloqueado',
+  'publicado',
+  'retificado',
+  'cancelado',
+];
+
+export function valorOrdemTurma(valor) {
+  const conteudo = texto(valor);
+  if (!conteudo) return '';
+  const numero = Number(conteudo);
+  return Number.isFinite(numero) ? numero : conteudo;
+}
+
+export function normalizarItemTurmaOperacional(item = {}) {
+  return {
+    id: item.id,
+    promocao_id: texto(item.promocao_id),
+    militar_id: texto(item.militar_id),
+    historico_promocao_v2_id: texto(item.historico_promocao_v2_id),
+    ordem: valorOrdemTurma(item.ordem),
+    status: STATUS_TURMA_OPERACIONAL.includes(texto(item.status)) ? texto(item.status) : 'elegivel',
+    selecionado: Boolean(item.selecionado),
+    publicado: Boolean(item.publicado),
+    justificativa: texto(item.justificativa),
+    observacao: texto(item.observacao),
+    origem: texto(item.origem),
+  };
+}
+
+export function montarPatchPromocaoMilitar(item = {}) {
+  const normalizado = normalizarItemTurmaOperacional(item);
+  return {
+    ordem: normalizado.ordem,
+    selecionado: normalizado.selecionado,
+    status: normalizado.status,
+    justificativa: normalizado.justificativa,
+    observacao: normalizado.observacao,
+  };
+}
+
+export function avaliarAlertasTurmaOperacional(itens = []) {
+  const alertasPorId = new Map();
+  const alertasGlobais = [];
+  const adicionar = (id, alerta) => {
+    if (!alertasPorId.has(id)) alertasPorId.set(id, []);
+    alertasPorId.get(id).push(alerta);
+  };
+
+  const porMilitar = new Map();
+  const ordensSelecionadas = new Map();
+
+  itens.forEach((itemBruto, indice) => {
+    const item = normalizarItemTurmaOperacional(itemBruto);
+    const id = texto(item.id) || `linha-${indice}`;
+    const militarId = texto(item.militar_id);
+    const ordemTexto = texto(item.ordem);
+
+    if (militarId) {
+      if (!porMilitar.has(militarId)) porMilitar.set(militarId, []);
+      porMilitar.get(militarId).push(id);
+    }
+
+    if (!ordemTexto) adicionar(id, 'sem ordem');
+    if (item.selecionado && ['bloqueado', 'cancelado'].includes(item.status)) adicionar(id, 'selecionado com status bloqueado/cancelado');
+    if (item.publicado && !item.selecionado) adicionar(id, 'publicado mas selecionado = false');
+    if (item.status === 'publicado' && !texto(item.historico_promocao_v2_id)) adicionar(id, 'status publicado sem historico_promocao_v2_id');
+    if (['bloqueado', 'cancelado'].includes(item.status) && !texto(item.justificativa)) adicionar(id, 'bloqueado/cancelado sem justificativa');
+
+    if (item.selecionado && ordemTexto) {
+      if (!ordensSelecionadas.has(ordemTexto)) ordensSelecionadas.set(ordemTexto, []);
+      ordensSelecionadas.get(ordemTexto).push(id);
+    }
+  });
+
+  porMilitar.forEach((ids) => {
+    if (ids.length > 1) {
+      alertasGlobais.push('militar duplicado na turma');
+      ids.forEach((id) => adicionar(id, 'militar duplicado na turma'));
+    }
+  });
+
+  ordensSelecionadas.forEach((ids) => {
+    if (ids.length > 1) {
+      alertasGlobais.push('ordem duplicada entre selecionados');
+      ids.forEach((id) => adicionar(id, 'ordem duplicada'));
+    }
+  });
+
+  return {
+    alertasPorId,
+    alertasGlobais: [...new Set(alertasGlobais)],
+  };
+}
+
+export function validarSalvarTurmaOperacional(itens = []) {
+  const { alertasPorId, alertasGlobais } = avaliarAlertasTurmaOperacional(itens);
+  const bloqueios = [...alertasGlobais];
+
+  alertasPorId.forEach((alertas) => {
+    alertas.forEach((alerta) => {
+      if (alerta === 'bloqueado/cancelado sem justificativa') bloqueios.push(alerta);
+    });
+  });
+
+  return {
+    valido: bloqueios.length === 0,
+    bloqueios: [...new Set(bloqueios)],
+    alertasPorId,
+    alertasGlobais,
+  };
+}
+
+export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, militarId = '', usuario = {} } = {}) {
+  const agora = new Date().toISOString();
+  return {
+    promocao_id: texto(promocao?.id),
+    militar_id: texto(militarId || historico?.militar_id),
+    historico_promocao_v2_id: texto(historico?.id),
+    ordem: '',
+    status: 'elegivel',
+    selecionado: false,
+    publicado: false,
+    origem: 'adicao_manual',
+    data_vinculo: agora,
+    usuario_vinculo: texto(usuario?.email) || texto(usuario?.full_name) || texto(usuario?.name) || 'operador',
+  };
+}
+
 export function texto(valor) {
   return String(valor ?? '').trim();
 }
