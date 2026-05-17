@@ -2,28 +2,37 @@
   "name": "Promocao",
   "type": "object",
   "title": "Promoção",
-  "description": "Lote ou agrupamento estrutural de registros individuais de promoção.",
+  "description": "Lote mínimo de promoção publicado no runtime Base44.",
   "properties": {
-    "tipo": { "type": "string", "default": "historica" },
-    "natureza": { "type": "string", "default": "individual" },
-    "posto_graduacao": { "type": "string", "default": "" },
-    "quadro": { "type": "string", "default": "" },
-    "data_promocao": { "type": "date", "default": "" },
-    "data_publicacao": { "type": "date", "default": "" },
-    "boletim_referencia": { "type": "string", "default": "" },
-    "ato_referencia": { "type": "string", "default": "" },
-    "status": { "type": "string", "default": "rascunho" },
-    "origem": { "type": "string", "default": "manual" },
-    "observacoes": { "type": "string", "default": "" },
-    "chave_agrupamento": { "type": "string", "default": "" },
-    "hash_agrupamento": { "type": "string", "default": "" },
-    "total_militares_vinculados": { "type": "number", "default": 0 },
-    "criado_por": { "type": "string", "default": "" },
-    "criado_em": { "type": "datetime", "default": "" },
-    "atualizado_por": { "type": "string", "default": "" },
-    "atualizado_em": { "type": "datetime", "default": "" },
-    "cancelado_por": { "type": "string", "default": "" },
-    "cancelado_em": { "type": "datetime", "default": "" },
-    "motivo_cancelamento": { "type": "string", "default": "" }
-  }
+    "tipo": {
+      "type": "string",
+      "description": "Tipo de promoção representada pelo lote",
+      "default": "historica"
+    },
+    "posto_graduacao": {
+      "type": "string",
+      "description": "Posto/graduação de referência da promoção"
+    },
+    "quadro": {
+      "type": "string",
+      "description": "Quadro de referência da promoção"
+    },
+    "data_promocao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data efetiva da promoção"
+    },
+    "status": {
+      "type": "string",
+      "description": "Status operacional do lote de promoção",
+      "default": "rascunho"
+    }
+  },
+  "required": [
+    "tipo",
+    "posto_graduacao",
+    "quadro",
+    "data_promocao",
+    "status"
+  ]
 }
