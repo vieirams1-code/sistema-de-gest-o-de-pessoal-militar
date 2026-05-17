@@ -1,29 +1,109 @@
 {
   "name": "Promocao",
   "type": "object",
-  "title": "Promo\u00e7\u00e3o",
-  "description": "Lote m\u00ednimo de promo\u00e7\u00e3o publicado no runtime Base44.",
+  "title": "Promoção",
+  "description": "Lote de promoção publicado no runtime Base44 a partir do Rastreamento de Promoções.",
   "properties": {
     "tipo": {
       "type": "string",
+      "description": "Tipo de promoção representada pelo lote.",
       "default": "historica"
+    },
+    "natureza": {
+      "type": "string",
+      "description": "Natureza da promoção, individual ou coletiva.",
+      "default": "coletiva"
     },
     "posto_graduacao": {
       "type": "string",
+      "description": "Posto/graduação de referência da promoção.",
       "default": ""
     },
     "quadro": {
       "type": "string",
+      "description": "Quadro de referência da promoção.",
       "default": ""
     },
     "data_promocao": {
       "type": "string",
+      "format": "date",
+      "description": "Data efetiva da promoção.",
+      "default": ""
+    },
+    "data_publicacao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de publicação associada ao agrupamento.",
+      "default": ""
+    },
+    "boletim_referencia": {
+      "type": "string",
+      "description": "Boletim de referência informado nos históricos agrupados.",
+      "default": ""
+    },
+    "ato_referencia": {
+      "type": "string",
+      "description": "Ato de referência informado nos históricos agrupados.",
       "default": ""
     },
     "status": {
       "type": "string",
+      "description": "Status operacional do lote de promoção.",
       "default": "rascunho"
+    },
+    "origem": {
+      "type": "string",
+      "description": "Origem operacional da promoção criada.",
+      "default": "agrupamento"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observações de auditoria sobre a criação da promoção.",
+      "default": ""
+    },
+    "chave_agrupamento": {
+      "type": "string",
+      "description": "Chave determinística do agrupamento usada para prevenir duplicidade.",
+      "default": ""
+    },
+    "hash_agrupamento": {
+      "type": "string",
+      "description": "Hash curto da chave de agrupamento usado para indexação e prevenção de duplicidade.",
+      "default": ""
+    },
+    "total_militares_vinculados": {
+      "type": "number",
+      "description": "Quantidade de militares vinculados diretamente à entidade Promocao.",
+      "default": 0
+    },
+    "criado_por": {
+      "type": "string",
+      "description": "Usuário que criou a promoção.",
+      "default": ""
+    },
+    "criado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de criação da promoção.",
+      "default": ""
+    },
+    "atualizado_por": {
+      "type": "string",
+      "description": "Usuário responsável pela última atualização da promoção.",
+      "default": ""
+    },
+    "atualizado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da última atualização da promoção.",
+      "default": ""
     }
   },
-  "required": []
+  "required": [
+    "tipo",
+    "posto_graduacao",
+    "quadro",
+    "data_promocao",
+    "status"
+  ]
 }
