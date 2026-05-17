@@ -58,4 +58,6 @@ fi
 echo "Publicando no GitHub..."
 git push -u origin "$BRANCH"
 
-echo "Concluído. Se o Base44 estiver conectado ao GitHub deste repositório, ele receberá as alterações publicadas."
+echo "Concluído: alterações publicadas no GitHub."
+echo "Atenção: para criar/atualizar schemas no runtime Base44, execute também: npm run entities:push && npm run deploy:base44"
+echo "O script npm run publish:base44 já executa essa etapa de sync após publicar no GitHub."
