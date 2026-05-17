@@ -23,14 +23,14 @@ const PROMOCAO_ENTIDADE_AUSENTE_MENSAGEM = 'Entidade Promocao ainda não está s
 
 function obterEntidadePromocaoRuntime() {
   const entidade = base44?.entities?.Promocao;
-  const disponivel = Boolean(entidade && typeof entidade.filter === 'function' && typeof entidade.create === 'function');
+  const disponivel = Boolean(entidade && typeof entidade.filter === 'function' && typeof entidade.create === 'function' && typeof entidade.list === 'function');
 
   return {
     disponivel,
     entidade: disponivel ? entidade : null,
     motivo: disponivel
       ? 'base44.entities.Promocao disponível no runtime.'
-      : 'base44.entities.Promocao ausente ou sem métodos filter/create no runtime.',
+      : 'base44.entities.Promocao ausente ou sem métodos list/filter/create no runtime.',
   };
 }
 
@@ -301,6 +301,53 @@ function linhasMilitares(militares) {
   ].join('\t')).join('\n');
 }
 
+function linhasPromocao(promocao) {
+  if (!promocao) return '';
+  return [
+    ['ID', promocao.id],
+    ['Tipo', promocao.tipo],
+    ['Status', promocao.status],
+    ['Posto/graduação', promocao.posto_graduacao],
+    ['Quadro', promocao.quadro],
+    ['Data promoção', promocao.data_promocao],
+    ['Boletim referência', promocao.boletim_referencia],
+    ['Ato referência', promocao.ato_referencia],
+    ['Origem', promocao.origem],
+    ['Total militares vinculados', promocao.total_militares_vinculados],
+    ['Hash agrupamento', promocao.hash_agrupamento],
+    ['Chave agrupamento', promocao.chave_agrupamento],
+    ['Criado em', promocao.criado_em],
+  ].map(([label, value]) => `${label}: ${valorOuTraco(value)}`).join('\n');
+}
+
+function linhasPromocoes(promocoes) {
+  return (promocoes || []).map((promocao) => [
+    promocao.id,
+    promocao.tipo,
+    promocao.status,
+    promocao.posto_graduacao,
+    promocao.quadro,
+    promocao.data_promocao,
+    promocao.boletim_referencia,
+    promocao.ato_referencia,
+    promocao.origem,
+    promocao.total_militares_vinculados,
+    promocao.hash_agrupamento,
+    promocao.criado_em,
+  ].map(valorOuTraco).join('\t')).join('\n');
+}
+
+function criarIndicePromocoesPorAgrupamento(promocoes) {
+  const indice = new Map();
+  (promocoes || []).forEach((promocao) => {
+    [promocao?.chave_agrupamento, promocao?.hash_agrupamento].forEach((chave) => {
+      const chaveNormalizada = texto(chave);
+      if (chaveNormalizada && !indice.has(chaveNormalizada)) indice.set(chaveNormalizada, promocao);
+    });
+  });
+  return indice;
+}
+
 function PainelMilitares({ titulo, descricao, militares, busca, onBuscaChange }) {
   const filtrados = useMemo(() => filtrarMilitares(militares, busca), [militares, busca]);
   return (
@@ -364,6 +411,7 @@ export default function RastreamentoPromocoes() {
   const [grupoCriacao, setGrupoCriacao] = useState(null);
   const [confirmacaoCriacao, setConfirmacaoCriacao] = useState('');
   const [promocaoExistente, setPromocaoExistente] = useState(null);
+  const [promocaoDetalhe, setPromocaoDetalhe] = useState(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const promocaoRuntimeInicial = useMemo(() => obterEntidadePromocaoRuntime(), []);
@@ -393,12 +441,33 @@ export default function RastreamentoPromocoes() {
     },
   });
 
+  const {
+    data: promocoesCriadas = [],
+    isLoading: isLoadingPromocoes,
+    error: promocoesError,
+    refetch: refetchPromocoes,
+    isFetching: isFetchingPromocoes,
+  } = useQuery({
+    queryKey: ['rastreamento-promocoes-criadas'],
+    enabled: promocaoEntidadeDisponivel,
+    queryFn: async () => {
+      const runtimeAtual = obterEntidadePromocaoRuntime();
+      if (!runtimeAtual.disponivel || typeof runtimeAtual.entidade?.list !== 'function') {
+        throw criarErroPromocaoEntidadeAusente();
+      }
+      return runtimeAtual.entidade.list();
+    },
+  });
+
+  const promocoesPorAgrupamento = useMemo(() => criarIndicePromocoesPorAgrupamento(promocoesCriadas), [promocoesCriadas]);
+
   const diagnosticoCriacao = useMemo(() => diagnosticarCriacaoPromocao(grupoCriacao), [grupoCriacao]);
   const promocaoRevisao = diagnosticoCriacao.payload || null;
   const podeConfirmarCriacao = Boolean(
     promocaoEntidadeDisponivel
     && promocaoRevisao
     && !diagnosticoCriacao.bloqueado
+    && !promocaoExistente
     && confirmacaoCriacao === TEXTO_CONFIRMACAO_CRIAR_PROMOCAO,
   );
 
@@ -415,9 +484,10 @@ export default function RastreamentoPromocoes() {
       return;
     }
 
+    const promocaoDoAgrupamento = promocoesPorAgrupamento.get(grupo.key) || promocoesPorAgrupamento.get(hashAgrupamento(grupo.key)) || null;
     setGrupoCriacao(grupo);
     setConfirmacaoCriacao('');
-    setPromocaoExistente(null);
+    setPromocaoExistente(promocaoDoAgrupamento);
   };
 
   const fecharCriacaoPromocao = () => {
@@ -490,6 +560,7 @@ export default function RastreamentoPromocoes() {
       toast({ title: 'Promoção criada', description: `Promoção ${promocao?.id ? `ID ${promocao.id}` : ''} criada sem vincular históricos.` });
       fecharCriacaoPromocao();
       queryClient.invalidateQueries({ queryKey: ['rastreamento-promocoes'] });
+      queryClient.invalidateQueries({ queryKey: ['rastreamento-promocoes-criadas'] });
     },
     onError: (mutationError) => {
       if (mutationError?.promocaoEntidadeAusente) {
@@ -575,8 +646,8 @@ export default function RastreamentoPromocoes() {
           <h1 className="text-2xl font-bold text-[#1e3a5f]">Rastreamento de Promoções</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-600">Painel para identificar lacunas, agrupamentos e militares ativos sem vínculo adequado em HistoricoPromocaoMilitarV2, com criação controlada apenas da entidade Promoção.</p>
         </div>
-        <Button type="button" variant="outline" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> Atualizar
+        <Button type="button" variant="outline" onClick={() => { refetch(); if (promocaoEntidadeDisponivel) refetchPromocoes(); }} disabled={isFetching || isFetchingPromocoes}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${isFetching || isFetchingPromocoes ? 'animate-spin' : ''}`} /> Atualizar
         </Button>
       </div>
 
@@ -644,45 +715,63 @@ export default function RastreamentoPromocoes() {
           <div className="overflow-x-auto rounded-lg border">
             <table className="min-w-max w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <tr><th className="p-3">Grupo</th><th className="p-3">Promoção</th><th className="p-3">Publicação</th><th className="p-3">Refs.</th><th className="p-3">Total</th><th className="p-3">Com ordem</th><th className="p-3">Sem ordem</th><th className="p-3">Ativos</th><th className="p-3">Previstos</th><th className="p-3">Cancel./Retif.</th><th className="p-3">Duplic.</th><th className="p-3">Confiança</th><th className="p-3">Ações</th></tr>
+                <tr><th className="p-3">Grupo</th><th className="p-3">Promoção</th><th className="p-3">Publicação</th><th className="p-3">Refs.</th><th className="p-3">Total</th><th className="p-3">Com ordem</th><th className="p-3">Sem ordem</th><th className="p-3">Ativos</th><th className="p-3">Previstos</th><th className="p-3">Cancel./Retif.</th><th className="p-3">Duplic.</th><th className="p-3">Confiança</th><th className="p-3">Promoção criada</th><th className="p-3">Ações</th></tr>
               </thead>
               <tbody>
-                {gruposFiltrados.map((grupo) => (
-                  <tr key={grupo.key} className="border-t">
-                    <td className="p-3 font-medium">{grupo.posto} / {grupo.quadro}</td>
-                    <td className="p-3">{dataFormatada(grupo.data_promocao)}</td>
-                    <td className="p-3">{dataFormatada(grupo.data_publicacao)}</td>
-                    <td className="p-3">{grupo.boletim_referencia}<br /><span className="text-xs text-slate-500">{grupo.ato_referencia}</span></td>
-                    <td className="p-3">{grupo.totalMilitares}</td>
-                    <td className="p-3">{grupo.comOrdem}</td>
-                    <td className="p-3">{grupo.semOrdem}</td>
-                    <td className="p-3">{grupo.ativos}</td>
-                    <td className="p-3">{grupo.previstos}</td>
-                    <td className="p-3">{grupo.canceladosRetificados}</td>
-                    <td className="p-3">{grupo.duplicidades}</td>
-                    <td className="p-3"><Badge variant={confiancaVariant(grupo.confianca)} className="whitespace-nowrap px-2 py-0.5 text-xs">{grupo.confianca}</Badge></td>
-                    <td className="p-2 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Abrir ações do agrupamento">
-                            <MoreVertical className="h-4 w-4" />
+                {gruposFiltrados.map((grupo) => {
+                  const promocaoDoAgrupamento = promocoesPorAgrupamento.get(grupo.key) || promocoesPorAgrupamento.get(hashAgrupamento(grupo.key));
+                  return (
+                    <tr key={grupo.key} className="border-t">
+                      <td className="p-3 font-medium">{grupo.posto} / {grupo.quadro}</td>
+                      <td className="p-3">{dataFormatada(grupo.data_promocao)}</td>
+                      <td className="p-3">{dataFormatada(grupo.data_publicacao)}</td>
+                      <td className="p-3">{grupo.boletim_referencia}<br /><span className="text-xs text-slate-500">{grupo.ato_referencia}</span></td>
+                      <td className="p-3">{grupo.totalMilitares}</td>
+                      <td className="p-3">{grupo.comOrdem}</td>
+                      <td className="p-3">{grupo.semOrdem}</td>
+                      <td className="p-3">{grupo.ativos}</td>
+                      <td className="p-3">{grupo.previstos}</td>
+                      <td className="p-3">{grupo.canceladosRetificados}</td>
+                      <td className="p-3">{grupo.duplicidades}</td>
+                      <td className="p-3"><Badge variant={confiancaVariant(grupo.confianca)} className="whitespace-nowrap px-2 py-0.5 text-xs">{grupo.confianca}</Badge></td>
+                      <td className="p-3">
+                        {promocaoDoAgrupamento ? (
+                          <Button type="button" size="sm" variant="outline" onClick={() => setPromocaoDetalhe(promocaoDoAgrupamento)}>
+                            Promoção já criada
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" sideOffset={6} collisionPadding={12} className="w-48 max-w-[calc(100vw-1.5rem)]">
-                          <DropdownMenuItem onClick={() => setGrupoDetalhe(grupo)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled={!promocaoEntidadeDisponivel} onClick={() => abrirCriacaoPromocao(grupo)}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Criar Promoção
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-                {gruposFiltrados.length === 0 && <tr><td colSpan={13} className="p-6 text-center text-slate-500">Nenhum agrupamento encontrado.</td></tr>}
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Abrir ações do agrupamento">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" sideOffset={6} collisionPadding={12} className="w-48 max-w-[calc(100vw-1.5rem)]">
+                            <DropdownMenuItem onClick={() => setGrupoDetalhe(grupo)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ver
+                            </DropdownMenuItem>
+                            {promocaoDoAgrupamento && (
+                              <DropdownMenuItem onClick={() => setPromocaoDetalhe(promocaoDoAgrupamento)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver Promoção
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem disabled={!promocaoEntidadeDisponivel || Boolean(promocaoDoAgrupamento)} onClick={() => abrirCriacaoPromocao(grupo)}>
+                              <PlusCircle className="mr-2 h-4 w-4" />
+                              {promocaoDoAgrupamento ? 'Promoção já criada' : 'Criar Promoção'}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {gruposFiltrados.length === 0 && <tr><td colSpan={14} className="p-6 text-center text-slate-500">Nenhum agrupamento encontrado.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -718,6 +807,83 @@ export default function RastreamentoPromocoes() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle>5. Promoções criadas</CardTitle>
+              <p className="mt-1 text-sm text-slate-500">Registros carregados diretamente de base44.entities.Promocao.list().</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="w-fit whitespace-nowrap px-2 py-0.5 text-xs">{promocoesCriadas.length} registro(s)</Badge>
+              <Button type="button" variant="outline" size="sm" onClick={() => refetchPromocoes()} disabled={!promocaoEntidadeDisponivel || isFetchingPromocoes}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${isFetchingPromocoes ? 'animate-spin' : ''}`} /> Atualizar
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => copiarTexto(linhasPromocoes(promocoesCriadas))} disabled={promocoesCriadas.length === 0}>
+                <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar dados
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {promocoesError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Falha ao carregar Promoções</AlertTitle>
+              <AlertDescription>{promocoesError?.message || 'Não foi possível carregar base44.entities.Promocao.list().'}</AlertDescription>
+            </Alert>
+          )}
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="min-w-max w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <tr><th className="p-3">Tipo</th><th className="p-3">Status</th><th className="p-3">Posto/graduação</th><th className="p-3">Quadro</th><th className="p-3">Data promoção</th><th className="p-3">Boletim referência</th><th className="p-3">Ato referência</th><th className="p-3">Origem</th><th className="p-3">Total vinculados</th><th className="p-3">Hash agrupamento</th><th className="p-3">Criado em</th><th className="p-3">Ações</th></tr>
+              </thead>
+              <tbody>
+                {promocoesCriadas.map((promocao) => (
+                  <tr key={promocao.id || promocao.hash_agrupamento || promocao.chave_agrupamento} className="border-t">
+                    <td className="p-3">{valorOuTraco(promocao.tipo)}</td>
+                    <td className="p-3">{valorOuTraco(promocao.status)}</td>
+                    <td className="p-3">{valorOuTraco(promocao.posto_graduacao)}</td>
+                    <td className="p-3">{valorOuTraco(promocao.quadro)}</td>
+                    <td className="p-3">{dataFormatada(promocao.data_promocao)}</td>
+                    <td className="p-3">{valorOuTraco(promocao.boletim_referencia)}</td>
+                    <td className="p-3">{valorOuTraco(promocao.ato_referencia)}</td>
+                    <td className="p-3">{valorOuTraco(promocao.origem)}</td>
+                    <td className="p-3">{valorOuTraco(promocao.total_militares_vinculados)}</td>
+                    <td className="p-3 font-mono text-xs">{valorOuTraco(promocao.hash_agrupamento)}</td>
+                    <td className="p-3">{dataFormatada(promocao.criado_em)}</td>
+                    <td className="p-2 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Abrir ações da promoção">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" sideOffset={6} collisionPadding={12} className="w-48 max-w-[calc(100vw-1.5rem)]">
+                          <DropdownMenuItem onClick={() => setPromocaoDetalhe(promocao)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => copiarTexto(linhasPromocao(promocao))}>
+                            <ClipboardCopy className="mr-2 h-4 w-4" />
+                            Copiar dados
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => refetchPromocoes()}>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Atualizar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+                {!isLoadingPromocoes && promocoesCriadas.length === 0 && <tr><td colSpan={12} className="p-6 text-center text-slate-500">Nenhuma Promoção criada encontrada.</td></tr>}
+                {isLoadingPromocoes && <tr><td colSpan={12} className="p-6 text-center text-slate-500">Carregando Promoções criadas...</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
       <Dialog open={Boolean(grupoCriacao)} onOpenChange={(open) => !open && fecharCriacaoPromocao()}>
         <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12"><DialogTitle>Criar Promoção a partir do agrupamento</DialogTitle></DialogHeader>
@@ -744,8 +910,15 @@ export default function RastreamentoPromocoes() {
                 <Alert variant="destructive">
                   <AlertTitle>Duplicidade encontrada</AlertTitle>
                   <AlertDescription>
-                    Já existe Promoção com a mesma chave/hash de agrupamento. Abra/verifique a promoção existente
-                    {promocaoExistente.id ? ` (ID ${promocaoExistente.id})` : ''} antes de tentar criar uma nova.
+                    <div className="space-y-2">
+                      <p>
+                        Promoção já criada com a mesma chave/hash de agrupamento
+                        {promocaoExistente.id ? ` (ID ${promocaoExistente.id})` : ''}.
+                      </p>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setPromocaoDetalhe(promocaoExistente)}>
+                        Ver Promoção
+                      </Button>
+                    </div>
                   </AlertDescription>
                 </Alert>
               )}
@@ -798,6 +971,57 @@ export default function RastreamentoPromocoes() {
                 <Button type="button" onClick={confirmarCriacaoPromocao} disabled={!podeConfirmarCriacao || criarPromocaoMutation.isPending}>
                   {criarPromocaoMutation.isPending ? 'Criando...' : 'Criar Promoção'}
                 </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(promocaoDetalhe)} onOpenChange={(open) => !open && setPromocaoDetalhe(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader><DialogTitle>Detalhes da Promoção</DialogTitle></DialogHeader>
+          {promocaoDetalhe && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2 xl:grid-cols-3">
+                {[
+                  ['ID', promocaoDetalhe.id],
+                  ['Tipo', promocaoDetalhe.tipo],
+                  ['Status', promocaoDetalhe.status],
+                  ['Posto/graduação', promocaoDetalhe.posto_graduacao],
+                  ['Quadro', promocaoDetalhe.quadro],
+                  ['Data promoção', dataFormatada(promocaoDetalhe.data_promocao)],
+                  ['Boletim referência', promocaoDetalhe.boletim_referencia],
+                  ['Ato referência', promocaoDetalhe.ato_referencia],
+                  ['Origem', promocaoDetalhe.origem],
+                  ['Total militares vinculados', promocaoDetalhe.total_militares_vinculados],
+                  ['Hash agrupamento', promocaoDetalhe.hash_agrupamento],
+                  ['Criado em', dataFormatada(promocaoDetalhe.criado_em)],
+                  ['Criado por', promocaoDetalhe.criado_por],
+                  ['Atualizado em', dataFormatada(promocaoDetalhe.atualizado_em)],
+                  ['Atualizado por', promocaoDetalhe.atualizado_por],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-md border bg-slate-50 px-3 py-2">
+                    <span className="text-[0.68rem] font-semibold uppercase leading-none text-slate-500">{label}</span>
+                    <p className="mt-0.5 break-words text-sm font-medium leading-snug text-slate-900">{valorOuTraco(value)}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <Label className="text-xs">Chave agrupamento</Label>
+                <Textarea value={valorOuTraco(promocaoDetalhe.chave_agrupamento)} readOnly rows={2} className="mt-1 min-h-[64px] bg-slate-50 font-mono text-xs" />
+              </div>
+
+              <div>
+                <Label className="text-xs">Observações</Label>
+                <Textarea value={valorOuTraco(promocaoDetalhe.observacoes)} readOnly rows={3} className="mt-1 min-h-[84px] bg-slate-50 text-sm" />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => copiarTexto(linhasPromocao(promocaoDetalhe))}>
+                  <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar dados
+                </Button>
+                <Button type="button" onClick={() => setPromocaoDetalhe(null)}>Fechar</Button>
               </DialogFooter>
             </div>
           )}
