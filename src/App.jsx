@@ -53,6 +53,8 @@ const moduleGuardByPage = {
   AntiguidadeImportarPromocoes: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadePrevia: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   RastreamentoPromocoes: { moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes', moduleName: 'Antiguidade' },
+  Promocoes: { moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes', moduleName: 'Antiguidade' },
+  DetalhePromocao: { moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes', moduleName: 'Antiguidade' },
   IndicacoesDomPedroII: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   QuadroOperacional: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },
   AgendaAcoesOperacionais: { moduleKey: 'quadro_operacional', moduleName: 'Quadro Operacional' },

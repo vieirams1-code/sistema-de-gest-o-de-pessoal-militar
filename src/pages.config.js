@@ -106,6 +106,8 @@ import CadastrarRegistroRP from './pages/CadastrarRegistroRP';
 import CentralPendencias from './pages/CentralPendencias';
 import RevisaoDuplicidadesMilitar from './pages/RevisaoDuplicidadesMilitar';
 import RastreamentoPromocoes from './pages/RastreamentoPromocoes';
+import Promocoes from './pages/Promocoes';
+import DetalhePromocao from './pages/DetalhePromocao';
 import ProcedimentosProcessos from './pages/ProcedimentosProcessos';
 import __Layout from './Layout.jsx';
 
@@ -170,6 +172,8 @@ export const PAGES = {
     "CentralPendencias": CentralPendencias,
     "RevisaoDuplicidadesMilitar": RevisaoDuplicidadesMilitar,
     "RastreamentoPromocoes": RastreamentoPromocoes,
+    "Promocoes": Promocoes,
+    "DetalhePromocao": DetalhePromocao,
     "ProcedimentosProcessos": ProcedimentosProcessos,
 }
 
