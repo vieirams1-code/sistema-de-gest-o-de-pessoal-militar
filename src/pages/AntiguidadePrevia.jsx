@@ -186,7 +186,7 @@ function ContadorDetalhes({ tipo, itens }) {
     : 'border-blue-200 bg-blue-50 text-blue-800';
 
   return (
-    <Badge variant="outline" className={estilos}>
+    <Badge variant="outline" className={`${estilos} whitespace-nowrap px-2 py-0.5 text-xs`}>
       {quantidade}
     </Badge>
   );
@@ -194,7 +194,7 @@ function ContadorDetalhes({ tipo, itens }) {
 
 function LoadingState() {
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-[clamp(1rem,1.4vw,1.5rem)]">
       <Skeleton className="h-10 w-2/3" />
       <Skeleton className="h-24 w-full" />
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -318,7 +318,7 @@ export default function AntiguidadePrevia() {
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="p-[clamp(1rem,1.4vw,1.5rem)]">
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Falha ao carregar a prévia</AlertTitle>
@@ -334,7 +334,7 @@ export default function AntiguidadePrevia() {
   const semItens = !semMilitares && (resultado?.itens?.length || 0) === 0;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-[clamp(1rem,1.4vw,1.5rem)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-3">
           <h1 className="text-2xl font-bold text-[#1e3a5f]">Prévia da Listagem de Antiguidade Geral</h1>
@@ -347,7 +347,7 @@ export default function AntiguidadePrevia() {
               'Sem persistência',
               'Fonte: HistoricoPromocaoMilitarV2',
             ].map((chip) => (
-              <Badge key={chip} variant="secondary" className="bg-slate-100 text-slate-700">
+              <Badge key={chip} variant="secondary" className="whitespace-nowrap bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
                 {chip}
               </Badge>
             ))}
@@ -375,7 +375,7 @@ export default function AntiguidadePrevia() {
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="border-slate-300 bg-white text-slate-700">
+          <Badge variant="outline" className="whitespace-nowrap border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-700">
             {selecaoConfiguracao.metadado.origem === 'configuracao'
               ? 'Regra de quadros: configuração ativa'
               : 'Regra de quadros: fallback técnico padrão'}
@@ -447,7 +447,7 @@ export default function AntiguidadePrevia() {
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-600">Top 3 por volume</p>
                   <div className="flex flex-wrap gap-2">
                     {resumoAlertas.top3.map((alerta) => (
-                      <Badge key={alerta.tipo} variant="outline" title={alerta.tipo} className="border-blue-200 bg-blue-50 text-blue-800">
+                      <Badge key={alerta.tipo} variant="outline" title={alerta.tipo} className="whitespace-nowrap border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800">
                         {alerta.rotulo}: {alerta.quantidade}
                       </Badge>
                     ))}
@@ -463,7 +463,7 @@ export default function AntiguidadePrevia() {
                     return (
                       <div key={alerta.tipo} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm">
                         <span title={alerta.tipo} className="text-slate-700">{alerta.rotulo}</span>
-                        <Badge variant="secondary" className="bg-slate-100 text-slate-700">{alerta.quantidade}</Badge>
+                        <Badge variant="secondary" className="whitespace-nowrap bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{alerta.quantidade}</Badge>
                         <Button
                           type="button"
                           variant="ghost"
@@ -573,8 +573,8 @@ export default function AntiguidadePrevia() {
               Nenhum item encontrado para os filtros atuais.
             </div>
           ) : (
-            <div className="overflow-auto">
-              <table className="w-full min-w-[1100px] text-sm">
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="min-w-max w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wide text-slate-500">
                     <th className="px-2 py-3">Posição</th>
@@ -622,7 +622,7 @@ export default function AntiguidadePrevia() {
                                   <p className="mb-2 font-semibold text-slate-700">Pendências</p>
                                   {item.pendencias?.length ? (
                                     <div className="flex flex-wrap gap-2">
-                                      {item.pendencias.map((pendencia) => <Badge key={pendencia} variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">{pendencia}</Badge>)}
+                                      {item.pendencias.map((pendencia) => <Badge key={pendencia} variant="outline" className="whitespace-nowrap border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-800">{pendencia}</Badge>)}
                                     </div>
                                   ) : <p className="text-slate-500">Sem pendências.</p>}
                                 </div>
@@ -630,7 +630,7 @@ export default function AntiguidadePrevia() {
                                   <p className="mb-2 font-semibold text-slate-700">Alertas</p>
                                   {item.alertas?.length ? (
                                     <div className="flex flex-wrap gap-2">
-                                      {item.alertas.map((alerta) => <Badge key={alerta} title={alerta} variant="outline" className="border-blue-200 bg-blue-50 text-blue-800">{rotuloAlerta(alerta)}</Badge>)}
+                                      {item.alertas.map((alerta) => <Badge key={alerta} title={alerta} variant="outline" className="whitespace-nowrap border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-800">{rotuloAlerta(alerta)}</Badge>)}
                                     </div>
                                   ) : <p className="text-slate-500">Sem alertas.</p>}
                                 </div>

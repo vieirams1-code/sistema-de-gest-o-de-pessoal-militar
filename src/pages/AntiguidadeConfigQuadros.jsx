@@ -423,7 +423,7 @@ export default function AntiguidadeConfigQuadros() {
   const atualizando = militaresFetching || configuracoesFetching;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-[clamp(1rem,1.4vw,1.5rem)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-3">
           <div>
@@ -432,7 +432,7 @@ export default function AntiguidadeConfigQuadros() {
           </div>
           <div className="flex flex-wrap gap-2">
             {badgesInstitucionais.map((badge) => (
-              <Badge key={badge} variant="outline" className="border-slate-300 bg-white text-slate-700">{badge}</Badge>
+              <Badge key={badge} variant="outline" className="whitespace-nowrap border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-700">{badge}</Badge>
             ))}
           </div>
         </div>
@@ -537,8 +537,8 @@ export default function AntiguidadeConfigQuadros() {
               Carregando quadros disponíveis...
             </div>
           ) : (
-            <div className="overflow-auto rounded-lg border border-slate-200">
-              <Table>
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <Table className="min-w-max">
                 <TableHeader>
                   <TableRow className="bg-slate-50 hover:bg-slate-50">
                     <TableHead>Valor do quadro</TableHead>
@@ -555,22 +555,22 @@ export default function AntiguidadeConfigQuadros() {
                     const classificado = !quadro.vazio && validacoes.classificados.has(quadro.valor);
                     return (
                       <TableRow key={quadro.valor || '__vazio__'}>
-                        <TableCell className="font-semibold text-slate-900">{quadro.vazio ? <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">Quadro vazio</Badge> : quadro.valor}</TableCell>
+                        <TableCell className="font-semibold text-slate-900">{quadro.vazio ? <Badge variant="outline" className="whitespace-nowrap border-red-300 bg-red-50 px-2 py-0.5 text-xs text-red-800">Quadro vazio</Badge> : quadro.valor}</TableCell>
                         <TableCell className="text-right font-mono font-semibold text-slate-800">{quadro.quantidade}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={classificado ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-800'}>
+                          <Badge variant="outline" className={`whitespace-nowrap px-2 py-0.5 text-xs ${classificado ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
                             {quadro.vazio ? 'não classificado' : classificado ? 'classificado' : 'não classificado'}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           {quadro.origem === 'legado_base' ? (
-                            <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-800">valor legado encontrado na base</Badge>
+                            <Badge variant="outline" className="whitespace-nowrap border-orange-300 bg-orange-50 px-2 py-0.5 text-xs text-orange-800">valor legado encontrado na base</Badge>
                           ) : quadro.origem === 'opcao_sistema_e_valor_real' ? (
-                            <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-800">opção do sistema + valor real</Badge>
+                            <Badge variant="outline" className="whitespace-nowrap border-blue-300 bg-blue-50 px-2 py-0.5 text-xs text-blue-800">opção do sistema + valor real</Badge>
                           ) : quadro.origem === 'valor_real_vazio' ? (
-                            <Badge variant="outline" className="border-red-300 bg-red-50 text-red-800">valor real incompleto</Badge>
+                            <Badge variant="outline" className="whitespace-nowrap border-red-300 bg-red-50 px-2 py-0.5 text-xs text-red-800">valor real incompleto</Badge>
                           ) : (
-                            <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-800">opção do sistema</Badge>
+                            <Badge variant="outline" className="whitespace-nowrap border-slate-300 bg-slate-50 px-2 py-0.5 text-xs text-slate-800">opção do sistema</Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-sm text-slate-600">
@@ -656,7 +656,7 @@ export default function AntiguidadeConfigQuadros() {
                     ) : (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {membros.map((membro) => (
-                          <Badge key={`${grupo.id_local}-${membro}`} variant="secondary" className="gap-1 bg-slate-100 text-slate-800 hover:bg-slate-100">
+                          <Badge key={`${grupo.id_local}-${membro}`} variant="secondary" className="gap-1 whitespace-nowrap bg-slate-100 px-2 py-0.5 text-xs text-slate-800 hover:bg-slate-100">
                             {membro}
                             <button type="button" onClick={() => removerMembro(grupo.id_local, membro)} aria-label={`Remover ${membro}`} className="rounded-full hover:bg-slate-200">
                               <X className="h-3 w-3" />
@@ -701,7 +701,7 @@ export default function AntiguidadeConfigQuadros() {
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {validacoes.naoClassificados.map((quadro) => <Badge key={quadro} variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">{quadro}</Badge>)}
+              {validacoes.naoClassificados.map((quadro) => <Badge key={quadro} variant="outline" className="whitespace-nowrap border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-800">{quadro}</Badge>)}
             </div>
           )}
         </CardContent>
