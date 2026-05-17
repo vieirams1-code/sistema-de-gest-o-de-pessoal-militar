@@ -97,6 +97,24 @@ function DiagnosticoItem({ titulo, total, children, tone = 'default' }) {
   );
 }
 
+function statusPromocaoMilitarClass(status) {
+  const classes = {
+    elegivel: 'border-sky-300 bg-sky-50 text-sky-700',
+    selecionado: 'border-indigo-300 bg-indigo-50 text-indigo-700',
+    bloqueado: 'border-amber-300 bg-amber-50 text-amber-700',
+    publicado: 'border-emerald-300 bg-emerald-50 text-emerald-700',
+    retificado: 'border-purple-300 bg-purple-50 text-purple-700',
+    cancelado: 'border-rose-300 bg-rose-50 text-rose-700',
+  };
+  return classes[String(status || '').toLowerCase()] || 'border-slate-300 bg-slate-50 text-slate-700';
+}
+
+function BooleanBadge({ ativo }) {
+  return ativo
+    ? <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">Sim</Badge>
+    : <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-600">Não</Badge>;
+}
+
 export default function DetalhePromocao() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -123,6 +141,20 @@ export default function DetalhePromocao() {
     queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.list(),
   });
 
+  const promocaoMilitarQuery = useQuery({
+    queryKey: ['detalhe-promocao-promocao-militar'],
+    queryFn: async () => {
+      const entity = base44.entities.PromocaoMilitar;
+      if (!entity || typeof entity.list !== 'function') return [];
+      try {
+        return await entity.list();
+      } catch (error) {
+        console.warn('[DetalhePromocao] PromocaoMilitar indisponível, mantendo fallback legado.', error);
+        return [];
+      }
+    },
+  });
+
   const militaresQuery = useQuery({
     queryKey: ['detalhe-promocao-militares'],
     queryFn: () => base44.entities.Militar.list(),
@@ -141,6 +173,35 @@ export default function DetalhePromocao() {
     const itens = (historicosQuery.data || []).filter((historico) => String(historico?.promocao_id || '') === String(promocao.id));
     return ordenarHistoricosVinculados(enriquecerHistoricos(itens, militarPorId));
   }, [historicosQuery.data, militarPorId, promocao]);
+
+  const turmaOperacional = useMemo(() => {
+    if (!promocao) return [];
+    return (promocaoMilitarQuery.data || [])
+      .filter((registro) => String(registro?.promocao_id || '') === String(promocao.id))
+      .map((registro) => ({
+        ...registro,
+        militar: militarPorId.get(String(registro?.militar_id || '')) || null,
+      }))
+      .sort((a, b) => (Number(a?.ordem || 0) - Number(b?.ordem || 0)) || nomeMilitar(a.militar).localeCompare(nomeMilitar(b.militar)));
+  }, [militarPorId, promocao, promocaoMilitarQuery.data]);
+
+  const turmaOperacionalExibida = useMemo(() => {
+    if (turmaOperacional.length > 0) return turmaOperacional;
+    return vinculados.map((historico) => ({
+      id: `historico-${historico.id}`,
+      promocao_id: promocao?.id || '',
+      militar_id: historico.militar_id || '',
+      historico_promocao_v2_id: historico.id || '',
+      ordem: historico.antiguidade_referencia_ordem || 0,
+      status: 'publicado',
+      selecionado: true,
+      publicado: true,
+      origem: 'legado_historico_v2',
+      militar: historico.militar || null,
+    }));
+  }, [promocao, turmaOperacional, vinculados]);
+
+  const turmaOperacionalFonte = turmaOperacional.length > 0 ? 'PromocaoMilitar' : 'HistoricoPromocaoMilitarV2.promocao_id';
 
   const candidatos = useMemo(() => {
     if (!promocao) return [];
@@ -256,8 +317,37 @@ export default function DetalhePromocao() {
     onError: (error) => toast({ title: 'Falha ao desvincular', description: error.message, variant: 'destructive' }),
   });
 
-  const isLoading = promocaoQuery.isLoading || historicosQuery.isLoading || militaresQuery.isLoading;
-  const error = promocaoQuery.error || historicosQuery.error || militaresQuery.error;
+  const materializarTurmaMutation = useMutation({
+    mutationFn: async () => {
+      if (!promocao) throw new Error('Promoção não carregada.');
+      if (turmaOperacional.length > 0) throw new Error('Esta promoção já possui registros PromocaoMilitar.');
+      if (!base44.entities.PromocaoMilitar || typeof base44.entities.PromocaoMilitar.create !== 'function') {
+        throw new Error('Entidade PromocaoMilitar indisponível no runtime.');
+      }
+
+      const historicosVinculados = (historicosQuery.data || [])
+        .filter((historico) => String(historico?.promocao_id || '') === String(promocao.id));
+
+      await Promise.all(historicosVinculados.map((historico) => base44.entities.PromocaoMilitar.create({
+        promocao_id: promocao.id,
+        militar_id: historico.militar_id || '',
+        historico_promocao_v2_id: historico.id || '',
+        ordem: Number(historico.antiguidade_referencia_ordem || 0),
+        status: 'publicado',
+        selecionado: true,
+        publicado: true,
+        origem: 'backfill_historico_v2',
+      })));
+    },
+    onSuccess: () => {
+      toast({ title: 'Turma materializada', description: 'Registros PromocaoMilitar criados sem alterar Histórico V2, Militar, Antiguidade, Prévia Geral ou snapshots.' });
+      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+    },
+    onError: (error) => toast({ title: 'Falha ao materializar turma', description: error.message, variant: 'destructive' }),
+  });
+
+  const isLoading = promocaoQuery.isLoading || historicosQuery.isLoading || promocaoMilitarQuery.isLoading || militaresQuery.isLoading;
+  const error = promocaoQuery.error || historicosQuery.error || promocaoMilitarQuery.error || militaresQuery.error;
 
   const alternarSelecionado = (historicoId, checked) => {
     setSelecionados((atuais) => (checked
@@ -288,6 +378,7 @@ export default function DetalhePromocao() {
           onClick={() => {
             promocaoQuery.refetch();
             historicosQuery.refetch();
+            promocaoMilitarQuery.refetch();
             militaresQuery.refetch();
           }}
           disabled={isLoading}
@@ -352,6 +443,59 @@ export default function DetalhePromocao() {
               <ResumoItem label="Compatíveis encontrados" total={resumoVinculo.compativeisEncontrados} />
               <ResumoItem label="Compatíveis bloqueados" total={resumoVinculo.compativeisBloqueados} tone={resumoVinculo.compativeisBloqueados > 0 ? 'warning' : 'default'} />
               <ResumoItem label="Sem histórico" total={resumoVinculo.semHistorico} tone={resumoVinculo.semHistorico > 0 ? 'warning' : 'default'} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle>Turma operacional</CardTitle>
+                <p className="text-sm text-slate-500 mt-1">
+                  Leitura dual: usa PromocaoMilitar quando houver registros e mantém fallback legado por HistoricoPromocaoMilitarV2.promocao_id.
+                  Fonte atual: {turmaOperacionalFonte}.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                disabled={turmaOperacional.length > 0 || vinculados.length === 0 || materializarTurmaMutation.isPending}
+                onClick={() => materializarTurmaMutation.mutate()}
+              >
+                <Link2 className="w-4 h-4 mr-2" />
+                Materializar turma
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ordem</TableHead>
+                      <TableHead>Militar</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Selecionado</TableHead>
+                      <TableHead>Publicado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {turmaOperacionalExibida.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-8 text-center text-slate-500">Nenhuma turma operacional ou vínculo legado localizado.</TableCell>
+                      </TableRow>
+                    )}
+                    {turmaOperacionalExibida.map((registro) => (
+                      <TableRow key={registro.id || `${registro.militar_id}-${registro.historico_promocao_v2_id}`}>
+                        <TableCell>{registro.ordem || '—'}</TableCell>
+                        <TableCell className="font-medium">{nomeMilitar(registro.militar)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusPromocaoMilitarClass(registro.status)}>{valorOuTraco(registro.status)}</Badge>
+                        </TableCell>
+                        <TableCell><BooleanBadge ativo={Boolean(registro.selecionado)} /></TableCell>
+                        <TableCell><BooleanBadge ativo={Boolean(registro.publicado)} /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
 
