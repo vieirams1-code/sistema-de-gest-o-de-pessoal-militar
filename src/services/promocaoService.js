@@ -137,7 +137,7 @@ export function avaliarCompatibilidadePromocao(historico, promocao) {
       motivos: [
         !mesmoPosto ? 'posto divergente' : '',
         !mesmoQuadro ? 'quadro divergente' : '',
-        !mesmaDataPromocao ? 'datas divergentes' : '',
+        !mesmaDataPromocao ? 'data de promoção divergente' : '',
       ].filter(Boolean),
     };
   }
@@ -145,8 +145,8 @@ export function avaliarCompatibilidadePromocao(historico, promocao) {
   const dataPublicacao = rotuloCampoAusenteOuDivergente(
     historico?.data_publicacao,
     promocao?.data_publicacao,
-    'datas divergentes',
-    'datas divergentes',
+    'faltando data de publicação',
+    'data de publicação divergente',
   );
   const boletim = rotuloCampoAusenteOuDivergente(
     historico?.boletim_referencia,
@@ -172,6 +172,35 @@ export function avaliarCompatibilidadePromocao(historico, promocao) {
     compatibilidade: motivos.length === 0 ? 'forte' : 'provável',
     motivos: [...new Set(motivos)],
   };
+}
+
+export function possuiNucleoMinimoProvavelVinculavel(historico, promocao) {
+  return mesmoValorNormalizado(historico?.posto_graduacao_novo, promocao?.posto_graduacao)
+    && mesmoValorNormalizado(historico?.quadro_novo, promocao?.quadro)
+    && mesmoValorNormalizado(historico?.data_promocao, promocao?.data_promocao);
+}
+
+export function motivosBloqueioVinculoProvavel(historico, promocao) {
+  const motivos = [];
+  const mesmoPosto = mesmoValorNormalizado(historico?.posto_graduacao_novo, promocao?.posto_graduacao);
+  const mesmoQuadro = mesmoValorNormalizado(historico?.quadro_novo, promocao?.quadro);
+  const mesmaDataPromocao = mesmoValorNormalizado(historico?.data_promocao, promocao?.data_promocao);
+
+  if (!texto(historico?.militar_id)) motivos.push('militar_id ausente');
+  if (!mesmoPosto) motivos.push('posto divergente');
+  if (!mesmoQuadro) motivos.push('quadro divergente');
+  if (!mesmaDataPromocao) motivos.push('data de promoção divergente');
+  if (isStatusCanceladoRetificado(historico)) motivos.push(statusNormalizado(historico?.status_registro).startsWith('retific') ? 'retificado' : 'cancelado');
+  if (texto(historico?.promocao_id) && texto(historico?.promocao_id) !== texto(promocao?.id)) motivos.push('já vinculado a outra Promoção');
+  if (!statusCompativelComPromocao(historico, promocao)) motivos.push('status incompatível grave');
+
+  return [...new Set(motivos)];
+}
+
+export function podeVincularProvavelAdministrativamente(historico, promocao) {
+  return avaliarCompatibilidadePromocao(historico, promocao).compatibilidade === 'provável'
+    && possuiNucleoMinimoProvavelVinculavel(historico, promocao)
+    && motivosBloqueioVinculoProvavel(historico, promocao).length === 0;
 }
 
 export function historicoCombinaComPromocao(historico, promocao) {
@@ -267,7 +296,8 @@ export function buscarCandidatosProvaveis({ promocao, historicos = [] }) {
       ...historico,
       diagnosticoCompatibilidade: avaliarCompatibilidadePromocao(historico, promocao),
     }))
-    .filter((historico) => historico.diagnosticoCompatibilidade.compatibilidade === 'provável');
+    .filter((historico) => historico.diagnosticoCompatibilidade.compatibilidade === 'provável')
+    .filter((historico) => texto(historico?.promocao_id) !== texto(promocao?.id));
 }
 
 export function montarDiagnosticoMilitaresPromocao({ promocao, historicos = [], militares = [] }) {

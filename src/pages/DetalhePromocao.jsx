@@ -24,7 +24,9 @@ import {
   historicoCombinaComPromocao,
   montarDiagnosticoMilitaresPromocao,
   montarMilitarPorId,
+  motivosBloqueioVinculoProvavel,
   nomeMilitar,
+  podeVincularProvavelAdministrativamente,
   ordenarHistoricosVinculados,
   texto,
   tituloPromocao,
@@ -32,6 +34,7 @@ import {
 } from '@/services/promocaoService';
 
 const CONFIRMACAO_VINCULAR = 'VINCULAR PROMOÇÃO';
+const CONFIRMACAO_VINCULAR_PROVAVEIS = 'VINCULAR PROVÁVEIS';
 const CONFIRMACAO_DESVINCULAR = 'DESVINCULAR PROMOÇÃO';
 
 async function carregarPromocaoPorId(promocaoId) {
@@ -101,6 +104,9 @@ export default function DetalhePromocao() {
   const { toast } = useToast();
   const promocaoId = searchParams.get('id');
   const [selecionados, setSelecionados] = useState([]);
+  const [provaveisSelecionados, setProvaveisSelecionados] = useState([]);
+  const [dialogoVincularProvaveisAberto, setDialogoVincularProvaveisAberto] = useState(false);
+  const [confirmacaoVincularProvaveis, setConfirmacaoVincularProvaveis] = useState('');
   const [dialogoVincularAberto, setDialogoVincularAberto] = useState(false);
   const [confirmacaoVincular, setConfirmacaoVincular] = useState('');
   const [historicoParaDesvincular, setHistoricoParaDesvincular] = useState(null);
@@ -145,12 +151,19 @@ export default function DetalhePromocao() {
   }, [historicosQuery.data, militarPorId, promocao]);
 
   const candidatosProvaveis = useMemo(() => {
-    if (!promocao || candidatos.length > 0) return [];
+    if (!promocao) return [];
     return ordenarHistoricosVinculados(enriquecerHistoricos(
-      buscarCandidatosProvaveis({ promocao, historicos: historicosQuery.data || [] }),
+      buscarCandidatosProvaveis({ promocao, historicos: historicosQuery.data || [] }).map((historico) => {
+        const bloqueiosVinculoProvavel = motivosBloqueioVinculoProvavel(historico, promocao);
+        return {
+          ...historico,
+          bloqueiosVinculoProvavel,
+          vinculoProvavelPermitido: podeVincularProvavelAdministrativamente(historico, promocao),
+        };
+      }),
       militarPorId,
     ));
-  }, [candidatos.length, historicosQuery.data, militarPorId, promocao]);
+  }, [historicosQuery.data, militarPorId, promocao]);
 
   const diagnosticoMilitares = useMemo(() => {
     if (!promocao) return [];
@@ -203,6 +216,32 @@ export default function DetalhePromocao() {
     onError: (error) => toast({ title: 'Falha ao vincular', description: error.message, variant: 'destructive' }),
   });
 
+  const vincularProvaveisMutation = useMutation({
+    mutationFn: async (historicoIds) => {
+      const historicosPorId = new Map((historicosQuery.data || []).map((historico) => [String(historico?.id), historico]));
+      const bloqueados = historicoIds
+        .map((historicoId) => historicosPorId.get(String(historicoId)))
+        .filter((historico) => !historico || !podeVincularProvavelAdministrativamente(historico, promocao));
+
+      if (bloqueados.length > 0) {
+        throw new Error('Há candidatos prováveis bloqueados. Revise núcleo mínimo, status, vínculo existente e militar_id antes de vincular.');
+      }
+
+      await Promise.all(historicoIds.map((historicoId) => (
+        base44.entities.HistoricoPromocaoMilitarV2.update(historicoId, { promocao_id: promocao.id })
+      )));
+    },
+    onSuccess: () => {
+      toast({ title: 'Prováveis vinculados', description: 'Vínculo administrativo concluído. Somente o campo promocao_id foi preenchido nos históricos selecionados.' });
+      setProvaveisSelecionados([]);
+      setConfirmacaoVincularProvaveis('');
+      setDialogoVincularProvaveisAberto(false);
+      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-historicos-v2'] });
+      queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais-historicos-v2'] });
+    },
+    onError: (error) => toast({ title: 'Falha ao vincular prováveis', description: error.message, variant: 'destructive' }),
+  });
+
   const desvincularMutation = useMutation({
     mutationFn: async (historicoId) => {
       await base44.entities.HistoricoPromocaoMilitarV2.update(historicoId, { promocao_id: '' });
@@ -222,6 +261,12 @@ export default function DetalhePromocao() {
 
   const alternarSelecionado = (historicoId, checked) => {
     setSelecionados((atuais) => (checked
+      ? [...new Set([...atuais, historicoId])]
+      : atuais.filter((id) => id !== historicoId)));
+  };
+
+  const alternarProvavelSelecionado = (historicoId, checked) => {
+    setProvaveisSelecionados((atuais) => (checked
       ? [...new Set([...atuais, historicoId])]
       : atuais.filter((id) => id !== historicoId)));
   };
@@ -437,17 +482,34 @@ export default function DetalhePromocao() {
             </CardContent>
           </Card>
 
-          {candidatos.length === 0 && candidatosProvaveis.length > 0 && (
+          {candidatosProvaveis.length > 0 && (
             <Card className="border-amber-200">
-              <CardHeader>
-                <CardTitle>Candidatos prováveis — revisão manual</CardTitle>
-                <p className="text-sm text-slate-500 mt-1">Busca relaxada por mesmo posto, quadro e data de promoção. Estes registros são apenas diagnóstico e não permitem vínculo automático.</p>
+              <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle>Candidatos prováveis — revisão manual</CardTitle>
+                  <p className="text-sm text-slate-500 mt-1">Busca relaxada mantendo o núcleo mínimo de posto, quadro e data de promoção. Prováveis continuam separados dos compatíveis fortes e nunca são vinculados automaticamente.</p>
+                </div>
+                <Button
+                  variant="outline"
+                  disabled={provaveisSelecionados.length === 0 || vincularProvaveisMutation.isPending}
+                  onClick={() => setDialogoVincularProvaveisAberto(true)}
+                >
+                  <Link2 className="w-4 h-4 mr-2" />
+                  Vincular prováveis selecionados ({provaveisSelecionados.length})
+                </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <Alert>
+                  <AlertTitle>Vínculo administrativo com dados históricos preservados</AlertTitle>
+                  <AlertDescription>
+                    Estes registros possuem divergências ou dados incompletos. O vínculo será administrativo e não corrigirá os dados do histórico.
+                  </AlertDescription>
+                </Alert>
                 <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">Sel.</TableHead>
                         <TableHead>Militar</TableHead>
                         <TableHead>Matrícula</TableHead>
                         <TableHead>Ordem</TableHead>
@@ -457,16 +519,31 @@ export default function DetalhePromocao() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {candidatosProvaveis.map((historico) => (
-                        <TableRow key={historico.id}>
-                          <TableCell className="font-medium">{nomeMilitar(historico.militar)}</TableCell>
-                          <TableCell>{valorOuTraco(historico.militar?.matricula)}</TableCell>
-                          <TableCell>{historico.antiguidade_referencia_ordem ?? '—'}</TableCell>
-                          <TableCell><Badge variant="secondary">{valorOuTraco(historico.status_registro)}</Badge></TableCell>
-                          <TableCell><MotivosBadges motivos={historico.diagnosticoCompatibilidade?.motivos || []} /></TableCell>
-                          <TableCell><Badge variant="outline">Revisar manualmente</Badge></TableCell>
-                        </TableRow>
-                      ))}
+                      {candidatosProvaveis.map((historico) => {
+                        const bloqueios = historico.bloqueiosVinculoProvavel || [];
+                        return (
+                          <TableRow key={historico.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={provaveisSelecionados.includes(historico.id)}
+                                disabled={!historico.vinculoProvavelPermitido}
+                                onCheckedChange={(checked) => alternarProvavelSelecionado(historico.id, Boolean(checked))}
+                                aria-label={`Selecionar provável ${nomeMilitar(historico.militar)}`}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{nomeMilitar(historico.militar)}</TableCell>
+                            <TableCell>{valorOuTraco(historico.militar?.matricula)}</TableCell>
+                            <TableCell>{historico.antiguidade_referencia_ordem ?? '—'}</TableCell>
+                            <TableCell><Badge variant="secondary">{valorOuTraco(historico.status_registro)}</Badge></TableCell>
+                            <TableCell><MotivosBadges motivos={historico.diagnosticoCompatibilidade?.motivos || []} /></TableCell>
+                            <TableCell>
+                              {historico.vinculoProvavelPermitido
+                                ? <Badge variant="outline" className="border-emerald-300 text-emerald-700">Vinculável com confirmação</Badge>
+                                : <MotivosBadges motivos={bloqueios.length ? bloqueios : ['bloqueado']} />}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -553,6 +630,38 @@ export default function DetalhePromocao() {
           </Card>
         </>
       )}
+
+
+      <Dialog open={dialogoVincularProvaveisAberto} onOpenChange={setDialogoVincularProvaveisAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar vínculo administrativo de candidatos prováveis</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Alert>
+              <AlertTitle>Vínculo administrativo sem saneamento automático</AlertTitle>
+              <AlertDescription>
+                Estes registros possuem divergências ou dados incompletos. O vínculo será administrativo e não corrigirá os dados do histórico.
+                Esta operação preencherá apenas HistoricoPromocaoMilitarV2.promocao_id em {provaveisSelecionados.length} histórico(s).
+                Não altera data de promoção, data de publicação, boletim, ato, posto, quadro, ordem, Militar ou Prévia Geral.
+              </AlertDescription>
+            </Alert>
+            <div>
+              <Label>Digite {CONFIRMACAO_VINCULAR_PROVAVEIS} para confirmar</Label>
+              <Input value={confirmacaoVincularProvaveis} onChange={(event) => setConfirmacaoVincularProvaveis(event.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogoVincularProvaveisAberto(false)}>Cancelar</Button>
+            <Button
+              disabled={confirmacaoVincularProvaveis !== CONFIRMACAO_VINCULAR_PROVAVEIS || provaveisSelecionados.length === 0 || vincularProvaveisMutation.isPending}
+              onClick={() => vincularProvaveisMutation.mutate(provaveisSelecionados)}
+            >
+              Confirmar vínculo administrativo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogoVincularAberto} onOpenChange={setDialogoVincularAberto}>
         <DialogContent>
