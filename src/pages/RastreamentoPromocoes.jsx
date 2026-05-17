@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ClipboardCopy, Eye, MoreVertical, PlusCircle, RefreshCw, Search } from 'lucide-react';
@@ -18,6 +18,33 @@ import { useToast } from '@/components/ui/use-toast';
 const STATUS_OPERACIONAIS = new Set(['ativo', 'previsto']);
 const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'retificado', 'retificada', 'cancelada']);
 const TEXTO_CONFIRMACAO_CRIAR_PROMOCAO = 'CRIAR PROMOÇÃO';
+
+const PROMOCAO_ENTIDADE_AUSENTE_MENSAGEM = 'Entidade Promocao ainda não está sincronizada no Base44. Publique/sincronize as entidades antes de criar promoções.';
+
+function obterEntidadePromocaoRuntime() {
+  const entidade = base44?.entities?.Promocao;
+  const disponivel = Boolean(entidade && typeof entidade.filter === 'function' && typeof entidade.create === 'function');
+
+  return {
+    disponivel,
+    entidade: disponivel ? entidade : null,
+    motivo: disponivel
+      ? 'base44.entities.Promocao disponível no runtime.'
+      : 'base44.entities.Promocao ausente ou sem métodos filter/create no runtime.',
+  };
+}
+
+function isErroSchemaPromocaoAusente(error) {
+  const mensagem = String(error?.message || error || '');
+  return /Entity schema Promocao not found in app|schema\s+Promocao\s+not found/i.test(mensagem);
+}
+
+function criarErroPromocaoEntidadeAusente(error) {
+  const erro = new Error(PROMOCAO_ENTIDADE_AUSENTE_MENSAGEM);
+  erro.promocaoEntidadeAusente = true;
+  erro.cause = error;
+  return erro;
+}
 
 function texto(valor) {
   return String(valor ?? '').trim();
@@ -339,6 +366,21 @@ export default function RastreamentoPromocoes() {
   const [promocaoExistente, setPromocaoExistente] = useState(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const promocaoRuntimeInicial = useMemo(() => obterEntidadePromocaoRuntime(), []);
+  const [promocaoRuntime, setPromocaoRuntime] = useState(promocaoRuntimeInicial);
+  const promocaoEntidadeDisponivel = promocaoRuntime.disponivel;
+
+  useEffect(() => {
+    if (promocaoRuntime.disponivel) {
+      console.info('[RastreamentoPromocoes] base44.entities.Promocao disponível no runtime Base44.');
+      return;
+    }
+
+    console.warn('[RastreamentoPromocoes] Entidade Promocao indisponível no runtime Base44.', {
+      motivo: promocaoRuntime.motivo,
+      entidadesDisponiveis: Object.keys(base44?.entities || {}).sort(),
+    });
+  }, [promocaoRuntime]);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['rastreamento-promocoes'],
@@ -354,12 +396,25 @@ export default function RastreamentoPromocoes() {
   const diagnosticoCriacao = useMemo(() => diagnosticarCriacaoPromocao(grupoCriacao), [grupoCriacao]);
   const promocaoRevisao = diagnosticoCriacao.payload || null;
   const podeConfirmarCriacao = Boolean(
-    promocaoRevisao
+    promocaoEntidadeDisponivel
+    && promocaoRevisao
     && !diagnosticoCriacao.bloqueado
     && confirmacaoCriacao === TEXTO_CONFIRMACAO_CRIAR_PROMOCAO,
   );
 
   const abrirCriacaoPromocao = (grupo) => {
+    if (!promocaoEntidadeDisponivel) {
+      console.warn('[RastreamentoPromocoes] Abertura/criação de Promoção bloqueada: entidade Promocao não existe no runtime Base44.', {
+        motivo: promocaoRuntime.motivo,
+      });
+      toast({
+        title: 'Promoção indisponível',
+        description: PROMOCAO_ENTIDADE_AUSENTE_MENSAGEM,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setGrupoCriacao(grupo);
     setConfirmacaoCriacao('');
     setPromocaoExistente(null);
@@ -373,10 +428,35 @@ export default function RastreamentoPromocoes() {
 
   const criarPromocaoMutation = useMutation({
     mutationFn: async (payload) => {
-      const [porChave, porHash] = await Promise.all([
-        base44.entities.Promocao.filter({ chave_agrupamento: payload.chave_agrupamento }),
-        base44.entities.Promocao.filter({ hash_agrupamento: payload.hash_agrupamento }),
-      ]);
+      const runtimeAtual = obterEntidadePromocaoRuntime();
+      if (!runtimeAtual.disponivel) {
+        const erro = criarErroPromocaoEntidadeAusente();
+        console.warn('[RastreamentoPromocoes] create/filter não executados: entidade Promocao não existe no runtime Base44.', {
+          motivo: runtimeAtual.motivo,
+          entidadesDisponiveis: Object.keys(base44?.entities || {}).sort(),
+        });
+        throw erro;
+      }
+
+      const Promocao = runtimeAtual.entidade;
+      let porChave = [];
+      let porHash = [];
+
+      try {
+        [porChave, porHash] = await Promise.all([
+          Promocao.filter({ chave_agrupamento: payload.chave_agrupamento }),
+          Promocao.filter({ hash_agrupamento: payload.hash_agrupamento }),
+        ]);
+      } catch (filterError) {
+        if (isErroSchemaPromocaoAusente(filterError)) {
+          console.warn('[RastreamentoPromocoes] Promocao existe no objeto do SDK, mas o schema não está sincronizado no app Base44. create não será executado.', {
+            mensagem: filterError?.message,
+          });
+          throw criarErroPromocaoEntidadeAusente(filterError);
+        }
+        throw filterError;
+      }
+
       const existente = [...(porChave || []), ...(porHash || [])].find(Boolean);
 
       if (existente) {
@@ -387,13 +467,24 @@ export default function RastreamentoPromocoes() {
 
       const agora = new Date().toISOString();
       const usuario = await base44.auth.me();
-      return base44.entities.Promocao.create({
-        ...payload,
-        criado_por: usuario?.email || usuario?.full_name || '',
-        criado_em: agora,
-        atualizado_por: usuario?.email || usuario?.full_name || '',
-        atualizado_em: agora,
-      });
+
+      try {
+        return await Promocao.create({
+          ...payload,
+          criado_por: usuario?.email || usuario?.full_name || '',
+          criado_em: agora,
+          atualizado_por: usuario?.email || usuario?.full_name || '',
+          atualizado_em: agora,
+        });
+      } catch (createError) {
+        if (isErroSchemaPromocaoAusente(createError)) {
+          console.warn('[RastreamentoPromocoes] Promocao existe no objeto do SDK, mas create falhou porque o schema não está sincronizado no app Base44.', {
+            mensagem: createError?.message,
+          });
+          throw criarErroPromocaoEntidadeAusente(createError);
+        }
+        throw createError;
+      }
     },
     onSuccess: (promocao) => {
       toast({ title: 'Promoção criada', description: `Promoção ${promocao?.id ? `ID ${promocao.id}` : ''} criada sem vincular históricos.` });
@@ -401,6 +492,20 @@ export default function RastreamentoPromocoes() {
       queryClient.invalidateQueries({ queryKey: ['rastreamento-promocoes'] });
     },
     onError: (mutationError) => {
+      if (mutationError?.promocaoEntidadeAusente) {
+        setPromocaoRuntime({
+          disponivel: false,
+          entidade: null,
+          motivo: 'Promocao indisponível: schema não encontrado/sincronizado no app Base44.',
+        });
+        toast({
+          title: 'Promoção indisponível',
+          description: PROMOCAO_ENTIDADE_AUSENTE_MENSAGEM,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       if (mutationError?.promocaoExistente) {
         setPromocaoExistente(mutationError.promocaoExistente);
         toast({
@@ -415,10 +520,23 @@ export default function RastreamentoPromocoes() {
   });
 
   const confirmarCriacaoPromocao = () => {
+    if (!promocaoEntidadeDisponivel) {
+      toast({
+        title: 'Promoção indisponível',
+        description: PROMOCAO_ENTIDADE_AUSENTE_MENSAGEM,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!podeConfirmarCriacao || !promocaoRevisao) return;
     setPromocaoExistente(null);
     criarPromocaoMutation.mutate(promocaoRevisao);
   };
+
+  const avisoPromocaoIndisponivel = !promocaoEntidadeDisponivel
+    ? PROMOCAO_ENTIDADE_AUSENTE_MENSAGEM
+    : '';
 
   const gruposFiltrados = useMemo(() => {
     const termo = normalizar(filtroGrupo);
@@ -466,6 +584,13 @@ export default function RastreamentoPromocoes() {
         <AlertTitle>Criação limitada à entidade Promoção</AlertTitle>
         <AlertDescription>Esta tela permite criar somente a entidade Promoção a partir de agrupamento homogêneo. Não adiciona promocao_id, não vincula HistoricoPromocaoMilitarV2 e não altera Militar, histórico, prévia geral, ordenação ou snapshots.</AlertDescription>
       </Alert>
+
+      {!promocaoEntidadeDisponivel && (
+        <Alert variant="destructive">
+          <AlertTitle>Criação de Promoção indisponível</AlertTitle>
+          <AlertDescription>{avisoPromocaoIndisponivel}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card><CardHeader><CardTitle className="text-sm">Militares ativos</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{data.militaresAtivos.length}</p></CardContent></Card>
@@ -543,12 +668,12 @@ export default function RastreamentoPromocoes() {
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuContent align="end" sideOffset={6} collisionPadding={12} className="w-48 max-w-[calc(100vw-1.5rem)]">
                           <DropdownMenuItem onClick={() => setGrupoDetalhe(grupo)}>
                             <Eye className="mr-2 h-4 w-4" />
                             Ver
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => abrirCriacaoPromocao(grupo)}>
+                          <DropdownMenuItem disabled={!promocaoEntidadeDisponivel} onClick={() => abrirCriacaoPromocao(grupo)}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Criar Promoção
                           </DropdownMenuItem>
@@ -594,10 +719,18 @@ export default function RastreamentoPromocoes() {
       </Card>
 
       <Dialog open={Boolean(grupoCriacao)} onOpenChange={(open) => !open && fecharCriacaoPromocao()}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader><DialogTitle>Criar Promoção a partir do agrupamento</DialogTitle></DialogHeader>
+        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12"><DialogTitle>Criar Promoção a partir do agrupamento</DialogTitle></DialogHeader>
           {grupoCriacao && (
-            <div className="space-y-4">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                {!promocaoEntidadeDisponivel && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Criação indisponível</AlertTitle>
+                    <AlertDescription>{avisoPromocaoIndisponivel}</AlertDescription>
+                  </Alert>
+                )}
+
               <Alert variant={diagnosticoCriacao.bloqueado ? 'destructive' : 'default'}>
                 <AlertTitle>{diagnosticoCriacao.bloqueado ? 'Criação bloqueada' : 'Revisão obrigatória'}</AlertTitle>
                 <AlertDescription>
@@ -619,7 +752,7 @@ export default function RastreamentoPromocoes() {
 
               {promocaoRevisao && (
                 <>
-                  <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2 xl:grid-cols-3">
                     {[
                       ['Tipo', promocaoRevisao.tipo],
                       ['Natureza', promocaoRevisao.natureza],
@@ -635,38 +768,39 @@ export default function RastreamentoPromocoes() {
                       ['Hash agrupamento', promocaoRevisao.hash_agrupamento],
                       ['Total militares vinculados', promocaoRevisao.total_militares_vinculados],
                     ].map(([label, value]) => (
-                      <div key={label} className="rounded-md border bg-slate-50 p-3">
-                        <span className="text-xs uppercase text-slate-500">{label}</span>
-                        <p className="mt-1 break-words font-medium text-slate-900">{valorOuTraco(value)}</p>
+                      <div key={label} className="rounded-md border bg-slate-50 px-3 py-2">
+                        <span className="text-[0.68rem] font-semibold uppercase leading-none text-slate-500">{label}</span>
+                        <p className="mt-0.5 break-words text-sm font-medium leading-snug text-slate-900">{valorOuTraco(value)}</p>
                       </div>
                     ))}
                   </div>
 
                   <div>
-                    <Label>Observações</Label>
-                    <Textarea value={promocaoRevisao.observacoes} readOnly rows={3} className="mt-1 bg-slate-50" />
+                    <Label className="text-xs">Observações</Label>
+                    <Textarea value={promocaoRevisao.observacoes} readOnly rows={2} className="mt-1 min-h-[64px] bg-slate-50 text-sm" />
                   </div>
 
                   <div>
-                    <Label>Digite {TEXTO_CONFIRMACAO_CRIAR_PROMOCAO} para confirmar</Label>
+                    <Label className="text-xs">Digite {TEXTO_CONFIRMACAO_CRIAR_PROMOCAO} para confirmar</Label>
                     <Input
                       value={confirmacaoCriacao}
                       onChange={(event) => setConfirmacaoCriacao(event.target.value)}
                       placeholder={TEXTO_CONFIRMACAO_CRIAR_PROMOCAO}
-                      disabled={diagnosticoCriacao.bloqueado || criarPromocaoMutation.isPending}
+                      disabled={!promocaoEntidadeDisponivel || diagnosticoCriacao.bloqueado || criarPromocaoMutation.isPending}
                     />
                     <p className="mt-1 text-xs text-slate-500">Sem esse texto exato, nenhuma Promoção será criada.</p>
                   </div>
                 </>
               )}
+              </div>
+              <DialogFooter className="sticky bottom-0 z-10 shrink-0 border-t bg-background px-5 py-3">
+                <Button type="button" variant="outline" onClick={fecharCriacaoPromocao} disabled={criarPromocaoMutation.isPending}>Cancelar</Button>
+                <Button type="button" onClick={confirmarCriacaoPromocao} disabled={!podeConfirmarCriacao || criarPromocaoMutation.isPending}>
+                  {criarPromocaoMutation.isPending ? 'Criando...' : 'Criar Promoção'}
+                </Button>
+              </DialogFooter>
             </div>
           )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={fecharCriacaoPromocao} disabled={criarPromocaoMutation.isPending}>Cancelar</Button>
-            <Button type="button" onClick={confirmarCriacaoPromocao} disabled={!podeConfirmarCriacao || criarPromocaoMutation.isPending}>
-              {criarPromocaoMutation.isPending ? 'Criando...' : 'Criar Promoção'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
