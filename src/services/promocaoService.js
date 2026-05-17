@@ -115,13 +115,67 @@ export function chaveAgrupamentoPromocaoLike(item) {
   ].map((valor) => normalizar(valor) || '∅').join('|');
 }
 
+
+function mesmoValorNormalizado(a, b) {
+  return normalizar(a) === normalizar(b);
+}
+
+function rotuloCampoAusenteOuDivergente(valorHistorico, valorPromocao, rotuloAusente, rotuloDivergente = rotuloAusente) {
+  if (!texto(valorHistorico) || !texto(valorPromocao)) return rotuloAusente;
+  return mesmoValorNormalizado(valorHistorico, valorPromocao) ? '' : rotuloDivergente;
+}
+
+export function avaliarCompatibilidadePromocao(historico, promocao) {
+  const motivos = [];
+  const mesmoPosto = mesmoValorNormalizado(historico?.posto_graduacao_novo, promocao?.posto_graduacao);
+  const mesmoQuadro = mesmoValorNormalizado(historico?.quadro_novo, promocao?.quadro);
+  const mesmaDataPromocao = mesmoValorNormalizado(historico?.data_promocao, promocao?.data_promocao);
+
+  if (!mesmoPosto || !mesmoQuadro || !mesmaDataPromocao) {
+    return {
+      compatibilidade: 'fraca',
+      motivos: [
+        !mesmoPosto ? 'posto divergente' : '',
+        !mesmoQuadro ? 'quadro divergente' : '',
+        !mesmaDataPromocao ? 'datas divergentes' : '',
+      ].filter(Boolean),
+    };
+  }
+
+  const dataPublicacao = rotuloCampoAusenteOuDivergente(
+    historico?.data_publicacao,
+    promocao?.data_publicacao,
+    'datas divergentes',
+    'datas divergentes',
+  );
+  const boletim = rotuloCampoAusenteOuDivergente(
+    historico?.boletim_referencia,
+    promocao?.boletim_referencia,
+    'faltando boletim',
+    'boletim divergente',
+  );
+  const ato = rotuloCampoAusenteOuDivergente(
+    historico?.ato_referencia,
+    promocao?.ato_referencia,
+    'faltando ato',
+    'ato divergente',
+  );
+
+  [dataPublicacao, boletim, ato].filter(Boolean).forEach((motivo) => motivos.push(motivo));
+
+  if (texto(historico?.promocao_id) && texto(historico?.promocao_id) !== texto(promocao?.id)) motivos.push('já vinculado');
+  if (!isOrdemPreenchida(historico?.antiguidade_referencia_ordem)) motivos.push('sem ordem');
+  if (isStatusCanceladoRetificado(historico)) motivos.push(statusNormalizado(historico?.status_registro).startsWith('retific') ? 'retificado' : 'cancelado');
+  if (!statusCompativelComPromocao(historico, promocao)) motivos.push('status incompatível');
+
+  return {
+    compatibilidade: motivos.length === 0 ? 'forte' : 'provável',
+    motivos: [...new Set(motivos)],
+  };
+}
+
 export function historicoCombinaComPromocao(historico, promocao) {
-  return normalizar(historico?.posto_graduacao_novo) === normalizar(promocao?.posto_graduacao)
-    && normalizar(historico?.quadro_novo) === normalizar(promocao?.quadro)
-    && normalizar(historico?.data_promocao) === normalizar(promocao?.data_promocao)
-    && normalizar(historico?.data_publicacao) === normalizar(promocao?.data_publicacao)
-    && normalizar(historico?.boletim_referencia) === normalizar(promocao?.boletim_referencia)
-    && normalizar(historico?.ato_referencia) === normalizar(promocao?.ato_referencia);
+  return avaliarCompatibilidadePromocao(historico, promocao).compatibilidade === 'forte';
 }
 
 export function statusCompativelComPromocao(historico, promocao) {
@@ -201,8 +255,64 @@ export function diagnosticarPromocao({ promocao, historicosCompativeis = [] }) {
 
 export function filtrarCandidatosCompativeis({ promocao, historicos = [] }) {
   return historicos.filter((historico) => (
-    historicoCombinaComPromocao(historico, promocao)
+    avaliarCompatibilidadePromocao(historico, promocao).compatibilidade === 'forte'
     && !texto(historico?.promocao_id)
     && statusCompativelComPromocao(historico, promocao)
   ));
+}
+
+export function buscarCandidatosProvaveis({ promocao, historicos = [] }) {
+  return historicos
+    .map((historico) => ({
+      ...historico,
+      diagnosticoCompatibilidade: avaliarCompatibilidadePromocao(historico, promocao),
+    }))
+    .filter((historico) => historico.diagnosticoCompatibilidade.compatibilidade === 'provável');
+}
+
+export function montarDiagnosticoMilitaresPromocao({ promocao, historicos = [], militares = [] }) {
+  const historicosPorMilitar = new Map();
+  historicos.forEach((historico) => {
+    const militarId = texto(historico?.militar_id);
+    if (!militarId) return;
+    if (!historicosPorMilitar.has(militarId)) historicosPorMilitar.set(militarId, []);
+    historicosPorMilitar.get(militarId).push(historico);
+  });
+
+  const linhasHistoricos = historicos
+    .map((historico) => ({ historico, avaliacao: avaliarCompatibilidadePromocao(historico, promocao) }))
+    .filter(({ avaliacao }) => avaliacao.compatibilidade !== 'fraca')
+    .map(({ historico, avaliacao }) => {
+      const motivos = avaliacao.motivos.length ? avaliacao.motivos : ['histórico compatível'];
+      const vinculadoNesta = texto(historico?.promocao_id) === texto(promocao?.id);
+      const vinculadoOutra = texto(historico?.promocao_id) && !vinculadoNesta;
+      const situacao = vinculadoNesta ? 'Vinculado' : vinculadoOutra ? 'Já vinculado em outra promoção' : avaliacao.compatibilidade === 'forte' ? 'Compatível' : 'Sem vínculo';
+      const acaoSugerida = vinculadoNesta ? 'Acompanhar' : vinculadoOutra ? 'Conflito' : avaliacao.compatibilidade === 'forte' ? 'Pode vincular' : 'Revisar';
+
+      return {
+        chave: `historico:${historico?.id}`,
+        militar_id: historico?.militar_id,
+        historico_id: historico?.id,
+        situacao,
+        motivo: motivos.join(', '),
+        acaoSugerida,
+        compatibilidade: avaliacao.compatibilidade,
+      };
+    });
+
+  const militaresSemHistorico = militares
+    .filter((militar) => mesmoValorNormalizado(militar?.posto_graduacao, promocao?.posto_graduacao)
+      && mesmoValorNormalizado(militar?.quadro, promocao?.quadro)
+      && !historicosPorMilitar.has(texto(militar?.id)))
+    .map((militar) => ({
+      chave: `militar-sem-historico:${militar?.id}`,
+      militar_id: militar?.id,
+      historico_id: '',
+      situacao: 'Sem histórico',
+      motivo: 'Sem histórico V2',
+      acaoSugerida: 'Criar histórico futuramente',
+      compatibilidade: 'diagnóstico',
+    }));
+
+  return [...linhasHistoricos, ...militaresSemHistorico];
 }
