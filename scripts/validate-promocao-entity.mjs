@@ -7,6 +7,7 @@ const requiredFiles = [
   'base44/entities/Promocao.jsonc',
   'entities/Promocao.json',
   'src/api/entities.js',
+  'src/main.jsx',
 ];
 
 function stripJsonComments(source) {
@@ -110,6 +111,14 @@ if (!/export\s+const\s+Promocao\s*=\s*base44\.entities\.Promocao\s*;/.test(entit
   throw new Error('src/api/entities.js não exporta Promocao a partir de base44.entities.Promocao.');
 }
 
+const mainEntry = fs.readFileSync(path.join(repoRoot, 'src/main.jsx'), 'utf8');
+if (!/import\s*\{[\s\S]*\bPromocao\b[\s\S]*\}\s*from\s*['"]@\/api\/entities['"]/.test(mainEntry)) {
+  throw new Error('src/main.jsx não importa Promocao de @/api/entities; a entidade fica fora do caminho já usado para registrar entidades novas no runtime.');
+}
+if (!/void\s+Promocao\s*;/.test(mainEntry)) {
+  throw new Error('src/main.jsx não mantém referência void Promocao; Promocao pode ser removida do bundle e não seguir o fluxo de sync/publicação Base44.');
+}
+
 const base44EntityFiles = fs.readdirSync(path.join(repoRoot, 'base44/entities')).filter((file) => file.endsWith('.jsonc'));
 const statusUsers = base44EntityFiles
   .filter((file) => file !== 'Promocao.jsonc')
@@ -121,5 +130,6 @@ const statusUsers = base44EntityFiles
 console.log('✔ entidade encontrada: base44/entities/Promocao.jsonc.');
 console.log('✔ schema mínimo Promocao OK em base44/entities/Promocao.jsonc e entities/Promocao.json.');
 console.log('Export OK em src/api/entities.js.');
+console.log('✔ src/main.jsx mantém Promocao no bundle para seguir o fluxo de registro runtime já usado por entidades novas.');
 console.log(`✔ campo status em Promocao: ${publicSchema.properties.status ? 'presente' : 'ausente'}; outras entidades publicáveis também usam status: ${statusUsers.join(', ') || 'nenhuma'}.`);
 console.log('✔ manifesto explícito de entidades não encontrado: Base44 publica pelo diretório base44/entities/*.jsonc.');
