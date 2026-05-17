@@ -6,6 +6,8 @@ import {
   buscarCandidatosProvaveis,
   filtrarCandidatosCompativeis,
   montarDiagnosticoMilitaresPromocao,
+  motivosBloqueioVinculoProvavel,
+  podeVincularProvavelAdministrativamente,
 } from '../promocaoService.js';
 
 const promocao = {
@@ -111,4 +113,58 @@ test('diagnóstico por militar expõe conflitos, prováveis e sem histórico V2'
   assert.equal(linhas.find((linha) => linha.militar_id === 'm1').acaoSugerida, 'Conflito');
   assert.equal(linhas.find((linha) => linha.militar_id === 'm2').motivo, 'faltando boletim');
   assert.equal(linhas.find((linha) => linha.militar_id === 'm3').motivo, 'Sem histórico V2');
+});
+
+
+test('provável por boletim, ato ou data de publicação divergente pode ser vinculado administrativamente', () => {
+  const base = {
+    id: 'h-provavel',
+    militar_id: 'm1',
+    posto_graduacao_novo: 'Capitão',
+    quadro_novo: 'QOPM',
+    data_promocao: '2026-04-21',
+    data_publicacao: '2026-04-22',
+    boletim_referencia: 'BG 10',
+    ato_referencia: 'ATO 5',
+    status_registro: 'ativo',
+    antiguidade_referencia_ordem: 1,
+  };
+
+  const semBoletim = { ...base, id: 'h-sem-boletim', boletim_referencia: '' };
+  const semAto = { ...base, id: 'h-sem-ato', ato_referencia: '' };
+  const publicacaoDivergente = { ...base, id: 'h-pub-div', data_publicacao: '2026-04-23' };
+
+  assert.equal(podeVincularProvavelAdministrativamente(semBoletim, promocao), true);
+  assert.equal(podeVincularProvavelAdministrativamente(semAto, promocao), true);
+  assert.equal(podeVincularProvavelAdministrativamente(publicacaoDivergente, promocao), true);
+  assert.deepEqual(avaliarCompatibilidadePromocao(publicacaoDivergente, promocao).motivos, ['data de publicação divergente']);
+});
+
+test('provável com data de promoção divergente ou bloqueios graves não pode ser vinculado administrativamente', () => {
+  const base = {
+    id: 'h-base',
+    militar_id: 'm1',
+    posto_graduacao_novo: 'Capitão',
+    quadro_novo: 'QOPM',
+    data_promocao: '2026-04-21',
+    data_publicacao: '2026-04-23',
+    boletim_referencia: 'BG 10',
+    ato_referencia: 'ATO 5',
+    status_registro: 'ativo',
+    antiguidade_referencia_ordem: 1,
+  };
+
+  const dataPromocaoDivergente = { ...base, data_promocao: '2026-04-20' };
+  const cancelado = { ...base, status_registro: 'cancelado' };
+  const retificado = { ...base, status_registro: 'retificado' };
+  const vinculadoOutra = { ...base, promocao_id: 'outra-promocao' };
+  const semMilitar = { ...base, militar_id: '' };
+
+  assert.equal(podeVincularProvavelAdministrativamente(dataPromocaoDivergente, promocao), false);
+  assert.deepEqual(avaliarCompatibilidadePromocao(dataPromocaoDivergente, promocao).motivos, ['data de promoção divergente']);
+  assert.deepEqual(motivosBloqueioVinculoProvavel(dataPromocaoDivergente, promocao), ['data de promoção divergente']);
+  assert.equal(podeVincularProvavelAdministrativamente(cancelado, promocao), false);
+  assert.equal(podeVincularProvavelAdministrativamente(retificado, promocao), false);
+  assert.equal(podeVincularProvavelAdministrativamente(vinculadoOutra, promocao), false);
+  assert.equal(podeVincularProvavelAdministrativamente(semMilitar, promocao), false);
 });
