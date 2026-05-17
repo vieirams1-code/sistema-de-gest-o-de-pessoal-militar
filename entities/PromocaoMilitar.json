@@ -1,0 +1,104 @@
+{
+  "name": "PromocaoMilitar",
+  "type": "object",
+  "title": "Promoção Militar",
+  "description": "Turma operacional intermediária da promoção, sem impacto automático em Militar, Antiguidade, Prévia Geral ou snapshots.",
+  "properties": {
+    "promocao_id": {
+      "type": "string",
+      "description": "ID da Promoção operacional à qual o militar pertence.",
+      "default": ""
+    },
+    "militar_id": {
+      "type": "string",
+      "description": "ID do militar da turma operacional.",
+      "default": ""
+    },
+    "historico_promocao_v2_id": {
+      "type": "string",
+      "description": "ID do Histórico de Promoção Militar V2 usado como referência operacional.",
+      "default": ""
+    },
+    "ordem": {
+      "type": "number",
+      "description": "Ordem operacional da turma de promoção.",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "elegivel",
+        "selecionado",
+        "bloqueado",
+        "publicado",
+        "retificado",
+        "cancelado"
+      ],
+      "description": "Status operacional do militar na promoção.",
+      "default": "elegivel"
+    },
+    "selecionado": {
+      "type": "boolean",
+      "description": "Indica se o militar foi selecionado operacionalmente para a promoção.",
+      "default": false
+    },
+    "publicado": {
+      "type": "boolean",
+      "description": "Indica se a seleção operacional está marcada como publicada.",
+      "default": false
+    },
+    "origem": {
+      "type": "string",
+      "description": "Origem operacional do vínculo.",
+      "default": ""
+    },
+    "conflito": {
+      "type": "string",
+      "description": "Conflito operacional identificado para auditoria.",
+      "default": ""
+    },
+    "justificativa": {
+      "type": "string",
+      "description": "Justificativa operacional para seleção, bloqueio, retificação ou cancelamento.",
+      "default": ""
+    },
+    "observacao": {
+      "type": "string",
+      "description": "Observação livre de auditoria operacional.",
+      "default": ""
+    },
+    "usuario_vinculo": {
+      "type": "string",
+      "description": "Usuário responsável pelo vínculo operacional.",
+      "default": ""
+    },
+    "data_vinculo": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora do vínculo operacional.",
+      "default": ""
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usuário que criou o registro.",
+      "default": ""
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Usuário que atualizou o registro pela última vez.",
+      "default": ""
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de criação do registro.",
+      "default": ""
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da última atualização do registro.",
+      "default": ""
+    }
+  }
+}

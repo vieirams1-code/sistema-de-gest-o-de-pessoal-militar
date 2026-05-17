@@ -10,6 +10,7 @@ import {
   CreditoExtraFerias,
   HistoricoPromocaoMilitarV2,
   Promocao,
+  PromocaoMilitar,
   ResetOperacionalLog,
   BaseConhecimentoProcedimento,
   AssistenteLog,
@@ -29,6 +30,7 @@ void ImpedimentoMedalha;
 void CreditoExtraFerias;
 void HistoricoPromocaoMilitarV2;
 void Promocao;
+void PromocaoMilitar;
 void ResetOperacionalLog;
 void BaseConhecimentoProcedimento;
 void AssistenteLog;
