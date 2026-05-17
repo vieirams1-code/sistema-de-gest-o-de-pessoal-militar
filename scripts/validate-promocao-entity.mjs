@@ -78,9 +78,9 @@ function assertPromocaoSchema(relativePath) {
   if (!schema.properties || typeof schema.properties !== 'object') {
     throw new Error(`${relativePath}: properties ausente ou inválido.`);
   }
-  for (const field of ['tipo', 'natureza', 'posto_graduacao', 'quadro', 'data_promocao', 'origem']) {
+  for (const field of ['tipo', 'posto_graduacao', 'quadro', 'data_promocao', 'status']) {
     if (!schema.properties[field]) {
-      throw new Error(`${relativePath}: campo obrigatório para runtime ausente em properties.${field}`);
+      throw new Error(`${relativePath}: campo mínimo para runtime ausente em properties.${field}`);
     }
   }
   return schema;
@@ -93,7 +93,17 @@ for (const relativePath of requiredFiles) {
 }
 
 const publicSchema = assertPromocaoSchema('base44/entities/Promocao.jsonc');
-assertPromocaoSchema('entities/Promocao.json');
+const legacySchema = assertPromocaoSchema('entities/Promocao.json');
+
+const publicProperties = Object.keys(publicSchema.properties).sort();
+const legacyProperties = Object.keys(legacySchema.properties).sort();
+if (JSON.stringify(publicProperties) !== JSON.stringify(legacyProperties)) {
+  throw new Error(`Schemas Promocao divergentes entre base44/entities e entities. base44=${publicProperties.join(',')} entities=${legacyProperties.join(',')}`);
+}
+
+if (!Array.isArray(publicSchema.required) || !['tipo', 'posto_graduacao', 'quadro', 'data_promocao', 'status'].every((field) => publicSchema.required.includes(field))) {
+  throw new Error('base44/entities/Promocao.jsonc deve declarar required mínimo: tipo, posto_graduacao, quadro, data_promocao, status.');
+}
 
 const entitiesApi = fs.readFileSync(path.join(repoRoot, 'src/api/entities.js'), 'utf8');
 if (!/export\s+const\s+Promocao\s*=\s*base44\.entities\.Promocao\s*;/.test(entitiesApi)) {
@@ -108,7 +118,8 @@ const statusUsers = base44EntityFiles
     return Boolean(schema.properties?.status);
   });
 
-console.log('Promocao OK em base44/entities/Promocao.jsonc e entities/Promocao.json.');
+console.log('✔ entidade encontrada: base44/entities/Promocao.jsonc.');
+console.log('✔ schema mínimo Promocao OK em base44/entities/Promocao.jsonc e entities/Promocao.json.');
 console.log('Export OK em src/api/entities.js.');
-console.log(`Campo status em Promocao: ${publicSchema.properties.status ? 'presente' : 'ausente'}; outras entidades publicáveis também usam status: ${statusUsers.join(', ') || 'nenhuma'}.`);
-console.log('Manifesto explícito de entidades não encontrado: Base44 publica pelo diretório base44/entities/*.jsonc.');
+console.log(`✔ campo status em Promocao: ${publicSchema.properties.status ? 'presente' : 'ausente'}; outras entidades publicáveis também usam status: ${statusUsers.join(', ') || 'nenhuma'}.`);
+console.log('✔ manifesto explícito de entidades não encontrado: Base44 publica pelo diretório base44/entities/*.jsonc.');

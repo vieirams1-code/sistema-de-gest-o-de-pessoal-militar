@@ -10,14 +10,15 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "publish:base44": "npm run validate:promocao-entity && bash ./scripts/publish-github-base44.sh && npm run entities:push && npm run deploy:base44",
+    "publish:base44": "node scripts/publish-base44-with-logs.mjs",
     "entities:push": "npx base44@latest entities push",
     "deploy:base44": "npx base44@latest deploy",
     "test": "npm run lint && npm run build && npm run test:unit",
     "test:unit": "node --test src/pages/extracaoEfetivo/__tests__/*.test.js",
     "validate:transicao-designacao-runtime": "node scripts/validate-transicao-designacao-runtime.mjs",
     "publish:transicao-designacao-runtime": "npm run validate:transicao-designacao-runtime && npm run entities:push && npm run deploy:base44",
-    "validate:promocao-entity": "node scripts/validate-promocao-entity.mjs"
+    "validate:promocao-entity": "node scripts/validate-promocao-entity.mjs",
+    "verify:promocao-runtime": "node scripts/verify-promocao-runtime.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.28",
