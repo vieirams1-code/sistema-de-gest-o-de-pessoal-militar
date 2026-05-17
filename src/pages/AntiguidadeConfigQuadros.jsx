@@ -9,11 +9,10 @@ import {
   ExternalLink,
   Info,
   Loader2,
-  Plus,
+  Search,
   RefreshCw,
   Save,
   Trash2,
-  X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -25,14 +24,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 const VERSAO_REGRA_RASCUNHO = 'antiguidade.quadros.rascunho.v1';
 const OBSERVACAO_PADRAO = 'Confirmar precedência institucional.';
@@ -259,6 +250,8 @@ export default function AntiguidadeConfigQuadros() {
   const [grupos, setGrupos] = useState([]);
   const [motivoAlteracao, setMotivoAlteracao] = useState('');
   const [estadoInicial, setEstadoInicial] = useState(null);
+  const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const [termoPesquisaQuadros, setTermoPesquisaQuadros] = useState('');
 
   const {
     data: militaresAtivos = [],
@@ -292,12 +285,46 @@ export default function AntiguidadeConfigQuadros() {
     setGrupos(inicial.grupos);
     setMotivoAlteracao(inicial.motivoAlteracao);
     setEstadoInicial(inicial);
+    setSelectedGroupId((idAtual) => (inicial.grupos.some((grupo) => grupo.id_local === idAtual) ? idAtual : inicial.grupos[0]?.id_local || null));
   }, [configuracoesAtivas, configuracoesLoading, militaresLoading, quadrosDisponiveis]);
 
   const validacoes = useMemo(() => calcularValidacoes(grupos, quadrosDisponiveis, motivoAlteracao), [grupos, motivoAlteracao, quadrosDisponiveis]);
   const gruposAtivos = useMemo(() => grupos.filter((grupo) => grupo.ativo !== false), [grupos]);
   const gruposOrdenados = useMemo(() => ordenarGruposPorIndice(gruposAtivos), [gruposAtivos]);
   const podeSalvar = validacoes.alertas.length === 0 && !militaresErro && !configuracoesErro;
+
+  const grupoPorQuadro = useMemo(() => {
+    const mapa = new Map();
+    gruposAtivos.forEach((grupo) => {
+      (grupo.membros_reais || []).forEach((membro) => {
+        if (texto(membro)) mapa.set(membro, grupo);
+      });
+    });
+    return mapa;
+  }, [gruposAtivos]);
+
+  const quadrosVisiveis = useMemo(() => {
+    const termo = texto(termoPesquisaQuadros).toLowerCase();
+    return quadrosDisponiveis
+      .filter((quadro) => !quadro.vazio && texto(quadro.valor))
+      .filter((quadro) => {
+        if (!termo) return true;
+        const grupo = grupoPorQuadro.get(quadro.valor);
+        return quadro.valor.toLowerCase().includes(termo) || texto(grupo?.nome_grupo).toLowerCase().includes(termo);
+      });
+  }, [grupoPorQuadro, quadrosDisponiveis, termoPesquisaQuadros]);
+
+  const quadrosNaoClassificados = useMemo(
+    () => quadrosVisiveis.filter((quadro) => !validacoes.classificados.has(quadro.valor)),
+    [quadrosVisiveis, validacoes.classificados],
+  );
+
+  const quadrosClassificados = useMemo(
+    () => quadrosVisiveis
+      .filter((quadro) => validacoes.classificados.has(quadro.valor))
+      .map((quadro) => ({ ...quadro, grupo: grupoPorQuadro.get(quadro.valor) })),
+    [grupoPorQuadro, quadrosVisiveis, validacoes.classificados],
+  );
 
   const totais = useMemo(() => ({
     disponiveis: quadrosDisponiveis.filter((quadro) => !quadro.vazio && texto(quadro.valor)).length,
@@ -353,8 +380,9 @@ export default function AntiguidadeConfigQuadros() {
 
   function adicionarGrupo() {
     const indice = grupos.length ? Math.max(...grupos.map((grupo) => Number(grupo.indice) || 0)) + 1 : 0;
+    const novoId = `novo-grupo-${Date.now()}`;
     setGrupos((atuais) => [...atuais, {
-      id_local: `novo-grupo-${Date.now()}`,
+      id_local: novoId,
       nome_grupo: '',
       indice,
       membros_reais: [],
@@ -364,14 +392,17 @@ export default function AntiguidadeConfigQuadros() {
       motivo_alteracao: texto(motivoAlteracao),
       atualizado_em: new Date().toISOString(),
     }]);
+    setSelectedGroupId(novoId);
   }
 
   function removerGrupo(idLocal) {
     setGrupos((atuais) => atuais.filter((grupo) => grupo.id_local !== idLocal));
+    setSelectedGroupId((idAtual) => (idAtual === idLocal ? null : idAtual));
   }
 
   function adicionarMembro(idLocal, membro) {
     if (!texto(membro) || !quadrosConfiguraveisSet.has(membro)) return;
+    setSelectedGroupId(idLocal);
     setGrupos((atuais) => atuais.map((grupo) => {
       if (grupo.id_local !== idLocal) return grupo;
       const membros = Array.isArray(grupo.membros_reais) ? grupo.membros_reais : [];
@@ -409,6 +440,7 @@ export default function AntiguidadeConfigQuadros() {
     if (!estadoInicial) return;
     setGrupos(estadoInicial.grupos);
     setMotivoAlteracao(estadoInicial.motivoAlteracao);
+    setSelectedGroupId(estadoInicial.grupos[0]?.id_local || null);
   }
 
   function salvarRascunho() {
@@ -525,187 +557,223 @@ export default function AntiguidadeConfigQuadros() {
         </Alert>
       )}
 
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg text-slate-900">Quadros disponíveis no sistema e legados encontrados</CardTitle>
-          <p className="text-sm text-slate-600">Fonte oficial: QUADROS_FIXOS de src/utils/postoQuadroCompatibilidade.js, unida aos valores distintos de Militar.quadro em militares ativos.</p>
-        </CardHeader>
-        <CardContent>
-          {carregando ? (
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-sm font-medium text-slate-700">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando quadros disponíveis...
+      <div className="flex min-h-[600px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-[calc(100vh-220px)]">
+        <div className="flex w-1/3 min-w-[320px] flex-col border-r border-slate-200 bg-slate-50">
+          <div className="border-b border-slate-200 bg-white p-4">
+            <h2 className="mb-3 font-bold text-slate-800">Banco de Quadros</h2>
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                type="text"
+                value={termoPesquisaQuadros}
+                onChange={(event) => setTermoPesquisaQuadros(event.target.value)}
+                placeholder="Procurar quadro..."
+                className="w-full border-slate-300 py-2 pl-9 pr-3 text-sm focus:ring-2 focus:ring-blue-500"
+              />
             </div>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <Table className="min-w-max">
-                <TableHeader>
-                  <TableRow className="bg-slate-50 hover:bg-slate-50">
-                    <TableHead>Valor do quadro</TableHead>
-                    <TableHead className="text-right">Quantidade de militares</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Origem</TableHead>
-                    <TableHead>Observação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {quadrosDisponiveis.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="py-6 text-center text-slate-500">Nenhum quadro encontrado.</TableCell></TableRow>
-                  ) : quadrosDisponiveis.map((quadro) => {
-                    const classificado = !quadro.vazio && validacoes.classificados.has(quadro.valor);
-                    return (
-                      <TableRow key={quadro.valor || '__vazio__'}>
-                        <TableCell className="font-semibold text-slate-900">{quadro.vazio ? <Badge variant="outline" className="whitespace-nowrap border-red-300 bg-red-50 px-2 py-0.5 text-xs text-red-800">Quadro vazio</Badge> : quadro.valor}</TableCell>
-                        <TableCell className="text-right font-mono font-semibold text-slate-800">{quadro.quantidade}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={`whitespace-nowrap px-2 py-0.5 text-xs ${classificado ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
-                            {quadro.vazio ? 'não classificado' : classificado ? 'classificado' : 'não classificado'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {quadro.origem === 'legado_base' ? (
-                            <Badge variant="outline" className="whitespace-nowrap border-orange-300 bg-orange-50 px-2 py-0.5 text-xs text-orange-800">valor legado encontrado na base</Badge>
-                          ) : quadro.origem === 'opcao_sistema_e_valor_real' ? (
-                            <Badge variant="outline" className="whitespace-nowrap border-blue-300 bg-blue-50 px-2 py-0.5 text-xs text-blue-800">opção do sistema + valor real</Badge>
-                          ) : quadro.origem === 'valor_real_vazio' ? (
-                            <Badge variant="outline" className="whitespace-nowrap border-red-300 bg-red-50 px-2 py-0.5 text-xs text-red-800">valor real incompleto</Badge>
-                          ) : (
-                            <Badge variant="outline" className="whitespace-nowrap border-slate-300 bg-slate-50 px-2 py-0.5 text-xs text-slate-800">opção do sistema</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-600">
-                          {quadro.legado && quadro.valor === 'QBMPT' ? 'Saneamento sugerido: migrar para QPTBM; pode ser coberto temporariamente pelo grupo QPTBM.' : quadro.legado ? 'Valor não está no dropdown oficial; revisar saneamento cadastral.' : quadro.oficial ? 'Disponível para configuração mesmo com quantidade 0.' : 'Não é configurável como quadro.'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader className="space-y-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-lg text-slate-900">Grupos de antiguidade</CardTitle>
-              <p className="text-sm text-slate-600">Edite nomes, índices, observações e vincule quadros oficiais ou legados reais ainda não classificados.</p>
-            </div>
-            <Button type="button" variant="outline" onClick={adicionarGrupo}>
-              <Plus className="h-4 w-4" />
-              Criar novo grupo
-            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {gruposOrdenados.length === 0 ? (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">Nenhum grupo criado.</div>
-          ) : gruposOrdenados.map((grupo, posicao) => {
-            const membros = Array.isArray(grupo.membros_reais) ? grupo.membros_reais : [];
-            const podeRemoverGrupo = membros.length === 0;
-            const opcoesAdicionar = validacoes.naoClassificados;
 
-            return (
-              <div key={grupo.id_local} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_120px_1.5fr]">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nome do grupo</label>
-                    <Input value={grupo.nome_grupo} onChange={(event) => atualizarGrupo(grupo.id_local, { nome_grupo: event.target.value })} placeholder="Ex.: QOBM" className="mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Índice</label>
-                    <Input type="number" value={grupo.indice} onChange={(event) => atualizarGrupo(grupo.id_local, { indice: event.target.value })} className="mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Observação</label>
-                    <Input value={grupo.observacao} onChange={(event) => atualizarGrupo(grupo.id_local, { observacao: event.target.value })} placeholder={OBSERVACAO_PADRAO} className="mt-1" />
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={grupo.pendente_confirmacao_institucional !== false}
-                      onChange={(event) => atualizarGrupo(grupo.id_local, { pendente_confirmacao_institucional: event.target.checked })}
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-                    Pendente de confirmação institucional
-                  </label>
-                  <Button type="button" variant="outline" size="sm" onClick={() => moverGrupo(grupo.id_local, -1)} disabled={posicao === 0}>
-                    <ArrowUp className="h-4 w-4" />
-                    Subir
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => moverGrupo(grupo.id_local, 1)} disabled={posicao === gruposOrdenados.length - 1}>
-                    <ArrowDown className="h-4 w-4" />
-                    Descer
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => removerGrupo(grupo.id_local)} disabled={!podeRemoverGrupo} className="text-red-700 hover:text-red-800">
-                    <Trash2 className="h-4 w-4" />
-                    Remover grupo vazio
-                  </Button>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quadros cobertos vinculados</p>
-                    {membros.length === 0 ? (
-                      <p className="mt-2 text-sm text-slate-500">Sem quadros cobertos vinculados.</p>
-                    ) : (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {membros.map((membro) => (
-                          <Badge key={`${grupo.id_local}-${membro}`} variant="secondary" className="gap-1 whitespace-nowrap bg-slate-100 px-2 py-0.5 text-xs text-slate-800 hover:bg-slate-100">
-                            {membro}
-                            <button type="button" onClick={() => removerMembro(grupo.id_local, membro)} aria-label={`Remover ${membro}`} className="rounded-full hover:bg-slate-200">
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <select
-                      className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800"
-                      defaultValue=""
-                      onChange={(event) => {
-                        adicionarMembro(grupo.id_local, event.target.value);
-                        event.target.value = '';
-                      }}
-                    >
-                      <option value="">Adicionar quadro ainda não classificado</option>
-                      {opcoesAdicionar.map((quadro) => <option key={`${grupo.id_local}-${quadro}`} value={quadro}>{quadro}</option>)}
-                    </select>
-                    {opcoesAdicionar.length === 0 && <span className="text-sm text-slate-500">Não há quadros livres para adicionar.</span>}
-                  </div>
-                </div>
+          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+            {carregando ? (
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm font-medium text-slate-700">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Carregando quadros disponíveis...
               </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+            ) : (
+              <>
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase text-amber-600">Não Classificados</h3>
+                    <span className="text-[11px] font-semibold text-amber-700">{quadrosNaoClassificados.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {quadrosNaoClassificados.length === 0 ? (
+                      <div className="flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Todos os quadros visíveis estão classificados.
+                      </div>
+                    ) : quadrosNaoClassificados.map((quadro) => {
+                      const grupoSelecionadoExiste = gruposOrdenados.some((grupo) => grupo.id_local === selectedGroupId);
+                      return (
+                        <div key={quadro.valor} className="flex items-center justify-between gap-3 rounded border border-amber-200 bg-white p-2.5 shadow-sm">
+                          <div className="min-w-0">
+                            <span className="block truncate font-medium text-slate-700">{quadro.valor}</span>
+                            <span className="text-[11px] text-slate-500">{quadro.quantidade} militar(es)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!grupoSelecionadoExiste) {
+                                toast({ title: 'Selecione um grupo', description: 'Abra ou crie um grupo de antiguidade antes de atribuir o quadro.', variant: 'destructive' });
+                                return;
+                              }
+                              adicionarMembro(selectedGroupId, quadro.valor);
+                            }}
+                            className="shrink-0 rounded bg-amber-100 px-2 py-1 text-xs text-amber-800 transition-colors hover:bg-amber-200"
+                          >
+                            Atribuir →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg text-slate-900">Não classificados</CardTitle>
-          <p className="text-sm text-slate-600">Todo quadro oficial do sistema e todo valor legado real não vazio de Militar.quadro que ainda não esteja em nenhum grupo ativo.</p>
-        </CardHeader>
-        <CardContent>
-          {validacoes.naoClassificados.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-              <CheckCircle2 className="h-4 w-4" />
-              Todos os quadros oficiais e legados reais não vazios estão classificados.
+                <div>
+                  <div className="mb-2 mt-6 flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase text-slate-400">Já Classificados</h3>
+                    <span className="text-[11px] font-semibold text-slate-500">{quadrosClassificados.length}</span>
+                  </div>
+                  <div className="space-y-2 opacity-70">
+                    {quadrosClassificados.length === 0 ? (
+                      <p className="rounded border border-slate-200 bg-white p-3 text-sm text-slate-500">Nenhum quadro classificado corresponde à pesquisa.</p>
+                    ) : quadrosClassificados.map((quadro) => (
+                      <div key={quadro.valor} className="flex items-center justify-between gap-3 rounded border border-slate-200 bg-white p-2">
+                        <span className="min-w-0 truncate text-sm font-medium text-slate-600">{quadro.valor}</span>
+                        <span className="shrink-0 truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500" title={quadro.grupo?.nome_grupo || 'Grupo não identificado'}>
+                          {quadro.grupo?.nome_grupo || 'Grupo não identificado'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex w-2/3 flex-col">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-white p-4">
+            <div>
+              <h2 className="font-bold text-slate-800">Grupos de Antiguidade</h2>
+              <p className="text-xs text-slate-500">Selecione um cartão para editar e receber quadros do banco lateral.</p>
             </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {validacoes.naoClassificados.map((quadro) => <Badge key={quadro} variant="outline" className="whitespace-nowrap border-amber-300 bg-amber-50 px-2 py-0.5 text-xs text-amber-800">{quadro}</Badge>)}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <button
+              type="button"
+              onClick={adicionarGrupo}
+              className="rounded-md bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100"
+            >
+              + Novo Grupo
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
+            {gruposOrdenados.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-600">
+                Nenhum grupo criado. Use “Novo Grupo” para iniciar a configuração.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {gruposOrdenados.map((grupo, posicao) => {
+                  const selecionado = selectedGroupId === grupo.id_local;
+                  const membros = Array.isArray(grupo.membros_reais) ? grupo.membros_reais : [];
+                  const podeRemoverGrupo = membros.length === 0;
+
+                  return (
+                    <div
+                      key={grupo.id_local}
+                      onClick={() => setSelectedGroupId(selecionado ? null : grupo.id_local)}
+                      className={`cursor-pointer rounded-lg border transition-all ${
+                        selecionado
+                          ? 'border-blue-400 bg-white shadow-md ring-1 ring-blue-400'
+                          : 'border-slate-200 bg-white hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-4 p-4">
+                        <div className="flex min-w-0 items-center">
+                          <div className={`mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold ${selecionado ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {posicao + 1}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className={`truncate font-bold ${selecionado ? 'text-blue-900' : 'text-slate-700'}`}>
+                              {texto(grupo.nome_grupo) || 'Grupo sem nome'}
+                            </h3>
+                            <div className="mt-0.5 text-xs text-slate-500">Índice atual: {grupo.indice}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex max-w-[55%] flex-wrap justify-end gap-1">
+                          {membros.slice(0, 6).map((membro) => (
+                            <span key={`${grupo.id_local}-preview-${membro}`} className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                              {membro}
+                            </span>
+                          ))}
+                          {membros.length > 6 && <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">+{membros.length - 6}</span>}
+                        </div>
+                      </div>
+
+                      {selecionado && (
+                        <div className="rounded-b-lg border-t border-slate-100 bg-blue-50/30 p-4" onClick={(event) => event.stopPropagation()}>
+                          <div className="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_120px_1.5fr]">
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-slate-500">Nome do Grupo</label>
+                              <Input value={grupo.nome_grupo} onChange={(event) => atualizarGrupo(grupo.id_local, { nome_grupo: event.target.value })} placeholder="Ex.: QOBM" className="w-full border-slate-300 p-2 text-sm" />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-slate-500">Índice</label>
+                              <Input type="number" value={grupo.indice} onChange={(event) => atualizarGrupo(grupo.id_local, { indice: event.target.value })} className="w-full border-slate-300 p-2 text-sm" />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-slate-500">Observação Institucional</label>
+                              <Input value={grupo.observacao} onChange={(event) => atualizarGrupo(grupo.id_local, { observacao: event.target.value })} placeholder={OBSERVACAO_PADRAO} className="w-full border-slate-300 p-2 text-sm" />
+                            </div>
+                          </div>
+
+                          <div className="mb-4 flex flex-wrap items-center gap-3">
+                            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={grupo.pendente_confirmacao_institucional !== false}
+                                onChange={(event) => atualizarGrupo(grupo.id_local, { pendente_confirmacao_institucional: event.target.checked })}
+                                className="h-4 w-4 rounded border-slate-300"
+                              />
+                              Pendente de confirmação institucional
+                            </label>
+                            <Button type="button" variant="outline" size="sm" onClick={() => moverGrupo(grupo.id_local, -1)} disabled={posicao === 0}>
+                              <ArrowUp className="h-4 w-4" />
+                              Subir
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => moverGrupo(grupo.id_local, 1)} disabled={posicao === gruposOrdenados.length - 1}>
+                              <ArrowDown className="h-4 w-4" />
+                              Descer
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => removerGrupo(grupo.id_local)} disabled={!podeRemoverGrupo} className="text-red-700 hover:text-red-800">
+                              <Trash2 className="h-4 w-4" />
+                              Remover grupo vazio
+                            </Button>
+                          </div>
+
+                          <div>
+                            <label className="mb-2 block text-xs font-medium text-slate-500">Quadros vinculados (remova clicando na lixeira)</label>
+                            <div className="flex min-h-[60px] flex-wrap gap-2 rounded border border-slate-200 bg-white p-3">
+                              {membros.map((membro) => (
+                                <div key={`${grupo.id_local}-${membro}`} className="flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800">
+                                  {membro}
+                                  <button
+                                    type="button"
+                                    onClick={() => removerMembro(grupo.id_local, membro)}
+                                    aria-label={`Remover ${membro}`}
+                                    className="ml-2 rounded-full bg-blue-200 p-0.5 text-blue-500 hover:text-red-500"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
+                              <div className="flex items-center px-2 text-sm text-slate-400">
+                                ← Use a lista lateral para adicionar mais
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
