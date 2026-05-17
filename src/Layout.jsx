@@ -339,7 +339,7 @@ export default function Layout({ children, currentPageName }) {
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-0 left-0 h-screen w-72 bg-[#173764] text-white z-50
+          fixed top-0 left-0 h-screen w-64 bg-[#173764] text-white z-50
           flex flex-col
           transform transition-transform duration-300 ease-in-out
           lg:translate-x-0
@@ -347,7 +347,7 @@ export default function Layout({ children, currentPageName }) {
         `}
       >
         {/* Topo */}
-        <div className="border-b border-white/10 px-5 py-5 shrink-0">
+        <div className="border-b border-white/10 px-4 py-4 shrink-0">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="rounded-2xl border border-white/20 p-2 bg-white/5 shrink-0">
@@ -373,7 +373,7 @@ export default function Layout({ children, currentPageName }) {
         </div>
 
         {/* Menu rolável */}
-        <nav className="flex-1 overflow-y-auto px-3 py-5 custom-scrollbar">
+        <nav className="flex-1 overflow-y-auto px-2.5 py-4 custom-scrollbar">
           <div className="space-y-6">
             {visibleMenuGroups.map((group) => (
               <div key={group.title}>
@@ -394,7 +394,7 @@ export default function Layout({ children, currentPageName }) {
                           <button
                             onClick={() => toggleExpanded(item.name)}
                             className={`
-                              flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-medium transition-all
+                              flex w-full items-center justify-between rounded-xl px-2.5 py-2.5 text-left text-sm font-medium transition-all
                               ${active ? 'bg-white/15 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'}
                             `}
                           >
@@ -448,7 +448,7 @@ export default function Layout({ children, currentPageName }) {
                         to={item.tab ? `${item.path || createPageUrl(item.page)}?tab=${item.tab}` : (item.path || createPageUrl(item.page))}
                         onClick={() => setSidebarOpen(false)}
                         className={`
-                          group flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all
+                          group flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-all
                           ${active
                             ? 'bg-white/15 text-white shadow-inner'
                             : 'text-white/75 hover:bg-white/10 hover:text-white'}
@@ -485,9 +485,9 @@ export default function Layout({ children, currentPageName }) {
       </aside>
 
       {/* Conteúdo */}
-      <main className="lg:pl-72 pt-16 lg:pt-0 min-h-screen">
+      <main className="lg:pl-64 pt-16 lg:pt-0 min-h-screen">
         <div className="sticky top-16 lg:top-0 z-30 border-b border-slate-200 bg-slate-50/95 backdrop-blur px-4 py-3">
-          <div className="max-w-7xl mx-auto flex items-center gap-3">
+          <div className="mx-auto flex w-full max-w-none items-center gap-3">
             <GlobalMilitarSearch />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

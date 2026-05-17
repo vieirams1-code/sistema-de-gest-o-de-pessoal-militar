@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ClipboardCopy, Eye, PlusCircle, RefreshCw, Search } from 'lucide-react';
+import { ClipboardCopy, Eye, MoreVertical, PlusCircle, RefreshCw, Search } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -283,7 +284,7 @@ function PainelMilitares({ titulo, descricao, militares, busca, onBuscaChange })
             <CardTitle className="text-lg text-slate-900">{titulo}</CardTitle>
             <p className="mt-1 text-sm text-slate-500">{descricao}</p>
           </div>
-          <Badge variant="outline" className="w-fit text-sm">{filtrados.length} / {militares.length}</Badge>
+          <Badge variant="outline" className="w-fit whitespace-nowrap px-2 py-0.5 text-xs">{filtrados.length} / {militares.length}</Badge>
         </div>
         <div className="flex flex-col gap-2 md:flex-row">
           <div className="relative flex-1">
@@ -296,8 +297,8 @@ function PainelMilitares({ titulo, descricao, militares, busca, onBuscaChange })
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-auto rounded-lg border">
-          <table className="w-full min-w-[760px] text-sm">
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="min-w-max w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr><th className="p-3">Nome</th><th className="p-3">Matrícula</th><th className="p-3">Posto</th><th className="p-3">Quadro</th><th className="p-3">Lotação</th><th className="p-3">Ficha</th></tr>
             </thead>
@@ -445,11 +446,11 @@ export default function RastreamentoPromocoes() {
     return Array.from(grupos.values()).sort((a, b) => texto(b.data_promocao).localeCompare(texto(a.data_promocao)) || Number(a.ordem) - Number(b.ordem));
   }, [data?.atuaisComOrdenacao]);
 
-  if (isLoading) return <div className="p-6">Carregando rastreamento de promoções...</div>;
-  if (error) return <div className="p-6 text-red-600">{error?.message || 'Falha ao carregar rastreamento de promoções.'}</div>;
+  if (isLoading) return <div className="p-[clamp(1rem,1.4vw,1.5rem)]">Carregando rastreamento de promoções...</div>;
+  if (error) return <div className="p-[clamp(1rem,1.4vw,1.5rem)] text-red-600">{error?.message || 'Falha ao carregar rastreamento de promoções.'}</div>;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-[clamp(1rem,1.4vw,1.5rem)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">Antiguidade</p>
@@ -496,7 +497,7 @@ export default function RastreamentoPromocoes() {
               <CardTitle>3. Agrupamentos detectados</CardTitle>
               <p className="mt-1 text-sm text-slate-500">Agrupamento por posto_graduacao_novo, quadro_novo, data_promocao, data_publicacao, boletim_referencia e ato_referencia.</p>
             </div>
-            <Badge variant="outline" className="w-fit text-sm">{gruposFiltrados.length} / {data.agrupamentos.length}</Badge>
+            <Badge variant="outline" className="w-fit whitespace-nowrap px-2 py-0.5 text-xs">{gruposFiltrados.length} / {data.agrupamentos.length}</Badge>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px]">
             <div>
@@ -515,8 +516,8 @@ export default function RastreamentoPromocoes() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-auto rounded-lg border">
-            <table className="w-full min-w-[1120px] text-sm">
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="min-w-max w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                 <tr><th className="p-3">Grupo</th><th className="p-3">Promoção</th><th className="p-3">Publicação</th><th className="p-3">Refs.</th><th className="p-3">Total</th><th className="p-3">Com ordem</th><th className="p-3">Sem ordem</th><th className="p-3">Ativos</th><th className="p-3">Previstos</th><th className="p-3">Cancel./Retif.</th><th className="p-3">Duplic.</th><th className="p-3">Confiança</th><th className="p-3">Ações</th></tr>
               </thead>
@@ -534,8 +535,26 @@ export default function RastreamentoPromocoes() {
                     <td className="p-3">{grupo.previstos}</td>
                     <td className="p-3">{grupo.canceladosRetificados}</td>
                     <td className="p-3">{grupo.duplicidades}</td>
-                    <td className="p-3"><Badge variant={confiancaVariant(grupo.confianca)}>{grupo.confianca}</Badge></td>
-                    <td className="p-3"><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setGrupoDetalhe(grupo)}><Eye className="mr-2 h-4 w-4" />Ver</Button><Button type="button" size="sm" onClick={() => abrirCriacaoPromocao(grupo)}><PlusCircle className="mr-2 h-4 w-4" />Criar Promoção</Button></div></td>
+                    <td className="p-3"><Badge variant={confiancaVariant(grupo.confianca)} className="whitespace-nowrap px-2 py-0.5 text-xs">{grupo.confianca}</Badge></td>
+                    <td className="p-2 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Abrir ações do agrupamento">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem onClick={() => setGrupoDetalhe(grupo)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => abrirCriacaoPromocao(grupo)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Criar Promoção
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 ))}
                 {gruposFiltrados.length === 0 && <tr><td colSpan={13} className="p-6 text-center text-slate-500">Nenhum agrupamento encontrado.</td></tr>}
@@ -555,9 +574,9 @@ export default function RastreamentoPromocoes() {
             {atuaisPorGrupo.map((grupo) => (
               <div key={`${grupo.data_promocao}-${grupo.ordem}`} className="rounded-lg border p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">Data: {dataFormatada(grupo.data_promocao)}</Badge>
-                  <Badge variant="outline">Ordem: {grupo.ordem}</Badge>
-                  <Badge>{grupo.itens.length} militar(es)</Badge>
+                  <Badge variant="outline" className="whitespace-nowrap px-2 py-0.5 text-xs">Data: {dataFormatada(grupo.data_promocao)}</Badge>
+                  <Badge variant="outline" className="whitespace-nowrap px-2 py-0.5 text-xs">Ordem: {grupo.ordem}</Badge>
+                  <Badge className="whitespace-nowrap px-2 py-0.5 text-xs">{grupo.itens.length} militar(es)</Badge>
                   <Button type="button" size="sm" variant="ghost" onClick={() => copiarTexto(linhasMilitares(grupo.itens.map((item) => item.militar)))}><ClipboardCopy className="mr-2 h-4 w-4" />Copiar lista</Button>
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -663,8 +682,8 @@ export default function RastreamentoPromocoes() {
                 <div><span className="text-slate-500">Confiança</span><p><Badge variant={confiancaVariant(grupoDetalhe.confianca)}>{grupoDetalhe.confianca}</Badge></p></div>
               </div>
               <Button type="button" variant="outline" onClick={() => copiarTexto(linhasMilitares(grupoDetalhe.militares))}><ClipboardCopy className="mr-2 h-4 w-4" />Copiar militares do agrupamento</Button>
-              <div className="max-h-[55vh] overflow-auto rounded-lg border">
-                <table className="w-full min-w-[880px] text-sm">
+              <div className="max-h-[55vh] overflow-x-auto rounded-lg border">
+                <table className="min-w-max w-full text-sm">
                   <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-3">Militar</th><th className="p-3">Matrícula</th><th className="p-3">Status</th><th className="p-3">Ordem</th><th className="p-3">Boletim</th><th className="p-3">Ato</th><th className="p-3">Ficha</th></tr></thead>
                   <tbody>
                     {grupoDetalhe.registros.map((registro, index) => {

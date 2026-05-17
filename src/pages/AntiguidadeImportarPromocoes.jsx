@@ -1,8 +1,10 @@
 import React from 'react';
+import { MoreVertical } from 'lucide-react';
 import { queryClientInstance } from '@/lib/query-client';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { gerarPreviaImportacao, parseArquivoPromocoes } from '@/utils/antiguidade/importarPromocoes';
@@ -334,9 +336,9 @@ export default function AntiguidadeImportarPromocoes() {
     }
   };
 
-  return <div className="p-6 space-y-6">
+  return <div className="space-y-6 p-[clamp(1rem,1.4vw,1.5rem)]">
     <h1 className="text-2xl font-bold text-[#1e3a5f]">Promoções de Antiguidade</h1>
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button variant={aba === 'importacao' ? 'default' : 'outline'} onClick={() => setAba('importacao')}>Importação</Button>
       <Button variant={aba === 'manual' ? 'default' : 'outline'} onClick={() => setAba('manual')}>Registrar promoção atual</Button>
       <Button variant={aba === 'coletiva' ? 'default' : 'outline'} onClick={() => setAba('coletiva')}>Promoção Coletiva</Button>
@@ -381,7 +383,7 @@ export default function AntiguidadeImportarPromocoes() {
         </div>
         <datalist id="postos-promocao-coletiva">{POSTOS_GRADUACOES.map((posto) => <option key={posto} value={posto} />)}</datalist>
         <datalist id="quadros-promocao-coletiva">{QUADROS.filter((quadro) => quadro !== 'QBMPT').map((quadro) => <option key={quadro} value={quadro} />)}</datalist>
-        <div className="grid grid-cols-3 gap-3 text-sm">
+        <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
           <div><strong>Selecionados:</strong> {resumoColetiva.selecionados}</div>
           <div><strong>Aptos selecionados:</strong> {resumoColetiva.aptos}</div>
           <div><strong>Bloqueados selecionados:</strong> {resumoColetiva.bloqueados}</div>
@@ -396,7 +398,7 @@ export default function AntiguidadeImportarPromocoes() {
             <Button type="button" variant="outline" onClick={limparSelecaoColetiva} disabled={selecionadosColetiva.length === 0}>Limpar seleção</Button>
           </div>
         </div>
-        <div className="overflow-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th>Selecionar</th><th>Militar</th><th>Matrícula</th><th>Posto atual</th><th>Quadro atual</th><th>Lotação</th><th>Quadro anterior a gravar</th><th>Ordem</th><th>Alertas/Bloqueios</th><th>Ações</th></tr></thead><tbody>{linhasColetiva.map(({ militar, validacao, selecionado }) => <tr key={militar.id} className={`border-b align-top ${!selecionado ? 'bg-slate-50 text-slate-500' : validacao.apto ? '' : 'bg-red-50'}`}><td><input type="checkbox" checked={selecionado} onChange={() => alternarSelecaoColetiva(militar.id)} aria-label={`Selecionar ${militar.nome_completo || militar.nome_guerra || militar.id}`} /></td><td>{militar.nome_completo || militar.nome_guerra || 'Sem nome'}</td><td>{militar.matricula || '—'}</td><td>{militar.posto_graduacao || '—'}</td><td>{militar.quadro || '—'}</td><td>{militar.lotacao || '—'}</td><td>{validacao.quadroAnterior || '—'}</td><td><Input className="h-8 w-24" value={ordensColetiva[militar.id] || ''} onChange={(e) => setOrdensColetiva((o) => ({ ...o, [militar.id]: e.target.value }))} /></td><td>{alertasCopiaOrdemColetiva[militar.id] && <div className="text-amber-700">Alerta: {alertasCopiaOrdemColetiva[militar.id]}</div>}{validacao.bloqueios.map((b) => <div key={b} className="text-red-700">Bloqueio: {b}</div>)}{validacao.alertas.map((a) => <div key={a} className="text-amber-700">Alerta: {a}</div>)}</td><td><Button size="sm" variant="outline" onClick={() => alternarSelecaoColetiva(militar.id)}>{selecionado ? 'Remover' : 'Selecionar'}</Button></td></tr>)}</tbody></table></div>
+        <div className="overflow-x-auto rounded-lg border"><table className="min-w-max w-full text-xs"><thead><tr className="border-b text-left"><th>Selecionar</th><th>Militar</th><th>Matrícula</th><th>Posto atual</th><th>Quadro atual</th><th>Lotação</th><th>Quadro anterior a gravar</th><th>Ordem</th><th>Alertas/Bloqueios</th><th>Ações</th></tr></thead><tbody>{linhasColetiva.map(({ militar, validacao, selecionado }) => <tr key={militar.id} className={`border-b align-top ${!selecionado ? 'bg-slate-50 text-slate-500' : validacao.apto ? '' : 'bg-red-50'}`}><td><input type="checkbox" checked={selecionado} onChange={() => alternarSelecaoColetiva(militar.id)} aria-label={`Selecionar ${militar.nome_completo || militar.nome_guerra || militar.id}`} /></td><td>{militar.nome_completo || militar.nome_guerra || 'Sem nome'}</td><td>{militar.matricula || '—'}</td><td>{militar.posto_graduacao || '—'}</td><td>{militar.quadro || '—'}</td><td>{militar.lotacao || '—'}</td><td>{validacao.quadroAnterior || '—'}</td><td><Input className="h-8 w-24" value={ordensColetiva[militar.id] || ''} onChange={(e) => setOrdensColetiva((o) => ({ ...o, [militar.id]: e.target.value }))} /></td><td>{alertasCopiaOrdemColetiva[militar.id] && <div className="text-amber-700">Alerta: {alertasCopiaOrdemColetiva[militar.id]}</div>}{validacao.bloqueios.map((b) => <div key={b} className="text-red-700">Bloqueio: {b}</div>)}{validacao.alertas.map((a) => <div key={a} className="text-amber-700">Alerta: {a}</div>)}</td><td className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Abrir ações do candidato"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => alternarSelecaoColetiva(militar.id)}>{selecionado ? 'Remover' : 'Selecionar'}</DropdownMenuItem></DropdownMenuContent></DropdownMenu></td></tr>)}</tbody></table></div>
         {!linhasColetiva.length && <p className="text-sm text-slate-600">Informe o posto de origem para listar militares ativos elegíveis. No tipo histórico, o filtro por posto atual é apenas auxiliar e não bloqueia militares atualmente mais graduados.</p>}
       </CardContent></Card>
 
@@ -432,7 +434,7 @@ export default function AntiguidadeImportarPromocoes() {
 
       <Card><CardHeader><CardTitle>Histórico de promoções do militar</CardTitle></CardHeader><CardContent className="space-y-3">
         <Input placeholder="Motivo obrigatório para retificar/cancelar" value={motivoRetificacao} onChange={(e) => setMotivoRetificacao(e.target.value)} />
-        <div className="overflow-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th>Status</th><th>Posto ant.</th><th>Posto novo</th><th>Quadro</th><th>Data</th><th>Boletim/Ato</th><th>Antiguidade ordem</th><th>Origem</th><th>Observações</th><th>Ações</th></tr></thead><tbody>{historico.map((h) => <tr key={h.id} className="border-b"><td>{h.status_registro}</td><td>{h.posto_graduacao_anterior || '—'}</td><td>{h.posto_graduacao_novo || '—'}</td><td>{h.quadro_novo || '—'}</td><td>{h.data_promocao || '—'}</td><td>{h.boletim_referencia || h.ato_referencia || '—'}</td><td>{h.antiguidade_referencia_ordem ?? '—'}</td><td>{h.origem_dado || '—'}</td><td>{h.observacoes || '—'}</td><td className="space-x-1"><Button size="sm" variant="outline" disabled={h.status_registro !== STATUS_ATIVO} onClick={() => retificarRegistro(h).catch((e) => setFeedbackManual(e.message))}>Retificar</Button><Button size="sm" variant="destructive" disabled={h.status_registro !== STATUS_ATIVO} onClick={() => cancelarRegistro(h).catch((e) => setFeedbackManual(e.message))}>Cancelar</Button></td></tr>)}</tbody></table></div>
+        <div className="overflow-x-auto rounded-lg border"><table className="min-w-max w-full text-xs"><thead><tr className="border-b text-left"><th>Status</th><th>Posto ant.</th><th>Posto novo</th><th>Quadro</th><th>Data</th><th>Boletim/Ato</th><th>Antiguidade ordem</th><th>Origem</th><th>Observações</th><th>Ações</th></tr></thead><tbody>{historico.map((h) => <tr key={h.id} className="border-b"><td>{h.status_registro}</td><td>{h.posto_graduacao_anterior || '—'}</td><td>{h.posto_graduacao_novo || '—'}</td><td>{h.quadro_novo || '—'}</td><td>{h.data_promocao || '—'}</td><td>{h.boletim_referencia || h.ato_referencia || '—'}</td><td>{h.antiguidade_referencia_ordem ?? '—'}</td><td>{h.origem_dado || '—'}</td><td>{h.observacoes || '—'}</td><td className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Abrir ações do histórico"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem disabled={h.status_registro !== STATUS_ATIVO} onClick={() => retificarRegistro(h).catch((e) => setFeedbackManual(e.message))}>Retificar</DropdownMenuItem><DropdownMenuItem disabled={h.status_registro !== STATUS_ATIVO} onClick={() => cancelarRegistro(h).catch((e) => setFeedbackManual(e.message))}>Cancelar</DropdownMenuItem></DropdownMenuContent></DropdownMenu></td></tr>)}</tbody></table></div>
       </CardContent></Card>
     </>}
   </div>;

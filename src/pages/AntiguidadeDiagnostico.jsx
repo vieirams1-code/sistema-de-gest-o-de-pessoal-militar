@@ -16,13 +16,15 @@ function TabelaResumo({ titulo, dados }) {
     <Card>
       <CardHeader><CardTitle>{titulo}</CardTitle></CardHeader>
       <CardContent>
-        <table className="w-full text-sm">
-          <tbody>
+        <div className="overflow-x-auto">
+          <table className="min-w-max w-full text-sm">
+            <tbody>
             {entries.map(([chave, valor]) => (
               <tr key={chave} className="border-b"><td className="py-1">{chave}</td><td className="py-1 text-right font-semibold">{valor}</td></tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -43,8 +45,8 @@ export default function AntiguidadeDiagnostico() {
     },
   });
 
-  if (loading) return <div className="p-6">Carregando diagnóstico...</div>;
-  if (error) return <div className="p-6 text-red-600">{error?.message || 'Falha ao carregar diagnóstico de antiguidade.'}</div>;
+  if (loading) return <div className="p-[clamp(1rem,1.4vw,1.5rem)]">Carregando diagnóstico...</div>;
+  if (error) return <div className="p-[clamp(1rem,1.4vw,1.5rem)] text-red-600">{error?.message || 'Falha ao carregar diagnóstico de antiguidade.'}</div>;
 
   const cards = [
     ['Total de militares ativos', diag.totalAtivos],
@@ -57,8 +59,8 @@ export default function AntiguidadeDiagnostico() {
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-[clamp(1rem,1.4vw,1.5rem)]">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-bold text-[#1e3a5f]">Cobertura de Dados para Antiguidade</h1>
         <Button disabled title="Disponível em lote futuro">Gerar lista rascunho (futuro)</Button>
       </div>
@@ -78,8 +80,8 @@ export default function AntiguidadeDiagnostico() {
       <Card>
         <CardHeader><CardTitle>Lista de militares pendentes</CardTitle></CardHeader>
         <CardContent>
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="min-w-max w-full text-sm">
               <thead><tr className="text-left border-b"><th>Posto</th><th>Quadro</th><th>Nome de guerra</th><th>Nome completo</th><th>Matrícula</th><th>Lotação</th><th>Motivo</th></tr></thead>
               <tbody>
                 {diag.pendentesDetalhes.map(({ militar, motivos }) => (
