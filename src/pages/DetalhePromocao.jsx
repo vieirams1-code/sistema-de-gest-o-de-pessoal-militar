@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Link2, RefreshCw, Unlink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Link2, RefreshCw, Trash2, Unlink } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import {
+  STATUS_TURMA_OPERACIONAL,
   alertasCandidato,
   buscarCandidatosProvaveis,
   dataFormatada,
@@ -22,20 +23,26 @@ import {
   enriquecerHistoricos,
   filtrarCandidatosCompativeis,
   historicoCombinaComPromocao,
+  avaliarAlertasTurmaOperacional,
   montarDiagnosticoMilitaresPromocao,
   montarMilitarPorId,
+  montarPatchPromocaoMilitar,
+  montarPayloadAdicaoManualTurma,
   motivosBloqueioVinculoProvavel,
   nomeMilitar,
+  normalizarItemTurmaOperacional,
   podeVincularProvavelAdministrativamente,
   ordenarHistoricosVinculados,
   texto,
   tituloPromocao,
+  validarSalvarTurmaOperacional,
   valorOuTraco,
 } from '@/services/promocaoService';
 
 const CONFIRMACAO_VINCULAR = 'VINCULAR PROMOÇÃO';
 const CONFIRMACAO_VINCULAR_PROVAVEIS = 'VINCULAR PROVÁVEIS';
 const CONFIRMACAO_DESVINCULAR = 'DESVINCULAR PROMOÇÃO';
+const CONFIRMACAO_REMOVER_TURMA = 'REMOVER DA TURMA';
 
 async function carregarPromocaoPorId(promocaoId) {
   if (!promocaoId) return null;
@@ -129,6 +136,9 @@ export default function DetalhePromocao() {
   const [confirmacaoVincular, setConfirmacaoVincular] = useState('');
   const [historicoParaDesvincular, setHistoricoParaDesvincular] = useState(null);
   const [confirmacaoDesvincular, setConfirmacaoDesvincular] = useState('');
+  const [rascunhoTurma, setRascunhoTurma] = useState([]);
+  const [registroParaRemover, setRegistroParaRemover] = useState(null);
+  const [confirmacaoRemoverTurma, setConfirmacaoRemoverTurma] = useState('');
 
   const promocaoQuery = useQuery({
     queryKey: ['detalhe-promocao', promocaoId],
@@ -203,6 +213,10 @@ export default function DetalhePromocao() {
 
   const turmaOperacionalFonte = turmaOperacional.length > 0 ? 'PromocaoMilitar' : 'HistoricoPromocaoMilitarV2.promocao_id';
 
+  useEffect(() => {
+    setRascunhoTurma(turmaOperacional.map((registro) => normalizarItemTurmaOperacional(registro)));
+  }, [turmaOperacional]);
+
   const candidatos = useMemo(() => {
     if (!promocao) return [];
     return ordenarHistoricosVinculados(enriquecerHistoricos(
@@ -225,6 +239,17 @@ export default function DetalhePromocao() {
       militarPorId,
     ));
   }, [historicosQuery.data, militarPorId, promocao]);
+
+  const candidatosParaAdicionarTurma = useMemo(() => {
+    const militaresNaTurma = new Set(turmaOperacional.map((registro) => String(registro?.militar_id || '')));
+    const porMilitar = new Map();
+    [...candidatos, ...candidatosProvaveis.filter((historico) => historico.vinculoProvavelPermitido)].forEach((historico) => {
+      const militarId = String(historico?.militar_id || '');
+      if (!militarId || militaresNaTurma.has(militarId) || porMilitar.has(militarId)) return;
+      porMilitar.set(militarId, historico);
+    });
+    return [...porMilitar.values()];
+  }, [candidatos, candidatosProvaveis, turmaOperacional]);
 
   const diagnosticoMilitares = useMemo(() => {
     if (!promocao) return [];
@@ -259,6 +284,13 @@ export default function DetalhePromocao() {
     if (!promocao) return null;
     return diagnosticarPromocao({ promocao, historicosCompativeis });
   }, [historicosCompativeis, promocao]);
+
+  const alertasTurma = useMemo(() => avaliarAlertasTurmaOperacional(rascunhoTurma), [rascunhoTurma]);
+  const validacaoSalvarTurma = useMemo(() => validarSalvarTurmaOperacional(rascunhoTurma), [rascunhoTurma]);
+  const existemAlteracoesTurma = useMemo(() => {
+    const origem = new Map(turmaOperacional.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
+    return rascunhoTurma.some((registro) => JSON.stringify(montarPatchPromocaoMilitar(registro)) !== JSON.stringify(origem.get(String(registro.id)) || {}));
+  }, [rascunhoTurma, turmaOperacional]);
 
   const vincularMutation = useMutation({
     mutationFn: async (historicoIds) => {
@@ -346,6 +378,62 @@ export default function DetalhePromocao() {
     onError: (error) => toast({ title: 'Falha ao materializar turma', description: error.message, variant: 'destructive' }),
   });
 
+  const salvarTurmaMutation = useMutation({
+    mutationFn: async () => {
+      if (!base44.entities.PromocaoMilitar || typeof base44.entities.PromocaoMilitar.update !== 'function') {
+        throw new Error('Entidade PromocaoMilitar indisponível para atualização.');
+      }
+      const validacao = validarSalvarTurmaOperacional(rascunhoTurma);
+      if (!validacao.valido) throw new Error(`Corrija antes de salvar: ${validacao.bloqueios.join('; ')}.`);
+      const originais = new Map(turmaOperacional.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
+      const alterados = rascunhoTurma.filter((registro) => (
+        JSON.stringify(montarPatchPromocaoMilitar(registro)) !== JSON.stringify(originais.get(String(registro.id)) || {})
+      ));
+      await Promise.all(alterados.map((registro) => (
+        base44.entities.PromocaoMilitar.update(registro.id, montarPatchPromocaoMilitar(registro))
+      )));
+    },
+    onSuccess: () => {
+      toast({ title: 'Turma salva', description: 'Somente PromocaoMilitar foi atualizado. Histórico V2, Militar, Prévia Geral e lista oficial não foram alterados.' });
+      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+    },
+    onError: (error) => toast({ title: 'Falha ao salvar turma', description: error.message, variant: 'destructive' }),
+  });
+
+  const removerTurmaMutation = useMutation({
+    mutationFn: async (registro) => {
+      if (!registro) throw new Error('Registro não selecionado.');
+      if (registro.publicado) throw new Error('Item publicado não pode ser removido da turma operacional.');
+      await base44.entities.PromocaoMilitar.delete(registro.id);
+    },
+    onSuccess: () => {
+      toast({ title: 'Registro removido da turma', description: 'Somente o registro PromocaoMilitar foi excluído; Histórico V2 e Militar foram preservados.' });
+      setRegistroParaRemover(null);
+      setConfirmacaoRemoverTurma('');
+      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+    },
+    onError: (error) => toast({ title: 'Falha ao remover da turma', description: error.message, variant: 'destructive' }),
+  });
+
+  const adicionarCandidatoTurmaMutation = useMutation({
+    mutationFn: async (historico) => {
+      if (!promocao) throw new Error('Promoção não carregada.');
+      if (!historico?.militar_id) throw new Error('Candidato sem militar_id.');
+      const jaExiste = turmaOperacional.some((registro) => (
+        String(registro?.promocao_id || '') === String(promocao.id)
+        && String(registro?.militar_id || '') === String(historico.militar_id)
+      ));
+      if (jaExiste) throw new Error('Este militar já existe na turma operacional.');
+      const usuario = typeof base44.auth?.me === 'function' ? await base44.auth.me() : null;
+      await base44.entities.PromocaoMilitar.create(montarPayloadAdicaoManualTurma({ promocao, historico, usuario }));
+    },
+    onSuccess: () => {
+      toast({ title: 'Candidato adicionado', description: 'Registro PromocaoMilitar criado como rascunho operacional, sem criar Histórico V2.' });
+      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+    },
+    onError: (error) => toast({ title: 'Falha ao adicionar candidato', description: error.message, variant: 'destructive' }),
+  });
+
   const isLoading = promocaoQuery.isLoading || historicosQuery.isLoading || promocaoMilitarQuery.isLoading || militaresQuery.isLoading;
   const error = promocaoQuery.error || historicosQuery.error || promocaoMilitarQuery.error || militaresQuery.error;
 
@@ -361,6 +449,21 @@ export default function DetalhePromocao() {
       : atuais.filter((id) => id !== historicoId)));
   };
 
+  const atualizarRascunhoTurma = (registroId, campo, valor) => {
+    setRascunhoTurma((atuais) => atuais.map((registro) => (
+      String(registro.id) === String(registroId) ? { ...registro, [campo]: valor } : registro
+    )));
+  };
+
+  const abrirRemocaoTurma = (registro) => {
+    if (registro.publicado) {
+      toast({ title: 'Remoção bloqueada', description: 'Item publicado não pode ser removido da turma operacional.', variant: 'destructive' });
+      return;
+    }
+    setRegistroParaRemover(registro);
+    setConfirmacaoRemoverTurma('');
+  };
+
   return (
     <div className="p-4 md:p-8 space-y-6 bg-slate-50 min-h-screen">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -371,7 +474,12 @@ export default function DetalhePromocao() {
           </Button>
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Gestão da promoção</p>
           <h1 className="text-3xl font-bold text-slate-900">{promocao ? tituloPromocao(promocao) : 'Detalhe da promoção'}</h1>
-          <p className="text-slate-600 mt-1">Vincule ou desvincule históricos existentes sem alterar Militar, Prévia Geral ou regras de antiguidade.</p>
+          <div className="mt-2 flex flex-col gap-2">
+            <div>
+              <Badge variant="outline" className="border-indigo-300 bg-indigo-50 text-indigo-700">Modo rascunho operacional — não impacta Antiguidade</Badge>
+            </div>
+            <p className="text-slate-600">As alterações nesta turma não alteram Histórico V2, Militar, Prévia Geral ou lista oficial.</p>
+          </div>
         </div>
         <Button
           variant="outline"
@@ -454,17 +562,44 @@ export default function DetalhePromocao() {
                   Leitura dual: usa PromocaoMilitar quando houver registros e mantém fallback legado por HistoricoPromocaoMilitarV2.promocao_id.
                   Fonte atual: {turmaOperacionalFonte}.
                 </p>
+                <p className="text-xs text-slate-500 mt-1">Edição em rascunho salva somente ordem, seleção, status, justificativa e observação em PromocaoMilitar.</p>
               </div>
-              <Button
-                variant="outline"
-                disabled={turmaOperacional.length > 0 || vinculados.length === 0 || materializarTurmaMutation.isPending}
-                onClick={() => materializarTurmaMutation.mutate()}
-              >
-                <Link2 className="w-4 h-4 mr-2" />
-                Materializar turma
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="outline"
+                  disabled={turmaOperacional.length > 0 || vinculados.length === 0 || materializarTurmaMutation.isPending}
+                  onClick={() => materializarTurmaMutation.mutate()}
+                >
+                  <Link2 className="w-4 h-4 mr-2" />
+                  Materializar turma
+                </Button>
+                <Button
+                  disabled={turmaOperacional.length === 0 || !existemAlteracoesTurma || salvarTurmaMutation.isPending || !validacaoSalvarTurma.valido}
+                  onClick={() => salvarTurmaMutation.mutate()}
+                >
+                  Salvar turma
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertTitle>Rascunho operacional sem publicação</AlertTitle>
+                <AlertDescription>
+                  As alterações nesta tabela atualizam somente PromocaoMilitar. Não criam Histórico V2, não publicam promoção e não alteram Militar, Prévia Geral ou lista oficial.
+                </AlertDescription>
+              </Alert>
+              {(alertasTurma.alertasGlobais.length > 0 || !validacaoSalvarTurma.valido) && (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertTitle>Alertas da turma operacional</AlertTitle>
+                  <AlertDescription>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {[...new Set([...alertasTurma.alertasGlobais, ...validacaoSalvarTurma.bloqueios])].map((alerta) => (
+                        <Badge key={alerta} variant="outline" className="border-amber-300 text-amber-800">{alerta}</Badge>
+                      ))}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
@@ -474,25 +609,88 @@ export default function DetalhePromocao() {
                       <TableHead>Status</TableHead>
                       <TableHead>Selecionado</TableHead>
                       <TableHead>Publicado</TableHead>
+                      <TableHead>Justificativa</TableHead>
+                      <TableHead>Observação</TableHead>
+                      <TableHead>Alertas</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {turmaOperacionalExibida.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className="py-8 text-center text-slate-500">Nenhuma turma operacional ou vínculo legado localizado.</TableCell>
+                        <TableCell colSpan={9} className="py-8 text-center text-slate-500">Nenhuma turma operacional ou vínculo legado localizado.</TableCell>
                       </TableRow>
                     )}
-                    {turmaOperacionalExibida.map((registro) => (
+                    {turmaOperacional.length === 0 && turmaOperacionalExibida.map((registro) => (
                       <TableRow key={registro.id || `${registro.militar_id}-${registro.historico_promocao_v2_id}`}>
                         <TableCell>{registro.ordem || '—'}</TableCell>
                         <TableCell className="font-medium">{nomeMilitar(registro.militar)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={statusPromocaoMilitarClass(registro.status)}>{valorOuTraco(registro.status)}</Badge>
-                        </TableCell>
+                        <TableCell><Badge variant="outline" className={statusPromocaoMilitarClass(registro.status)}>{valorOuTraco(registro.status)}</Badge></TableCell>
                         <TableCell><BooleanBadge ativo={Boolean(registro.selecionado)} /></TableCell>
                         <TableCell><BooleanBadge ativo={Boolean(registro.publicado)} /></TableCell>
+                        <TableCell colSpan={4} className="text-slate-500">Materialize a turma para editar em PromocaoMilitar.</TableCell>
                       </TableRow>
                     ))}
+                    {turmaOperacional.length > 0 && rascunhoTurma.map((registro) => {
+                      const original = turmaOperacional.find((item) => String(item.id) === String(registro.id));
+                      const alertas = alertasTurma.alertasPorId.get(String(registro.id)) || [];
+                      return (
+                        <TableRow key={registro.id} className={alertas.length ? 'bg-amber-50/40' : ''}>
+                          <TableCell className="min-w-28">
+                            <Input
+                              type="number"
+                              value={registro.ordem}
+                              onChange={(event) => atualizarRascunhoTurma(registro.id, 'ordem', event.target.value === '' ? '' : Number(event.target.value))}
+                              aria-label={`Ordem de ${nomeMilitar(original?.militar)}`}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium min-w-48">{nomeMilitar(original?.militar)}</TableCell>
+                          <TableCell className="min-w-40">
+                            <select
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              value={registro.status}
+                              onChange={(event) => atualizarRascunhoTurma(registro.id, 'status', event.target.value)}
+                              aria-label={`Status de ${nomeMilitar(original?.militar)}`}
+                            >
+                              {STATUS_TURMA_OPERACIONAL.map((status) => <option key={status} value={status}>{status}</option>)}
+                            </select>
+                          </TableCell>
+                          <TableCell>
+                            <Checkbox
+                              checked={Boolean(registro.selecionado)}
+                              onCheckedChange={(checked) => atualizarRascunhoTurma(registro.id, 'selecionado', Boolean(checked))}
+                              aria-label={`Selecionado ${nomeMilitar(original?.militar)}`}
+                            />
+                          </TableCell>
+                          <TableCell><BooleanBadge ativo={Boolean(registro.publicado)} /></TableCell>
+                          <TableCell className="min-w-56">
+                            <Input
+                              value={registro.justificativa}
+                              onChange={(event) => atualizarRascunhoTurma(registro.id, 'justificativa', event.target.value)}
+                              placeholder="Obrigatória se bloqueado/cancelado"
+                            />
+                          </TableCell>
+                          <TableCell className="min-w-56">
+                            <Input
+                              value={registro.observacao}
+                              onChange={(event) => atualizarRascunhoTurma(registro.id, 'observacao', event.target.value)}
+                              placeholder="Opcional"
+                            />
+                          </TableCell>
+                          <TableCell className="min-w-56">
+                            {alertas.length === 0 ? <span className="text-slate-500">Sem alertas</span> : alertas.map((alerta) => (
+                              <Badge key={alerta} variant="outline" className="mr-1 mb-1 border-amber-300 text-amber-800">{alerta}</Badge>
+                            ))}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="outline" disabled={Boolean(registro.publicado)} onClick={() => abrirRemocaoTurma(registro)}>
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Remover
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -505,6 +703,58 @@ export default function DetalhePromocao() {
               <AlertDescription>Verifique candidatos compatíveis ou realize saneamento.</AlertDescription>
             </Alert>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Candidatos para adicionar à turma</CardTitle>
+              <p className="text-sm text-slate-500 mt-1">Candidatos compatíveis ou prováveis vinculáveis que ainda não possuem PromocaoMilitar nesta promoção. A adição cria somente PromocaoMilitar em rascunho operacional.</p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Militar</TableHead>
+                      <TableHead>Matrícula</TableHead>
+                      <TableHead>Ordem histórico</TableHead>
+                      <TableHead>Origem</TableHead>
+                      <TableHead>Alertas</TableHead>
+                      <TableHead className="text-right">Ação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {candidatosParaAdicionarTurma.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-8 text-center text-slate-500">Nenhum candidato elegível fora da turma operacional.</TableCell>
+                      </TableRow>
+                    )}
+                    {candidatosParaAdicionarTurma.map((historico) => {
+                      const alertas = alertasCandidato(historico, promocao);
+                      const origem = historico.vinculoProvavelPermitido ? 'provável vinculável' : 'compatível';
+                      return (
+                        <TableRow key={historico.id}>
+                          <TableCell className="font-medium">{nomeMilitar(historico.militar)}</TableCell>
+                          <TableCell>{valorOuTraco(historico.militar?.matricula)}</TableCell>
+                          <TableCell>{historico.antiguidade_referencia_ordem ?? '—'}</TableCell>
+                          <TableCell><Badge variant="secondary">{origem}</Badge></TableCell>
+                          <TableCell>
+                            {alertas.length === 0 ? <span className="text-slate-500">Sem alertas</span> : alertas.map((alerta) => (
+                              <Badge key={alerta} variant="outline" className="mr-1 border-amber-300 text-amber-700">{alerta}</Badge>
+                            ))}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="outline" disabled={adicionarCandidatoTurmaMutation.isPending} onClick={() => adicionarCandidatoTurmaMutation.mutate(historico)}>
+                              Adicionar à turma
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
@@ -775,6 +1025,36 @@ export default function DetalhePromocao() {
         </>
       )}
 
+
+      <Dialog open={Boolean(registroParaRemover)} onOpenChange={(open) => !open && setRegistroParaRemover(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar remoção da turma operacional</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Alert variant={registroParaRemover?.publicado ? 'destructive' : 'default'}>
+              <AlertTitle>{registroParaRemover?.publicado ? 'Remoção bloqueada' : 'Somente PromocaoMilitar será excluído'}</AlertTitle>
+              <AlertDescription>
+                Esta ação remove o registro da turma operacional e não altera Histórico V2, Militar, Prévia Geral ou lista oficial. Itens publicados não podem ser removidos.
+              </AlertDescription>
+            </Alert>
+            <div>
+              <Label>Digite {CONFIRMACAO_REMOVER_TURMA} para confirmar</Label>
+              <Input value={confirmacaoRemoverTurma} onChange={(event) => setConfirmacaoRemoverTurma(event.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRegistroParaRemover(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={confirmacaoRemoverTurma !== CONFIRMACAO_REMOVER_TURMA || !registroParaRemover || registroParaRemover.publicado || removerTurmaMutation.isPending}
+              onClick={() => removerTurmaMutation.mutate(registroParaRemover)}
+            >
+              Confirmar remoção
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogoVincularProvaveisAberto} onOpenChange={setDialogoVincularProvaveisAberto}>
         <DialogContent>
