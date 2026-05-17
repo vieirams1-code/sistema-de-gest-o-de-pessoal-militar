@@ -16,11 +16,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/components/ui/use-toast';
 import {
   alertasCandidato,
+  buscarCandidatosProvaveis,
   dataFormatada,
   diagnosticarPromocao,
   enriquecerHistoricos,
   filtrarCandidatosCompativeis,
   historicoCombinaComPromocao,
+  montarDiagnosticoMilitaresPromocao,
   montarMilitarPorId,
   nomeMilitar,
   ordenarHistoricosVinculados,
@@ -60,6 +62,23 @@ function Campo({ label, children }) {
       <p className="mt-1 text-sm font-medium text-slate-900 break-words">{children}</p>
     </div>
   );
+}
+
+function ResumoItem({ label, total, tone = 'default' }) {
+  const toneClass = tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-900';
+  return (
+    <div className={`rounded-lg border p-4 ${toneClass}`}>
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 text-3xl font-bold">{total}</p>
+    </div>
+  );
+}
+
+function MotivosBadges({ motivos = [] }) {
+  if (!motivos.length) return <span className="text-slate-500">Sem motivo adicional</span>;
+  return motivos.map((motivo) => (
+    <Badge key={motivo} variant="outline" className="mr-1 border-amber-300 text-amber-700">{motivo}</Badge>
+  ));
 }
 
 function DiagnosticoItem({ titulo, total, children, tone = 'default' }) {
@@ -124,6 +143,43 @@ export default function DetalhePromocao() {
       militarPorId,
     ));
   }, [historicosQuery.data, militarPorId, promocao]);
+
+  const candidatosProvaveis = useMemo(() => {
+    if (!promocao || candidatos.length > 0) return [];
+    return ordenarHistoricosVinculados(enriquecerHistoricos(
+      buscarCandidatosProvaveis({ promocao, historicos: historicosQuery.data || [] }),
+      militarPorId,
+    ));
+  }, [candidatos.length, historicosQuery.data, militarPorId, promocao]);
+
+  const diagnosticoMilitares = useMemo(() => {
+    if (!promocao) return [];
+    return montarDiagnosticoMilitaresPromocao({
+      promocao,
+      historicos: historicosQuery.data || [],
+      militares: militaresQuery.data || [],
+    }).map((linha) => ({
+      ...linha,
+      militar: militarPorId.get(String(linha.militar_id || '')) || null,
+    }));
+  }, [historicosQuery.data, militarPorId, militaresQuery.data, promocao]);
+
+  const resumoVinculo = useMemo(() => {
+    const idsVinculados = new Set(vinculados.map((historico) => String(historico.id)));
+    const idsCandidatos = new Set(candidatos.map((historico) => String(historico.id)));
+    const idsProvaveis = new Set(candidatosProvaveis.map((historico) => String(historico.id)));
+    return {
+      vinculados: vinculados.length,
+      compativeisEncontrados: candidatos.length,
+      compativeisBloqueados: diagnosticoMilitares.filter((linha) => (
+        linha.historico_id
+        && !idsVinculados.has(String(linha.historico_id))
+        && !idsCandidatos.has(String(linha.historico_id))
+        && (idsProvaveis.has(String(linha.historico_id)) || ['Conflito', 'Revisar'].includes(linha.acaoSugerida))
+      )).length,
+      semHistorico: diagnosticoMilitares.filter((linha) => linha.motivo === 'Sem histórico V2').length,
+    };
+  }, [candidatos, candidatosProvaveis, diagnosticoMilitares, vinculados]);
 
   const diagnostico = useMemo(() => {
     if (!promocao) return null;
@@ -243,8 +299,27 @@ export default function DetalhePromocao() {
           </Card>
 
           <Card>
+            <CardHeader>
+              <CardTitle>2. Resumo do vínculo</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-4">
+              <ResumoItem label="Históricos vinculados" total={resumoVinculo.vinculados} />
+              <ResumoItem label="Compatíveis encontrados" total={resumoVinculo.compativeisEncontrados} />
+              <ResumoItem label="Compatíveis bloqueados" total={resumoVinculo.compativeisBloqueados} tone={resumoVinculo.compativeisBloqueados > 0 ? 'warning' : 'default'} />
+              <ResumoItem label="Sem histórico" total={resumoVinculo.semHistorico} tone={resumoVinculo.semHistorico > 0 ? 'warning' : 'default'} />
+            </CardContent>
+          </Card>
+
+          {vinculados.length === 0 && (
+            <Alert>
+              <AlertTitle>Não existem históricos vinculados a esta promoção ainda.</AlertTitle>
+              <AlertDescription>Verifique candidatos compatíveis ou realize saneamento.</AlertDescription>
+            </Alert>
+          )}
+
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <CardTitle>2. Militares vinculados</CardTitle>
+              <CardTitle>3. Militares vinculados</CardTitle>
               <Badge variant="outline">{vinculados.length} histórico(s)</Badge>
             </CardHeader>
             <CardContent>
@@ -306,7 +381,7 @@ export default function DetalhePromocao() {
           <Card>
             <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <CardTitle>3. Candidatos compatíveis não vinculados</CardTitle>
+                <CardTitle>4. Candidatos compatíveis não vinculados</CardTitle>
                 <p className="text-sm text-slate-500 mt-1">Históricos existentes que batem com posto, quadro, datas, boletim, ato e status operacional compatível.</p>
               </div>
               <Button disabled={selecionados.length === 0 || vincularMutation.isPending} onClick={() => setDialogoVincularAberto(true)}>
@@ -362,9 +437,83 @@ export default function DetalhePromocao() {
             </CardContent>
           </Card>
 
+          {candidatos.length === 0 && candidatosProvaveis.length > 0 && (
+            <Card className="border-amber-200">
+              <CardHeader>
+                <CardTitle>Candidatos prováveis — revisão manual</CardTitle>
+                <p className="text-sm text-slate-500 mt-1">Busca relaxada por mesmo posto, quadro e data de promoção. Estes registros são apenas diagnóstico e não permitem vínculo automático.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Militar</TableHead>
+                        <TableHead>Matrícula</TableHead>
+                        <TableHead>Ordem</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Motivos</TableHead>
+                        <TableHead>Ação</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {candidatosProvaveis.map((historico) => (
+                        <TableRow key={historico.id}>
+                          <TableCell className="font-medium">{nomeMilitar(historico.militar)}</TableCell>
+                          <TableCell>{valorOuTraco(historico.militar?.matricula)}</TableCell>
+                          <TableCell>{historico.antiguidade_referencia_ordem ?? '—'}</TableCell>
+                          <TableCell><Badge variant="secondary">{valorOuTraco(historico.status_registro)}</Badge></TableCell>
+                          <TableCell><MotivosBadges motivos={historico.diagnosticoCompatibilidade?.motivos || []} /></TableCell>
+                          <TableCell><Badge variant="outline">Revisar manualmente</Badge></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
-              <CardTitle>4. Conflitos / faltantes</CardTitle>
+              <CardTitle>5. Diagnóstico por militar</CardTitle>
+              <p className="text-sm text-slate-500 mt-1">Indica por que um militar ou histórico apareceu como vinculado, compatível, provável, conflito ou sem histórico V2.</p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Militar</TableHead>
+                      <TableHead>Situação</TableHead>
+                      <TableHead>Motivo</TableHead>
+                      <TableHead>Ação sugerida</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {diagnosticoMilitares.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-8 text-center text-slate-500">Nenhum militar ou histórico V2 relacionado por posto, quadro e data.</TableCell>
+                      </TableRow>
+                    )}
+                    {diagnosticoMilitares.slice(0, 80).map((linha) => (
+                      <TableRow key={linha.chave}>
+                        <TableCell className="font-medium">{nomeMilitar(linha.militar)}</TableCell>
+                        <TableCell><Badge variant="secondary">{linha.situacao}</Badge></TableCell>
+                        <TableCell>{linha.motivo}</TableCell>
+                        <TableCell>{linha.acaoSugerida}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {diagnosticoMilitares.length > 80 && <p className="mt-2 text-xs text-slate-500">Exibindo 80 de {diagnosticoMilitares.length} linhas de diagnóstico.</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>6. Conflitos / faltantes</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
               <DiagnosticoItem titulo="Compatíveis já vinculados a outra Promoção" total={diagnostico?.compativeisOutraPromocao.length || 0}>
