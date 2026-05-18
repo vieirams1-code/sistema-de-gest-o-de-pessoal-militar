@@ -69,6 +69,18 @@ async function carregarPromocaoPorId(promocaoId) {
   return promocoes.find((promocao) => String(promocao.id) === String(promocaoId)) || null;
 }
 
+
+async function listarPromocaoMilitarVinculados(promocaoId) {
+  const entity = base44.entities.PromocaoMilitar;
+  if (!entity) throw new Error('Entidade PromocaoMilitar indisponível para validar a exclusão.');
+  if (typeof entity.filter === 'function') return entity.filter({ promocao_id: promocaoId });
+  if (typeof entity.list === 'function') {
+    const registros = await entity.list();
+    return (registros || []).filter((registro) => String(registro?.promocao_id || '') === String(promocaoId));
+  }
+  throw new Error('Não foi possível validar militares vinculados antes da exclusão.');
+}
+
 function campoData(valor) {
   return String(valor || '').split('T')[0];
 }
@@ -459,12 +471,16 @@ export default function DetalhePromocao() {
   const excluirPromocaoMutation = useMutation({
     mutationFn: async () => {
       if (!promocao) throw new Error('Promoção não carregada.');
-      const bloqueio = mensagemBloqueioExclusaoPromocao(promocao);
+      const bloqueio = mensagemBloqueioExclusaoPromocao(promocao, { turma });
       if (bloqueio) throw new Error(bloqueio);
+      const vinculadosAtuais = await listarPromocaoMilitarVinculados(promocao.id);
+      if ((vinculadosAtuais || []).length > 0) {
+        throw new Error('Exclusão bloqueada: a promoção possui militares vinculados em PromocaoMilitar.');
+      }
       await base44.entities.Promocao.delete(promocao.id);
     },
     onSuccess: () => {
-      toast({ title: 'Promoção excluída', description: 'O rascunho foi removido.' });
+      toast({ title: 'Promoção excluída', description: 'A promoção vazia foi removida.' });
       queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
       navigate(createPageUrl('Promocoes'));
     },
@@ -472,12 +488,12 @@ export default function DetalhePromocao() {
   });
 
   const confirmarExclusaoPromocao = () => {
-    const bloqueio = mensagemBloqueioExclusaoPromocao(promocao);
+    const bloqueio = mensagemBloqueioExclusaoPromocao(promocao, { turma });
     if (bloqueio) {
       toast({ title: 'Exclusão não permitida', description: bloqueio, variant: 'destructive' });
       return;
     }
-    const confirmou = window.confirm('Excluir esta promoção em rascunho? Esta ação não poderá ser desfeita.');
+    const confirmou = window.confirm('Esta promoção não possui militares vinculados. Deseja excluir?');
     if (confirmou) excluirPromocaoMutation.mutate();
   };
 
@@ -637,10 +653,10 @@ export default function DetalhePromocao() {
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
-          {promocaoPermiteExclusao(promocao) && (
+          {promocaoPermiteExclusao(promocao, { turma }) && (
             <Button variant="destructive" onClick={confirmarExclusaoPromocao} disabled={excluirPromocaoMutation.isPending}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Excluir
+              Excluir promoção vazia
             </Button>
           )}
         </div>
