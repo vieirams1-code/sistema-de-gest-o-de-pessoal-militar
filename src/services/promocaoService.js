@@ -8,6 +8,8 @@ export const POSTOS_GRADUACOES_PROMOCAO = [...POSTOS_GRADUACOES_HIERARQUIA].reve
 const STATUS_OPERACIONAIS = new Set(['ativo', 'previsto']);
 const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'cancelada', 'retificado', 'retificada']);
 
+const STATUS_PROMOCAO_RASCUNHO = new Set(['rascunho']);
+
 export const STATUS_TURMA_OPERACIONAL = [
   'elegivel',
   'selecionado',
@@ -16,6 +18,15 @@ export const STATUS_TURMA_OPERACIONAL = [
   'retificado',
   'cancelado',
 ];
+
+export function promocaoPermiteExclusao(promocao = {}) {
+  return STATUS_PROMOCAO_RASCUNHO.has(statusNormalizado(promocao?.status));
+}
+
+export function mensagemBloqueioExclusaoPromocao(promocao = {}) {
+  if (promocaoPermiteExclusao(promocao)) return '';
+  return 'Somente promoções em rascunho podem ser excluídas.';
+}
 
 export function valorOrdemTurma(valor) {
   const conteudo = texto(valor);

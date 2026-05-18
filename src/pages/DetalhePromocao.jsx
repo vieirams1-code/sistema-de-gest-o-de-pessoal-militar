@@ -20,12 +20,14 @@ import {
   dataFormatada,
   enriquecerHistoricos,
   filtrarCandidatosCompativeis,
+  mensagemBloqueioExclusaoPromocao,
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
   montarPayloadsPromocaoMilitarAgrupamento,
   nomeMilitar,
   normalizar,
+  promocaoPermiteExclusao,
   normalizarItemTurmaOperacional,
   podeVincularProvavelAdministrativamente,
   texto,
@@ -378,8 +380,8 @@ export default function DetalhePromocao() {
           militar,
           historico: null,
           avisoCompatibilidade: postoCombinaDestino
-            ? 'Sem histórico compatível para esta promoção.'
-            : `Posto atual (${valorOuTraco(postoAtual)}) diferente do destino; revisar antes de adicionar.`,
+            ? ''
+            : `Cadastro atual: ${valorOuTraco(postoAtual)}. Ao adicionar, o sistema vai comparar com o posto da promoção.`,
         });
       });
     }
@@ -453,6 +455,31 @@ export default function DetalhePromocao() {
     },
     onError: (error) => toast({ title: 'Falha ao salvar dados', description: error.message, variant: 'destructive' }),
   });
+
+  const excluirPromocaoMutation = useMutation({
+    mutationFn: async () => {
+      if (!promocao) throw new Error('Promoção não carregada.');
+      const bloqueio = mensagemBloqueioExclusaoPromocao(promocao);
+      if (bloqueio) throw new Error(bloqueio);
+      await base44.entities.Promocao.delete(promocao.id);
+    },
+    onSuccess: () => {
+      toast({ title: 'Promoção excluída', description: 'O rascunho foi removido.' });
+      queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
+      navigate(createPageUrl('Promocoes'));
+    },
+    onError: (error) => toast({ title: 'Falha ao excluir promoção', description: error.message, variant: 'destructive' }),
+  });
+
+  const confirmarExclusaoPromocao = () => {
+    const bloqueio = mensagemBloqueioExclusaoPromocao(promocao);
+    if (bloqueio) {
+      toast({ title: 'Exclusão não permitida', description: bloqueio, variant: 'destructive' });
+      return;
+    }
+    const confirmou = window.confirm('Excluir esta promoção em rascunho? Esta ação não poderá ser desfeita.');
+    if (confirmou) excluirPromocaoMutation.mutate();
+  };
 
   const prepararListaMutation = useMutation({
     mutationFn: async () => {
@@ -557,7 +584,7 @@ export default function DetalhePromocao() {
 
   const isLoading = promocaoQuery.isLoading || historicosQuery.isLoading || promocaoMilitarQuery.isLoading || militaresQuery.isLoading;
   const error = promocaoQuery.error || historicosQuery.error || promocaoMilitarQuery.error || militaresQuery.error;
-  const salvando = salvarPromocaoMutation.isPending || salvarTurmaMutation.isPending;
+  const salvando = salvarPromocaoMutation.isPending || salvarTurmaMutation.isPending || excluirPromocaoMutation.isPending;
   const temAlteracoesPendentes = existemAlteracoesPromocao || existemAlteracoesTurma;
   const bloqueioSalvarTexto = explicarBloqueioSalvar({
     salvando,
@@ -610,6 +637,12 @@ export default function DetalhePromocao() {
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
+          {promocaoPermiteExclusao(promocao) && (
+            <Button variant="destructive" onClick={confirmarExclusaoPromocao} disabled={excluirPromocaoMutation.isPending}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir
+            </Button>
+          )}
         </div>
       </div>
 
@@ -799,10 +832,15 @@ export default function DetalhePromocao() {
               {candidatosAdicionar.map((item) => (
                 <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-900">{nomeMilitar(item.militar)}</p>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {valorOuTraco(item.militar?.posto_graduacao || item.militar?.posto_graduacao_atual)} • {valorOuTraco(item.militar?.quadro || item.militar?.quadro_atual)}
+                    <div className="min-w-0 space-y-2">
+                      <div>
+                        <p className="truncate text-base font-bold text-slate-950">{valorOuTraco(item.militar?.nome_completo || nomeMilitar(item.militar))}</p>
+                        <Badge variant="outline" className="mt-1 border-slate-200 bg-slate-50 text-slate-700">
+                          Nome de guerra: {valorOuTraco(item.militar?.nome_guerra)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-slate-600">
+                        {valorOuTraco(item.militar?.matricula)} • {valorOuTraco(item.militar?.posto_graduacao || item.militar?.posto_graduacao_atual)} • {valorOuTraco(item.militar?.quadro || item.militar?.quadro_atual)}
                       </p>
                       {item.avisoCompatibilidade && <p className="mt-2 text-xs text-amber-700">{item.avisoCompatibilidade}</p>}
                     </div>
