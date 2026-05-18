@@ -31,6 +31,7 @@ import {
   EVENTO_AUDITORIA_PUBLICACAO,
   extrairSnapshotPublicacao,
   normalizarStatusPublicacao,
+  obterStatusCanonicoPublicacao,
   STATUS_PUBLICACAO,
   validarPayloadPublicacao,
 } from '@/components/publicacao/publicacaoStateMachine';
@@ -73,17 +74,6 @@ function mapStatusContratoParaControle(statusCodigo) {
   if (statusCodigo === 'aguardando_nota') return 'Aguardando Nota';
   if (statusCodigo === 'inconsistente') return 'Inconsistente';
   return 'Aguardando Nota';
-}
-
-function obterStatusCanonicoPublicacao(registro = {}) {
-  return (
-    normalizarStatusPublicacao(
-      registro.status_canonico ||
-      registro.status_calculado ||
-      registro.status_publicacao ||
-      registro.status
-    ) || calcularStatusPublicacaoRegistro(registro)
-  );
 }
 
 function getGrupoDisplay(registro) {

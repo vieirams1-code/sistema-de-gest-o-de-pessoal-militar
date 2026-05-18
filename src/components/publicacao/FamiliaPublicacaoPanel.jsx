@@ -5,18 +5,13 @@ import { createPageUrl } from '@/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { obterStatusCanonicoPublicacao } from '@/components/publicacao/publicacaoStateMachine';
 
 const statusColors = {
   'Aguardando Nota': 'bg-amber-100 text-amber-700',
   'Aguardando Publicação': 'bg-blue-100 text-blue-700',
   'Publicado': 'bg-emerald-100 text-emerald-700',
 };
-
-function calcStatus(r) {
-  if (r.numero_bg && r.data_bg) return 'Publicado';
-  if (r.nota_para_bg) return 'Aguardando Publicação';
-  return 'Aguardando Nota';
-}
 
 function getTipoDisplay(tipo) {
   if (tipo === 'Saída Férias') return 'Início';
@@ -244,14 +239,14 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
     (!!raiz.apostilada_por_id &&
       !tsesPorApostila.some(x => x.apostila.id === raiz.apostilada_por_id && x.tse));
 
-  const raizStatus = calcStatus(raiz);
+  const raizStatus = obterStatusCanonicoPublicacao(raiz);
   const raizTipoLabel = getTipoLabel(raiz);
   const raizGrupoLabel = getGrupoDisplay(raiz);
   const raizCodigo = gerarCodigo(raiz.id);
 
   // Item selecionado para detalhes
   const itemSelecionado = todosRegistros.find(r => r.id === selectedId) || raiz;
-  const itemStatus = calcStatus(itemSelecionado);
+  const itemStatus = obterStatusCanonicoPublicacao(itemSelecionado);
 
   // Determinar papel do item selecionado
   const selectedIsOriginal = itemSelecionado.id === raiz.id;
@@ -397,7 +392,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                   codigo={gerarCodigoApostila(raiz.id, idx + 1)}
                   tipoLabel={getTipoLabel(ap) || 'Apostila'}
                   grupoLabel={getGrupoDisplay(ap)}
-                  status={calcStatus(ap)}
+                  status={obterStatusCanonicoPublicacao(ap)}
                   isSelected={selectedId === ap.id}
                   onClick={() => setSelectedId(ap.id)}
                   onNavigate={getEditUrl(ap) ? () => {
@@ -414,7 +409,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                     codigo={`${gerarCodigoApostila(raiz.id, idx + 1)}-TSE`}
                     tipoLabel={getTipoLabel(tseAp) || 'Tornar sem Efeito'}
                     grupoLabel={getGrupoDisplay(tseAp)}
-                    status={calcStatus(tseAp)}
+                    status={obterStatusCanonicoPublicacao(tseAp)}
                     isSelected={selectedId === tseAp.id}
                     onClick={() => setSelectedId(tseAp.id)}
                     onNavigate={getEditUrl(tseAp) ? () => {
@@ -435,7 +430,7 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
                 codigo={gerarCodigoTSE(raiz.id, 1)}
                 tipoLabel={getTipoLabel(tseRaiz) || 'Tornar sem Efeito'}
                 grupoLabel={getGrupoDisplay(tseRaiz)}
-                status={calcStatus(tseRaiz)}
+                status={obterStatusCanonicoPublicacao(tseRaiz)}
                 isSelected={selectedId === tseRaiz.id}
                 onClick={() => setSelectedId(tseRaiz.id)}
                 onNavigate={getEditUrl(tseRaiz) ? () => {
