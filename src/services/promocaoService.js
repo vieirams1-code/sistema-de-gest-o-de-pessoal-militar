@@ -10,6 +10,191 @@ const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'cancelada', 'retifi
 
 const STATUS_PROMOCAO_RASCUNHO = new Set(['rascunho']);
 
+const STATUS_PROMOCAO_PUBLICADA = new Set(['publicada', 'publicado', 'consolidada', 'consolidado']);
+const STATUS_ITEM_BLOQUEADO_PUBLICACAO = new Set(['bloqueado', 'bloqueada', 'cancelado', 'cancelada', 'retificado', 'retificada']);
+
+function dataSomente(valor) {
+  return texto(valor).split('T')[0];
+}
+
+function mesmoTextoNormalizado(a, b) {
+  return normalizar(a) === normalizar(b);
+}
+
+function montarErroPublicacao(mensagens) {
+  const erro = new Error([...new Set(mensagens)].join(' '));
+  erro.bloqueios = [...new Set(mensagens)];
+  return erro;
+}
+
+function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoesPendentes = false, temAlteracoesPendentes = false } = {}) {
+  const bloqueios = [];
+
+  if (!promocao || !texto(promocao.id)) bloqueios.push('Promoção não carregada.');
+  if (STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(promocao?.status))) bloqueios.push('Promoção já publicada/consolidada.');
+  if (!dataSomente(promocao?.data_promocao)) bloqueios.push('Informe a data da promoção antes de publicar.');
+  if (!texto(promocao?.posto_graduacao)) bloqueios.push('Informe o posto/graduação destino antes de publicar.');
+  if (!texto(promocao?.quadro)) bloqueios.push('Informe o quadro destino antes de publicar.');
+  if (!Array.isArray(itens) || itens.length === 0) bloqueios.push('Inclua ao menos um militar antes de publicar.');
+  if (!permitirAlteracoesPendentes && temAlteracoesPendentes) bloqueios.push('Salve as alterações pendentes antes de publicar.');
+
+  const ordens = new Set();
+  const militares = new Set();
+
+  (itens || []).forEach((item, indice) => {
+    const linha = `Linha ${indice + 1}`;
+    const militarId = texto(item?.militar_id);
+    const ordem = Number(item?.ordem);
+    const status = statusNormalizado(item?.status);
+    const efeito = getSugestaoAtualizacaoCadastro({ militar: item?.militar, promocao });
+
+    if (!militarId) bloqueios.push(`${linha}: militar_id ausente.`);
+    if (!item?.militar) bloqueios.push(`${linha}: militar não carregado.`);
+    if (!Number.isFinite(ordem) || ordem <= 0) bloqueios.push(`${linha}: ordem inválida.`);
+    if (militarId) {
+      if (militares.has(militarId)) bloqueios.push('Há militar duplicado na promoção.');
+      militares.add(militarId);
+    }
+    if (Number.isFinite(ordem) && ordem > 0) {
+      const chaveOrdem = String(ordem);
+      if (ordens.has(chaveOrdem)) bloqueios.push('Há ordem duplicada na promoção.');
+      ordens.add(chaveOrdem);
+    }
+    if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) bloqueios.push(`${linha}: item bloqueado/cancelado/retificado não pode ser publicado.`);
+    if (efeito.tipo === 'incompativel') bloqueios.push(`${linha}: militar incompatível com o posto/graduação destino.`);
+    if (efeito.tipo === 'revisao') bloqueios.push(`${linha}: militar em revisão cadastral.`);
+  });
+
+  return {
+    valido: bloqueios.length === 0,
+    bloqueios: [...new Set(bloqueios)],
+  };
+}
+
+export function validarPublicacaoPromocao(contexto = {}) {
+  return validarPublicacaoPromocaoBase(contexto);
+}
+
+function montarPayloadHistoricoPublicacao({ promocao, item, efeito }) {
+  const militar = item.militar || {};
+  return {
+    militar_id: texto(item.militar_id),
+    promocao_id: texto(promocao.id),
+    posto_graduacao_anterior: texto(militar.posto_graduacao || militar.posto_graduacao_atual),
+    quadro_anterior: texto(militar.quadro || militar.quadro_atual),
+    posto_graduacao_novo: texto(promocao.posto_graduacao),
+    quadro_novo: texto(promocao.quadro),
+    data_promocao: dataSomente(promocao.data_promocao),
+    data_publicacao: dataSomente(promocao.data_publicacao) || dataSomente(promocao.data_promocao),
+    boletim_referencia: texto(promocao.boletim_referencia),
+    ato_referencia: texto(promocao.ato_referencia),
+    antiguidade_referencia_ordem: Number(item.ordem),
+    origem_dado: 'publicacao_promocao',
+    status_registro: 'ativo',
+    observacoes: `Registro gerado pela publicação da promoção ${texto(promocao.id)} (${efeito.tipo}).`,
+  };
+}
+
+async function listarHistoricosPublicacao(entity) {
+  if (!entity) throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível.');
+  if (typeof entity.list === 'function') return entity.list();
+  if (typeof entity.filter === 'function') return entity.filter({ status_registro: 'ativo' });
+  throw new Error('Não foi possível consultar o Histórico V2 antes da publicação.');
+}
+
+function resolverHistoricoPublicacao({ historicos = [], payload }) {
+  const ativosMesmoMilitarPostoQuadro = (historicos || []).filter((historico) => (
+    statusNormalizado(historico?.status_registro) === 'ativo'
+    && texto(historico?.militar_id) === texto(payload.militar_id)
+    && mesmoTextoNormalizado(historico?.posto_graduacao_novo, payload.posto_graduacao_novo)
+    && mesmoTextoNormalizado(historico?.quadro_novo, payload.quadro_novo)
+  ));
+
+  const exato = ativosMesmoMilitarPostoQuadro.find((historico) => dataSomente(historico?.data_promocao) === dataSomente(payload.data_promocao));
+  if (exato) {
+    const promocaoIdExistente = texto(exato.promocao_id);
+    if (!promocaoIdExistente) return { acao: 'vincular', historico: exato };
+    if (promocaoIdExistente === texto(payload.promocao_id)) return { acao: 'idempotente', historico: exato };
+    throw new Error(`Histórico V2 ativo exato do militar ${payload.militar_id} já está vinculado a outra promoção (${promocaoIdExistente}).`);
+  }
+
+  const divergente = ativosMesmoMilitarPostoQuadro.find((historico) => dataSomente(historico?.data_promocao) !== dataSomente(payload.data_promocao));
+  if (divergente) {
+    throw new Error(`Histórico V2 ativo divergente para o militar ${payload.militar_id} no mesmo posto/quadro exige revisão manual.`);
+  }
+
+  return { acao: 'criar', historico: null };
+}
+
+function patchDocumentalFaltante(historico = {}, payload = {}) {
+  const patch = { promocao_id: payload.promocao_id };
+  ['data_publicacao', 'boletim_referencia', 'ato_referencia', 'antiguidade_referencia_ordem', 'origem_dado', 'observacoes'].forEach((campo) => {
+    if (!texto(historico?.[campo]) && texto(payload?.[campo])) patch[campo] = payload[campo];
+  });
+  return patch;
+}
+
+export async function publicarPromocaoOficial({ promocao, itens = [], entities, temAlteracoesPendentes = false } = {}) {
+  const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes });
+  if (!validacao.valido) throw montarErroPublicacao(validacao.bloqueios);
+
+  const Historico = entities?.HistoricoPromocaoMilitarV2;
+  const MilitarEntity = entities?.Militar;
+  const PromocaoMilitar = entities?.PromocaoMilitar;
+  const Promocao = entities?.Promocao;
+
+  if (!Historico || typeof Historico.create !== 'function') throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para criação.');
+  if (typeof Historico.update !== 'function') throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para vínculo seguro.');
+  if (!PromocaoMilitar || typeof PromocaoMilitar.update !== 'function') throw new Error('Entidade PromocaoMilitar indisponível para publicação.');
+  if (!Promocao || typeof Promocao.update !== 'function') throw new Error('Entidade Promocao indisponível para finalizar a promoção.');
+
+  const historicos = await listarHistoricosPublicacao(Historico);
+  const planos = itens.map((item) => {
+    const efeito = getSugestaoAtualizacaoCadastro({ militar: item.militar, promocao });
+    const payload = montarPayloadHistoricoPublicacao({ promocao, item, efeito });
+    return { item, efeito, payload, resolucao: resolverHistoricoPublicacao({ historicos, payload }) };
+  });
+
+  if (planos.some((plano) => plano.efeito.tipo === 'imediatamente_superior') && (!MilitarEntity || typeof MilitarEntity.update !== 'function')) {
+    throw new Error('Entidade Militar indisponível para atualização cadastral da promoção imediatamente superior.');
+  }
+
+  const resultados = [];
+  for (const plano of planos) {
+    let historico = plano.resolucao.historico;
+    if (plano.resolucao.acao === 'criar') {
+      historico = await Historico.create(plano.payload);
+    } else if (plano.resolucao.acao === 'vincular') {
+      const patch = patchDocumentalFaltante(historico, plano.payload);
+      await Historico.update(historico.id, patch);
+      historico = { ...historico, ...patch };
+    }
+
+    if (plano.efeito.tipo === 'imediatamente_superior') {
+      const patchMilitar = { posto_graduacao: texto(promocao.posto_graduacao) };
+      if (!mesmoTextoNormalizado(plano.item.militar?.quadro || plano.item.militar?.quadro_atual, promocao.quadro)) {
+        patchMilitar.quadro = texto(promocao.quadro);
+      }
+      await MilitarEntity.update(plano.item.militar_id, patchMilitar);
+    }
+
+    await PromocaoMilitar.update(plano.item.id, {
+      status: 'publicado',
+      publicado: true,
+      historico_promocao_v2_id: texto(historico?.id),
+      atualizar_cadastro_militar: plano.efeito.tipo === 'imediatamente_superior',
+      motivo_atualizacao_cadastro: plano.efeito.mensagem,
+      resultado_aplicacao_cadastro: plano.efeito.tipo,
+    });
+
+    resultados.push({ promocao_militar_id: plano.item.id, historico_promocao_v2_id: texto(historico?.id), efeito: plano.efeito.tipo });
+  }
+
+  await Promocao.update(promocao.id, { status: 'publicada' });
+
+  return { publicados: resultados.length, resultados };
+}
+
 export const STATUS_TURMA_OPERACIONAL = [
   'elegivel',
   'selecionado',
