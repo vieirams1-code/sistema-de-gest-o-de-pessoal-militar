@@ -1,0 +1,15 @@
+export const POSTOS_GRADUACOES_HIERARQUIA = [
+  'Soldado',
+  'Cabo',
+  '3º Sargento',
+  '2º Sargento',
+  '1º Sargento',
+  'Subtenente',
+  'Aspirante a Oficial',
+  '2º Tenente',
+  '1º Tenente',
+  'Capitão',
+  'Major',
+  'Tenente-Coronel',
+  'Coronel',
+];

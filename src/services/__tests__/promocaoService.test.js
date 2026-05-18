@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   avaliarAlertasTurmaOperacional,
@@ -187,7 +188,16 @@ test('patch de edição da turma altera somente campos operacionais de PromocaoM
     publicado: false,
   });
 
-  assert.deepEqual(Object.keys(patchOrdem).sort(), ['justificativa', 'observacao', 'ordem', 'selecionado', 'status']);
+  assert.deepEqual(Object.keys(patchOrdem).sort(), [
+    'atualizar_cadastro_militar',
+    'justificativa',
+    'motivo_atualizacao_cadastro',
+    'observacao',
+    'ordem',
+    'resultado_aplicacao_cadastro',
+    'selecionado',
+    'status',
+  ]);
   assert.equal(patchOrdem.ordem, 7);
   assert.equal(patchOrdem.selecionado, true);
   assert.equal(patchOrdem.status, 'elegivel');
@@ -261,3 +271,74 @@ test('alertas cobrem publicado sem histórico e publicado desselecionado', () =>
     'status publicado sem historico_promocao_v2_id',
   ]);
 });
+
+
+test('tentar marcar atualização cadastral para posto inferior bloqueia salvar turma', () => {
+  const validacao = validarSalvarTurmaOperacional([
+    {
+      id: 'pm1',
+      militar_id: 'm1',
+      ordem: 1,
+      selecionado: true,
+      status: 'selecionado',
+      atualizar_cadastro_militar: true,
+      militar: { posto_graduacao: 'Subtenente' },
+    },
+  ], { promocao: { posto_graduacao: '3º Sargento' } });
+
+  assert.equal(validacao.valido, false);
+  assert.deepEqual(validacao.bloqueios, ['Há militar marcado para atualização cadastral que seria rebaixado.']);
+});
+
+test('promoção inferior com cadastro preservado pode ser salva', () => {
+  const validacao = validarSalvarTurmaOperacional([
+    {
+      id: 'pm1',
+      militar_id: 'm1',
+      ordem: 1,
+      selecionado: true,
+      status: 'selecionado',
+      atualizar_cadastro_militar: false,
+      militar: { posto_graduacao: 'Subtenente' },
+    },
+  ], { promocao: { posto_graduacao: '3º Sargento' } });
+
+  assert.equal(validacao.valido, true);
+});
+
+test('salvar turma persiste atualizar_cadastro_militar no patch', () => {
+  const patch = montarPatchPromocaoMilitar({
+    id: 'pm1',
+    ordem: 1,
+    selecionado: true,
+    status: 'selecionado',
+    atualizar_cadastro_militar: true,
+    motivo_atualizacao_cadastro: 'Promoção superior ao cadastro atual.',
+    resultado_aplicacao_cadastro: 'Cadastro será atualizado',
+  });
+
+  assert.equal(patch.atualizar_cadastro_militar, true);
+  assert.equal(patch.motivo_atualizacao_cadastro, 'Promoção superior ao cadastro atual.');
+  assert.equal(patch.resultado_aplicacao_cadastro, 'Cadastro será atualizado');
+});
+
+test('nenhuma ação faz Militar.update', () => {
+  const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
+  const promocaoService = readFileSync(new URL('../promocaoService.js', import.meta.url), 'utf8');
+
+  assert.equal(detalleSemEspacos(detalhePromocao).includes('entities.Militar.update'), false);
+  assert.equal(detalleSemEspacos(promocaoService).includes('Militar.update'), false);
+});
+
+test('nenhuma ação altera Histórico V2', () => {
+  const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
+  const promocaoService = readFileSync(new URL('../promocaoService.js', import.meta.url), 'utf8');
+
+  assert.equal(detalleSemEspacos(detalhePromocao).includes('HistoricoPromocaoMilitarV2.update'), false);
+  assert.equal(detalleSemEspacos(detalhePromocao).includes('HistoricoPromocaoMilitarV2.create'), false);
+  assert.equal(detalleSemEspacos(promocaoService).includes('HistoricoPromocaoMilitarV2'), false);
+});
+
+function detalleSemEspacos(valor) {
+  return valor.replace(/\s+/g, '');
+}

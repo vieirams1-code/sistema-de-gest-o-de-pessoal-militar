@@ -1,8 +1,8 @@
 {
   "name": "PromocaoMilitar",
   "type": "object",
-  "title": "Promo\u00e7\u00e3o Militar",
-  "description": "Turma operacional intermedi\u00e1ria da promo\u00e7\u00e3o, sem impacto autom\u00e1tico em Militar, Antiguidade, Pr\u00e9via Geral ou snapshots.",
+  "title": "Promoção Militar",
+  "description": "Turma operacional intermediária da promoção, sem impacto automático em Militar, Antiguidade, Prévia Geral ou snapshots.",
   "properties": {
     "promocao_id": {
       "type": "string",
@@ -31,6 +31,21 @@
     "publicado": {
       "type": "boolean",
       "default": false
+    },
+    "atualizar_cadastro_militar": {
+      "type": "boolean",
+      "description": "Indica se esta promoção deve atualizar o cadastro atual do militar sem permitir rebaixamento.",
+      "default": false
+    },
+    "motivo_atualizacao_cadastro": {
+      "type": "string",
+      "description": "Motivo operacional da decisão individual de atualizar ou preservar o cadastro atual do militar.",
+      "default": ""
+    },
+    "resultado_aplicacao_cadastro": {
+      "type": "string",
+      "description": "Resultado operacional previsto para a aplicação cadastral desta promoção.",
+      "default": ""
     },
     "origem": {
       "type": "string",

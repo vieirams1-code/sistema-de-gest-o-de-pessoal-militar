@@ -1,22 +1,9 @@
+import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
+import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, isPostoInferior, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
+
 const TEXTO_VAZIO = '—';
 
-export const POSTOS_GRADUACOES_PROMOCAO = [
-  'Coronel',
-  'Tenente Coronel',
-  'Tenente-Coronel',
-  'Major',
-  'Capitão',
-  '1º Tenente',
-  '2º Tenente',
-  'Aspirante',
-  'Aspirante a Oficial',
-  'Subtenente',
-  '1º Sargento',
-  '2º Sargento',
-  '3º Sargento',
-  'Cabo',
-  'Soldado',
-];
+export const POSTOS_GRADUACOES_PROMOCAO = [...POSTOS_GRADUACOES_HIERARQUIA].reverse();
 
 const STATUS_OPERACIONAIS = new Set(['ativo', 'previsto']);
 const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'cancelada', 'retificado', 'retificada']);
@@ -50,6 +37,9 @@ export function normalizarItemTurmaOperacional(item = {}) {
     justificativa: texto(item.justificativa),
     observacao: texto(item.observacao),
     origem: texto(item.origem),
+    atualizar_cadastro_militar: Boolean(item.atualizar_cadastro_militar),
+    motivo_atualizacao_cadastro: texto(item.motivo_atualizacao_cadastro),
+    resultado_aplicacao_cadastro: texto(item.resultado_aplicacao_cadastro),
   };
 }
 
@@ -61,6 +51,9 @@ export function montarPatchPromocaoMilitar(item = {}) {
     status: normalizado.status,
     justificativa: normalizado.justificativa,
     observacao: normalizado.observacao,
+    atualizar_cadastro_militar: normalizado.atualizar_cadastro_militar,
+    motivo_atualizacao_cadastro: normalizado.motivo_atualizacao_cadastro,
+    resultado_aplicacao_cadastro: normalizado.resultado_aplicacao_cadastro,
   };
 }
 
@@ -118,7 +111,7 @@ export function avaliarAlertasTurmaOperacional(itens = []) {
   };
 }
 
-export function validarSalvarTurmaOperacional(itens = []) {
+export function validarSalvarTurmaOperacional(itens = [], { promocao } = {}) {
   const { alertasPorId, alertasGlobais } = avaliarAlertasTurmaOperacional(itens);
   const bloqueios = [...alertasGlobais];
 
@@ -127,6 +120,10 @@ export function validarSalvarTurmaOperacional(itens = []) {
       if (alerta === 'bloqueado/cancelado sem justificativa') bloqueios.push(alerta);
     });
   });
+
+  const temRebaixamentoCadastral = itens.some((item) => item?.atualizar_cadastro_militar === true
+    && isPostoInferior(promocao?.posto_graduacao || item?.promocao?.posto_graduacao, item?.militar?.posto_graduacao || item?.militar?.posto_graduacao_atual));
+  if (temRebaixamentoCadastral) bloqueios.push(MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL);
 
   return {
     valido: bloqueios.length === 0,
@@ -149,6 +146,9 @@ export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, 
     origem: 'adicao_manual',
     data_vinculo: agora,
     usuario_vinculo: texto(usuario?.email) || texto(usuario?.full_name) || texto(usuario?.name) || 'operador',
+    atualizar_cadastro_militar: false,
+    motivo_atualizacao_cadastro: '',
+    resultado_aplicacao_cadastro: '',
   };
 }
 
@@ -208,8 +208,8 @@ export function isOrdemPreenchida(valor) {
 }
 
 export function indicePostoGraduacao(postoGraduacao) {
-  const alvo = normalizar(postoGraduacao);
-  const indice = POSTOS_GRADUACOES_PROMOCAO.findIndex((posto) => normalizar(posto) === alvo);
+  const normalizado = normalizarPostoGraduacao(postoGraduacao);
+  const indice = POSTOS_GRADUACOES_PROMOCAO.findIndex((posto) => posto === normalizado);
   return indice >= 0 ? indice : POSTOS_GRADUACOES_PROMOCAO.length;
 }
 
