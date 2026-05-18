@@ -10,6 +10,7 @@ import {
   montarDiagnosticoMilitaresPromocao,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
+  montarPayloadsPromocaoMilitarAgrupamento,
   motivosBloqueioVinculoProvavel,
   podeVincularProvavelAdministrativamente,
   validarSalvarTurmaOperacional,
@@ -205,6 +206,19 @@ test('patch de edição da turma altera somente campos operacionais de PromocaoM
   assert.equal(Object.hasOwn(patchOrdem, 'historico_promocao_v2_id'), false);
 });
 
+
+test('patch de edição nunca envia ordem como string vazia', () => {
+  const patch = montarPatchPromocaoMilitar({
+    id: 'pm1',
+    ordem: '',
+    selecionado: true,
+    status: 'selecionado',
+  });
+
+  assert.equal(Object.hasOwn(patch, 'ordem'), false);
+  assert.notEqual(patch.ordem, '');
+});
+
 test('bloqueado ou cancelado sem justificativa bloqueia salvar turma', () => {
   const validacao = validarSalvarTurmaOperacional([
     { id: 'pm1', militar_id: 'm1', ordem: 1, selecionado: false, status: 'bloqueado', justificativa: '' },
@@ -248,6 +262,7 @@ test('payload de adicionar candidato cria apenas PromocaoMilitar em rascunho ope
     promocao,
     historico: { id: 'h1', militar_id: 'm1' },
     usuario: { email: 'operador@example.test' },
+    registrosExistentes: [{ ordem: 1 }, { ordem: 4 }, { ordem: 9 }],
   });
 
   assert.equal(payload.promocao_id, 'promo-1');
@@ -256,9 +271,62 @@ test('payload de adicionar candidato cria apenas PromocaoMilitar em rascunho ope
   assert.equal(payload.selecionado, false);
   assert.equal(payload.publicado, false);
   assert.equal(payload.origem, 'adicao_manual');
+  assert.equal(payload.ordem, 10);
+  assert.notEqual(payload.ordem, '');
   assert.equal(payload.usuario_vinculo, 'operador@example.test');
   assert.equal(Object.hasOwn(payload, 'status_registro'), false);
   assert.equal(Object.hasOwn(payload, 'posto_graduacao'), false);
+});
+
+
+test('promoção criada por agrupamento com 8 históricos cria 8 PromocaoMilitar', () => {
+  const historicos = Array.from({ length: 8 }, (_, index) => ({
+    id: `h${index + 1}`,
+    militar_id: `m${index + 1}`,
+    antiguidade_referencia_ordem: index + 1,
+  }));
+  const payloads = montarPayloadsPromocaoMilitarAgrupamento({ promocao, historicos });
+
+  assert.equal(payloads.length, 8);
+  assert.deepEqual(payloads.map((payload) => payload.militar_id), ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8']);
+  assert.equal(payloads.every((payload) => payload.promocao_id === 'promo-1'), true);
+  assert.equal(payloads.every((payload) => payload.status === 'publicado' && payload.selecionado === true && payload.publicado === true), true);
+  assert.equal(payloads.every((payload) => payload.origem === 'agrupamento'), true);
+});
+
+test('promoção por agrupamento não cria PromocaoMilitar duplicado por promocao_id e militar_id', () => {
+  const historicos = [
+    { id: 'h1', militar_id: 'm1', antiguidade_referencia_ordem: 1 },
+    { id: 'h2', militar_id: 'm2', antiguidade_referencia_ordem: 2 },
+  ];
+  const payloads = montarPayloadsPromocaoMilitarAgrupamento({
+    promocao,
+    historicos,
+    registrosExistentes: [{ promocao_id: 'promo-1', militar_id: 'm1', ordem: 7 }],
+  });
+
+  assert.deepEqual(payloads.map((payload) => payload.militar_id), ['m2']);
+});
+
+test('ordem numérica do histórico é preservada ao montar turma do agrupamento', () => {
+  const [payload] = montarPayloadsPromocaoMilitarAgrupamento({
+    promocao,
+    historicos: [{ id: 'h1', militar_id: 'm1', antiguidade_referencia_ordem: '7' }],
+  });
+
+  assert.equal(payload.ordem, 7);
+  assert.equal(typeof payload.ordem, 'number');
+});
+
+test('ordem vazia no histórico vira próximo número válido na turma do agrupamento', () => {
+  const [payload] = montarPayloadsPromocaoMilitarAgrupamento({
+    promocao,
+    historicos: [{ id: 'h1', militar_id: 'm1', antiguidade_referencia_ordem: '' }],
+    registrosExistentes: [{ ordem: 1 }, { ordem: 4 }, { ordem: 9 }],
+  });
+
+  assert.equal(payload.ordem, 10);
+  assert.notEqual(payload.ordem, '');
 });
 
 test('alertas cobrem publicado sem histórico e publicado desselecionado', () => {
@@ -324,18 +392,23 @@ test('salvar turma persiste atualizar_cadastro_militar no patch', () => {
 
 test('nenhuma ação faz Militar.update', () => {
   const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
+  const rastreamentoPromocoes = readFileSync(new URL('../../pages/RastreamentoPromocoes.jsx', import.meta.url), 'utf8');
   const promocaoService = readFileSync(new URL('../promocaoService.js', import.meta.url), 'utf8');
 
   assert.equal(detalleSemEspacos(detalhePromocao).includes('entities.Militar.update'), false);
+  assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('entities.Militar.update'), false);
   assert.equal(detalleSemEspacos(promocaoService).includes('Militar.update'), false);
 });
 
 test('nenhuma ação altera Histórico V2', () => {
   const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
+  const rastreamentoPromocoes = readFileSync(new URL('../../pages/RastreamentoPromocoes.jsx', import.meta.url), 'utf8');
   const promocaoService = readFileSync(new URL('../promocaoService.js', import.meta.url), 'utf8');
 
   assert.equal(detalleSemEspacos(detalhePromocao).includes('HistoricoPromocaoMilitarV2.update'), false);
   assert.equal(detalleSemEspacos(detalhePromocao).includes('HistoricoPromocaoMilitarV2.create'), false);
+  assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('HistoricoPromocaoMilitarV2.update'), false);
+  assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('HistoricoPromocaoMilitarV2.create'), false);
   assert.equal(detalleSemEspacos(promocaoService).includes('HistoricoPromocaoMilitarV2'), false);
 });
 

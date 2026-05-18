@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { montarMilitarPorId, montarPayloadsPromocaoMilitarAgrupamento } from '@/services/promocaoService';
 
 const STATUS_OPERACIONAIS = new Set(['ativo', 'previsto']);
 const STATUS_CANCELADOS_RETIFICADOS = new Set(['cancelado', 'retificado', 'retificada', 'cancelada']);
@@ -174,7 +175,7 @@ function diagnosticarCriacaoPromocao(grupo) {
       origem: 'agrupamento',
       observacoes: [
         'Criada a partir de agrupamento detectado no Rastreamento de Promoções.',
-        'Nenhum HistoricoPromocaoMilitarV2 foi vinculado nesta etapa.',
+        'A turma da Promoção será criada automaticamente em PromocaoMilitar.',
         `Registros detectados: ${totalRegistros}. Militares únicos no agrupamento: ${grupo.totalMilitares}.`,
       ].join(' '),
       chave_agrupamento: chave,
@@ -509,13 +510,15 @@ export default function RastreamentoPromocoes() {
       }
 
       const Promocao = runtimeAtual.entidade;
+      const payloadPromocao = payload?.payload || payload;
+      const registrosAgrupamento = payload?.registros || [];
       let porChave = [];
       let porHash = [];
 
       try {
         [porChave, porHash] = await Promise.all([
-          Promocao.filter({ chave_agrupamento: payload.chave_agrupamento }),
-          Promocao.filter({ hash_agrupamento: payload.hash_agrupamento }),
+          Promocao.filter({ chave_agrupamento: payloadPromocao.chave_agrupamento }),
+          Promocao.filter({ hash_agrupamento: payloadPromocao.hash_agrupamento }),
         ]);
       } catch (filterError) {
         if (isErroSchemaPromocaoAusente(filterError)) {
@@ -539,13 +542,34 @@ export default function RastreamentoPromocoes() {
       const usuario = await base44.auth.me();
 
       try {
-        return await Promocao.create({
-          ...payload,
+        const promocaoCriada = await Promocao.create({
+          ...payloadPromocao,
           criado_por: usuario?.email || usuario?.full_name || '',
           criado_em: agora,
           atualizado_por: usuario?.email || usuario?.full_name || '',
           atualizado_em: agora,
         });
+
+        const PromocaoMilitar = base44?.entities?.PromocaoMilitar;
+        if (!PromocaoMilitar || typeof PromocaoMilitar.create !== 'function') {
+          throw new Error('Promoção criada, mas a entidade PromocaoMilitar está indisponível para criar a turma automaticamente.');
+        }
+
+        const existentes = typeof PromocaoMilitar.list === 'function' ? await PromocaoMilitar.list() : [];
+        const militarPorId = montarMilitarPorId(data?.militaresAtivos || []);
+        const historicosComMilitar = registrosAgrupamento.map((historico) => ({
+          ...historico,
+          militar: militarPorId.get(String(historico?.militar_id || '')) || null,
+        }));
+        const payloadsTurma = montarPayloadsPromocaoMilitarAgrupamento({
+          promocao: promocaoCriada,
+          historicos: historicosComMilitar,
+          registrosExistentes: existentes || [],
+          militarPorId,
+        });
+
+        await Promise.all(payloadsTurma.map((payloadTurma) => PromocaoMilitar.create(payloadTurma)));
+        return { ...promocaoCriada, total_promocao_militar_criados: payloadsTurma.length };
       } catch (createError) {
         if (isErroSchemaPromocaoAusente(createError)) {
           console.warn('[RastreamentoPromocoes] Promocao existe no objeto do SDK, mas create falhou porque o schema não está sincronizado no app Base44.', {
@@ -557,7 +581,7 @@ export default function RastreamentoPromocoes() {
       }
     },
     onSuccess: (promocao) => {
-      toast({ title: 'Promoção criada', description: `Promoção ${promocao?.id ? `ID ${promocao.id}` : ''} criada sem vincular históricos.` });
+      toast({ title: 'Promoção criada', description: `Promoção ${promocao?.id ? `ID ${promocao.id}` : ''} criada com ${promocao?.total_promocao_militar_criados || 0} militar(es) na turma.` });
       fecharCriacaoPromocao();
       queryClient.invalidateQueries({ queryKey: ['rastreamento-promocoes'] });
       queryClient.invalidateQueries({ queryKey: ['rastreamento-promocoes-criadas'] });
@@ -602,7 +626,7 @@ export default function RastreamentoPromocoes() {
 
     if (!podeConfirmarCriacao || !promocaoRevisao) return;
     setPromocaoExistente(null);
-    criarPromocaoMutation.mutate(promocaoRevisao);
+    criarPromocaoMutation.mutate({ payload: promocaoRevisao, registros: grupoCriacao?.registros || [] });
   };
 
   const avisoPromocaoIndisponivel = !promocaoEntidadeDisponivel
@@ -644,7 +668,7 @@ export default function RastreamentoPromocoes() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">Antiguidade</p>
           <h1 className="text-2xl font-bold text-[#1e3a5f]">Rastreamento de Promoções</h1>
-          <p className="mt-1 max-w-3xl text-sm text-slate-600">Painel para identificar lacunas, agrupamentos e militares ativos sem vínculo adequado em HistoricoPromocaoMilitarV2, com criação controlada apenas da entidade Promoção.</p>
+          <p className="mt-1 max-w-3xl text-sm text-slate-600">Painel para identificar lacunas, agrupamentos e militares ativos sem vínculo adequado em HistoricoPromocaoMilitarV2, com criação controlada da Promoção e da turma em PromocaoMilitar.</p>
         </div>
         <Button type="button" variant="outline" onClick={() => { refetch(); if (promocaoEntidadeDisponivel) refetchPromocoes(); }} disabled={isFetching || isFetchingPromocoes}>
           <RefreshCw className={`mr-2 h-4 w-4 ${isFetching || isFetchingPromocoes ? 'animate-spin' : ''}`} /> Atualizar
@@ -653,7 +677,7 @@ export default function RastreamentoPromocoes() {
 
       <Alert>
         <AlertTitle>Criação limitada à entidade Promoção</AlertTitle>
-        <AlertDescription>Esta tela permite criar somente a entidade Promoção a partir de agrupamento homogêneo. Não adiciona promocao_id, não vincula HistoricoPromocaoMilitarV2 e não altera Militar, histórico, prévia geral, ordenação ou snapshots.</AlertDescription>
+        <AlertDescription>Esta tela cria a entidade Promoção e a turma operacional em PromocaoMilitar a partir de agrupamento homogêneo. Não adiciona promocao_id, não vincula HistoricoPromocaoMilitarV2 e não altera Militar, histórico, prévia geral, ordenação ou snapshots.</AlertDescription>
       </Alert>
 
       {!promocaoEntidadeDisponivel && (
