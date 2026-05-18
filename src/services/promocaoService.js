@@ -1,5 +1,5 @@
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
-import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, isPostoInferior, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
+import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
 
 const TEXTO_VAZIO = '—';
 
@@ -43,8 +43,24 @@ export function normalizarItemTurmaOperacional(item = {}) {
   };
 }
 
-export function montarPatchPromocaoMilitar(item = {}) {
-  const normalizado = normalizarItemTurmaOperacional(item);
+export function aplicarEfeitoCadastroPromocaoMilitar(item = {}, { promocao } = {}) {
+  const efeito = getSugestaoAtualizacaoCadastro({
+    militar: item?.militar,
+    promocao: promocao || item?.promocao,
+  });
+
+  return {
+    ...item,
+    atualizar_cadastro_militar: efeito.atualizar,
+    motivo_atualizacao_cadastro: efeito.mensagem,
+    resultado_aplicacao_cadastro: efeito.tipo,
+  };
+}
+
+export function montarPatchPromocaoMilitar(item = {}, { promocao } = {}) {
+  const normalizado = normalizarItemTurmaOperacional(
+    promocao ? aplicarEfeitoCadastroPromocaoMilitar(item, { promocao }) : item,
+  );
   const patch = {
     selecionado: normalizado.selecionado,
     status: normalizado.status,
@@ -122,9 +138,15 @@ export function validarSalvarTurmaOperacional(itens = [], { promocao } = {}) {
     });
   });
 
-  const temRebaixamentoCadastral = itens.some((item) => item?.atualizar_cadastro_militar === true
-    && isPostoInferior(promocao?.posto_graduacao || item?.promocao?.posto_graduacao, item?.militar?.posto_graduacao || item?.militar?.posto_graduacao_atual));
-  if (temRebaixamentoCadastral) bloqueios.push(MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL);
+  const temIncompatibilidadeCadastro = itens.some((item) => {
+    const promocaoReferencia = promocao || item?.promocao;
+    if (!promocaoReferencia || !item?.militar) return false;
+    return getSugestaoAtualizacaoCadastro({
+      militar: item.militar,
+      promocao: promocaoReferencia,
+    }).bloqueiaSalvar;
+  });
+  if (temIncompatibilidadeCadastro) bloqueios.push(MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL);
 
   return {
     valido: bloqueios.length === 0,
@@ -134,9 +156,10 @@ export function validarSalvarTurmaOperacional(itens = [], { promocao } = {}) {
   };
 }
 
-export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, militarId = '', usuario = {}, registrosExistentes = [], ordem } = {}) {
+export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, militar = null, militarId = '', usuario = {}, registrosExistentes = [], ordem } = {}) {
   const agora = new Date().toISOString();
   const ordemNumerica = isOrdemPreenchida(ordem) ? Number(ordem) : proximaOrdemNumerica(registrosExistentes);
+  const efeito = getSugestaoAtualizacaoCadastro({ militar: militar || historico?.militar, promocao });
   return {
     promocao_id: texto(promocao?.id),
     militar_id: texto(militarId || historico?.militar_id),
@@ -148,15 +171,20 @@ export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, 
     origem: 'adicao_manual',
     data_vinculo: agora,
     usuario_vinculo: texto(usuario?.email) || texto(usuario?.full_name) || texto(usuario?.name) || 'operador',
-    atualizar_cadastro_militar: false,
-    motivo_atualizacao_cadastro: '',
-    resultado_aplicacao_cadastro: '',
+    atualizar_cadastro_militar: efeito.atualizar,
+    motivo_atualizacao_cadastro: efeito.mensagem,
+    resultado_aplicacao_cadastro: efeito.tipo,
   };
 }
 
 
-export function resultadoAplicacaoCadastro(atualizar) {
-  return atualizar ? 'Cadastro será atualizado' : 'Cadastro preservado';
+export function resultadoAplicacaoCadastro(efeitoOuAtualizar) {
+  if (typeof efeitoOuAtualizar === 'object' && efeitoOuAtualizar !== null) {
+    if (efeitoOuAtualizar.tipo === 'imediatamente_superior') return 'Cadastro será atualizado';
+    if (['incompativel', 'revisao'].includes(efeitoOuAtualizar.tipo)) return 'Promoção incompatível';
+    return 'Cadastro preservado';
+  }
+  return efeitoOuAtualizar ? 'Cadastro será atualizado' : 'Cadastro preservado';
 }
 
 export function proximaOrdemNumerica(registros = []) {
@@ -188,7 +216,7 @@ export function montarPayloadsPromocaoMilitarAgrupamento({ promocao = {}, histor
     const ordem = ordemHistoricoOuProxima(historico, registrosParaOrdem);
     const militar = historico?.militar || militarPorId.get(militarId) || null;
     const sugestao = getSugestaoAtualizacaoCadastro({ militar, promocao });
-    const atualizarCadastro = Boolean(sugestao.atualizar_cadastro_militar);
+    const atualizarCadastro = Boolean(sugestao.atualizar);
     const payload = {
       promocao_id: promocaoId,
       militar_id: militarId,
@@ -199,8 +227,8 @@ export function montarPayloadsPromocaoMilitarAgrupamento({ promocao = {}, histor
       publicado: true,
       origem: 'agrupamento',
       atualizar_cadastro_militar: atualizarCadastro,
-      motivo_atualizacao_cadastro: sugestao.motivo_atualizacao_cadastro,
-      resultado_aplicacao_cadastro: resultadoAplicacaoCadastro(atualizarCadastro),
+      motivo_atualizacao_cadastro: sugestao.mensagem,
+      resultado_aplicacao_cadastro: sugestao.tipo,
     };
 
     existentes.add(chave);

@@ -341,7 +341,7 @@ test('alertas cobrem publicado sem histórico e publicado desselecionado', () =>
 });
 
 
-test('tentar marcar atualização cadastral para posto inferior bloqueia salvar turma', () => {
+test('salvar turma não depende mais de marcação manual para promoção inferior', () => {
   const validacao = validarSalvarTurmaOperacional([
     {
       id: 'pm1',
@@ -354,8 +354,7 @@ test('tentar marcar atualização cadastral para posto inferior bloqueia salvar 
     },
   ], { promocao: { posto_graduacao: '3º Sargento' } });
 
-  assert.equal(validacao.valido, false);
-  assert.deepEqual(validacao.bloqueios, ['Há militar marcado para atualização cadastral que seria rebaixado.']);
+  assert.equal(validacao.valido, true);
 });
 
 test('promoção inferior com cadastro preservado pode ser salva', () => {
@@ -374,20 +373,59 @@ test('promoção inferior com cadastro preservado pode ser salva', () => {
   assert.equal(validacao.valido, true);
 });
 
-test('salvar turma persiste atualizar_cadastro_militar no patch', () => {
+test('salvar turma persiste campos derivados automaticamente no patch', () => {
   const patch = montarPatchPromocaoMilitar({
     id: 'pm1',
     ordem: 1,
     selecionado: true,
     status: 'selecionado',
-    atualizar_cadastro_militar: true,
-    motivo_atualizacao_cadastro: 'Promoção superior ao cadastro atual.',
-    resultado_aplicacao_cadastro: 'Cadastro será atualizado',
-  });
+    atualizar_cadastro_militar: false,
+    motivo_atualizacao_cadastro: '',
+    resultado_aplicacao_cadastro: '',
+    militar: { posto_graduacao: 'Cabo' },
+  }, { promocao: { posto_graduacao: '3º Sargento' } });
 
   assert.equal(patch.atualizar_cadastro_militar, true);
-  assert.equal(patch.motivo_atualizacao_cadastro, 'Promoção superior ao cadastro atual.');
-  assert.equal(patch.resultado_aplicacao_cadastro, 'Cadastro será atualizado');
+  assert.equal(patch.motivo_atualizacao_cadastro, 'Promoção imediatamente superior ao cadastro atual.');
+  assert.equal(patch.resultado_aplicacao_cadastro, 'imediatamente_superior');
+});
+
+test('salvar turma bloqueia quando houver item incompatível', () => {
+  const validacao = validarSalvarTurmaOperacional([
+    {
+      id: 'pm1',
+      militar_id: 'm1',
+      ordem: 1,
+      selecionado: true,
+      status: 'selecionado',
+      militar: { posto_graduacao: 'Soldado' },
+    },
+  ], { promocao: { posto_graduacao: '3º Sargento' } });
+
+  assert.equal(validacao.valido, false);
+  assert.deepEqual(validacao.bloqueios, ['Há militar incompatível com o cadastro atual. Revise antes de salvar.']);
+});
+
+test('adição manual cria PromocaoMilitar com campos derivados automaticamente', () => {
+  const payload = montarPayloadAdicaoManualTurma({
+    promocao: { id: 'promo-1', posto_graduacao: '3º Sargento' },
+    militar: { id: 'm1', posto_graduacao: 'Cabo' },
+    militarId: 'm1',
+    registrosExistentes: [],
+  });
+
+  assert.equal(payload.atualizar_cadastro_militar, true);
+  assert.equal(payload.motivo_atualizacao_cadastro, 'Promoção imediatamente superior ao cadastro atual.');
+  assert.equal(payload.resultado_aplicacao_cadastro, 'imediatamente_superior');
+});
+
+test('DetalhePromocao não contém checkbox de atualização cadastral nem ações em lote removidas', () => {
+  const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
+
+  assert.equal(detalhePromocao.includes('Atualizar cadastro do militar'), false);
+  assert.equal(detalhePromocao.includes('Histórico somente'), false);
+  assert.equal(detalhePromocao.includes('Atualizar promoções superiores'), false);
+  assert.equal(detalhePromocao.includes('Restaurar sugestão'), false);
 });
 
 test('nenhuma ação faz Militar.update', () => {

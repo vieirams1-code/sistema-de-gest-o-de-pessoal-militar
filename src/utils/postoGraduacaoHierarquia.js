@@ -1,9 +1,44 @@
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
 
-const MOTIVO_SUPERIOR = 'Promoção superior ao cadastro atual.';
-const MOTIVO_IGUAL = 'Cadastro já compatível.';
-const MOTIVO_INFERIOR = 'Militar já possui posto superior. Cadastro preservado.';
-const MOTIVO_DESCONHECIDO = 'Posto/graduação não reconhecido. Revisão necessária.';
+const EFEITOS_ATUALIZACAO_CADASTRO = {
+  historica: {
+    atualizar: false,
+    tipo: 'historica',
+    titulo: 'Promoção histórica',
+    mensagem: 'Não altera o cadastro atual.',
+    bloqueiaSalvar: false,
+  },
+  atual: {
+    atualizar: false,
+    tipo: 'atual',
+    titulo: 'Promoção atual',
+    mensagem: 'Cadastro já compatível.',
+    bloqueiaSalvar: false,
+  },
+  imediatamente_superior: {
+    atualizar: true,
+    tipo: 'imediatamente_superior',
+    titulo: 'Cadastro será atualizado',
+    mensagem: 'Promoção imediatamente superior ao cadastro atual.',
+    bloqueiaSalvar: false,
+  },
+  incompativel: {
+    atualizar: false,
+    tipo: 'incompativel',
+    titulo: 'Promoção incompatível',
+    mensagem: 'Está duas ou mais graduações acima do cadastro atual.',
+    bloqueiaSalvar: true,
+  },
+  revisao: {
+    atualizar: false,
+    tipo: 'revisao',
+    titulo: 'Revisar cadastro',
+    mensagem: 'Posto/graduação não reconhecido.',
+    bloqueiaSalvar: true,
+  },
+};
+
+const MOTIVO_INFERIOR = EFEITOS_ATUALIZACAO_CADASTRO.historica.mensagem;
 
 function texto(valor) {
   return String(valor ?? '').trim();
@@ -69,6 +104,29 @@ const ALIASES = new Map([
 
 const INDICE_POR_POSTO = new Map(POSTOS_GRADUACOES_HIERARQUIA.map((posto, indice) => [posto, indice]));
 
+function copiarEfeito(tipo) {
+  const efeito = EFEITOS_ATUALIZACAO_CADASTRO[tipo] || EFEITOS_ATUALIZACAO_CADASTRO.revisao;
+  return {
+    ...efeito,
+    atualizar_cadastro_militar: efeito.atualizar,
+    motivo_atualizacao_cadastro: efeito.mensagem,
+    resultado_aplicacao_cadastro: efeito.tipo,
+    comparacao: efeito.tipo,
+  };
+}
+
+export function diferencaHierarquicaPostos(postoNovo, postoAtual) {
+  const normalizadoNovo = normalizarPostoGraduacao(postoNovo);
+  const normalizadoAtual = normalizarPostoGraduacao(postoAtual);
+  if (!normalizadoNovo || !normalizadoAtual) return null;
+
+  const indiceNovo = INDICE_POR_POSTO.get(normalizadoNovo);
+  const indiceAtual = INDICE_POR_POSTO.get(normalizadoAtual);
+  if (!Number.isInteger(indiceNovo) || !Number.isInteger(indiceAtual)) return null;
+
+  return indiceNovo - indiceAtual;
+}
+
 export function normalizarPostoGraduacao(valor) {
   const normalizado = ALIASES.get(chave(valor));
   return normalizado || '';
@@ -100,19 +158,14 @@ export function isPostoIgual(postoNovo, postoAtual) {
 export function getSugestaoAtualizacaoCadastro({ militar, promocao } = {}) {
   const postoAtual = militar?.posto_graduacao || militar?.posto_graduacao_atual || '';
   const postoNovo = promocao?.posto_graduacao || promocao?.posto_graduacao_novo || '';
-  const comparacao = compararPostos(postoNovo, postoAtual);
+  const diferenca = diferencaHierarquicaPostos(postoNovo, postoAtual);
 
-  if (comparacao === null) {
-    return { atualizar_cadastro_militar: false, motivo_atualizacao_cadastro: MOTIVO_DESCONHECIDO, comparacao: 'desconhecido' };
-  }
-  if (comparacao > 0) {
-    return { atualizar_cadastro_militar: true, motivo_atualizacao_cadastro: MOTIVO_SUPERIOR, comparacao: 'superior' };
-  }
-  if (comparacao === 0) {
-    return { atualizar_cadastro_militar: false, motivo_atualizacao_cadastro: MOTIVO_IGUAL, comparacao: 'igual' };
-  }
-  return { atualizar_cadastro_militar: false, motivo_atualizacao_cadastro: MOTIVO_INFERIOR, comparacao: 'inferior' };
+  if (diferenca === null) return copiarEfeito('revisao');
+  if (diferenca < 0) return copiarEfeito('historica');
+  if (diferenca === 0) return copiarEfeito('atual');
+  if (diferenca === 1) return copiarEfeito('imediatamente_superior');
+  return copiarEfeito('incompativel');
 }
 
 export const MENSAGEM_REBAIXAMENTO_CADASTRAL = MOTIVO_INFERIOR;
-export const MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL = 'Há militar marcado para atualização cadastral que seria rebaixado.';
+export const MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL = 'Há militar incompatível com o cadastro atual. Revise antes de salvar.';

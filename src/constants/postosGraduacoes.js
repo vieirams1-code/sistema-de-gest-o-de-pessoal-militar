@@ -13,3 +13,14 @@ export const POSTOS_GRADUACOES_HIERARQUIA = [
   'Tenente-Coronel',
   'Coronel',
 ];
+
+export const QUADROS_PROMOCAO_FIXOS = [
+  'QOBM',
+  'QAOBM',
+  'QOEBM',
+  'QOSAU',
+  'QBMP-1.a',
+  'QBMP-1.b',
+  'QBMP-2',
+  'QPTBM',
+];
