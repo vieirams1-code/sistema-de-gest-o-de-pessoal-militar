@@ -51,6 +51,17 @@ export function calcularStatusPublicacaoRegistro(registro = {}) {
   return STATUS_PUBLICACAO.AGUARDANDO_NOTA;
 }
 
+export function obterStatusCanonicoPublicacao(registro = {}) {
+  return (
+    normalizarStatusPublicacao(
+      registro.status_canonico ||
+      registro.status_calculado ||
+      registro.status_publicacao ||
+      registro.status
+    ) || calcularStatusPublicacaoRegistro(registro)
+  );
+}
+
 export function normalizarStatusPublicacao(status) {
   const valor = toText(status).toLowerCase();
 
