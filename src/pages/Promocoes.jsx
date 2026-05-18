@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, ListChecks, Plus, RefreshCw } from 'lucide-react';
+import { Eye, ListChecks, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -12,7 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/components/ui/use-toast';
 import {
   dataFormatada,
+  mensagemBloqueioExclusaoPromocao,
   ordenarPromocoes,
+  promocaoPermiteExclusao,
   tituloPromocao,
   valorOuTraco,
 } from '@/services/promocaoService';
@@ -72,6 +74,36 @@ export default function Promocoes() {
   const promocoesOrdenadas = useMemo(() => ordenarPromocoes(promocoesQuery.data || []), [promocoesQuery.data]);
   const isLoading = promocoesQuery.isLoading || historicosQuery.isLoading;
   const error = promocoesQuery.error || historicosQuery.error;
+
+  const excluirPromocaoMutation = useMutation({
+    mutationFn: async (promocao) => {
+      if (!promocao) throw new Error('Promoção não selecionada.');
+      const bloqueio = mensagemBloqueioExclusaoPromocao(promocao);
+      if (bloqueio) throw new Error(bloqueio);
+      await base44.entities.Promocao.delete(promocao.id);
+    },
+    onSuccess: () => {
+      toast({ title: 'Promoção excluída', description: 'O rascunho foi removido da listagem.' });
+      queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
+    },
+    onError: (mutationError) => {
+      toast({
+        title: 'Não foi possível excluir a promoção',
+        description: mutationError?.message || 'Tente novamente em instantes.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const confirmarExclusaoRascunho = (promocao) => {
+    const bloqueio = mensagemBloqueioExclusaoPromocao(promocao);
+    if (bloqueio) {
+      toast({ title: 'Exclusão não permitida', description: bloqueio, variant: 'destructive' });
+      return;
+    }
+    const confirmou = window.confirm('Excluir esta promoção em rascunho? Esta ação não poderá ser desfeita.');
+    if (confirmou) excluirPromocaoMutation.mutate(promocao);
+  };
 
   const novaPromocaoMutation = useMutation({
     mutationFn: criarPromocaoManual,
@@ -203,12 +235,25 @@ export default function Promocoes() {
                     <TableCell>{valorOuTraco(promocao.ato_referencia)}</TableCell>
                     <TableCell className="text-right font-semibold">{totaisReais[promocao.id] || 0}</TableCell>
                     <TableCell className="text-right">
-                      <Button asChild size="sm" variant="outline">
-                        <Link to={`${createPageUrl('DetalhePromocao')}?id=${promocao.id}`}>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Abrir
-                        </Link>
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={`${createPageUrl('DetalhePromocao')}?id=${promocao.id}`}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            Abrir
+                          </Link>
+                        </Button>
+                        {promocaoPermiteExclusao(promocao) && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => confirmarExclusaoRascunho(promocao)}
+                            disabled={excluirPromocaoMutation.isPending}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Excluir
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

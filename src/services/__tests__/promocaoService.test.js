@@ -7,11 +7,13 @@ import {
   avaliarCompatibilidadePromocao,
   buscarCandidatosProvaveis,
   filtrarCandidatosCompativeis,
+  mensagemBloqueioExclusaoPromocao,
   montarDiagnosticoMilitaresPromocao,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
   montarPayloadsPromocaoMilitarAgrupamento,
   motivosBloqueioVinculoProvavel,
+  promocaoPermiteExclusao,
   podeVincularProvavelAdministrativamente,
   validarSalvarTurmaOperacional,
 } from '../promocaoService.js';
@@ -26,6 +28,17 @@ const promocao = {
   ato_referencia: 'ATO 5',
   status: 'ativa',
 };
+
+
+test('exclusão de promoção é permitida apenas para rascunho', () => {
+  assert.equal(promocaoPermiteExclusao({ status: 'rascunho' }), true);
+  assert.equal(mensagemBloqueioExclusaoPromocao({ status: 'rascunho' }), '');
+
+  for (const status of ['ativa', 'publicada', 'publicado', 'concluída', 'concluida', 'homologada']) {
+    assert.equal(promocaoPermiteExclusao({ status }), false);
+    assert.equal(mensagemBloqueioExclusaoPromocao({ status }), 'Somente promoções em rascunho podem ser excluídas.');
+  }
+});
 
 test('classifica compatibilidade forte somente quando chave completa bate', () => {
   const historico = {

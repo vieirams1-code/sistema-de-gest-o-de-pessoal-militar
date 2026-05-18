@@ -45,6 +45,28 @@ test('promoção imediatamente superior atualiza cadastro e não bloqueia', () =
   assert.equal(resultado.bloqueiaSalvar, false);
 });
 
+
+test('2º Tenente para 1º Tenente é imediatamente superior em todas as nomenclaturas usuais', () => {
+  const postosAtuais = ['2º Ten', '2º Tenente', 'Segundo Tenente', '2° Ten', '2o Ten BM'];
+  const postosNovos = ['1º Ten', '1º Tenente', 'Primeiro Tenente', '1° Ten', '1o Ten BM'];
+
+  for (const postoAtual of postosAtuais) {
+    assert.equal(normalizarPostoGraduacao(postoAtual), '2º Tenente');
+  }
+  for (const postoNovo of postosNovos) {
+    assert.equal(normalizarPostoGraduacao(postoNovo), '1º Tenente');
+  }
+
+  for (const postoAtual of postosAtuais) {
+    for (const postoNovo of postosNovos) {
+      const resultado = sugestao(postoAtual, postoNovo);
+      assert.equal(resultado.tipo, 'imediatamente_superior', `${postoAtual} -> ${postoNovo}`);
+      assert.equal(resultado.titulo, 'Cadastro será atualizado');
+      assert.equal(resultado.bloqueiaSalvar, false);
+    }
+  }
+});
+
 test('promoção duas ou mais acima retorna incompatível e bloqueia', () => {
   const resultado = sugestao('Soldado', '3º Sgt');
   assert.equal(resultado.tipo, 'incompativel');
@@ -52,6 +74,13 @@ test('promoção duas ou mais acima retorna incompatível e bloqueia', () => {
   assert.equal(resultado.titulo, 'Promoção incompatível');
   assert.equal(resultado.mensagem, 'Está duas ou mais graduações acima do cadastro atual.');
   assert.equal(resultado.bloqueiaSalvar, true);
+});
+
+
+test('bloqueia somente quando promoção está duas ou mais posições acima ou há posto desconhecido', () => {
+  assert.equal(sugestao('2º Tenente', '1º Tenente').bloqueiaSalvar, false);
+  assert.equal(sugestao('2º Tenente', 'Capitão').bloqueiaSalvar, true);
+  assert.equal(sugestao('Posto inexistente', '1º Tenente').bloqueiaSalvar, true);
 });
 
 test('posto desconhecido retorna revisão e bloqueia', () => {
