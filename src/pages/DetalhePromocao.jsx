@@ -11,18 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   buscarCandidatosProvaveis,
   dataFormatada,
-  diagnosticarPromocao,
   enriquecerHistoricos,
   filtrarCandidatosCompativeis,
-  historicoCombinaComPromocao,
-  montarDiagnosticoMilitaresPromocao,
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
@@ -88,6 +83,12 @@ function montarPatchPromocao(rascunho = {}) {
   return CAMPOS_PROMOCAO.reduce((patch, campo) => ({ ...patch, [campo]: rascunho[campo] || '' }), {});
 }
 
+function rotuloBoletim(valor) {
+  const boletim = texto(valor);
+  if (!boletim) return 'Boletim não informado';
+  return normalizar(boletim).startsWith('bg') ? boletim : `BG ${boletim}`;
+}
+
 function rotuloSituacao(status, publicado) {
   if (publicado || status === 'publicado') return 'Publicado';
   if (status === 'bloqueado') return 'Bloqueado';
@@ -125,11 +126,68 @@ function Field({ label, children, className = '' }) {
   );
 }
 
-function InfoItem({ label, value }) {
+
+function ordemParaOrdenacao(ordem) {
+  if (ordem === '' || ordem === null || ordem === undefined) return Number.POSITIVE_INFINITY;
+  const numero = Number(ordem);
+  return Number.isFinite(numero) ? numero : Number.POSITIVE_INFINITY;
+}
+
+function ordenarPorOrdemCrescente(a, b) {
+  return (ordemParaOrdenacao(a?.ordem) - ordemParaOrdenacao(b?.ordem)) || nomeMilitar(a?.militar).localeCompare(nomeMilitar(b?.militar));
+}
+
+function MilitarCard({ registro, original, editavel, onAtualizar, onRemover }) {
+  const militar = original?.militar || registro?.militar;
+  const posto = valorOuTraco(militar?.posto_graduacao || militar?.posto_graduacao_atual);
+  const quadro = valorOuTraco(militar?.quadro || militar?.quadro_atual);
+
   return (
-    <div className="rounded-lg border bg-white p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="sm:w-24 sm:shrink-0">
+          <p className="sr-only">Ordem</p>
+          {editavel ? (
+            <div className="flex h-12 w-24 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-3 text-blue-700 shadow-sm">
+              <span className="text-lg font-bold">#</span>
+              <Input
+                className="h-10 border-0 bg-transparent px-1 text-center text-lg font-bold shadow-none focus-visible:ring-0"
+                type="number"
+                value={registro.ordem}
+                onChange={(event) => onAtualizar(registro.id, 'ordem', event.target.value === '' ? '' : Number(event.target.value))}
+                aria-label={`Ordem de antiguidade de ${nomeMilitar(militar)}`}
+              />
+            </div>
+          ) : (
+            <div className="flex h-12 w-24 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-lg font-bold text-blue-700 shadow-sm">
+              #{registro.ordem || '—'}
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+            <p className="truncate font-semibold text-slate-900">{nomeMilitar(militar)}</p>
+            <span className="hidden text-slate-300 sm:inline">•</span>
+            <p className="text-sm text-slate-600">{valorOuTraco(militar?.matricula)}</p>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">{posto} • {quadro}</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <Badge variant="outline" className={situacaoClass(registro.status, registro.publicado)}>
+            {rotuloSituacao(registro.status, registro.publicado)}
+          </Badge>
+          {editavel ? (
+            <Button size="sm" variant="outline" onClick={() => onRemover({ ...registro, militar })} disabled={Boolean(registro.publicado)}>
+              <Trash2 className="mr-1 h-4 w-4" />
+              Remover
+            </Button>
+          ) : (
+            <span className="text-sm text-slate-500">Aguarde</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -139,7 +197,6 @@ export default function DetalhePromocao() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { isAdmin } = useCurrentUser();
   const promocaoId = searchParams.get('id');
   const listasPreparadasAutomaticamente = useRef(new Set());
 
@@ -182,11 +239,6 @@ export default function DetalhePromocao() {
   const promocao = promocaoQuery.data;
   const militarPorId = useMemo(() => montarMilitarPorId(militaresQuery.data || []), [militaresQuery.data]);
 
-  const historicosCompativeis = useMemo(() => {
-    if (!promocao) return [];
-    return (historicosQuery.data || []).filter((historico) => historicoCombinaComPromocao(historico, promocao));
-  }, [historicosQuery.data, promocao]);
-
   const historicosVinculados = useMemo(() => {
     if (!promocao) return [];
     return enriquecerHistoricos(
@@ -203,7 +255,7 @@ export default function DetalhePromocao() {
         ...registro,
         militar: militarPorId.get(String(registro?.militar_id || '')) || null,
       }))
-      .sort((a, b) => (Number(a?.ordem || 0) - Number(b?.ordem || 0)) || nomeMilitar(a.militar).localeCompare(nomeMilitar(b.militar)));
+      .sort(ordenarPorOrdemCrescente);
   }, [militarPorId, promocao, promocaoMilitarQuery.data]);
 
   const listaExibida = useMemo(() => {
@@ -221,7 +273,7 @@ export default function DetalhePromocao() {
         origem: 'legado_historico_v2',
         militar: historico.militar || null,
       }))
-      .sort((a, b) => (Number(a?.ordem || 0) - Number(b?.ordem || 0)) || nomeMilitar(a.militar).localeCompare(nomeMilitar(b.militar)));
+      .sort(ordenarPorOrdemCrescente);
   }, [historicosVinculados, promocao, turma]);
 
   const candidatosHistorico = useMemo(() => {
@@ -271,19 +323,6 @@ export default function DetalhePromocao() {
       .slice(0, 30);
   }, [buscaAdicionar, candidatosHistorico, listaExibida, militarPorId, militaresQuery.data, promocao]);
 
-  const diagnostico = useMemo(() => {
-    if (!promocao) return null;
-    return diagnosticarPromocao({ promocao, historicosCompativeis });
-  }, [historicosCompativeis, promocao]);
-
-  const diagnosticoMilitares = useMemo(() => {
-    if (!promocao) return [];
-    return montarDiagnosticoMilitaresPromocao({
-      promocao,
-      historicos: historicosQuery.data || [],
-      militares: militaresQuery.data || [],
-    });
-  }, [historicosQuery.data, militaresQuery.data, promocao]);
 
   useEffect(() => {
     if (promocao) setRascunhoPromocao(montarRascunhoPromocao(promocao));
@@ -295,6 +334,16 @@ export default function DetalhePromocao() {
 
   const validacaoSalvarTurma = useMemo(() => validarSalvarTurmaOperacional(rascunhoTurma), [rascunhoTurma]);
   const mensagensValidacao = useMemo(() => mensagensValidacaoSimples(validacaoSalvarTurma), [validacaoSalvarTurma]);
+  const rascunhoTurmaOrdenado = useMemo(() => (
+    [...rascunhoTurma].sort((a, b) => {
+      const originalA = turma.find((item) => String(item.id) === String(a.id));
+      const originalB = turma.find((item) => String(item.id) === String(b.id));
+      return ordenarPorOrdemCrescente(
+        { ...a, militar: originalA?.militar },
+        { ...b, militar: originalB?.militar },
+      );
+    })
+  ), [rascunhoTurma, turma]);
 
   const existemAlteracoesPromocao = useMemo(() => {
     if (!promocao) return false;
@@ -463,10 +512,13 @@ export default function DetalhePromocao() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Promoção</p>
           <h1 className="text-3xl font-bold text-slate-900">
-            Promoção — {valorOuTraco(promocao?.posto_graduacao)}
+            Promoção para {valorOuTraco(promocao?.posto_graduacao)}
           </h1>
-          <p className="mt-2 text-slate-600">
-            {dataFormatada(promocao?.data_promocao)} • {valorOuTraco(promocao?.quadro)} • {listaExibida.length} militares
+          <p className="mt-2 text-slate-700">
+            {valorOuTraco(promocao?.quadro)} • {listaExibida.length} militares
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            {rotuloBoletim(promocao?.boletim_referencia)} • {dataFormatada(promocao?.data_publicacao || promocao?.data_promocao)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -477,9 +529,6 @@ export default function DetalhePromocao() {
           <Button variant="outline" onClick={invalidarDados} disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
-          </Button>
-          <Button onClick={salvarRascunho} disabled={salvando || (!existemAlteracoesPromocao && !existemAlteracoesTurma)}>
-            Salvar rascunho
           </Button>
         </div>
       </div>
@@ -507,203 +556,113 @@ export default function DetalhePromocao() {
 
       {promocao && (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle>1. Dados da promoção</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-6 pb-28 lg:grid-cols-[minmax(14rem,22%)_minmax(0,78%)]">
+            <Card className="h-fit border-slate-200 bg-white shadow-sm lg:sticky lg:top-8">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle>Dados da Promoção</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <Field label="Posto/graduação">
                   <Input value={rascunhoPromocao.posto_graduacao} onChange={(event) => atualizarCampoPromocao('posto_graduacao', event.target.value)} />
                 </Field>
                 <Field label="Quadro">
                   <Input value={rascunhoPromocao.quadro} onChange={(event) => atualizarCampoPromocao('quadro', event.target.value)} />
                 </Field>
-                <Field label="Status">
-                  <Input value={rascunhoPromocao.status} onChange={(event) => atualizarCampoPromocao('status', event.target.value)} />
-                </Field>
-                <Field label="Data da promoção">
-                  <Input type="date" value={rascunhoPromocao.data_promocao} onChange={(event) => atualizarCampoPromocao('data_promocao', event.target.value)} />
-                </Field>
-                <Field label="Data da publicação">
-                  <Input type="date" value={rascunhoPromocao.data_publicacao} onChange={(event) => atualizarCampoPromocao('data_publicacao', event.target.value)} />
-                </Field>
-                <Field label="Boletim">
-                  <Input value={rascunhoPromocao.boletim_referencia} onChange={(event) => atualizarCampoPromocao('boletim_referencia', event.target.value)} />
-                </Field>
-                <Field label="Ato">
-                  <Input value={rascunhoPromocao.ato_referencia} onChange={(event) => atualizarCampoPromocao('ato_referencia', event.target.value)} />
-                </Field>
-                <Field label="Observações" className="md:col-span-2">
-                  <Textarea value={rascunhoPromocao.observacoes} onChange={(event) => atualizarCampoPromocao('observacoes', event.target.value)} />
-                </Field>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <Field label="Data promoção">
+                    <Input type="date" value={rascunhoPromocao.data_promocao} onChange={(event) => atualizarCampoPromocao('data_promocao', event.target.value)} />
+                  </Field>
+                  <Field label="Data publicação">
+                    <Input type="date" value={rascunhoPromocao.data_publicacao} onChange={(event) => atualizarCampoPromocao('data_publicacao', event.target.value)} />
+                  </Field>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <Field label="Boletim">
+                    <Input value={rascunhoPromocao.boletim_referencia} onChange={(event) => atualizarCampoPromocao('boletim_referencia', event.target.value)} />
+                  </Field>
+                  <Field label="Ato">
+                    <Input value={rascunhoPromocao.ato_referencia} onChange={(event) => atualizarCampoPromocao('ato_referencia', event.target.value)} />
+                  </Field>
+                </div>
+                <details className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-slate-700">Observações</summary>
+                  <Textarea
+                    className="mt-3 min-h-20 bg-white"
+                    value={rascunhoPromocao.observacoes}
+                    onChange={(event) => atualizarCampoPromocao('observacoes', event.target.value)}
+                  />
+                </details>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle>2. Militares da promoção</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">Edite a ordem, adicione ou remova militares antes da publicação.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardHeader className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <CardTitle>Militares da Promoção ({listaExibida.length})</CardTitle>
+                  <p className="mt-1 text-sm text-slate-500">Defina a ordem de antiguidade manualmente.</p>
+                </div>
                 <Button onClick={() => setModalAdicionarAberto(true)} disabled={prepararListaMutation.isPending}>
                   <UserPlus className="mr-2 h-4 w-4" />
-                  Adicionar militar
+                  Adicionar Militar
                 </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {mensagensValidacao.length > 0 && (
-                <Alert className="border-amber-200 bg-amber-50">
-                  <AlertTitle>Revise a lista</AlertTitle>
-                  <AlertDescription>
-                    <ul className="mt-2 list-disc pl-5">
-                      {mensagensValidacao.map((mensagem) => <li key={mensagem}>{mensagem}</li>)}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <div className="overflow-x-auto rounded-lg border bg-white">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Ordem</TableHead>
-                      <TableHead>Militar</TableHead>
-                      <TableHead>Matrícula</TableHead>
-                      <TableHead>Posto atual</TableHead>
-                      <TableHead>Quadro atual</TableHead>
-                      <TableHead>Situação</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {listaExibida.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="py-8 text-center text-slate-500">Nenhum militar incluído nesta promoção.</TableCell>
-                      </TableRow>
-                    )}
-                    {turma.length === 0 && listaExibida.map((registro) => (
-                      <TableRow key={registro.id}>
-                        <TableCell>{registro.ordem || '—'}</TableCell>
-                        <TableCell className="font-medium">{nomeMilitar(registro.militar)}</TableCell>
-                        <TableCell>{valorOuTraco(registro.militar?.matricula)}</TableCell>
-                        <TableCell>{valorOuTraco(registro.militar?.posto_graduacao || registro.militar?.posto_graduacao_atual)}</TableCell>
-                        <TableCell>{valorOuTraco(registro.militar?.quadro || registro.militar?.quadro_atual)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={situacaoClass(registro.status, registro.publicado)}>
-                            {rotuloSituacao(registro.status, registro.publicado)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-sm text-slate-500">Aguarde</TableCell>
-                      </TableRow>
-                    ))}
-                    {turma.length > 0 && rascunhoTurma.map((registro) => {
-                      const original = turma.find((item) => String(item.id) === String(registro.id));
-                      return (
-                        <TableRow key={registro.id}>
-                          <TableCell className="min-w-28">
-                            <Input
-                              type="number"
-                              value={registro.ordem}
-                              onChange={(event) => atualizarRascunhoTurma(registro.id, 'ordem', event.target.value === '' ? '' : Number(event.target.value))}
-                              aria-label={`Ordem de ${nomeMilitar(original?.militar)}`}
-                            />
-                          </TableCell>
-                          <TableCell className="min-w-48 font-medium">{nomeMilitar(original?.militar)}</TableCell>
-                          <TableCell>{valorOuTraco(original?.militar?.matricula)}</TableCell>
-                          <TableCell>{valorOuTraco(original?.militar?.posto_graduacao || original?.militar?.posto_graduacao_atual)}</TableCell>
-                          <TableCell>{valorOuTraco(original?.militar?.quadro || original?.militar?.quadro_atual)}</TableCell>
-                          <TableCell>
-                            <select
-                              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                              value={registro.status}
-                              onChange={(event) => atualizarRascunhoTurma(registro.id, 'status', event.target.value)}
-                              aria-label={`Situação de ${nomeMilitar(original?.militar)}`}
-                            >
-                              {['elegivel', 'bloqueado', 'publicado', 'cancelado'].map((status) => (
-                                <option key={status} value={status}>{rotuloSituacao(status, false)}</option>
-                              ))}
-                              {!['elegivel', 'bloqueado', 'publicado', 'cancelado'].includes(registro.status) && (
-                                <option value={registro.status}>{rotuloSituacao(registro.status, registro.publicado)}</option>
-                              )}
-                            </select>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button size="sm" variant="outline" onClick={() => setRegistroParaRemover({ ...registro, militar: original?.militar })} disabled={Boolean(registro.publicado)}>
-                              <Trash2 className="mr-1 h-4 w-4" />
-                              Remover
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>3. Finalização</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <InfoItem label="Militares" value={listaExibida.length} />
-                <InfoItem label="Status da promoção" value={valorOuTraco(rascunhoPromocao.status)} />
-                <InfoItem label="Impacta antiguidade" value="Não, enquanto não publicada" />
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button disabled title="Publicação será implementada na próxima etapa.">
-                  Publicar promoção
-                </Button>
-              </div>
-              <Alert>
-                <AlertTitle>Publicação ainda não disponível</AlertTitle>
-                <AlertDescription>Publicação será implementada na próxima etapa.</AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-
-          {isAdmin && (
-            <details className="rounded-lg border bg-white p-4">
-              <summary className="cursor-pointer font-semibold text-slate-900">Detalhes técnicos</summary>
-              <div className="mt-4 space-y-4 text-sm text-slate-700">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div><strong>chave agrupamento:</strong> {valorOuTraco(promocao.chave_agrupamento)}</div>
-                  <div><strong>hash agrupamento:</strong> {valorOuTraco(promocao.hash_agrupamento)}</div>
-                  <div><strong>origem:</strong> {valorOuTraco(promocao.origem)}</div>
-                  <div><strong>fonte interna:</strong> {turma.length > 0 ? 'PromocaoMilitar' : 'HistoricoPromocaoMilitarV2.promocao_id'}</div>
-                </div>
-                <div>
-                  <p className="font-semibold">diagnósticos</p>
-                  <ul className="mt-2 list-disc pl-5">
-                    <li>históricos compatíveis: {historicosCompativeis.length}</li>
-                    <li>históricos vinculados: {historicosVinculados.length}</li>
-                    <li>registros de lista: {turma.length}</li>
-                    <li>conflitos por militar: {diagnosticoMilitares.filter((linha) => ['Conflito', 'Revisar'].includes(linha.acaoSugerida)).length}</li>
-                  </ul>
-                </div>
-                {diagnostico && (
-                  <pre className="max-h-80 overflow-auto rounded-md bg-slate-950 p-3 text-xs text-slate-100">
-                    {JSON.stringify(diagnostico, null, 2)}
-                  </pre>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {mensagensValidacao.length > 0 && (
+                  <Alert className="border-amber-200 bg-amber-50">
+                    <AlertTitle>Revise a lista</AlertTitle>
+                    <AlertDescription>
+                      <ul className="mt-2 list-disc pl-5">
+                        {mensagensValidacao.map((mensagem) => <li key={mensagem}>{mensagem}</li>)}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
                 )}
-                <div>
-                  <p className="font-semibold">conflitos</p>
-                  <ul className="mt-2 list-disc pl-5">
-                    {diagnosticoMilitares.filter((linha) => ['Conflito', 'Revisar'].includes(linha.acaoSugerida)).slice(0, 30).map((linha) => (
-                      <li key={linha.chave}>{linha.militar_id || 'sem militar'} — {linha.motivo}</li>
-                    ))}
-                    {diagnosticoMilitares.filter((linha) => ['Conflito', 'Revisar'].includes(linha.acaoSugerida)).length === 0 && <li>Sem conflitos técnicos identificados.</li>}
-                  </ul>
+
+                {listaExibida.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
+                    Nenhum militar incluído nesta promoção.
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {turma.length === 0 && listaExibida.map((registro) => (
+                    <MilitarCard
+                      key={registro.id}
+                      registro={registro}
+                      editavel={false}
+                      onAtualizar={atualizarRascunhoTurma}
+                      onRemover={setRegistroParaRemover}
+                    />
+                  ))}
+
+                  {turma.length > 0 && rascunhoTurmaOrdenado.map((registro) => {
+                    const original = turma.find((item) => String(item.id) === String(registro.id));
+                    return (
+                      <MilitarCard
+                        key={registro.id}
+                        registro={registro}
+                        original={original}
+                        editavel
+                        onAtualizar={atualizarRascunhoTurma}
+                        onRemover={setRegistroParaRemover}
+                      />
+                    );
+                  })}
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur md:px-8">
+            <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm font-medium text-slate-700">
+                {listaExibida.length} militares vinculados
               </div>
-            </details>
-          )}
+              <Button onClick={salvarRascunho} disabled={salvando || (!existemAlteracoesPromocao && !existemAlteracoesTurma)}>
+                Salvar alterações
+              </Button>
+            </div>
+          </div>
         </>
       )}
 
@@ -713,41 +672,30 @@ export default function DetalhePromocao() {
             <DialogTitle>Adicionar militar</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Field label="Buscar por nome ou matrícula">
-              <Input value={buscaAdicionar} onChange={(event) => setBuscaAdicionar(event.target.value)} placeholder="Digite nome ou matrícula" />
+            <Field label="Pesquisar militar">
+              <Input value={buscaAdicionar} onChange={(event) => setBuscaAdicionar(event.target.value)} placeholder="Pesquisar militar..." />
             </Field>
-            <div className="max-h-96 overflow-auto rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Militar</TableHead>
-                    <TableHead>Matrícula</TableHead>
-                    <TableHead>Posto atual</TableHead>
-                    <TableHead>Quadro atual</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {candidatosAdicionar.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-8 text-center text-slate-500">Nenhum militar disponível para adicionar.</TableCell>
-                    </TableRow>
-                  )}
-                  {candidatosAdicionar.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{nomeMilitar(item.militar)}</TableCell>
-                      <TableCell>{valorOuTraco(item.militar?.matricula)}</TableCell>
-                      <TableCell>{valorOuTraco(item.militar?.posto_graduacao || item.militar?.posto_graduacao_atual)}</TableCell>
-                      <TableCell>{valorOuTraco(item.militar?.quadro || item.militar?.quadro_atual)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" onClick={() => adicionarMutation.mutate(item)} disabled={adicionarMutation.isPending}>
-                          Adicionar
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="max-h-96 space-y-3 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
+              {candidatosAdicionar.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-slate-500">
+                  Nenhum militar disponível para adicionar.
+                </div>
+              )}
+              {candidatosAdicionar.map((item) => (
+                <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900">{nomeMilitar(item.militar)}</p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {valorOuTraco(item.militar?.posto_graduacao || item.militar?.posto_graduacao_atual)} • {valorOuTraco(item.militar?.quadro || item.militar?.quadro_atual)}
+                      </p>
+                    </div>
+                    <Button size="sm" onClick={() => adicionarMutation.mutate(item)} disabled={adicionarMutation.isPending}>
+                      Adicionar
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           <DialogFooter>
