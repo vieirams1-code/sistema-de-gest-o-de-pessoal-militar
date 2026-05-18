@@ -1,41 +1,26 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
   CheckCircle2,
-  ExternalLink,
-  Info,
   Loader2,
   Search,
-  RefreshCw,
   Save,
   Trash2,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from '@/utils';
 import { QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 
 const VERSAO_REGRA_RASCUNHO = 'antiguidade.quadros.rascunho.v1';
 const OBSERVACAO_PADRAO = 'Confirmar precedência institucional.';
 const MOTIVO_INICIAL = 'Configuração inicial a partir dos quadros oficiais do sistema e valores reais cadastrados.';
 const TEXTO_PENDENCIA = 'Configuração pendente de confirmação institucional. Esta configuração ainda não gera listagem oficial e não cria snapshot.';
-
-const badgesInstitucionais = [
-  'Rascunho controlado',
-  'Pendente de confirmação institucional',
-  'Quadros oficiais do sistema + legados reais',
-  'Sem snapshot',
-];
 
 function texto(valor) {
   return String(valor ?? '').trim();
@@ -256,9 +241,7 @@ export default function AntiguidadeConfigQuadros() {
   const {
     data: militaresAtivos = [],
     isLoading: militaresLoading,
-    isFetching: militaresFetching,
     error: militaresErro,
-    refetch: refetchMilitares,
   } = useQuery({
     queryKey: ['antiguidade-config-quadros-militares-ativos'],
     queryFn: async () => base44.entities.Militar.filter({ status_cadastro: 'Ativo' }),
@@ -267,9 +250,7 @@ export default function AntiguidadeConfigQuadros() {
   const {
     data: configuracoesAtivas = [],
     isLoading: configuracoesLoading,
-    isFetching: configuracoesFetching,
     error: configuracoesErro,
-    refetch: refetchConfiguracoes,
   } = useQuery({
     queryKey: ['antiguidade-config-quadros-configuracao-ativa'],
     queryFn: async () => base44.entities.ConfiguracaoAntiguidade.filter({ ativo: true }),
@@ -325,13 +306,6 @@ export default function AntiguidadeConfigQuadros() {
       .map((quadro) => ({ ...quadro, grupo: grupoPorQuadro.get(quadro.valor) })),
     [grupoPorQuadro, quadrosVisiveis, validacoes.classificados],
   );
-
-  const totais = useMemo(() => ({
-    disponiveis: quadrosDisponiveis.filter((quadro) => !quadro.vazio && texto(quadro.valor)).length,
-    classificados: Array.from(validacoes.classificados).filter((quadro) => quadrosConfiguraveisSet.has(quadro)).length,
-    naoClassificados: validacoes.naoClassificados.length,
-    grupos: gruposAtivos.length,
-  }), [gruposAtivos.length, quadrosConfiguraveisSet, quadrosDisponiveis, validacoes]);
 
   const salvarMutation = useMutation({
     mutationFn: async () => {
@@ -431,18 +405,6 @@ export default function AntiguidadeConfigQuadros() {
     }));
   }
 
-  function recarregarDados() {
-    refetchMilitares();
-    refetchConfiguracoes();
-  }
-
-  function limparAlteracoesLocais() {
-    if (!estadoInicial) return;
-    setGrupos(estadoInicial.grupos);
-    setMotivoAlteracao(estadoInicial.motivoAlteracao);
-    setSelectedGroupId(estadoInicial.grupos[0]?.id_local || null);
-  }
-
   function salvarRascunho() {
     if (!podeSalvar) {
       toast({ title: 'Rascunho inválido', description: 'Corrija as validações antes de salvar.', variant: 'destructive' });
@@ -452,102 +414,20 @@ export default function AntiguidadeConfigQuadros() {
   }
 
   const carregando = militaresLoading || configuracoesLoading;
-  const atualizando = militaresFetching || configuracoesFetching;
 
   return (
     <div className="space-y-6 p-[clamp(1rem,1.4vw,1.5rem)]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-3">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Antiguidade • editor de rascunho</p>
-            <h1 className="text-2xl font-bold text-[#1e3a5f]">Configuração de Quadros para Antiguidade</h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {badgesInstitucionais.map((badge) => (
-              <Badge key={badge} variant="outline" className="whitespace-nowrap border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-700">{badge}</Badge>
-            ))}
-          </div>
+        <div>
+          <p className="text-sm font-medium uppercase tracking-wide text-slate-500">Antiguidade • editor de rascunho</p>
+          <h1 className="text-2xl font-bold text-[#1e3a5f]">Configuração de Quadros para Antiguidade</h1>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="button" variant="outline" onClick={recarregarDados} disabled={atualizando}>
-            {atualizando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Recarregar dados
-          </Button>
-          <Button type="button" variant="outline" onClick={limparAlteracoesLocais} disabled={!estadoInicial || salvarMutation.isPending}>
-            Limpar alterações locais
-          </Button>
-          <Button asChild variant="outline">
-            <Link to={createPageUrl('AntiguidadePrevia')}>
-              Abrir Prévia Geral
-              <ExternalLink className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+        <Button type="button" onClick={salvarRascunho} disabled={!podeSalvar || salvarMutation.isPending} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
+          {salvarMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Salvar organização
+        </Button>
       </div>
-
-      <Alert className="border-amber-200 bg-amber-50 text-amber-900">
-        <AlertCircle className="h-4 w-4 text-amber-700" />
-        <AlertTitle>Esta configuração ainda não gera listagem oficial e não cria snapshot.</AlertTitle>
-        <AlertDescription>
-          O rascunho usa a lista oficial de quadros do sistema mais valores literais legados encontrados em Militar.quadro de militares ativos e fica pendente de confirmação institucional.
-        </AlertDescription>
-      </Alert>
-
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader className="space-y-2">
-          <CardTitle className="flex items-center gap-2 text-lg text-slate-900">
-            <Info className="h-5 w-5 text-slate-600" />
-            Validações visuais do rascunho
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-            {[
-              ['Quadros disponíveis', totais.disponiveis],
-              ['Classificados', totais.classificados],
-              ['Não classificados', totais.naoClassificados],
-              ['Grupos', totais.grupos],
-              ['Apto para salvar', podeSalvar ? 'Sim' : 'Não'],
-            ].map(([rotulo, valor]) => (
-              <div key={rotulo} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{rotulo}</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{valor}</p>
-              </div>
-            ))}
-          </div>
-
-          <div>
-            <label htmlFor="motivo-alteracao" className="text-sm font-semibold text-slate-800">Motivo da alteração</label>
-            <Textarea
-              id="motivo-alteracao"
-              value={motivoAlteracao}
-              onChange={(event) => setMotivoAlteracao(event.target.value)}
-              placeholder="Informe o motivo da alteração do rascunho."
-              className="mt-2 min-h-20"
-            />
-          </div>
-
-          {validacoes.alertas.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-              <CheckCircle2 className="h-4 w-4" />
-              Rascunho apto para salvar como configuração pendente.
-            </div>
-          ) : (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-              <p className="mb-2 font-semibold">Pendências que bloqueiam salvamento:</p>
-              <ul className="list-disc space-y-1 pl-5">
-                {validacoes.alertas.map((validacao) => <li key={validacao}>{validacao}</li>)}
-              </ul>
-            </div>
-          )}
-
-          <Button type="button" onClick={salvarRascunho} disabled={!podeSalvar || salvarMutation.isPending} className="bg-[#1e3a5f] hover:bg-[#2d4a6f]">
-            {salvarMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar rascunho da configuração
-          </Button>
-        </CardContent>
-      </Card>
 
       {(militaresErro || configuracoesErro) && (
         <Alert className="border-red-200 bg-red-50 text-red-900">
