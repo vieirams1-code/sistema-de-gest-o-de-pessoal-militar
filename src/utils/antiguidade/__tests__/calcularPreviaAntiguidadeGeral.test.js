@@ -487,3 +487,38 @@ test('D11-B diagnostica regressão cronológica de posto sem alterar ordenação
   assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['1', '2']);
   assert.ok(resultado.itens[0].alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REGRESSAO_CRONOLOGICA_POSTO));
 });
+
+test('D17-K1 Prévia considera promoção publicada quando Militar e Histórico V2 estão compatíveis', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [
+      militar('1', { nome: 'Bravo', posto_graduacao: '1º Tenente', quadro: 'QOBM' }),
+      militar('2', { nome: 'Alfa', posto_graduacao: '1º Tenente', quadro: 'QOBM' }),
+    ],
+    historicoPromocoes: [
+      promocao('pub-1', '1', {
+        promocao_id: 'promo-d17-k1',
+        posto_graduacao_anterior: '2º Tenente',
+        posto_graduacao_novo: '1º Tenente',
+        quadro_anterior: 'QOBM',
+        quadro_novo: 'QOBM',
+        data_promocao: '2026-05-01',
+        antiguidade_referencia_ordem: 2,
+        origem_dado: 'publicacao_promocao',
+      }),
+      promocao('pub-2', '2', {
+        posto_graduacao_anterior: '2º Tenente',
+        posto_graduacao_novo: '1º Tenente',
+        quadro_anterior: 'QOBM',
+        quadro_novo: 'QOBM',
+        data_promocao: '2026-05-01',
+        antiguidade_referencia_ordem: 1,
+        origem_dado: 'publicacao_promocao',
+      }),
+    ],
+  });
+
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['2', '1']);
+  assert.equal(resultado.itens[0].registroPromocaoAtualId, 'pub-2');
+  assert.equal(resultado.itens[1].registroPromocaoAtualId, 'pub-1');
+  assert.ok(resultado.itens.every((item) => item.posto_graduacao === '1º Tenente'));
+});

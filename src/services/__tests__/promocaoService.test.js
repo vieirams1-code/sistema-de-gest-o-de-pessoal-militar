@@ -15,6 +15,8 @@ import {
   motivosBloqueioVinculoProvavel,
   promocaoPermiteExclusao,
   podeVincularProvavelAdministrativamente,
+  publicarPromocaoOficial,
+  validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
 } from '../promocaoService.js';
 
@@ -462,17 +464,14 @@ test('DetalhePromocao não contém checkbox de atualização cadastral nem açõ
   assert.equal(detalhePromocao.includes('Restaurar sugestão'), false);
 });
 
-test('nenhuma ação faz Militar.update', () => {
+test('apenas serviço de publicação pode acionar atualização cadastral explícita', () => {
   const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
   const rastreamentoPromocoes = readFileSync(new URL('../../pages/RastreamentoPromocoes.jsx', import.meta.url), 'utf8');
-  const promocaoService = readFileSync(new URL('../promocaoService.js', import.meta.url), 'utf8');
-
   assert.equal(detalleSemEspacos(detalhePromocao).includes('entities.Militar.update'), false);
   assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('entities.Militar.update'), false);
-  assert.equal(detalleSemEspacos(promocaoService).includes('Militar.update'), false);
 });
 
-test('nenhuma ação altera Histórico V2', () => {
+test('DetalhePromocao não escreve Histórico V2 diretamente', () => {
   const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
   const rastreamentoPromocoes = readFileSync(new URL('../../pages/RastreamentoPromocoes.jsx', import.meta.url), 'utf8');
   const promocaoService = readFileSync(new URL('../promocaoService.js', import.meta.url), 'utf8');
@@ -483,7 +482,255 @@ test('nenhuma ação altera Histórico V2', () => {
   assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('HistoricoPromocaoMilitarV2.update'), false);
   assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('HistoricoPromocaoMilitarV2.create'), false);
   assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('HistoricoPromocaoMilitarV2.delete'), false);
-  assert.equal(detalleSemEspacos(promocaoService).includes('HistoricoPromocaoMilitarV2'), false);
+  assert.equal(promocaoService.includes('HistoricoPromocaoMilitarV2.delete'), false);
+});
+
+
+const promocaoPublicacao = {
+  id: 'promo-pub-1',
+  posto_graduacao: 'Capitão',
+  quadro: 'QOBM',
+  data_promocao: '2026-05-01',
+  data_publicacao: '2026-05-02',
+  boletim_referencia: 'BG 20',
+  ato_referencia: 'ATO 10',
+  status: 'ativa',
+};
+
+function itemPublicacao(overrides = {}) {
+  return {
+    id: 'pm-1',
+    promocao_id: 'promo-pub-1',
+    militar_id: 'm1',
+    ordem: 1,
+    status: 'selecionado',
+    selecionado: true,
+    militar: { id: 'm1', posto_graduacao: '1º Tenente', quadro: 'QOBM', nome_guerra: 'Alfa' },
+    ...overrides,
+  };
+}
+
+function entidadesPublicacao({ historicos = [] } = {}) {
+  const chamadas = {
+    historicoCreate: [],
+    historicoUpdate: [],
+    militarUpdate: [],
+    promocaoMilitarUpdate: [],
+    promocaoUpdate: [],
+  };
+  let contadorHistorico = 1;
+  return {
+    chamadas,
+    entities: {
+      HistoricoPromocaoMilitarV2: {
+        list: async () => historicos,
+        create: async (payload) => {
+          chamadas.historicoCreate.push(payload);
+          return { id: `hist-novo-${contadorHistorico++}`, ...payload };
+        },
+        update: async (id, patch) => {
+          chamadas.historicoUpdate.push({ id, patch });
+          return { id, ...patch };
+        },
+      },
+      Militar: {
+        update: async (id, patch) => {
+          chamadas.militarUpdate.push({ id, patch });
+          return { id, ...patch };
+        },
+      },
+      PromocaoMilitar: {
+        update: async (id, patch) => {
+          chamadas.promocaoMilitarUpdate.push({ id, patch });
+          return { id, ...patch };
+        },
+      },
+      Promocao: {
+        update: async (id, patch) => {
+          chamadas.promocaoUpdate.push({ id, patch });
+          return { id, ...patch };
+        },
+      },
+    },
+  };
+}
+
+async function rejeitaSemEscrita(contexto, textoMensagem) {
+  const { chamadas } = contexto;
+  await assert.rejects(
+    publicarPromocaoOficial({ ...contexto.args, entities: contexto.entities }),
+    (error) => error.message.includes(textoMensagem),
+  );
+  assert.equal(chamadas.historicoCreate.length, 0);
+  assert.equal(chamadas.historicoUpdate.length, 0);
+  assert.equal(chamadas.militarUpdate.length, 0);
+  assert.equal(chamadas.promocaoMilitarUpdate.length, 0);
+  assert.equal(chamadas.promocaoUpdate.length, 0);
+}
+
+test('publicação bloqueia promoção sem data_promocao antes de qualquer escrita', async () => {
+  const contexto = entidadesPublicacao();
+  await rejeitaSemEscrita({
+    ...contexto,
+    args: { promocao: { ...promocaoPublicacao, data_promocao: '' }, itens: [itemPublicacao()] },
+  }, 'data da promoção');
+});
+
+test('publicação bloqueia promoção sem posto/quadro destino', async () => {
+  const contexto = entidadesPublicacao();
+  await rejeitaSemEscrita({
+    ...contexto,
+    args: { promocao: { ...promocaoPublicacao, posto_graduacao: '', quadro: '' }, itens: [itemPublicacao()] },
+  }, 'posto/graduação destino');
+});
+
+test('publicação bloqueia militar incompatível', async () => {
+  const contexto = entidadesPublicacao();
+  await rejeitaSemEscrita({
+    ...contexto,
+    args: { promocao: promocaoPublicacao, itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: 'Soldado', quadro: 'QOBM' } })] },
+  }, 'incompatível');
+});
+
+test('publicação bloqueia militar em revisão', async () => {
+  const contexto = entidadesPublicacao();
+  await rejeitaSemEscrita({
+    ...contexto,
+    args: { promocao: promocaoPublicacao, itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: 'Posto Desconhecido', quadro: 'QOBM' } })] },
+  }, 'revisão');
+});
+
+test('publicação bloqueia ordem duplicada', async () => {
+  const contexto = entidadesPublicacao();
+  await rejeitaSemEscrita({
+    ...contexto,
+    args: { promocao: promocaoPublicacao, itens: [itemPublicacao(), itemPublicacao({ id: 'pm-2', militar_id: 'm2', ordem: 1, militar: { id: 'm2', posto_graduacao: '1º Tenente', quadro: 'QOBM' } })] },
+  }, 'ordem duplicada');
+});
+
+test('publicação bloqueia militar duplicado', async () => {
+  const contexto = entidadesPublicacao();
+  await rejeitaSemEscrita({
+    ...contexto,
+    args: { promocao: promocaoPublicacao, itens: [itemPublicacao(), itemPublicacao({ id: 'pm-2', ordem: 2 })] },
+  }, 'militar duplicado');
+});
+
+test('publicação histórica cria Histórico V2 e não atualiza Militar', async () => {
+  const contexto = entidadesPublicacao();
+  const resultado = await publicarPromocaoOficial({
+    promocao: { ...promocaoPublicacao, posto_graduacao: '1º Tenente' },
+    itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: 'Capitão', quadro: 'QOBM' } })],
+    entities: contexto.entities,
+  });
+
+  assert.equal(resultado.publicados, 1);
+  assert.equal(contexto.chamadas.historicoCreate.length, 1);
+  assert.equal(contexto.chamadas.militarUpdate.length, 0);
+  assert.equal(contexto.chamadas.promocaoMilitarUpdate[0].patch.status, 'publicado');
+});
+
+test('publicação atual cria Histórico V2 e não atualiza Militar', async () => {
+  const contexto = entidadesPublicacao();
+  await publicarPromocaoOficial({
+    promocao: promocaoPublicacao,
+    itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: 'Capitão', quadro: 'QOBM' } })],
+    entities: contexto.entities,
+  });
+
+  assert.equal(contexto.chamadas.historicoCreate.length, 1);
+  assert.equal(contexto.chamadas.militarUpdate.length, 0);
+});
+
+test('publicação imediatamente superior cria Histórico V2 e atualiza Militar', async () => {
+  const contexto = entidadesPublicacao();
+  await publicarPromocaoOficial({ promocao: promocaoPublicacao, itens: [itemPublicacao()], entities: contexto.entities });
+
+  assert.equal(contexto.chamadas.historicoCreate.length, 1);
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: 'Capitão' } });
+});
+
+test('publicação 2º Tenente para 1º Tenente atualiza Militar e cria Histórico V2', async () => {
+  const contexto = entidadesPublicacao();
+  await publicarPromocaoOficial({
+    promocao: { ...promocaoPublicacao, posto_graduacao: '1º Tenente' },
+    itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: '2º Tenente', quadro: 'QOBM' } })],
+    entities: contexto.entities,
+  });
+
+  assert.equal(contexto.chamadas.historicoCreate[0].posto_graduacao_anterior, '2º Tenente');
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: '1º Tenente' } });
+});
+
+test('histórico ativo exato com promocao_id vazio é vinculado e não recriado', async () => {
+  const contexto = entidadesPublicacao({ historicos: [{
+    id: 'hist-1',
+    militar_id: 'm1',
+    posto_graduacao_novo: 'Capitão',
+    quadro_novo: 'QOBM',
+    data_promocao: '2026-05-01',
+    status_registro: 'ativo',
+    promocao_id: '',
+  }] });
+
+  await publicarPromocaoOficial({ promocao: promocaoPublicacao, itens: [itemPublicacao()], entities: contexto.entities });
+
+  assert.equal(contexto.chamadas.historicoCreate.length, 0);
+  assert.equal(contexto.chamadas.historicoUpdate[0].id, 'hist-1');
+  assert.equal(contexto.chamadas.historicoUpdate[0].patch.promocao_id, 'promo-pub-1');
+});
+
+test('histórico ativo exato com mesma promocao_id é idempotente', async () => {
+  const contexto = entidadesPublicacao({ historicos: [{
+    id: 'hist-1',
+    militar_id: 'm1',
+    posto_graduacao_novo: 'Capitão',
+    quadro_novo: 'QOBM',
+    data_promocao: '2026-05-01',
+    status_registro: 'ativo',
+    promocao_id: 'promo-pub-1',
+  }] });
+
+  await publicarPromocaoOficial({ promocao: promocaoPublicacao, itens: [itemPublicacao()], entities: contexto.entities });
+
+  assert.equal(contexto.chamadas.historicoCreate.length, 0);
+  assert.equal(contexto.chamadas.historicoUpdate.length, 0);
+  assert.equal(contexto.chamadas.promocaoMilitarUpdate[0].patch.historico_promocao_v2_id, 'hist-1');
+});
+
+test('histórico ativo exato com outra promocao_id bloqueia sem escrita', async () => {
+  const contexto = entidadesPublicacao({ historicos: [{
+    id: 'hist-1',
+    militar_id: 'm1',
+    posto_graduacao_novo: 'Capitão',
+    quadro_novo: 'QOBM',
+    data_promocao: '2026-05-01',
+    status_registro: 'ativo',
+    promocao_id: 'outra-promo',
+  }] });
+
+  await rejeitaSemEscrita({
+    ...contexto,
+    args: { promocao: promocaoPublicacao, itens: [itemPublicacao()] },
+  }, 'outra promoção');
+});
+
+test('publicação expõe validação para bloquear alterações pendentes na tela', () => {
+  const validacao = validarPublicacaoPromocao({ promocao: promocaoPublicacao, itens: [itemPublicacao()], temAlteracoesPendentes: true });
+
+  assert.equal(validacao.valido, false);
+  assert.ok(validacao.bloqueios.includes('Salve as alterações pendentes antes de publicar.'));
+});
+
+test('serviço de publicação não altera motor da Prévia Geral nem snapshots', () => {
+  const previa = readFileSync(new URL('../../utils/antiguidade/calcularPreviaAntiguidadeGeral.js', import.meta.url), 'utf8');
+  const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
+  const promocaoService = readFileSync(new URL('../promocaoService.js', import.meta.url), 'utf8');
+
+  assert.equal(previa.includes('publicarPromocaoOficial'), false);
+  assert.equal(detalleSemEspacos(detalhePromocao).includes('HistoricoPromocaoMilitarV2.create'), false);
+  assert.equal(detalleSemEspacos(detalhePromocao).includes('entities.Militar.update'), false);
+  assert.equal(promocaoService.includes('HistoricoPromocaoMilitarV2.delete'), false);
 });
 
 function detalleSemEspacos(valor) {

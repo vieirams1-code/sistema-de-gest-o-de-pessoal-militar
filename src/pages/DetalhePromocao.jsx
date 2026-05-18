@@ -21,6 +21,7 @@ import {
   enriquecerHistoricos,
   filtrarCandidatosCompativeis,
   mensagemBloqueioExclusaoPromocao,
+  publicarPromocaoOficial,
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
@@ -32,6 +33,7 @@ import {
   podeVincularProvavelAdministrativamente,
   texto,
   resultadoAplicacaoCadastro,
+  validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
   valorOuTraco,
 } from '@/services/promocaoService';
@@ -454,6 +456,9 @@ export default function DetalhePromocao() {
   const invalidarDados = () => {
     queryClient.invalidateQueries({ queryKey: ['detalhe-promocao', promocaoId] });
     queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+    queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-militares'] });
+    queryClient.invalidateQueries({ queryKey: ['antiguidade-previa'] });
+    queryClient.invalidateQueries({ queryKey: ['previa-antiguidade-geral'] });
   };
 
   const salvarPromocaoMutation = useMutation({
@@ -598,9 +603,39 @@ export default function DetalhePromocao() {
     onError: (error) => toast({ title: 'Falha ao adicionar militar', description: error.message, variant: 'destructive' }),
   });
 
+  const publicarPromocaoMutation = useMutation({
+    mutationFn: async () => {
+      if (!promocao) throw new Error('Promoção não carregada.');
+      const itensPublicacao = rascunhoTurma.map((registro) => ({
+        ...montarRascunhoItemTurma(registro, promocao),
+        militar: turma.find((item) => String(item.id) === String(registro.id))?.militar || registro.militar || null,
+      }));
+      return publicarPromocaoOficial({
+        promocao,
+        itens: itensPublicacao,
+        entities: base44.entities,
+        temAlteracoesPendentes,
+      });
+    },
+    onSuccess: (resultado) => {
+      toast({
+        title: 'Promoção publicada',
+        description: `${resultado?.publicados || 0} militar(es) publicado(s) oficialmente.`,
+      });
+      invalidarDados();
+      queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
+    },
+    onError: (error) => toast({ title: 'Falha ao publicar promoção', description: error.message, variant: 'destructive' }),
+  });
+
+  const confirmarPublicacaoPromocao = () => {
+    const confirmou = window.confirm('Publicar promoção?\n\nEsta ação registrará a promoção no Histórico V2, atualizará o cadastro do militar quando aplicável e fará a Prévia Geral refletir a nova situação.\n\nDeseja continuar?');
+    if (confirmou) publicarPromocaoMutation.mutate();
+  };
+
   const isLoading = promocaoQuery.isLoading || historicosQuery.isLoading || promocaoMilitarQuery.isLoading || militaresQuery.isLoading;
   const error = promocaoQuery.error || historicosQuery.error || promocaoMilitarQuery.error || militaresQuery.error;
-  const salvando = salvarPromocaoMutation.isPending || salvarTurmaMutation.isPending || excluirPromocaoMutation.isPending;
+  const salvando = salvarPromocaoMutation.isPending || salvarTurmaMutation.isPending || excluirPromocaoMutation.isPending || publicarPromocaoMutation.isPending;
   const temAlteracoesPendentes = existemAlteracoesPromocao || existemAlteracoesTurma;
   const bloqueioSalvarTexto = explicarBloqueioSalvar({
     salvando,
@@ -609,6 +644,19 @@ export default function DetalhePromocao() {
     mensagens: mensagensValidacao,
   });
   const salvarBloqueado = salvando || !validacaoSalvarTurma.valido || !temAlteracoesPendentes;
+  const itensValidacaoPublicacao = useMemo(() => rascunhoTurma.map((registro) => ({
+    ...registro,
+    militar: turma.find((item) => String(item.id) === String(registro.id))?.militar || registro.militar || null,
+  })), [rascunhoTurma, turma]);
+  const validacaoPublicacao = useMemo(() => validarPublicacaoPromocao({
+    promocao,
+    itens: itensValidacaoPublicacao,
+    temAlteracoesPendentes,
+  }), [itensValidacaoPublicacao, promocao, temAlteracoesPendentes]);
+  const publicarBloqueado = isLoading || salvando || !validacaoPublicacao.valido;
+  const bloqueioPublicarTexto = publicarBloqueado
+    ? (isLoading ? 'Carregando dados da promoção.' : validacaoPublicacao.bloqueios[0] || 'Revise a promoção antes de publicar.')
+    : 'Pronto para publicar oficialmente.';
   const precisaPrepararLista = turma.length === 0 && historicosVinculados.length > 0;
 
   useEffect(() => {
@@ -652,6 +700,15 @@ export default function DetalhePromocao() {
           <Button variant="outline" onClick={invalidarDados} disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
+          </Button>
+          <Button
+            onClick={confirmarPublicacaoPromocao}
+            disabled={publicarBloqueado}
+            title={bloqueioPublicarTexto}
+            className={publicarBloqueado ? 'cursor-not-allowed bg-slate-200 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'}
+          >
+            <CheckCircle2 className="mr-2 h-4 w-4" />
+            Publicar promoção
           </Button>
           {promocaoPermiteExclusao(promocao, { turma }) && (
             <Button variant="destructive" onClick={confirmarExclusaoPromocao} disabled={excluirPromocaoMutation.isPending}>
@@ -815,6 +872,9 @@ export default function DetalhePromocao() {
                 <div className="font-medium text-slate-800">{listaExibida.length} militares vinculados</div>
                 <div className={salvarBloqueado ? 'text-slate-500' : 'text-emerald-700'}>
                   {bloqueioSalvarTexto}
+                </div>
+                <div className={publicarBloqueado ? 'text-slate-500' : 'text-emerald-700'}>
+                  Publicação: {bloqueioPublicarTexto}
                 </div>
               </div>
               <Button
