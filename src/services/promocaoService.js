@@ -19,13 +19,30 @@ export const STATUS_TURMA_OPERACIONAL = [
   'cancelado',
 ];
 
-export function promocaoPermiteExclusao(promocao = {}) {
-  return STATUS_PROMOCAO_RASCUNHO.has(statusNormalizado(promocao?.status));
+function contarVinculadosReaisExclusao({ vinculadosReais, turma, listaVinculada } = {}) {
+  if (Number.isFinite(Number(vinculadosReais))) return Number(vinculadosReais);
+  if (Array.isArray(turma)) return turma.length;
+  if (Array.isArray(listaVinculada)) return listaVinculada.length;
+  return null;
 }
 
-export function mensagemBloqueioExclusaoPromocao(promocao = {}) {
-  if (promocaoPermiteExclusao(promocao)) return '';
-  return 'Somente promoções em rascunho podem ser excluídas.';
+function temIndicicioVinculoOficial({ turma, listaVinculada } = {}) {
+  const vinculados = Array.isArray(turma) ? turma : listaVinculada;
+  if (!Array.isArray(vinculados)) return false;
+  return vinculados.some((item) => texto(item?.historico_promocao_v2_id));
+}
+
+export function promocaoPermiteExclusao(promocao = {}, contexto = {}) {
+  if (temIndicicioVinculoOficial(contexto)) return false;
+  const totalVinculadosReais = contarVinculadosReaisExclusao(contexto);
+  if (totalVinculadosReais > 0) return false;
+  if (STATUS_PROMOCAO_RASCUNHO.has(statusNormalizado(promocao?.status))) return true;
+  return totalVinculadosReais === 0;
+}
+
+export function mensagemBloqueioExclusaoPromocao(promocao = {}, contexto = {}) {
+  if (promocaoPermiteExclusao(promocao, contexto)) return '';
+  return 'Somente promoções em rascunho ou sem militares vinculados reais podem ser excluídas.';
 }
 
 export function valorOrdemTurma(valor) {

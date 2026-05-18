@@ -30,14 +30,35 @@ const promocao = {
 };
 
 
-test('exclusão de promoção é permitida apenas para rascunho', () => {
+test('exclusão de promoção é permitida para rascunho sem vínculo real informado', () => {
   assert.equal(promocaoPermiteExclusao({ status: 'rascunho' }), true);
   assert.equal(mensagemBloqueioExclusaoPromocao({ status: 'rascunho' }), '');
+});
 
+test('exclusão de promoção não rascunho é permitida sem PromocaoMilitar vinculado real', () => {
   for (const status of ['ativa', 'publicada', 'publicado', 'concluída', 'concluida', 'homologada']) {
-    assert.equal(promocaoPermiteExclusao({ status }), false);
-    assert.equal(mensagemBloqueioExclusaoPromocao({ status }), 'Somente promoções em rascunho podem ser excluídas.');
+    assert.equal(promocaoPermiteExclusao({ status }, { vinculadosReais: 0 }), true);
+    assert.equal(mensagemBloqueioExclusaoPromocao({ status }, { vinculadosReais: 0 }), '');
   }
+});
+
+test('exclusão de promoção é bloqueada quando há PromocaoMilitar vinculado real', () => {
+  assert.equal(promocaoPermiteExclusao({ status: 'rascunho' }, { vinculadosReais: 1 }), false);
+  assert.equal(promocaoPermiteExclusao({ status: 'ativa' }, { turma: [{ id: 'pm-1', militar_id: 'm1' }] }), false);
+  assert.equal(
+    mensagemBloqueioExclusaoPromocao({ status: 'ativa' }, { turma: [{ id: 'pm-1', militar_id: 'm1' }] }),
+    'Somente promoções em rascunho ou sem militares vinculados reais podem ser excluídas.',
+  );
+});
+
+test('exclusão de promoção é bloqueada quando há vínculo oficial sensível na turma', () => {
+  assert.equal(
+    promocaoPermiteExclusao(
+      { status: 'rascunho' },
+      { turma: [{ id: 'pm-1', historico_promocao_v2_id: 'hist-1' }] },
+    ),
+    false,
+  );
 });
 
 test('classifica compatibilidade forte somente quando chave completa bate', () => {
@@ -458,8 +479,10 @@ test('nenhuma ação altera Histórico V2', () => {
 
   assert.equal(detalleSemEspacos(detalhePromocao).includes('HistoricoPromocaoMilitarV2.update'), false);
   assert.equal(detalleSemEspacos(detalhePromocao).includes('HistoricoPromocaoMilitarV2.create'), false);
+  assert.equal(detalleSemEspacos(detalhePromocao).includes('HistoricoPromocaoMilitarV2.delete'), false);
   assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('HistoricoPromocaoMilitarV2.update'), false);
   assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('HistoricoPromocaoMilitarV2.create'), false);
+  assert.equal(detalleSemEspacos(rastreamentoPromocoes).includes('HistoricoPromocaoMilitarV2.delete'), false);
   assert.equal(detalleSemEspacos(promocaoService).includes('HistoricoPromocaoMilitarV2'), false);
 });
 
