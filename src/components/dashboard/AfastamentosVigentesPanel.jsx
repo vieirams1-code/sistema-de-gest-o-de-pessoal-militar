@@ -24,7 +24,7 @@ function getOrigemOptions(lista = []) {
   return [...new Set(lista.map((item) => item.origem).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
-export default function AfastamentosVigentesPanel() {
+export default function AfastamentosVigentesPanel({ atestados = [], registrosLivro = [] }) {
   const [militarFilter, setMilitarFilter] = useState('');
   const [tipoFilter, setTipoFilter] = useState('all');
   const [origemFilter, setOrigemFilter] = useState('all');
@@ -34,28 +34,10 @@ export default function AfastamentosVigentesPanel() {
   const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
   const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
 
-  const { data: atestados = [] } = useQuery({
-    queryKey: ['painel-afastamentos-atestados', scopeKey],
-    queryFn: async () => {
-      const lista = await base44.entities.Atestado.list('-created_date');
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-    },
-    enabled: scopedReady,
-  });
-
   const { data: ferias = [] } = useQuery({
     queryKey: ['painel-afastamentos-ferias', scopeKey],
     queryFn: async () => {
       const lista = await base44.entities.Ferias.list('-data_inicio');
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
-    },
-    enabled: scopedReady,
-  });
-
-  const { data: registrosLivro = [] } = useQuery({
-    queryKey: ['painel-afastamentos-livro', scopeKey],
-    queryFn: async () => {
-      const lista = await base44.entities.RegistroLivro.list('-created_date');
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
     },
     enabled: scopedReady,
