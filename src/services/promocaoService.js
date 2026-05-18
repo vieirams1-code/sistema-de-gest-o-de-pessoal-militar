@@ -1,5 +1,5 @@
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
-import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, isPostoInferior, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
+import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, isPostoInferior, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
 
 const TEXTO_VAZIO = '—';
 
@@ -45,8 +45,7 @@ export function normalizarItemTurmaOperacional(item = {}) {
 
 export function montarPatchPromocaoMilitar(item = {}) {
   const normalizado = normalizarItemTurmaOperacional(item);
-  return {
-    ordem: normalizado.ordem,
+  const patch = {
     selecionado: normalizado.selecionado,
     status: normalizado.status,
     justificativa: normalizado.justificativa,
@@ -55,6 +54,8 @@ export function montarPatchPromocaoMilitar(item = {}) {
     motivo_atualizacao_cadastro: normalizado.motivo_atualizacao_cadastro,
     resultado_aplicacao_cadastro: normalizado.resultado_aplicacao_cadastro,
   };
+  if (isOrdemPreenchida(normalizado.ordem)) patch.ordem = Number(normalizado.ordem);
+  return patch;
 }
 
 export function avaliarAlertasTurmaOperacional(itens = []) {
@@ -133,13 +134,14 @@ export function validarSalvarTurmaOperacional(itens = [], { promocao } = {}) {
   };
 }
 
-export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, militarId = '', usuario = {} } = {}) {
+export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, militarId = '', usuario = {}, registrosExistentes = [], ordem } = {}) {
   const agora = new Date().toISOString();
+  const ordemNumerica = isOrdemPreenchida(ordem) ? Number(ordem) : proximaOrdemNumerica(registrosExistentes);
   return {
     promocao_id: texto(promocao?.id),
     militar_id: texto(militarId || historico?.militar_id),
     historico_promocao_v2_id: texto(historico?.id),
-    ordem: '',
+    ordem: ordemNumerica,
     status: 'elegivel',
     selecionado: false,
     publicado: false,
@@ -150,6 +152,63 @@ export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, 
     motivo_atualizacao_cadastro: '',
     resultado_aplicacao_cadastro: '',
   };
+}
+
+
+export function resultadoAplicacaoCadastro(atualizar) {
+  return atualizar ? 'Cadastro será atualizado' : 'Cadastro preservado';
+}
+
+export function proximaOrdemNumerica(registros = []) {
+  const maior = (registros || []).reduce((atual, registro) => {
+    const numero = Number(registro?.ordem ?? registro?.antiguidade_referencia_ordem);
+    return Number.isFinite(numero) && numero > atual ? numero : atual;
+  }, 0);
+  return maior + 1;
+}
+
+export function ordemHistoricoOuProxima(historico = {}, registrosExistentes = []) {
+  if (isOrdemPreenchida(historico?.antiguidade_referencia_ordem)) {
+    return Number(historico.antiguidade_referencia_ordem);
+  }
+  return proximaOrdemNumerica(registrosExistentes);
+}
+
+export function montarPayloadsPromocaoMilitarAgrupamento({ promocao = {}, historicos = [], registrosExistentes = [], militarPorId = new Map() } = {}) {
+  const existentes = new Set((registrosExistentes || []).map((registro) => `${texto(registro?.promocao_id)}|${texto(registro?.militar_id)}`));
+  const registrosParaOrdem = [...(registrosExistentes || [])];
+  const payloads = [];
+
+  (historicos || []).forEach((historico) => {
+    const promocaoId = texto(promocao?.id);
+    const militarId = texto(historico?.militar_id);
+    const chave = `${promocaoId}|${militarId}`;
+    if (!promocaoId || !militarId || existentes.has(chave)) return;
+
+    const ordem = ordemHistoricoOuProxima(historico, registrosParaOrdem);
+    const militar = historico?.militar || militarPorId.get(militarId) || null;
+    const sugestao = getSugestaoAtualizacaoCadastro({ militar, promocao });
+    const atualizarCadastro = Boolean(sugestao.atualizar_cadastro_militar);
+    const payload = {
+      promocao_id: promocaoId,
+      militar_id: militarId,
+      historico_promocao_v2_id: texto(historico?.id),
+      ordem,
+      status: 'publicado',
+      selecionado: true,
+      publicado: true,
+      origem: 'agrupamento',
+      atualizar_cadastro_militar: atualizarCadastro,
+      motivo_atualizacao_cadastro: sugestao.motivo_atualizacao_cadastro,
+      resultado_aplicacao_cadastro: resultadoAplicacaoCadastro(atualizarCadastro),
+    };
+
+    existentes.add(chave);
+    registrosParaOrdem.push(payload);
+    payloads.push(payload);
+  });
+
+  return payloads;
 }
 
 export function texto(valor) {

@@ -22,11 +22,13 @@ import {
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
+  montarPayloadsPromocaoMilitarAgrupamento,
   nomeMilitar,
   normalizar,
   normalizarItemTurmaOperacional,
   podeVincularProvavelAdministrativamente,
   texto,
+  resultadoAplicacaoCadastro,
   validarSalvarTurmaOperacional,
   valorOuTraco,
 } from '@/services/promocaoService';
@@ -124,9 +126,6 @@ function mensagensValidacaoSimples(validacao) {
   return [...new Set((validacao?.bloqueios || []).map(mensagemSimples))];
 }
 
-function resultadoAplicacaoCadastro(atualizar) {
-  return atualizar ? 'Cadastro será atualizado' : 'Cadastro preservado';
-}
 
 function montarRascunhoItemTurma(registro, promocao) {
   const normalizado = normalizarItemTurmaOperacional(registro);
@@ -338,7 +337,7 @@ export default function DetalhePromocao() {
         promocao_id: promocao?.id || '',
         militar_id: historico.militar_id || '',
         historico_promocao_v2_id: historico.id || '',
-        ordem: historico.antiguidade_referencia_ordem || 0,
+        ordem: Number(historico.antiguidade_referencia_ordem) || 0,
         status: 'publicado',
         selecionado: true,
         publicado: true,
@@ -376,22 +375,35 @@ export default function DetalhePromocao() {
       });
     });
 
-    (militaresQuery.data || []).forEach((militar) => {
-      const militarId = String(militar?.id || '');
-      if (!militarId || idsNaPromocao.has(militarId) || porMilitar.has(militarId)) return;
-      const postoCombina = !texto(promocao?.posto_graduacao) || normalizar(militar?.posto_graduacao || militar?.posto_graduacao_atual) === normalizar(promocao?.posto_graduacao);
-      const quadroCombina = !texto(promocao?.quadro) || normalizar(militar?.quadro || militar?.quadro_atual) === normalizar(promocao?.quadro);
-      if (postoCombina && quadroCombina) {
-        porMilitar.set(militarId, { id: `militar-${militarId}`, militarId, militar, historico: null });
-      }
-    });
-
     const termo = normalizar(buscaAdicionar);
+    if (termo.length >= 2) {
+      (militaresQuery.data || []).forEach((militar) => {
+        const militarId = String(militar?.id || '');
+        if (!militarId || idsNaPromocao.has(militarId) || porMilitar.has(militarId)) return;
+        const buscaMilitar = normalizar(`${nomeMilitar(militar)} ${militar?.nome_completo || ''} ${militar?.matricula || ''}`);
+        if (!buscaMilitar.includes(termo)) return;
+        const quadroCombina = !texto(promocao?.quadro) || normalizar(militar?.quadro || militar?.quadro_atual) === normalizar(promocao?.quadro);
+        if (!quadroCombina) return;
+        const postoAtual = militar?.posto_graduacao || militar?.posto_graduacao_atual;
+        const postoCombinaDestino = !texto(promocao?.posto_graduacao) || normalizar(postoAtual) === normalizar(promocao?.posto_graduacao);
+        porMilitar.set(militarId, {
+          id: `militar-${militarId}`,
+          militarId,
+          militar,
+          historico: null,
+          avisoCompatibilidade: postoCombinaDestino
+            ? 'Sem histórico compatível para esta promoção.'
+            : `Posto atual (${valorOuTraco(postoAtual)}) diferente do destino; revisar antes de adicionar.`,
+        });
+      });
+    }
+
     return [...porMilitar.values()]
       .filter((item) => {
         if (!termo) return true;
         return normalizar(`${nomeMilitar(item.militar)} ${item.militar?.nome_completo || ''} ${item.militar?.matricula || ''}`).includes(termo);
       })
+      .sort((a, b) => Number(Boolean(a.historico) === false) - Number(Boolean(b.historico) === false))
       .slice(0, 30);
   }, [buscaAdicionar, candidatosHistorico, listaExibida, militarPorId, militaresQuery.data, promocao]);
 
@@ -483,29 +495,14 @@ export default function DetalhePromocao() {
       const registrosAtuais = typeof entity.list === 'function'
         ? await entity.list()
         : (promocaoMilitarQuery.data || []);
-      const registrosDaPromocao = (registrosAtuais || [])
-        .filter((registro) => String(registro?.promocao_id || '') === String(promocao.id));
-      if (registrosDaPromocao.length > 0) return { listaPreparada: false };
-
-      await Promise.all(historicosVinculados.map((historico) => {
-        const decisaoCadastro = montarRascunhoItemTurma({
-          militar: historico.militar || militarPorId.get(String(historico.militar_id || '')),
-        }, promocao);
-        return entity.create({
-          promocao_id: promocao.id,
-          militar_id: historico.militar_id || '',
-          historico_promocao_v2_id: historico.id || '',
-          ordem: Number(historico.antiguidade_referencia_ordem || 0),
-          status: 'publicado',
-          selecionado: true,
-          publicado: true,
-          origem: 'backfill_historico_v2',
-          atualizar_cadastro_militar: decisaoCadastro.atualizar_cadastro_militar,
-          motivo_atualizacao_cadastro: decisaoCadastro.motivo_atualizacao_cadastro,
-          resultado_aplicacao_cadastro: decisaoCadastro.resultado_aplicacao_cadastro,
-        });
-      }));
-      return { listaPreparada: true };
+      const payloads = montarPayloadsPromocaoMilitarAgrupamento({
+        promocao,
+        historicos: historicosVinculados,
+        registrosExistentes: registrosAtuais || [],
+        militarPorId,
+      });
+      await Promise.all(payloads.map((payload) => entity.create({ ...payload, origem: 'backfill_historico_v2' })));
+      return { listaPreparada: payloads.length > 0 };
     },
     onSuccess: (resultado) => {
       if (resultado?.listaPreparada) toast({ title: 'Lista de militares preparada.' });
@@ -571,6 +568,7 @@ export default function DetalhePromocao() {
         historico: item.historico || {},
         militarId: item.militarId,
         usuario,
+        registrosExistentes: listaExibida,
       });
       const decisaoCadastro = montarRascunhoItemTurma({ ...payload, militar: item.militar }, promocao);
       await base44.entities.PromocaoMilitar.create({
@@ -802,6 +800,7 @@ export default function DetalhePromocao() {
                       <p className="mt-1 text-sm text-slate-600">
                         {valorOuTraco(item.militar?.posto_graduacao || item.militar?.posto_graduacao_atual)} • {valorOuTraco(item.militar?.quadro || item.militar?.quadro_atual)}
                       </p>
+                      {item.avisoCompatibilidade && <p className="mt-2 text-xs text-amber-700">{item.avisoCompatibilidade}</p>}
                     </div>
                     <Button size="sm" onClick={() => adicionarMutation.mutate(item)} disabled={adicionarMutation.isPending}>
                       Adicionar
