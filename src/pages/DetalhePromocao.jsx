@@ -7,6 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,12 @@ import {
   validarSalvarTurmaOperacional,
   valorOuTraco,
 } from '@/services/promocaoService';
+import {
+  MENSAGEM_REBAIXAMENTO_CADASTRAL,
+  getSugestaoAtualizacaoCadastro,
+  isPostoInferior,
+  isPostoSuperior,
+} from '@/utils/postoGraduacaoHierarquia';
 
 const CAMPOS_PROMOCAO = [
   'posto_graduacao',
@@ -117,6 +124,31 @@ function mensagensValidacaoSimples(validacao) {
   return [...new Set((validacao?.bloqueios || []).map(mensagemSimples))];
 }
 
+function resultadoAplicacaoCadastro(atualizar) {
+  return atualizar ? 'Cadastro será atualizado' : 'Cadastro preservado';
+}
+
+function montarRascunhoItemTurma(registro, promocao) {
+  const normalizado = normalizarItemTurmaOperacional(registro);
+  const sugestao = getSugestaoAtualizacaoCadastro({ militar: registro?.militar, promocao });
+  const temValorSalvo = Object.hasOwn(registro || {}, 'atualizar_cadastro_militar');
+  const rebaixariaCadastro = isPostoInferior(promocao?.posto_graduacao, registro?.militar?.posto_graduacao || registro?.militar?.posto_graduacao_atual);
+  const superior = isPostoSuperior(promocao?.posto_graduacao, registro?.militar?.posto_graduacao || registro?.militar?.posto_graduacao_atual);
+  const atualizarSalvoOuSugerido = temValorSalvo ? Boolean(registro?.atualizar_cadastro_militar) : sugestao.atualizar_cadastro_militar;
+  const atualizar_cadastro_militar = superior ? atualizarSalvoOuSugerido : false;
+  const motivo_atualizacao_cadastro = rebaixariaCadastro
+    ? MENSAGEM_REBAIXAMENTO_CADASTRAL
+    : (texto(registro?.motivo_atualizacao_cadastro) || sugestao.motivo_atualizacao_cadastro);
+
+  return {
+    ...normalizado,
+    militar: registro?.militar || null,
+    atualizar_cadastro_militar,
+    motivo_atualizacao_cadastro,
+    resultado_aplicacao_cadastro: resultadoAplicacaoCadastro(atualizar_cadastro_militar),
+  };
+}
+
 function Field({ label, children, className = '' }) {
   return (
     <div className={`space-y-2 ${className}`}>
@@ -137,10 +169,31 @@ function ordenarPorOrdemCrescente(a, b) {
   return (ordemParaOrdenacao(a?.ordem) - ordemParaOrdenacao(b?.ordem)) || nomeMilitar(a?.militar).localeCompare(nomeMilitar(b?.militar));
 }
 
-function MilitarCard({ registro, original, editavel, onAtualizar, onRemover }) {
+function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRemover }) {
   const militar = original?.militar || registro?.militar;
   const posto = valorOuTraco(militar?.posto_graduacao || militar?.posto_graduacao_atual);
   const quadro = valorOuTraco(militar?.quadro || militar?.quadro_atual);
+  const nomeCompleto = valorOuTraco(militar?.nome_completo || nomeMilitar(militar));
+  const nomeGuerra = valorOuTraco(militar?.nome_guerra);
+  const promocaoInferior = isPostoInferior(promocao?.posto_graduacao, militar?.posto_graduacao || militar?.posto_graduacao_atual);
+  const motivoCadastro = registro?.motivo_atualizacao_cadastro || getSugestaoAtualizacaoCadastro({ militar, promocao }).motivo_atualizacao_cadastro;
+  const resultadoCadastro = resultadoAplicacaoCadastro(registro?.atualizar_cadastro_militar);
+
+  const alternarAtualizacaoCadastro = (marcado) => {
+    if (promocaoInferior && marcado) {
+      onAtualizar(registro.id, {
+        atualizar_cadastro_militar: false,
+        motivo_atualizacao_cadastro: MENSAGEM_REBAIXAMENTO_CADASTRAL,
+        resultado_aplicacao_cadastro: resultadoAplicacaoCadastro(false),
+      });
+      return;
+    }
+    onAtualizar(registro.id, {
+      atualizar_cadastro_militar: Boolean(marcado),
+      motivo_atualizacao_cadastro: motivoCadastro,
+      resultado_aplicacao_cadastro: resultadoAplicacaoCadastro(Boolean(marcado)),
+    });
+  };
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -167,11 +220,30 @@ function MilitarCard({ registro, original, editavel, onAtualizar, onRemover }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <p className="truncate font-semibold text-slate-900">{nomeMilitar(militar)}</p>
-            <span className="hidden text-slate-300 sm:inline">•</span>
-            <p className="text-sm text-slate-600">{valorOuTraco(militar?.matricula)}</p>
+            <p className="truncate font-semibold text-slate-900">{nomeCompleto}</p>
           </div>
-          <p className="mt-1 text-sm text-slate-600">{posto} • {quadro}</p>
+          <p className="mt-1 text-sm font-medium text-slate-700">{nomeGuerra}</p>
+          <p className="mt-1 text-sm text-slate-600">{valorOuTraco(militar?.matricula)} • {posto} • {quadro}</p>
+          <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
+            <p><span className="font-semibold">Promoção:</span> {valorOuTraco(promocao?.posto_graduacao)} • {valorOuTraco(promocao?.quadro)}</p>
+            <div className="mt-2">
+              <p className="font-semibold">Resultado:</p>
+              <ul className="mt-1 list-disc pl-5">
+                <li>Histórico/antiguidade será atualizado</li>
+                <li>{resultadoCadastro}</li>
+              </ul>
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Checkbox
+                checked={Boolean(registro?.atualizar_cadastro_militar)}
+                disabled={!editavel}
+                onCheckedChange={alternarAtualizacaoCadastro}
+                aria-label={`Atualizar cadastro do militar ${nomeMilitar(militar)}`}
+              />
+              Atualizar cadastro do militar
+            </label>
+            {motivoCadastro && <p className="mt-2 text-xs text-slate-500">{motivoCadastro}</p>}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -329,10 +401,10 @@ export default function DetalhePromocao() {
   }, [promocao]);
 
   useEffect(() => {
-    setRascunhoTurma(turma.map((registro) => normalizarItemTurmaOperacional(registro)));
-  }, [turma]);
+    setRascunhoTurma(turma.map((registro) => montarRascunhoItemTurma(registro, promocao)));
+  }, [promocao, turma]);
 
-  const validacaoSalvarTurma = useMemo(() => validarSalvarTurmaOperacional(rascunhoTurma), [rascunhoTurma]);
+  const validacaoSalvarTurma = useMemo(() => validarSalvarTurmaOperacional(rascunhoTurma, { promocao }), [promocao, rascunhoTurma]);
   const mensagensValidacao = useMemo(() => mensagensValidacaoSimples(validacaoSalvarTurma), [validacaoSalvarTurma]);
   const rascunhoTurmaOrdenado = useMemo(() => (
     [...rascunhoTurma].sort((a, b) => {
@@ -360,9 +432,25 @@ export default function DetalhePromocao() {
   };
 
   const atualizarRascunhoTurma = (registroId, campo, valor) => {
-    setRascunhoTurma((atuais) => atuais.map((registro) => (
-      String(registro.id) === String(registroId) ? { ...registro, [campo]: valor } : registro
-    )));
+    setRascunhoTurma((atuais) => atuais.map((registro) => {
+      if (String(registro.id) !== String(registroId)) return registro;
+      if (typeof campo === 'object' && campo !== null) return { ...registro, ...campo };
+      return { ...registro, [campo]: valor };
+    }));
+  };
+
+  const aplicarAcaoLoteCadastro = (acao) => {
+    setRascunhoTurma((atuais) => atuais.map((registro) => {
+      const sugestao = getSugestaoAtualizacaoCadastro({ militar: registro?.militar, promocao });
+      const superior = sugestao.comparacao === 'superior';
+      const atualizar = acao === 'historico' ? false : acao === 'superiores' ? superior : sugestao.atualizar_cadastro_militar;
+      return {
+        ...registro,
+        atualizar_cadastro_militar: atualizar,
+        motivo_atualizacao_cadastro: sugestao.motivo_atualizacao_cadastro,
+        resultado_aplicacao_cadastro: resultadoAplicacaoCadastro(atualizar),
+      };
+    }));
   };
 
   const invalidarDados = () => {
@@ -399,16 +487,24 @@ export default function DetalhePromocao() {
         .filter((registro) => String(registro?.promocao_id || '') === String(promocao.id));
       if (registrosDaPromocao.length > 0) return { listaPreparada: false };
 
-      await Promise.all(historicosVinculados.map((historico) => entity.create({
-        promocao_id: promocao.id,
-        militar_id: historico.militar_id || '',
-        historico_promocao_v2_id: historico.id || '',
-        ordem: Number(historico.antiguidade_referencia_ordem || 0),
-        status: 'publicado',
-        selecionado: true,
-        publicado: true,
-        origem: 'backfill_historico_v2',
-      })));
+      await Promise.all(historicosVinculados.map((historico) => {
+        const decisaoCadastro = montarRascunhoItemTurma({
+          militar: historico.militar || militarPorId.get(String(historico.militar_id || '')),
+        }, promocao);
+        return entity.create({
+          promocao_id: promocao.id,
+          militar_id: historico.militar_id || '',
+          historico_promocao_v2_id: historico.id || '',
+          ordem: Number(historico.antiguidade_referencia_ordem || 0),
+          status: 'publicado',
+          selecionado: true,
+          publicado: true,
+          origem: 'backfill_historico_v2',
+          atualizar_cadastro_militar: decisaoCadastro.atualizar_cadastro_militar,
+          motivo_atualizacao_cadastro: decisaoCadastro.motivo_atualizacao_cadastro,
+          resultado_aplicacao_cadastro: decisaoCadastro.resultado_aplicacao_cadastro,
+        });
+      }));
       return { listaPreparada: true };
     },
     onSuccess: (resultado) => {
@@ -426,7 +522,7 @@ export default function DetalhePromocao() {
       if (!base44.entities.PromocaoMilitar || typeof base44.entities.PromocaoMilitar.update !== 'function') {
         throw new Error('Não foi possível salvar a lista.');
       }
-      const validacao = validarSalvarTurmaOperacional(rascunhoTurma);
+      const validacao = validarSalvarTurmaOperacional(rascunhoTurma, { promocao });
       if (!validacao.valido) throw new Error(mensagensValidacaoSimples(validacao).join(' '));
       const originais = new Map(turma.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
       const alterados = rascunhoTurma.filter((registro) => (
@@ -470,12 +566,19 @@ export default function DetalhePromocao() {
       const jaExiste = listaExibida.some((registro) => String(registro?.militar_id || '') === String(item.militarId));
       if (jaExiste) throw new Error('Este militar já está na promoção.');
       const usuario = typeof base44.auth?.me === 'function' ? await base44.auth.me() : null;
-      await base44.entities.PromocaoMilitar.create(montarPayloadAdicaoManualTurma({
+      const payload = montarPayloadAdicaoManualTurma({
         promocao,
         historico: item.historico || {},
         militarId: item.militarId,
         usuario,
-      }));
+      });
+      const decisaoCadastro = montarRascunhoItemTurma({ ...payload, militar: item.militar }, promocao);
+      await base44.entities.PromocaoMilitar.create({
+        ...payload,
+        atualizar_cadastro_militar: decisaoCadastro.atualizar_cadastro_militar,
+        motivo_atualizacao_cadastro: decisaoCadastro.motivo_atualizacao_cadastro,
+        resultado_aplicacao_cadastro: decisaoCadastro.resultado_aplicacao_cadastro,
+      });
     },
     onSuccess: () => {
       toast({ title: 'Militar adicionado', description: 'O militar foi incluído na lista desta promoção.' });
@@ -607,6 +710,14 @@ export default function DetalhePromocao() {
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
+                {turma.length > 0 && (
+                  <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <Button type="button" variant="outline" size="sm" onClick={() => aplicarAcaoLoteCadastro('historico')}>Histórico somente</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => aplicarAcaoLoteCadastro('superiores')}>Atualizar promoções superiores</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => aplicarAcaoLoteCadastro('sugestao')}>Restaurar sugestão</Button>
+                  </div>
+                )}
+
                 {mensagensValidacao.length > 0 && (
                   <Alert className="border-amber-200 bg-amber-50">
                     <AlertTitle>Revise a lista</AlertTitle>
@@ -630,6 +741,7 @@ export default function DetalhePromocao() {
                       key={registro.id}
                       registro={registro}
                       editavel={false}
+                      promocao={promocao}
                       onAtualizar={atualizarRascunhoTurma}
                       onRemover={setRegistroParaRemover}
                     />
@@ -643,6 +755,7 @@ export default function DetalhePromocao() {
                         registro={registro}
                         original={original}
                         editavel
+                        promocao={promocao}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
                       />

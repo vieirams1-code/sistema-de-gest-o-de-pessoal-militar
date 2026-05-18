@@ -47,6 +47,21 @@
       "description": "Indica se a seleção operacional está marcada como publicada.",
       "default": false
     },
+    "atualizar_cadastro_militar": {
+      "type": "boolean",
+      "description": "Indica se esta promoção deve atualizar o cadastro atual do militar sem permitir rebaixamento.",
+      "default": false
+    },
+    "motivo_atualizacao_cadastro": {
+      "type": "string",
+      "description": "Motivo operacional da decisão individual de atualizar ou preservar o cadastro atual do militar.",
+      "default": ""
+    },
+    "resultado_aplicacao_cadastro": {
+      "type": "string",
+      "description": "Resultado operacional previsto para a aplicação cadastral desta promoção.",
+      "default": ""
+    },
     "origem": {
       "type": "string",
       "description": "Origem operacional do vínculo.",
