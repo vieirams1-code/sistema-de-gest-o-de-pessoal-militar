@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, RefreshCw, Trash2, UserPlus } from 'lucide-react';
 import { POSTOS_GRADUACOES_HIERARQUIA, QUADROS_PROMOCAO_FIXOS } from '@/constants/postosGraduacoes';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -122,6 +122,13 @@ function mensagensValidacaoSimples(validacao) {
   return [...new Set((validacao?.bloqueios || []).map(mensagemSimples))];
 }
 
+function explicarBloqueioSalvar({ salvando, valido, temAlteracoes, mensagens = [] }) {
+  if (salvando) return 'Salvando alterações...';
+  if (!valido) return mensagens[0] || 'Revise os militares sinalizados antes de salvar.';
+  if (!temAlteracoes) return 'Sem alterações pendentes.';
+  return 'Pronto para salvar.';
+}
+
 
 function montarRascunhoItemTurma(registro, promocao) {
   const normalizado = normalizarItemTurmaOperacional(registro);
@@ -180,9 +187,9 @@ function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRe
   const resultadoCadastro = resultadoAplicacaoCadastro(efeitoCadastro);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="sm:w-24 sm:shrink-0">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+        <div className="xl:w-24 xl:shrink-0">
           <p className="sr-only">Ordem</p>
           {editavel ? (
             <div className="flex h-12 w-24 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-3 text-blue-700 shadow-sm">
@@ -202,29 +209,29 @@ function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRe
           )}
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <p className="truncate font-semibold text-slate-900">{nomeCompleto}</p>
+        <div className="min-w-0 flex-1 space-y-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nome completo</p>
+            <p className="truncate text-lg font-bold text-slate-950">{nomeCompleto}</p>
           </div>
-          <p className="mt-1 text-sm font-medium text-slate-700">{nomeGuerra}</p>
-          <p className="mt-1 text-sm text-slate-600">{valorOuTraco(militar?.matricula)} • {posto} • {quadro}</p>
-          <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
-            <p><span className="font-semibold">Promoção:</span> {valorOuTraco(promocao?.posto_graduacao)} • {valorOuTraco(promocao?.quadro)}</p>
-            <div className="mt-2">
-              <p className="font-semibold">Resultado automático:</p>
-              <ul className="mt-1 list-disc pl-5">
-                <li>Histórico/antiguidade será atualizado</li>
-                <li>{resultadoCadastro}</li>
-              </ul>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nome de guerra</p>
+              <p className="mt-1 font-semibold text-slate-800">{nomeGuerra}</p>
+              <p className="mt-1 text-sm text-slate-600">{valorOuTraco(militar?.matricula)} • {posto} • {quadro}</p>
             </div>
-            <Badge variant="outline" className={`mt-3 ${classeBadgeEfeito(efeitoCadastro.tipo)}`}>
-              {efeitoCadastro.titulo}
-            </Badge>
-            <p className="mt-2 text-xs text-slate-500">{efeitoCadastro.mensagem}</p>
+            <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Promoção destino</p>
+              <p className="mt-1 font-semibold text-slate-900">{valorOuTraco(promocao?.posto_graduacao)} • {valorOuTraco(promocao?.quadro)}</p>
+              <Badge variant="outline" className={`mt-2 ${classeBadgeEfeito(efeitoCadastro.tipo)}`}>
+                {efeitoCadastro.titulo}
+              </Badge>
+              <p className="mt-2 text-xs text-slate-600">{resultadoCadastro}. {efeitoCadastro.mensagem}</p>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
           <Badge variant="outline" className={situacaoClass(registro.status, registro.publicado)}>
             {rotuloSituacao(registro.status, registro.publicado)}
           </Badge>
@@ -551,6 +558,14 @@ export default function DetalhePromocao() {
   const isLoading = promocaoQuery.isLoading || historicosQuery.isLoading || promocaoMilitarQuery.isLoading || militaresQuery.isLoading;
   const error = promocaoQuery.error || historicosQuery.error || promocaoMilitarQuery.error || militaresQuery.error;
   const salvando = salvarPromocaoMutation.isPending || salvarTurmaMutation.isPending;
+  const temAlteracoesPendentes = existemAlteracoesPromocao || existemAlteracoesTurma;
+  const bloqueioSalvarTexto = explicarBloqueioSalvar({
+    salvando,
+    valido: validacaoSalvarTurma.valido,
+    temAlteracoes: temAlteracoesPendentes,
+    mensagens: mensagensValidacao,
+  });
+  const salvarBloqueado = salvando || !validacaoSalvarTurma.valido || !temAlteracoesPendentes;
   const precisaPrepararLista = turma.length === 0 && historicosVinculados.length > 0;
 
   useEffect(() => {
@@ -582,6 +597,9 @@ export default function DetalhePromocao() {
           <p className="mt-1 text-sm text-slate-500">
             {rotuloBoletim(promocao?.boletim_referencia)} • {dataFormatada(promocao?.data_publicacao || promocao?.data_promocao)}
           </p>
+          <p className="mt-2 text-sm text-slate-600">
+            Fluxo: confira os dados à esquerda, adicione militares à direita e salve as alterações.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate(createPageUrl('Promocoes'))}>
@@ -612,13 +630,13 @@ export default function DetalhePromocao() {
       {!isLoading && promocaoId && !promocao && (
         <Alert variant="destructive">
           <AlertTitle>Promoção não encontrada</AlertTitle>
-          <AlertDescription>Nenhuma promoção foi localizada para o id informado.</AlertDescription>
+          <AlertDescription>Nenhuma promoção foi localizada para o endereço informado.</AlertDescription>
         </Alert>
       )}
 
       {promocao && (
         <>
-          <div className="grid gap-6 pb-28 lg:grid-cols-[minmax(14rem,22%)_minmax(0,78%)]">
+          <div className="grid gap-6 pb-32 lg:grid-cols-[minmax(18rem,30%)_minmax(0,70%)]">
             <Card className="h-fit border-slate-200 bg-white shadow-sm lg:sticky lg:top-8">
               <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle>Dados da Promoção</CardTitle>
@@ -677,7 +695,7 @@ export default function DetalhePromocao() {
               <CardHeader className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <CardTitle>Militares da Promoção ({listaExibida.length})</CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">Defina a ordem de antiguidade manualmente.</p>
+                  <p className="mt-1 text-sm text-slate-500">Adicione militares e confira a ordem operacional da promoção.</p>
                 </div>
                 <Button onClick={() => setModalAdicionarAberto(true)} disabled={prepararListaMutation.isPending}>
                   <UserPlus className="mr-2 h-4 w-4" />
@@ -687,8 +705,9 @@ export default function DetalhePromocao() {
               <CardContent className="space-y-4">
                 {mensagensValidacao.length > 0 && (
                   <Alert className="border-amber-200 bg-amber-50">
-                    <AlertTitle>Revise a lista</AlertTitle>
+                    <AlertTitle>Revise antes de salvar</AlertTitle>
                     <AlertDescription>
+                      Corrija os pontos abaixo para liberar o salvamento.
                       <ul className="mt-2 list-disc pl-5">
                         {mensagensValidacao.map((mensagem) => <li key={mensagem}>{mensagem}</li>)}
                       </ul>
@@ -697,8 +716,16 @@ export default function DetalhePromocao() {
                 )}
 
                 {listaExibida.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
-                    Nenhum militar incluído nesta promoção.
+                  <div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/60 p-8 text-center shadow-sm">
+                    <UserPlus className="mx-auto h-10 w-10 text-blue-600" />
+                    <h3 className="mt-3 text-lg font-semibold text-slate-900">Nenhum militar incluído</h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
+                      Clique em “Adicionar Militar” para montar a lista desta promoção. Depois confira a ordem e salve as alterações.
+                    </p>
+                    <Button className="mt-4" onClick={() => setModalAdicionarAberto(true)} disabled={prepararListaMutation.isPending}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Adicionar Militar
+                    </Button>
                   </div>
                 )}
 
@@ -735,10 +762,18 @@ export default function DetalhePromocao() {
 
           <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur md:px-8">
             <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm font-medium text-slate-700">
-                {listaExibida.length} militares vinculados
+              <div className="space-y-1 text-sm">
+                <div className="font-medium text-slate-800">{listaExibida.length} militares vinculados</div>
+                <div className={salvarBloqueado ? 'text-slate-500' : 'text-emerald-700'}>
+                  {bloqueioSalvarTexto}
+                </div>
               </div>
-              <Button onClick={salvarRascunho} disabled={salvando || !validacaoSalvarTurma.valido || (!existemAlteracoesPromocao && !existemAlteracoesTurma)}>
+              <Button
+                onClick={salvarRascunho}
+                disabled={salvarBloqueado}
+                className={salvarBloqueado ? 'cursor-not-allowed bg-slate-200 text-slate-500 hover:bg-slate-200' : ''}
+              >
+                {!salvarBloqueado && <CheckCircle2 className="mr-2 h-4 w-4" />}
                 Salvar alterações
               </Button>
             </div>
@@ -753,12 +788,12 @@ export default function DetalhePromocao() {
           </DialogHeader>
           <div className="space-y-4">
             <Field label="Pesquisar militar">
-              <Input value={buscaAdicionar} onChange={(event) => setBuscaAdicionar(event.target.value)} placeholder="Pesquisar militar..." />
+              <Input value={buscaAdicionar} onChange={(event) => setBuscaAdicionar(event.target.value)} placeholder="Digite nome, nome de guerra ou matrícula" />
             </Field>
             <div className="max-h-96 space-y-3 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
               {candidatosAdicionar.length === 0 && (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-slate-500">
-                  Nenhum militar disponível para adicionar.
+                  Nenhum militar disponível. Digite ao menos duas letras para buscar manualmente ou revise os dados da promoção.
                 </div>
               )}
               {candidatosAdicionar.map((item) => (
