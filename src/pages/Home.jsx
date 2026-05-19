@@ -190,12 +190,16 @@ export default function Home() {
     enabled: isAccessResolved,
   });
 
-  // Lote 1D-E — Auditoria de Escopo Transversal:
-  // Universo de militar_ids permitidos para o usuário corrente. Para admin,
-  // `scopedIds === null` → consultas globais. Para restritos, todas as
-  // entidades vinculadas a militares são filtradas por estes IDs.
-  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds();
-  const dashboardEnabled = scopedReady;
+  const scopedSeedIds = React.useMemo(() => militares.map((militar) => String(militar.id)), [militares]);
+
+  // Lote D3 — Home passa a ser fonte única do escopo de militares do dashboard.
+  // Admin mantém escopo global (`scopedIds === null`). Escopos restritos usam os
+  // IDs já resolvidos pela lista de militares carregada acima, evitando nova
+  // resolução de Militar.filter em paralelo.
+  const { ids: scopedIds, isAdmin: scopedIsAdmin, isReady: scopedReady } = useScopedMilitarIds({
+    seedIds: scopedSeedIds,
+  });
+  const dashboardEnabled = isAccessResolved && scopedReady;
   const scopeKey = scopedIsAdmin ? 'admin' : (scopedIds || []).join(',');
 
   const { data: periodos = [] } = useQuery({

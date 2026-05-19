@@ -25,7 +25,8 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
  * Não altera regras de negócio. Não toca em entidades de domínio. Apenas
  * resolve o universo de `militar_id` permitidos para o usuário corrente.
  */
-export function useScopedMilitarIds() {
+export function useScopedMilitarIds(options = {}) {
+  const { seedIds } = options;
   const {
     isAdmin,
     modoAcesso,
@@ -42,6 +43,8 @@ export function useScopedMilitarIds() {
     userEmail || 'self',
     linkedMilitarId || null,
   ];
+
+  const hasSeedIds = Array.isArray(seedIds);
 
   const query = useQuery({
     queryKey,
@@ -74,16 +77,27 @@ export function useScopedMilitarIds() {
       }
       return Array.from(ids);
     },
-    enabled: isAccessResolved,
+    enabled: isAccessResolved && !hasSeedIds,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
+  const resolvedIds = isAdmin
+    ? null
+    : hasSeedIds
+      ? Array.from(new Set((seedIds || []).map(String)))
+      : query.data === undefined
+        ? []
+        : query.data;
+
+  const isLoading = !isAccessResolved || (!hasSeedIds && query.isLoading);
+  const isReady = isAccessResolved && (isAdmin || hasSeedIds || query.data !== undefined) && !isLoading;
+
   return {
-    ids: query.data === undefined ? [] : query.data, // undefined = ainda carregando → tratar como "sem ids ainda"
+    ids: resolvedIds,
     isAdmin,
-    isLoading: query.isLoading || !isAccessResolved,
-    isReady: isAccessResolved && !query.isLoading && query.data !== undefined,
+    isLoading,
+    isReady,
   };
 }
 
