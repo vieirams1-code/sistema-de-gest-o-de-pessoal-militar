@@ -487,9 +487,21 @@ export default function Publicacoes() {
   const registrosDaAbaAtiva = useMemo(() => (abaOrigemAtiva === 'all' ? todosRegistros : todosRegistros.filter((registro) => registro.origem_tipo === abaOrigemAtiva)), [todosRegistros, abaOrigemAtiva]);
   const filteredRegistros = useMemo(() => registrosDaAbaAtiva.filter((r) => {
     const statusCanonico = obterStatusCanonicoPublicacao(r);
-    const statusReferencia = statusFilter === 'Inconsistente' ? r.status_calculado : statusCanonico;
-    if (!exibirPublicados && statusCanonico === STATUS_PUBLICACAO.PUBLICADO) return false;
-    const matchesStatus = statusFilter === 'all' || statusReferencia === statusFilter;
+    const statusNormalizado = normalizarStatusPublicacao(r.status_calculado) || statusCanonico;
+    const statusFiltroNormalizado = statusFilter === 'all' || statusFilter === 'Inconsistente'
+      ? statusFilter
+      : normalizarStatusPublicacao(statusFilter) || statusFilter;
+    const isPublicado = statusNormalizado === STATUS_PUBLICACAO.PUBLICADO;
+    const isInconsistente = String(r.status_calculado || '').trim().toLowerCase() === 'inconsistente';
+
+    if (!exibirPublicados && isPublicado) return false;
+
+    const matchesStatus = statusFiltroNormalizado === 'all'
+      ? true
+      : statusFiltroNormalizado === 'Inconsistente'
+        ? isInconsistente
+        : statusNormalizado === statusFiltroNormalizado;
+
     const termo = searchTerm.toLowerCase().trim();
     const matchesSearch =
       containsTerm(r.militar_nome, termo) ||
