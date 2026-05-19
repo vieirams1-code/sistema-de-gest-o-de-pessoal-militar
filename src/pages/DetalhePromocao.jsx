@@ -274,7 +274,9 @@ export default function DetalhePromocao() {
   const listasPreparadasAutomaticamente = useRef(new Set());
 
   const [rascunhoPromocao, setRascunhoPromocao] = useState(montarRascunhoPromocao());
+  const [promocaoBaseComparacao, setPromocaoBaseComparacao] = useState(null);
   const [rascunhoTurma, setRascunhoTurma] = useState([]);
+  const [turmaBaseComparacao, setTurmaBaseComparacao] = useState([]);
   const [registroParaRemover, setRegistroParaRemover] = useState(null);
   const [modalAdicionarAberto, setModalAdicionarAberto] = useState(false);
   const [buscaAdicionar, setBuscaAdicionar] = useState('');
@@ -310,9 +312,15 @@ export default function DetalhePromocao() {
   });
 
   const promocao = promocaoQuery.data;
+  useEffect(() => {
+    if (!promocao) return;
+    setPromocaoBaseComparacao(promocao);
+  }, [promocao]);
+
+  const promocaoConsolidada = promocaoBaseComparacao || promocao;
   const promocaoReferenciaCadastro = useMemo(() => (
-    promocao ? { ...promocao, ...montarPatchPromocao(rascunhoPromocao) } : promocao
-  ), [promocao, rascunhoPromocao]);
+    promocaoConsolidada ? { ...promocaoConsolidada, ...montarPatchPromocao(rascunhoPromocao) } : promocaoConsolidada
+  ), [promocaoConsolidada, rascunhoPromocao]);
   const militarPorId = useMemo(() => montarMilitarPorId(militaresQuery.data || []), [militaresQuery.data]);
 
   const historicosVinculados = useMemo(() => {
@@ -333,6 +341,9 @@ export default function DetalhePromocao() {
       }))
       .sort(ordenarPorOrdemCrescente);
   }, [militarPorId, promocao, promocaoMilitarQuery.data]);
+  useEffect(() => {
+    setTurmaBaseComparacao(turma);
+  }, [turma]);
 
   const listaExibida = useMemo(() => {
     if (turma.length > 0) return turma;
@@ -438,16 +449,16 @@ export default function DetalhePromocao() {
   ), [rascunhoTurma, turma]);
 
   const existemAlteracoesPromocao = useMemo(() => {
-    if (!promocao) return false;
-    return JSON.stringify(montarPatchPromocao(rascunhoPromocao)) !== JSON.stringify(montarPatchPromocao(montarRascunhoPromocao(promocao)));
-  }, [promocao, rascunhoPromocao]);
+    if (!promocaoConsolidada) return false;
+    return JSON.stringify(montarPatchPromocao(rascunhoPromocao)) !== JSON.stringify(montarPatchPromocao(montarRascunhoPromocao(promocaoConsolidada)));
+  }, [promocaoConsolidada, rascunhoPromocao]);
 
   const existemAlteracoesTurma = useMemo(() => {
-    const origem = new Map(turma.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
+    const origem = new Map(turmaBaseComparacao.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
     return rascunhoTurma.some((registro) => (
       JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })) !== JSON.stringify(origem.get(String(registro.id)) || {})
     ));
-  }, [promocaoReferenciaCadastro, rascunhoTurma, turma]);
+  }, [promocaoReferenciaCadastro, rascunhoTurma, turmaBaseComparacao]);
 
   const atualizarCampoPromocao = (campo, valor) => {
     setRascunhoPromocao((atual) => ({ ...atual, [campo]: valor }));
@@ -475,6 +486,7 @@ export default function DetalhePromocao() {
       await base44.entities.Promocao.update(promocao.id, montarPatchPromocao(rascunhoPromocao));
     },
     onSuccess: () => {
+      setPromocaoBaseComparacao((atual) => (atual ? { ...atual, ...montarPatchPromocao(rascunhoPromocao) } : atual));
       toast({ title: 'Dados salvos', description: 'Os dados da promoção foram atualizados.' });
       queryClient.invalidateQueries({ queryKey: ['detalhe-promocao', promocaoId] });
     },
@@ -550,13 +562,22 @@ export default function DetalhePromocao() {
       const turmaComEfeito = rascunhoTurma.map((registro) => montarRascunhoItemTurma(registro, promocaoReferenciaCadastro));
       const validacao = validarSalvarTurmaOperacional(turmaComEfeito, { promocao: promocaoReferenciaCadastro });
       if (!validacao.valido) throw new Error(mensagensValidacaoSimples(validacao).join(' '));
-      const originais = new Map(turma.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
+      const originais = new Map(turmaBaseComparacao.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
       const alterados = turmaComEfeito.filter((registro) => (
         JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })) !== JSON.stringify(originais.get(String(registro.id)) || {})
       ));
       await Promise.all(alterados.map((registro) => base44.entities.PromocaoMilitar.update(registro.id, montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }))));
+      return alterados;
     },
-    onSuccess: () => {
+    onSuccess: (alterados = []) => {
+      if (alterados.length > 0) {
+        const atualizacoes = new Map(alterados.map((registro) => [String(registro.id), registro]));
+        setTurmaBaseComparacao((atuais) => atuais.map((registro) => (
+          atualizacoes.has(String(registro.id))
+            ? { ...registro, ...atualizacoes.get(String(registro.id)) }
+            : registro
+        )));
+      }
       toast({ title: 'Rascunho salvo', description: 'A lista de militares foi atualizada.' });
       queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
     },
@@ -657,10 +678,10 @@ export default function DetalhePromocao() {
     militar: turma.find((item) => String(item.id) === String(registro.id))?.militar || registro.militar || null,
   })), [rascunhoTurma, turma]);
   const validacaoPublicacao = useMemo(() => validarPublicacaoPromocao({
-    promocao,
+    promocao: promocaoReferenciaCadastro,
     itens: itensValidacaoPublicacao,
     temAlteracoesPendentes,
-  }), [itensValidacaoPublicacao, promocao, temAlteracoesPendentes]);
+  }), [itensValidacaoPublicacao, promocaoReferenciaCadastro, temAlteracoesPendentes]);
   const publicarBloqueado = isLoading || salvando || !validacaoPublicacao.valido;
   const bloqueioPublicarTexto = publicarBloqueado
     ? (isLoading ? 'Carregando dados da promoção.' : validacaoPublicacao.bloqueios[0] || 'Revise a promoção antes de publicar.')
