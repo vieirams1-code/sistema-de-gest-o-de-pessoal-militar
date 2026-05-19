@@ -378,6 +378,37 @@ test('reversão restaura cadastro quando elegível e ainda coincidente', async (
   assert.equal(resultado.cadastroRestaurado, true);
 });
 
+test('reversão restaura cadastro usando militar_id mesmo sem objeto militar no item', async () => {
+  const calls = { militarGetId: '', militarUpdate: null };
+  const entities = {
+    HistoricoPromocaoMilitarV2: {
+      get: async () => ({ id: 'h1', posto_graduacao_anterior: '1º Sgt', quadro_anterior: 'QPPM', posto_graduacao_novo: 'Subtenente', quadro_novo: 'QPPM' }),
+      update: async () => {},
+    },
+    Militar: {
+      get: async (id) => {
+        calls.militarGetId = id;
+        return { id: 'm1', posto_graduacao: 'Subtenente', quadro: 'QPPM' };
+      },
+      update: async (_id, patch) => { calls.militarUpdate = patch; },
+    },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+  };
+
+  const resultado = await reverterPublicacaoPromocaoMilitar({
+    promocao: { id: 'p1' },
+    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1', atualizar_cadastro_militar: true },
+    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+    entities,
+    motivo: 'Retificação administrativa',
+  });
+
+  assert.equal(calls.militarGetId, 'm1');
+  assert.deepEqual(calls.militarUpdate, { posto_graduacao: '1º Sgt', quadro: 'QPPM' });
+  assert.equal(resultado.cadastroRestaurado, true);
+});
+
 test('reversão bloqueia rollback de cadastro quando militar já divergiu', async () => {
   let atualizou = false;
   const entities = {

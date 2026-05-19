@@ -248,8 +248,9 @@ export async function reverterPublicacaoPromocaoMilitar({
   let cadastroRestaurado = false;
 
   if (deveAvaliarRestauracaoCadastro && MilitarEntity && typeof MilitarEntity.update === 'function') {
-    const militarAtual = item?.militar?.id && typeof MilitarEntity.get === 'function'
-      ? await MilitarEntity.get(item.militar.id)
+    const militarIdParaRestore = texto(item?.militar_id) || texto(item?.militar?.id);
+    const militarAtual = militarIdParaRestore && typeof MilitarEntity.get === 'function'
+      ? await MilitarEntity.get(militarIdParaRestore)
       : item?.militar;
     const postoAtual = texto(militarAtual?.posto_graduacao || militarAtual?.posto_graduacao_atual);
     const quadroAtual = texto(militarAtual?.quadro || militarAtual?.quadro_atual);
