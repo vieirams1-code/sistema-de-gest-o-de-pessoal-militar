@@ -49,8 +49,17 @@ const STATUS_CANONICOS_PUBLICACAO = [
   STATUS_PUBLICACAO.PUBLICADO,
 ];
 
+function normalizarOrigemTipoRegistro(tipo) {
+  const valor = String(tipo || '').trim().toLowerCase().replace(/_/g, '-');
+  if (!valor) return 'ex-officio';
+  if (['livro', 'registro-livro', 'registrolivro'].includes(valor)) return 'livro';
+  if (['atestado', 'atestados'].includes(valor)) return 'atestado';
+  if (['ex-officio', 'exofficio'].includes(valor)) return 'ex-officio';
+  return valor;
+}
+
 function detectarOrigemTipo(registro) {
-  if (registro.origem_tipo) return registro.origem_tipo;
+  if (registro.origem_tipo) return normalizarOrigemTipoRegistro(registro.origem_tipo);
   if (registro.tipo && !registro.tipo_registro && !registro.medico && !registro.cid_10) return 'ex-officio';
   if (registro.medico || registro.cid_10) return 'atestado';
   return 'livro';
@@ -263,12 +272,6 @@ function isFeriasOperacional(registro) {
 }
 
 
-
-function normalizarOrigemTipoRegistro(tipo) {
-  if (tipo === 'atestado') return 'atestado';
-  if (tipo === 'livro') return 'livro';
-  return 'ex-officio';
-}
 
 function mapearEntityPublicacao(tipo) {
   if (tipo === 'atestado') return base44.entities.Atestado;
@@ -484,7 +487,12 @@ export default function Publicacoes() {
     onError: (error) => alert(error?.message || 'Erro ao excluir registro.'),
   });
 
-  const registrosDaAbaAtiva = useMemo(() => (abaOrigemAtiva === 'all' ? todosRegistros : todosRegistros.filter((registro) => registro.origem_tipo === abaOrigemAtiva)), [todosRegistros, abaOrigemAtiva]);
+  const registrosDaAbaAtiva = useMemo(() => {
+    if (abaOrigemAtiva === 'all') return todosRegistros;
+    const abaNormalizada = normalizarOrigemTipoRegistro(abaOrigemAtiva);
+    return todosRegistros.filter((registro) => normalizarOrigemTipoRegistro(registro.origem_tipo) === abaNormalizada);
+  }, [todosRegistros, abaOrigemAtiva]);
+
   const filteredRegistros = useMemo(() => registrosDaAbaAtiva.filter((r) => {
     const statusCanonico = obterStatusCanonicoPublicacao(r);
     const statusNormalizado = normalizarStatusPublicacao(r.status_calculado) || statusCanonico;
@@ -494,7 +502,7 @@ export default function Publicacoes() {
     const isPublicado = statusNormalizado === STATUS_PUBLICACAO.PUBLICADO;
     const isInconsistente = String(r.status_calculado || '').trim().toLowerCase() === 'inconsistente';
 
-    if (!exibirPublicados && isPublicado) return false;
+    const matchesPublicado = exibirPublicados ? true : !isPublicado;
 
     const matchesStatus = statusFiltroNormalizado === 'all'
       ? true
@@ -503,7 +511,7 @@ export default function Publicacoes() {
         : statusNormalizado === statusFiltroNormalizado;
 
     const termo = searchTerm.toLowerCase().trim();
-    const matchesSearch =
+    const matchesSearch = termo === '' ? true :
       containsTerm(r.militar_nome, termo) ||
       containsTerm(r.militar_matricula, termo) ||
       containsTerm(r.militar_matricula_atual, termo) ||
@@ -515,7 +523,7 @@ export default function Publicacoes() {
       containsTerm(r.tipo_registro, termo) ||
       containsTerm(r.tipo_display, termo) ||
       containsTerm(r.grupo_display, termo);
-    return matchesStatus && matchesSearch;
+    return matchesPublicado && matchesStatus && matchesSearch;
   }), [registrosDaAbaAtiva, statusFilter, searchTerm, exibirPublicados]);
 
   const statsOrigem = useMemo(() => calcularMetricasPublicacao(registrosDaAbaAtiva, {
@@ -674,7 +682,7 @@ export default function Publicacoes() {
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Origem</label>
               <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
                 {ABAS_ORIGEM.map((aba) => {
-                  const totalAba = aba.key === 'all' ? todosRegistros.length : todosRegistros.filter((registro) => registro.origem_tipo === aba.key).length;
+                  const totalAba = aba.key === 'all' ? todosRegistros.length : todosRegistros.filter((registro) => normalizarOrigemTipoRegistro(registro.origem_tipo) === normalizarOrigemTipoRegistro(aba.key)).length;
                   const ativa = abaOrigemAtiva === aba.key;
                   return <button key={aba.key} type="button" onClick={() => setAbaOrigemAtiva(aba.key)} className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${ativa ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-white hover:text-slate-900'}`}><span>{aba.label}</span><span className={`rounded-full px-2 py-0.5 text-xs ${ativa ? 'bg-white/15 text-white' : 'border border-slate-200 bg-slate-50 text-slate-500'}`}>{totalAba}</span></button>;
                 })}
