@@ -24,7 +24,7 @@ function getOrigemOptions(lista = []) {
   return [...new Set(lista.map((item) => item.origem).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
-export default function AfastamentosVigentesPanel({ atestados = [], registrosLivro = [] }) {
+export default function AfastamentosVigentesPanel({ atestados = [], registrosLivro = [], enabled = true }) {
   const [militarFilter, setMilitarFilter] = useState('');
   const [tipoFilter, setTipoFilter] = useState('all');
   const [origemFilter, setOrigemFilter] = useState('all');
@@ -40,7 +40,7 @@ export default function AfastamentosVigentesPanel({ atestados = [], registrosLiv
       const lista = await base44.entities.Ferias.list('-data_inicio');
       return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
     },
-    enabled: scopedReady,
+    enabled: enabled && scopedReady,
   });
 
   const { data: militaresLtip = [] } = useQuery({
@@ -52,7 +52,7 @@ export default function AfastamentosVigentesPanel({ atestados = [], registrosLiv
         scopedIds,
       );
     },
-    enabled: scopedReady,
+    enabled: enabled && scopedReady,
   });
 
   const afastamentos = useMemo(() => {

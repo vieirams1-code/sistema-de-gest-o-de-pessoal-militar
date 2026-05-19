@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Users, Award, Shield, AlertTriangle, Calendar, Star,
   FileText, BookOpen, ClipboardList, Gavel, Activity,
-  ChevronRight, Clock, CheckCircle, Stethoscope
+  ChevronRight, Clock, CheckCircle, Stethoscope, CalendarClock
 } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import AfastamentosVigentesPanel from '@/components/dashboard/AfastamentosVigentesPanel';
@@ -21,6 +21,7 @@ import {
   listarInconsistenciasCadastraisDashboard,
 } from '@/services/dashboardMilitarPendenciasService';
 import { carregarMilitaresComMatriculas } from '@/services/matriculaMilitarViewService';
+import { buildAfastamentosVigentes } from '@/services/afastamentosVigentesService';
 import { useScopedMilitarIds, filtrarPorMilitarIdsPermitidos } from '@/hooks/useScopedMilitarIds';
 
 function StatCard({ icon: Icon, value, label, color, onClick }) {
@@ -68,6 +69,43 @@ function AlertItem({ nivel, titulo, subtitulo, diasRestantes }) {
   );
 }
 
+
+function AfastamentosVigentesResumoCard({ totalParcial, onOpen }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <CalendarClock className="w-5 h-5 text-[#1e3a5f]" />
+            <h2 className="font-semibold text-slate-800">Afastamentos vigentes</h2>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Resumo inicial com dados já carregados. Férias e LTIP serão consultados apenas ao abrir os detalhes.
+          </p>
+        </div>
+        <Badge className="bg-[#1e3a5f]/10 text-[#1e3a5f] border border-[#1e3a5f]/20">
+          {totalParcial} na prévia
+        </Badge>
+      </div>
+
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <p className="text-sm text-slate-600">
+          Abra o painel para calcular a visão completa, incluindo férias e militares em LTIP.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0 border-[#1e3a5f] text-[#1e3a5f] hover:bg-[#1e3a5f]/5"
+          onClick={onOpen}
+        >
+          Ver detalhes <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ShortcutButton({ icon: Icon, label, to, navigate }) {
   return (
     <Button
@@ -83,6 +121,7 @@ function ShortcutButton({ icon: Icon, label, to, navigate }) {
 
 export default function Home() {
   const navigate = useNavigate();
+  const [afastamentosPanelOpen, setAfastamentosPanelOpen] = React.useState(false);
   const punicaoEntity = getPunicaoEntity();
   const {
     isAdmin,
@@ -250,6 +289,10 @@ export default function Home() {
   const pendenciasComportamentoValidas = filtrarPendenciasComportamentoDashboard(pendenciasComportamento, militares);
   const inconsistenciasCadastrais = listarInconsistenciasCadastraisDashboard(militares);
   const totalAlertas = periodosAlerta.length + publicacoesUrgentes.length + pendenciasComportamentoValidas.length + inconsistenciasCadastrais.length;
+  const afastamentosParciais = React.useMemo(() => {
+    return buildAfastamentosVigentes({ atestados, registrosLivro }).length;
+  }, [atestados, registrosLivro]);
+
   const registrosRecentes = registrosLivro.slice(0, 5);
   const jisosAgendadas = jisos
     .filter((jiso) => {
@@ -315,7 +358,14 @@ export default function Home() {
         </div>
 
         <div className="mb-8">
-          <AfastamentosVigentesPanel atestados={atestados} registrosLivro={registrosLivro} />
+          {afastamentosPanelOpen ? (
+            <AfastamentosVigentesPanel atestados={atestados} registrosLivro={registrosLivro} enabled={afastamentosPanelOpen} />
+          ) : (
+            <AfastamentosVigentesResumoCard
+              totalParcial={afastamentosParciais}
+              onOpen={() => setAfastamentosPanelOpen(true)}
+            />
+          )}
         </div>
 
         {isAdmin && (
