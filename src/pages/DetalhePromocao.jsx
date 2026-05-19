@@ -472,12 +472,17 @@ export default function DetalhePromocao() {
     }));
   };
 
-  const invalidarDados = () => {
-    queryClient.invalidateQueries({ queryKey: ['detalhe-promocao', promocaoId] });
-    queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
-    queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-militares'] });
-    queryClient.invalidateQueries({ queryKey: ['antiguidade-previa'] });
-    queryClient.invalidateQueries({ queryKey: ['previa-antiguidade-geral'] });
+  const invalidarDados = async () => {
+    const keys = [
+      ['detalhe-promocao', promocaoId],
+      ['detalhe-promocao-promocao-militar'],
+      ['detalhe-promocao-militares'],
+      ['antiguidade-previa'],
+      ['previa-antiguidade-geral'],
+    ];
+
+    await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+    await Promise.all(keys.map((queryKey) => queryClient.refetchQueries({ queryKey, type: 'active' })));
   };
 
   const salvarPromocaoMutation = useMutation({
@@ -485,10 +490,10 @@ export default function DetalhePromocao() {
       if (!promocao) throw new Error('Promoção não carregada.');
       await base44.entities.Promocao.update(promocao.id, montarPatchPromocao(rascunhoPromocao));
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setPromocaoBaseComparacao((atual) => (atual ? { ...atual, ...montarPatchPromocao(rascunhoPromocao) } : atual));
       toast({ title: 'Dados salvos', description: 'Os dados da promoção foram atualizados.' });
-      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao', promocaoId] });
+      await invalidarDados();
     },
     onError: (error) => toast({ title: 'Falha ao salvar dados', description: error.message, variant: 'destructive' }),
   });
@@ -544,9 +549,9 @@ export default function DetalhePromocao() {
       await Promise.all(payloads.map((payload) => entity.create({ ...payload, origem: 'backfill_historico_v2' })));
       return { listaPreparada: payloads.length > 0 };
     },
-    onSuccess: (resultado) => {
+    onSuccess: async (resultado) => {
       if (resultado?.listaPreparada) toast({ title: 'Lista de militares preparada.' });
-      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+      await invalidarDados();
     },
     onError: (error) => {
       listasPreparadasAutomaticamente.current.delete(String(promocao?.id || promocaoId || ''));
@@ -569,7 +574,7 @@ export default function DetalhePromocao() {
       await Promise.all(alterados.map((registro) => base44.entities.PromocaoMilitar.update(registro.id, montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }))));
       return alterados;
     },
-    onSuccess: (alterados = []) => {
+    onSuccess: async (alterados = []) => {
       if (alterados.length > 0) {
         const atualizacoes = new Map(alterados.map((registro) => [String(registro.id), registro]));
         setTurmaBaseComparacao((atuais) => atuais.map((registro) => (
@@ -579,7 +584,7 @@ export default function DetalhePromocao() {
         )));
       }
       toast({ title: 'Rascunho salvo', description: 'A lista de militares foi atualizada.' });
-      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+      await invalidarDados();
     },
     onError: (error) => toast({ title: 'Falha ao salvar rascunho', description: error.message, variant: 'destructive' }),
   });
@@ -598,10 +603,10 @@ export default function DetalhePromocao() {
       if (registro.publicado) throw new Error('Não é possível remover militar publicado.');
       await base44.entities.PromocaoMilitar.delete(registro.id);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: 'Militar removido', description: 'O militar saiu da lista desta promoção.' });
       setRegistroParaRemover(null);
-      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+      await invalidarDados();
     },
     onError: (error) => toast({ title: 'Falha ao remover militar', description: error.message, variant: 'destructive' }),
   });
@@ -623,11 +628,11 @@ export default function DetalhePromocao() {
       });
       await base44.entities.PromocaoMilitar.create(payload);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: 'Militar adicionado', description: 'O militar foi incluído na lista desta promoção.' });
       setModalAdicionarAberto(false);
       setBuscaAdicionar('');
-      queryClient.invalidateQueries({ queryKey: ['detalhe-promocao-promocao-militar'] });
+      await invalidarDados();
     },
     onError: (error) => toast({ title: 'Falha ao adicionar militar', description: error.message, variant: 'destructive' }),
   });
@@ -646,13 +651,13 @@ export default function DetalhePromocao() {
         temAlteracoesPendentes,
       });
     },
-    onSuccess: (resultado) => {
+    onSuccess: async (resultado) => {
       toast({
         title: 'Promoção publicada',
         description: `${resultado?.publicados || 0} militar(es) publicado(s) oficialmente.`,
       });
-      invalidarDados();
-      queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
+      await invalidarDados();
+      await queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
     },
     onError: (error) => toast({ title: 'Falha ao publicar promoção', description: error.message, variant: 'destructive' }),
   });
