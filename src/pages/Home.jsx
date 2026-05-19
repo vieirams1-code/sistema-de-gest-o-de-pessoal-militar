@@ -263,8 +263,21 @@ export default function Home() {
   const { data: publicacoesExOfficio = [] } = useQuery({
     queryKey: ['dashboard-publicacoes-exofficio', scopeKey],
     queryFn: async () => {
-      const lista = await base44.entities.PublicacaoExOfficio.list('-created_date');
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.PublicacaoExOfficio.list('-created_date');
+      }
+
+      if (!scopedIds?.length) return [];
+
+      try {
+        const listaEscopo = await base44.entities.PublicacaoExOfficio.filter({
+          militar_id: { in: scopedIds },
+        }, '-created_date');
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.PublicacaoExOfficio.list('-created_date');
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
     },
     enabled: dashboardEnabled,
   });
