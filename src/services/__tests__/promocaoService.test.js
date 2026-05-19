@@ -750,6 +750,41 @@ test('publicação expõe validação para bloquear alterações pendentes na te
   assert.ok(validacao.bloqueios.includes('Salve as alterações pendentes antes de publicar.'));
 });
 
+test('validarPublicacaoPromocao permite cenário completo 2º Tenente -> 1º Tenente / QOBM', () => {
+  const validacao = validarPublicacaoPromocao({
+    promocao: { ...promocaoPublicacao, posto_graduacao: '1º Tenente', quadro: 'QOBM', data_promocao: '2026-05-01' },
+    itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: '2º Tenente', quadro: 'QOBM' }, ordem: 1 })],
+    temAlteracoesPendentes: false,
+  });
+
+  assert.equal(validacao.valido, true);
+  assert.deepEqual(validacao.bloqueios, []);
+});
+
+test('validarPublicacaoPromocao bloqueia sem quadro', () => {
+  const validacao = validarPublicacaoPromocao({ promocao: { ...promocaoPublicacao, quadro: '' }, itens: [itemPublicacao()] });
+  assert.equal(validacao.valido, false);
+  assert.ok(validacao.bloqueios.includes('Informe o quadro destino antes de publicar.'));
+});
+
+test('validarPublicacaoPromocao bloqueia sem data', () => {
+  const validacao = validarPublicacaoPromocao({ promocao: { ...promocaoPublicacao, data_promocao: '' }, itens: [itemPublicacao()] });
+  assert.equal(validacao.valido, false);
+  assert.ok(validacao.bloqueios.includes('Informe a data da promoção antes de publicar.'));
+});
+
+test('validarPublicacaoPromocao bloqueia sem item', () => {
+  const validacao = validarPublicacaoPromocao({ promocao: promocaoPublicacao, itens: [] });
+  assert.equal(validacao.valido, false);
+  assert.ok(validacao.bloqueios.includes('Inclua ao menos um militar antes de publicar.'));
+});
+
+test('validarPublicacaoPromocao bloqueia item com ordem inválida', () => {
+  const validacao = validarPublicacaoPromocao({ promocao: promocaoPublicacao, itens: [itemPublicacao({ ordem: 0 })] });
+  assert.equal(validacao.valido, false);
+  assert.ok(validacao.bloqueios.includes('Linha 1: ordem inválida.'));
+});
+
 test('serviço de publicação não altera motor da Prévia Geral nem snapshots', () => {
   const previa = readFileSync(new URL('../../utils/antiguidade/calcularPreviaAntiguidadeGeral.js', import.meta.url), 'utf8');
   const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');

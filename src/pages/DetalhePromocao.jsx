@@ -454,7 +454,7 @@ export default function DetalhePromocao() {
   }, [promocaoConsolidada, rascunhoPromocao]);
 
   const existemAlteracoesTurma = useMemo(() => {
-    const origem = new Map(turmaBaseComparacao.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
+    const origem = new Map(turmaBaseComparacao.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })]));
     return rascunhoTurma.some((registro) => (
       JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })) !== JSON.stringify(origem.get(String(registro.id)) || {})
     ));
@@ -567,7 +567,7 @@ export default function DetalhePromocao() {
       const turmaComEfeito = rascunhoTurma.map((registro) => montarRascunhoItemTurma(registro, promocaoReferenciaCadastro));
       const validacao = validarSalvarTurmaOperacional(turmaComEfeito, { promocao: promocaoReferenciaCadastro });
       if (!validacao.valido) throw new Error(mensagensValidacaoSimples(validacao).join(' '));
-      const originais = new Map(turmaBaseComparacao.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
+      const originais = new Map(turmaBaseComparacao.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })]));
       const alterados = turmaComEfeito.filter((registro) => (
         JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })) !== JSON.stringify(originais.get(String(registro.id)) || {})
       ));
