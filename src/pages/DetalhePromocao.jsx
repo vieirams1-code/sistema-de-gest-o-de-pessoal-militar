@@ -42,6 +42,9 @@ import {
 } from '@/services/promocaoService';
 import { getSugestaoAtualizacaoCadastro } from '@/utils/postoGraduacaoHierarquia';
 
+const DIAG_PREFIX = '[D17-L-DIAG]';
+const diagLog = (evento, dados = {}) => console.info(`${DIAG_PREFIX} ${evento}`, dados);
+
 const CAMPOS_PROMOCAO = [
   'posto_graduacao',
   'quadro',
@@ -506,6 +509,7 @@ export default function DetalhePromocao() {
   };
 
   const invalidarDados = async () => {
+    diagLog('cache:invalidacao:inicio');
     const keys = [
       ['detalhe-promocao', promocaoId],
       ['detalhe-promocao-promocao-militar'],
@@ -518,15 +522,28 @@ export default function DetalhePromocao() {
       ['historico-promocoes'],
     ];
 
-    await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
-    await Promise.all(keys.map((queryKey) => queryClient.refetchQueries({ queryKey, type: 'active' })));
+    diagLog('cache:queryKeys', { keys });
+    await Promise.all(keys.map(async (queryKey) => {
+      diagLog('cache:invalidate:executando', { queryKey });
+      const retorno = await queryClient.invalidateQueries({ queryKey });
+      diagLog('cache:invalidate:retorno', { queryKey, retorno });
+    }));
+    await Promise.all(keys.map(async (queryKey) => {
+      diagLog('cache:refetch:executando', { queryKey, type: 'active' });
+      const retorno = await queryClient.refetchQueries({ queryKey, type: 'active' });
+      diagLog('cache:refetch:retorno', { queryKey, retorno });
+    }));
   };
 
   const salvarPromocaoMutation = useMutation({
     mutationFn: async () => {
       if (!promocao) throw new Error('Promoção não carregada.');
-      const promocaoAtualizada = { ...promocao, ...montarPatchPromocao(rascunhoPromocao) };
-      await base44.entities.Promocao.update(promocao.id, montarPatchPromocao(rascunhoPromocao));
+      const patchPromocao = montarPatchPromocao(rascunhoPromocao);
+      const promocaoAtualizada = { ...promocao, ...patchPromocao };
+      diagLog('salvar-promocao-publicada:promocao-update:enviando', { promocaoId: promocao.id, status: promocao.status, patchPromocao });
+      const retornoPromocao = await base44.entities.Promocao.update(promocao.id, patchPromocao);
+      diagLog('salvar-promocao-publicada:promocao-update:retorno', { promocaoId: promocao.id, retornoPromocao });
+      diagLog('salvar-promocao-publicada:sincronizacao:chamada', { chamada: true });
       const sincronizacao = await sincronizarHistoricoPromocaoPublicada({
         promocaoAntes: promocao,
         promocaoDepois: promocaoAtualizada,

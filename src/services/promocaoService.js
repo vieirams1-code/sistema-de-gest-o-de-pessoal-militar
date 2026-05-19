@@ -199,6 +199,17 @@ function ehStatusPublicado(status) {
   return STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(status));
 }
 
+
+const DIAG_PREFIX = '[D17-L-DIAG]';
+
+function diagLog(evento, dados = {}) {
+  try {
+    console.info(`${DIAG_PREFIX} ${evento}`, dados);
+  } catch {
+    // diagnóstico temporário: evitar quebra de runtime por logging
+  }
+}
+
 function montarPatchSincronizacaoHistoricoPromocao(promocao = {}) {
   return {
     data_promocao: dataSomente(promocao?.data_promocao),
@@ -215,6 +226,7 @@ export async function sincronizarHistoricoPromocaoPublicada({
   entities = null,
 } = {}) {
   if (!promocaoDepois?.id || !ehStatusPublicado(promocaoDepois?.status)) return { atualizados: 0, ignorado: true };
+  diagLog('salvar-promocao-publicada:inicio', { promocaoId: promocaoDepois?.id, status: promocaoDepois?.status });
   const Historico = entities?.HistoricoPromocaoMilitarV2;
   if (!Historico || typeof Historico.list !== 'function' || typeof Historico.update !== 'function') {
     throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para sincronização da promoção publicada.');
@@ -236,7 +248,19 @@ export async function sincronizarHistoricoPromocaoPublicada({
   ));
 
   const patch = montarPatchSincronizacaoHistoricoPromocao(promocaoDepois);
-  await Promise.all(ativosDaPromocao.map((registro) => Historico.update(registro.id, patch)));
+  diagLog('sincronizacao-historico:busca-vinculados', { totalHistoricos: (historicos || []).length, encontrados: ativosDaPromocao.length, idsHistoricos: ativosDaPromocao.map((r) => r?.id), patch });
+  await Promise.all(ativosDaPromocao.map(async (registro) => {
+    try {
+      diagLog('sincronizacao-historico:update:enviando', { historicoId: registro?.id, patch });
+      const retorno = await Historico.update(registro.id, patch);
+      diagLog('sincronizacao-historico:update:retorno', { historicoId: registro?.id, retorno });
+      const atualizado = typeof Historico.get === 'function' ? await Historico.get(registro.id) : null;
+      diagLog('sincronizacao-historico:update:refetch', { historicoId: registro?.id, data_promocao: atualizado?.data_promocao, atualizado });
+    } catch (error) {
+      diagLog('sincronizacao-historico:update:erro', { historicoId: registro?.id, erro: error?.message || String(error) });
+      throw error;
+    }
+  }));
   return { atualizados: ativosDaPromocao.length, ignorado: false };
 }
 
@@ -271,9 +295,18 @@ export async function reverterPublicacaoPromocaoMilitar({
   if (!PromocaoMilitar || typeof PromocaoMilitar.update !== 'function') throw new Error('Entidade PromocaoMilitar indisponível para reversão.');
   if (!Promocao || typeof Promocao.update !== 'function') throw new Error('Entidade Promocao indisponível para recalcular status.');
 
+  diagLog('reversao:inicio', {
+    promocaoMilitarId: item?.id,
+    militarId: item?.militar_id,
+    historicoPromocaoV2Id: item?.historico_promocao_v2_id,
+    atualizar_cadastro_militar: item?.atualizar_cadastro_militar,
+    resultado_aplicacao_cadastro: item?.resultado_aplicacao_cadastro,
+  });
+
   const historicoId = texto(item?.historico_promocao_v2_id);
   if (!historicoId) throw new Error('Item publicado sem vínculo de histórico V2.');
   const historicoRegistro = typeof Historico.get === 'function' ? await Historico.get(historicoId) : null;
+  diagLog('reversao:historico-carregado', { historicoId, historicoRegistro, postoAnterior: historicoRegistro?.posto_graduacao_anterior, quadroAnterior: historicoRegistro?.quadro_anterior, postoNovo: historicoRegistro?.posto_graduacao_novo, quadroNovo: historicoRegistro?.quadro_novo });
 
   const trilhaAdmin = [
     '[REVERSAO_ADMINISTRATIVA]',
@@ -302,12 +335,23 @@ export async function reverterPublicacaoPromocaoMilitar({
     const postoNovo = texto(historicoRegistro?.posto_graduacao_novo);
     const quadroNovo = texto(historicoRegistro?.quadro_novo);
     const aindaCoincideComPromovido = mesmoTextoNormalizado(postoAtual, postoNovo) && mesmoTextoNormalizado(quadroAtual, quadroNovo);
+    diagLog('reversao:militar-carregado', { militarIdParaRestore, militarAtual, postoAtual, quadroAtual, postoNovo, quadroNovo, guardaPermitiuRollback: aindaCoincideComPromovido });
 
     if (aindaCoincideComPromovido) {
-      await MilitarEntity.update(item.militar_id, {
+      const patchMilitar = {
         posto_graduacao: texto(historicoRegistro?.posto_graduacao_anterior),
         quadro: texto(historicoRegistro?.quadro_anterior),
-      });
+      };
+      try {
+        diagLog('reversao:militar-update:enviando', { militarId: item.militar_id, patchMilitar });
+        const retornoMilitar = await MilitarEntity.update(item.militar_id, patchMilitar);
+        diagLog('reversao:militar-update:retorno', { militarId: item.militar_id, retornoMilitar });
+        const militarRefetch = typeof MilitarEntity.get === 'function' ? await MilitarEntity.get(item.militar_id) : null;
+        diagLog('reversao:militar-update:refetch', { militarId: item.militar_id, militarRefetch });
+      } catch (error) {
+        diagLog('reversao:militar-update:erro', { militarId: item.militar_id, erro: error?.message || String(error) });
+        throw error;
+      }
       cadastroRestaurado = true;
     }
   }
