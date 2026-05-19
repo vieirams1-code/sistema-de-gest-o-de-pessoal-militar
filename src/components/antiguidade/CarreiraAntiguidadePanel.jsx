@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import PromocoesTimeline from '@/components/antiguidade/PromocoesTimeline';
 import RankIcon from '@/components/antiguidade/RankIcon';
 import { POSTOS_GRADUACOES } from '@/components/antiguidade/promocaoHistoricaUtils';
+import { createPageUrl } from '@/utils';
 
 const STATUS_ATIVO = 'ativo';
 const STATUS_RETIFICADO = 'retificado';
@@ -61,6 +63,7 @@ export default function CarreiraAntiguidadePanel(props) {
   const [confirmacaoExclusao, setConfirmacaoExclusao] = React.useState('');
   const [erroExclusao, setErroExclusao] = React.useState('');
   const [excluindoRegistro, setExcluindoRegistro] = React.useState(false);
+  const navigate = useNavigate();
 
   const historico = React.useMemo(() => [...(historicoPromocoes || [])].sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || ''))), [historicoPromocoes]);
   const ativos = React.useMemo(() => historico.filter((h) => valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO && String(h.militar_id || '') === String(militar?.id || '')), [historico, militar?.id]);
@@ -175,6 +178,12 @@ export default function CarreiraAntiguidadePanel(props) {
     }
   };
 
+
+  const abrirPromocaoOrigem = (registro) => {
+    if (!registro?.promocao_id) return;
+    navigate(`${createPageUrl('DetalhePromocao')}?id=${registro.promocao_id}`);
+  };
+
   const acaoEhRetificacao = acaoRegistro?.tipo === ACAO_RETIFICAR;
 
   return <div className="space-y-5">
@@ -221,6 +230,7 @@ export default function CarreiraAntiguidadePanel(props) {
           onCorrigirPromocao={(registro) => abrirAcaoRegistro(ACAO_CORRIGIR, registro)}
           onRetificarPromocao={(registro) => abrirAcaoRegistro(ACAO_RETIFICAR, registro)}
           onExcluirPromocao={abrirExclusaoRegistro}
+          onAbrirPromocaoOrigem={abrirPromocaoOrigem}
         />
       </CardContent>
     </Card>
