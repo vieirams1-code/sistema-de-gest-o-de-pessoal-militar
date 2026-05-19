@@ -279,8 +279,21 @@ export default function Home() {
   const { data: jisos = [] } = useQuery({
     queryKey: ['dashboard-jisos', scopeKey],
     queryFn: async () => {
-      const lista = await base44.entities.JISO.list('-data_jiso');
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.JISO.list('-data_jiso');
+      }
+
+      if (!scopedIds?.length) return [];
+
+      try {
+        const listaEscopo = await base44.entities.JISO.filter({
+          militar_id: { in: scopedIds },
+        }, '-data_jiso');
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.JISO.list('-data_jiso');
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
     },
     enabled: dashboardEnabled,
   });
