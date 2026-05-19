@@ -35,6 +35,7 @@ import {
   podeVincularProvavelAdministrativamente,
   texto,
   resultadoAplicacaoCadastro,
+  sincronizarHistoricoPromocaoPublicada,
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
   valorOuTraco,
@@ -499,6 +500,10 @@ export default function DetalhePromocao() {
       ['detalhe-promocao-militares'],
       ['antiguidade-previa'],
       ['previa-antiguidade-geral'],
+      ['antiguidade-previa-geral'],
+      ['promocoes-operacionais'],
+      ['promocoes-operacionais-historicos-v2'],
+      ['historico-promocoes'],
     ];
 
     await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
@@ -508,11 +513,22 @@ export default function DetalhePromocao() {
   const salvarPromocaoMutation = useMutation({
     mutationFn: async () => {
       if (!promocao) throw new Error('Promoção não carregada.');
+      const promocaoAtualizada = { ...promocao, ...montarPatchPromocao(rascunhoPromocao) };
       await base44.entities.Promocao.update(promocao.id, montarPatchPromocao(rascunhoPromocao));
+      const sincronizacao = await sincronizarHistoricoPromocaoPublicada({
+        promocaoAntes: promocao,
+        promocaoDepois: promocaoAtualizada,
+        entities: base44.entities,
+      });
+      return { sincronizacao };
     },
-    onSuccess: async () => {
+    onSuccess: async (resultado) => {
       setPromocaoBaseComparacao((atual) => (atual ? { ...atual, ...montarPatchPromocao(rascunhoPromocao) } : atual));
-      toast({ title: 'Dados salvos', description: 'Os dados da promoção foram atualizados.' });
+      const totalSincronizado = Number(resultado?.sincronizacao?.atualizados) || 0;
+      const descricao = totalSincronizado > 0
+        ? `Os dados da promoção foram atualizados e ${totalSincronizado} histórico(s) oficial(is) foram sincronizados.`
+        : 'Os dados da promoção foram atualizados.';
+      toast({ title: 'Dados salvos', description: descricao });
       await invalidarDados();
     },
     onError: (error) => toast({ title: 'Falha ao salvar dados', description: error.message, variant: 'destructive' }),
