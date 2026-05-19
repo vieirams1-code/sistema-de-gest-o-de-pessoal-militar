@@ -195,6 +195,51 @@ export async function publicarPromocaoOficial({ promocao, itens = [], entities, 
   return { publicados: resultados.length, resultados };
 }
 
+function ehStatusPublicado(status) {
+  return STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(status));
+}
+
+function montarPatchSincronizacaoHistoricoPromocao(promocao = {}) {
+  return {
+    data_promocao: dataSomente(promocao?.data_promocao),
+    boletim_referencia: texto(promocao?.boletim_referencia),
+    ato_referencia: texto(promocao?.ato_referencia),
+    quadro_novo: texto(promocao?.quadro),
+    data_publicacao: dataSomente(promocao?.data_publicacao) || dataSomente(promocao?.data_promocao),
+  };
+}
+
+export async function sincronizarHistoricoPromocaoPublicada({
+  promocaoAntes = null,
+  promocaoDepois = null,
+  entities = null,
+} = {}) {
+  if (!promocaoDepois?.id || !ehStatusPublicado(promocaoDepois?.status)) return { atualizados: 0, ignorado: true };
+  const Historico = entities?.HistoricoPromocaoMilitarV2;
+  if (!Historico || typeof Historico.list !== 'function' || typeof Historico.update !== 'function') {
+    throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para sincronização da promoção publicada.');
+  }
+
+  const houveMudancaEstrutural = (
+    dataSomente(promocaoAntes?.data_promocao) !== dataSomente(promocaoDepois?.data_promocao)
+    || dataSomente(promocaoAntes?.data_publicacao) !== dataSomente(promocaoDepois?.data_publicacao)
+    || texto(promocaoAntes?.boletim_referencia) !== texto(promocaoDepois?.boletim_referencia)
+    || texto(promocaoAntes?.ato_referencia) !== texto(promocaoDepois?.ato_referencia)
+    || texto(promocaoAntes?.quadro) !== texto(promocaoDepois?.quadro)
+  );
+  if (!houveMudancaEstrutural) return { atualizados: 0, ignorado: true };
+
+  const historicos = await Historico.list();
+  const ativosDaPromocao = (historicos || []).filter((registro) => (
+    statusNormalizado(registro?.status_registro) === 'ativo'
+    && texto(registro?.promocao_id) === texto(promocaoDepois.id)
+  ));
+
+  const patch = montarPatchSincronizacaoHistoricoPromocao(promocaoDepois);
+  await Promise.all(ativosDaPromocao.map((registro) => Historico.update(registro.id, patch)));
+  return { atualizados: ativosDaPromocao.length, ignorado: false };
+}
+
 function statusPromocaoPosReversao(itens = []) {
   const publicados = (itens || []).filter((item) => Boolean(item?.publicado) && statusNormalizado(item?.status) === 'publicado').length;
   if (publicados === 0) return 'rascunho';
