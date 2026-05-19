@@ -194,6 +194,18 @@ function classeBadgeEfeito(tipo) {
   return classes[tipo] || classes.revisao;
 }
 
+function efeitoCadastroVisualPorRegistro({ registro, militar, promocao }) {
+  const status = statusNormalizado(registro?.status);
+  if (status === 'cancelado' || status === 'retificado') {
+    return {
+      titulo: 'Registro cancelado',
+      mensagem: 'Este item não deve ser considerado para promoção atual.',
+      tipo: 'historica',
+    };
+  }
+  return getSugestaoAtualizacaoCadastro({ militar, promocao });
+}
+
 const SELECT_VAZIO = '__vazio__';
 
 function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRemover, canReverterPublicacao, onReverterPublicacao }) {
@@ -202,7 +214,7 @@ function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRe
   const quadro = valorOuTraco(militar?.quadro || militar?.quadro_atual);
   const nomeCompleto = valorOuTraco(militar?.nome_completo || nomeMilitar(militar));
   const nomeGuerra = valorOuTraco(militar?.nome_guerra);
-  const efeitoCadastro = getSugestaoAtualizacaoCadastro({ militar, promocao });
+  const efeitoCadastro = efeitoCadastroVisualPorRegistro({ registro, militar, promocao });
   const resultadoCadastro = resultadoAplicacaoCadastro(efeitoCadastro);
 
   return (
@@ -671,6 +683,12 @@ export default function DetalhePromocao() {
       setMotivoReversao('');
       setObservacaoReversao('');
       await invalidarDados();
+      if (registro?.militar_id) {
+        await queryClient.invalidateQueries({ queryKey: ['militar', registro.militar_id] });
+        await queryClient.invalidateQueries({ queryKey: ['ver-historico-promocoes', registro.militar_id] });
+        await queryClient.refetchQueries({ queryKey: ['militar', registro.militar_id], type: 'active' });
+        await queryClient.refetchQueries({ queryKey: ['ver-historico-promocoes', registro.militar_id], type: 'active' });
+      }
       await queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
     },
     onError: (error) => toast({ title: 'Falha ao reverter publicação', description: error.message, variant: 'destructive' }),
