@@ -16,6 +16,7 @@ import {
   promocaoPermiteExclusao,
   podeVincularProvavelAdministrativamente,
   publicarPromocaoOficial,
+  reverterPublicacaoPromocaoMilitar,
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
 } from '../promocaoService.js';
@@ -328,6 +329,130 @@ test('promoção criada por agrupamento com 8 históricos cria 8 PromocaoMilitar
   assert.equal(payloads.every((payload) => payload.promocao_id === 'promo-1'), true);
   assert.equal(payloads.every((payload) => payload.status === 'publicado' && payload.selecionado === true && payload.publicado === true), true);
   assert.equal(payloads.every((payload) => payload.origem === 'agrupamento'), true);
+});
+
+test('reverte item publicado cancelando histórico sem delete físico', async () => {
+  const calls = { historicoUpdate: 0, historicoDelete: 0 };
+  const entities = {
+    HistoricoPromocaoMilitarV2: {
+      get: async () => ({ id: 'h1', posto_graduacao_anterior: '1º Sgt', quadro_anterior: 'QPPM', posto_graduacao_novo: 'Subtenente', quadro_novo: 'QPPM' }),
+      update: async () => { calls.historicoUpdate += 1; },
+      delete: async () => { calls.historicoDelete += 1; },
+    },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+  };
+  await reverterPublicacaoPromocaoMilitar({
+    promocao: { id: 'p1' },
+    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1', militar: { id: 'm1' } },
+    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+    entities,
+    motivo: 'Erro material',
+  });
+  assert.equal(calls.historicoUpdate, 1);
+  assert.equal(calls.historicoDelete, 0);
+});
+
+test('reversão restaura cadastro quando elegível e ainda coincidente', async () => {
+  const calls = { militarUpdate: null };
+  const entities = {
+    HistoricoPromocaoMilitarV2: {
+      get: async () => ({ id: 'h1', posto_graduacao_anterior: '1º Sgt', quadro_anterior: 'QPPM', posto_graduacao_novo: 'Subtenente', quadro_novo: 'QPPM' }),
+      update: async () => {},
+    },
+    Militar: {
+      get: async () => ({ id: 'm1', posto_graduacao: 'Subtenente', quadro: 'QPPM' }),
+      update: async (_id, patch) => { calls.militarUpdate = patch; },
+    },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+  };
+  const resultado = await reverterPublicacaoPromocaoMilitar({
+    promocao: { id: 'p1' },
+    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1', militar: { id: 'm1' }, atualizar_cadastro_militar: true },
+    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+    entities,
+    motivo: 'Retificação administrativa',
+  });
+  assert.deepEqual(calls.militarUpdate, { posto_graduacao: '1º Sgt', quadro: 'QPPM' });
+  assert.equal(resultado.cadastroRestaurado, true);
+});
+
+test('reversão bloqueia rollback de cadastro quando militar já divergiu', async () => {
+  let atualizou = false;
+  const entities = {
+    HistoricoPromocaoMilitarV2: {
+      get: async () => ({ id: 'h1', posto_graduacao_anterior: '1º Sgt', quadro_anterior: 'QPPM', posto_graduacao_novo: 'Subtenente', quadro_novo: 'QPPM' }),
+      update: async () => {},
+    },
+    Militar: {
+      get: async () => ({ id: 'm1', posto_graduacao: 'Capitão', quadro: 'QOPM' }),
+      update: async () => { atualizou = true; },
+    },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+  };
+  const resultado = await reverterPublicacaoPromocaoMilitar({
+    promocao: { id: 'p1' },
+    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1', militar: { id: 'm1' }, resultado_aplicacao_cadastro: 'imediatamente_superior' },
+    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+    entities,
+    motivo: 'Publicação indevida',
+  });
+  assert.equal(atualizou, false);
+  assert.equal(resultado.cadastroRestaurado, false);
+});
+
+test('reversão parcial mantém promoção publicada parcial', async () => {
+  let statusPromocao = '';
+  const entities = {
+    HistoricoPromocaoMilitarV2: { get: async () => ({ id: 'h1' }), update: async () => {} },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async (_id, patch) => { statusPromocao = patch.status; } },
+  };
+  await reverterPublicacaoPromocaoMilitar({
+    promocao: { id: 'p1' },
+    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1' },
+    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }, { id: 'pm2', publicado: true, status: 'publicado' }],
+    entities,
+    motivo: 'Outro',
+  });
+  assert.equal(statusPromocao, 'publicada_parcial');
+});
+
+test('reversão total move promoção para rascunho', async () => {
+  let statusPromocao = '';
+  const entities = {
+    HistoricoPromocaoMilitarV2: { get: async () => ({ id: 'h1' }), update: async () => {} },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async (_id, patch) => { statusPromocao = patch.status; } },
+  };
+  await reverterPublicacaoPromocaoMilitar({
+    promocao: { id: 'p1' },
+    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1' },
+    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+    entities,
+    motivo: 'Outro',
+  });
+  assert.equal(statusPromocao, 'rascunho');
+});
+
+test('idempotência: segunda reversão é bloqueada sem corromper', async () => {
+  const entities = {
+    HistoricoPromocaoMilitarV2: { get: async () => ({ id: 'h1' }), update: async () => {} },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+  };
+  await assert.rejects(
+    () => reverterPublicacaoPromocaoMilitar({
+      promocao: { id: 'p1' },
+      item: { id: 'pm1', publicado: false, status: 'cancelado', historico_promocao_v2_id: 'h1', militar_id: 'm1' },
+      itensPromocao: [{ id: 'pm1', publicado: false, status: 'cancelado' }],
+      entities,
+      motivo: 'Outro',
+    }),
+    /Somente itens publicados podem ser revertidos/,
+  );
 });
 
 test('promoção por agrupamento não cria PromocaoMilitar duplicado por promocao_id e militar_id', () => {
