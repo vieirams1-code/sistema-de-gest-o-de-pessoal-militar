@@ -200,14 +200,9 @@ function ehStatusPublicado(status) {
 }
 
 
-const DIAG_PREFIX = '[D17-L-DIAG]';
-
 function diagLog(evento, dados = {}) {
-  try {
-    console.info(`${DIAG_PREFIX} ${evento}`, dados);
-  } catch {
-    // diagnóstico temporário: evitar quebra de runtime por logging
-  }
+  void evento;
+  void dados;
 }
 
 function montarPatchSincronizacaoHistoricoPromocao(promocao = {}) {

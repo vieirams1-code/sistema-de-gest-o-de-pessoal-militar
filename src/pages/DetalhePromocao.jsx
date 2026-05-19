@@ -29,6 +29,7 @@ import {
   montarPayloadAdicaoManualTurma,
   montarPayloadsPromocaoMilitarAgrupamento,
   nomeMilitar,
+  statusNormalizado,
   normalizar,
   promocaoPermiteExclusao,
   normalizarItemTurmaOperacional,
@@ -362,7 +363,10 @@ export default function DetalhePromocao() {
   const historicosVinculados = useMemo(() => {
     if (!promocao) return [];
     return enriquecerHistoricos(
-      (historicosQuery.data || []).filter((historico) => String(historico?.promocao_id || '') === String(promocao.id)),
+      (historicosQuery.data || []).filter((historico) => (
+        String(historico?.promocao_id || '') === String(promocao.id)
+        && statusNormalizado(historico?.status_registro) === 'ativo'
+      )),
       militarPorId,
     );
   }, [historicosQuery.data, militarPorId, promocao]);
@@ -377,6 +381,20 @@ export default function DetalhePromocao() {
       }))
       .sort(ordenarPorOrdemCrescente);
   }, [militarPorId, promocao, promocaoMilitarQuery.data]);
+  const diagnosticoDuplicidadeTurma = useMemo(() => {
+    const grupos = new Map();
+    turma.forEach((registro) => {
+      const chave = `${String(registro?.promocao_id || '')}|${String(registro?.militar_id || '')}`;
+      if (!registro?.militar_id) return;
+      if (!grupos.has(chave)) grupos.set(chave, []);
+      grupos.get(chave).push(registro);
+    });
+    const duplicados = [...grupos.values()].filter((grupo) => grupo.length > 1);
+    return {
+      temDuplicidade: duplicados.length > 0,
+      duplicados,
+    };
+  }, [turma]);
   useEffect(() => {
     setTurmaBaseComparacao(turma);
   }, [turma]);
@@ -413,7 +431,7 @@ export default function DetalhePromocao() {
   }, [historicosQuery.data, militarPorId, promocao]);
 
   const candidatosAdicionar = useMemo(() => {
-    const idsNaPromocao = new Set(listaExibida.map((registro) => String(registro?.militar_id || '')).filter(Boolean));
+    const idsNaPromocao = new Set(turma.map((registro) => String(registro?.militar_id || '')).filter(Boolean));
     const porMilitar = new Map();
 
     candidatosHistorico.forEach((historico) => {
@@ -457,7 +475,7 @@ export default function DetalhePromocao() {
       })
       .sort((a, b) => Number(Boolean(a.historico) === false) - Number(Boolean(b.historico) === false))
       .slice(0, 30);
-  }, [buscaAdicionar, candidatosHistorico, listaExibida, militarPorId, militaresQuery.data, promocao, promocaoReferenciaCadastro]);
+  }, [buscaAdicionar, candidatosHistorico, militarPorId, militaresQuery.data, promocao, promocaoReferenciaCadastro, turma]);
 
 
   useEffect(() => {
@@ -665,7 +683,11 @@ export default function DetalhePromocao() {
   const removerMutation = useMutation({
     mutationFn: async (registro) => {
       if (!registro) throw new Error('Selecione um militar.');
+      const statusRegistro = String(registro?.status || '').toLowerCase();
       if (registro.publicado) throw new Error('Não é possível remover militar publicado.');
+      if (registro?.historico_promocao_v2_id || ['cancelado', 'retificado'].includes(statusRegistro)) {
+        throw new Error('Não é possível remover item com histórico oficial/cancelado; mantenha para preservar rastreabilidade.');
+      }
       await base44.entities.PromocaoMilitar.delete(registro.id);
     },
     onSuccess: async () => {
@@ -715,7 +737,7 @@ export default function DetalhePromocao() {
     mutationFn: async (item) => {
       if (!promocao) throw new Error('Promoção não carregada.');
       if (!item?.militarId) throw new Error('Militar não selecionado.');
-      const jaExiste = listaExibida.some((registro) => String(registro?.militar_id || '') === String(item.militarId));
+      const jaExiste = turma.some((registro) => String(registro?.militar_id || '') === String(item.militarId));
       if (jaExiste) throw new Error('Este militar já está na promoção.');
       const usuario = typeof base44.auth?.me === 'function' ? await base44.auth.me() : null;
       const payload = montarPayloadAdicaoManualTurma({
@@ -723,7 +745,7 @@ export default function DetalhePromocao() {
         historico: item.historico || {},
         militarId: item.militarId,
         usuario,
-        registrosExistentes: listaExibida,
+        registrosExistentes: turma,
         militar: item.militar,
       });
       await base44.entities.PromocaoMilitar.create(payload);
@@ -825,6 +847,11 @@ export default function DetalhePromocao() {
           <p className="mt-2 text-sm text-slate-600">
             Fluxo: confira os dados à esquerda, adicione militares à direita e salve as alterações.
           </p>
+          {diagnosticoDuplicidadeTurma.temDuplicidade && (
+            <p className="mt-2 text-sm font-semibold text-amber-700">
+              Duplicidade detectada em PromocaoMilitar: revise os vínculos antes de nova publicação.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate(createPageUrl('Promocoes'))}>

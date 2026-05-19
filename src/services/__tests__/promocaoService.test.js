@@ -500,6 +500,16 @@ test('promoção por agrupamento não cria PromocaoMilitar duplicado por promoca
   assert.deepEqual(payloads.map((payload) => payload.militar_id), ['m2']);
 });
 
+test('backfill não recria PromocaoMilitar quando já existe cancelado para mesmo promocao_id + militar_id', () => {
+  const historicos = [{ id: 'h1', militar_id: 'm1', antiguidade_referencia_ordem: 1 }];
+  const payloads = montarPayloadsPromocaoMilitarAgrupamento({
+    promocao,
+    historicos,
+    registrosExistentes: [{ promocao_id: 'promo-1', militar_id: 'm1', status: 'cancelado', publicado: false }],
+  });
+  assert.equal(payloads.length, 0);
+});
+
 test('ordem numérica do histórico é preservada ao montar turma do agrupamento', () => {
   const [payload] = montarPayloadsPromocaoMilitarAgrupamento({
     promocao,
