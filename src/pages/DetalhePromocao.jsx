@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, RefreshCw, Trash2, UserPlus } from 'lucide-react';
@@ -27,7 +27,6 @@ import {
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
-  montarPayloadsPromocaoMilitarAgrupamento,
   nomeMilitar,
   statusNormalizado,
   normalizar,
@@ -304,7 +303,6 @@ export default function DetalhePromocao() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const promocaoId = searchParams.get('id');
-  const listasPreparadasAutomaticamente = useRef(new Set());
 
   const [rascunhoPromocao, setRascunhoPromocao] = useState(montarRascunhoPromocao());
   const [promocaoBaseComparacao, setPromocaoBaseComparacao] = useState(null);
@@ -399,23 +397,7 @@ export default function DetalhePromocao() {
     setTurmaBaseComparacao(turma);
   }, [turma]);
 
-  const listaExibida = useMemo(() => {
-    if (turma.length > 0) return turma;
-    return historicosVinculados
-      .map((historico) => ({
-        id: `historico-${historico.id}`,
-        promocao_id: promocao?.id || '',
-        militar_id: historico.militar_id || '',
-        historico_promocao_v2_id: historico.id || '',
-        ordem: Number(historico.antiguidade_referencia_ordem) || 0,
-        status: 'publicado',
-        selecionado: true,
-        publicado: true,
-        origem: 'legado_historico_v2',
-        militar: historico.militar || null,
-      }))
-      .sort(ordenarPorOrdemCrescente);
-  }, [historicosVinculados, promocao, turma]);
+  const listaExibida = useMemo(() => turma, [turma]);
 
   const candidatosHistorico = useMemo(() => {
     if (!promocao) return [];
@@ -610,37 +592,6 @@ export default function DetalhePromocao() {
     if (confirmou) excluirPromocaoMutation.mutate();
   };
 
-  const prepararListaMutation = useMutation({
-    mutationFn: async () => {
-      if (!promocao) throw new Error('Promoção não carregada.');
-      if (turma.length > 0) return { listaPreparada: false };
-
-      const entity = base44.entities.PromocaoMilitar;
-      if (!entity || typeof entity.create !== 'function') {
-        throw new Error('Não foi possível organizar a lista de militares.');
-      }
-
-      const registrosAtuais = typeof entity.list === 'function'
-        ? await entity.list()
-        : (promocaoMilitarQuery.data || []);
-      const payloads = montarPayloadsPromocaoMilitarAgrupamento({
-        promocao,
-        historicos: historicosVinculados,
-        registrosExistentes: registrosAtuais || [],
-        militarPorId,
-      });
-      await Promise.all(payloads.map((payload) => entity.create({ ...payload, origem: 'backfill_historico_v2' })));
-      return { listaPreparada: payloads.length > 0 };
-    },
-    onSuccess: async (resultado) => {
-      if (resultado?.listaPreparada) toast({ title: 'Lista de militares preparada.' });
-      await invalidarDados();
-    },
-    onError: (error) => {
-      listasPreparadasAutomaticamente.current.delete(String(promocao?.id || promocaoId || ''));
-      toast({ title: 'Falha ao organizar lista', description: error.message, variant: 'destructive' });
-    },
-  });
 
   const salvarTurmaMutation = useMutation({
     mutationFn: async () => {
@@ -813,22 +764,6 @@ export default function DetalhePromocao() {
   const bloqueioPublicarTexto = publicarBloqueado
     ? (isLoading ? 'Carregando dados da promoção.' : validacaoPublicacao.bloqueios[0] || 'Revise a promoção antes de publicar.')
     : 'Pronto para publicar oficialmente.';
-  const precisaPrepararLista = turma.length === 0 && historicosVinculados.length > 0;
-
-  useEffect(() => {
-    if (historicosQuery.isLoading || promocaoMilitarQuery.isLoading) return;
-    if (!promocao || !precisaPrepararLista || prepararListaMutation.isPending) return;
-    const chavePromocao = String(promocao.id || '');
-    if (!chavePromocao || listasPreparadasAutomaticamente.current.has(chavePromocao)) return;
-    listasPreparadasAutomaticamente.current.add(chavePromocao);
-    prepararListaMutation.mutate();
-  }, [
-    historicosQuery.isLoading,
-    precisaPrepararLista,
-    prepararListaMutation,
-    promocao,
-    promocaoMilitarQuery.isLoading,
-  ]);
 
   return (
     <div className="min-h-screen space-y-6 bg-slate-50 p-4 md:p-8">
@@ -964,7 +899,7 @@ export default function DetalhePromocao() {
                   <CardTitle>Militares da Promoção ({listaExibida.length})</CardTitle>
                   <p className="mt-1 text-sm text-slate-500">Adicione militares e confira a ordem operacional da promoção.</p>
                 </div>
-                <Button onClick={() => setModalAdicionarAberto(true)} disabled={prepararListaMutation.isPending}>
+                <Button onClick={() => setModalAdicionarAberto(true)}>
                   <UserPlus className="mr-2 h-4 w-4" />
                   Adicionar Militar
                 </Button>
@@ -985,31 +920,18 @@ export default function DetalhePromocao() {
                 {listaExibida.length === 0 && (
                   <div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/60 p-8 text-center shadow-sm">
                     <UserPlus className="mx-auto h-10 w-10 text-blue-600" />
-                    <h3 className="mt-3 text-lg font-semibold text-slate-900">Nenhum militar incluído</h3>
+                    <h3 className="mt-3 text-lg font-semibold text-slate-900">Nenhum militar foi adicionado a esta promoção.</h3>
                     <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
                       Clique em “Adicionar Militar” para montar a lista desta promoção. Depois confira a ordem e salve as alterações.
                     </p>
-                    <Button className="mt-4" onClick={() => setModalAdicionarAberto(true)} disabled={prepararListaMutation.isPending}>
+                    <Button className="mt-4" onClick={() => setModalAdicionarAberto(true)}>
                       <UserPlus className="mr-2 h-4 w-4" />
-                      Adicionar Militar
+                      Adicionar militar
                     </Button>
                   </div>
                 )}
 
                 <div className="space-y-3">
-                  {turma.length === 0 && listaExibida.map((registro) => (
-                    <MilitarCard
-                      key={registro.id}
-                      registro={registro}
-                      editavel={false}
-                      promocao={promocaoReferenciaCadastro}
-                      onAtualizar={atualizarRascunhoTurma}
-                      onRemover={setRegistroParaRemover}
-                      canReverterPublicacao={isAdmin === true}
-                      onReverterPublicacao={setRegistroParaReverter}
-                    />
-                  ))}
-
                   {turma.length > 0 && rascunhoTurmaOrdenado.map((registro) => {
                     const original = turma.find((item) => String(item.id) === String(registro.id));
                     return (
