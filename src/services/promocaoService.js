@@ -397,23 +397,38 @@ export async function excluirCadeiaPromocaoMilitar({
 
   const deveAvaliarRestauracaoCadastro = Boolean(item?.atualizar_cadastro_militar)
     || statusNormalizado(item?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
+  const rollbackElegivel = deveAvaliarRestauracaoCadastro && !!historicoId;
   let cadastroRestaurado = false;
+  let alertaRollback = '';
 
-  if (deveAvaliarRestauracaoCadastro && MilitarEntity && typeof MilitarEntity.update === 'function' && typeof MilitarEntity.get === 'function' && historicoRegistro) {
+  if (rollbackElegivel && !historicoRegistro) {
+    alertaRollback = 'Não foi possível restaurar o cadastro porque o histórico vinculado já não existe.';
+  }
+
+  if (rollbackElegivel && historicoRegistro) {
+    if (!MilitarEntity || typeof MilitarEntity.update !== 'function' || typeof MilitarEntity.get !== 'function') {
+      throw new Error('Entidade Militar indisponível para rollback cadastral na exclusão definitiva.');
+    }
+
     const militarId = texto(item?.militar_id) || texto(item?.militar?.id);
-    const militarAtual = militarId ? await MilitarEntity.get(militarId) : null;
+    if (!militarId) throw new Error('Item sem militar vinculado para rollback cadastral na exclusão definitiva.');
+
+    const militarAtual = await MilitarEntity.get(militarId);
     const postoAtual = texto(militarAtual?.posto_graduacao || militarAtual?.posto_graduacao_atual);
     const quadroAtual = texto(militarAtual?.quadro || militarAtual?.quadro_atual);
     const postoNovo = texto(historicoRegistro?.posto_graduacao_novo);
     const quadroNovo = texto(historicoRegistro?.quadro_novo);
     const guardaPermitiuRollback = mesmoTextoNormalizado(postoAtual, postoNovo) && mesmoTextoNormalizado(quadroAtual, quadroNovo);
-    if (guardaPermitiuRollback) {
-      await MilitarEntity.update(militarId, {
-        posto_graduacao: texto(historicoRegistro?.posto_graduacao_anterior),
-        quadro: texto(historicoRegistro?.quadro_anterior),
-      });
-      cadastroRestaurado = true;
+
+    if (!guardaPermitiuRollback) {
+      throw new Error('Rollback cadastral bloqueado por segurança: posto/quadro atual do militar diverge do posto/quadro novo do histórico vinculado.');
     }
+
+    await MilitarEntity.update(militarId, {
+      posto_graduacao: texto(historicoRegistro?.posto_graduacao_anterior),
+      quadro: texto(historicoRegistro?.quadro_anterior),
+    });
+    cadastroRestaurado = true;
   }
 
   if (historicoId) {
@@ -430,11 +445,11 @@ export async function excluirCadeiaPromocaoMilitar({
 
   if ((vinculados || []).length === 0) {
     await Promocao.delete(item.promocao_id);
-    return { promocaoExcluida: true, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado };
+    return { promocaoExcluida: true, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado, alertaRollback };
   }
 
   await Promocao.update(item.promocao_id, { status: statusPromocaoPosReversao(vinculados) });
-  return { promocaoExcluida: false, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado };
+  return { promocaoExcluida: false, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado, alertaRollback };
 }
 
 export const STATUS_TURMA_OPERACIONAL = [

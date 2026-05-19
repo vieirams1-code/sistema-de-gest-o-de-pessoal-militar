@@ -77,6 +77,120 @@ test('exclusão definitiva recalcula promoção quando ainda houver itens', asyn
     entities,
   });
 
+test('exclusão definitiva de item cancelado restaura cadastro antes de deletar histórico', async () => {
+  const chamadas = [];
+  const entities = {
+    PromocaoMilitar: {
+      get: async () => ({
+        id: 'pm-1',
+        promocao_id: 'promo-1',
+        militar_id: 'mil-1',
+        status: 'cancelado',
+        publicado: false,
+        historico_promocao_v2_id: 'hist-1',
+        atualizar_cadastro_militar: false,
+        resultado_aplicacao_cadastro: 'imediatamente_superior',
+      }),
+      delete: async (id) => chamadas.push(['pmDelete', id]),
+      filter: async () => [],
+    },
+    HistoricoPromocaoMilitarV2: {
+      get: async () => ({
+        id: 'hist-1',
+        posto_graduacao_anterior: '1º Sgt',
+        quadro_anterior: 'QPPM',
+        posto_graduacao_novo: 'Subtenente',
+        quadro_novo: 'QPPM',
+      }),
+      delete: async (id) => chamadas.push(['histDelete', id]),
+    },
+    Militar: {
+      get: async () => ({ id: 'mil-1', posto_graduacao: 'Subtenente', quadro: 'QPPM' }),
+      update: async (id, patch) => chamadas.push(['milUpdate', id, patch]),
+    },
+    Promocao: {
+      delete: async (id) => chamadas.push(['promoDelete', id]),
+      update: async () => {},
+    },
+  };
+
+  const resultado = await excluirCadeiaPromocaoMilitar({
+    promocaoMilitarId: 'pm-1',
+    motivo: 'Cancelamento definitivo',
+    entities,
+  });
+
+  assert.equal(resultado.cadastroRestaurado, true);
+  assert.deepEqual(chamadas, [
+    ['milUpdate', 'mil-1', { posto_graduacao: '1º Sgt', quadro: 'QPPM' }],
+    ['histDelete', 'hist-1'],
+    ['pmDelete', 'pm-1'],
+    ['promoDelete', 'promo-1'],
+  ]);
+});
+
+test('exclusão definitiva bloqueia rollback quando militar atual diverge do posto novo do histórico', async () => {
+  const entities = {
+    PromocaoMilitar: {
+      get: async () => ({
+        id: 'pm-1', promocao_id: 'promo-1', militar_id: 'mil-1', status: 'cancelado', publicado: false,
+        historico_promocao_v2_id: 'hist-1', atualizar_cadastro_militar: true,
+      }),
+      delete: async () => { throw new Error('não deveria deletar'); },
+    },
+    HistoricoPromocaoMilitarV2: {
+      get: async () => ({ id: 'hist-1', posto_graduacao_novo: 'Subtenente', quadro_novo: 'QPPM' }),
+      delete: async () => { throw new Error('não deveria deletar histórico'); },
+    },
+    Militar: {
+      get: async () => ({ id: 'mil-1', posto_graduacao: '2º Sgt', quadro: 'QPPM' }),
+      update: async () => { throw new Error('não deveria atualizar'); },
+    },
+    Promocao: { delete: async () => {}, update: async () => {} },
+  };
+
+  await assert.rejects(
+    () => excluirCadeiaPromocaoMilitar({ promocaoMilitarId: 'pm-1', motivo: 'Teste', entities }),
+    /Rollback cadastral bloqueado por segurança/,
+  );
+});
+
+test('exclusão definitiva sem histórico não altera militar e retorna alerta claro', async () => {
+  const chamadas = [];
+  const entities = {
+    PromocaoMilitar: {
+      get: async () => ({
+        id: 'pm-1', promocao_id: 'promo-1', militar_id: 'mil-1', status: 'cancelado', publicado: false,
+        historico_promocao_v2_id: 'hist-inexistente', atualizar_cadastro_militar: true,
+      }),
+      delete: async (id) => chamadas.push(['pmDelete', id]),
+      filter: async () => [],
+    },
+    HistoricoPromocaoMilitarV2: {
+      get: async () => null,
+      delete: async (id) => chamadas.push(['histDelete', id]),
+    },
+    Militar: {
+      get: async () => ({ id: 'mil-1', posto_graduacao: 'Subtenente', quadro: 'QPPM' }),
+      update: async () => chamadas.push(['milUpdate']),
+    },
+    Promocao: {
+      delete: async (id) => chamadas.push(['promoDelete', id]),
+      update: async () => {},
+    },
+  };
+
+  const resultado = await excluirCadeiaPromocaoMilitar({ promocaoMilitarId: 'pm-1', motivo: 'Teste', entities });
+  assert.equal(resultado.cadastroRestaurado, false);
+  assert.equal(resultado.alertaRollback, 'Não foi possível restaurar o cadastro porque o histórico vinculado já não existe.');
+  assert.deepEqual(chamadas, [
+    ['histDelete', 'hist-inexistente'],
+    ['pmDelete', 'pm-1'],
+    ['promoDelete', 'promo-1'],
+  ]);
+});
+
+
   assert.equal(resultado.promocaoExcluida, false);
   assert.deepEqual(chamadas, [
     ['pmDelete', 'pm-1'],
