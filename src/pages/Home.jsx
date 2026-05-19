@@ -205,8 +205,21 @@ export default function Home() {
   const { data: periodos = [] } = useQuery({
     queryKey: ['periodos-aquisitivos', scopeKey],
     queryFn: async () => {
-      const lista = await base44.entities.PeriodoAquisitivo.list();
-      return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      if (scopedIsAdmin || scopedIds === null) {
+        return base44.entities.PeriodoAquisitivo.list();
+      }
+
+      if (!scopedIds?.length) return [];
+
+      try {
+        const listaEscopo = await base44.entities.PeriodoAquisitivo.filter({
+          militar_id: { in: scopedIds },
+        });
+        return filtrarPorMilitarIdsPermitidos(listaEscopo, scopedIds);
+      } catch (_error) {
+        const lista = await base44.entities.PeriodoAquisitivo.list();
+        return filtrarPorMilitarIdsPermitidos(lista, scopedIds);
+      }
     },
     enabled: dashboardEnabled,
   });
