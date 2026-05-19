@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
   buscarCandidatosProvaveis,
   dataFormatada,
@@ -22,6 +23,7 @@ import {
   filtrarCandidatosCompativeis,
   mensagemBloqueioExclusaoPromocao,
   publicarPromocaoOficial,
+  reverterPublicacaoPromocaoMilitar,
   montarMilitarPorId,
   montarPatchPromocaoMilitar,
   montarPayloadAdicaoManualTurma,
@@ -193,7 +195,7 @@ function classeBadgeEfeito(tipo) {
 
 const SELECT_VAZIO = '__vazio__';
 
-function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRemover }) {
+function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRemover, canReverterPublicacao, onReverterPublicacao }) {
   const militar = original?.militar || registro?.militar;
   const posto = valorOuTraco(militar?.posto_graduacao || militar?.posto_graduacao_atual);
   const quadro = valorOuTraco(militar?.quadro || militar?.quadro_atual);
@@ -252,10 +254,23 @@ function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRe
             {rotuloSituacao(registro.status, registro.publicado)}
           </Badge>
           {editavel ? (
-            <Button size="sm" variant="outline" onClick={() => onRemover({ ...registro, militar })} disabled={Boolean(registro.publicado)}>
-              <Trash2 className="mr-1 h-4 w-4" />
-              Remover
-            </Button>
+            Boolean(registro.publicado) ? (
+              canReverterPublicacao ? (
+                <Button size="sm" variant="destructive" onClick={() => onReverterPublicacao({ ...registro, militar })}>
+                  Reverter publicação
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" disabled title="Apenas admin pode reverter publicação">
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Remover
+                </Button>
+              )
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => onRemover({ ...registro, militar })}>
+                <Trash2 className="mr-1 h-4 w-4" />
+                Remover
+              </Button>
+            )
           ) : (
             <span className="text-sm text-slate-500">Aguarde</span>
           )}
@@ -266,6 +281,7 @@ function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRe
 }
 
 export default function DetalhePromocao() {
+  const { isAdmin, user } = useCurrentUser();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -278,6 +294,10 @@ export default function DetalhePromocao() {
   const [rascunhoTurma, setRascunhoTurma] = useState([]);
   const [turmaBaseComparacao, setTurmaBaseComparacao] = useState([]);
   const [registroParaRemover, setRegistroParaRemover] = useState(null);
+  const [registroParaReverter, setRegistroParaReverter] = useState(null);
+  const [confirmacaoReversao, setConfirmacaoReversao] = useState('');
+  const [motivoReversao, setMotivoReversao] = useState('');
+  const [observacaoReversao, setObservacaoReversao] = useState('');
   const [modalAdicionarAberto, setModalAdicionarAberto] = useState(false);
   const [buscaAdicionar, setBuscaAdicionar] = useState('');
 
@@ -611,6 +631,35 @@ export default function DetalhePromocao() {
     onError: (error) => toast({ title: 'Falha ao remover militar', description: error.message, variant: 'destructive' }),
   });
 
+  const reverterPublicacaoMutation = useMutation({
+    mutationFn: async (registro) => {
+      if (!isAdmin) throw new Error('Apenas administrador pode reverter publicação.');
+      if (!registro?.publicado) throw new Error('Somente item publicado pode ser revertido.');
+      return reverterPublicacaoPromocaoMilitar({
+        promocao,
+        item: registro,
+        itensPromocao: listaExibida,
+        entities: base44.entities,
+        motivo: motivoReversao,
+        observacoes: observacaoReversao,
+        usuario: user,
+      });
+    },
+    onSuccess: async (resultado) => {
+      const partes = ['Histórico cancelado'];
+      if (resultado?.cadastroRestaurado) partes.push('Cadastro restaurado');
+      partes.push('Promoção reaberta');
+      toast({ title: 'Reversão concluída', description: partes.join(' • ') });
+      setRegistroParaReverter(null);
+      setConfirmacaoReversao('');
+      setMotivoReversao('');
+      setObservacaoReversao('');
+      await invalidarDados();
+      await queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
+    },
+    onError: (error) => toast({ title: 'Falha ao reverter publicação', description: error.message, variant: 'destructive' }),
+  });
+
   const adicionarMutation = useMutation({
     mutationFn: async (item) => {
       if (!promocao) throw new Error('Promoção não carregada.');
@@ -878,6 +927,8 @@ export default function DetalhePromocao() {
                       promocao={promocaoReferenciaCadastro}
                       onAtualizar={atualizarRascunhoTurma}
                       onRemover={setRegistroParaRemover}
+                      canReverterPublicacao={isAdmin === true}
+                      onReverterPublicacao={setRegistroParaReverter}
                     />
                   ))}
 
@@ -892,6 +943,8 @@ export default function DetalhePromocao() {
                         promocao={promocaoReferenciaCadastro}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
+                        canReverterPublicacao={isAdmin === true}
+                        onReverterPublicacao={setRegistroParaReverter}
                       />
                     );
                   })}
@@ -980,6 +1033,42 @@ export default function DetalhePromocao() {
             <Button variant="outline" onClick={() => setRegistroParaRemover(null)}>Cancelar</Button>
             <Button variant="destructive" onClick={() => removerMutation.mutate(registroParaRemover)} disabled={!registroParaRemover || registroParaRemover.publicado || removerMutation.isPending}>
               Remover
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(registroParaReverter)} onOpenChange={(open) => !open && setRegistroParaReverter(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ATENÇÃO</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>Você está revertendo uma promoção oficial.</p>
+            <p>Esta ação poderá cancelar histórico oficial, restaurar posto/quadro anterior, alterar Prévia Geral e reabrir esta promoção para edição.</p>
+            <Label>Digite: REVERTER PROMOÇÃO</Label>
+            <Input value={confirmacaoReversao} onChange={(event) => setConfirmacaoReversao(event.target.value)} />
+            <Label>Motivo obrigatório</Label>
+            <Select value={motivoReversao || SELECT_VAZIO} onValueChange={(value) => setMotivoReversao(value === SELECT_VAZIO ? '' : value)}>
+              <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SELECT_VAZIO}>Selecione...</SelectItem>
+                <SelectItem value="Erro material">Erro material</SelectItem>
+                <SelectItem value="Retificação administrativa">Retificação administrativa</SelectItem>
+                <SelectItem value="Publicação indevida">Publicação indevida</SelectItem>
+                <SelectItem value="Outro">Outro</SelectItem>
+              </SelectContent>
+            </Select>
+            <Label>Observações</Label>
+            <Textarea value={observacaoReversao} onChange={(event) => setObservacaoReversao(event.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRegistroParaReverter(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={confirmacaoReversao.trim() !== 'REVERTER PROMOÇÃO' || !motivoReversao || reverterPublicacaoMutation.isPending}
+              onClick={() => reverterPublicacaoMutation.mutate(registroParaReverter)}
+            >
+              Confirmar reversão
             </Button>
           </DialogFooter>
         </DialogContent>

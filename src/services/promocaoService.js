@@ -195,6 +195,90 @@ export async function publicarPromocaoOficial({ promocao, itens = [], entities, 
   return { publicados: resultados.length, resultados };
 }
 
+function statusPromocaoPosReversao(itens = []) {
+  const publicados = (itens || []).filter((item) => Boolean(item?.publicado) && statusNormalizado(item?.status) === 'publicado').length;
+  if (publicados === 0) return 'rascunho';
+  if (publicados < (itens || []).length) return 'publicada_parcial';
+  return 'publicada';
+}
+
+export async function reverterPublicacaoPromocaoMilitar({
+  promocao,
+  item,
+  itensPromocao = [],
+  entities,
+  motivo = '',
+  observacoes = '',
+  usuario = null,
+} = {}) {
+  const motivoNormalizado = texto(motivo);
+  if (!promocao?.id) throw new Error('Promoção não carregada.');
+  if (!item?.id) throw new Error('Item da promoção não carregado.');
+  if (!item?.publicado || statusNormalizado(item?.status) !== 'publicado') throw new Error('Somente itens publicados podem ser revertidos.');
+  if (!motivoNormalizado) throw new Error('Motivo da reversão é obrigatório.');
+
+  const Historico = entities?.HistoricoPromocaoMilitarV2;
+  const MilitarEntity = entities?.Militar;
+  const PromocaoMilitar = entities?.PromocaoMilitar;
+  const Promocao = entities?.Promocao;
+
+  if (!Historico || typeof Historico.update !== 'function') throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para reversão.');
+  if (!PromocaoMilitar || typeof PromocaoMilitar.update !== 'function') throw new Error('Entidade PromocaoMilitar indisponível para reversão.');
+  if (!Promocao || typeof Promocao.update !== 'function') throw new Error('Entidade Promocao indisponível para recalcular status.');
+
+  const historicoId = texto(item?.historico_promocao_v2_id);
+  if (!historicoId) throw new Error('Item publicado sem vínculo de histórico V2.');
+  const historicoRegistro = typeof Historico.get === 'function' ? await Historico.get(historicoId) : null;
+
+  const trilhaAdmin = [
+    '[REVERSAO_ADMINISTRATIVA]',
+    `motivo=${motivoNormalizado}`,
+    texto(observacoes) ? `observacoes=${texto(observacoes)}` : '',
+    texto(usuario?.email) ? `usuario=${texto(usuario.email)}` : '',
+    `data=${new Date().toISOString()}`,
+  ].filter(Boolean).join(' | ');
+  await Historico.update(historicoId, {
+    status_registro: 'cancelado',
+    motivo_retificacao: motivoNormalizado,
+    observacoes: [texto(historicoRegistro?.observacoes), trilhaAdmin].filter(Boolean).join('\n'),
+  });
+
+  const deveAvaliarRestauracaoCadastro = Boolean(item?.atualizar_cadastro_militar)
+    || statusNormalizado(item?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
+  let cadastroRestaurado = false;
+
+  if (deveAvaliarRestauracaoCadastro && MilitarEntity && typeof MilitarEntity.update === 'function') {
+    const militarAtual = item?.militar?.id && typeof MilitarEntity.get === 'function'
+      ? await MilitarEntity.get(item.militar.id)
+      : item?.militar;
+    const postoAtual = texto(militarAtual?.posto_graduacao || militarAtual?.posto_graduacao_atual);
+    const quadroAtual = texto(militarAtual?.quadro || militarAtual?.quadro_atual);
+    const postoNovo = texto(historicoRegistro?.posto_graduacao_novo);
+    const quadroNovo = texto(historicoRegistro?.quadro_novo);
+    const aindaCoincideComPromovido = mesmoTextoNormalizado(postoAtual, postoNovo) && mesmoTextoNormalizado(quadroAtual, quadroNovo);
+
+    if (aindaCoincideComPromovido) {
+      await MilitarEntity.update(item.militar_id, {
+        posto_graduacao: texto(historicoRegistro?.posto_graduacao_anterior),
+        quadro: texto(historicoRegistro?.quadro_anterior),
+      });
+      cadastroRestaurado = true;
+    }
+  }
+
+  await PromocaoMilitar.update(item.id, {
+    status: 'cancelado',
+    publicado: false,
+  });
+
+  const itensAtualizados = (itensPromocao || []).map((registro) => (
+    String(registro?.id) === String(item.id) ? { ...registro, status: 'cancelado', publicado: false } : registro
+  ));
+  await Promocao.update(promocao.id, { status: statusPromocaoPosReversao(itensAtualizados) });
+
+  return { historicoCancelado: true, cadastroRestaurado, promocaoRecalculada: true };
+}
+
 export const STATUS_TURMA_OPERACIONAL = [
   'elegivel',
   'selecionado',
