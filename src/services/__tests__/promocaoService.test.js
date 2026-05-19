@@ -6,6 +6,7 @@ import {
   avaliarAlertasTurmaOperacional,
   avaliarCompatibilidadePromocao,
   buscarCandidatosProvaveis,
+  excluirCadeiaPromocaoMilitar,
   filtrarCandidatosCompativeis,
   mensagemBloqueioExclusaoPromocao,
   montarDiagnosticoMilitaresPromocao,
@@ -20,6 +21,68 @@ import {
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
 } from '../promocaoService.js';
+
+test('exclusão definitiva remove histórico, item e exclui promoção quando ficar vazia', async () => {
+  const chamadas = [];
+  const entities = {
+    PromocaoMilitar: {
+      get: async () => ({ id: 'pm-1', promocao_id: 'promo-1', status: 'cancelado', publicado: false, historico_promocao_v2_id: 'hist-1' }),
+      delete: async (id) => chamadas.push(['pmDelete', id]),
+      filter: async () => [],
+    },
+    HistoricoPromocaoMilitarV2: {
+      get: async () => ({ id: 'hist-1' }),
+      delete: async (id) => chamadas.push(['histDelete', id]),
+    },
+    Promocao: {
+      delete: async (id) => chamadas.push(['promoDelete', id]),
+      update: async (id, patch) => chamadas.push(['promoUpdate', id, patch]),
+    },
+  };
+
+  const resultado = await excluirCadeiaPromocaoMilitar({
+    promocaoMilitarId: 'pm-1',
+    motivo: 'Cancelado em duplicidade',
+    entities,
+  });
+
+  assert.equal(resultado.promocaoExcluida, true);
+  assert.deepEqual(chamadas, [
+    ['histDelete', 'hist-1'],
+    ['pmDelete', 'pm-1'],
+    ['promoDelete', 'promo-1'],
+  ]);
+});
+
+test('exclusão definitiva recalcula promoção quando ainda houver itens', async () => {
+  const chamadas = [];
+  const entities = {
+    PromocaoMilitar: {
+      get: async () => ({ id: 'pm-1', promocao_id: 'promo-1', status: 'cancelado', publicado: false }),
+      delete: async (id) => chamadas.push(['pmDelete', id]),
+      filter: async () => [{ id: 'pm-2', status: 'publicado', publicado: true }],
+    },
+    HistoricoPromocaoMilitarV2: {
+      delete: async () => {},
+    },
+    Promocao: {
+      delete: async () => chamadas.push(['promoDelete']),
+      update: async (id, patch) => chamadas.push(['promoUpdate', id, patch]),
+    },
+  };
+
+  const resultado = await excluirCadeiaPromocaoMilitar({
+    promocaoMilitarId: 'pm-1',
+    motivo: 'Retirado por revisão administrativa',
+    entities,
+  });
+
+  assert.equal(resultado.promocaoExcluida, false);
+  assert.deepEqual(chamadas, [
+    ['pmDelete', 'pm-1'],
+    ['promoUpdate', 'promo-1', { status: 'publicada' }],
+  ]);
+});
 
 const promocao = {
   id: 'promo-1',

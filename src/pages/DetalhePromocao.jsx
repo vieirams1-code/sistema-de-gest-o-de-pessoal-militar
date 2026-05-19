@@ -18,6 +18,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import {
   buscarCandidatosProvaveis,
+  excluirCadeiaPromocaoMilitar,
   dataFormatada,
   enriquecerHistoricos,
   filtrarCandidatosCompativeis,
@@ -211,7 +212,7 @@ function efeitoCadastroVisualPorRegistro({ registro, militar, promocao }) {
 
 const SELECT_VAZIO = '__vazio__';
 
-function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRemover, canReverterPublicacao, onReverterPublicacao }) {
+function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRemover, onExcluirDefinitivo, canReverterPublicacao, onReverterPublicacao, isAdmin }) {
   const militar = original?.militar || registro?.militar;
   const posto = valorOuTraco(militar?.posto_graduacao || militar?.posto_graduacao_atual);
   const quadro = valorOuTraco(militar?.quadro || militar?.quadro_atual);
@@ -281,6 +282,10 @@ function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRe
                   Remover
                 </Button>
               )
+            ) : isAdmin && (statusNormalizado(registro.status) === 'cancelado' || registro.publicado === false) ? (
+              <Button size="sm" variant="destructive" onClick={() => onExcluirDefinitivo({ ...registro, militar })}>
+                Excluir definitivamente
+              </Button>
             ) : (
               <Button size="sm" variant="outline" onClick={() => onRemover({ ...registro, militar })}>
                 <Trash2 className="mr-1 h-4 w-4" />
@@ -309,6 +314,7 @@ export default function DetalhePromocao() {
   const [rascunhoTurma, setRascunhoTurma] = useState([]);
   const [turmaBaseComparacao, setTurmaBaseComparacao] = useState([]);
   const [registroParaRemover, setRegistroParaRemover] = useState(null);
+  const [registroParaExcluirDefinitivo, setRegistroParaExcluirDefinitivo] = useState(null);
   const [registroParaReverter, setRegistroParaReverter] = useState(null);
   const [confirmacaoReversao, setConfirmacaoReversao] = useState('');
   const [motivoReversao, setMotivoReversao] = useState('');
@@ -649,6 +655,27 @@ export default function DetalhePromocao() {
     onError: (error) => toast({ title: 'Falha ao remover militar', description: error.message, variant: 'destructive' }),
   });
 
+  const excluirDefinitivoMutation = useMutation({
+    mutationFn: async (registro) => {
+      if (!isAdmin) throw new Error('Apenas administrador pode excluir definitivamente.');
+      return excluirCadeiaPromocaoMilitar({
+        promocaoMilitarId: registro?.id,
+        motivo: 'Exclusão administrativa definitiva',
+        entities: base44.entities,
+      });
+    },
+    onSuccess: async (resultado) => {
+      toast({
+        title: 'Exclusão definitiva concluída',
+        description: resultado?.promocaoExcluida ? 'Item removido e promoção vazia excluída.' : 'Item removido definitivamente da cadeia da promoção.',
+      });
+      setRegistroParaExcluirDefinitivo(null);
+      await invalidarDados();
+      if (resultado?.promocaoExcluida) navigate(createPageUrl('Promocoes'));
+    },
+    onError: (error) => toast({ title: 'Falha na exclusão definitiva', description: error.message, variant: 'destructive' }),
+  });
+
   const reverterPublicacaoMutation = useMutation({
     mutationFn: async (registro) => {
       if (!isAdmin) throw new Error('Apenas administrador pode reverter publicação.');
@@ -943,8 +970,10 @@ export default function DetalhePromocao() {
                         promocao={promocaoReferenciaCadastro}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
+                        onExcluirDefinitivo={setRegistroParaExcluirDefinitivo}
                         canReverterPublicacao={isAdmin === true}
                         onReverterPublicacao={setRegistroParaReverter}
+                        isAdmin={isAdmin === true}
                       />
                     );
                   })}
@@ -1069,6 +1098,22 @@ export default function DetalhePromocao() {
               onClick={() => reverterPublicacaoMutation.mutate(registroParaReverter)}
             >
               Confirmar reversão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(registroParaExcluirDefinitivo)} onOpenChange={(open) => !open && setRegistroParaExcluirDefinitivo(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir definitivamente</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-700">
+            Excluir definitivamente {nomeMilitar(registroParaExcluirDefinitivo?.militar)} da cadeia operacional desta promoção?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRegistroParaExcluirDefinitivo(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => excluirDefinitivoMutation.mutate(registroParaExcluirDefinitivo)} disabled={!registroParaExcluirDefinitivo || excluirDefinitivoMutation.isPending}>
+              Excluir definitivamente
             </Button>
           </DialogFooter>
         </DialogContent>
