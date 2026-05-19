@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { normalizarPostoGraduacaoMilitar } from '@/utils/militarPostoGraduacao';
 
 // =====================================================================
 // getScopedMilitaresClient — Lote 1B
@@ -58,7 +59,7 @@ export async function fetchScopedMilitares(payload = {}) {
   const response = await base44.functions.invoke('getScopedMilitares', finalPayload);
   const data = response?.data ?? response ?? {};
   return {
-    militares: Array.isArray(data.militares) ? data.militares : [],
+    militares: Array.isArray(data.militares) ? data.militares.map((militar) => normalizarPostoGraduacaoMilitar(militar)) : [],
     meta: data.meta || {},
   };
 }

@@ -11,6 +11,7 @@ import PromocoesTimeline from '@/components/antiguidade/PromocoesTimeline';
 import RankIcon from '@/components/antiguidade/RankIcon';
 import { POSTOS_GRADUACOES } from '@/components/antiguidade/promocaoHistoricaUtils';
 import { createPageUrl } from '@/utils';
+import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
 
 const STATUS_ATIVO = 'ativo';
 const STATUS_RETIFICADO = 'retificado';
@@ -68,9 +69,11 @@ export default function CarreiraAntiguidadePanel(props) {
   const historico = React.useMemo(() => [...(historicoPromocoes || [])].sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || ''))), [historicoPromocoes]);
   const ativos = React.useMemo(() => historico.filter((h) => valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO && String(h.militar_id || '') === String(militar?.id || '')), [historico, militar?.id]);
 
-  const promocaoAtual = React.useMemo(() => ativos.find((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao) && isOrdemPreenchida(h.antiguidade_referencia_ordem)) || null, [ativos, militar]);
+  const postoGraduacaoMilitar = getPostoGraduacaoOficial(militar);
 
-  const registrosAtuaisCompativeis = React.useMemo(() => ativos.filter((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao)), [ativos, militar]);
+  const promocaoAtual = React.useMemo(() => ativos.find((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(postoGraduacaoMilitar) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao) && isOrdemPreenchida(h.antiguidade_referencia_ordem)) || null, [ativos, postoGraduacaoMilitar, militar?.quadro]);
+
+  const registrosAtuaisCompativeis = React.useMemo(() => ativos.filter((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(postoGraduacaoMilitar) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao)), [ativos, postoGraduacaoMilitar, militar?.quadro]);
   const haMultiplosRegistrosAtuais = registrosAtuaisCompativeis.length > 1;
 
   const abrirAcaoRegistro = (tipo, registro) => {
@@ -105,7 +108,7 @@ export default function CarreiraAntiguidadePanel(props) {
 
   const isPromocaoAtualUnicaUsadaNaPrevia = (registro) => {
     if (!registro?.id) return false;
-    const isAtualCompativel = valorTexto(registro.posto_graduacao_novo) === valorTexto(militar?.posto_graduacao)
+    const isAtualCompativel = valorTexto(registro.posto_graduacao_novo) === valorTexto(postoGraduacaoMilitar)
       && valorTexto(registro.quadro_novo) === valorTexto(militar?.quadro)
       && valorTexto(registro.data_promocao);
     return isAtualCompativel && registrosAtuaisCompativeis.length <= 1;
@@ -150,6 +153,13 @@ export default function CarreiraAntiguidadePanel(props) {
           status_registro: registro.status_registro || STATUS_ATIVO,
           motivo_retificacao: registro.motivo_retificacao || '',
         });
+
+      if (tipo === ACAO_CORRIGIR && valorTexto(registro.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO && isPromocaoAtualUnicaUsadaNaPrevia(registro)) {
+        await base44.entities.Militar.update(militar.id, {
+          posto_graduacao: formRegistro.posto_graduacao_novo || '',
+          quadro: formRegistro.quadro_novo || '',
+        });
+      }
       } else {
         await base44.entities.HistoricoPromocaoMilitarV2.update(registro.id, {
           status_registro: STATUS_RETIFICADO,
@@ -203,12 +213,12 @@ export default function CarreiraAntiguidadePanel(props) {
           <div className="grid flex-1 grid-cols-1 gap-4 text-sm md:grid-cols-2 xl:grid-cols-5">
             <Info label="Nome" value={militar?.nome_completo || militar?.nome_guerra || '—'} />
             <Info label="Matrícula" value={militar?.matricula || '—'} />
-            <Info label="Posto/graduação atual" value={militar?.posto_graduacao || '—'} />
+            <Info label="Posto/graduação atual" value={postoGraduacaoMilitar || '—'} />
             <Info label="Quadro" value={militar?.quadro || '—'} />
             <Info label="Lotação" value={militar?.lotacao_atual || militar?.lotacao || '—'} />
           </div>
           <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
-            <RankIcon postoGraduacao={militar?.posto_graduacao} />
+            <RankIcon postoGraduacao={postoGraduacaoMilitar} />
           </div>
         </div>
       </CardContent>

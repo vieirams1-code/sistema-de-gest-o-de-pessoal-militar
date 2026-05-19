@@ -47,6 +47,7 @@ import { calcularStatusPeriodoAquisitivo } from '@/components/ferias/recalcularP
 import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cudEscopadoClient';
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
+import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -193,8 +194,9 @@ export default function VerMilitar() {
     enabled: Boolean(militar?.merged_into_id)
   });
 
+  const postoGraduacaoMilitar = getPostoGraduacaoOficial(militar);
   const canViewMilitar = militar ? hasAccess(militar) || hasSelfAccess(militar) : false;
-  const comportamentoElegivel = militar ? !isOficial(militar.posto_graduacao) : false;
+  const comportamentoElegivel = militar ? !isOficial(postoGraduacaoMilitar) : false;
   const tabInicial = comportamentoElegivel ?
   selectedTab :
   selectedTab === 'comportamento' ? 'dados' : selectedTab;
@@ -482,7 +484,7 @@ export default function VerMilitar() {
         {/* Alertas e tempo de serviço */}
         <div className="space-y-2 mb-4">
           <AlertasContrato militarId={id} />
-          <TempoServico militar={militar} />
+          <TempoServico militar={{ ...militar, posto_graduacao: postoGraduacaoMilitar }} />
           {militarMesclado &&
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Cadastro mesclado</p>
@@ -515,7 +517,7 @@ export default function VerMilitar() {
                   {militar.condicao && <Badge variant="outline" className="border-white/30 text-white">{militar.condicao}</Badge>}
                 </div>
                 <h2 className="text-2xl font-bold mb-1">
-                  {militar.posto_graduacao && `${militar.posto_graduacao} `}
+                  {postoGraduacaoMilitar && `${postoGraduacaoMilitar} `}
                   {militar.nome_guerra || militar.nome_completo}
                 </h2>
                 {militar.nome_guerra && <p className="text-white/80">{militar.nome_completo}</p>}
@@ -558,7 +560,7 @@ export default function VerMilitar() {
                   <div className="grid grid-cols-2 gap-x-4">
                     <InfoItem label="Nome de Guerra" value={militar.nome_guerra} />
                     <InfoItem label="Matrícula atual" value={militarEnriquecido?.matricula_atual || militar.matricula} />
-                    <InfoItem label="Posto/Graduação" value={militar.posto_graduacao} />
+                    <InfoItem label="Posto/Graduação" value={postoGraduacaoMilitar} />
                     <InfoItem label="Quadro" value={militar.quadro} />
                     <InfoItem label="Situação" value={militar.situacao_militar} />
                     <InfoItem label="Condição" value={militar.condicao} />
@@ -961,6 +963,8 @@ export default function VerMilitar() {
               onHistoricoChanged={async () => {
                 await refetchHistoricoPromocoes();
                 await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+                await queryClient.invalidateQueries({ queryKey: ['militar', militar?.id] });
+                await queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
               }}
             />
           </TabsContent>
@@ -977,6 +981,8 @@ export default function VerMilitar() {
         onSaved={async () => {
           await refetchHistoricoPromocoes();
           await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+          await queryClient.invalidateQueries({ queryKey: ['militar', militar?.id] });
+          await queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
         }}
       />
 
@@ -993,6 +999,7 @@ export default function VerMilitar() {
           await refetchHistoricoPromocoes();
           await queryClient.invalidateQueries({ queryKey: ['militar', militar?.id] });
           await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+          await queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
         }}
       />
 
@@ -1003,6 +1010,8 @@ export default function VerMilitar() {
         onSaved={async () => {
           await refetchHistoricoPromocoes();
           await queryClient.invalidateQueries({ queryKey: ['antiguidade-diagnostico'] });
+          await queryClient.invalidateQueries({ queryKey: ['militar', militar?.id] });
+          await queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
         }}
       />
 
