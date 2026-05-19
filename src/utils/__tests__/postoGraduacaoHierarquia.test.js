@@ -67,6 +67,32 @@ test('2º Tenente para 1º Tenente é imediatamente superior em todas as nomencl
   }
 });
 
+
+test('runtime de Tenentes aceita origem e destino em formato completo, abreviado e por extenso', () => {
+  const casos = [
+    ['2º Tenente', '1º Tenente'],
+    ['2º Ten', '1º Ten'],
+    ['Segundo Tenente', 'Primeiro Tenente'],
+  ];
+
+  for (const [postoAtual, postoNovo] of casos) {
+    const resultado = sugestao(postoAtual, postoNovo);
+    assert.equal(resultado.tipo, 'imediatamente_superior', `${postoAtual} -> ${postoNovo}`);
+    assert.equal(resultado.titulo, 'Cadastro será atualizado');
+    assert.equal(resultado.atualizar, true);
+    assert.equal(resultado.bloqueiaSalvar, false);
+  }
+});
+
+test('runtime de Tenentes ignora quadro anexado ao texto exibido pela UI', () => {
+  const resultado = sugestao('2º Tenente • QOBM', '1º Tenente • QOBM');
+
+  assert.equal(normalizarPostoGraduacao('2º Tenente • QOBM'), '2º Tenente');
+  assert.equal(normalizarPostoGraduacao('1º Tenente • QOBM'), '1º Tenente');
+  assert.equal(resultado.tipo, 'imediatamente_superior');
+  assert.equal(resultado.bloqueiaSalvar, false);
+});
+
 test('promoção duas ou mais acima retorna incompatível e bloqueia', () => {
   const resultado = sugestao('Soldado', '3º Sgt');
   assert.equal(resultado.tipo, 'incompativel');

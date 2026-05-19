@@ -426,6 +426,34 @@ test('salvar turma persiste campos derivados automaticamente no patch', () => {
   assert.equal(patch.resultado_aplicacao_cadastro, 'imediatamente_superior');
 });
 
+
+test('runtime de salvar turma para Tenentes recalcula imediatamente superior e não bloqueia', () => {
+  const casos = [
+    ['2º Tenente', '1º Tenente'],
+    ['2º Ten', '1º Ten'],
+    ['Segundo Tenente', 'Primeiro Tenente'],
+  ];
+
+  for (const [origem, destino] of casos) {
+    const item = {
+      id: `pm-${origem}`,
+      militar_id: 'm1',
+      ordem: 1,
+      selecionado: true,
+      status: 'selecionado',
+      militar: { posto_graduacao: origem },
+    };
+    const promocaoTenente = { posto_graduacao: destino };
+    const patch = montarPatchPromocaoMilitar(item, { promocao: promocaoTenente });
+    const validacao = validarSalvarTurmaOperacional([item], { promocao: promocaoTenente });
+
+    assert.equal(patch.resultado_aplicacao_cadastro, 'imediatamente_superior', `${origem} -> ${destino}`);
+    assert.equal(patch.atualizar_cadastro_militar, true);
+    assert.equal(validacao.valido, true);
+    assert.deepEqual(validacao.bloqueios, []);
+  }
+});
+
 test('salvar turma bloqueia quando houver item incompatível', () => {
   const validacao = validarSalvarTurmaOperacional([
     {

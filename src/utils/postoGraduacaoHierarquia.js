@@ -49,10 +49,18 @@ function chave(valor) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[°º]/g, 'o')
+    .replace(/[•|/]/g, ' ')
     .replace(/[-–—]/g, ' ')
     .replace(/\./g, '')
     .replace(/\s+/g, ' ')
     .toLowerCase();
+}
+
+function removerQuadroAnexado(valor) {
+  return valor
+    .replace(/\b(qobm|qaobm|qoebm|qosau|qopm|qptbm|qbm|qbmp\s*\d(?:\s*[ab])?)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 const ALIASES = new Map([
@@ -122,6 +130,9 @@ const ALIASES = new Map([
   ['cel', 'Coronel'],
 ]);
 
+const ALIASES_ORDENADOS_POR_ESPECIFICIDADE = [...ALIASES.entries()]
+  .sort(([aliasA], [aliasB]) => aliasB.length - aliasA.length);
+
 const INDICE_POR_POSTO = new Map(POSTOS_GRADUACOES_HIERARQUIA.map((posto, indice) => [posto, indice]));
 
 function copiarEfeito(tipo) {
@@ -148,8 +159,16 @@ export function diferencaHierarquicaPostos(postoNovo, postoAtual) {
 }
 
 export function normalizarPostoGraduacao(valor) {
-  const normalizado = ALIASES.get(chave(valor));
-  return normalizado || '';
+  const chaveOriginal = chave(valor);
+  const normalizado = ALIASES.get(chaveOriginal);
+  if (normalizado) return normalizado;
+
+  const chaveSemQuadro = removerQuadroAnexado(chaveOriginal);
+  const normalizadoSemQuadro = ALIASES.get(chaveSemQuadro);
+  if (normalizadoSemQuadro) return normalizadoSemQuadro;
+
+  const aliasPorPrefixo = ALIASES_ORDENADOS_POR_ESPECIFICIDADE.find(([alias]) => chaveSemQuadro.startsWith(`${alias} `));
+  return aliasPorPrefixo?.[1] || '';
 }
 
 export function compararPostos(postoA, postoB) {
