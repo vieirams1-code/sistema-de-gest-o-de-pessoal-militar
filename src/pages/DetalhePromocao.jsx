@@ -310,6 +310,9 @@ export default function DetalhePromocao() {
   });
 
   const promocao = promocaoQuery.data;
+  const promocaoReferenciaCadastro = useMemo(() => (
+    promocao ? { ...promocao, ...montarPatchPromocao(rascunhoPromocao) } : promocao
+  ), [promocao, rascunhoPromocao]);
   const militarPorId = useMemo(() => montarMilitarPorId(militaresQuery.data || []), [militaresQuery.data]);
 
   const historicosVinculados = useMemo(() => {
@@ -384,10 +387,10 @@ export default function DetalhePromocao() {
         if (!militarId || idsNaPromocao.has(militarId) || porMilitar.has(militarId)) return;
         const buscaMilitar = normalizar(`${nomeMilitar(militar)} ${militar?.nome_completo || ''} ${militar?.matricula || ''}`);
         if (!buscaMilitar.includes(termo)) return;
-        const quadroCombina = !texto(promocao?.quadro) || normalizar(militar?.quadro || militar?.quadro_atual) === normalizar(promocao?.quadro);
+        const quadroCombina = !texto(promocaoReferenciaCadastro?.quadro) || normalizar(militar?.quadro || militar?.quadro_atual) === normalizar(promocaoReferenciaCadastro?.quadro);
         if (!quadroCombina) return;
         const postoAtual = militar?.posto_graduacao || militar?.posto_graduacao_atual;
-        const postoCombinaDestino = !texto(promocao?.posto_graduacao) || normalizar(postoAtual) === normalizar(promocao?.posto_graduacao);
+        const postoCombinaDestino = !texto(promocaoReferenciaCadastro?.posto_graduacao) || normalizar(postoAtual) === normalizar(promocaoReferenciaCadastro?.posto_graduacao);
         porMilitar.set(militarId, {
           id: `militar-${militarId}`,
           militarId,
@@ -407,7 +410,7 @@ export default function DetalhePromocao() {
       })
       .sort((a, b) => Number(Boolean(a.historico) === false) - Number(Boolean(b.historico) === false))
       .slice(0, 30);
-  }, [buscaAdicionar, candidatosHistorico, listaExibida, militarPorId, militaresQuery.data, promocao]);
+  }, [buscaAdicionar, candidatosHistorico, listaExibida, militarPorId, militaresQuery.data, promocao, promocaoReferenciaCadastro]);
 
 
   useEffect(() => {
@@ -418,7 +421,10 @@ export default function DetalhePromocao() {
     setRascunhoTurma(turma.map((registro) => montarRascunhoItemTurma(registro, promocao)));
   }, [promocao, turma]);
 
-  const validacaoSalvarTurma = useMemo(() => validarSalvarTurmaOperacional(rascunhoTurma, { promocao }), [promocao, rascunhoTurma]);
+  const validacaoSalvarTurma = useMemo(() => validarSalvarTurmaOperacional(
+    rascunhoTurma,
+    { promocao: promocaoReferenciaCadastro },
+  ), [promocaoReferenciaCadastro, rascunhoTurma]);
   const mensagensValidacao = useMemo(() => mensagensValidacaoSimples(validacaoSalvarTurma), [validacaoSalvarTurma]);
   const rascunhoTurmaOrdenado = useMemo(() => (
     [...rascunhoTurma].sort((a, b) => {
@@ -438,8 +444,10 @@ export default function DetalhePromocao() {
 
   const existemAlteracoesTurma = useMemo(() => {
     const origem = new Map(turma.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
-    return rascunhoTurma.some((registro) => JSON.stringify(montarPatchPromocaoMilitar(registro)) !== JSON.stringify(origem.get(String(registro.id)) || {}));
-  }, [rascunhoTurma, turma]);
+    return rascunhoTurma.some((registro) => (
+      JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })) !== JSON.stringify(origem.get(String(registro.id)) || {})
+    ));
+  }, [promocaoReferenciaCadastro, rascunhoTurma, turma]);
 
   const atualizarCampoPromocao = (campo, valor) => {
     setRascunhoPromocao((atual) => ({ ...atual, [campo]: valor }));
@@ -539,14 +547,14 @@ export default function DetalhePromocao() {
       if (!base44.entities.PromocaoMilitar || typeof base44.entities.PromocaoMilitar.update !== 'function') {
         throw new Error('Não foi possível salvar a lista.');
       }
-      const turmaComEfeito = rascunhoTurma.map((registro) => montarRascunhoItemTurma(registro, promocao));
-      const validacao = validarSalvarTurmaOperacional(turmaComEfeito, { promocao });
+      const turmaComEfeito = rascunhoTurma.map((registro) => montarRascunhoItemTurma(registro, promocaoReferenciaCadastro));
+      const validacao = validarSalvarTurmaOperacional(turmaComEfeito, { promocao: promocaoReferenciaCadastro });
       if (!validacao.valido) throw new Error(mensagensValidacaoSimples(validacao).join(' '));
       const originais = new Map(turma.map((registro) => [String(registro.id), montarPatchPromocaoMilitar(registro)]));
       const alterados = turmaComEfeito.filter((registro) => (
-        JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao })) !== JSON.stringify(originais.get(String(registro.id)) || {})
+        JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })) !== JSON.stringify(originais.get(String(registro.id)) || {})
       ));
-      await Promise.all(alterados.map((registro) => base44.entities.PromocaoMilitar.update(registro.id, montarPatchPromocaoMilitar(registro, { promocao }))));
+      await Promise.all(alterados.map((registro) => base44.entities.PromocaoMilitar.update(registro.id, montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }))));
     },
     onSuccess: () => {
       toast({ title: 'Rascunho salvo', description: 'A lista de militares foi atualizada.' });
@@ -841,7 +849,7 @@ export default function DetalhePromocao() {
                       key={registro.id}
                       registro={registro}
                       editavel={false}
-                      promocao={promocao}
+                      promocao={promocaoReferenciaCadastro}
                       onAtualizar={atualizarRascunhoTurma}
                       onRemover={setRegistroParaRemover}
                     />
@@ -855,7 +863,7 @@ export default function DetalhePromocao() {
                         registro={registro}
                         original={original}
                         editavel
-                        promocao={promocao}
+                        promocao={promocaoReferenciaCadastro}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
                       />
