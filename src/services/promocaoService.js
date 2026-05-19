@@ -364,6 +364,79 @@ export async function reverterPublicacaoPromocaoMilitar({
   return { historicoCancelado: true, cadastroRestaurado, promocaoRecalculada: true };
 }
 
+export async function excluirCadeiaPromocaoMilitar({
+  promocaoMilitarId,
+  motivo = '',
+  entities,
+} = {}) {
+  const itemId = texto(promocaoMilitarId);
+  const motivoNormalizado = texto(motivo);
+  if (!itemId) throw new Error('Item da promoção não informado.');
+  if (!motivoNormalizado) throw new Error('Motivo da exclusão definitiva é obrigatório.');
+
+  const PromocaoMilitar = entities?.PromocaoMilitar;
+  const Promocao = entities?.Promocao;
+  const Historico = entities?.HistoricoPromocaoMilitarV2;
+  const MilitarEntity = entities?.Militar;
+
+  if (!PromocaoMilitar || typeof PromocaoMilitar.delete !== 'function') throw new Error('Entidade PromocaoMilitar indisponível para exclusão definitiva.');
+  if (!Promocao || typeof Promocao.delete !== 'function' || typeof Promocao.update !== 'function') throw new Error('Entidade Promocao indisponível para exclusão definitiva.');
+  if (!Historico || typeof Historico.delete !== 'function') throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para exclusão definitiva.');
+
+  const item = typeof PromocaoMilitar.get === 'function' ? await PromocaoMilitar.get(itemId) : null;
+  if (!item?.id) throw new Error('Item da promoção não encontrado.');
+  if (!item?.promocao_id) throw new Error('Item sem promoção vinculada.');
+
+  const statusItem = statusNormalizado(item?.status);
+  if (!(statusItem === 'cancelado' || item?.publicado === false)) {
+    throw new Error('Exclusão definitiva permitida apenas para item cancelado ou não publicado.');
+  }
+
+  const historicoId = texto(item?.historico_promocao_v2_id);
+  const historicoRegistro = historicoId && typeof Historico.get === 'function' ? await Historico.get(historicoId) : null;
+
+  const deveAvaliarRestauracaoCadastro = Boolean(item?.atualizar_cadastro_militar)
+    || statusNormalizado(item?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
+  let cadastroRestaurado = false;
+
+  if (deveAvaliarRestauracaoCadastro && MilitarEntity && typeof MilitarEntity.update === 'function' && typeof MilitarEntity.get === 'function' && historicoRegistro) {
+    const militarId = texto(item?.militar_id) || texto(item?.militar?.id);
+    const militarAtual = militarId ? await MilitarEntity.get(militarId) : null;
+    const postoAtual = texto(militarAtual?.posto_graduacao || militarAtual?.posto_graduacao_atual);
+    const quadroAtual = texto(militarAtual?.quadro || militarAtual?.quadro_atual);
+    const postoNovo = texto(historicoRegistro?.posto_graduacao_novo);
+    const quadroNovo = texto(historicoRegistro?.quadro_novo);
+    const guardaPermitiuRollback = mesmoTextoNormalizado(postoAtual, postoNovo) && mesmoTextoNormalizado(quadroAtual, quadroNovo);
+    if (guardaPermitiuRollback) {
+      await MilitarEntity.update(militarId, {
+        posto_graduacao: texto(historicoRegistro?.posto_graduacao_anterior),
+        quadro: texto(historicoRegistro?.quadro_anterior),
+      });
+      cadastroRestaurado = true;
+    }
+  }
+
+  if (historicoId) {
+    await Historico.delete(historicoId);
+  }
+
+  await PromocaoMilitar.delete(itemId);
+
+  const vinculados = typeof PromocaoMilitar.filter === 'function'
+    ? await PromocaoMilitar.filter({ promocao_id: item.promocao_id })
+    : (typeof PromocaoMilitar.list === 'function'
+      ? (await PromocaoMilitar.list()).filter((registro) => texto(registro?.promocao_id) === texto(item.promocao_id))
+      : []);
+
+  if ((vinculados || []).length === 0) {
+    await Promocao.delete(item.promocao_id);
+    return { promocaoExcluida: true, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado };
+  }
+
+  await Promocao.update(item.promocao_id, { status: statusPromocaoPosReversao(vinculados) });
+  return { promocaoExcluida: false, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado };
+}
+
 export const STATUS_TURMA_OPERACIONAL = [
   'elegivel',
   'selecionado',
