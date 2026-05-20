@@ -38,7 +38,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
-import { aplicarTemplate } from '@/components/utils/templateUtils';
+import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
 import {
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
@@ -111,6 +111,12 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const matriculaOperacional = montarLabelMilitarAtestado(atestado, { contexto: 'operacional' });
   const matriculaDocumental = montarLabelMilitarAtestado(atestado, { contexto: 'documental' });
 
+  const montarPostoNome = () => {
+    const abreviatura = abreviarPosto(atestado?.militar_posto);
+    const quadro = String(militarAtestado?.quadro || atestado?.militar_quadro || '').trim();
+    return [abreviatura, quadro].filter(Boolean).join(' ');
+  };
+
   const gerarTextoHomologacao = (form) => {
     const tmpl = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templates, {
       grupamento_id: militarAtestado?.grupamento_id,
@@ -118,7 +124,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
     });
     if (!tmpl?.template) return null;
-    const posto = `${atestado.militar_posto || ''} QOBM`;
+    const posto = montarPostoNome();
     return aplicarTemplate(tmpl.template, {
       posto_nome: posto,
       nome_completo: atestado.militar_nome,
@@ -138,7 +144,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
     });
     if (!tmpl?.template) return null;
-    const posto = `${atestado.militar_posto || ''} QOBM`;
+    const posto = montarPostoNome();
     return aplicarTemplate(tmpl.template, {
       posto_nome: posto,
       nome_completo: atestado.militar_nome,
