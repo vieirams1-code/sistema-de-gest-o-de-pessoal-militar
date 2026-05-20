@@ -1,5 +1,6 @@
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
 import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
+import { deveAtualizarCadastroMilitarPorPromocao } from '../utils/promocao/deveAtualizarCadastroMilitarPorPromocao.js';
 
 const TEXTO_VAZIO = '—';
 
@@ -211,7 +212,24 @@ export async function publicarPromocaoOficial({ promocao, itens = [], entities, 
       historico = { ...historico, ...patch };
     }
 
-    if (plano.efeito.tipo === 'imediatamente_superior') {
+    const podeAtualizarMilitar = deveAtualizarCadastroMilitarPorPromocao({
+      promocao,
+      item: {
+        ...plano.item,
+        status: 'publicado',
+        publicado: true,
+        resultado_aplicacao_cadastro: plano.efeito.tipo,
+      },
+      historico,
+      contextoPublicacao: {
+        ...contextoPublicacao,
+        publicacaoConcluida: true,
+        promocaoId: promocao?.id,
+        itemId: plano.item?.id,
+      },
+    });
+
+    if (podeAtualizarMilitar) {
       const patchMilitar = { posto_graduacao: texto(promocao.posto_graduacao) };
       if (!mesmoTextoNormalizado(plano.item.militar?.quadro || plano.item.militar?.quadro_atual, promocao.quadro)) {
         patchMilitar.quadro = texto(promocao.quadro);
