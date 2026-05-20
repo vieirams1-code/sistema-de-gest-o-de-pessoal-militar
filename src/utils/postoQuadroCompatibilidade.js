@@ -10,6 +10,9 @@ const QUADRO_ALIASES_LEGADOS = {
   'QBMP-1A': 'QBMP-1.a',
   'QBMP-1.A': 'QBMP-1.a',
   'QBMP-1ª': 'QBMP-1.a',
+  'QBMP-1B': 'QBMP-1.b',
+  'QBMP-1.B': 'QBMP-1.b',
+  'QBMP-1ºB': 'QBMP-1.b',
 };
 
 const QUADROS_COM_DESTAQUE = new Set(['QOETBM', 'QOSTBM', 'QPTBM']);
