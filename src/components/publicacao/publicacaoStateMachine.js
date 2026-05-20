@@ -54,6 +54,8 @@ export function calcularStatusPublicacaoRegistro(registro = {}) {
 }
 
 export function obterStatusCanonicoPublicacao(registro = {}) {
+  if (temDadosCompletosBg(registro)) return STATUS_PUBLICACAO.PUBLICADO;
+
   return (
     normalizarStatusPublicacao(
       registro.status_canonico ||

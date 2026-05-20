@@ -845,12 +845,16 @@ export default function CadastrarRegistroRP() {
       return criado;
     },
     onSuccess: async (resultado, payload) => {
+      const refIdApostila = String(resultado?.publicacao_referencia_id || payload?.publicacao_referencia_id || '').trim();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] }),
         queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
         queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+        queryClient.invalidateQueries({ queryKey: ['publicacoes-lista'] }),
+        queryClient.invalidateQueries({ queryKey: ['registros-militar-registros'] }),
         queryClient.invalidateQueries({ queryKey: ['militares'] }),
         queryClient.invalidateQueries({ queryKey: ['punicoes-disciplinares'] }),
+        ...(refIdApostila ? [queryClient.invalidateQueries({ queryKey: ['publicacao', refIdApostila] })] : []),
       ]);
       toast({
         title: 'Registro salvo com sucesso',

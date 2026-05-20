@@ -7,14 +7,17 @@ import {
   obterStatusCanonicoPublicacao,
 } from '../publicacaoStateMachine.js';
 
-test('obterStatusCanonicoPublicacao reutiliza status operacional normalizado antes do cálculo por campos', () => {
+test('obterStatusCanonicoPublicacao prioriza BG completo mesmo com status legado divergente', () => {
   assert.equal(
     obterStatusCanonicoPublicacao({
-      status_calculado: 'aguardando_publicacao',
-      numero_bg: '123',
-      data_bg: '2026-05-18',
+      tipo: 'Apostila',
+      status: 'aguardando_publicacao',
+      publicacao: {
+        numero_bg: '123',
+        data_bg: '2026-05-18',
+      },
     }),
-    STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO,
+    STATUS_PUBLICACAO.PUBLICADO,
   );
 });
 
