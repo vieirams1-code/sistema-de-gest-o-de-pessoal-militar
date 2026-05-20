@@ -95,7 +95,7 @@ export default function Promocoes() {
       if (bloqueio) throw new Error(bloqueio);
       const vinculadosAtuais = await listarPromocaoMilitarVinculados(promocao.id);
       if ((vinculadosAtuais || []).length > 0) {
-        throw new Error('Exclusão bloqueada: a promoção possui militares vinculados em PromocaoMilitar.');
+        throw new Error('Exclusão bloqueada: remova primeiro os militares da turma em rascunho/na promoção.');
       }
       await base44.entities.Promocao.delete(promocao.id);
     },

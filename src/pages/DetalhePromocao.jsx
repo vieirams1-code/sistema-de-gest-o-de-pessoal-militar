@@ -40,7 +40,6 @@ import {
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
   valorOuTraco,
-  simularImpactoCadeiaPromocoes,
   isPromocaoFormacaoTerceiroSargento,
 } from '@/services/promocaoService';
 import { getSugestaoAtualizacaoCadastro } from '@/utils/postoGraduacaoHierarquia';
@@ -290,7 +289,7 @@ function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRe
                   Remover
                 </Button>
               )
-            ) : isAdmin && (statusNormalizado(registro.status) === 'cancelado' || registro.publicado === false) ? (
+            ) : isAdmin && statusNormalizado(registro.status) === 'cancelado' ? (
               <Button size="sm" variant="destructive" onClick={() => onExcluirDefinitivo({ ...registro, militar })}>
                 Excluir definitivamente
               </Button>
@@ -329,8 +328,6 @@ export default function DetalhePromocao() {
   const [observacaoReversao, setObservacaoReversao] = useState('');
   const [modalAdicionarAberto, setModalAdicionarAberto] = useState(false);
   const [buscaAdicionar, setBuscaAdicionar] = useState('');
-  const [militarImpactoId, setMilitarImpactoId] = useState('');
-  const [ordemImpactoBase, setOrdemImpactoBase] = useState('');
   const [ordemManualAdicionar, setOrdemManualAdicionar] = useState({});
 
   const promocaoQuery = useQuery({
@@ -380,22 +377,6 @@ export default function DetalhePromocao() {
     promocaoConsolidada ? { ...promocaoConsolidada, ...montarPatchPromocao(rascunhoPromocao) } : promocaoConsolidada
   ), [promocaoConsolidada, rascunhoPromocao]);
   const militarPorId = useMemo(() => montarMilitarPorId(militaresQuery.data || []), [militaresQuery.data]);
-
-  const previewImpactoCadeia = useMemo(() => {
-    if (!promocao || !militarImpactoId || !ordemImpactoBase) return null;
-    try {
-      return simularImpactoCadeiaPromocoes({
-        promocaoBase: promocao,
-        militarId: militarImpactoId,
-        ordemSugeridaBase: Number(ordemImpactoBase),
-        promocoes: promocoesQuery.data || [],
-        promocaoMilitar: promocaoMilitarQuery.data || [],
-        militarPorId,
-      });
-    } catch (error) {
-      return { promocoesAfetadas: [], alertas: [error.message] };
-    }
-  }, [militarImpactoId, militarPorId, ordemImpactoBase, promocao, promocaoMilitarQuery.data, promocoesQuery.data]);
 
   const historicosVinculados = useMemo(() => {
     if (!promocao) return [];
@@ -613,7 +594,7 @@ export default function DetalhePromocao() {
       if (bloqueio) throw new Error(bloqueio);
       const vinculadosAtuais = await listarPromocaoMilitarVinculados(promocao.id);
       if ((vinculadosAtuais || []).length > 0) {
-        throw new Error('Exclusão bloqueada: a promoção possui militares vinculados em PromocaoMilitar.');
+        throw new Error('Exclusão bloqueada: remova primeiro os militares da turma em rascunho/na promoção.');
       }
       await base44.entities.Promocao.delete(promocao.id);
     },
@@ -1021,25 +1002,6 @@ export default function DetalhePromocao() {
                   {promocaoFormacaoTerceiro
                     ? <p className="mt-1 text-xs text-blue-700">Promoção de formação: informe a classificação de cada militar na turma.</p>
                     : <p className="mt-1 text-xs text-slate-500">Edição manual da ordem permanece somente leitura para promoções sucessivas.</p> }
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-sm font-semibold text-slate-700">Simulador de impacto da cadeia (somente leitura)</p>
-                  <div className="mt-2 grid gap-2 md:grid-cols-3">
-                    <Input placeholder="ID militar" value={militarImpactoId} onChange={(e) => setMilitarImpactoId(e.target.value)} />
-                    <Input type="number" placeholder="Ordem sugerida base" value={ordemImpactoBase} onChange={(e) => setOrdemImpactoBase(e.target.value)} />
-                  </div>
-                  {previewImpactoCadeia && (
-                    <div className="mt-2 space-y-2 text-xs">
-                      {(previewImpactoCadeia.alertas || []).map((a) => <p key={a} className="text-amber-700">• {a}</p>)}
-                      {(previewImpactoCadeia.promocoesAfetadas || []).map((p) => (
-                        <div key={p.promocao_id} className="rounded border bg-white p-2">
-                          <p className="font-semibold">{p.promocao_rotulo}</p>
-                          {p.militaresDeslocados.map((d) => <p key={d.militar_id}>{d.nome || d.militar_id}: #{d.ordemAtual} → #{d.ordemSugerida}</p>)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
                 </div>
                 <div className="flex gap-2">
                   {!promocaoFormacaoTerceiro && (
