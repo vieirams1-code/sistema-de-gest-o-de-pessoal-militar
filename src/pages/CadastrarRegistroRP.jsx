@@ -51,6 +51,16 @@ function nomeEntidadePorModulo(modulo) {
   return modulo === MODULO_LIVRO ? 'RegistroLivro' : 'PublicacaoExOfficio';
 }
 
+function resolverReferenciaApostila(formData = {}, criado = {}) {
+  return {
+    refId: formData.publicacao_referencia_id || criado.publicacao_referencia_id || '',
+    origemTipo:
+      formData.publicacao_referencia_origem_tipo ||
+      criado.publicacao_referencia_origem_tipo ||
+      'ex-officio',
+  };
+}
+
 function montarResumoEdicaoCamposPublicacao(antes = {}, depois = {}) {
   const campos = ['nota_para_bg', 'numero_bg', 'data_bg'];
   const alterados = campos.filter((campo) => String(antes[campo] || '') !== String(depois[campo] || ''));
@@ -777,6 +787,24 @@ export default function CadastrarRegistroRP() {
       await atualizarEscopado('PublicacaoExOfficio', criado.id, {
         historico_publicacao: anexarEventoAuditoriaPublicacao(criado, eventoCriacao),
       });
+
+      const isApostila = String(criado?.tipo || payloadExOfficio?.tipo || '').trim() === 'Apostila';
+      if (isApostila) {
+        const { refId, origemTipo } = resolverReferenciaApostila(data, criado);
+        if (refId) {
+          const entityNameOriginal = origemTipo === 'livro' ? 'RegistroLivro' : origemTipo === 'atestado' ? 'Atestado' : 'PublicacaoExOfficio';
+          const entityOriginal = origemTipo === 'livro' ? base44.entities.RegistroLivro : origemTipo === 'atestado' ? base44.entities.Atestado : base44.entities.PublicacaoExOfficio;
+          const [original] = await entityOriginal.filter({ id: refId });
+
+          if (original) {
+            const payloadOriginal = {
+              apostilada_por_id: criado.id,
+              foi_apostilada: true,
+            };
+            await atualizarEscopado(entityNameOriginal, refId, payloadOriginal);
+          }
+        }
+      }
       return criado;
     },
     onSuccess: async (resultado, payload) => {

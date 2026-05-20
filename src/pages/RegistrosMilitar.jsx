@@ -39,6 +39,11 @@ import {
   militarCorrespondeBusca,
   montarIndiceMatriculas,
 } from '@/services/matriculaMilitarViewService';
+import {
+  calcularStatusPublicacaoRegistro,
+  normalizarStatusPublicacao,
+  STATUS_PUBLICACAO,
+} from '@/components/publicacao/publicacaoStateMachine';
 
 function normalizarDataISO(valor) {
   if (!valor) return '';
@@ -85,7 +90,13 @@ function extrairDescricao(registro) {
 }
 
 function getStatusPublicacaoLabel(registro) {
-  return String(registro?.status_publicacao || registro?.status || '').trim() || 'Sem status';
+  const statusInformado =
+    normalizarStatusPublicacao(registro?.status_canonico) ||
+    normalizarStatusPublicacao(registro?.status_calculado) ||
+    normalizarStatusPublicacao(registro?.status_publicacao) ||
+    normalizarStatusPublicacao(registro?.status);
+  if (statusInformado) return statusInformado;
+  return calcularStatusPublicacaoRegistro(registro);
 }
 
 function toSearch(value) {
@@ -237,9 +248,12 @@ export default function RegistrosMilitar() {
 
     return registros
       .map((registro) => {
+        const notaParaBgNormalizada = String(registro?.nota_para_bg || registro?.publicacao?.nota_para_bg || '').trim();
+        const numeroBgNormalizado = String(registro?.numero_bg || registro?.publicacao?.numero_bg || '').trim();
+        const dataBgNormalizada = String(registro?.data_bg || registro?.publicacao?.data_bg || '').trim();
         const militar = militaresPorId[registro?.militar_id] || {};
         const dataEvento = normalizarDataISO(
-          registro?.data_evento || registro?.data_publicacao || registro?.data_bg || registro?.created_date,
+          registro?.data_evento || registro?.data_publicacao || dataBgNormalizada || registro?.created_date,
         );
 
         const nomeRegistro = String(registro?.militar_nome || '').trim();
@@ -263,7 +277,7 @@ export default function RegistrosMilitar() {
           registro?.matricula_legado,
           tipoRegistro,
           registro?.materia_legado,
-          registro?.numero_bg,
+          numeroBgNormalizado,
           descricaoCompleta,
           registro?.texto_publicacao,
           statusPublicacao,
@@ -280,17 +294,20 @@ export default function RegistrosMilitar() {
           militar?.nome_completo,
           militar?.nome_guerra,
         ].filter(Boolean).join(' '));
-        const numeroBgBusca = toSearch(registro?.numero_bg);
+        const numeroBgBusca = toSearch(numeroBgNormalizado);
         const tipoBgLegado = String(registro?.tipo_bg_legado || '').trim();
         const materiaLegado = String(registro?.materia_legado || '').trim();
         const classificacaoPendente = registro?.classificacao_pendente === true;
-        const publicado = toSearch(statusPublicacao) === 'publicado';
-        const comBg = Boolean(String(registro?.numero_bg || '').trim());
+        const publicado = statusPublicacao === STATUS_PUBLICACAO.PUBLICADO;
+        const comBg = Boolean(numeroBgNormalizado);
         const isEditavelExcluivel = canManageAdminActions;
         const isLegadoNaoClassificado = origemRegistro === 'legado' && (!tipoRegistro || classificacaoPendente);
 
         return {
           ...registro,
+          nota_para_bg: notaParaBgNormalizada,
+          numero_bg: numeroBgNormalizado,
+          data_bg: dataBgNormalizada,
           dataEvento,
           descricao: descricaoCompleta,
           militarNome,
@@ -300,7 +317,7 @@ export default function RegistrosMilitar() {
           textoBusca,
           matriculaBusca,
           nomeMilitarBusca,
-          numeroBgBusca,
+          numeroBgBusca: toSearch(numeroBgNormalizado),
           tipoBgLegado,
           materiaLegado,
           classificacaoPendente,
