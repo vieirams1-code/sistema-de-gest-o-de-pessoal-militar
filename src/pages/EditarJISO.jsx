@@ -23,8 +23,16 @@ import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
 import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
+import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 
 export default function EditarJISO() {
+  // GOVERNANÇA TEMPLATE:
+  // source_of_truth = render_on_submit
+  // edit_mode = imutavel
+  const TEMPLATE_GOVERNANCA = {
+    source_of_truth: TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT,
+    edit_mode: TEMPLATE_EDIT_MODE.IMUTAVEL,
+  };
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const atestadoId = searchParams.get('atestado_id');
@@ -458,6 +466,11 @@ export default function EditarJISO() {
                   Texto Gerado para Publicação (Ata JISO)
                 </h3>
               </div>
+              <p className="mb-3 text-[11px] text-slate-500">
+                {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT
+                  ? 'Texto recalculado ao salvar.'
+                  : 'Texto oficial persistido.'}
+              </p>
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                   {textoPublicacao}

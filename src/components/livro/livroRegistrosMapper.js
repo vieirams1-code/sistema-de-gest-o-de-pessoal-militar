@@ -3,6 +3,16 @@ import { getTipoRegistroLabel } from '@/components/livro/livroTipoRegistroConfig
 import { aplicarTemplate, buildVarsLivro, resolveQuadroTemplate } from '@/components/utils/templateUtils';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { getTipoFeriasOperacional, resolverTipoFeriasCanonico } from '@/components/ferias/feriasTipoResolver';
+import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+
+// GOVERNANÇA TEMPLATE (Leitura de Livro):
+// source_of_truth = persistido (preferencial), com fallback render_on_read
+// edit_mode = imutavel
+export const LIVRO_LEITURA_TEMPLATE_GOVERNANCA = {
+  source_of_truth_preferencial: TEMPLATE_SOURCE_OF_TRUTH.PERSISTIDO,
+  source_of_truth_fallback: TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_READ,
+  edit_mode: TEMPLATE_EDIT_MODE.IMUTAVEL,
+};
 
 const STATUS_LABELS = {
   ativo: 'Ativo',

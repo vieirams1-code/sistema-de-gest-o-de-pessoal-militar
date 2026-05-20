@@ -1,6 +1,15 @@
 import { base44 } from '@/api/base44Client';
 import { getTextoPublicacaoRegistro, mapLivroRegistrosPresenter } from '@/components/livro/livroRegistrosMapper';
 import { mapLivroRegistrosMetricasRP } from '@/components/livro/livroMetricasMapper';
+import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+
+// GOVERNANÇA TEMPLATE (Livro persistido):
+// source_of_truth = persistido
+// edit_mode = imutavel
+export const LIVRO_PERSISTIDO_TEMPLATE_GOVERNANCA = {
+  source_of_truth: TEMPLATE_SOURCE_OF_TRUTH.PERSISTIDO,
+  edit_mode: TEMPLATE_EDIT_MODE.IMUTAVEL,
+};
 
 function emptyLivroPresenterContrato() {
   return mapLivroRegistrosPresenter({ registros: [], militares: [], ferias: [], periodos: [] });
