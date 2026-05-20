@@ -557,7 +557,7 @@ export default function DetalhePromocao() {
       });
       return { sincronizacao };
     },
-    onSuccess: async (resultado) => {
+    onSuccess: async (resultado, registroPromocao) => {
       setPromocaoBaseComparacao((atual) => (atual ? { ...atual, ...montarPatchPromocao(rascunhoPromocao) } : atual));
       const totalSincronizado = Number(resultado?.sincronizacao?.atualizados) || 0;
       const descricao = totalSincronizado > 0
@@ -664,7 +664,7 @@ export default function DetalhePromocao() {
         entities: base44.entities,
       });
     },
-    onSuccess: async (resultado) => {
+    onSuccess: async (resultado, registroPromocao) => {
       toast({
         title: 'Exclusão definitiva concluída',
         description: resultado?.promocaoExcluida ? 'Item removido e promoção vazia excluída.' : 'Item removido definitivamente da cadeia da promoção.',
@@ -690,7 +690,7 @@ export default function DetalhePromocao() {
         usuario: user,
       });
     },
-    onSuccess: async (resultado) => {
+    onSuccess: async (resultado, registroPromocao) => {
       const partes = ['Histórico cancelado'];
       if (resultado?.cadastroRestaurado) partes.push('Cadastro restaurado');
       partes.push('Promoção reaberta');
@@ -700,11 +700,11 @@ export default function DetalhePromocao() {
       setMotivoReversao('');
       setObservacaoReversao('');
       await invalidarDados();
-      if (registro?.militar_id) {
-        await queryClient.invalidateQueries({ queryKey: ['militar', registro.militar_id] });
-        await queryClient.invalidateQueries({ queryKey: ['ver-historico-promocoes', registro.militar_id] });
-        await queryClient.refetchQueries({ queryKey: ['militar', registro.militar_id], type: 'active' });
-        await queryClient.refetchQueries({ queryKey: ['ver-historico-promocoes', registro.militar_id], type: 'active' });
+      if (registroPromocao?.militar_id) {
+        await queryClient.invalidateQueries({ queryKey: ['militar', registroPromocao.militar_id] });
+        await queryClient.invalidateQueries({ queryKey: ['ver-historico-promocoes', registroPromocao.militar_id] });
+        await queryClient.refetchQueries({ queryKey: ['militar', registroPromocao.militar_id], type: 'active' });
+        await queryClient.refetchQueries({ queryKey: ['ver-historico-promocoes', registroPromocao.militar_id], type: 'active' });
       }
       await queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
     },
