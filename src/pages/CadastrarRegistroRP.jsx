@@ -41,6 +41,7 @@ import {
   normalizarStatusPublicacao,
   validarPayloadPublicacao,
 } from '@/components/publicacao/publicacaoStateMachine';
+import { montarPayloadOriginalApostilada, resolverReferenciaApostila } from '@/components/publicacao/apostilaUtils';
 
 
 function mapearEntityPublicacaoPorModulo(modulo) {
@@ -51,15 +52,6 @@ function nomeEntidadePorModulo(modulo) {
   return modulo === MODULO_LIVRO ? 'RegistroLivro' : 'PublicacaoExOfficio';
 }
 
-function resolverReferenciaApostila(formData = {}, criado = {}) {
-  return {
-    refId: formData.publicacao_referencia_id || criado.publicacao_referencia_id || '',
-    origemTipo:
-      formData.publicacao_referencia_origem_tipo ||
-      criado.publicacao_referencia_origem_tipo ||
-      'ex-officio',
-  };
-}
 
 function montarResumoEdicaoCamposPublicacao(antes = {}, depois = {}) {
   const campos = ['nota_para_bg', 'numero_bg', 'data_bg'];
@@ -829,16 +821,29 @@ export default function CadastrarRegistroRP() {
       if (isApostila) {
         const { refId, origemTipo } = resolverReferenciaApostila(data, criado);
         if (refId) {
-          const entityNameOriginal = origemTipo === 'livro' ? 'RegistroLivro' : origemTipo === 'atestado' ? 'Atestado' : 'PublicacaoExOfficio';
-          const entityOriginal = origemTipo === 'livro' ? base44.entities.RegistroLivro : origemTipo === 'atestado' ? base44.entities.Atestado : base44.entities.PublicacaoExOfficio;
-          const [original] = await entityOriginal.filter({ id: refId });
+          const candidatosOrigem = [origemTipo, 'livro', 'ex-officio', 'atestado']
+            .filter(Boolean)
+            .filter((tipo, idx, arr) => arr.indexOf(tipo) === idx);
 
-          if (original) {
-            const payloadOriginal = {
-              apostilada_por_id: criado.id,
-              foi_apostilada: true,
-            };
-            await atualizarEscopado(entityNameOriginal, refId, payloadOriginal);
+          const resolverRegistroPorOrigem = async (tipo) => {
+            const entityNameOriginal = tipo === 'livro' ? 'RegistroLivro' : tipo === 'atestado' ? 'Atestado' : 'PublicacaoExOfficio';
+            const entityOriginal = tipo === 'livro' ? base44.entities.RegistroLivro : tipo === 'atestado' ? base44.entities.Atestado : base44.entities.PublicacaoExOfficio;
+            const [original] = await entityOriginal.filter({ id: refId });
+            return original ? { entityNameOriginal, original } : null;
+          };
+
+          let alvoOriginal = null;
+          for (const tipo of candidatosOrigem) {
+            alvoOriginal = await resolverRegistroPorOrigem(tipo);
+            if (alvoOriginal) break;
+          }
+
+          if (alvoOriginal?.original) {
+            await atualizarEscopado(
+              alvoOriginal.entityNameOriginal,
+              refId,
+              montarPayloadOriginalApostilada(criado.id),
+            );
           }
         }
       }

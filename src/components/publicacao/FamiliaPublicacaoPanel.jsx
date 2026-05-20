@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { obterStatusCanonicoPublicacao } from '@/components/publicacao/publicacaoStateMachine';
+import { calcularFoiApostilada } from '@/components/publicacao/apostilaUtils';
 
 const statusColors = {
   'Aguardando Nota': 'bg-amber-100 text-amber-700',
@@ -233,11 +234,11 @@ export default function FamiliaPublicacaoPanel({ registro, todosRegistros, onClo
   const foiInvalidada = !!raiz.tornada_sem_efeito_por_id || !!tseRaiz;
 
   // foiApostilada: só se houver apostila ativa (sem TSE)
-  const apostilaAtiva = apostilas.find(ap => !ap.tornada_sem_efeito_por_id);
-  const foiApostilada =
-    !!apostilaAtiva ||
-    (!!raiz.apostilada_por_id &&
-      !tsesPorApostila.some(x => x.apostila.id === raiz.apostilada_por_id && x.tse));
+  const foiApostilada = calcularFoiApostilada({
+    raiz,
+    apostilas,
+    tsesPorApostila,
+  });
 
   const raizStatus = obterStatusCanonicoPublicacao(raiz);
   const raizTipoLabel = getTipoLabel(raiz);
