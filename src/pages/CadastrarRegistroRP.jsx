@@ -153,6 +153,7 @@ function formatarDataExtenso(dataStr) {
 function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, publicacoesDisponiveis = [] } = {}) {
   const postoBase = formData.militar_posto || militar?.posto_graduacao || militar?.posto || '';
   const postoAbreviado = abreviarPosto(postoBase);
+  const quadroBase = String(formData.militar_quadro || militar?.quadro || militar?.militar_quadro || '').trim();
   const dataRegistro = formData.data_registro || formData.data_publicacao || '';
 
   const dadosPublicacaoReferencia = extrairDadosPublicacaoReferencia({ formData, publicacoesDisponiveis });
@@ -166,8 +167,9 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, pub
     matricula: formData.militar_matricula || militar?.matricula || '',
     militar_posto: postoBase,
     posto: postoAbreviado,
-    posto_nome: postoAbreviado ? `${postoAbreviado} QOBM` : '',
+    posto_nome: [postoAbreviado, quadroBase].filter(Boolean).join(' '),
     posto_graduacao: postoBase,
+    quadro: quadroBase,
     data_registro: formatDateBR(dataRegistro),
     data_publicacao: formatDateBR(dataRegistro),
     data_bg: formatDateBR(formData.data_bg),
