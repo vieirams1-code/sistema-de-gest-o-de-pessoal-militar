@@ -526,6 +526,8 @@ export default function RegistroLivroModal({
       interrupcaoInfo
     });
 
+    // Proteção operacional: este texto é re-renderizado de forma determinística a cada
+    // alteração de dados do formulário (fluxo TEMPLATE_IMUTAVEL/RENDER_LAZY).
     setTextoPublicacao(aplicarTemplate(tmpl.template, vars));
   }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar]);
 
@@ -821,6 +823,9 @@ export default function RegistroLivroModal({
                 <RefreshCw className="w-3 h-3" /> Gerado automaticamente
               </span>
             </div>
+            <p className="mb-2 text-xs text-slate-500">
+              Este texto é recalculado automaticamente quando as datas/tipo forem alterados.
+            </p>
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg min-h-[100px]">
               <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                 {textoPublicacao || 'Nenhum texto gerado.'}

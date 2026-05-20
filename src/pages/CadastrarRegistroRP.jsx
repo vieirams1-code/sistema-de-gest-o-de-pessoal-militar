@@ -1338,7 +1338,14 @@ export default function CadastrarRegistroRP() {
                   />
                 </div>
                 <div className="mt-4">
-                  <Label className="text-sm font-medium text-slate-700">Texto de Publicação</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-slate-700">Texto de Publicação</Label>
+                    {textoEditadoManualmente && (
+                      <span className="text-xs font-medium text-amber-700">
+                        Texto alterado manualmente
+                      </span>
+                    )}
+                  </div>
                   <Textarea
                     value={formData.texto_publicacao || ''}
                     onChange={e => {
