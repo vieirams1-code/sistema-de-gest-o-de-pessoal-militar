@@ -53,9 +53,12 @@ function montarErroPublicacao(mensagens) {
   return erro;
 }
 
-function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoesPendentes = false, temAlteracoesPendentes = false } = {}) {
+function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoesPendentes = false, temAlteracoesPendentes = false, contextoPublicacao = {} } = {}) {
   const bloqueios = [];
-  const promocaoInicioCadeia = isPromocaoInicioCadeia(promocao);
+  const promocaoInicioCadeia = typeof contextoPublicacao?.promocaoInicio === 'boolean' ? contextoPublicacao.promocaoInicio : isPromocaoInicioCadeia(promocao);
+  const promocaoSucessiva = typeof contextoPublicacao?.promocaoSucessiva === 'boolean' ? contextoPublicacao.promocaoSucessiva : !promocaoInicioCadeia;
+  const statusOperacional = statusNormalizado(contextoPublicacao?.statusOperacional || '');
+  const fonteOrdem = statusNormalizado(contextoPublicacao?.fonteOrdem || '');
 
   if (!promocao || !texto(promocao.id)) bloqueios.push('Promoção não carregada.');
   if (STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(promocao?.status))) bloqueios.push('Promoção já publicada/consolidada.');
@@ -64,6 +67,15 @@ function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoe
   if (!texto(promocao?.quadro)) bloqueios.push('Informe o quadro destino antes de publicar.');
   if (!Array.isArray(itens) || itens.length === 0) bloqueios.push('Inclua ao menos um militar antes de publicar.');
   if (!permitirAlteracoesPendentes && temAlteracoesPendentes) bloqueios.push('Salve as alterações pendentes antes de publicar.');
+
+
+
+  if (promocaoSucessiva && fonteOrdem === 'manual') {
+    bloqueios.push('Promoção sucessiva não permite ordem manual como fonte primária.');
+  }
+  if (promocaoSucessiva && statusOperacional === 'historica' && fonteOrdem && fonteOrdem !== 'historico_v2_temporal') {
+    bloqueios.push('Promoção sucessiva histórica exige ordenação por histórico V2 temporal.');
+  }
 
   const ordens = new Set();
   const militares = new Set();
@@ -163,8 +175,8 @@ function patchDocumentalFaltante(historico = {}, payload = {}) {
   return patch;
 }
 
-export async function publicarPromocaoOficial({ promocao, itens = [], entities, temAlteracoesPendentes = false } = {}) {
-  const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes });
+export async function publicarPromocaoOficial({ promocao, itens = [], entities, temAlteracoesPendentes = false, contextoPublicacao = {} } = {}) {
+  const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes, contextoPublicacao });
   if (!validacao.valido) throw montarErroPublicacao(validacao.bloqueios);
 
   const Historico = entities?.HistoricoPromocaoMilitarV2;

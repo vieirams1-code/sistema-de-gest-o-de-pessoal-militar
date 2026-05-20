@@ -895,6 +895,7 @@ export default function DetalhePromocao() {
         itens: itensPublicacao,
         entities: base44.entities,
         temAlteracoesPendentes,
+        contextoPublicacao,
       });
     },
     onSuccess: async (resultado) => {
@@ -928,11 +929,20 @@ export default function DetalhePromocao() {
     ...registro,
     militar: turma.find((item) => String(item.id) === String(registro.id))?.militar || registro.militar || null,
   })), [rascunhoTurma, turma]);
+  const contextoPublicacao = useMemo(() => {
+    const historica = isPromocaoHistorica(promocaoReferenciaCadastro || {});
+    return {
+      ...promocaoContext,
+      ordemManualObrigatoria: Boolean(promocaoContext?.promocaoInicio),
+      fonteOrdem: promocaoContext?.promocaoInicio ? 'manual' : (historica ? 'historico_v2_temporal' : 'lista_atual'),
+    };
+  }, [promocaoContext, promocaoReferenciaCadastro]);
   const validacaoPublicacao = useMemo(() => validarPublicacaoPromocao({
     promocao: promocaoReferenciaCadastro,
     itens: itensValidacaoPublicacao,
     temAlteracoesPendentes,
-  }), [itensValidacaoPublicacao, promocaoReferenciaCadastro, temAlteracoesPendentes]);
+    contextoPublicacao,
+  }), [itensValidacaoPublicacao, promocaoReferenciaCadastro, temAlteracoesPendentes, contextoPublicacao]);
   const publicarBloqueado = isLoading || salvando || !validacaoPublicacao.valido;
   const bloqueioPublicarTexto = publicarBloqueado
     ? (isLoading ? 'Carregando dados da promoção.' : validacaoPublicacao.bloqueios[0] || 'Revise a promoção antes de publicar.')
