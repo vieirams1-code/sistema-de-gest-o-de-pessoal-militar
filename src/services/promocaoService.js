@@ -34,6 +34,19 @@ export function isPromocaoFormacaoTerceiroSargento(postoGraduacao = '') {
   );
 }
 
+export function isPromocaoInicioCadeia(promocao = {}) {
+  const posto = promocao?.posto_graduacao || promocao;
+  const normalizadoCanonico = normalizarPostoGraduacao(posto);
+  const textoNormalizado = normalizar(posto);
+
+  return (
+    normalizadoCanonico.includes('soldado')
+    || normalizadoCanonico.includes('cabo')
+    || isPromocaoFormacaoTerceiroSargento(posto)
+    || textoNormalizado.includes('terceiro sargento')
+  );
+}
+
 function montarErroPublicacao(mensagens) {
   const erro = new Error([...new Set(mensagens)].join(' '));
   erro.bloqueios = [...new Set(mensagens)];
@@ -42,7 +55,7 @@ function montarErroPublicacao(mensagens) {
 
 function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoesPendentes = false, temAlteracoesPendentes = false } = {}) {
   const bloqueios = [];
-  const promocaoFormacaoTerceiro = isPromocaoFormacaoTerceiroSargento(promocao?.posto_graduacao);
+  const promocaoInicioCadeia = isPromocaoInicioCadeia(promocao);
 
   if (!promocao || !texto(promocao.id)) bloqueios.push('Promoção não carregada.');
   if (STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(promocao?.status))) bloqueios.push('Promoção já publicada/consolidada.');
@@ -75,7 +88,7 @@ function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoe
       ordens.add(chaveOrdem);
     }
     if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) bloqueios.push(`${linha}: item bloqueado/cancelado/retificado não pode ser publicado.`);
-    if (!promocaoFormacaoTerceiro) {
+    if (!promocaoInicioCadeia) {
       if (efeito.tipo === 'incompativel') bloqueios.push(`${linha}: militar incompatível com o posto/graduação destino.`);
       if (efeito.tipo === 'revisao') bloqueios.push(`${linha}: militar em revisão cadastral.`);
     }
@@ -606,7 +619,7 @@ export function avaliarAlertasTurmaOperacional(itens = []) {
 }
 
 export function validarSalvarTurmaOperacional(itens = [], { promocao } = {}) {
-  const promocaoFormacaoTerceiro = isPromocaoFormacaoTerceiroSargento(promocao?.posto_graduacao);
+  const promocaoInicioCadeia = isPromocaoInicioCadeia(promocao);
   const { alertasPorId, alertasGlobais } = avaliarAlertasTurmaOperacional(itens);
   const bloqueios = [...alertasGlobais];
 
@@ -616,7 +629,7 @@ export function validarSalvarTurmaOperacional(itens = [], { promocao } = {}) {
     });
   });
 
-  const temIncompatibilidadeCadastro = !promocaoFormacaoTerceiro && itens.some((item) => {
+  const temIncompatibilidadeCadastro = !promocaoInicioCadeia && itens.some((item) => {
     const promocaoReferencia = promocao || item?.promocao;
     if (!promocaoReferencia || !item?.militar) return false;
     return getSugestaoAtualizacaoCadastro({
