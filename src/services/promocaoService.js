@@ -638,6 +638,92 @@ export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, 
   };
 }
 
+function chaveDesempateMilitar(militar = {}, militarId = '') {
+  return [texto(militar?.nome_completo), texto(militar?.matricula), texto(militarId)].join('|').toLowerCase();
+}
+
+export function postoGraduacaoBaseAnterior(postoGraduacaoAtual = '') {
+  const atual = normalizarPostoGraduacao(postoGraduacaoAtual);
+  if (!atual || atual.includes('3º sargento') || atual.includes('3o sargento')) return '';
+  const indiceAtual = POSTOS_GRADUACOES_HIERARQUIA.findIndex((posto) => posto === atual);
+  if (indiceAtual <= 0) return '';
+  return POSTOS_GRADUACOES_HIERARQUIA[indiceAtual - 1];
+}
+
+export function calcularInsercaoPorAntiguidadeAnterior({
+  promocao = {},
+  militar = {},
+  turmaAtual = [],
+  historicos = [],
+  militares = [],
+} = {}) {
+  const alertas = [];
+  const postoBaseAnterior = postoGraduacaoBaseAnterior(promocao?.posto_graduacao);
+  if (!postoBaseAnterior) {
+    return {
+      ordemSugerida: null,
+      baseAnterior: null,
+      deslocamentos: [],
+      alertas: ['Promoção de formação ou sem posto-base anterior: manter ordem manual.'],
+      podeAdicionar: true,
+    };
+  }
+
+  const militarId = texto(militar?.id);
+  const historicoBase = (historicos || [])
+    .filter((h) => statusNormalizado(h?.status_registro) === 'ativo')
+    .filter((h) => texto(h?.militar_id) === militarId)
+    .filter((h) => normalizarPostoGraduacao(h?.posto_graduacao_novo) === postoBaseAnterior)
+    .sort((a, b) => texto(b?.data_promocao).localeCompare(texto(a?.data_promocao)))[0];
+
+  if (!historicoBase) {
+    return { ordemSugerida: null, baseAnterior: null, deslocamentos: [], alertas: ['Sem histórico ativo no posto anterior esperado.'], podeAdicionar: false };
+  }
+
+  const referencia = {
+    militar_id: militarId,
+    data_promocao: texto(historicoBase?.data_promocao),
+    classificacao: Number(historicoBase?.antiguidade_referencia_ordem || 0),
+    desempate: chaveDesempateMilitar(militar, militarId),
+  };
+
+  const militarPorId = new Map((militares || []).map((m) => [texto(m?.id), m]));
+  const ordenados = (turmaAtual || []).filter((item) => Number(item?.ordem) > 0).sort((a, b) => Number(a.ordem) - Number(b.ordem));
+  let posicao = ordenados.length;
+  for (let i = 0; i < ordenados.length; i += 1) {
+    const item = ordenados[i];
+    const hist = (historicos || [])
+      .filter((h) => statusNormalizado(h?.status_registro) === 'ativo')
+      .filter((h) => texto(h?.militar_id) === texto(item?.militar_id))
+      .filter((h) => normalizarPostoGraduacao(h?.posto_graduacao_novo) === postoBaseAnterior)
+      .sort((a, b) => texto(b?.data_promocao).localeCompare(texto(a?.data_promocao)))[0];
+    if (!hist) continue;
+    const cmpData = texto(hist?.data_promocao).localeCompare(referencia.data_promocao);
+    const cmpClassificacao = Number(hist?.antiguidade_referencia_ordem || 0) - referencia.classificacao;
+    const cmpDesempate = chaveDesempateMilitar(militarPorId.get(texto(item?.militar_id)), texto(item?.militar_id)).localeCompare(referencia.desempate);
+    if (cmpData > 0 || (cmpData === 0 && cmpClassificacao > 0) || (cmpData === 0 && cmpClassificacao === 0 && cmpDesempate > 0)) {
+      posicao = i;
+      break;
+    }
+  }
+  const ordemSugerida = posicao + 1;
+  const deslocamentos = ordenados
+    .filter((item) => Number(item?.ordem) >= ordemSugerida)
+    .map((item) => ({ id: item.id, militar_id: item.militar_id, ordemAtual: Number(item.ordem), ordemSugerida: Number(item.ordem) + 1 }));
+
+  return {
+    ordemSugerida,
+    baseAnterior: {
+      posto: postoBaseAnterior,
+      dataPromocao: texto(historicoBase?.data_promocao),
+      classificacao: referencia.classificacao,
+    },
+    deslocamentos,
+    alertas,
+    podeAdicionar: true,
+  };
+}
+
 
 export function resultadoAplicacaoCadastro(efeitoOuAtualizar) {
   if (typeof efeitoOuAtualizar === 'object' && efeitoOuAtualizar !== null) {

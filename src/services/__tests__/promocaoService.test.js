@@ -20,6 +20,7 @@ import {
   reverterPublicacaoPromocaoMilitar,
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
+  calcularInsercaoPorAntiguidadeAnterior,
 } from '../promocaoService.js';
 
 test('exclusão definitiva remove histórico, item e exclui promoção quando ficar vazia', async () => {
@@ -1141,3 +1142,44 @@ test('serviço de publicação não altera motor da Prévia Geral nem snapshots'
 function detalleSemEspacos(valor) {
   return valor.replace(/\s+/g, '');
 }
+
+test('calcular inserção em 2º Sgt usa base 3º Sgt e desloca posteriores', () => {
+  const resultado = calcularInsercaoPorAntiguidadeAnterior({
+    promocao: { posto_graduacao: '2º Sgt' },
+    militar: { id: 'm-novo', nome_completo: 'Novo', matricula: '999' },
+    turmaAtual: [{ id: 'pm-1', militar_id: 'm-1', ordem: 1 }, { id: 'pm-2', militar_id: 'm-2', ordem: 2 }],
+    militares: [{ id: 'm-1', nome_completo: 'A', matricula: '001' }, { id: 'm-2', nome_completo: 'B', matricula: '002' }],
+    historicos: [
+      { militar_id: 'm-1', status_registro: 'ativo', posto_graduacao_novo: '3º Sgt', data_promocao: '2016-11-28', antiguidade_referencia_ordem: 25 },
+      { militar_id: 'm-2', status_registro: 'ativo', posto_graduacao_novo: '3º Sgt', data_promocao: '2016-11-28', antiguidade_referencia_ordem: 32 },
+      { militar_id: 'm-novo', status_registro: 'ativo', posto_graduacao_novo: '3º Sgt', data_promocao: '2016-11-28', antiguidade_referencia_ordem: 27 },
+    ],
+  });
+  assert.equal(resultado.ordemSugerida, 2);
+  assert.match(resultado.baseAnterior.posto, /3º/i);
+  assert.equal(resultado.deslocamentos.length, 1);
+  assert.equal(resultado.deslocamentos[0].ordemSugerida, 3);
+});
+
+test('promoção 3º Sgt sem base anterior retorna alerta', () => {
+  const resultado = calcularInsercaoPorAntiguidadeAnterior({
+    promocao: { posto_graduacao: '3º Sargento' },
+    militar: { id: 'm-novo' },
+    turmaAtual: [],
+    historicos: [],
+  });
+  assert.equal(resultado.ordemSugerida, null);
+  assert.equal(resultado.podeAdicionar, false);
+  assert.ok(resultado.alertas.length > 0);
+});
+
+test('sem histórico base anterior gera alerta e bloqueia adição automática', () => {
+  const resultado = calcularInsercaoPorAntiguidadeAnterior({
+    promocao: { posto_graduacao: '2º Sgt' },
+    militar: { id: 'm-novo' },
+    turmaAtual: [],
+    historicos: [],
+  });
+  assert.equal(resultado.podeAdicionar, false);
+  assert.match(resultado.alertas[0], /Sem histórico ativo/);
+});
