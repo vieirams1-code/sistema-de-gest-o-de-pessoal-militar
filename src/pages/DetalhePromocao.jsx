@@ -224,6 +224,7 @@ function MilitarCard({
   registro,
   original,
   promocao,
+  promocaoInicioCadeia,
   onAtualizar,
   onRemover,
   onExcluirDefinitivo,
@@ -239,8 +240,10 @@ function MilitarCard({
   const nomeGuerra = valorOuTraco(militar?.nome_guerra);
   const efeitoCadastro = efeitoCadastroVisualPorRegistro({ registro, militar, promocao });
   const resultadoCadastro = resultadoAplicacaoCadastro(efeitoCadastro);
-  const promocaoInicio = isPromocaoInicioCadeia(promocao);
-  const ordemEditavel = promocaoInicio && !registro.publicado && statusNormalizado(registro.status) !== 'publicado';
+  const ordemEditavel =
+    promocaoInicioCadeia &&
+    !Boolean(registro.publicado) &&
+    !['publicado', 'publicada', 'consolidado', 'consolidada', 'cancelado', 'retificado'].includes(statusNormalizado(registro.status));
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
@@ -297,16 +300,6 @@ function MilitarCard({
             const canceladoOuRetificado = statusRegistro === 'cancelado' || statusRegistro === 'retificado';
             const ocultarRemover = publicado || ['cancelado', 'retificado', 'publicado'].includes(statusRegistro);
             const podeRemover = !ocultarRemover;
-            console.log({
-              id: registro.id,
-              statusOriginal: registro.status,
-              statusNormalizado: statusRegistro,
-              publicado: registro.publicado,
-              podeRemover,
-              canceladoOuRetificado,
-              ordemEditavel,
-            });
-
             if (publicado) {
               return canReverterPublicacao ? (
                 <Button size="sm" variant="destructive" onClick={() => onReverterPublicacao({ ...registro, militar })} disabled={acaoEmAndamento}>
@@ -525,13 +518,16 @@ export default function DetalhePromocao() {
     { promocao: promocaoReferenciaCadastro },
   ), [promocaoReferenciaCadastro, rascunhoTurma]);
   const mensagensValidacao = useMemo(() => mensagensValidacaoSimples(validacaoSalvarTurma), [validacaoSalvarTurma]);
+  const promocaoContextoAtual = useMemo(() => ({
+    ...promocao,
+    ...rascunhoPromocao,
+    posto_graduacao: rascunhoPromocao.posto_graduacao || promocao?.posto_graduacao,
+    quadro: rascunhoPromocao.quadro || promocao?.quadro,
+  }), [promocao, rascunhoPromocao]);
+
   const promocaoInicioCadeia = useMemo(
-    () => isPromocaoInicioCadeia(promocaoReferenciaCadastro),
-    [promocaoReferenciaCadastro],
-  );
-  const mostrarOrdenacaoAutomatica = useMemo(
-    () => !isPromocaoInicioCadeia(promocaoReferenciaCadastro),
-    [promocaoReferenciaCadastro],
+    () => isPromocaoInicioCadeia(promocaoContextoAtual),
+    [promocaoContextoAtual],
   );
   const rascunhoTurmaOrdenado = useMemo(() => (
     [...rascunhoTurma].sort((a, b) => {
@@ -951,10 +947,10 @@ export default function DetalhePromocao() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Promoção</p>
           <h1 className="text-3xl font-bold text-slate-900">
-            Promoção para {valorOuTraco(promocao?.posto_graduacao)}
+            Promoção para {valorOuTraco(promocaoContextoAtual?.posto_graduacao)}
           </h1>
           <p className="mt-2 text-slate-700">
-            {valorOuTraco(promocao?.quadro)} • {listaExibida.length} militares
+            {valorOuTraco(promocaoContextoAtual?.quadro)} • {listaExibida.length} militares
           </p>
           <p className="mt-1 text-sm text-slate-500">
             {rotuloBoletim(promocao?.boletim_referencia)} • {dataFormatada(promocao?.data_publicacao || promocao?.data_promocao)}
@@ -1083,7 +1079,7 @@ export default function DetalhePromocao() {
                     : <p className="mt-1 text-xs text-slate-500">Edição manual da ordem permanece somente leitura para promoções sucessivas.</p> }
                 </div>
                 <div className="flex gap-2">
-                  {mostrarOrdenacaoAutomatica && (
+                  {!promocaoInicioCadeia && (
                     <Button
                       variant="outline"
                       onClick={() => ordenarPelaListaAtualMutation.mutate()}
@@ -1134,7 +1130,8 @@ export default function DetalhePromocao() {
                         registro={registro}
                         original={original}
                         acaoEmAndamento={removerMutation.isPending || excluirDefinitivoMutation.isPending || reverterPublicacaoMutation.isPending}
-                        promocao={promocaoReferenciaCadastro}
+                        promocao={promocaoContextoAtual}
+                        promocaoInicioCadeia={promocaoInicioCadeia}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
                         onExcluirDefinitivo={setRegistroParaExcluirDefinitivo}
