@@ -224,7 +224,6 @@ function MilitarCard({
   registro,
   original,
   promocao,
-  editavel,
   onAtualizar,
   onRemover,
   onExcluirDefinitivo,
@@ -240,15 +239,16 @@ function MilitarCard({
   const nomeGuerra = valorOuTraco(militar?.nome_guerra);
   const efeitoCadastro = efeitoCadastroVisualPorRegistro({ registro, militar, promocao });
   const resultadoCadastro = resultadoAplicacaoCadastro(efeitoCadastro);
+  const promocaoInicio = isPromocaoInicioCadeia(promocao);
+  const ordemEditavel = promocaoInicio && !registro.publicado && statusNormalizado(registro.status) !== 'publicado';
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <div className="xl:w-24 xl:shrink-0">
           <p className="sr-only">Ordem</p>
-          {editavel ? (
+          {ordemEditavel ? (
             <div className="flex h-12 w-24 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-3 text-blue-700 shadow-sm">
-              <span className="text-lg font-bold">#</span>
               <Input
                 className="h-10 border-0 bg-transparent px-1 text-center text-lg font-bold shadow-none focus-visible:ring-0"
                 type="number"
@@ -304,7 +304,7 @@ function MilitarCard({
               publicado: registro.publicado,
               podeRemover,
               canceladoOuRetificado,
-              editavel,
+              ordemEditavel,
             });
 
             if (publicado) {
@@ -527,6 +527,10 @@ export default function DetalhePromocao() {
   const mensagensValidacao = useMemo(() => mensagensValidacaoSimples(validacaoSalvarTurma), [validacaoSalvarTurma]);
   const promocaoInicioCadeia = useMemo(
     () => isPromocaoInicioCadeia(promocaoReferenciaCadastro),
+    [promocaoReferenciaCadastro],
+  );
+  const mostrarOrdenacaoAutomatica = useMemo(
+    () => !isPromocaoInicioCadeia(promocaoReferenciaCadastro),
     [promocaoReferenciaCadastro],
   );
   const rascunhoTurmaOrdenado = useMemo(() => (
@@ -1079,7 +1083,7 @@ export default function DetalhePromocao() {
                     : <p className="mt-1 text-xs text-slate-500">Edição manual da ordem permanece somente leitura para promoções sucessivas.</p> }
                 </div>
                 <div className="flex gap-2">
-                  {!promocaoInicioCadeia && (
+                  {mostrarOrdenacaoAutomatica && (
                     <Button
                       variant="outline"
                       onClick={() => ordenarPelaListaAtualMutation.mutate()}
@@ -1129,7 +1133,6 @@ export default function DetalhePromocao() {
                         key={registro.id}
                         registro={registro}
                         original={original}
-                        editavel={promocaoInicioCadeia && !registro.publicado && !['publicado', 'publicada', 'consolidado', 'consolidada'].includes(statusNormalizado(promocao?.status))}
                         acaoEmAndamento={removerMutation.isPending || excluirDefinitivoMutation.isPending || reverterPublicacaoMutation.isPending}
                         promocao={promocaoReferenciaCadastro}
                         onAtualizar={atualizarRascunhoTurma}
