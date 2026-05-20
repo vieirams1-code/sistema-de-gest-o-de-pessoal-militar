@@ -24,6 +24,7 @@ import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { calcularMetricasPublicacao, listarAtestadosPublicacaoEscopo, listarPublicacoesExOfficioEscopo } from '@/services/publicacoesPainelService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
+import { calcularFoiApostilada, calcularFoiTornadaSemEfeito } from '@/components/publicacao/apostilaUtils';
 import {
   anexarEventoAuditoriaPublicacao,
   calcularStatusPublicacaoRegistro,
@@ -272,6 +273,29 @@ function montarPayloadAtualizacao(registroAtual, dataParcial, tipo, opcoes = {})
   }
   if (tipo === 'atestado') return { ...(dataParcial || {}), status_publicacao: statusCalculado };
   return { ...(dataParcial || {}), status: statusCalculado };
+}
+
+function enriquecerMarcadoresFamilia(registro, todosRegistros) {
+  if (!registro?.id) return registro;
+  const apostilas = todosRegistros.filter(
+    (r) => r.publicacao_referencia_id === registro.id && r.tipo === 'Apostila',
+  );
+  const tseRaiz = registro.tornada_sem_efeito_por_id
+    ? todosRegistros.find((r) => r.id === registro.tornada_sem_efeito_por_id)
+    : todosRegistros.find((r) => r.publicacao_referencia_id === registro.id && r.tipo === 'Tornar sem Efeito');
+
+  const tsesPorApostila = apostilas.map((ap) => {
+    const tse = ap.tornada_sem_efeito_por_id
+      ? todosRegistros.find((r) => r.id === ap.tornada_sem_efeito_por_id)
+      : todosRegistros.find((r) => r.publicacao_referencia_id === ap.id && r.tipo === 'Tornar sem Efeito');
+    return { apostila: ap, tse: tse || null };
+  });
+
+  return {
+    ...registro,
+    marcador_apostilada: calcularFoiApostilada({ raiz: registro, apostilas, tsesPorApostila }),
+    marcador_tornada_sem_efeito: calcularFoiTornadaSemEfeito({ raiz: registro, tseRaiz }),
+  };
 }
 
 function isFeriasOperacional(registro) {
@@ -721,10 +745,12 @@ export default function Publicacoes() {
                 <section key={grupo.key} className="space-y-3">
                   <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${grupo.border} ${grupo.bg}`}><span className={`text-sm font-bold ${grupo.color}`}>{grupo.label}</span><span className={`text-xs ${grupo.color} opacity-70`}>{items.length} registro(s)</span></div>
                   <div className="space-y-3">
-                    {items.map((registro) => (
+                    {items.map((registro) => {
+                      const registroComMarcadores = enriquecerMarcadoresFamilia(registro, todosRegistros);
+                      return (
                       <PublicacaoCard
                         key={registro.id}
-                        registro={registro}
+                        registro={registroComMarcadores}
                         onUpdate={handleUpdate}
                         onDelete={handleDelete}
                         onVerFamilia={() => setFamiliaPanel({ open: true, registro })}
@@ -732,7 +758,8 @@ export default function Publicacoes() {
                         modoAdmin={modoAdmin}
                         isAdmin={isAdmin}
                       />
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               );

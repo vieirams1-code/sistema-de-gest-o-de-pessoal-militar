@@ -167,6 +167,20 @@ export default function PublicacaoCard({ registro, onUpdate, onDelete, onVerFami
             {registro.status_calculado || currentStatus}
           </Badge>
         </div>
+        {(registro.marcador_apostilada || registro.marcador_tornada_sem_efeito) && (
+          <div className="flex flex-wrap gap-2">
+            {registro.marcador_apostilada && (
+              <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
+                Apostilada
+              </Badge>
+            )}
+            {registro.marcador_tornada_sem_efeito && (
+              <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700">
+                Tornada sem Efeito
+              </Badge>
+            )}
+          </div>
+        )}
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-lg border bg-slate-50 p-3">

@@ -39,3 +39,8 @@ export function calcularFoiApostilada({ raiz = {}, apostilas = [], tsesPorAposti
   );
   return !apostilaFoiInvalidada;
 }
+
+export function calcularFoiTornadaSemEfeito({ raiz = {}, tseRaiz = null } = {}) {
+  if (tseRaiz) return true;
+  return Boolean(raiz?.foi_tornada_sem_efeito || raiz?.tornada_sem_efeito_por_id);
+}

@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { calcularFoiApostilada, montarPayloadOriginalApostilada } from '../apostilaUtils.js';
+import {
+  calcularFoiApostilada,
+  calcularFoiTornadaSemEfeito,
+  montarPayloadOriginalApostilada,
+} from '../apostilaUtils.js';
 
 test('calcularFoiApostilada considera campos da original quando há vínculo ativo', () => {
   const raiz = { id: 'orig-1', foi_apostilada: true, apostilada_por_id: 'ap-1' };
@@ -20,4 +24,9 @@ test('montarPayloadOriginalApostilada gera update esperado da publicação origi
     apostilada_por_id: 'ap-55',
     foi_apostilada: true,
   });
+});
+
+test('calcularFoiTornadaSemEfeito considera vínculo familiar direto de TSE', () => {
+  const raiz = { id: 'orig-1', foi_tornada_sem_efeito: false, tornada_sem_efeito_por_id: null };
+  assert.equal(calcularFoiTornadaSemEfeito({ raiz, tseRaiz: { id: 'tse-2' } }), true);
 });
