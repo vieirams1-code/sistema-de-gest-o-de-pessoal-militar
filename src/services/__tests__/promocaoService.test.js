@@ -1183,3 +1183,17 @@ test('sem histórico base anterior gera alerta e bloqueia adição automática',
   assert.equal(resultado.podeAdicionar, false);
   assert.match(resultado.alertas[0], /Sem histórico ativo/);
 });
+
+test('desempate por data de nascimento mantém militar mais velho antes', () => {
+  const resultado = calcularInsercaoPorAntiguidadeAnterior({
+    promocao: { posto_graduacao: '2º Sgt' },
+    militar: { id: 'm-novo', data_nascimento: '1990-01-01', matricula: '100' },
+    turmaAtual: [{ id: 'pm-1', militar_id: 'm-1', ordem: 1 }],
+    militares: [{ id: 'm-1', data_nascimento: '1985-01-01', matricula: '001' }],
+    historicos: [
+      { militar_id: 'm-1', status_registro: 'ativo', posto_graduacao_novo: '3º Sgt', data_promocao: '2016-11-28', antiguidade_referencia_ordem: 25 },
+      { militar_id: 'm-novo', status_registro: 'ativo', posto_graduacao_novo: '3º Sgt', data_promocao: '2016-11-28', antiguidade_referencia_ordem: 25 },
+    ],
+  });
+  assert.equal(resultado.ordemSugerida, 2);
+});

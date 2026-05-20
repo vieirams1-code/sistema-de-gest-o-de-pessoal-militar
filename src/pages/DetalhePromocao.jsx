@@ -966,7 +966,8 @@ export default function DetalhePromocao() {
               <CardHeader className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <CardTitle>Militares da Promoção ({listaExibida.length})</CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">Adicione militares e confira a ordem operacional da promoção.</p>
+                  <p className="mt-1 text-sm text-slate-500">Ordem calculada pela antiguidade anterior.</p>
+                  <p className="mt-1 text-xs text-slate-500">Edição manual da ordem está temporariamente somente leitura neste lote (TODO: habilitar apenas para admin com justificativa).</p>
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="text-sm font-semibold text-slate-700">Simulador de impacto da cadeia (somente leitura)</p>
                   <div className="mt-2 grid gap-2 md:grid-cols-3">
@@ -1027,7 +1028,7 @@ export default function DetalhePromocao() {
                         key={registro.id}
                         registro={registro}
                         original={original}
-                        editavel
+                        editavel={false}
                         promocao={promocaoReferenciaCadastro}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}

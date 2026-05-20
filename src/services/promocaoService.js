@@ -639,12 +639,16 @@ export function montarPayloadAdicaoManualTurma({ promocao = {}, historico = {}, 
 }
 
 function chaveDesempateMilitar(militar = {}, militarId = '') {
-  return [texto(militar?.nome_completo), texto(militar?.matricula), texto(militarId)].join('|').toLowerCase();
+  return [texto(militar?.matricula), texto(militarId)].join('|').toLowerCase();
 }
 
 export function postoGraduacaoBaseAnterior(postoGraduacaoAtual = '') {
   const atual = normalizarPostoGraduacao(postoGraduacaoAtual);
   if (!atual || atual.includes('3º sargento') || atual.includes('3o sargento')) return '';
+  if (atual.includes('2º ten') || atual.includes('2o ten') || atual.includes('2º tenente') || atual.includes('2o tenente')) return 'subtenente';
+  if (atual.includes('subtenente')) return '1º sargento';
+  if (atual.includes('1º sargento') || atual.includes('1o sargento')) return '2º sargento';
+  if (atual.includes('2º sargento') || atual.includes('2o sargento')) return '3º sargento';
   const indiceAtual = POSTOS_GRADUACOES_HIERARQUIA.findIndex((posto) => posto === atual);
   if (indiceAtual <= 0) return '';
   return POSTOS_GRADUACOES_HIERARQUIA[indiceAtual - 1];
@@ -684,6 +688,7 @@ export function calcularInsercaoPorAntiguidadeAnterior({
     militar_id: militarId,
     data_promocao: texto(historicoBase?.data_promocao),
     classificacao: Number(historicoBase?.antiguidade_referencia_ordem || 0),
+    data_nascimento: texto(militar?.data_nascimento),
     desempate: chaveDesempateMilitar(militar, militarId),
   };
 
@@ -700,8 +705,15 @@ export function calcularInsercaoPorAntiguidadeAnterior({
     if (!hist) continue;
     const cmpData = texto(hist?.data_promocao).localeCompare(referencia.data_promocao);
     const cmpClassificacao = Number(hist?.antiguidade_referencia_ordem || 0) - referencia.classificacao;
-    const cmpDesempate = chaveDesempateMilitar(militarPorId.get(texto(item?.militar_id)), texto(item?.militar_id)).localeCompare(referencia.desempate);
-    if (cmpData > 0 || (cmpData === 0 && cmpClassificacao > 0) || (cmpData === 0 && cmpClassificacao === 0 && cmpDesempate > 0)) {
+    const militarDaTurma = militarPorId.get(texto(item?.militar_id));
+    const cmpNascimento = texto(militarDaTurma?.data_nascimento).localeCompare(referencia.data_nascimento);
+    const cmpDesempate = chaveDesempateMilitar(militarDaTurma, texto(item?.militar_id)).localeCompare(referencia.desempate);
+    if (
+      cmpData > 0
+      || (cmpData === 0 && cmpClassificacao > 0)
+      || (cmpData === 0 && cmpClassificacao === 0 && cmpNascimento > 0)
+      || (cmpData === 0 && cmpClassificacao === 0 && cmpNascimento === 0 && cmpDesempate > 0)
+    ) {
       posicao = i;
       break;
     }
