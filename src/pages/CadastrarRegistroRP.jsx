@@ -107,10 +107,45 @@ function extrairDadosPublicacaoReferencia({ formData = {}, publicacoesDisponivei
   };
 }
 
+function parseDataBGReferencia(dataStr) {
+  if (!dataStr) return null;
+  const valor = String(dataStr).trim();
+  if (!valor || valor === '-') return null;
+
+  const isoMatch = valor.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const [, ano, mes, dia] = isoMatch;
+    const data = new Date(Number(ano), Number(mes) - 1, Number(dia));
+    if (
+      data.getFullYear() === Number(ano)
+      && data.getMonth() === Number(mes) - 1
+      && data.getDate() === Number(dia)
+    ) {
+      return data;
+    }
+    return null;
+  }
+
+  const brMatch = valor.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) {
+    const [, dia, mes, ano] = brMatch;
+    const data = new Date(Number(ano), Number(mes) - 1, Number(dia));
+    if (
+      data.getFullYear() === Number(ano)
+      && data.getMonth() === Number(mes) - 1
+      && data.getDate() === Number(dia)
+    ) {
+      return data;
+    }
+  }
+
+  return null;
+}
+
 function formatarDataExtenso(dataStr) {
-  if (!dataStr) return '';
-  const d = new Date(dataStr + 'T00:00:00');
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const data = parseDataBGReferencia(dataStr);
+  if (!data) return '';
+  return data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
 function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, publicacoesDisponiveis = [] } = {}) {
@@ -119,6 +154,7 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, pub
   const dataRegistro = formData.data_registro || formData.data_publicacao || '';
 
   const dadosPublicacaoReferencia = extrairDadosPublicacaoReferencia({ formData, publicacoesDisponiveis });
+  const dataBgRefExtenso = formatarDataExtenso(dadosPublicacaoReferencia.data_bg_ref);
 
   const variaveis = {
     ...formData,
@@ -152,6 +188,7 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, pub
     usuario_nome: user?.full_name || user?.name || '',
     usuario_email: user?.email || '',
     ...dadosPublicacaoReferencia,
+    data_bg_ref: dataBgRefExtenso || dadosPublicacaoReferencia.data_bg_ref,
   };
 
   return variaveis;
