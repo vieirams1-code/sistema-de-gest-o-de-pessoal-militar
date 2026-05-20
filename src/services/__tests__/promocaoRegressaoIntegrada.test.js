@@ -159,3 +159,93 @@ test('exclusão definitiva: não publicado remove, publicado bloqueia, cancelado
   };
   await assert.rejects(() => excluirCadeiaPromocaoMilitar({ promocaoMilitarId: 'pm-2', motivo: 'x', entities: entitiesPublicado }), /publicad/);
 });
+
+test('lote 7 cadeia complexa: retificar/republicar, reverter/republicar, promoção coletiva parcial, dupla promoção sequencial e coexistência histórico cancelado+ativo', async () => {
+  const historicos = [];
+  const promocaoMilitarStore = new Map();
+  const promocoes = new Map();
+  const militares = new Map();
+  const idHistorico = () => `hist-${historicos.length + 1}`;
+
+  const entities = {
+    HistoricoPromocaoMilitarV2: {
+      list: async () => historicos,
+      get: async (id) => historicos.find((h) => h.id === id) || null,
+      create: async (payload) => {
+        const novo = { id: idHistorico(), ...payload };
+        historicos.push(novo);
+        return novo;
+      },
+      update: async (id, patch) => {
+        const idx = historicos.findIndex((h) => h.id === id);
+        historicos[idx] = { ...historicos[idx], ...patch };
+      },
+    },
+    PromocaoMilitar: {
+      update: async (id, patch) => promocaoMilitarStore.set(id, { ...(promocaoMilitarStore.get(id) || {}), ...patch }),
+    },
+    Promocao: {
+      update: async (id, patch) => promocoes.set(id, { ...(promocoes.get(id) || {}), ...patch }),
+    },
+    Militar: {
+      get: async (id) => militares.get(id),
+      update: async (id, patch) => militares.set(id, { ...militares.get(id), ...patch }),
+    },
+  };
+
+  // 1) publicar → retificar(manual) → republicar (novo ato, mesma graduação/quadro)
+  const promocaoA = { id: 'promo-a', posto_graduacao: '2º Sgt', quadro: 'QPPM', data_promocao: '2026-01-10', status: 'rascunho' };
+  const itemA = { id: 'pm-a', militar_id: 'm-a', ordem: 1, status: 'elegivel', publicado: false, militar: { posto_graduacao: '3º Sgt', quadro: 'QPPM' } };
+  await publicarPromocaoOficial({ promocao: promocaoA, itens: [itemA], entities });
+  const histA1 = historicos.find((h) => h.promocao_id === 'promo-a');
+  await entities.HistoricoPromocaoMilitarV2.update(histA1.id, { status_registro: 'retificado', motivo_retificacao: 'erro material' });
+  const promocaoA2 = { ...promocaoA, id: 'promo-a2', data_promocao: '2026-01-11' };
+  await publicarPromocaoOficial({ promocao: promocaoA2, itens: [{ ...itemA, id: 'pm-a2', publicado: false }], entities });
+  assert.equal(historicos.filter((h) => h.militar_id === 'm-a' && h.status_registro === 'ativo').length, 1);
+
+  // 2) publicar → reverter → republicar
+  militares.set('m-b', { id: 'm-b', posto_graduacao: 'Subtenente', quadro: 'QPPM' });
+  const promocaoB = { id: 'promo-b', posto_graduacao: 'Subtenente', quadro: 'QPPM', data_promocao: '2026-02-01', status: 'publicada' };
+  const itemB = { id: 'pm-b', militar_id: 'm-b', ordem: 2, status: 'publicado', publicado: true, atualizar_cadastro_militar: true, militar: { posto_graduacao: '1º Sgt', quadro: 'QPPM' } };
+  await publicarPromocaoOficial({ promocao: { ...promocaoB, id: 'promo-b-seed', status: 'rascunho' }, itens: [{ ...itemB, id: 'pm-b-seed', publicado: false, status: 'elegivel' }], entities });
+  const histB1 = historicos.findLast((h) => h.militar_id === 'm-b' && h.status_registro === 'ativo');
+  await reverterPublicacaoPromocaoMilitar({ promocao: promocaoB, item: { ...itemB, historico_promocao_v2_id: histB1.id }, itensPromocao: [itemB], entities, motivo: 'ajuste legal' });
+  await publicarPromocaoOficial({ promocao: { ...promocaoB, id: 'promo-b2', status: 'rascunho', data_promocao: '2026-02-02' }, itens: [{ ...itemB, id: 'pm-b2', publicado: false, status: 'elegivel' }], entities });
+  assert.equal(historicos.filter((h) => h.militar_id === 'm-b' && h.status_registro === 'ativo').length, 1);
+
+  // 3) promoção coletiva parcial + 5) ordem manual antes/depois publicação
+  const promocaoC = { id: 'promo-c', posto_graduacao: '2º Sgt', quadro: 'QPPM', data_promocao: '2026-03-01', status: 'rascunho' };
+  const itensC = [
+    { id: 'pm-c1', militar_id: 'm-c1', ordem: 10, status: 'elegivel', publicado: false, militar: { posto_graduacao: '3º Sgt', quadro: 'QPPM' } },
+    { id: 'pm-c2', militar_id: 'm-c2', ordem: 11, status: 'cancelado', publicado: false, militar: { posto_graduacao: '3º Sgt', quadro: 'QPPM' } },
+  ];
+  await assert.rejects(() => publicarPromocaoOficial({ promocao: promocaoC, itens: itensC, entities }), /bloqueado\/cancelado\/retificado/);
+  await publicarPromocaoOficial({ promocao: promocaoC, itens: [itensC[0]], entities });
+  const histC1 = historicos.findLast((h) => h.militar_id === 'm-c1');
+  assert.equal(histC1.antiguidade_referencia_ordem, 10);
+  await entities.PromocaoMilitar.update('pm-c1', { ordem: 12 }); // alteração manual após publicar
+  assert.equal(promocaoMilitarStore.get('pm-c1').ordem, 12);
+
+  // 4) militar promovido duas vezes seguidas: 3º Sgt -> 2º Sgt -> 1º Sgt
+  const militarSeq = { id: 'm-seq', posto_graduacao: '3º Sgt', quadro: 'QPPM' };
+  militares.set('m-seq', militarSeq);
+  await publicarPromocaoOficial({
+    promocao: { id: 'promo-d1', posto_graduacao: '2º Sgt', quadro: 'QPPM', data_promocao: '2026-04-01', status: 'rascunho' },
+    itens: [{ id: 'pm-d1', militar_id: 'm-seq', ordem: 20, status: 'elegivel', publicado: false, militar: militarSeq }],
+    entities,
+  });
+  await publicarPromocaoOficial({
+    promocao: { id: 'promo-d2', posto_graduacao: '1º Sgt', quadro: 'QPPM', data_promocao: '2026-05-01', status: 'rascunho' },
+    itens: [{ id: 'pm-d2', militar_id: 'm-seq', ordem: 4, status: 'elegivel', publicado: false, militar: { id: 'm-seq', posto_graduacao: '2º Sgt', quadro: 'QPPM' } }],
+    entities,
+  });
+  const seqAtivos = historicos.filter((h) => h.militar_id === 'm-seq' && h.status_registro === 'ativo');
+  assert.equal(seqAtivos.length, 2);
+  assert.equal(seqAtivos[0].posto_graduacao_novo, '2º Sgt');
+  assert.equal(seqAtivos[1].posto_graduacao_novo, '1º Sgt');
+
+  // 6) coexistência de histórico cancelado com histórico ativo
+  const histosB = historicos.filter((h) => h.militar_id === 'm-b');
+  assert.equal(histosB.some((h) => h.status_registro === 'cancelado'), true);
+  assert.equal(histosB.some((h) => h.status_registro === 'ativo'), true);
+});
