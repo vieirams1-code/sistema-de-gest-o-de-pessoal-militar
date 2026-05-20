@@ -61,16 +61,64 @@ function montarResumoEdicaoCamposPublicacao(antes = {}, depois = {}) {
 const TEMPLATE_CONFLITO_MENSAGEM =
   'Conflito de template detectado para este tipo. Verifique os templates cadastrados.';
 
+
+function normalizarNumeroOpcional(value) {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  const texto = String(value).trim();
+  if (!texto) return undefined;
+  const numero = Number(texto.replace(',', '.'));
+  return Number.isFinite(numero) ? numero : undefined;
+}
+
+function extrairDadosPublicacaoReferencia({ formData = {}, publicacoesDisponiveis = [] } = {}) {
+  const referenciaSelecionada = publicacoesDisponiveis.find((p) => p.id === formData.publicacao_referencia_id) || {};
+  const registroPublicacao = referenciaSelecionada.publicacao || referenciaSelecionada.registro || {};
+
+  const numeroBg =
+    formData.publicacao_referencia_numero_bg ||
+    referenciaSelecionada.numero_bg ||
+    registroPublicacao.numero_bg ||
+    registroPublicacao?.publicacao?.numero_bg ||
+    formData.numero_bg_ref ||
+    '';
+
+  const dataBg =
+    formData.publicacao_referencia_data_bg ||
+    referenciaSelecionada.data_bg ||
+    registroPublicacao.data_bg ||
+    registroPublicacao?.publicacao?.data_bg ||
+    formData.data_bg_ref ||
+    '';
+
+  const notaRef =
+    formData.publicacao_referencia_nota ||
+    referenciaSelecionada.nota_para_bg ||
+    referenciaSelecionada.nota_ref ||
+    registroPublicacao.nota_para_bg ||
+    registroPublicacao?.publicacao?.nota_para_bg ||
+    formData.nota_ref ||
+    '';
+
+  return {
+    numero_bg_ref: numeroBg || '-',
+    data_bg_ref: dataBg || '-',
+    nota_ref: notaRef || '-',
+  };
+}
+
 function formatarDataExtenso(dataStr) {
   if (!dataStr) return '';
   const d = new Date(dataStr + 'T00:00:00');
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {} } = {}) {
+function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, publicacoesDisponiveis = [] } = {}) {
   const postoBase = formData.militar_posto || militar?.posto_graduacao || militar?.posto || '';
   const postoAbreviado = abreviarPosto(postoBase);
   const dataRegistro = formData.data_registro || formData.data_publicacao || '';
+
+  const dadosPublicacaoReferencia = extrairDadosPublicacaoReferencia({ formData, publicacoesDisponiveis });
 
   const variaveis = {
     ...formData,
@@ -103,6 +151,7 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {} } = 
     unidade_id: militar?.unidade_id || formData.unidade_id || '',
     usuario_nome: user?.full_name || user?.name || '',
     usuario_email: user?.email || '',
+    ...dadosPublicacaoReferencia,
   };
 
   return variaveis;
@@ -603,6 +652,7 @@ export default function CadastrarRegistroRP() {
         formData,
         militar: militarSelecionado,
         user,
+        publicacoesDisponiveis: publicacoesMilitar,
       }),
     );
 
@@ -834,11 +884,14 @@ export default function CadastrarRegistroRP() {
       return;
     }
 
+    const diasPunicaoNormalizado = normalizarNumeroOpcional(formData.dias_punicao);
     const payload = {
       ...formData,
       status: statusCalculadoFormulario,
       ...(Object.keys(camposCustom).length > 0 ? { campos_custom: camposCustom } : {}),
     };
+    if (diasPunicaoNormalizado === undefined) delete payload.dias_punicao;
+    else payload.dias_punicao = diasPunicaoNormalizado;
     isSubmittingRef.current = true;
     saveMutation.mutate(payload);
   };
