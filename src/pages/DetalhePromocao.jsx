@@ -357,22 +357,6 @@ export default function DetalhePromocao() {
   });
 
 
-  const previewImpactoCadeia = useMemo(() => {
-    if (!promocao || !militarImpactoId || !ordemImpactoBase) return null;
-    try {
-      return simularImpactoCadeiaPromocoes({
-        promocaoBase: promocao,
-        militarId: militarImpactoId,
-        ordemSugeridaBase: Number(ordemImpactoBase),
-        promocoes: promocoesQuery.data || [],
-        promocaoMilitar: promocaoMilitarQuery.data || [],
-        militarPorId,
-      });
-    } catch (error) {
-      return { promocoesAfetadas: [], alertas: [error.message] };
-    }
-  }, [militarImpactoId, militarPorId, ordemImpactoBase, promocao, promocaoMilitarQuery.data, promocoesQuery.data]);
-
   const militaresQuery = useQuery({
     queryKey: ['detalhe-promocao-militares'],
     queryFn: () => base44.entities.Militar.list(),
@@ -389,6 +373,22 @@ export default function DetalhePromocao() {
     promocaoConsolidada ? { ...promocaoConsolidada, ...montarPatchPromocao(rascunhoPromocao) } : promocaoConsolidada
   ), [promocaoConsolidada, rascunhoPromocao]);
   const militarPorId = useMemo(() => montarMilitarPorId(militaresQuery.data || []), [militaresQuery.data]);
+
+  const previewImpactoCadeia = useMemo(() => {
+    if (!promocao || !militarImpactoId || !ordemImpactoBase) return null;
+    try {
+      return simularImpactoCadeiaPromocoes({
+        promocaoBase: promocao,
+        militarId: militarImpactoId,
+        ordemSugeridaBase: Number(ordemImpactoBase),
+        promocoes: promocoesQuery.data || [],
+        promocaoMilitar: promocaoMilitarQuery.data || [],
+        militarPorId,
+      });
+    } catch (error) {
+      return { promocoesAfetadas: [], alertas: [error.message] };
+    }
+  }, [militarImpactoId, militarPorId, ordemImpactoBase, promocao, promocaoMilitarQuery.data, promocoesQuery.data]);
 
   const historicosVinculados = useMemo(() => {
     if (!promocao) return [];
