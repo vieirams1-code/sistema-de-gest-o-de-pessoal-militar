@@ -266,6 +266,52 @@ function statusPromocaoPosReversao(itens = []) {
   return 'publicada';
 }
 
+async function restaurarCadastroMilitarDaPromocao({
+  item,
+  historico,
+  militar,
+  entities,
+  contexto = 'rollback',
+} = {}) {
+  const deveRestaurarCadastro = Boolean(item?.atualizar_cadastro_militar)
+    || statusNormalizado(item?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
+  if (!deveRestaurarCadastro) return { exigiaRollback: false, cadastroRestaurado: false };
+
+  if (!historico?.id) {
+    throw new Error(`Rollback cadastral bloqueado (${contexto}): histórico oficial da promoção não foi encontrado.`);
+  }
+
+  const MilitarEntity = entities?.Militar;
+  if (!MilitarEntity || typeof MilitarEntity.get !== 'function' || typeof MilitarEntity.update !== 'function') {
+    throw new Error(`Entidade Militar indisponível para rollback cadastral (${contexto}).`);
+  }
+
+  const militarId = texto(item?.militar_id) || texto(item?.militar?.id) || texto(militar?.id);
+  if (!militarId) {
+    throw new Error(`Rollback cadastral bloqueado (${contexto}): item sem militar vinculado.`);
+  }
+
+  const militarAtual = await MilitarEntity.get(militarId);
+  if (!militarAtual?.id) {
+    throw new Error(`Rollback cadastral bloqueado (${contexto}): militar vinculado não encontrado.`);
+  }
+
+  const postoAtual = texto(militarAtual?.posto_graduacao);
+  const quadroAtual = texto(militarAtual?.quadro);
+  const postoNovo = texto(historico?.posto_graduacao_novo);
+  const quadroNovo = texto(historico?.quadro_novo);
+  const coincideComHistoricoPublicado = mesmoTextoNormalizado(postoAtual, postoNovo) && mesmoTextoNormalizado(quadroAtual, quadroNovo);
+  if (!coincideComHistoricoPublicado) {
+    throw new Error(`Rollback cadastral bloqueado (${contexto}): cadastro atual do militar diverge do posto/quadro publicado nesta promoção.`);
+  }
+
+  await MilitarEntity.update(militarId, {
+    posto_graduacao: texto(historico?.posto_graduacao_anterior),
+    quadro: texto(historico?.quadro_anterior),
+  });
+  return { exigiaRollback: true, cadastroRestaurado: true };
+}
+
 export async function reverterPublicacaoPromocaoMilitar({
   promocao,
   item,
@@ -282,7 +328,6 @@ export async function reverterPublicacaoPromocaoMilitar({
   if (!motivoNormalizado) throw new Error('Motivo da reversão é obrigatório.');
 
   const Historico = entities?.HistoricoPromocaoMilitarV2;
-  const MilitarEntity = entities?.Militar;
   const PromocaoMilitar = entities?.PromocaoMilitar;
   const Promocao = entities?.Promocao;
 
@@ -316,40 +361,14 @@ export async function reverterPublicacaoPromocaoMilitar({
     observacoes: [texto(historicoRegistro?.observacoes), trilhaAdmin].filter(Boolean).join('\n'),
   });
 
-  const deveAvaliarRestauracaoCadastro = Boolean(item?.atualizar_cadastro_militar)
-    || statusNormalizado(item?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
-  let cadastroRestaurado = false;
-
-  if (deveAvaliarRestauracaoCadastro && MilitarEntity && typeof MilitarEntity.update === 'function') {
-    const militarIdParaRestore = texto(item?.militar_id) || texto(item?.militar?.id);
-    const militarAtual = militarIdParaRestore && typeof MilitarEntity.get === 'function'
-      ? await MilitarEntity.get(militarIdParaRestore)
-      : item?.militar;
-    const postoAtual = texto(militarAtual?.posto_graduacao || militarAtual?.posto_graduacao_atual);
-    const quadroAtual = texto(militarAtual?.quadro || militarAtual?.quadro_atual);
-    const postoNovo = texto(historicoRegistro?.posto_graduacao_novo);
-    const quadroNovo = texto(historicoRegistro?.quadro_novo);
-    const aindaCoincideComPromovido = mesmoTextoNormalizado(postoAtual, postoNovo) && mesmoTextoNormalizado(quadroAtual, quadroNovo);
-    diagLog('reversao:militar-carregado', { militarIdParaRestore, militarAtual, postoAtual, quadroAtual, postoNovo, quadroNovo, guardaPermitiuRollback: aindaCoincideComPromovido });
-
-    if (aindaCoincideComPromovido) {
-      const patchMilitar = {
-        posto_graduacao: texto(historicoRegistro?.posto_graduacao_anterior),
-        quadro: texto(historicoRegistro?.quadro_anterior),
-      };
-      try {
-        diagLog('reversao:militar-update:enviando', { militarId: item.militar_id, patchMilitar });
-        const retornoMilitar = await MilitarEntity.update(item.militar_id, patchMilitar);
-        diagLog('reversao:militar-update:retorno', { militarId: item.militar_id, retornoMilitar });
-        const militarRefetch = typeof MilitarEntity.get === 'function' ? await MilitarEntity.get(item.militar_id) : null;
-        diagLog('reversao:militar-update:refetch', { militarId: item.militar_id, militarRefetch });
-      } catch (error) {
-        diagLog('reversao:militar-update:erro', { militarId: item.militar_id, erro: error?.message || String(error) });
-        throw error;
-      }
-      cadastroRestaurado = true;
-    }
-  }
+  const resultadoRollback = await restaurarCadastroMilitarDaPromocao({
+    item,
+    historico: historicoRegistro,
+    militar: item?.militar,
+    entities,
+    contexto: 'reversão de publicação',
+  });
+  const cadastroRestaurado = Boolean(resultadoRollback?.cadastroRestaurado);
 
   await PromocaoMilitar.update(item.id, {
     status: 'cancelado',
@@ -377,7 +396,6 @@ export async function excluirCadeiaPromocaoMilitar({
   const PromocaoMilitar = entities?.PromocaoMilitar;
   const Promocao = entities?.Promocao;
   const Historico = entities?.HistoricoPromocaoMilitarV2;
-  const MilitarEntity = entities?.Militar;
 
   if (!PromocaoMilitar || typeof PromocaoMilitar.delete !== 'function') throw new Error('Entidade PromocaoMilitar indisponível para exclusão definitiva.');
   if (!Promocao || typeof Promocao.delete !== 'function' || typeof Promocao.update !== 'function') throw new Error('Entidade Promocao indisponível para exclusão definitiva.');
@@ -395,41 +413,14 @@ export async function excluirCadeiaPromocaoMilitar({
   const historicoId = texto(item?.historico_promocao_v2_id);
   const historicoRegistro = historicoId && typeof Historico.get === 'function' ? await Historico.get(historicoId) : null;
 
-  const deveAvaliarRestauracaoCadastro = Boolean(item?.atualizar_cadastro_militar)
-    || statusNormalizado(item?.resultado_aplicacao_cadastro) === 'imediatamente_superior';
-  const rollbackElegivel = deveAvaliarRestauracaoCadastro && !!historicoId;
-  let cadastroRestaurado = false;
-  let alertaRollback = '';
-
-  if (rollbackElegivel && !historicoRegistro) {
-    alertaRollback = 'Não foi possível restaurar o cadastro porque o histórico vinculado já não existe.';
-  }
-
-  if (rollbackElegivel && historicoRegistro) {
-    if (!MilitarEntity || typeof MilitarEntity.update !== 'function' || typeof MilitarEntity.get !== 'function') {
-      throw new Error('Entidade Militar indisponível para rollback cadastral na exclusão definitiva.');
-    }
-
-    const militarId = texto(item?.militar_id) || texto(item?.militar?.id);
-    if (!militarId) throw new Error('Item sem militar vinculado para rollback cadastral na exclusão definitiva.');
-
-    const militarAtual = await MilitarEntity.get(militarId);
-    const postoAtual = texto(militarAtual?.posto_graduacao || militarAtual?.posto_graduacao_atual);
-    const quadroAtual = texto(militarAtual?.quadro || militarAtual?.quadro_atual);
-    const postoNovo = texto(historicoRegistro?.posto_graduacao_novo);
-    const quadroNovo = texto(historicoRegistro?.quadro_novo);
-    const guardaPermitiuRollback = mesmoTextoNormalizado(postoAtual, postoNovo) && mesmoTextoNormalizado(quadroAtual, quadroNovo);
-
-    if (!guardaPermitiuRollback) {
-      throw new Error('Rollback cadastral bloqueado por segurança: posto/quadro atual do militar diverge do posto/quadro novo do histórico vinculado.');
-    }
-
-    await MilitarEntity.update(militarId, {
-      posto_graduacao: texto(historicoRegistro?.posto_graduacao_anterior),
-      quadro: texto(historicoRegistro?.quadro_anterior),
-    });
-    cadastroRestaurado = true;
-  }
+  const resultadoRollback = await restaurarCadastroMilitarDaPromocao({
+    item,
+    historico: historicoRegistro,
+    militar: item?.militar,
+    entities,
+    contexto: 'exclusão definitiva',
+  });
+  const cadastroRestaurado = Boolean(resultadoRollback?.cadastroRestaurado);
 
   if (historicoId) {
     await Historico.delete(historicoId);
@@ -445,11 +436,11 @@ export async function excluirCadeiaPromocaoMilitar({
 
   if ((vinculados || []).length === 0) {
     await Promocao.delete(item.promocao_id);
-    return { promocaoExcluida: true, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado, alertaRollback };
+    return { promocaoExcluida: true, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado };
   }
 
   await Promocao.update(item.promocao_id, { status: statusPromocaoPosReversao(vinculados) });
-  return { promocaoExcluida: false, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado, alertaRollback };
+  return { promocaoExcluida: false, promocaoMilitarExcluido: true, historicoExcluido: Boolean(historicoId), cadastroRestaurado };
 }
 
 export const STATUS_TURMA_OPERACIONAL = [
