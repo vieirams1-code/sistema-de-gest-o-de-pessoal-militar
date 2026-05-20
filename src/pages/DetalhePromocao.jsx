@@ -41,10 +41,10 @@ import {
   validarSalvarTurmaOperacional,
   valorOuTraco,
   simularImpactoCadeiaPromocoes,
-  calcularInsercaoPorAntiguidadeAnterior,
   isPromocaoFormacaoTerceiroSargento,
 } from '@/services/promocaoService';
 import { getSugestaoAtualizacaoCadastro } from '@/utils/postoGraduacaoHierarquia';
+import { calcularPreviaAntiguidadeGeral } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
 const diagLog = (evento, dados = {}) => console.info(`${DIAG_PREFIX} ${evento}`, dados);
@@ -751,21 +751,13 @@ export default function DetalhePromocao() {
       const jaExiste = turma.some((registro) => String(registro?.militar_id || '') === String(item.militarId));
       if (jaExiste) throw new Error('Este militar já está na promoção.');
       const usuario = typeof base44.auth?.me === 'function' ? await base44.auth.me() : null;
-      const sugestaoInsercao = calcularInsercaoPorAntiguidadeAnterior({
-        promocao,
-        militar: item.militar,
-        turmaAtual: turma,
-        historicos: historicosQuery.data || [],
-        militares: militaresQuery.data || [],
-      });
       const ordemManual = Number(item?.ordemManual || 0);
       if (promocaoFormacaoTerceiro && (!Number.isFinite(ordemManual) || ordemManual <= 0)) {
         throw new Error('Informe a classificação da turma.');
       }
       const ordemAplicada = promocaoFormacaoTerceiro
         ? (Number.isFinite(ordemManual) && ordemManual > 0 ? ordemManual : undefined)
-        : (sugestaoInsercao.podeAdicionar && Number(sugestaoInsercao.ordemSugerida) > 0 ? Number(sugestaoInsercao.ordemSugerida) : undefined);
-      if (!promocaoFormacaoTerceiro && !sugestaoInsercao.podeAdicionar) throw new Error(sugestaoInsercao.alertas[0] || 'Sem histórico base anterior para sugerir inserção.');
+        : undefined;
 
       const payload = montarPayloadAdicaoManualTurma({
         promocao,
@@ -776,9 +768,6 @@ export default function DetalhePromocao() {
         militar: item.militar,
         ordem: ordemAplicada,
       });
-      if (Array.isArray(sugestaoInsercao.deslocamentos) && sugestaoInsercao.deslocamentos.length > 0) {
-        await Promise.all(sugestaoInsercao.deslocamentos.map((d) => base44.entities.PromocaoMilitar.update(d.id, { ordem: d.ordemSugerida })));
-      }
       await base44.entities.PromocaoMilitar.create(payload);
     },
     onSuccess: async () => {
@@ -789,6 +778,41 @@ export default function DetalhePromocao() {
       await invalidarDados();
     },
     onError: (error) => toast({ title: 'Falha ao adicionar militar', description: error.message, variant: 'destructive' }),
+  });
+
+  const ordenarPelaListaAtualMutation = useMutation({
+    mutationFn: async () => {
+      if (!promocao) throw new Error('Promoção não carregada.');
+      if (promocaoFormacaoTerceiro) throw new Error('Promoção de formação (3º Sgt) mantém classificação manual.');
+      const previa = calcularPreviaAntiguidadeGeral({
+        militares: militaresQuery.data || [],
+        historicoPromocoes: historicosQuery.data || [],
+      });
+      const ranking = new Map((previa?.itens || []).map((item, idx) => [String(item?.militar_id || ''), idx + 1]));
+      const ordenados = [...rascunhoTurma]
+        .sort((a, b) => {
+          const rankA = ranking.get(String(a?.militar_id || ''));
+          const rankB = ranking.get(String(b?.militar_id || ''));
+          if (rankA && rankB) return rankA - rankB;
+          if (rankA) return -1;
+          if (rankB) return 1;
+          return ordenarPorOrdemCrescente(a, b);
+        })
+        .map((item, index) => ({ ...item, ordem: index + 1 }));
+
+      const previaTexto = ordenados.slice(0, 10).map((item) => `${nomeMilitar(item?.militar || {})}: #${item?.ordem}`).join('\n');
+      const confirmou = window.confirm(`Ordenar pela lista atual?\n\nPrévia (primeiros 10):\n${previaTexto}${ordenados.length > 10 ? '\n...' : ''}`);
+      if (!confirmou) return { cancelado: true };
+
+      await Promise.all(ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
+      return { atualizados: ordenados.length };
+    },
+    onSuccess: async (resultado) => {
+      if (resultado?.cancelado) return;
+      toast({ title: 'Ordem atualizada', description: `${resultado?.atualizados || 0} militar(es) renumerado(s) pela lista atual.` });
+      await invalidarDados();
+    },
+    onError: (error) => toast({ title: 'Falha ao ordenar pela lista atual', description: error.message, variant: 'destructive' }),
   });
 
   const publicarPromocaoMutation = useMutation({
@@ -978,7 +1002,7 @@ export default function DetalhePromocao() {
               <CardHeader className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <CardTitle>Militares da Promoção ({listaExibida.length})</CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">Ordem calculada pela antiguidade anterior.</p>
+                  <p className="mt-1 text-sm text-slate-500">A ordem é livre na adição. Use “Ordenar pela lista atual” para renumerar o bloco.</p>
                   {promocaoFormacaoTerceiro
                     ? <p className="mt-1 text-xs text-blue-700">Promoção de formação: informe a classificação de cada militar na turma.</p>
                     : <p className="mt-1 text-xs text-slate-500">Edição manual da ordem permanece somente leitura para promoções sucessivas.</p> }
@@ -1002,10 +1026,21 @@ export default function DetalhePromocao() {
                 </div>
 
                 </div>
-                <Button onClick={() => setModalAdicionarAberto(true)}>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Adicionar Militar
-                </Button>
+                <div className="flex gap-2">
+                  {!promocaoFormacaoTerceiro && (
+                    <Button
+                      variant="outline"
+                      onClick={() => ordenarPelaListaAtualMutation.mutate()}
+                      disabled={ordenarPelaListaAtualMutation.isPending || rascunhoTurma.length === 0}
+                    >
+                      Ordenar pela lista atual
+                    </Button>
+                  )}
+                  <Button onClick={() => setModalAdicionarAberto(true)}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Adicionar Militar
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {mensagensValidacao.length > 0 && (
@@ -1099,26 +1134,6 @@ export default function DetalhePromocao() {
               )}
               {candidatosAdicionar.map((item) => (
                 <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                  {(() => {
-                    const sugestao = calcularInsercaoPorAntiguidadeAnterior({
-                      promocao,
-                      militar: item.militar,
-                      turmaAtual: turma,
-                      historicos: historicosQuery.data || [],
-                      militares: militaresQuery.data || [],
-                    });
-                    return (
-                      <div className="mb-2 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-700">
-                        {sugestao.baseAnterior ? (
-                          <p>Base anterior: {sugestao.baseAnterior.posto} em {dataFormatada(sugestao.baseAnterior.dataPromocao)} • classificação {sugestao.baseAnterior.classificacao}</p>
-                        ) : (
-                          <p>Base anterior: {sugestao.alertas[0] || 'Não disponível'}</p>
-                        )}
-                        {Number(sugestao.ordemSugerida) > 0 && <p>Posição sugerida: Entrará como #{sugestao.ordemSugerida} nesta promoção</p>}
-                        {(sugestao.deslocamentos || []).slice(0, 3).map((d) => <p key={d.id}>Impacto: #{d.ordemAtual} → #{d.ordemSugerida}</p>)}
-                      </div>
-                    );
-                  })()}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0 space-y-2">
                       <div>
