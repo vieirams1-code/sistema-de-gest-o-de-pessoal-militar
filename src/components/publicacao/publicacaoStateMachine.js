@@ -38,11 +38,13 @@ function limparObjeto(obj = {}) {
 }
 
 export function temNotaParaBg(registro = {}) {
-  return !!toText(registro.nota_para_bg);
+  return !!toText(registro.nota_para_bg || registro?.publicacao?.nota_para_bg);
 }
 
 export function temDadosCompletosBg(registro = {}) {
-  return !!toText(registro.numero_bg) && !!toText(registro.data_bg);
+  const numeroBg = toText(registro.numero_bg || registro?.publicacao?.numero_bg);
+  const dataBg = toText(registro.data_bg || registro?.publicacao?.data_bg);
+  return !!numeroBg && !!dataBg;
 }
 
 export function calcularStatusPublicacaoRegistro(registro = {}) {

@@ -144,6 +144,9 @@ function extrairMatriculasHistoricasTexto(registro = {}, origemTipo = '') {
 
 function normalizarRegistro(registro) {
   const origemTipo = detectarOrigemTipo(registro);
+  const numeroBgRegistro = origemTipo === 'livro' ? (registro?.publicacao?.numero_bg || registro.numero_bg || '') : (registro.numero_bg || '');
+  const dataBgRegistro = origemTipo === 'livro' ? (registro?.publicacao?.data_bg || registro.data_bg || '') : (registro.data_bg || '');
+  const notaBgRegistro = origemTipo === 'livro' ? (registro?.publicacao?.nota_para_bg || registro.nota_para_bg || '') : (registro.nota_para_bg || '');
   const militarContrato = registro?.militar || {};
   const militarNomeCompleto = origemTipo === 'livro'
     ? pickPrimeiroValor(
@@ -190,7 +193,13 @@ function normalizarRegistro(registro) {
   const grupoDisplay = getGrupoDisplay({ ...registro, tipo_registro: tipoBase });
 
   const statusOrigem =
-    registro.status_calculado ||
+    normalizarStatusPublicacao(registro.status_calculado) ||
+    calcularStatusPublicacaoRegistro({
+      ...registro,
+      numero_bg: numeroBgRegistro,
+      data_bg: dataBgRegistro,
+      nota_para_bg: notaBgRegistro,
+    }) ||
     (origemTipo === 'livro' ? mapStatusContratoParaControle(registro.status_codigo) : calcularStatusPublicacaoRegistro(registro));
   const statusCanonico = obterStatusCanonicoPublicacao({ ...registro, status_calculado: statusOrigem });
   const matriculaRegistroHistorica = pickPrimeiroValor(
@@ -237,9 +246,9 @@ function normalizarRegistro(registro) {
     data_registro: origemTipo === 'livro' ? (registro.data_inicio_iso || registro.data_registro) : registro.data_registro,
     ferias_id: origemTipo === 'livro' ? (registro.ferias_id || registro?.vinculos?.ferias?.id) : registro.ferias_id,
     periodo_aquisitivo_id: origemTipo === 'livro' ? (registro.periodo_aquisitivo_id || registro?.vinculos?.periodo?.id) : registro.periodo_aquisitivo_id,
-    nota_para_bg: origemTipo === 'livro' ? (registro?.publicacao?.nota_para_bg || registro.nota_para_bg || '') : (registro.nota_para_bg || ''),
-    numero_bg: origemTipo === 'livro' ? (registro?.publicacao?.numero_bg || registro.numero_bg || '') : (registro.numero_bg || ''),
-    data_bg: origemTipo === 'livro' ? (registro?.publicacao?.data_bg || registro.data_bg || '') : (registro.data_bg || ''),
+    nota_para_bg: notaBgRegistro,
+    numero_bg: numeroBgRegistro,
+    data_bg: dataBgRegistro,
     detalhes_contrato: origemTipo === 'livro' ? (registro?.detalhes || null) : registro.detalhes_contrato,
     vinculos_contrato: origemTipo === 'livro' ? (registro?.vinculos || null) : registro.vinculos_contrato,
     publicacao_contrato: origemTipo === 'livro' ? (registro?.publicacao || null) : registro.publicacao_contrato,
