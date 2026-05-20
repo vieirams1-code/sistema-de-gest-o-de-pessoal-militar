@@ -49,6 +49,7 @@ import {
   normalizarPostoGraduacao as normalizarPostoPreviaAntiguidade,
   normalizarQuadroPreviaAntiguidade,
 } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
+import { isPromocaoHistorica, ordenarPorAntiguidadeAnterior } from '@/utils/promocao/ordenacaoPromocao';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
 const diagLog = (evento, dados = {}) => console.info(`${DIAG_PREFIX} ${evento}`, dados);
@@ -800,6 +801,23 @@ export default function DetalhePromocao() {
     mutationFn: async () => {
       if (!promocao) throw new Error('Promoção não carregada.');
       if (promocaoFormacaoTerceiro) throw new Error('Promoção de formação (3º Sgt) mantém classificação manual.');
+      const historica = isPromocaoHistorica(promocao);
+      if (historica) {
+        const resultado = ordenarPorAntiguidadeAnterior({
+          promocao,
+          itensPromocao: rascunhoTurma,
+          historicoV2: historicosQuery.data || [],
+          militares: militaresQuery.data || [],
+        });
+        const previaTexto = resultado.ordenados.slice(0, 10).map((item) => `${nomeMilitar(item?.militar || {})}: #${item?.ordem}`).join('\n');
+        const confirmou = window.confirm(
+          `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.totalEncontrados}\nTotal sem histórico: ${resultado.totalSemHistorico}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${resultado.totalSemHistorico > 0 ? '\n\nAlerta: militares sem histórico-base foram enviados ao final.' : ''}`
+        );
+        if (!confirmou) return { cancelado: true };
+        await Promise.all(resultado.ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
+        return { atualizados: resultado.ordenados.length, totalSemHistorico: resultado.totalSemHistorico, historica: true };
+      }
+
       const previa = calcularPreviaAntiguidadeGeral({
         militares: militaresQuery.data || [],
         historicoPromocoes: historicosQuery.data || [],
@@ -832,14 +850,16 @@ export default function DetalhePromocao() {
       if (!confirmou) return { cancelado: true };
 
       await Promise.all(ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
-      return { atualizados: ordenados.length };
+      return { atualizados: ordenados.length, historica: false };
     },
     onSuccess: async (resultado) => {
       if (resultado?.cancelado) return;
-      toast({ title: 'Ordem atualizada', description: `${resultado?.atualizados || 0} militar(es) renumerado(s) pela lista atual.` });
+      const contexto = resultado?.historica ? 'pela antiguidade anterior' : 'pela lista atual';
+      const alertaFaltantes = resultado?.totalSemHistorico ? ` ${resultado.totalSemHistorico} sem histórico-base foram para o final.` : '';
+      toast({ title: 'Ordem atualizada', description: `${resultado?.atualizados || 0} militar(es) renumerado(s) ${contexto}.${alertaFaltantes}`.trim() });
       await invalidarDados();
     },
-    onError: (error) => toast({ title: 'Falha ao ordenar pela lista atual', description: error.message, variant: 'destructive' }),
+    onError: (error) => toast({ title: 'Falha ao ordenar promoção', description: error.message, variant: 'destructive' }),
   });
 
   const publicarPromocaoMutation = useMutation({
@@ -1029,7 +1049,7 @@ export default function DetalhePromocao() {
               <CardHeader className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <CardTitle>Militares da Promoção ({listaExibida.length})</CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">A ordem é livre na adição. Use “Ordenar pela lista atual” para renumerar o bloco.</p>
+                  <p className="mt-1 text-sm text-slate-500">A ordem é livre na adição. Use a ordenação automática conforme o contexto da promoção.</p>
                   {promocaoFormacaoTerceiro
                     ? <p className="mt-1 text-xs text-blue-700">Promoção de formação: informe a classificação de cada militar na turma.</p>
                     : <p className="mt-1 text-xs text-slate-500">Edição manual da ordem permanece somente leitura para promoções sucessivas.</p> }
@@ -1041,7 +1061,7 @@ export default function DetalhePromocao() {
                       onClick={() => ordenarPelaListaAtualMutation.mutate()}
                       disabled={ordenarPelaListaAtualMutation.isPending || rascunhoTurma.length === 0}
                     >
-                      Ordenar pela lista atual
+                      {isPromocaoHistorica(promocao) ? 'Ordenar pela antiguidade anterior' : 'Ordenar pela lista atual'}
                     </Button>
                   )}
                   <Button onClick={() => setModalAdicionarAberto(true)}>
