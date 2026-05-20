@@ -1025,3 +1025,80 @@ export function montarDiagnosticoMilitaresPromocao({ promocao, historicos = [], 
 
   return [...linhasHistoricos, ...militaresSemHistorico];
 }
+
+export function simularImpactoCadeiaPromocoes({
+  promocaoBase,
+  militarId,
+  ordemSugeridaBase,
+  promocoes = [],
+  promocaoMilitar = [],
+  militarPorId = new Map(),
+}) {
+  const alertas = [];
+  const militarIdNormalizado = texto(militarId);
+  const ordemSugerida = Number(ordemSugeridaBase);
+  if (!promocaoBase?.id) throw new Error('promoção-base é obrigatória');
+  if (!militarIdNormalizado) throw new Error('militarId é obrigatório');
+  if (!Number.isFinite(ordemSugerida) || ordemSugerida <= 0) throw new Error('ordemSugeridaBase deve ser numérica e positiva');
+
+  const itensBase = promocaoMilitar.filter((item) => String(item?.promocao_id || '') === String(promocaoBase.id));
+  const itemMilitarBase = itensBase.find((item) => String(item?.militar_id || '') === militarIdNormalizado);
+  const ordemAtualBase = Number(itemMilitarBase?.ordem || 0);
+  if (!Number.isFinite(ordemAtualBase) || ordemAtualBase <= 0) alertas.push('Militar não possui ordem válida na promoção-base.');
+
+  const delta = ordemSugerida - ordemAtualBase;
+  if (!Number.isFinite(delta) || delta === 0) {
+    return { promocoesAfetadas: [], alertas: ['Sem impacto: a ordem sugerida é igual à ordem atual.'] };
+  }
+
+  const futuras = (promocoes || [])
+    .filter((p) => p?.id && String(p.id) !== String(promocaoBase.id))
+    .filter((p) => texto(p?.quadro) === texto(promocaoBase?.quadro))
+    .filter((p) => texto(p?.data_promocao) > texto(promocaoBase?.data_promocao))
+    .sort((a, b) => texto(a?.data_promocao).localeCompare(texto(b?.data_promocao)));
+
+  const resultado = [];
+  futuras.forEach((promocao) => {
+    const itens = promocaoMilitar
+      .filter((item) => String(item?.promocao_id || '') === String(promocao.id))
+      .filter((item) => Number(item?.ordem) > 0)
+      .sort((a, b) => Number(a?.ordem || 0) - Number(b?.ordem || 0));
+    if (itens.length === 0) return;
+
+    const idx = itens.findIndex((item) => String(item?.militar_id || '') === militarIdNormalizado);
+    if (idx < 0) return;
+
+    const atual = itens[idx];
+    const ordemAtual = Number(atual?.ordem || 0);
+    const ordemSugeridaFutura = Math.max(1, ordemAtual + delta);
+
+    const semMilitar = itens.filter((item) => String(item?.militar_id || '') !== militarIdNormalizado);
+    const posicaoInsercao = semMilitar.findIndex((item) => Number(item?.ordem || 0) >= ordemSugeridaFutura);
+    const baseReordenada = posicaoInsercao >= 0
+      ? [...semMilitar.slice(0, posicaoInsercao), atual, ...semMilitar.slice(posicaoInsercao)]
+      : [...semMilitar, atual];
+
+    const ordemAtualLista = itens.map((item) => ({ militar_id: item.militar_id, nome: nomeMilitar(militarPorId.get(String(item.militar_id || '')) || item?.militar), ordem: Number(item.ordem) }));
+    const ordemSugeridaLista = baseReordenada.map((item, index) => ({ militar_id: item.militar_id, nome: nomeMilitar(militarPorId.get(String(item.militar_id || '')) || item?.militar), ordem: index + 1 }));
+
+    const deslocados = ordemSugeridaLista
+      .map((novo) => {
+        const anterior = ordemAtualLista.find((at) => String(at.militar_id || '') === String(novo.militar_id || ''));
+        if (!anterior || anterior.ordem === novo.ordem) return null;
+        return { militar_id: novo.militar_id, nome: novo.nome, ordemAtual: anterior.ordem, ordemSugerida: novo.ordem };
+      })
+      .filter(Boolean);
+
+    resultado.push({
+      promocao_id: promocao.id,
+      promocao_rotulo: `${valorOuTraco(promocao?.posto_graduacao)} • ${dataFormatada(promocao?.data_promocao)}`,
+      ordemAtual: ordemAtualLista,
+      ordemSugerida: ordemSugeridaLista,
+      militaresDeslocados: deslocados,
+    });
+  });
+
+  if (resultado.length === 0) alertas.push('Nenhuma promoção futura da cadeia foi impactada para este militar.');
+
+  return { promocoesAfetadas: resultado, alertas };
+}
