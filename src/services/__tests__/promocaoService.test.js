@@ -606,7 +606,7 @@ test('reversão bloqueia rollback de cadastro quando militar já divergiu', asyn
       entities,
       motivo: 'Publicação indevida',
     }),
-    /Rollback cadastral bloqueado \(reversão de publicação\)/,
+    /Cadastro atual divergente do efeito da promoção/,
   );
   assert.equal(atualizou, false);
 });
@@ -659,7 +659,7 @@ test('idempotência: segunda reversão é bloqueada sem corromper', async () => 
       entities,
       motivo: 'Outro',
     }),
-    /Somente itens publicados podem ser revertidos/,
+    /Item ainda não está publicado/,
   );
 });
 
@@ -1254,4 +1254,29 @@ test('validação e publicação usam o mesmo contexto efetivo', async () => {
   const validacao = validarPublicacaoPromocao(args);
   assert.equal(validacao.valido, false);
   await assert.rejects(() => publicarPromocaoOficial({ ...args, entities: { HistoricoPromocaoMilitarV2: { list: async () => [], create: async () => ({ id: 'h1' }), update: async () => {} }, PromocaoMilitar: { update: async () => {} }, Promocao: { update: async () => {} } } }), /histórico V2 temporal/i);
+});
+
+
+test('reversão sem motivo bloqueia com mensagem específica', async () => {
+  const entities = {
+    HistoricoPromocaoMilitarV2: { get: async () => ({ id: 'hist-1' }), update: async () => {} },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+  };
+  await assert.rejects(
+    () => reverterPublicacaoPromocaoMilitar({ promocao: { id: 'p1' }, item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'hist-1' }, motivo: '', entities }),
+    /Motivo da reversão é obrigatório/,
+  );
+});
+
+test('exclusão com histórico ativo bloqueia', async () => {
+  const entities = {
+    PromocaoMilitar: { get: async () => ({ id: 'pm-1', promocao_id: 'promo-1', status: 'cancelado', publicado: false, historico_promocao_v2_id: 'hist-1' }), delete: async () => { throw new Error('nao'); } },
+    HistoricoPromocaoMilitarV2: { get: async () => ({ id: 'hist-1', status_registro: 'ativo' }), delete: async () => { throw new Error('nao'); } },
+    Promocao: { delete: async () => {}, update: async () => {} },
+  };
+  await assert.rejects(
+    () => excluirCadeiaPromocaoMilitar({ promocaoMilitarId: 'pm-1', motivo: 'teste', entities }),
+    /Histórico ainda ativo/,
+  );
 });

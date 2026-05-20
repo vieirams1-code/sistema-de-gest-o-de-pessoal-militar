@@ -1,6 +1,7 @@
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
 import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
 import { deveAtualizarCadastroMilitarPorPromocao } from '../utils/promocao/deveAtualizarCadastroMilitarPorPromocao.js';
+import { deveRollbackCadastroMilitarPorReversao, podeExcluirDefinitivamentePromocaoMilitar, podeReverterPublicacaoPromocao } from '../utils/promocao/reversaoExclusaoRules.js';
 
 const TEXTO_VAZIO = '—';
 
@@ -359,7 +360,10 @@ async function restaurarCadastroMilitarDaPromocao({
   const quadroAtual = texto(militarAtual?.quadro);
   const postoNovo = texto(historico?.posto_graduacao_novo);
   const quadroNovo = texto(historico?.quadro_novo);
-  const coincideComHistoricoPublicado = mesmoTextoNormalizado(postoAtual, postoNovo) && mesmoTextoNormalizado(quadroAtual, quadroNovo);
+  const coincideComHistoricoPublicado = deveRollbackCadastroMilitarPorReversao({
+    historico: { ...historico, posto_graduacao_novo: postoNovo, quadro_novo: quadroNovo },
+    militar: { ...militarAtual, posto_graduacao: postoAtual, quadro: quadroAtual },
+  });
   if (!coincideComHistoricoPublicado) {
     throw new Error(`Rollback cadastral bloqueado (${contexto}): cadastro atual do militar diverge do posto/quadro publicado nesta promoção.`);
   }
@@ -383,8 +387,6 @@ export async function reverterPublicacaoPromocaoMilitar({
   const motivoNormalizado = texto(motivo);
   if (!promocao?.id) throw new Error('Promoção não carregada.');
   if (!item?.id) throw new Error('Item da promoção não carregado.');
-  if (!item?.publicado || statusNormalizado(item?.status) !== 'publicado') throw new Error('Somente itens publicados podem ser revertidos.');
-  if (!motivoNormalizado) throw new Error('Motivo da reversão é obrigatório.');
 
   const Historico = entities?.HistoricoPromocaoMilitarV2;
   const PromocaoMilitar = entities?.PromocaoMilitar;
@@ -403,9 +405,20 @@ export async function reverterPublicacaoPromocaoMilitar({
   });
 
   const historicoId = texto(item?.historico_promocao_v2_id);
-  if (!historicoId) throw new Error('Item publicado sem vínculo de histórico V2.');
+  if (!historicoId) throw new Error('Sem histórico vinculado para reversão.');
   const historicoRegistro = typeof Historico.get === 'function' ? await Historico.get(historicoId) : null;
   diagLog('reversao:historico-carregado', { historicoId, historicoRegistro, postoAnterior: historicoRegistro?.posto_graduacao_anterior, quadroAnterior: historicoRegistro?.quadro_anterior, postoNovo: historicoRegistro?.posto_graduacao_novo, quadroNovo: historicoRegistro?.quadro_novo });
+  const militarAtual = (entities?.Militar && typeof entities.Militar.get === 'function' && item?.militar_id)
+    ? await entities.Militar.get(item.militar_id)
+    : item?.militar;
+  const validacaoReversao = podeReverterPublicacaoPromocao({
+    promocao,
+    item,
+    historico: historicoRegistro,
+    militar: militarAtual,
+    motivo: motivoNormalizado,
+  });
+  if (!validacaoReversao.permitido) throw new Error(validacaoReversao.motivo);
 
   const trilhaAdmin = [
     '[REVERSAO_ADMINISTRATIVA]',
@@ -464,13 +477,10 @@ export async function excluirCadeiaPromocaoMilitar({
   if (!item?.id) throw new Error('Item da promoção não encontrado.');
   if (!item?.promocao_id) throw new Error('Item sem promoção vinculada.');
 
-  const statusItem = statusNormalizado(item?.status);
-  if (!(statusItem === 'cancelado' || item?.publicado === false)) {
-    throw new Error('Exclusão definitiva permitida apenas para item cancelado ou não publicado.');
-  }
-
   const historicoId = texto(item?.historico_promocao_v2_id);
   const historicoRegistro = historicoId && typeof Historico.get === 'function' ? await Historico.get(historicoId) : null;
+  const validacaoExclusao = podeExcluirDefinitivamentePromocaoMilitar({ item, historico: historicoRegistro });
+  if (!validacaoExclusao.permitido) throw new Error(validacaoExclusao.motivo);
 
   const resultadoRollback = await restaurarCadastroMilitarDaPromocao({
     item,
