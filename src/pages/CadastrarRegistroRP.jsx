@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, BookOpenText, Search } from 'lucide-react';
 import MilitarSelector from '@/components/atestado/MilitarSelector';
 import RPSpecificFieldsLivro from '@/components/rp/RPSpecificFieldsLivro';
@@ -109,6 +110,7 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {} } = 
 
 export default function CadastrarRegistroRP() {
   const [searchParams] = useSearchParams();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const registroId = searchParams.get('id');
@@ -728,12 +730,25 @@ export default function CadastrarRegistroRP() {
       return criado;
     },
     onSuccess: async (resultado, payload) => {
-      queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] });
-      queryClient.invalidateQueries({ queryKey: ['registros-livro'] });
-      queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] });
-      queryClient.invalidateQueries({ queryKey: ['militares'] });
-      queryClient.invalidateQueries({ queryKey: ['punicoes-disciplinares'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['registro-rp-lista'] }),
+        queryClient.invalidateQueries({ queryKey: ['registros-livro'] }),
+        queryClient.invalidateQueries({ queryKey: ['publicacoes-ex-officio'] }),
+        queryClient.invalidateQueries({ queryKey: ['militares'] }),
+        queryClient.invalidateQueries({ queryKey: ['punicoes-disciplinares'] }),
+      ]);
+      toast({
+        title: 'Registro salvo com sucesso',
+        description: isEditing ? 'As alterações foram persistidas.' : 'Novo registro de publicação criado.',
+      });
       navigate(createPageUrl('RP'));
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Falha ao salvar registro RP',
+        description: error?.message || 'Não foi possível salvar o registro. Tente novamente.',
+      });
     },
     onSettled: () => {
       isSubmittingRef.current = false;
@@ -811,7 +826,9 @@ export default function CadastrarRegistroRP() {
         });
         atualizarEscopado(entityNameBloqueio, registroEdicao.id, {
           historico_publicacao: anexarEventoAuditoriaPublicacao(registroEdicao, eventoBloqueio),
-        }).catch(() => {});
+        }).catch((erroAuditoria) => {
+          console.error('Falha ao registrar bloqueio de transição de publicação:', erroAuditoria);
+        });
       }
       alert(validacaoTransicao.motivo || 'Transição inválida de status para publicação.');
       return;
