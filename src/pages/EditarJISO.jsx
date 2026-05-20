@@ -104,7 +104,8 @@ export default function EditarJISO() {
     };
 
     const abreviatura = abreviarPosto(atestado.militar_posto);
-    const postoNome = abreviatura ? `${abreviatura} QOBM` : '';
+    const quadro = String(militarAtestado?.quadro || atestadoContexto?.militar_quadro || atestado?.militar_quadro || '').trim();
+    const postoNome = [abreviatura, quadro].filter(Boolean).join(' ');
 
     const vars = {
       posto_nome: postoNome,

@@ -198,7 +198,7 @@ const VARS_POR_TIPO = {
     grupo: 'Início',
     cor: 'green',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo do militar' },
       { v: '{{matricula}}', desc: 'Matrícula funcional' },
       { v: '{{data_registro}}', desc: 'Data do registro' },
@@ -214,7 +214,7 @@ const VARS_POR_TIPO = {
     grupo: 'Interrupção',
     cor: 'orange',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_registro}}', desc: 'Data do registro / interrupção' },
@@ -230,7 +230,7 @@ const VARS_POR_TIPO = {
     grupo: 'Continuação',
     cor: 'teal',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_registro}}', desc: 'Data do registro / continuação' },
@@ -245,7 +245,7 @@ const VARS_POR_TIPO = {
     grupo: 'Continuação',
     cor: 'teal',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_registro}}', desc: 'Data do registro / continuação' },
@@ -260,7 +260,7 @@ const VARS_POR_TIPO = {
     grupo: 'Término',
     cor: 'green',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_registro}}', desc: 'Data do término / retorno' },
@@ -275,7 +275,7 @@ const VARS_POR_TIPO = {
     grupo: 'Licença Maternidade',
     cor: 'orange',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_inicio}}', desc: 'Data de início' },
@@ -288,7 +288,7 @@ const VARS_POR_TIPO = {
     grupo: 'Prorrogação de Licença Maternidade',
     cor: 'orange',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_inicio}}', desc: 'Data de início' },
@@ -299,7 +299,7 @@ const VARS_POR_TIPO = {
     grupo: 'Licença Paternidade',
     cor: 'orange',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_inicio}}', desc: 'Data de início' },
@@ -310,7 +310,7 @@ const VARS_POR_TIPO = {
     grupo: 'Núpcias',
     cor: 'purple',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{conjuge_nome}}', desc: 'Nome do cônjuge' },
@@ -323,7 +323,7 @@ const VARS_POR_TIPO = {
     grupo: 'Luto',
     cor: 'slate',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{falecido_nome}}', desc: 'Nome do falecido' },
@@ -337,7 +337,7 @@ const VARS_POR_TIPO = {
     grupo: 'Cedência',
     cor: 'slate',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{origem}}', desc: 'Unidade de origem' },
@@ -349,7 +349,7 @@ const VARS_POR_TIPO = {
     grupo: 'Transferência',
     cor: 'slate',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{origem}}', desc: 'Unidade de origem' },
@@ -363,7 +363,7 @@ const VARS_POR_TIPO = {
     grupo: 'Transferência para Reserva Remunerada',
     cor: 'slate',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{documento_referencia_rr}}', desc: 'Documento de referência RR' },
@@ -379,7 +379,7 @@ const VARS_POR_TIPO = {
     grupo: 'Trânsito',
     cor: 'slate',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{origem}}', desc: 'Unidade de origem' },
@@ -391,7 +391,7 @@ const VARS_POR_TIPO = {
     grupo: 'Instalação',
     cor: 'slate',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{origem}}', desc: 'Unidade de origem' },
@@ -403,7 +403,7 @@ const VARS_POR_TIPO = {
     grupo: 'Dispensa como Recompensa',
     cor: 'orange',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{dias}}', desc: 'Dias de dispensa' },
@@ -416,7 +416,7 @@ const VARS_POR_TIPO = {
     grupo: 'Deslocamento para Missões',
     cor: 'teal',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_inicio}}', desc: 'Data de início' },
@@ -431,7 +431,7 @@ const VARS_POR_TIPO = {
     grupo: 'Cursos / Estágios / Capacitações',
     cor: 'teal',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_inicio}}', desc: 'Data de início' },
@@ -446,7 +446,7 @@ const VARS_POR_TIPO = {
     grupo: 'Designação de Função',
     cor: 'blue',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{funcao}}', desc: 'Função designada' },
@@ -457,7 +457,7 @@ const VARS_POR_TIPO = {
     grupo: 'Dispensa de Função',
     cor: 'blue',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{funcao}}', desc: 'Função dispensada' },
@@ -468,7 +468,7 @@ const VARS_POR_TIPO = {
     grupo: 'Punição',
     cor: 'red',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{portaria}}', desc: 'Número da Portaria' },
@@ -485,7 +485,7 @@ const VARS_POR_TIPO = {
     grupo: 'Elogio Individual',
     cor: 'green',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{texto_complemento}}', desc: 'Texto do elogio' },
@@ -495,7 +495,7 @@ const VARS_POR_TIPO = {
     grupo: 'Melhoria de Comportamento',
     cor: 'green',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{data_melhoria}}', desc: 'Data da melhoria' },
@@ -525,7 +525,7 @@ const VARS_POR_TIPO = {
     grupo: 'Ata JISO',
     cor: 'purple',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{finalidade_jiso}}', desc: 'Finalidade da JISO' },
@@ -539,7 +539,7 @@ const VARS_POR_TIPO = {
     grupo: 'Transcrição de Documentos',
     cor: 'teal',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{documento}}', desc: 'Nome do documento (ex: Ofício 001)' },
@@ -551,7 +551,7 @@ const VARS_POR_TIPO = {
     grupo: 'Homologação de Atestado',
     cor: 'blue',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{dias}}', desc: 'Quantidade de dias' },
@@ -565,7 +565,7 @@ const VARS_POR_TIPO = {
     grupo: 'Apostila',
     cor: 'purple',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{numero_bg_ref}}', desc: 'Número do BG da publicação corrigida' },
@@ -579,7 +579,7 @@ const VARS_POR_TIPO = {
     grupo: 'Tornar sem Efeito',
     cor: 'orange',
     variaveis: [
-      { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+      { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
       { v: '{{nome_completo}}', desc: 'Nome completo' },
       { v: '{{matricula}}', desc: 'Matrícula' },
       { v: '{{numero_bg_ref}}', desc: 'Número do BG da publicação tornada sem efeito' },
@@ -592,7 +592,7 @@ const VARS_POR_TIPO = {
 
 const GRUPOS_GENERICOS_LIVRO = [
   { grupo: 'Militar (Geral)', cor: 'blue', variaveis: [
-    { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+    { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
     { v: '{{posto}}', desc: 'Posto/Graduação Abreviado' },
     { v: '{{nome_completo}}', desc: 'Nome completo' },
     { v: '{{matricula}}', desc: 'Matrícula' },
@@ -605,7 +605,7 @@ const GRUPOS_GENERICOS_LIVRO = [
 ];
 const GRUPOS_GENERICOS_EXOFFICIO = [
   { grupo: 'Militar (Geral)', cor: 'blue', variaveis: [
-    { v: '{{posto_nome}}', desc: 'Posto/Graduação + QOBM' },
+    { v: '{{posto_nome}}', desc: 'Posto/Graduação + [QUADRO]' },
     { v: '{{posto}}', desc: 'Posto/Graduação Abreviado' },
     { v: '{{nome_completo}}', desc: 'Nome completo' },
     { v: '{{matricula}}', desc: 'Matrícula' },
