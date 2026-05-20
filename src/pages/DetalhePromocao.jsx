@@ -802,6 +802,23 @@ export default function DetalhePromocao() {
       if (!promocao) throw new Error('Promoção não carregada.');
       if (promocaoFormacaoTerceiro) throw new Error('Promoção de formação (3º Sgt) mantém classificação manual.');
       const historica = isPromocaoHistorica(promocao);
+      if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+        const historicoV2 = historicosQuery.data || [];
+        const basePreview = ordenarPorAntiguidadeAnterior({
+          promocao,
+          itensPromocao: rascunhoTurma,
+          historicoV2,
+          militares: militaresQuery.data || [],
+        });
+        console.debug('[Promocao][Ordenacao]', {
+          promocaoId: promocao?.id || null,
+          dataPromocao: promocao?.data_promocao || null,
+          isHistorica: historica,
+          caminhoUsado: historica ? 'historico-v2' : 'previa-atual',
+          totalHistoricos: historicoV2.length,
+          totalBaseEncontrada: basePreview.totalEncontrados || 0,
+        });
+      }
       if (historica) {
         const resultado = ordenarPorAntiguidadeAnterior({
           promocao,
@@ -810,8 +827,11 @@ export default function DetalhePromocao() {
           militares: militaresQuery.data || [],
         });
         const previaTexto = resultado.ordenados.slice(0, 10).map((item) => `${nomeMilitar(item?.militar || {})}: #${item?.ordem}`).join('\n');
+        const alertaSemHistorico = resultado.totalSemHistorico > 0
+          ? `\n\nSem histórico-base (final da lista):\n${resultado.semHistorico.join('\n')}`
+          : '';
         const confirmou = window.confirm(
-          `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.totalEncontrados}\nTotal sem histórico: ${resultado.totalSemHistorico}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${resultado.totalSemHistorico > 0 ? '\n\nAlerta: militares sem histórico-base foram enviados ao final.' : ''}`
+          `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.totalEncontrados}\nTotal sem histórico: ${resultado.totalSemHistorico}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${alertaSemHistorico}`
         );
         if (!confirmou) return { cancelado: true };
         await Promise.all(resultado.ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
@@ -854,9 +874,12 @@ export default function DetalhePromocao() {
     },
     onSuccess: async (resultado) => {
       if (resultado?.cancelado) return;
-      const contexto = resultado?.historica ? 'pela antiguidade anterior' : 'pela lista atual';
-      const alertaFaltantes = resultado?.totalSemHistorico ? ` ${resultado.totalSemHistorico} sem histórico-base foram para o final.` : '';
-      toast({ title: 'Ordem atualizada', description: `${resultado?.atualizados || 0} militar(es) renumerado(s) ${contexto}.${alertaFaltantes}`.trim() });
+      if (resultado?.historica) {
+        const alertaFaltantes = resultado?.totalSemHistorico ? ` ${resultado.totalSemHistorico} sem histórico-base foram para o final.` : '';
+        toast({ title: 'Ordem atualizada', description: `Ordem atualizada pela antiguidade anterior.${alertaFaltantes}`.trim() });
+      } else {
+        toast({ title: 'Ordem atualizada', description: `${resultado?.atualizados || 0} militar(es) renumerado(s) pela lista atual.` });
+      }
       await invalidarDados();
     },
     onError: (error) => toast({ title: 'Falha ao ordenar promoção', description: error.message, variant: 'destructive' }),
