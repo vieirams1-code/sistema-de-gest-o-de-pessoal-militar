@@ -325,6 +325,7 @@ export default function DetalhePromocao() {
   const [buscaAdicionar, setBuscaAdicionar] = useState('');
   const [militarImpactoId, setMilitarImpactoId] = useState('');
   const [ordemImpactoBase, setOrdemImpactoBase] = useState('');
+  const [ordemManualAdicionar, setOrdemManualAdicionar] = useState({});
 
   const promocaoQuery = useQuery({
     queryKey: ['detalhe-promocao', promocaoId],
@@ -751,10 +752,12 @@ export default function DetalhePromocao() {
         historicos: historicosQuery.data || [],
         militares: militaresQuery.data || [],
       });
-      const ordemAplicada = sugestaoInsercao.podeAdicionar && Number(sugestaoInsercao.ordemSugerida) > 0
-        ? Number(sugestaoInsercao.ordemSugerida)
-        : undefined;
-      if (!sugestaoInsercao.podeAdicionar) throw new Error(sugestaoInsercao.alertas[0] || 'Sem histórico base anterior para sugerir inserção.');
+      const promocaoFormacaoTerceiro = /3º\s*sargento|3o\s*sargento/i.test(String(promocao?.posto_graduacao || ''));
+      const ordemManual = Number(item?.ordemManual || 0);
+      const ordemAplicada = promocaoFormacaoTerceiro
+        ? (Number.isFinite(ordemManual) && ordemManual > 0 ? ordemManual : undefined)
+        : (sugestaoInsercao.podeAdicionar && Number(sugestaoInsercao.ordemSugerida) > 0 ? Number(sugestaoInsercao.ordemSugerida) : undefined);
+      if (!promocaoFormacaoTerceiro && !sugestaoInsercao.podeAdicionar) throw new Error(sugestaoInsercao.alertas[0] || 'Sem histórico base anterior para sugerir inserção.');
 
       const payload = montarPayloadAdicaoManualTurma({
         promocao,
@@ -774,6 +777,7 @@ export default function DetalhePromocao() {
       toast({ title: 'Militar adicionado', description: 'O militar foi incluído na lista desta promoção.' });
       setModalAdicionarAberto(false);
       setBuscaAdicionar('');
+      setOrdemManualAdicionar({});
       await invalidarDados();
     },
     onError: (error) => toast({ title: 'Falha ao adicionar militar', description: error.message, variant: 'destructive' }),
@@ -967,7 +971,9 @@ export default function DetalhePromocao() {
                 <div>
                   <CardTitle>Militares da Promoção ({listaExibida.length})</CardTitle>
                   <p className="mt-1 text-sm text-slate-500">Ordem calculada pela antiguidade anterior.</p>
-                  <p className="mt-1 text-xs text-slate-500">Edição manual da ordem está temporariamente somente leitura neste lote (TODO: habilitar apenas para admin com justificativa).</p>
+                  { /3º\s*sargento|3o\s*sargento/i.test(String(promocaoReferenciaCadastro?.posto_graduacao || ''))
+                    ? <p className="mt-1 text-xs text-blue-700">Promoção de formação/classificação: informe a ordem manual da turma.</p>
+                    : <p className="mt-1 text-xs text-slate-500">Edição manual da ordem permanece somente leitura para promoções sucessivas.</p> }
                 <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="text-sm font-semibold text-slate-700">Simulador de impacto da cadeia (somente leitura)</p>
                   <div className="mt-2 grid gap-2 md:grid-cols-3">
@@ -1118,7 +1124,18 @@ export default function DetalhePromocao() {
                       </p>
                       {item.avisoCompatibilidade && <p className="mt-2 text-xs text-amber-700">{item.avisoCompatibilidade}</p>}
                     </div>
-                    <Button size="sm" onClick={() => adicionarMutation.mutate(item)} disabled={adicionarMutation.isPending}>
+                    {/3º\s*sargento|3o\s*sargento/i.test(String(promocao?.posto_graduacao || '')) && (
+                      <div className="w-full sm:w-44">
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="Ordem da turma"
+                          value={ordemManualAdicionar[item.id] ?? ''}
+                          onChange={(e) => setOrdemManualAdicionar((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                        />
+                      </div>
+                    )}
+                    <Button size="sm" onClick={() => adicionarMutation.mutate({ ...item, ordemManual: ordemManualAdicionar[item.id] })} disabled={adicionarMutation.isPending}>
                       Adicionar
                     </Button>
                   </div>
