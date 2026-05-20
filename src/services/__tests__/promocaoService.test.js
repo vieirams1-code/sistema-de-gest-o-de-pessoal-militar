@@ -1214,3 +1214,44 @@ test('desempate por data de nascimento mantém militar mais velho antes', () => 
   });
   assert.equal(resultado.ordemSugerida, 2);
 });
+
+test('3º Sgt publica com ordem manual e grava antiguidade_referencia_ordem', async () => {
+  const historicosCriados = [];
+  const entities = {
+    HistoricoPromocaoMilitarV2: { list: async () => [], create: async (p) => { historicosCriados.push(p); return { id: 'h1', ...p }; }, update: async () => {} },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+  };
+  const resultado = await publicarPromocaoOficial({
+    promocao: { id: 'p1', posto_graduacao: '3º Sgt', quadro: 'QPPM', data_promocao: '2024-01-01', status: 'rascunho' },
+    itens: [{ id: 'pm1', militar_id: 'm1', ordem: 7, status: 'ativo', militar: { posto_graduacao: 'Aluno', quadro: 'QPPM' } }],
+    entities,
+    contextoPublicacao: { promocaoInicio: true, ordemManualObrigatoria: true, fonteOrdem: 'manual' },
+  });
+  assert.equal(resultado.publicados, 1);
+  assert.equal(historicosCriados[0].antiguidade_referencia_ordem, 7);
+});
+
+test('3º Sgt bloqueia ordem duplicada', () => {
+  const validacao = validarPublicacaoPromocao({
+    promocao: { id: 'p1', posto_graduacao: '3º Sgt', quadro: 'QPPM', data_promocao: '2024-01-01' },
+    itens: [
+      { militar_id: 'm1', ordem: 1, status: 'ativo', militar: {} },
+      { militar_id: 'm2', ordem: 1, status: 'ativo', militar: {} },
+    ],
+    contextoPublicacao: { promocaoInicio: true, ordemManualObrigatoria: true, fonteOrdem: 'manual' },
+  });
+  assert.equal(validacao.valido, false);
+  assert.match(validacao.bloqueios.join(' '), /ordem duplicada/i);
+});
+
+test('validação e publicação usam o mesmo contexto efetivo', async () => {
+  const args = {
+    promocao: { id: 'p2', posto_graduacao: '2º Sgt', quadro: 'QPPM', data_promocao: '2020-01-01' },
+    itens: [{ id: 'pm1', militar_id: 'm1', ordem: 1, status: 'ativo', militar: { posto_graduacao: '3º Sgt', quadro: 'QPPM' } }],
+    contextoPublicacao: { promocaoSucessiva: true, statusOperacional: 'historica', fonteOrdem: 'lista_atual' },
+  };
+  const validacao = validarPublicacaoPromocao(args);
+  assert.equal(validacao.valido, false);
+  await assert.rejects(() => publicarPromocaoOficial({ ...args, entities: { HistoricoPromocaoMilitarV2: { list: async () => [], create: async () => ({ id: 'h1' }), update: async () => {} }, PromocaoMilitar: { update: async () => {} }, Promocao: { update: async () => {} } } }), /histórico V2 temporal/i);
+});
