@@ -157,15 +157,40 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto, in
   };
 }
 
+export function buildPreviewTemplateVars(overrides = {}) {
+  const base = {
+    nome: 'João da Silva',
+    nome_completo: 'João da Silva',
+    matricula: '123456',
+    posto_abreviatura: 'Cap',
+    quadro: 'QPTBM',
+  };
+
+  const merged = { ...base, ...overrides };
+  const quadro = resolveQuadroTemplate(merged);
+  const posto = String(merged.posto_abreviatura || merged.posto || '').trim();
+  const postoNome = montarPostoNomeTemplate({
+    abreviatura: posto,
+    quadro,
+    source: merged,
+  });
+
+  return {
+    ...merged,
+    nome: merged.nome || merged.nome_completo || '',
+    nome_completo: merged.nome_completo || merged.nome || '',
+    posto,
+    quadro,
+    quadro_nome: quadro,
+    militar_quadro: quadro,
+    posto_nome: postoNome,
+  };
+}
+
 /**
  * Dados simulados para preview do template na página de edição.
  */
-export const VARS_PREVIEW = {
-  posto_nome: 'Cap QPTBM',
-  posto: 'Cap',
-  quadro_nome: 'QPTBM',
-  nome_completo: 'João da Silva',
-  matricula: '123456',
+export const VARS_PREVIEW = buildPreviewTemplateVars({
   data_inicio: '01/04/2026',
   data_termino: '30/04/2026',
   data_retorno: '01/05/2026',
@@ -236,11 +261,10 @@ export const VARS_PREVIEW = {
   tipo_ref: 'Transferência',
   militar_nome: 'João da Silva',
   posto_graduacao: '3º Sargento',
-  quadro: 'QPBM',
   unidade: '1º GBM',
   comportamento_anterior: 'Bom',
   comportamento_novo: 'Ótimo',
   data_alteracao: '01/03/2026',
   motivo_mudanca: 'cumprimento dos requisitos temporais para melhoria',
   fundamento_legal: 'Art. 52 do regulamento disciplinar',
-};
+});

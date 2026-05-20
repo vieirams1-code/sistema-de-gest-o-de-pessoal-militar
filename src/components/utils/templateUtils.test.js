@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  aplicarTemplate,
+  buildPreviewTemplateVars,
   buildVarsLivro,
   montarPostoNomeTemplate,
   resolveQuadroTemplate,
@@ -25,6 +27,39 @@ test('buildVarsLivro expõe quadro_nome sem quebrar posto_nome legado', () => {
   assert.equal(vars.posto, 'Cap');
   assert.equal(vars.quadro_nome, 'QOBM');
   assert.equal(vars.militar_quadro, 'QOBM');
+});
+
+test('buildPreviewTemplateVars retorna aliases de quadro coerentes', () => {
+  const vars = buildPreviewTemplateVars();
+
+  assert.equal(vars.quadro, 'QPTBM');
+  assert.equal(vars.quadro_nome, vars.quadro);
+  assert.equal(vars.militar_quadro, vars.quadro);
+});
+
+test('buildPreviewTemplateVars usa mesmo contrato para posto_nome', () => {
+  const vars = buildPreviewTemplateVars({ posto_abreviatura: 'Maj', quadro: 'QOSAU' });
+  const esperado = montarPostoNomeTemplate({ abreviatura: 'Maj', quadro: 'QOSAU', source: vars });
+
+  assert.equal(vars.posto_nome, esperado);
+});
+
+test('buildPreviewTemplateVars respeita override de quadro QOBM sem fallback artificial', () => {
+  const vars = buildPreviewTemplateVars({ quadro: 'QOBM' });
+  assert.equal(vars.quadro, 'QOBM');
+  assert.equal(vars.quadro_nome, 'QOBM');
+  assert.equal(vars.militar_quadro, 'QOBM');
+});
+
+test('buildPreviewTemplateVars sem quadro não inventa QOBM', () => {
+  const vars = buildPreviewTemplateVars({ quadro: '', quadro_nome: '', militar_quadro: '' });
+  assert.equal(vars.quadro, '');
+});
+
+test('aplicarTemplate mantém aliases de quadro com o mesmo valor', () => {
+  const vars = buildPreviewTemplateVars({ quadro: 'QPTBM' });
+  const saida = aplicarTemplate('{{quadro}}|{{quadro_nome}}|{{militar_quadro}}', vars);
+  assert.equal(saida, 'QPTBM|QPTBM|QPTBM');
 });
 
 test('resolveQuadroTemplate retorna QPTBM quando quadro real existir', () => {
