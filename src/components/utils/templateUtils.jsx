@@ -105,6 +105,7 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto, in
   return {
     posto_nome: [abreviatura, quadro].filter(Boolean).join(' '),
     posto: abreviatura,
+    quadro_nome: quadro,
     nome_completo: ferias.militar_nome || '',
     matricula: ferias.militar_matricula || '',
     data_inicio: formatDateBR(ferias.data_inicio),
@@ -134,6 +135,7 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto, in
 export const VARS_PREVIEW = {
   posto_nome: 'Cap QOBM',
   posto: 'Cap',
+  quadro_nome: 'QOBM',
   nome_completo: 'João da Silva',
   matricula: '123456',
   data_inicio: '01/04/2026',
