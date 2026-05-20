@@ -761,6 +761,16 @@ export default function RegistrosMilitar() {
                           Classificação pendente
                         </Badge>
                       )}
+                      {registro.marcador_apostilada && (
+                        <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
+                          Apostilada
+                        </Badge>
+                      )}
+                      {registro.marcador_tornada_sem_efeito && (
+                        <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700">
+                          Tornada sem Efeito
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-2">

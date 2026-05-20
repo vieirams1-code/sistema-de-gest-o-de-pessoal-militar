@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { calcularFoiApostilada } from '@/components/publicacao/apostilaUtils';
 import { vinculaRegistroAoMilitar } from './registrosMilitarMatcher.js';
 
 function limparTexto(valor) {
@@ -40,8 +41,33 @@ export async function listarRegistrosMilitar() {
 
   const sistemaNormalizado = (Array.isArray(registrosSistema) ? registrosSistema : []).map((registro) => normalizarRegistro(registro, 'RegistroLivro'));
   const exOfficioNormalizado = (Array.isArray(registrosExOfficio) ? registrosExOfficio : []).map((registro) => normalizarRegistro(registro, 'PublicacaoExOfficio'));
+  const registrosUnificados = [...sistemaNormalizado, ...exOfficioNormalizado];
 
-  return [...sistemaNormalizado, ...exOfficioNormalizado];
+  return registrosUnificados.map((registro) => {
+    const apostilas = registrosUnificados.filter((item) => item.publicacao_referencia_id === registro.id && item.tipo === 'Apostila');
+    const tsesPorApostila = apostilas.map((apostila) => ({
+      apostila,
+      tse: apostila.tornada_sem_efeito_por_id
+        ? registrosUnificados.find((item) => item.id === apostila.tornada_sem_efeito_por_id)
+        : registrosUnificados.find((item) => item.publicacao_referencia_id === apostila.id && item.tipo === 'Tornar sem Efeito') || null,
+    }));
+
+    const foiApostilada = calcularFoiApostilada({
+      raiz: registro,
+      apostilas,
+      tsesPorApostila,
+    });
+
+    const tseVinculada = registro.tornada_sem_efeito_por_id
+      ? registrosUnificados.find((item) => item.id === registro.tornada_sem_efeito_por_id)
+      : registrosUnificados.find((item) => item.publicacao_referencia_id === registro.id && item.tipo === 'Tornar sem Efeito');
+
+    return {
+      ...registro,
+      marcador_apostilada: Boolean(foiApostilada),
+      marcador_tornada_sem_efeito: Boolean(registro.tornada_sem_efeito_por_id || tseVinculada),
+    };
+  });
 }
 
 function getEntityFromRegistro(registro) {
