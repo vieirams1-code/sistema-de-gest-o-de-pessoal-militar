@@ -291,9 +291,19 @@ function MilitarCard({
           </Badge>
           {(() => {
             const statusRegistro = statusNormalizado(registro.status);
-            const publicado = Boolean(registro.publicado) || statusRegistro === 'publicado';
+            const publicado = Boolean(registro.publicado);
             const canceladoOuRetificado = statusRegistro === 'cancelado' || statusRegistro === 'retificado';
-            const podeRemover = !publicado && !canceladoOuRetificado;
+            const ocultarRemover = publicado || ['cancelado', 'retificado', 'publicado'].includes(statusRegistro);
+            const podeRemover = !ocultarRemover;
+            console.log({
+              id: registro.id,
+              statusOriginal: registro.status,
+              statusNormalizado: statusRegistro,
+              publicado: registro.publicado,
+              podeRemover,
+              canceladoOuRetificado,
+              editavel,
+            });
 
             if (publicado) {
               return canReverterPublicacao ? (
