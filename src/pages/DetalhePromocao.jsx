@@ -40,8 +40,7 @@ import {
   sincronizarHistoricoPromocaoPublicada,
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
-  valorOuTraco,
-  isPromocaoInicioCadeia,
+  valorOuTraco
 } from '@/services/promocaoService';
 import { getSugestaoAtualizacaoCadastro } from '@/utils/postoGraduacaoHierarquia';
 import {
@@ -50,6 +49,7 @@ import {
   normalizarQuadroPreviaAntiguidade,
 } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
 import { isPromocaoHistorica, ordenarPorAntiguidadeAnterior } from '@/utils/promocao/ordenacaoPromocao';
+import { buildPromocaoContext } from '@/utils/promocao/buildPromocaoContext';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
 const diagLog = (evento, dados = {}) => console.info(`${DIAG_PREFIX} ${evento}`, dados);
@@ -224,7 +224,7 @@ function MilitarCard({
   registro,
   original,
   promocao,
-  promocaoInicioCadeia,
+  promocaoContext,
   onAtualizar,
   onRemover,
   onExcluirDefinitivo,
@@ -241,7 +241,7 @@ function MilitarCard({
   const efeitoCadastro = efeitoCadastroVisualPorRegistro({ registro, militar, promocao });
   const resultadoCadastro = resultadoAplicacaoCadastro(efeitoCadastro);
   const ordemEditavel =
-    promocaoInicioCadeia &&
+    promocaoContext.permiteEdicaoOrdem &&
     !Boolean(registro.publicado) &&
     !['publicado', 'publicada', 'consolidado', 'consolidada', 'cancelado', 'retificado'].includes(statusNormalizado(registro.status));
 
@@ -525,10 +525,7 @@ export default function DetalhePromocao() {
     quadro: rascunhoPromocao.quadro || promocao?.quadro,
   }), [promocao, rascunhoPromocao]);
 
-  const promocaoInicioCadeia = useMemo(
-    () => isPromocaoInicioCadeia(promocaoContextoAtual),
-    [promocaoContextoAtual],
-  );
+  const promocaoContext = useMemo(() => buildPromocaoContext(promocaoContextoAtual), [promocaoContextoAtual]);
   const rascunhoTurmaOrdenado = useMemo(() => (
     [...rascunhoTurma].sort((a, b) => {
       const originalA = turma.find((item) => String(item.id) === String(a.id));
@@ -769,10 +766,10 @@ export default function DetalhePromocao() {
       if (jaExiste) throw new Error('Este militar já está na promoção.');
       const usuario = typeof base44.auth?.me === 'function' ? await base44.auth.me() : null;
       const ordemManual = Number(item?.ordemManual || 0);
-      if (promocaoInicioCadeia && (!Number.isFinite(ordemManual) || ordemManual <= 0)) {
+      if (promocaoContext.promocaoInicio && (!Number.isFinite(ordemManual) || ordemManual <= 0)) {
         throw new Error('Informe a classificação da turma.');
       }
-      const ordemAplicada = promocaoInicioCadeia
+      const ordemAplicada = promocaoContext.promocaoInicio
         ? (Number.isFinite(ordemManual) && ordemManual > 0 ? ordemManual : undefined)
         : undefined;
 
@@ -800,7 +797,7 @@ export default function DetalhePromocao() {
   const ordenarPelaListaAtualMutation = useMutation({
     mutationFn: async () => {
       if (!promocao) throw new Error('Promoção não carregada.');
-      if (promocaoInicioCadeia) throw new Error('Promoção de início de cadeia mantém classificação manual.');
+      if (!promocaoContext.permiteOrdenacao) throw new Error('Promoção de início de cadeia mantém classificação manual.');
       const historica = isPromocaoHistorica(promocao);
       if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
         const historicoV2 = historicosQuery.data || [];
@@ -1074,12 +1071,12 @@ export default function DetalhePromocao() {
                 <div>
                   <CardTitle>Militares da Promoção ({listaExibida.length})</CardTitle>
                   <p className="mt-1 text-sm text-slate-500">A ordem é livre na adição. Use a ordenação automática conforme o contexto da promoção.</p>
-                  {promocaoInicioCadeia
+                  {promocaoContext.promocaoInicio
                     ? <p className="mt-1 text-xs text-blue-700">Promoção de início de cadeia: informe manualmente a classificação da turma.</p>
                     : <p className="mt-1 text-xs text-slate-500">Edição manual da ordem permanece somente leitura para promoções sucessivas.</p> }
                 </div>
                 <div className="flex gap-2">
-                  {!promocaoInicioCadeia && (
+                  {promocaoContext.permiteOrdenacao && (
                     <Button
                       variant="outline"
                       onClick={() => ordenarPelaListaAtualMutation.mutate()}
@@ -1131,7 +1128,7 @@ export default function DetalhePromocao() {
                         original={original}
                         acaoEmAndamento={removerMutation.isPending || excluirDefinitivoMutation.isPending || reverterPublicacaoMutation.isPending}
                         promocao={promocaoContextoAtual}
-                        promocaoInicioCadeia={promocaoInicioCadeia}
+                        promocaoContext={promocaoContext}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
                         onExcluirDefinitivo={setRegistroParaExcluirDefinitivo}
@@ -1200,7 +1197,7 @@ export default function DetalhePromocao() {
                       </p>
                       {item.avisoCompatibilidade && <p className="mt-2 text-xs text-amber-700">{item.avisoCompatibilidade}</p>}
                     </div>
-                    {promocaoInicioCadeia && (
+                    {promocaoContext.permiteEdicaoOrdem && (
                       <div className="w-full sm:w-44">
                         <Input
                           type="number"
@@ -1214,8 +1211,8 @@ export default function DetalhePromocao() {
                     <Button
                       size="sm"
                       onClick={() => adicionarMutation.mutate({ ...item, ordemManual: ordemManualAdicionar[item.id] })}
-                      disabled={adicionarMutation.isPending || (promocaoInicioCadeia && Number(ordemManualAdicionar[item.id]) <= 0)}
-                      title={promocaoInicioCadeia && Number(ordemManualAdicionar[item.id]) <= 0 ? 'Informe a classificação da turma.' : ''}
+                      disabled={adicionarMutation.isPending || (promocaoContext.permiteEdicaoOrdem && Number(ordemManualAdicionar[item.id]) <= 0)}
+                      title={promocaoContext.permiteEdicaoOrdem && Number(ordemManualAdicionar[item.id]) <= 0 ? 'Informe a classificação da turma.' : ''}
                     >
                       Adicionar
                     </Button>
