@@ -816,7 +816,7 @@ export default function DetalhePromocao() {
           isHistorica: historica,
           caminhoUsado: historica ? 'historico-v2' : 'previa-atual',
           totalHistoricos: historicoV2.length,
-          totalBaseEncontrada: basePreview.totalEncontrados || 0,
+          totalBaseEncontrada: basePreview.encontrados || 0,
         });
       }
       if (historica) {
@@ -827,15 +827,16 @@ export default function DetalhePromocao() {
           militares: militaresQuery.data || [],
         });
         const previaTexto = resultado.ordenados.slice(0, 10).map((item) => `${nomeMilitar(item?.militar || {})}: #${item?.ordem}`).join('\n');
-        const alertaSemHistorico = resultado.totalSemHistorico > 0
+        const alertaSemHistorico = resultado.semHistorico.length > 0
           ? `\n\nSem histórico-base (final da lista):\n${resultado.semHistorico.join('\n')}`
           : '';
+        const alertaResumo = resultado.alertas.length ? `\n\nAlertas:\n- ${resultado.alertas.join('\n- ')}` : '';
         const confirmou = window.confirm(
-          `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.totalEncontrados}\nTotal sem histórico: ${resultado.totalSemHistorico}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${alertaSemHistorico}`
+          `Ordenar pela antiguidade anterior?\n\nBase usada: ${resultado.base.posto || '—'} / ${resultado.base.quadro || '—'}\nTotal encontrados: ${resultado.encontrados}\nTotal sem histórico: ${resultado.semHistorico.length}\n\nPrévia (primeiros 10):\n${previaTexto}${resultado.ordenados.length > 10 ? '\n...' : ''}${alertaSemHistorico}${alertaResumo}`
         );
         if (!confirmou) return { cancelado: true };
         await Promise.all(resultado.ordenados.map((item) => base44.entities.PromocaoMilitar.update(item.id, { ordem: item.ordem })));
-        return { atualizados: resultado.ordenados.length, totalSemHistorico: resultado.totalSemHistorico, historica: true };
+        return { atualizados: resultado.ordenados.length, totalSemHistorico: resultado.semHistorico.length, historica: true };
       }
 
       const previa = calcularPreviaAntiguidadeGeral({

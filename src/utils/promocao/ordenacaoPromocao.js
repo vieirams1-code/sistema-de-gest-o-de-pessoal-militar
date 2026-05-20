@@ -71,12 +71,28 @@ export function ordenarPorAntiguidadeAnterior({ promocao, itensPromocao = [], hi
     return String(a?.militar?.matricula || a?.militar_id || a?.id || '').localeCompare(String(b?.militar?.matricula || b?.militar_id || b?.id || ''));
   }).map((item, index) => ({ ...item, ordem: index + 1 }));
 
+  const encontrados = ordenados.length - semHistorico.length;
+  const base = { posto: postoBaseAnterior, quadro: promocao?.quadro || '' };
+  const alertas = [];
+  if (!base.posto || !base.quadro) {
+    alertas.push('Base anterior incompleta para ordenação histórica.');
+  }
+  if (!encontrados) {
+    alertas.push('Nenhum militar com histórico-base elegível encontrado em HistoricoPromocaoMilitarV2.');
+  }
+  if (semHistorico.length > 0) {
+    alertas.push(`${semHistorico.length} militar(es) sem histórico-base foram posicionados ao final.`);
+  }
+
   return {
-    base: { posto: postoBaseAnterior, quadro: promocao?.quadro || '' },
-    totalEncontrados: ordenados.length - semHistorico.length,
-    totalSemHistorico: semHistorico.length,
-    semHistorico,
     ordenados,
+    encontrados,
+    semHistorico,
+    base,
+    alertas,
+    // compatibilidade retroativa
+    totalEncontrados: encontrados,
+    totalSemHistorico: semHistorico.length,
   };
 }
 

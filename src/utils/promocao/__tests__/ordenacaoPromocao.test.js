@@ -15,6 +15,11 @@ test('ordena promoção histórica de 2º Sgt com base em histórico de 3º Sgt'
   ];
   const resultado = ordenarPorAntiguidadeAnterior({ promocao, itensPromocao: itens, historicoV2: historico, militares: [] });
   assert.deepEqual(resultado.ordenados.map((x) => x.militar_id), ['2', '1']);
+  assert.equal(resultado.encontrados, 2);
+  assert.equal(resultado.semHistorico.length, 0);
+  assert.equal(resultado.base.posto, '3º Sargento');
+  assert.equal(resultado.alertas.some((alerta) => alerta.toLowerCase().includes('nenhum')), false);
+  assert.equal(resultado.alertas.some((alerta) => alerta.toLowerCase().includes('incompleta')), false);
 });
 
 test('militar sem histórico-base vai ao final e gera alerta nominal', () => {
