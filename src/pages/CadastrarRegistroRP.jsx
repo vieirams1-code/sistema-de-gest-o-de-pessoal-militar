@@ -31,7 +31,13 @@ import {
   getTemplateAtivoPorTipo,
   tipoExigeTemplate,
 } from '@/components/rp/templateValidation';
-import { aplicarTemplate, abreviarPosto, formatDateBR } from '@/components/utils/templateUtils';
+import {
+  aplicarTemplate,
+  abreviarPosto,
+  formatDateBR,
+  montarPostoNomeTemplate,
+  resolveQuadroTemplate,
+} from '@/components/utils/templateUtils';
 import {
   anexarEventoAuditoriaPublicacao,
   calcularStatusPublicacaoRegistro,
@@ -153,7 +159,11 @@ function formatarDataExtenso(dataStr) {
 function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, publicacoesDisponiveis = [] } = {}) {
   const postoBase = formData.militar_posto || militar?.posto_graduacao || militar?.posto || '';
   const postoAbreviado = abreviarPosto(postoBase);
-  const quadroBase = String(formData.militar_quadro || militar?.quadro || militar?.militar_quadro || '').trim();
+  const quadroBase = resolveQuadroTemplate({
+    ...formData,
+    militar,
+    quadro_atual: militar?.quadro_atual,
+  });
   const dataRegistro = formData.data_registro || formData.data_publicacao || '';
 
   const dadosPublicacaoReferencia = extrairDadosPublicacaoReferencia({ formData, publicacoesDisponiveis });
@@ -167,9 +177,11 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, pub
     matricula: formData.militar_matricula || militar?.matricula || '',
     militar_posto: postoBase,
     posto: postoAbreviado,
-    posto_nome: [postoAbreviado, quadroBase].filter(Boolean).join(' '),
+    posto_nome: montarPostoNomeTemplate({ abreviatura: postoAbreviado, quadro: quadroBase }),
     posto_graduacao: postoBase,
     quadro: quadroBase,
+    quadro_nome: quadroBase,
+    militar_quadro: quadroBase,
     data_registro: formatDateBR(dataRegistro),
     data_publicacao: formatDateBR(dataRegistro),
     data_bg: formatDateBR(formData.data_bg),

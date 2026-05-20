@@ -26,6 +26,31 @@ export const abreviarPosto = (posto) => {
   return ABREVIATURAS[posto] || posto;
 };
 
+export const resolveQuadroTemplate = (source = {}) => {
+  const candidatos = [
+    source?.quadro,
+    source?.quadro_nome,
+    source?.militar_quadro,
+    source?.quadro_atual,
+    source?.militar?.quadro,
+    source?.militar?.quadro_nome,
+    source?.militar?.militar_quadro,
+  ];
+
+  for (const candidato of candidatos) {
+    const valor = String(candidato || '').trim();
+    if (valor) return valor;
+  }
+
+  return '';
+};
+
+export const montarPostoNomeTemplate = ({ abreviatura, posto, quadro, source } = {}) => {
+  const postoResolvido = String(abreviatura || posto || '').trim();
+  const quadroResolvido = String(quadro || resolveQuadroTemplate(source) || '').trim();
+  return [postoResolvido, quadroResolvido].filter(Boolean).join(' ');
+};
+
 const numeroPorExtenso = (num) => {
   const numeros = {
     1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',10:'dez',
@@ -100,12 +125,15 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto, in
   const dias = diasBase;
   const desconto = diasDesconto || ferias._diasDesconto || 0;
   const abreviatura = abreviarPosto(ferias.militar_posto);
-  const quadro = String(ferias.militar_quadro || '').trim();
+  const quadro = resolveQuadroTemplate(ferias);
+  const postoNome = montarPostoNomeTemplate({ abreviatura, quadro, source: ferias });
 
   return {
-    posto_nome: [abreviatura, quadro].filter(Boolean).join(' '),
+    posto_nome: postoNome,
     posto: abreviatura,
+    quadro,
     quadro_nome: quadro,
+    militar_quadro: quadro,
     nome_completo: ferias.militar_nome || '',
     matricula: ferias.militar_matricula || '',
     data_inicio: formatDateBR(ferias.data_inicio),

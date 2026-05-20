@@ -13,7 +13,12 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreMilitar';
 import { createPageUrl } from '@/utils';
-import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
+import {
+  aplicarTemplate,
+  abreviarPosto,
+  montarPostoNomeTemplate,
+  resolveQuadroTemplate,
+} from '@/components/utils/templateUtils';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
 import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
@@ -104,12 +109,19 @@ export default function EditarJISO() {
     };
 
     const abreviatura = abreviarPosto(atestado.militar_posto);
-    const quadro = String(militarAtestado?.quadro || atestadoContexto?.militar_quadro || atestado?.militar_quadro || '').trim();
-    const postoNome = [abreviatura, quadro].filter(Boolean).join(' ');
+    const quadro = resolveQuadroTemplate({
+      ...atestadoContexto,
+      ...atestado,
+      militar: militarAtestado,
+    });
+    const postoNome = montarPostoNomeTemplate({ abreviatura, quadro });
 
     const vars = {
       posto_nome: postoNome,
       posto: abreviatura,
+      quadro,
+      quadro_nome: quadro,
+      militar_quadro: quadro,
       nome_completo: atestado.militar_nome || '',
       matricula: atestadoContexto.militar_matricula_atual || atestado.militar_matricula || '',
       finalidade_jiso: formData.finalidade_jiso || '',
