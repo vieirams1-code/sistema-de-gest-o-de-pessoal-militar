@@ -50,6 +50,7 @@ import {
 } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
 import { isPromocaoHistorica, ordenarPorAntiguidadeAnterior } from '@/utils/promocao/ordenacaoPromocao';
 import { buildPromocaoContext } from '@/utils/promocao/buildPromocaoContext';
+import { canEditarOrdem, canExcluirDefinitivo, canRemoverDaTurma, canReverterItem } from '@/utils/promocao/promocaoStateMachine';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
 const diagLog = (evento, dados = {}) => console.info(`${DIAG_PREFIX} ${evento}`, dados);
@@ -240,10 +241,7 @@ function MilitarCard({
   const nomeGuerra = valorOuTraco(militar?.nome_guerra);
   const efeitoCadastro = efeitoCadastroVisualPorRegistro({ registro, militar, promocao });
   const resultadoCadastro = resultadoAplicacaoCadastro(efeitoCadastro);
-  const ordemEditavel =
-    promocaoContext.permiteEdicaoOrdem &&
-    !Boolean(registro.publicado) &&
-    !['publicado', 'publicada', 'consolidado', 'consolidada', 'cancelado', 'retificado'].includes(statusNormalizado(registro.status));
+  const ordemEditavel = canEditarOrdem(registro, { promocaoContext, promocao });
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
@@ -295,25 +293,23 @@ function MilitarCard({
             {rotuloSituacao(registro.status, registro.publicado)}
           </Badge>
           {(() => {
-            const statusRegistro = statusNormalizado(registro.status);
-            const publicado = Boolean(registro.publicado);
-            const canceladoOuRetificado = statusRegistro === 'cancelado' || statusRegistro === 'retificado';
-            const ocultarRemover = publicado || ['cancelado', 'retificado', 'publicado'].includes(statusRegistro);
-            const podeRemover = !ocultarRemover;
-            if (publicado) {
-              return canReverterPublicacao ? (
+            const podeRemover = canRemoverDaTurma(registro, { promocao, itens: promocaoContext?.itens || [] });
+            const podeReverter = canReverterPublicacao && canReverterItem(registro, { isAdmin });
+            const podeExcluirDefinitivo = canExcluirDefinitivo(registro, { isAdmin });
+            if (podeReverter) {
+              return (
                 <Button size="sm" variant="destructive" onClick={() => onReverterPublicacao({ ...registro, militar })} disabled={acaoEmAndamento}>
                   {acaoEmAndamento ? 'Aguarde' : 'Reverter publicação'}
                 </Button>
-              ) : null;
+              );
             }
 
-            if (statusRegistro === 'cancelado') {
-              return isAdmin ? (
+            if (podeExcluirDefinitivo) {
+              return (
                 <Button size="sm" variant="destructive" onClick={() => onExcluirDefinitivo({ ...registro, militar })} disabled={acaoEmAndamento}>
                   {acaoEmAndamento ? 'Aguarde' : 'Excluir definitivamente'}
                 </Button>
-              ) : null;
+              );
             }
 
             if (podeRemover) {
@@ -687,9 +683,8 @@ export default function DetalhePromocao() {
   const removerMutation = useMutation({
     mutationFn: async (registro) => {
       if (!registro) throw new Error('Selecione um militar.');
-      const statusRegistro = String(registro?.status || '').toLowerCase();
-      if (registro.publicado) throw new Error('Não é possível remover militar publicado.');
-      if (registro?.historico_promocao_v2_id || ['cancelado', 'retificado'].includes(statusRegistro)) {
+      if (!canRemoverDaTurma(registro, { promocao, itens: listaExibida })) throw new Error('Não é possível remover este militar no estado atual.');
+      if (registro?.historico_promocao_v2_id) {
         throw new Error('Não é possível remover item com histórico oficial/cancelado; mantenha para preservar rastreabilidade.');
       }
       await base44.entities.PromocaoMilitar.delete(registro.id);
@@ -726,7 +721,7 @@ export default function DetalhePromocao() {
   const reverterPublicacaoMutation = useMutation({
     mutationFn: async (registro) => {
       if (!isAdmin) throw new Error('Apenas administrador pode reverter publicação.');
-      if (!registro?.publicado) throw new Error('Somente item publicado pode ser revertido.');
+      if (!canReverterItem(registro, { isAdmin })) throw new Error('Somente item publicado pode ser revertido.');
       return reverterPublicacaoPromocaoMilitar({
         promocao,
         item: registro,
