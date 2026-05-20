@@ -20,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, FileText, Save, Info, Eye, AlertCircle, Copy } from 'lucide-react';
-import { aplicarTemplate, VARS_PREVIEW, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
+import { aplicarTemplate, buildPreviewTemplateVars, extrairVariaveisDoTemplate } from '@/components/utils/templateUtils';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { RP_TIPOS_BASE, MODULO_LIVRO, MODULO_EX_OFFICIO } from '@/components/rp/rpTiposConfig';
@@ -1038,7 +1038,7 @@ export default function TemplatesTexto() {
                   </div>
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                     {(() => {
-                      const textoPreview = aplicarTemplate(editingTemplate.template, VARS_PREVIEW);
+                      const textoPreview = aplicarTemplate(editingTemplate.template, buildPreviewTemplateVars());
                       const regex = /\{\{([^}]+)\}\}/g;
                       const parts = [];
                       let lastIndex = 0;
