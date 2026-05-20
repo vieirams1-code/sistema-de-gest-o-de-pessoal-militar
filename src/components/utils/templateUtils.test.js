@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildVarsLivro } from './templateUtils.jsx';
+import {
+  buildVarsLivro,
+  montarPostoNomeTemplate,
+  resolveQuadroTemplate,
+} from './templateUtils.jsx';
 
 test('buildVarsLivro expõe quadro_nome sem quebrar posto_nome legado', () => {
   const vars = buildVarsLivro({
@@ -20,4 +24,25 @@ test('buildVarsLivro expõe quadro_nome sem quebrar posto_nome legado', () => {
   assert.equal(vars.posto_nome, 'Cap QOBM');
   assert.equal(vars.posto, 'Cap');
   assert.equal(vars.quadro_nome, 'QOBM');
+  assert.equal(vars.militar_quadro, 'QOBM');
+});
+
+test('resolveQuadroTemplate retorna QPTBM quando quadro real existir', () => {
+  assert.equal(resolveQuadroTemplate({ quadro_nome: 'QPTBM' }), 'QPTBM');
+});
+
+test('resolveQuadroTemplate retorna QOBM quando quadro real existir', () => {
+  assert.equal(resolveQuadroTemplate({ militar_quadro: 'QOBM' }), 'QOBM');
+});
+
+test('resolveQuadroTemplate não inventa fallback QOBM quando ausência de quadro', () => {
+  assert.equal(resolveQuadroTemplate({}), '');
+});
+
+test('montarPostoNomeTemplate compõe posto + quadro', () => {
+  assert.equal(montarPostoNomeTemplate({ abreviatura: 'Cap', quadro: 'QPTBM' }), 'Cap QPTBM');
+});
+
+test('montarPostoNomeTemplate retorna somente posto quando quadro não existe', () => {
+  assert.equal(montarPostoNomeTemplate({ abreviatura: 'Cap', quadro: '' }), 'Cap');
 });

@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { getTipoRegistroLabel } from '@/components/livro/livroTipoRegistroConfig';
-import { aplicarTemplate, buildVarsLivro } from '@/components/utils/templateUtils';
+import { aplicarTemplate, buildVarsLivro, resolveQuadroTemplate } from '@/components/utils/templateUtils';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { getTipoFeriasOperacional, resolverTipoFeriasCanonico } from '@/components/ferias/feriasTipoResolver';
 
@@ -246,6 +246,10 @@ function mapVinculos({ registro, ferias, periodo, cadeiaInfo }) {
 }
 
 function mapMilitar(registro, militar) {
+  const quadro = resolveQuadroTemplate({
+    ...registro,
+    militar,
+  });
   return {
     id: registro?.militar_id || militar?.id || null,
     nome_completo:
@@ -267,7 +271,9 @@ function mapMilitar(registro, militar) {
       registro?.nome_guerra ||
       null,
     posto_graduacao: registro?.militar_posto || militar?.posto_graduacao || militar?.militar_posto || null,
-    quadro: registro?.militar_quadro || militar?.quadro || null,
+    quadro: quadro || null,
+    quadro_nome: quadro || null,
+    militar_quadro: quadro || null,
     matricula: militar?.matricula_atual || militar?.matricula || registro?.militar_matricula || militar?.militar_matricula || null,
     matricula_atual: militar?.matricula_atual || militar?.matricula || null,
     matricula_registro: registro?.militar_matricula || null,

@@ -38,7 +38,12 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import JisoHistoricoModal from './JisoHistoricoModal';
 import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
-import { aplicarTemplate, abreviarPosto } from '@/components/utils/templateUtils';
+import {
+  aplicarTemplate,
+  abreviarPosto,
+  montarPostoNomeTemplate,
+  resolveQuadroTemplate,
+} from '@/components/utils/templateUtils';
 import {
   calcStatusPublicacao,
   existePublicacaoAtivaParaAtestado,
@@ -113,9 +118,17 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
 
   const montarPostoNome = () => {
     const abreviatura = abreviarPosto(atestado?.militar_posto);
-    const quadro = String(militarAtestado?.quadro || atestado?.militar_quadro || '').trim();
-    return [abreviatura, quadro].filter(Boolean).join(' ');
+    const quadro = resolveQuadroTemplate({
+      ...atestado,
+      militar: militarAtestado,
+    });
+    return montarPostoNomeTemplate({ abreviatura, quadro });
   };
+
+  const quadroTemplate = resolveQuadroTemplate({
+    ...atestado,
+    militar: militarAtestado,
+  });
 
   const gerarTextoHomologacao = (form) => {
     const tmpl = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templates, {
@@ -127,6 +140,9 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     const posto = montarPostoNome();
     return aplicarTemplate(tmpl.template, {
       posto_nome: posto,
+      quadro: quadroTemplate,
+      quadro_nome: quadroTemplate,
+      militar_quadro: quadroTemplate,
       nome_completo: atestado.militar_nome,
       matricula: matriculaDocumental,
       dias: String(atestado.dias),
@@ -147,6 +163,9 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     const posto = montarPostoNome();
     return aplicarTemplate(tmpl.template, {
       posto_nome: posto,
+      quadro: quadroTemplate,
+      quadro_nome: quadroTemplate,
+      militar_quadro: quadroTemplate,
       nome_completo: atestado.militar_nome,
       matricula: matriculaDocumental,
       secao_jiso: form.secao_jiso || '___',
