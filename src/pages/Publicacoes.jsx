@@ -24,6 +24,7 @@ import { getLivroRegistrosContrato } from '@/components/livro/livroService';
 import { calcularMetricasPublicacao, listarAtestadosPublicacaoEscopo, listarPublicacoesExOfficioEscopo } from '@/services/publicacoesPainelService';
 import { reconciliarCadeiaFerias } from '@/components/ferias/reconciliacaoCadeiaFerias';
 import { RP_TIPO_LABELS } from '@/components/rp/rpTiposConfig';
+import { calcularFoiApostilada } from '@/components/publicacao/apostilaUtils';
 import {
   anexarEventoAuditoriaPublicacao,
   calcularStatusPublicacaoRegistro,
@@ -257,6 +258,36 @@ function normalizarRegistro(registro) {
   };
 }
 
+
+
+function enriquecerMarcadoresFamilia(registros = []) {
+  return registros.map((registro) => {
+    const apostilas = registros.filter((r) => r.publicacao_referencia_id === registro.id && r.tipo === 'Apostila');
+    const tsesPorApostila = apostilas.map((ap) => ({
+      apostila: ap,
+      tse: ap.tornada_sem_efeito_por_id
+        ? registros.find((r) => r.id === ap.tornada_sem_efeito_por_id)
+        : registros.find((r) => r.publicacao_referencia_id === ap.id && r.tipo === 'Tornar sem Efeito') || null,
+    }));
+
+    const foiApostilada = calcularFoiApostilada({
+      raiz: registro,
+      apostilas,
+      tsesPorApostila,
+    });
+
+    const tseVinculada = registro.tornada_sem_efeito_por_id
+      ? registros.find((r) => r.id === registro.tornada_sem_efeito_por_id)
+      : registros.find((r) => r.publicacao_referencia_id === registro.id && r.tipo === 'Tornar sem Efeito');
+
+    return {
+      ...registro,
+      marcador_apostilada: Boolean(foiApostilada),
+      marcador_tornada_sem_efeito: Boolean(registro.tornada_sem_efeito_por_id || tseVinculada),
+    };
+  });
+}
+
 function montarPayloadAtualizacao(registroAtual, dataParcial, tipo, opcoes = {}) {
   const houveAlteracaoCamposPublicacao = ['nota_para_bg', 'numero_bg', 'data_bg'].some((campo) => Object.prototype.hasOwnProperty.call(dataParcial || {}, campo));
   if (!houveAlteracaoCamposPublicacao) return dataParcial || {};
@@ -366,7 +397,12 @@ export default function Publicacoes() {
 
   const isLoading = loadingLivro || loadingExOfficio || loadingAtestados;
   const registrosLivro = useMemo(() => contratoLivro?.registros_livro || [], [contratoLivro]);
-  const todosRegistros = useMemo(() => [...registrosLivro, ...publicacoesExOfficio, ...atestados].map(normalizarRegistro).sort((a, b) => new Date(b.created_date) - new Date(a.created_date)), [registrosLivro, publicacoesExOfficio, atestados]);
+  const todosRegistros = useMemo(() => {
+    const normalizados = [...registrosLivro, ...publicacoesExOfficio, ...atestados]
+      .map(normalizarRegistro)
+      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    return enriquecerMarcadoresFamilia(normalizados);
+  }, [registrosLivro, publicacoesExOfficio, atestados]);
 
   const refrescarDadosPublicacoes = async () => {
     await Promise.all([
