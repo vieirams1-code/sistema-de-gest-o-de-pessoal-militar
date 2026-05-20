@@ -1128,6 +1128,23 @@ test('validarPublicacaoPromocao bloqueia item com ordem inválida', () => {
   assert.ok(validacao.bloqueios.includes('Linha 1: ordem inválida.'));
 });
 
+test('validarSalvarTurmaOperacional aceita 3º Sgt sem histórico anterior e com ordem manual válida', () => {
+  const validacao = validarSalvarTurmaOperacional(
+    [{ id: 'pm-1', militar_id: 'm1', ordem: 3, status: 'elegivel', selecionado: false, militar: { id: 'm1', posto_graduacao: 'Soldado', quadro: 'QPPM' } }],
+    { promocao: { posto_graduacao: '3o Sgt', quadro: 'QPPM' } },
+  );
+  assert.equal(validacao.valido, true);
+});
+
+test('validarPublicacaoPromocao aceita 3º Sargento sem base anterior e exige classificação', () => {
+  const promocao3 = { ...promocaoPublicacao, posto_graduacao: 'Terceiro Sargento', quadro: 'QPPM' };
+  const ok = validarPublicacaoPromocao({ promocao: promocao3, itens: [itemPublicacao({ ordem: 4, militar: { id: 'm1', posto_graduacao: 'Soldado', quadro: 'QPPM' } })] });
+  const bloqueado = validarPublicacaoPromocao({ promocao: promocao3, itens: [itemPublicacao({ ordem: 0, militar: { id: 'm1', posto_graduacao: 'Soldado', quadro: 'QPPM' } })] });
+  assert.equal(ok.valido, true);
+  assert.equal(bloqueado.valido, false);
+  assert.ok(bloqueado.bloqueios.includes('Linha 1: ordem inválida.'));
+});
+
 test('serviço de publicação não altera motor da Prévia Geral nem snapshots', () => {
   const previa = readFileSync(new URL('../../utils/antiguidade/calcularPreviaAntiguidadeGeral.js', import.meta.url), 'utf8');
   const detalhePromocao = readFileSync(new URL('../../pages/DetalhePromocao.jsx', import.meta.url), 'utf8');
