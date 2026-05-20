@@ -218,7 +218,19 @@ function efeitoCadastroVisualPorRegistro({ registro, militar, promocao }) {
 
 const SELECT_VAZIO = '__vazio__';
 
-function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRemover, onExcluirDefinitivo, canReverterPublicacao, onReverterPublicacao, isAdmin }) {
+function MilitarCard({
+  registro,
+  original,
+  promocao,
+  editavel,
+  onAtualizar,
+  onRemover,
+  onExcluirDefinitivo,
+  canReverterPublicacao,
+  onReverterPublicacao,
+  isAdmin,
+  acaoEmAndamento,
+}) {
   const militar = original?.militar || registro?.militar;
   const posto = valorOuTraco(militar?.posto_graduacao || militar?.posto_graduacao_atual);
   const quadro = valorOuTraco(militar?.quadro || militar?.quadro_atual);
@@ -277,31 +289,39 @@ function MilitarCard({ registro, original, promocao, editavel, onAtualizar, onRe
           <Badge variant="outline" className={situacaoClass(registro.status, registro.publicado)}>
             {rotuloSituacao(registro.status, registro.publicado)}
           </Badge>
-          {editavel ? (
-            Boolean(registro.publicado) ? (
-              canReverterPublicacao ? (
-                <Button size="sm" variant="destructive" onClick={() => onReverterPublicacao({ ...registro, militar })}>
-                  Reverter publicação
+          {(() => {
+            const statusRegistro = statusNormalizado(registro.status);
+            const publicado = Boolean(registro.publicado) || statusRegistro === 'publicado';
+            const canceladoOuRetificado = statusRegistro === 'cancelado' || statusRegistro === 'retificado';
+            const podeRemover = !publicado && !canceladoOuRetificado;
+
+            if (publicado) {
+              return canReverterPublicacao ? (
+                <Button size="sm" variant="destructive" onClick={() => onReverterPublicacao({ ...registro, militar })} disabled={acaoEmAndamento}>
+                  {acaoEmAndamento ? 'Aguarde' : 'Reverter publicação'}
                 </Button>
-              ) : (
-                <Button size="sm" variant="outline" disabled title="Apenas admin pode reverter publicação">
+              ) : null;
+            }
+
+            if (statusRegistro === 'cancelado') {
+              return isAdmin ? (
+                <Button size="sm" variant="destructive" onClick={() => onExcluirDefinitivo({ ...registro, militar })} disabled={acaoEmAndamento}>
+                  {acaoEmAndamento ? 'Aguarde' : 'Excluir definitivamente'}
+                </Button>
+              ) : null;
+            }
+
+            if (podeRemover) {
+              return (
+                <Button size="sm" variant="outline" onClick={() => onRemover({ ...registro, militar })} disabled={acaoEmAndamento}>
                   <Trash2 className="mr-1 h-4 w-4" />
-                  Remover
+                  {acaoEmAndamento ? 'Aguarde' : 'Remover'}
                 </Button>
-              )
-            ) : isAdmin && statusNormalizado(registro.status) === 'cancelado' ? (
-              <Button size="sm" variant="destructive" onClick={() => onExcluirDefinitivo({ ...registro, militar })}>
-                Excluir definitivamente
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => onRemover({ ...registro, militar })}>
-                <Trash2 className="mr-1 h-4 w-4" />
-                Remover
-              </Button>
-            )
-          ) : (
-            <span className="text-sm text-slate-500">Aguarde</span>
-          )}
+              );
+            }
+
+            return null;
+          })()}
         </div>
       </div>
     </div>
@@ -1055,6 +1075,7 @@ export default function DetalhePromocao() {
                         registro={registro}
                         original={original}
                         editavel={promocaoFormacaoTerceiro && !registro.publicado && !['publicado', 'publicada', 'consolidado', 'consolidada'].includes(statusNormalizado(promocao?.status))}
+                        acaoEmAndamento={removerMutation.isPending || excluirDefinitivoMutation.isPending || reverterPublicacaoMutation.isPending}
                         promocao={promocaoReferenciaCadastro}
                         onAtualizar={atualizarRascunhoTurma}
                         onRemover={setRegistroParaRemover}
