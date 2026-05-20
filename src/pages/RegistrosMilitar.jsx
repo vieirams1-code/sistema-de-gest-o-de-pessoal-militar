@@ -40,8 +40,7 @@ import {
   montarIndiceMatriculas,
 } from '@/services/matriculaMilitarViewService';
 import {
-  calcularStatusPublicacaoRegistro,
-  normalizarStatusPublicacao,
+  obterStatusCanonicoPublicacao,
   STATUS_PUBLICACAO,
 } from '@/components/publicacao/publicacaoStateMachine';
 
@@ -90,13 +89,7 @@ function extrairDescricao(registro) {
 }
 
 function getStatusPublicacaoLabel(registro) {
-  const statusInformado =
-    normalizarStatusPublicacao(registro?.status_canonico) ||
-    normalizarStatusPublicacao(registro?.status_calculado) ||
-    normalizarStatusPublicacao(registro?.status_publicacao) ||
-    normalizarStatusPublicacao(registro?.status);
-  if (statusInformado) return statusInformado;
-  return calcularStatusPublicacaoRegistro(registro);
+  return obterStatusCanonicoPublicacao(registro);
 }
 
 function toSearch(value) {
