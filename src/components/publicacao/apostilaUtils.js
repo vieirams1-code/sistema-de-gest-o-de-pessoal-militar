@@ -3,12 +3,21 @@ export function normalizarTexto(v = '') {
 }
 
 export function resolverReferenciaApostila(formData = {}, criado = {}) {
+  const origemTipoRaw =
+      formData.publicacao_referencia_origem_tipo
+      || criado.publicacao_referencia_origem_tipo
+      || '';
+  const origemTipoNormalizada = normalizarTexto(origemTipoRaw).replace(/_/g, '-');
+  const mapaOrigem = {
+    livro: 'livro',
+    'ex-officio': 'ex-officio',
+    exofficio: 'ex-officio',
+    atestado: 'atestado',
+  };
+
   return {
     refId: formData.publicacao_referencia_id || criado.publicacao_referencia_id || '',
-    origemTipo:
-      formData.publicacao_referencia_origem_tipo ||
-      criado.publicacao_referencia_origem_tipo ||
-      '',
+    origemTipo: mapaOrigem[origemTipoNormalizada] || origemTipoNormalizada,
   };
 }
 
