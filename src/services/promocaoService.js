@@ -21,6 +21,19 @@ function mesmoTextoNormalizado(a, b) {
   return normalizar(a) === normalizar(b);
 }
 
+export function isPromocaoFormacaoTerceiroSargento(postoGraduacao = '') {
+  const normalizadoCanonico = normalizarPostoGraduacao(postoGraduacao);
+  const textoNormalizado = normalizar(postoGraduacao);
+  return (
+    normalizadoCanonico.includes('3º sargento')
+    || normalizadoCanonico.includes('3o sargento')
+    || textoNormalizado.includes('3º sgt')
+    || textoNormalizado.includes('3o sgt')
+    || textoNormalizado.includes('3 sgt')
+    || textoNormalizado.includes('terceiro sargento')
+  );
+}
+
 function montarErroPublicacao(mensagens) {
   const erro = new Error([...new Set(mensagens)].join(' '));
   erro.bloqueios = [...new Set(mensagens)];
@@ -29,6 +42,7 @@ function montarErroPublicacao(mensagens) {
 
 function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoesPendentes = false, temAlteracoesPendentes = false } = {}) {
   const bloqueios = [];
+  const promocaoFormacaoTerceiro = isPromocaoFormacaoTerceiroSargento(promocao?.posto_graduacao);
 
   if (!promocao || !texto(promocao.id)) bloqueios.push('Promoção não carregada.');
   if (STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(promocao?.status))) bloqueios.push('Promoção já publicada/consolidada.');
@@ -61,8 +75,10 @@ function validarPublicacaoPromocaoBase({ promocao, itens = [], permitirAlteracoe
       ordens.add(chaveOrdem);
     }
     if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) bloqueios.push(`${linha}: item bloqueado/cancelado/retificado não pode ser publicado.`);
-    if (efeito.tipo === 'incompativel') bloqueios.push(`${linha}: militar incompatível com o posto/graduação destino.`);
-    if (efeito.tipo === 'revisao') bloqueios.push(`${linha}: militar em revisão cadastral.`);
+    if (!promocaoFormacaoTerceiro) {
+      if (efeito.tipo === 'incompativel') bloqueios.push(`${linha}: militar incompatível com o posto/graduação destino.`);
+      if (efeito.tipo === 'revisao') bloqueios.push(`${linha}: militar em revisão cadastral.`);
+    }
   });
 
   return {
@@ -590,6 +606,7 @@ export function avaliarAlertasTurmaOperacional(itens = []) {
 }
 
 export function validarSalvarTurmaOperacional(itens = [], { promocao } = {}) {
+  const promocaoFormacaoTerceiro = isPromocaoFormacaoTerceiroSargento(promocao?.posto_graduacao);
   const { alertasPorId, alertasGlobais } = avaliarAlertasTurmaOperacional(itens);
   const bloqueios = [...alertasGlobais];
 
@@ -599,7 +616,7 @@ export function validarSalvarTurmaOperacional(itens = [], { promocao } = {}) {
     });
   });
 
-  const temIncompatibilidadeCadastro = itens.some((item) => {
+  const temIncompatibilidadeCadastro = !promocaoFormacaoTerceiro && itens.some((item) => {
     const promocaoReferencia = promocao || item?.promocao;
     if (!promocaoReferencia || !item?.militar) return false;
     return getSugestaoAtualizacaoCadastro({
