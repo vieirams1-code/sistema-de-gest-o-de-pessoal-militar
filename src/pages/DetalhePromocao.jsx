@@ -34,6 +34,7 @@ import {
   promocaoPermiteExclusao,
   normalizarItemTurmaOperacional,
   podeVincularProvavelAdministrativamente,
+  postoGraduacaoBaseAnterior,
   texto,
   resultadoAplicacaoCadastro,
   sincronizarHistoricoPromocaoPublicada,
