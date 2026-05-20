@@ -604,6 +604,45 @@ export function montarPatchPromocaoMilitar(item = {}, { promocao } = {}) {
   return patch;
 }
 
+function valorComparavelImutabilidade(valor) {
+  const conteudo = texto(valor);
+  if (!conteudo) return '';
+  return conteudo.toLowerCase();
+}
+
+function itemBloqueadoEdicaoDireta(item = {}, historicoPorId = new Map()) {
+  if (Boolean(item?.publicado) || statusNormalizado(item?.status) === 'publicado') return true;
+  const historicoId = texto(item?.historico_promocao_v2_id);
+  if (!historicoId) return false;
+  const historico = historicoPorId.get(historicoId);
+  return statusNormalizado(historico?.status_registro) === 'ativo';
+}
+
+export function validarImutabilidadePosPublicacao({
+  itensOriginais = [],
+  itensRascunho = [],
+  historicosV2 = [],
+} = {}) {
+  const originaisPorId = new Map((itensOriginais || []).map((item) => [texto(item?.id), item]));
+  const historicoPorId = new Map((historicosV2 || []).map((item) => [texto(item?.id), item]));
+  const camposBloqueados = ['ordem', 'militar_id', 'quadro', 'posto_graduacao'];
+  const mudancasBloqueadas = [];
+
+  (itensRascunho || []).forEach((atual) => {
+    const id = texto(atual?.id);
+    const original = originaisPorId.get(id);
+    if (!original || !itemBloqueadoEdicaoDireta(original, historicoPorId)) return;
+    camposBloqueados.forEach((campo) => {
+      const antes = valorComparavelImutabilidade(original?.[campo]);
+      const depois = valorComparavelImutabilidade(atual?.[campo]);
+      if (antes !== depois) mudancasBloqueadas.push({ id, campo, antes, depois });
+    });
+  });
+
+  const mensagens = mudancasBloqueadas.map((item) => `Item ${item.id}: alteração de ${item.campo} não permitida após publicação.`);
+  return { valido: mudancasBloqueadas.length === 0, mudancasBloqueadas, mensagens };
+}
+
 export function avaliarAlertasTurmaOperacional(itens = []) {
   const alertasPorId = new Map();
   const alertasGlobais = [];

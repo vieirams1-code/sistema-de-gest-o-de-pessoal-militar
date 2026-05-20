@@ -40,6 +40,7 @@ import {
   sincronizarHistoricoPromocaoPublicada,
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
+  validarImutabilidadePosPublicacao,
   valorOuTraco
 } from '@/services/promocaoService';
 import { getSugestaoAtualizacaoCadastro } from '@/utils/postoGraduacaoHierarquia';
@@ -654,6 +655,12 @@ export default function DetalhePromocao() {
       const alterados = turmaComEfeito.filter((registro) => (
         JSON.stringify(montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro })) !== JSON.stringify(originais.get(String(registro.id)) || {})
       ));
+      const validacaoImutabilidade = validarImutabilidadePosPublicacao({
+        itensOriginais: turmaBaseComparacao,
+        itensRascunho: turmaComEfeito,
+        historicosV2: historicosVinculados,
+      });
+      if (!validacaoImutabilidade.valido) throw new Error(validacaoImutabilidade.mensagens.join(' '));
       await Promise.all(alterados.map((registro) => base44.entities.PromocaoMilitar.update(registro.id, montarPatchPromocaoMilitar(registro, { promocao: promocaoReferenciaCadastro }))));
       return alterados;
     },
