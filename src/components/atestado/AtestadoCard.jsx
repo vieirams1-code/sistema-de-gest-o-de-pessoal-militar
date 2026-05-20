@@ -54,6 +54,7 @@ import {
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContextService';
 import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
+import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -63,6 +64,13 @@ const statusColors = {
 };
 
 export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEdit = true, canDelete = true }) {
+  // GOVERNANÇA TEMPLATE:
+  // source_of_truth = render_on_submit
+  // edit_mode = hibrido
+  const TEMPLATE_GOVERNANCA = {
+    source_of_truth: TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT,
+    edit_mode: TEMPLATE_EDIT_MODE.HIBRIDO,
+  };
   const queryClient = useQueryClient();
   const { canAccessAction } = useCurrentUser();
   const [editingJiso, setEditingJiso] = useState(false);
@@ -684,6 +692,11 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
         <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Homologação pelo Comandante</DialogTitle>
+            <p className="text-[11px] text-slate-500">
+              {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT
+                ? 'Texto derivado do template (permite ajuste manual).'
+                : 'Texto oficial persistido.'}
+            </p>
           </DialogHeader>
           <div className="space-y-4">
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
@@ -726,6 +739,11 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
         <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Ata JISO</DialogTitle>
+            <p className="text-[11px] text-slate-500">
+              {TEMPLATE_GOVERNANCA.edit_mode === TEMPLATE_EDIT_MODE.HIBRIDO
+                ? 'Texto derivado do template (permite ajuste manual).'
+                : 'Texto oficial persistido.'}
+            </p>
           </DialogHeader>
           <div className="space-y-4">
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">

@@ -48,6 +48,7 @@ import {
   validarPayloadPublicacao,
 } from '@/components/publicacao/publicacaoStateMachine';
 import { montarPayloadOriginalApostilada, resolverReferenciaApostila } from '@/components/publicacao/apostilaUtils';
+import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 
 
 function mapearEntityPublicacaoPorModulo(modulo) {
@@ -211,6 +212,13 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, pub
 }
 
 export default function CadastrarRegistroRP() {
+  // GOVERNANÇA TEMPLATE:
+  // source_of_truth = manual_override
+  // edit_mode = hibrido
+  const TEMPLATE_GOVERNANCA = {
+    source_of_truth: TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE,
+    edit_mode: TEMPLATE_EDIT_MODE.HIBRIDO,
+  };
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -1346,6 +1354,11 @@ export default function CadastrarRegistroRP() {
                       </span>
                     )}
                   </div>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.MANUAL_OVERRIDE
+                      ? 'Texto derivado do template com sobrescrita manual.'
+                      : 'Texto derivado do template.'}
+                  </p>
                   <Textarea
                     value={formData.texto_publicacao || ''}
                     onChange={e => {

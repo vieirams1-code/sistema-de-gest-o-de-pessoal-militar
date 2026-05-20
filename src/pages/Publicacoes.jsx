@@ -36,6 +36,15 @@ import {
   STATUS_PUBLICACAO,
   validarPayloadPublicacao,
 } from '@/components/publicacao/publicacaoStateMachine';
+import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+
+// GOVERNANÇA TEMPLATE:
+// source_of_truth = persistido
+// edit_mode = imutavel
+const PUBLICACOES_TEMPLATE_GOVERNANCA = {
+  source_of_truth: TEMPLATE_SOURCE_OF_TRUTH.PERSISTIDO,
+  edit_mode: TEMPLATE_EDIT_MODE.IMUTAVEL,
+};
 
 const TIPOS_FERIAS = ['Saída Férias', 'Interrupção de Férias', 'Nova Saída / Retomada', 'Retorno Férias'];
 const ABAS_ORIGEM = [
@@ -658,6 +667,11 @@ export default function Publicacoes() {
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f]">Painel Operacional de Publicações</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Consolide Livro, Ex Officio e Atestados no mesmo fluxo operacional.</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {PUBLICACOES_TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.PERSISTIDO
+                    ? 'Texto oficial persistido.'
+                    : 'Texto derivado do template.'}
+                </p>
                 <p className="mt-2 text-sm font-medium text-slate-700">
                   No filtro atual: {statsFiltro.aguardandoNota} em {STATUS_PUBLICACAO.AGUARDANDO_NOTA.toLowerCase()}, {statsFiltro.aguardandoPublicacao} em {STATUS_PUBLICACAO.AGUARDANDO_PUBLICACAO.toLowerCase()} e {statsFiltro.publicados} {STATUS_PUBLICACAO.PUBLICADO.toLowerCase()}.
                 </p>

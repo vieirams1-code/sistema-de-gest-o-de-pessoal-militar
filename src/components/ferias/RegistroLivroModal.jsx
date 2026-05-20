@@ -33,6 +33,7 @@ import {
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
+import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import {
   calcularTotaisGozoComCreditos,
   formatarTipoCreditoExtra,
@@ -278,6 +279,13 @@ export default function RegistroLivroModal({
   ferias,
   tipoInicial = 'Saída Férias',
 }) {
+  // GOVERNANÇA TEMPLATE:
+  // source_of_truth = render_on_submit
+  // edit_mode = imutavel
+  const TEMPLATE_GOVERNANCA = {
+    source_of_truth: TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT,
+    edit_mode: TEMPLATE_EDIT_MODE.IMUTAVEL,
+  };
   const queryClient = useQueryClient();
   
   const { canAccessAction } = useCurrentUser();
@@ -642,6 +650,11 @@ export default function RegistroLivroModal({
           <DialogDescription>
             Registro de movimentação no Livro de Férias e Outras Concessões.
           </DialogDescription>
+          <p className="text-[11px] text-slate-500">
+            {TEMPLATE_GOVERNANCA.source_of_truth === TEMPLATE_SOURCE_OF_TRUTH.RENDER_ON_SUBMIT
+              ? 'Texto recalculado ao salvar.'
+              : 'Texto derivado do template.'}
+          </p>
         </DialogHeader>
 
         <div className="space-y-5">
