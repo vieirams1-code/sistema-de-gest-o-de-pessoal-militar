@@ -18,6 +18,7 @@ import {
   podeVincularProvavelAdministrativamente,
   publicarPromocaoOficial,
   reverterPublicacaoPromocaoMilitar,
+  validarImutabilidadePosPublicacao,
   validarPublicacaoPromocao,
   validarSalvarTurmaOperacional,
   calcularInsercaoPorAntiguidadeAnterior,
@@ -429,6 +430,52 @@ test('patch de edição nunca envia ordem como string vazia', () => {
 
   assert.equal(Object.hasOwn(patch, 'ordem'), false);
   assert.notEqual(patch.ordem, '');
+});
+
+test('imutabilidade pós-publicação bloqueia editar ordem e trocar militar', () => {
+  const validacao = validarImutabilidadePosPublicacao({
+    itensOriginais: [{
+      id: 'pm1', publicado: true, status: 'publicado', ordem: 1, militar_id: 'm1', quadro: 'QPPM', posto_graduacao: '3º SGT',
+    }],
+    itensRascunho: [{
+      id: 'pm1', publicado: true, status: 'publicado', ordem: 2, militar_id: 'm2', quadro: 'QPPM', posto_graduacao: '3º SGT',
+    }],
+  });
+
+  assert.equal(validacao.valido, false);
+  assert.equal(validacao.mudancasBloqueadas.some((item) => item.campo === 'ordem'), true);
+  assert.equal(validacao.mudancasBloqueadas.some((item) => item.campo === 'militar_id'), true);
+});
+
+test('imutabilidade pós-publicação bloqueia alterar quadro e posto por histórico V2 ativo', () => {
+  const validacao = validarImutabilidadePosPublicacao({
+    historicosV2: [{ id: 'h1', status_registro: 'ativo' }],
+    itensOriginais: [{
+      id: 'pm1', publicado: false, status: 'elegivel', historico_promocao_v2_id: 'h1', quadro: 'QPPM', posto_graduacao: '3º SGT',
+    }],
+    itensRascunho: [{
+      id: 'pm1', publicado: false, status: 'elegivel', historico_promocao_v2_id: 'h1', quadro: 'QOPM', posto_graduacao: '2º SGT',
+    }],
+  });
+
+  assert.equal(validacao.valido, false);
+  assert.equal(validacao.mudancasBloqueadas.some((item) => item.campo === 'quadro'), true);
+  assert.equal(validacao.mudancasBloqueadas.some((item) => item.campo === 'posto_graduacao'), true);
+});
+
+test('retificação permanece permitida via novo histórico sem editar item original', () => {
+  const validacao = validarImutabilidadePosPublicacao({
+    historicosV2: [{ id: 'h1', status_registro: 'retificado' }],
+    itensOriginais: [{
+      id: 'pm1', publicado: false, status: 'elegivel', historico_promocao_v2_id: 'h1', quadro: 'QPPM', posto_graduacao: '3º SGT', ordem: 1, militar_id: 'm1',
+    }],
+    itensRascunho: [{
+      id: 'pm1', publicado: false, status: 'elegivel', historico_promocao_v2_id: 'h1', quadro: 'QPPM', posto_graduacao: '3º SGT', ordem: 1, militar_id: 'm1',
+    }],
+  });
+
+  assert.equal(validacao.valido, true);
+  assert.deepEqual(validacao.mudancasBloqueadas, []);
 });
 
 test('bloqueado ou cancelado sem justificativa bloqueia salvar turma', () => {
