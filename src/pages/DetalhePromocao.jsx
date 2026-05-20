@@ -41,6 +41,7 @@ import {
   validarSalvarTurmaOperacional,
   valorOuTraco,
   simularImpactoCadeiaPromocoes,
+  calcularInsercaoPorAntiguidadeAnterior,
 } from '@/services/promocaoService';
 import { getSugestaoAtualizacaoCadastro } from '@/utils/postoGraduacaoHierarquia';
 
@@ -743,6 +744,18 @@ export default function DetalhePromocao() {
       const jaExiste = turma.some((registro) => String(registro?.militar_id || '') === String(item.militarId));
       if (jaExiste) throw new Error('Este militar já está na promoção.');
       const usuario = typeof base44.auth?.me === 'function' ? await base44.auth.me() : null;
+      const sugestaoInsercao = calcularInsercaoPorAntiguidadeAnterior({
+        promocao,
+        militar: item.militar,
+        turmaAtual: turma,
+        historicos: historicosQuery.data || [],
+        militares: militaresQuery.data || [],
+      });
+      const ordemAplicada = sugestaoInsercao.podeAdicionar && Number(sugestaoInsercao.ordemSugerida) > 0
+        ? Number(sugestaoInsercao.ordemSugerida)
+        : undefined;
+      if (!sugestaoInsercao.podeAdicionar) throw new Error(sugestaoInsercao.alertas[0] || 'Sem histórico base anterior para sugerir inserção.');
+
       const payload = montarPayloadAdicaoManualTurma({
         promocao,
         historico: item.historico || {},
@@ -750,7 +763,11 @@ export default function DetalhePromocao() {
         usuario,
         registrosExistentes: turma,
         militar: item.militar,
+        ordem: ordemAplicada,
       });
+      if (Array.isArray(sugestaoInsercao.deslocamentos) && sugestaoInsercao.deslocamentos.length > 0) {
+        await Promise.all(sugestaoInsercao.deslocamentos.map((d) => base44.entities.PromocaoMilitar.update(d.id, { ordem: d.ordemSugerida })));
+      }
       await base44.entities.PromocaoMilitar.create(payload);
     },
     onSuccess: async () => {
@@ -1067,6 +1084,26 @@ export default function DetalhePromocao() {
               )}
               {candidatosAdicionar.map((item) => (
                 <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  {(() => {
+                    const sugestao = calcularInsercaoPorAntiguidadeAnterior({
+                      promocao,
+                      militar: item.militar,
+                      turmaAtual: turma,
+                      historicos: historicosQuery.data || [],
+                      militares: militaresQuery.data || [],
+                    });
+                    return (
+                      <div className="mb-2 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs text-slate-700">
+                        {sugestao.baseAnterior ? (
+                          <p>Base anterior: {sugestao.baseAnterior.posto} em {dataFormatada(sugestao.baseAnterior.dataPromocao)} • classificação {sugestao.baseAnterior.classificacao}</p>
+                        ) : (
+                          <p>Base anterior: {sugestao.alertas[0] || 'Não disponível'}</p>
+                        )}
+                        {Number(sugestao.ordemSugerida) > 0 && <p>Posição sugerida: Entrará como #{sugestao.ordemSugerida} nesta promoção</p>}
+                        {(sugestao.deslocamentos || []).slice(0, 3).map((d) => <p key={d.id}>Impacto: #{d.ordemAtual} → #{d.ordemSugerida}</p>)}
+                      </div>
+                    );
+                  })()}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0 space-y-2">
                       <div>
