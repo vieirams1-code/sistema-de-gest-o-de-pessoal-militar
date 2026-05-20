@@ -18,7 +18,7 @@ const ABREVIATURAS = {
   '2º Sargento': '2º Sgt',
   '3º Sargento': '3º Sgt',
   'Cabo': 'Cb',
-  'Soldado': 'Sd',
+  'Soldado': 'SD',
 };
 
 export const abreviarPosto = (posto) => {
@@ -100,8 +100,10 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto, in
   const dias = diasBase;
   const desconto = diasDesconto || ferias._diasDesconto || 0;
   const abreviatura = abreviarPosto(ferias.militar_posto);
+  const quadro = String(ferias.militar_quadro || '').trim();
+
   return {
-    posto_nome: abreviatura ? `${abreviatura} QOBM` : '',
+    posto_nome: [abreviatura, quadro].filter(Boolean).join(' '),
     posto: abreviatura,
     nome_completo: ferias.militar_nome || '',
     matricula: ferias.militar_matricula || '',
