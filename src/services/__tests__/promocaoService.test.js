@@ -151,11 +151,11 @@ test('exclusão definitiva bloqueia rollback quando militar atual diverge do pos
 
   await assert.rejects(
     () => excluirCadeiaPromocaoMilitar({ promocaoMilitarId: 'pm-1', motivo: 'Teste', entities }),
-    /Rollback cadastral bloqueado por segurança/,
+    /Rollback cadastral bloqueado \(exclusão definitiva\)/,
   );
 });
 
-test('exclusão definitiva sem histórico não altera militar e retorna alerta claro', async () => {
+test('exclusão definitiva sem histórico bloqueia antes de deletar', async () => {
   const chamadas = [];
   const entities = {
     PromocaoMilitar: {
@@ -180,14 +180,11 @@ test('exclusão definitiva sem histórico não altera militar e retorna alerta c
     },
   };
 
-  const resultado = await excluirCadeiaPromocaoMilitar({ promocaoMilitarId: 'pm-1', motivo: 'Teste', entities });
-  assert.equal(resultado.cadastroRestaurado, false);
-  assert.equal(resultado.alertaRollback, 'Não foi possível restaurar o cadastro porque o histórico vinculado já não existe.');
-  assert.deepEqual(chamadas, [
-    ['histDelete', 'hist-inexistente'],
-    ['pmDelete', 'pm-1'],
-    ['promoDelete', 'promo-1'],
-  ]);
+  await assert.rejects(
+    () => excluirCadeiaPromocaoMilitar({ promocaoMilitarId: 'pm-1', motivo: 'Teste', entities }),
+    /histórico oficial da promoção não foi encontrado/,
+  );
+  assert.deepEqual(chamadas, []);
 });
 
 
@@ -600,15 +597,17 @@ test('reversão bloqueia rollback de cadastro quando militar já divergiu', asyn
     PromocaoMilitar: { update: async () => {} },
     Promocao: { update: async () => {} },
   };
-  const resultado = await reverterPublicacaoPromocaoMilitar({
-    promocao: { id: 'p1' },
-    item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1', militar: { id: 'm1' }, resultado_aplicacao_cadastro: 'imediatamente_superior' },
-    itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
-    entities,
-    motivo: 'Publicação indevida',
-  });
+  await assert.rejects(
+    () => reverterPublicacaoPromocaoMilitar({
+      promocao: { id: 'p1' },
+      item: { id: 'pm1', publicado: true, status: 'publicado', historico_promocao_v2_id: 'h1', militar_id: 'm1', militar: { id: 'm1' }, resultado_aplicacao_cadastro: 'imediatamente_superior' },
+      itensPromocao: [{ id: 'pm1', publicado: true, status: 'publicado' }],
+      entities,
+      motivo: 'Publicação indevida',
+    }),
+    /Rollback cadastral bloqueado \(reversão de publicação\)/,
+  );
   assert.equal(atualizou, false);
-  assert.equal(resultado.cadastroRestaurado, false);
 });
 
 test('reversão parcial mantém promoção publicada parcial', async () => {
