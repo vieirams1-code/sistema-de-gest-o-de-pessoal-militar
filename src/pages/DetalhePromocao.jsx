@@ -44,7 +44,11 @@ import {
   isPromocaoFormacaoTerceiroSargento,
 } from '@/services/promocaoService';
 import { getSugestaoAtualizacaoCadastro } from '@/utils/postoGraduacaoHierarquia';
-import { calcularPreviaAntiguidadeGeral } from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
+import {
+  calcularPreviaAntiguidadeGeral,
+  normalizarPostoGraduacao as normalizarPostoPreviaAntiguidade,
+  normalizarQuadroPreviaAntiguidade,
+} from '@/utils/antiguidade/calcularPreviaAntiguidadeGeral';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
 const diagLog = (evento, dados = {}) => console.info(`${DIAG_PREFIX} ${evento}`, dados);
@@ -788,7 +792,18 @@ export default function DetalhePromocao() {
         militares: militaresQuery.data || [],
         historicoPromocoes: historicosQuery.data || [],
       });
-      const ranking = new Map((previa?.itens || []).map((item, idx) => [String(item?.militar_id || ''), idx + 1]));
+      const postoBaseAnterior = postoGraduacaoBaseAnterior(promocao?.posto_graduacao);
+      const postoBaseNormalizado = normalizarPostoPreviaAntiguidade(postoBaseAnterior);
+      const quadroPromocaoNormalizado = normalizarQuadroPreviaAntiguidade(promocao?.quadro).valor;
+      const itensBaseAnterior = (previa?.itens || []).filter((item) => {
+        const postoItemNormalizado = normalizarPostoPreviaAntiguidade(item?.posto_graduacao);
+        const quadroItemNormalizado = normalizarQuadroPreviaAntiguidade(item?.quadro).valor;
+        return postoItemNormalizado === postoBaseNormalizado && quadroItemNormalizado === quadroPromocaoNormalizado;
+      });
+      const ranking = new Map(itensBaseAnterior.map((item, idx) => [String(item?.militar_id || ''), idx + 1]));
+      if (!ranking.size) {
+        throw new Error('Não foi encontrada lista-base do posto/quadro imediatamente anterior para ordenar esta promoção.');
+      }
       const ordenados = [...rascunhoTurma]
         .sort((a, b) => {
           const rankA = ranking.get(String(a?.militar_id || ''));
