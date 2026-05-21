@@ -1,0 +1,27 @@
+{
+  "name": "JISO",
+  "type": "object",
+  "properties": {
+    "atestado_id": { "type": "string" },
+    "militar_id": { "type": "string" },
+    "militar_nome": { "type": "string" },
+    "militar_posto": { "type": "string" },
+    "militar_matricula": { "type": "string" },
+    "militar_matricula_atual": { "type": "string" },
+    "militar_matricula_vinculo": { "type": "string" },
+    "data_jiso": { "type": "string", "format": "date" },
+    "secao_jiso": { "type": "string" },
+    "finalidade_jiso": { "type": "string" },
+    "nup": { "type": "string" },
+    "resultado_jiso": { "type": "string" },
+    "dias_original": { "type": "number" },
+    "dias_jiso": { "type": "number" },
+    "ata_jiso": { "type": "string" },
+    "parecer_jiso": { "type": "string" },
+    "status": { "type": "string" },
+    "observacoes": { "type": "string" },
+    "texto_publicacao": { "type": "string" },
+    "render_metadata": { "type": "object" }
+  },
+  "required": ["atestado_id", "militar_id"]
+}

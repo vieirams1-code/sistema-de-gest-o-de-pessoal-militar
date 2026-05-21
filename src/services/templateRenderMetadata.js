@@ -1,4 +1,4 @@
-import { TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { TEMPLATE_SOURCE_OF_TRUTH } from '../constants/templateGovernance.js';
 
 function buildRenderedBy(user = {}) {
   return user?.full_name || user?.name || user?.email || user?.id || 'sistema';
