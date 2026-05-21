@@ -152,3 +152,46 @@ test('template válido passa', () => {
   assert.equal(result.ok, true);
   assert.equal(result.summary.erros, 0);
 });
+
+test('saída férias oficial com data_registro não gera VAR_DESCONHECIDA', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Início de Férias',
+    template: 'Texto {{data_registro}} {{dias}} {{dias_extenso}} {{periodo_aquisitivo}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
+});
+
+test('interrupção férias com variáveis de buildVarsLivro passa sem VAR_DESCONHECIDA', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Interrupção',
+    template:
+      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{data_registro}} {{data_interrupcao}} {{dias_gozados_interrupcao}} {{saldo_remanescente}} {{periodo_aquisitivo}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
+});
+
+test('continuação/nova saída com data_inicio e saldo_remanescente passa', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Nova Saída',
+    template:
+      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{data_registro}} {{data_inicio}} {{data_retorno}} {{saldo_remanescente}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
+});
+
+test('retorno férias oficial com data_registro passa sem VAR_DESCONHECIDA', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Retorno Férias',
+    template:
+      'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{data_registro}} {{data_retorno}} {{periodo_aquisitivo}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA'), false);
+});
