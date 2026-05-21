@@ -49,7 +49,7 @@ import {
 } from '@/components/publicacao/publicacaoStateMachine';
 import { montarPayloadOriginalApostilada, resolverReferenciaApostila } from '@/components/publicacao/apostilaUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
-import { buildTemplateRenderMetadata, parseTemplateRenderMetadata } from '@/services/templateRenderMetadata';
+import { buildTemplateRenderMetadata, parseTemplateRenderMetadata, warnIfMissingRenderMetadata } from '@/services/templateRenderMetadata';
 
 
 function mapearEntityPublicacaoPorModulo(modulo) {
@@ -357,6 +357,15 @@ export default function CadastrarRegistroRP() {
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if (!isEditing || !registroEdicao) return;
+    warnIfMissingRenderMetadata({
+      metadata: registroEdicao?.render_metadata,
+      metadataJson: registroEdicao?.render_metadata_json,
+      entity: moduloOrigemEdicao === 'Livro' ? 'RegistroLivro' : 'PublicacaoExOfficio',
+    });
+  }, [isEditing, registroEdicao, moduloOrigemEdicao]);
 
   // Fetch tiposCustom
   const {
