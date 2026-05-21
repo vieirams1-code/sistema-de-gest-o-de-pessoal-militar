@@ -17,12 +17,17 @@ const EVENTO_SANEAMENTO = 'saneamento_texto_ferias_qobm';
 
 const normalize = (v) => String(v || '').trim();
 const containsQobm = (txt) => /\bQOBM\b/i.test(normalize(txt));
-const isFeriasTipo = (tipo = '') => /f[eé]rias|livro/i.test(String(tipo));
+const normalizeSearch = (v) => normalize(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const isFeriasTipo = (tipo = '') => {
+  const t = normalizeSearch(tipo);
+  return /(ferias|saida|retorno|interrupcao|continuacao|nova\s+saida|retomada)/i.test(t);
+};
+const isFeriasRegistro = (registro) => isFeriasTipo(registro?.tipo_registro) || Boolean(normalize(registro?.ferias_id));
 
 function classificarRegistro(registro, militar) {
   const quadro = normalize(militar?.quadro).toUpperCase();
   const status = normalize(registro?.status).toLowerCase();
-  if (!militar?.id || !quadro || !containsQobm(registro?.texto_publicacao) || !isFeriasTipo(registro?.tipo_registro)) {
+  if (!militar?.id || !quadro || !containsQobm(registro?.texto_publicacao) || !isFeriasRegistro(registro)) {
     return { classe: 'revisao_manual', label: 'Revisão manual', motivo: 'Vínculo incompleto/conflito de dados.' };
   }
   if (quadro === 'QOBM') return { classe: 'ignorar', label: 'Ignorar: militar é QOBM', motivo: 'Quadro real já é QOBM.' };
@@ -45,8 +50,11 @@ export default function SaneamentoFeriasQobm() {
   const { data, isLoading } = useQuery({
     queryKey: ['saneamento-ferias-qobm'],
     queryFn: async () => {
-      const registros = await base44.entities.RegistroLivro.filter({ tipo_registro: 'férias' }, '-data_registro', 500);
-      const candidatos = (registros || []).filter((item) => containsQobm(item?.texto_publicacao || '') || isFeriasTipo(item?.tipo_registro));
+      const registros = await base44.entities.RegistroLivro.list('-data_registro', 1000);
+      const candidatos = (registros || []).filter((item) => {
+        const matchQobm = containsQobm(item?.texto_publicacao || '');
+        return matchQobm && isFeriasRegistro(item);
+      });
       const militarIds = [...new Set(candidatos.map((r) => String(r?.militar_id || '')).filter(Boolean))];
       const militaresPorId = new Map();
       await Promise.all(militarIds.map(async (id) => {
