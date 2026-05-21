@@ -93,3 +93,21 @@ test('prévia de férias renderiza {{posto_nome}} como posto + quadro', () => {
   const saida = aplicarTemplate('{{posto_nome}}', vars);
   assert.equal(saida, 'Maj QOSAU');
 });
+
+
+test('aplicarTemplate no fluxo de férias remove placeholders de quadro e posto_nome quando vazio', () => {
+  const vars = buildVarsLivro({
+    ferias: {
+      militar_posto: 'Capitão',
+      militar_quadro: 'QPTBM',
+      militar_nome: 'Maria Silva',
+      dias: 30,
+      data_inicio: '2026-01-01',
+      data_fim: '2026-01-30',
+    },
+  });
+
+  const saida = aplicarTemplate('{{posto_nome}} {{quadro}} {{quadro_nome}} {{militar_quadro}}', vars);
+  assert.equal(saida.includes('{{'), false);
+  assert.equal(saida, 'Cap QPTBM QPTBM QPTBM');
+});
