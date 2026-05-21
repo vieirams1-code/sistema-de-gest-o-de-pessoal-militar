@@ -175,13 +175,35 @@ export async function publicarPromocaoOficial({ promocao, itens = [], temAlterac
   const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes, contextoPublicacao });
   if (!validacao.valido) throw montarErroPublicacao(validacao.bloqueios);
 
+  const payloadEnvio = {
+    promocaoId: promocao?.id || null,
+    itens,
+    datas: {
+      data_promocao: promocao?.data_promocao || null,
+      data_publicacao: promocao?.data_publicacao || null,
+    },
+    quadro: promocao?.quadro || null,
+    posto: promocao?.posto_graduacao || null,
+  };
+  console.log('[publicarPromocaoOficial][frontend][payload]', payloadEnvio);
+
   const response = await base44.functions.invoke('publicarPromocaoOficial', {
     body: { promocao, itens, temAlteracoesPendentes, contextoPublicacao },
   });
 
+  const etapa = response?.data?.etapa || null;
+  const motivo = response?.data?.motivo || null;
   const erros = response?.data?.errors || [];
-  if (Array.isArray(erros) && erros.length > 0) {
-    const mensagens = erros.map((erro) => (typeof erro === 'string' ? erro : erro?.message)).filter(Boolean);
+  if (response?.data?.success === false || (Array.isArray(erros) && erros.length > 0)) {
+    const mensagens = [];
+    if (etapa || motivo) mensagens.push(`Falha ao publicar: Etapa: ${etapa || 'nao_informada'} Motivo: ${motivo || 'nao_informado'} item_id: ${response?.data?.item_id || 'nao_informado'} militar_id: ${response?.data?.militar_id || 'nao_informado'}`);
+    if (Array.isArray(erros) && erros.length > 0) {
+      mensagens.push(...erros.map((erro) => {
+        if (typeof erro === 'string') return erro;
+        if (erro?.etapa || erro?.motivo) return `Etapa: ${erro?.etapa || 'nao_informada'} Motivo: ${erro?.motivo || erro?.message || 'nao_informado'} item_id: ${erro?.item_id || 'nao_informado'} militar_id: ${erro?.militar_id || 'nao_informado'}`;
+        return erro?.message;
+      }).filter(Boolean));
+    }
     if (mensagens.length > 0) throw montarErroPublicacao(mensagens);
   }
 
