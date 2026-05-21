@@ -874,6 +874,12 @@ export default function TemplatesTexto() {
     return extrairVariaveisDoTemplate(editingTemplate?.template || '');
   }, [editingTemplate?.template]);
 
+  const variaveisInvalidas = useMemo(() => {
+    if (!editingTemplate?.modulo || !editingTemplate?.tipo_registro) return [];
+    const validas = getVariaveisValidas(editingTemplate.modulo, editingTemplate.tipo_registro);
+    return variaveisUsadas.filter((nome) => !validas.has(nome));
+  }, [editingTemplate?.modulo, editingTemplate?.tipo_registro, variaveisUsadas]);
+
   const safeLintResult = useMemo(() => getSafeLintResult(lintResult), [lintResult]);
 
   const handleSaveTemplate = () => {
