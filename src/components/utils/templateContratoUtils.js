@@ -87,3 +87,11 @@ export function buildTemplateVarsContrato(source = {}) {
     matricula,
   };
 }
+
+export function composeTemplateVarsRP({ formData = {}, sourceRP = {}, rpSpecificOverrides = {} } = {}) {
+  return {
+    ...formData,
+    ...buildTemplateVarsContrato(sourceRP),
+    ...rpSpecificOverrides,
+  };
+}

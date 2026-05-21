@@ -5,11 +5,12 @@
 import {
   abreviarPosto,
   buildTemplateVarsContrato,
+  composeTemplateVarsRP,
   montarPostoNomeTemplate,
   resolveQuadroTemplate,
 } from './templateContratoUtils.js';
 
-export { abreviarPosto, buildTemplateVarsContrato, montarPostoNomeTemplate, resolveQuadroTemplate };
+export { abreviarPosto, buildTemplateVarsContrato, composeTemplateVarsRP, montarPostoNomeTemplate, resolveQuadroTemplate };
 
 const numeroPorExtenso = (num) => {
   const numeros = {
