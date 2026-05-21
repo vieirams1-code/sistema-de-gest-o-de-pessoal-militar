@@ -34,6 +34,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 import {
   calcularTotaisGozoComCreditos,
   formatarTipoCreditoExtra,
@@ -288,7 +289,7 @@ export default function RegistroLivroModal({
   };
   const queryClient = useQueryClient();
   
-  const { canAccessAction } = useCurrentUser();
+  const { canAccessAction, user } = useCurrentUser();
   const canGerirCadeia = canAccessAction('gerir_cadeia_ferias');
 
   const [tipoRegistro, setTipoRegistro] = useState(tipoInicial);
@@ -568,6 +569,18 @@ export default function RegistroLivroModal({
         observacoes: observacoes || '',
         texto_publicacao: textoPublicacao || '',
       });
+      const templateAtivo = getTemplateAtivoPorTipo(tipoRegistro, 'Livro', templates, {
+        grupamento_id: ferias?.grupamento_id,
+        subgrupamento_id: ferias?.subgrupamento_id,
+        subgrupamento_tipo: ferias?.subgrupamento_tipo,
+      });
+      const renderMetadata = buildTemplateRenderMetadata({
+        template: templateAtivo,
+        modulo: 'Livro',
+        user,
+        sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
+      });
+      if (renderMetadata) registroPayload.render_metadata = renderMetadata;
 
       if (tipoRegistro === 'Interrupção de Férias' && resumo) {
         registroPayload.dias = Number(resumo.diasNoMomento || ferias.dias || 0);

@@ -24,6 +24,7 @@ import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/ma
 import { aplicarContextoMilitarNoAtestado } from '@/services/atestadoJisoMilitarContextService';
 import { atualizarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 
 export default function EditarJISO() {
   // GOVERNANÇA TEMPLATE:
@@ -37,7 +38,7 @@ export default function EditarJISO() {
   const [searchParams] = useSearchParams();
   const atestadoId = searchParams.get('atestado_id');
   const queryClient = useQueryClient();
-  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { canAccessModule, canAccessAction, isLoading: loadingUser, isAccessResolved, user } = useCurrentUser();
   const { validar: validarEscopoMilitar } = useUsuarioPodeAgirSobreMilitar();
   const hasAtestadosAccess = canAccessModule('atestados');
   const canGerirJiso = canAccessAction('gerir_jiso') || canAccessAction('registrar_decisao_jiso');
@@ -187,6 +188,18 @@ export default function EditarJISO() {
       dias_jiso: formData.dias_jiso ? parseInt(formData.dias_jiso) : null,
       texto_publicacao: gerarTextoPublicacao()
     };
+    const templateAtaJiso = getTemplateAtivoPorTipo('Ata JISO', 'ExOfficio', templatesExOfficio, {
+      grupamento_id: atestado?.grupamento_id,
+      subgrupamento_id: atestado?.subgrupamento_id,
+      subgrupamento_tipo: atestado?.subgrupamento_tipo,
+    });
+    const renderMetadata = buildTemplateRenderMetadata({
+      template: templateAtaJiso,
+      modulo: 'JISO',
+      user,
+      sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
+    });
+    if (renderMetadata) jisoData.render_metadata = renderMetadata;
 
     if (jiso) {
       await base44.entities.JISO.update(jiso.id, jisoData);

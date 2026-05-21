@@ -49,6 +49,7 @@ import {
 } from '@/components/publicacao/publicacaoStateMachine';
 import { montarPayloadOriginalApostilada, resolverReferenciaApostila } from '@/components/publicacao/apostilaUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 
 
 function mapearEntityPublicacaoPorModulo(modulo) {
@@ -772,6 +773,16 @@ export default function CadastrarRegistroRP() {
         data_publicacao: exOfficioBase.data_publicacao || data.data_registro || '',
         status: exOfficioBase.status || 'Aguardando Nota',
       };
+      const metadataRender = buildTemplateRenderMetadata({
+        template: templateAtivoSelecionado,
+        modulo: isLivro ? 'Livro' : 'Publicação Ex Officio',
+        user,
+        sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
+      });
+      if (metadataRender) {
+        payloadLivro.render_metadata = metadataRender;
+        payloadExOfficio.render_metadata = metadataRender;
+      }
 
       if (isEditing) {
         const moduloPersistencia = moduloOrigemEdicao === 'Livro' ? MODULO_LIVRO : MODULO_EX_OFFICIO;
@@ -1359,6 +1370,11 @@ export default function CadastrarRegistroRP() {
                       ? 'Texto derivado do template com sobrescrita manual.'
                       : 'Texto derivado do template.'}
                   </p>
+                  {registroEdicao?.render_metadata?.rendered_at && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Gerado via template em {formatDateBR(registroEdicao.render_metadata.rendered_at)}.
+                    </p>
+                  )}
                   <Textarea
                     value={formData.texto_publicacao || ''}
                     onChange={e => {
