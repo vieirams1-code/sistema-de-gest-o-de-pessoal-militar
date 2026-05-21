@@ -84,7 +84,7 @@ const Kpi = ({ label, value, tone = 'slate' }) => {
 };
 
 const TreeNode = ({ node, q, expanded, onToggle }) => {
-  const safeNode = { ...node, militares: node?.militares || [], children: node?.children || [], alertas: node?.alertas || [] };
+  const safeNode = { ...(node || {}), militares: node?.militares || [], children: node?.children || [], alertas: node?.alertas || [] };
   const isOpen = expanded[safeNode.key] ?? true;
   return (
     <div className="relative flex flex-col items-center">
@@ -114,8 +114,8 @@ const TreeNode = ({ node, q, expanded, onToggle }) => {
               <div className="h-6 w-px bg-slate-300" />
               <div className="relative flex gap-6 pt-4">
                 <div className="absolute left-6 right-6 top-0 h-px bg-slate-300" />
-                {(safeNode.children || []).map((child) => (
-                  <div key={child.key} className="relative flex flex-col items-center">
+                {(safeNode.children || []).map((child, index) => (
+                  <div key={child.key || `${safeNode.key}-${index}`} className="relative flex flex-col items-center">
                     <div className="h-4 w-px bg-slate-300" />
                     <TreeNode node={child} q={q} expanded={expanded} onToggle={onToggle} />
                   </div>
