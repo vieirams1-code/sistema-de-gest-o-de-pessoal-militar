@@ -150,6 +150,22 @@ function createDuplicatedTemplateForm(template) {
   };
 }
 
+
+function getSafeLintResult(lint) {
+  const findings = Array.isArray(lint?.findings) ? lint.findings : [];
+  const summaryRaw = lint?.summary && typeof lint.summary === 'object' ? lint.summary : {};
+  const summary = {
+    erros: Number.isFinite(summaryRaw.erros) ? summaryRaw.erros : findings.filter((f) => f?.severity === 'ERRO').length,
+    alertas: Number.isFinite(summaryRaw.alertas) ? summaryRaw.alertas : findings.filter((f) => f?.severity === 'ALERTA').length,
+    infos: Number.isFinite(summaryRaw.infos) ? summaryRaw.infos : findings.filter((f) => f?.severity === 'INFO').length,
+  };
+
+  return {
+    ok: lint?.ok !== false,
+    findings,
+    summary,
+  };
+}
 function buildTemplatePayload(data) {
   const normalizado = normalizarEscopoTemplate(data);
   return {
@@ -858,14 +874,16 @@ export default function TemplatesTexto() {
     return extrairVariaveisDoTemplate(editingTemplate?.template || '');
   }, [editingTemplate?.template]);
 
+  const safeLintResult = useMemo(() => getSafeLintResult(lintResult), [lintResult]);
+
   const handleSaveTemplate = () => {
     if (!editingTemplate) return;
     if (templateConflictError) return;
-    const lint = lintTemplateOnSave({
-      modulo: editingTemplate.modulo,
-      tipoRegistro: editingTemplate.tipo_registro,
-      template: editingTemplate.template,
-    });
+    const lint = getSafeLintResult(lintTemplateOnSave({
+      modulo: editingTemplate?.modulo || '',
+      tipoRegistro: editingTemplate?.tipo_registro || '',
+      template: editingTemplate?.template || '',
+    }));
     setLintResult(lint);
     if (!lint.ok) return;
     saveMutation.mutate(editingTemplate);
@@ -1211,19 +1229,19 @@ export default function TemplatesTexto() {
                 />
               </div>
 
-              {lintResult?.findings?.length > 0 && (
+              {safeLintResult.findings.length > 0 && (
                 <div className={`rounded-md p-3 text-sm flex gap-2 ${
-                  lintResult.summary.erros > 0
+                  safeLintResult.summary.erros > 0
                     ? 'border border-red-200 bg-red-50 text-red-700'
                     : 'border border-amber-200 bg-amber-50 text-amber-800'
                 }`}>
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                   <div>
                     <span className="font-semibold block mb-1">
-                      Lint do template — {lintResult.summary.erros} erro(s), {lintResult.summary.alertas} alerta(s), {lintResult.summary.infos} info(s)
+                      Lint do template — {safeLintResult.summary.erros} erro(s), {safeLintResult.summary.alertas} alerta(s), {safeLintResult.summary.infos} info(s)
                     </span>
                     <ul className="list-disc pl-4 space-y-0.5">
-                      {lintResult.findings.map((finding, i) => (
+                      {safeLintResult.findings.map((finding, i) => (
                         <li key={`${finding.code}-${i}`}>
                           <span className="font-semibold">[{finding.severity}]</span> {finding.code} — {finding.message}
                         </li>
