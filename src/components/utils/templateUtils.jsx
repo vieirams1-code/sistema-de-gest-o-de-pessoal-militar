@@ -171,12 +171,37 @@ export function buildVarsLivro({ ferias, militar, registro, dataRegistro, period
 }
 
 export function buildPreviewTemplateVars(overrides = {}) {
+  const dataSimuladaLivro = {
+    ferias: {
+      militar_posto: 'Capitão',
+      militar_quadro: 'QPTBM',
+      militar_nome: 'João da Silva',
+      militar_matricula: '123456',
+      data_inicio: '2026-01-07',
+      data_fim: '2026-02-05',
+      data_retorno: '2026-02-06',
+      dias: 30,
+      dias_base: 30,
+      periodo_aquisitivo_ref: '2024/2025',
+      fracionamento: '1ª parcela',
+    },
+    dataRegistro: '2026-01-07',
+    periodo: {
+      inicio_aquisitivo: '2024-01-01',
+      fim_aquisitivo: '2025-12-31',
+    },
+  };
+
+  const varsLivro = buildVarsLivro(dataSimuladaLivro);
   const base = {
     nome: 'João da Silva',
     nome_completo: 'João da Silva',
     matricula: '123456',
-    posto_abreviatura: 'Cap',
-    quadro: 'QPTBM',
+    posto_abreviatura: varsLivro.posto || 'Cap',
+    ...varsLivro,
+    novo_fim: varsLivro.data_termino || '',
+    retorno_previsto: varsLivro.data_retorno || '',
+    base_dias: String(dataSimuladaLivro.ferias.dias_base || dataSimuladaLivro.ferias.dias || ''),
   };
 
   const merged = { ...base, ...overrides };
@@ -204,18 +229,18 @@ export function buildPreviewTemplateVars(overrides = {}) {
  * Dados simulados para preview do template na página de edição.
  */
 export const VARS_PREVIEW = buildPreviewTemplateVars({
-  data_inicio: '01/04/2026',
-  data_termino: '30/04/2026',
-  data_retorno: '01/05/2026',
-  data_registro: '01/04/2026',
-  data_publicacao: '01/04/2026',
+  data_inicio: '07/01/2026',
+  data_termino: '05/02/2026',
+  data_retorno: '06/02/2026',
+  data_registro: '07/01/2026',
+  data_publicacao: '07/01/2026',
   data_interrupcao: '10/04/2026',
   dias: '30',
   dias_extenso: 'trinta',
   dias_gozados: '10',
   dias_gozados_interrupcao: '10',
   saldo_remanescente: '20',
-  periodo_aquisitivo: '01/09/2024 a 31/08/2025',
+  periodo_aquisitivo: '01/01/2024 a 31/12/2025',
   periodo_aquisitivo_simplificado: '2024/2025',
   fracionamento: '1ª parcela',
   tipo_ferias_texto: '1ª parcela de férias regulamentares',
