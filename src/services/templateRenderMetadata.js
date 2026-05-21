@@ -33,3 +33,16 @@ export function parseTemplateRenderMetadata(metadata, metadataJson) {
     return null;
   }
 }
+
+export function warnIfMissingRenderMetadata({ metadata, metadataJson, entity = 'Registro' } = {}) {
+  const isDev = typeof import.meta !== 'undefined' && import.meta?.env?.DEV;
+  if (!isDev) return;
+
+  const parsed = parseTemplateRenderMetadata(metadata, metadataJson);
+  if (parsed) return;
+
+  // Aviso discreto para detectar quando o provider ignora objeto JSON sem erro explícito.
+  // Sem bloquear fluxo de produção e sem alterar backend.
+  // eslint-disable-next-line no-console
+  console.warn(`[render_metadata] ausente após persistência em ${entity}. Verificar schema/provider.`);
+}
