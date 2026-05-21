@@ -2,6 +2,7 @@ import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
 import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
 import { deveAtualizarCadastroMilitarPorPromocao } from '../utils/promocao/deveAtualizarCadastroMilitarPorPromocao.js';
 import { deveRollbackCadastroMilitarPorReversao, podeExcluirDefinitivamentePromocaoMilitar, podeReverterPublicacaoPromocao } from '../utils/promocao/reversaoExclusaoRules.js';
+import { isPostoDestinoPromocaoInicial } from '../utils/promocao/buildPromocaoContext.js';
 
 const TEXTO_VAZIO = '—';
 
@@ -38,15 +39,7 @@ export function isPromocaoFormacaoTerceiroSargento(postoGraduacao = '') {
 
 export function isPromocaoInicioCadeia(promocao = {}) {
   const posto = promocao?.posto_graduacao || promocao;
-  const normalizadoCanonico = normalizarPostoGraduacao(posto);
-  const textoNormalizado = normalizar(posto);
-
-  return (
-    normalizadoCanonico.includes('soldado')
-    || normalizadoCanonico.includes('cabo')
-    || isPromocaoFormacaoTerceiroSargento(posto)
-    || textoNormalizado.includes('terceiro sargento')
-  );
+  return isPostoDestinoPromocaoInicial(posto);
 }
 
 function montarErroPublicacao(mensagens) {

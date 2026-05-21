@@ -844,7 +844,7 @@ test('runtime de salvar turma para Tenentes recalcula imediatamente superior e n
   }
 });
 
-test('salvar turma bloqueia quando houver item incompatível', () => {
+test('promoção inicial não bloqueia salvar turma por incompatibilidade cadastral', () => {
   const validacao = validarSalvarTurmaOperacional([
     {
       id: 'pm1',
@@ -856,8 +856,8 @@ test('salvar turma bloqueia quando houver item incompatível', () => {
     },
   ], { promocao: { posto_graduacao: '3º Sargento' } });
 
-  assert.equal(validacao.valido, false);
-  assert.deepEqual(validacao.bloqueios, ['Há militar incompatível com o cadastro atual. Revise antes de salvar.']);
+  assert.equal(validacao.valido, true);
+  assert.deepEqual(validacao.bloqueios, []);
 });
 
 test('adição manual cria PromocaoMilitar com campos derivados automaticamente', () => {

@@ -40,7 +40,8 @@ export function getEstadoPromocao(promocao = {}, itens = []) {
 export function canEditarOrdem(item = {}, contexto = {}) {
   const estado = getEstadoItemPromocao(item);
   const ctx = contexto?.promocaoContext || buildPromocaoContext(contexto?.promocao || {});
-  if (!ctx?.permiteEdicaoOrdem) return false;
+  if (!ctx?.promocaoInicio || !ctx?.permiteEdicaoOrdem) return false;
+  if (item?.historico_promocao_v2_id) return false;
   return estado === ESTADOS_PROMOCAO.EM_EDICAO;
 }
 
