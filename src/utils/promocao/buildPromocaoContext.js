@@ -1,12 +1,23 @@
 import { normalizar, statusNormalizado } from '../../services/promocaoService.js';
 
+const POSTOS_INICIAIS_CANONICOS = new Set([
+  'sd', 'soldado', 'cb', 'cabo', '3sgt', '3sargento', '2ten', '2tenente',
+]);
 
-
-const POSTOS_INICIO_CADEIA = new Set(['soldado', 'sd', 'cabo', 'cb', '3 sgt', '3º sgt', '3o sgt', '3° sgt']);
-
-function isInicioCadeiaPorPosto(postoGraduacao = '') {
-  const postoNormalizado = normalizar(String(postoGraduacao || '')).replace(/\s+/g, ' ').trim();
-  return POSTOS_INICIO_CADEIA.has(postoNormalizado);
+export function isPostoDestinoPromocaoInicial(postoGraduacao = '') {
+  const bruto = String(postoGraduacao || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[º°]/g, '')
+    .replace(/\b([23])o\b/g, '$1')
+    .replace(/\./g, ' ')
+    .replace(/\bterceiro\b/g, '3')
+    .replace(/\bsegundo\b/g, '2')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const canonico = bruto.replace(/\s+/g, '');
+  return POSTOS_INICIAIS_CANONICOS.has(canonico);
 }
 
 function normalizarStatusHistorico(promocao = {}) {
@@ -40,7 +51,7 @@ export function buildPromocaoContext(promocao = {}) {
   const quadro = promocao?.quadro || '';
   const contextoPromocao = { ...promocao, posto_graduacao: posto, quadro };
 
-  const promocaoInicio = isInicioCadeiaPorPosto(contextoPromocao.posto_graduacao);
+  const promocaoInicio = isPostoDestinoPromocaoInicial(contextoPromocao.posto_graduacao);
   const promocaoSucessiva = !promocaoInicio;
   const statusHistorico = normalizarStatusHistorico(promocao);
   const statusOperacional = normalizarStatusOperacional(promocao);

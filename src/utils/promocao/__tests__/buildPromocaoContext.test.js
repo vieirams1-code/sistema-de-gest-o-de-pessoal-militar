@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPromocaoContext } from '../buildPromocaoContext.js';
+import { isPostoDestinoPromocaoInicial } from '../buildPromocaoContext.js';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const FUTURE = '2099-01-01';
@@ -35,6 +36,29 @@ test('Cabo publicado: início de cadeia com ordem manual', () => {
   assert.equal(ctx.promocaoInicio, true);
   assert.equal(ctx.permiteEdicaoOrdem, true);
   assert.equal(ctx.permiteOrdenacao, false);
+});
+
+test('SD rascunho: início de cadeia com ordem manual e sem ordenação automática', () => {
+  const ctx = buildPromocaoContext(basePromocao({ posto_graduacao: 'SD', status: 'rascunho' }));
+  assert.equal(ctx.promocaoInicio, true);
+  assert.equal(ctx.permiteEdicaoOrdem, true);
+  assert.equal(ctx.permiteOrdenacao, false);
+});
+
+test('2º TEN é promoção inicial (regressão)', () => {
+  const ctx = buildPromocaoContext(basePromocao({ posto_graduacao: '2º Ten', status: 'rascunho' }));
+  assert.equal(ctx.promocaoInicio, true);
+  assert.equal(ctx.promocaoSucessiva, false);
+  assert.equal(ctx.permiteEdicaoOrdem, true);
+  assert.equal(ctx.permiteOrdenacao, false);
+});
+
+test('normalização de posto destino inicial cobre abreviações', () => {
+  assert.equal(isPostoDestinoPromocaoInicial('3º SGT'), true);
+  assert.equal(isPostoDestinoPromocaoInicial('3 Sargento'), true);
+  assert.equal(isPostoDestinoPromocaoInicial('2. Tenente'), true);
+  assert.equal(isPostoDestinoPromocaoInicial('  soldado  '), true);
+  assert.equal(isPostoDestinoPromocaoInicial('2º Sgt'), false);
 });
 
 test('2º Sgt histórica: sucessiva sem edição manual e com ordenar', () => {
