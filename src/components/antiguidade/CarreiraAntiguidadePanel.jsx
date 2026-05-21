@@ -12,6 +12,7 @@ import RankIcon from '@/components/antiguidade/RankIcon';
 import { POSTOS_GRADUACOES } from '@/components/antiguidade/promocaoHistoricaUtils';
 import { createPageUrl } from '@/utils';
 import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
+import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 
 const STATUS_ATIVO = 'ativo';
 const STATUS_RETIFICADO = 'retificado';
@@ -66,15 +67,39 @@ export default function CarreiraAntiguidadePanel(props) {
   const [excluindoRegistro, setExcluindoRegistro] = React.useState(false);
   const navigate = useNavigate();
 
-  const historico = React.useMemo(() => [...(historicoPromocoes || [])].sort((a, b) => String(b.data_promocao || '').localeCompare(String(a.data_promocao || ''))), [historicoPromocoes]);
-  const ativos = React.useMemo(() => historico.filter((h) => valorTexto(h.status_registro || STATUS_ATIVO).toLowerCase() === STATUS_ATIVO && String(h.militar_id || '') === String(militar?.id || '')), [historico, militar?.id]);
+  const historico = React.useMemo(() => [...(historicoPromocoes || [])], [historicoPromocoes]);
 
   const postoGraduacaoMilitar = getPostoGraduacaoOficial(militar);
 
-  const promocaoAtual = React.useMemo(() => ativos.find((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(postoGraduacaoMilitar) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao) && isOrdemPreenchida(h.antiguidade_referencia_ordem)) || null, [ativos, postoGraduacaoMilitar, militar?.quadro]);
+  const selecaoPromocao = React.useMemo(() => selecionarPromocaoAtualEAnteriores({ historicoPromocoes: historico, militar }), [historico, militar]);
+  const ativos = selecaoPromocao.ativosOrdenados;
+  const promocaoAtual = selecaoPromocao.promocaoAtual;
+  const promocoesAnteriores = selecaoPromocao.promocoesAnteriores;
+  const haMultiplosRegistrosAtuais = ativos.length > 1;
 
-  const registrosAtuaisCompativeis = React.useMemo(() => ativos.filter((h) => valorTexto(h.posto_graduacao_novo) === valorTexto(postoGraduacaoMilitar) && valorTexto(h.quadro_novo) === valorTexto(militar?.quadro) && valorTexto(h.data_promocao)), [ativos, postoGraduacaoMilitar, militar?.quadro]);
-  const haMultiplosRegistrosAtuais = registrosAtuaisCompativeis.length > 1;
+  React.useEffect(() => {
+    console.info('[CarreiraAntiguidadePanel] Diagnóstico promoção atual', {
+      militarId: militar?.id || null,
+      historicosAtivosEncontrados: ativos.map((h) => ({
+        id: h?.id || null,
+        status_registro: h?.status_registro || STATUS_ATIVO,
+        posto_graduacao_novo: h?.posto_graduacao_novo || null,
+        data_promocao: h?.data_promocao || null,
+        data_publicacao: h?.data_publicacao || null,
+        created_at: h?.created_at || null,
+      })),
+      historicoEscolhidoComoAtual: promocaoAtual ? {
+        id: promocaoAtual?.id || null,
+        posto_graduacao_novo: promocaoAtual?.posto_graduacao_novo || null,
+        data_promocao: promocaoAtual?.data_promocao || null,
+        data_publicacao: promocaoAtual?.data_publicacao || null,
+        created_at: promocaoAtual?.created_at || null,
+      } : null,
+      motivoEscolha: selecaoPromocao.motivoEscolha,
+      fallbackMilitarPostoGraduacao: !promocaoAtual ? (postoGraduacaoMilitar || null) : null,
+    });
+  }, [ativos, militar?.id, postoGraduacaoMilitar, promocaoAtual, selecaoPromocao.motivoEscolha]);
+
 
   const abrirAcaoRegistro = (tipo, registro) => {
     setAcaoRegistro({ tipo, registro });
@@ -106,13 +131,7 @@ export default function CarreiraAntiguidadePanel(props) {
     setExcluindoRegistro(false);
   };
 
-  const isPromocaoAtualUnicaUsadaNaPrevia = (registro) => {
-    if (!registro?.id) return false;
-    const isAtualCompativel = valorTexto(registro.posto_graduacao_novo) === valorTexto(postoGraduacaoMilitar)
-      && valorTexto(registro.quadro_novo) === valorTexto(militar?.quadro)
-      && valorTexto(registro.data_promocao);
-    return isAtualCompativel && registrosAtuaisCompativeis.length <= 1;
-  };
+  const isPromocaoAtualUnicaUsadaNaPrevia = (registro) => Boolean(registro?.id && promocaoAtual?.id && String(registro.id) === String(promocaoAtual.id) && ativos.length <= 1);
 
   const excluirRegistro = async () => {
     if (!registroExclusao?.id) return setErroExclusao('Registro de promoção não encontrado para exclusão.');
@@ -233,6 +252,7 @@ export default function CarreiraAntiguidadePanel(props) {
       <CardContent className="p-5">
         <PromocoesTimeline
           historico={historico}
+          promocoesAnteriores={promocoesAnteriores}
           promocaoAtual={promocaoAtual}
           militar={militar}
           canManage={canManage}

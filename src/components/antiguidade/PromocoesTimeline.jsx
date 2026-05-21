@@ -122,12 +122,8 @@ function PromocaoAnteriorItem({ registro, canManage, onCorrigir, onRetificar, on
   </article>;
 }
 
-export default function PromocoesTimeline({ historico, promocaoAtual, militar, canManage, onRegistrarAtual, onCorrigirPromocao, onRetificarPromocao, onExcluirPromocao, onAbrirPromocaoOrigem }) {
-  const anteriores = (historico || []).filter((registro) => {
-    if (!registro?.id) return false;
-    if (promocaoAtual?.id && String(registro.id) === String(promocaoAtual.id)) return false;
-    return statusRegistro(registro) !== STATUS_PREVISTO;
-  });
+export default function PromocoesTimeline({ historico, promocoesAnteriores, promocaoAtual, militar, canManage, onRegistrarAtual, onCorrigirPromocao, onRetificarPromocao, onExcluirPromocao, onAbrirPromocaoOrigem }) {
+  const anteriores = (promocoesAnteriores || []).filter((registro) => registro?.id && statusRegistro(registro) === STATUS_ATIVO);
 
   return <div className="space-y-5">
     <PromocaoAtualCard promocaoAtual={promocaoAtual} militar={militar} canManage={canManage} onRegistrarAtual={onRegistrarAtual} onCorrigir={onCorrigirPromocao} onRetificar={onRetificarPromocao} onExcluir={onExcluirPromocao} onAbrirPromocaoOrigem={onAbrirPromocaoOrigem} />
