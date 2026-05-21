@@ -186,6 +186,10 @@
       "default": false,
       "description": "Indica se o registro est\u00e1 agrupado em um lote de publica\u00e7\u00e3o compilada"
     },
+    "render_metadata": {
+      "type": "object",
+      "description": "Metadados de renderização de template"
+    },
     "publicacao_compilada_ordem": {
       "type": "number",
       "description": "Posi\u00e7\u00e3o/ordem deste registro dentro do lote compilado"

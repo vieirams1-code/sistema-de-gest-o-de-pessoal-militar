@@ -172,6 +172,10 @@
     "tornada_sem_efeito_por_id": {
       "type": "string"
     },
+    "render_metadata": {
+      "type": "object",
+      "description": "Metadados de renderização de template"
+    },
     "observacoes": {
       "type": "string"
     }
