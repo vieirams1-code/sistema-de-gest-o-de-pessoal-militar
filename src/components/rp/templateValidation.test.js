@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getTemplateAtivoPorTipo, tipoExigeTemplate } from './templateValidation.js';
+import { getTemplateAtivoPorTipo, lintTemplateOnSave, tipoExigeTemplate } from './templateValidation.js';
 
 const BASE_TEMPLATE = {
   ativo: true,
@@ -92,3 +92,63 @@ test('bloqueio permanece quando tipo exige template e não existe template aplic
 function aplicarTemplateLocal(template, vars) {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
 }
+
+test('variável desconhecida bloqueia em tipo com contrato', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Saída Férias',
+    template: 'Texto {{nome_completo}} {{variavel_que_nao_existe}}',
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_DESCONHECIDA' && f.severity === 'ERRO'), true);
+});
+
+test('template vazio bloqueia', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Saída Férias',
+    template: '   ',
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.findings.some((f) => f.code === 'TEMPLATE_VAZIO' && f.severity === 'ERRO'), true);
+});
+
+test('alias gera alerta e não bloqueia', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Saída Férias',
+    template: 'Texto {{nome_completo}} {{posto}} {{matricula}} {{data_inicio}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_ALIAS' && f.severity === 'ALERTA'), true);
+});
+
+test('obrigatória ausente gera alerta e não bloqueia', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Saída Férias',
+    template: 'Texto {{nome_completo}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'VAR_OBRIGATORIA_AUSENTE' && f.severity === 'ALERTA'), true);
+});
+
+test('tipo sem contrato não bloqueia e gera alerta', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Tipo sem contrato',
+    template: 'Texto {{qualquer_variavel}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.findings.some((f) => f.code === 'CONTRATO_AUSENTE' && f.severity === 'ALERTA'), true);
+});
+
+test('template válido passa', () => {
+  const result = lintTemplateOnSave({
+    modulo: 'Livro',
+    tipoRegistro: 'Retorno Férias',
+    template: 'Texto {{nome_completo}} {{posto_nome}} {{matricula}} {{data_retorno}}',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.summary.erros, 0);
+});

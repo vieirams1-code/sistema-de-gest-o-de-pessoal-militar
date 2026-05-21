@@ -29,6 +29,7 @@ import {
   getConflitoTemplatePorTipo,
   getConflitoUnicidadeTemplate,
   getMensagemConflitoUnicidadeTemplate,
+  lintTemplateOnSave,
   normalizarEscopoTemplate,
   validarEscopoTemplate,
 } from '@/components/rp/templateValidation';
@@ -649,6 +650,7 @@ export default function TemplatesTexto() {
   const [formMode, setFormMode] = useState('new');
   const [showForm, setShowForm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [lintResult, setLintResult] = useState(null);
   const textareaRef = useRef(null);
 
   const { data: templates = [], isLoading } = useQuery({
@@ -733,18 +735,21 @@ export default function TemplatesTexto() {
   const handleEdit = (t) => {
     setEditingTemplate(normalizeTemplateForForm(t));
     setFormMode('edit');
+    setLintResult(null);
     setShowForm(true);
   };
 
   const handleNew = () => {
     setEditingTemplate(createEmptyTemplateForm());
     setFormMode('new');
+    setLintResult(null);
     setShowForm(true);
   };
 
   const handleDuplicate = (template) => {
     setEditingTemplate(createDuplicatedTemplateForm(template));
     setFormMode('duplicate');
+    setLintResult(null);
     setShowForm(true);
   };
 
@@ -853,18 +858,16 @@ export default function TemplatesTexto() {
     return extrairVariaveisDoTemplate(editingTemplate?.template || '');
   }, [editingTemplate?.template]);
 
-  const variaveisValidas = useMemo(() => {
-    return getVariaveisValidas(editingTemplate?.modulo, editingTemplate?.tipo_registro);
-  }, [editingTemplate?.modulo, editingTemplate?.tipo_registro]);
-
-  const variaveisInvalidas = useMemo(() => {
-    if (!editingTemplate?.tipo_registro) return [];
-    return variaveisUsadas.filter(v => !variaveisValidas.has(v));
-  }, [variaveisUsadas, variaveisValidas, editingTemplate?.tipo_registro]);
-
   const handleSaveTemplate = () => {
     if (!editingTemplate) return;
-    if (templateConflictError || variaveisInvalidas.length > 0) return;
+    if (templateConflictError) return;
+    const lint = lintTemplateOnSave({
+      modulo: editingTemplate.modulo,
+      tipoRegistro: editingTemplate.tipo_registro,
+      template: editingTemplate.template,
+    });
+    setLintResult(lint);
+    if (!lint.ok) return;
     saveMutation.mutate(editingTemplate);
   };
 
@@ -1208,17 +1211,27 @@ export default function TemplatesTexto() {
                 />
               </div>
 
-              {variaveisInvalidas.length > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2">
+              {lintResult?.findings?.length > 0 && (
+                <div className={`rounded-md p-3 text-sm flex gap-2 ${
+                  lintResult.summary.erros > 0
+                    ? 'border border-red-200 bg-red-50 text-red-700'
+                    : 'border border-amber-200 bg-amber-50 text-amber-800'
+                }`}>
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                   <div>
-                    <span className="font-semibold block mb-1">Variáveis não reconhecidas neste template:</span>
+                    <span className="font-semibold block mb-1">
+                      Lint do template — {lintResult.summary.erros} erro(s), {lintResult.summary.alertas} alerta(s), {lintResult.summary.infos} info(s)
+                    </span>
                     <ul className="list-disc pl-4 space-y-0.5">
-                      {variaveisInvalidas.map((v, i) => (
-                        <li key={i} className="font-mono">{`{{${v}}}`}</li>
+                      {lintResult.findings.map((finding, i) => (
+                        <li key={`${finding.code}-${i}`}>
+                          <span className="font-semibold">[{finding.severity}]</span> {finding.code} — {finding.message}
+                        </li>
                       ))}
                     </ul>
-                    <span className="block mt-2 text-xs">As variáveis acima não são suportadas para este tipo de registro. Remova-as ou corrija a digitação para poder salvar.</span>
+                    <span className="block mt-2 text-xs">
+                      O salvamento só é bloqueado quando houver findings de severidade ERRO.
+                    </span>
                   </div>
                 </div>
               )}
@@ -1278,7 +1291,7 @@ export default function TemplatesTexto() {
             </Button>
                 <Button
                   onClick={handleSaveTemplate}
-                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError || variaveisInvalidas.length > 0}
+                  disabled={saveMutation.isPending || !editingTemplate.nome || !editingTemplate.tipo_registro || !editingTemplate.template || !!templateConflictError}
                   className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white"
                 >
                   {saveMutation.isPending ? (

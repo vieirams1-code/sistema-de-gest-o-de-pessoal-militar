@@ -315,3 +315,150 @@ export function normalizarEscopoTemplate(template = {}) {
 
   return { ...template, escopo };
 }
+
+const TEMPLATE_PLACEHOLDER_REGEX = /\{\{\s*([\w.]+)\s*\}\}/g;
+
+const TEMPLATE_VAR_CONTRACT = {
+  [resolveTipoRegistroTemplate('Saída Férias')]: {
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula', 'data_inicio'],
+    opcionais: ['dias', 'dias_extenso', 'periodo_aquisitivo', 'quadro', 'quadro_nome', 'militar_quadro'],
+    aliases: {
+      posto: 'posto_nome',
+      nome: 'nome_completo',
+      data_saida: 'data_inicio',
+    },
+  },
+  [resolveTipoRegistroTemplate('Retorno Férias')]: {
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula', 'data_retorno'],
+    opcionais: ['dias', 'dias_extenso', 'periodo_aquisitivo', 'tipo_ferias_texto', 'quadro', 'quadro_nome', 'militar_quadro'],
+    aliases: {
+      posto: 'posto_nome',
+      nome: 'nome_completo',
+    },
+  },
+  [resolveTipoRegistroTemplate('Homologação de Atestado')]: {
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula'],
+    opcionais: ['data_registro', 'quadro', 'quadro_nome', 'militar_quadro'],
+    aliases: {
+      posto: 'posto_nome',
+      nome: 'nome_completo',
+    },
+  },
+  [resolveTipoRegistroTemplate('Ata JISO')]: {
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula'],
+    opcionais: ['data_registro', 'quadro', 'quadro_nome', 'militar_quadro'],
+    aliases: {
+      posto: 'posto_nome',
+      nome: 'nome_completo',
+    },
+  },
+};
+
+function pushFinding(findings, severity, code, variavel, message) {
+  findings.push({ severity, code, variavel, message });
+}
+
+function extractTemplateVars(template = '') {
+  const vars = [];
+  const normalized = String(template || '');
+  for (const match of normalized.matchAll(TEMPLATE_PLACEHOLDER_REGEX)) {
+    vars.push(match[1]);
+  }
+  return vars;
+}
+
+export function lintTemplateOnSave({ modulo = '', tipoRegistro = '', template = '' } = {}) {
+  void modulo;
+  const findings = [];
+  const normalizedTemplate = String(template || '');
+  const tipoResolvido = resolveTipoRegistroTemplate(tipoRegistro);
+
+  if (!normalizedTemplate.trim()) {
+    pushFinding(findings, 'ERRO', 'TEMPLATE_VAZIO', null, 'Template vazio: informe o texto antes de salvar.');
+  }
+
+  const vars = extractTemplateVars(normalizedTemplate);
+  const contract = TEMPLATE_VAR_CONTRACT[tipoResolvido] || null;
+  const normalizedVars = [];
+
+  if (!contract) {
+    pushFinding(
+      findings,
+      'ALERTA',
+      'CONTRATO_AUSENTE',
+      null,
+      'Tipo sem contrato explícito de variáveis. Lint em modo fail-open (não bloqueante).'
+    );
+
+    return {
+      ok: findings.every((item) => item.severity !== 'ERRO'),
+      summary: {
+        erros: findings.filter((f) => f.severity === 'ERRO').length,
+        alertas: findings.filter((f) => f.severity === 'ALERTA').length,
+        infos: findings.filter((f) => f.severity === 'INFO').length,
+      },
+      findings,
+      normalizedVars: vars,
+    };
+  }
+
+  const obrigatorias = new Set(contract.obrigatorias || []);
+  const opcionais = new Set(contract.opcionais || []);
+  const aliases = contract.aliases || {};
+  const canonicasUsadas = new Set();
+
+  for (const variavelOriginal of vars) {
+    if (obrigatorias.has(variavelOriginal)) {
+      canonicasUsadas.add(variavelOriginal);
+      normalizedVars.push(variavelOriginal);
+      continue;
+    }
+
+    if (opcionais.has(variavelOriginal)) {
+      canonicasUsadas.add(variavelOriginal);
+      normalizedVars.push(variavelOriginal);
+      pushFinding(findings, 'INFO', 'VAR_OPCIONAL_USADA', variavelOriginal, `Variável opcional '{{${variavelOriginal}}}' usada.`);
+      continue;
+    }
+
+    const canonicByAlias = aliases[variavelOriginal];
+    if (canonicByAlias) {
+      canonicasUsadas.add(canonicByAlias);
+      normalizedVars.push(canonicByAlias);
+      pushFinding(
+        findings,
+        'ALERTA',
+        'VAR_ALIAS',
+        variavelOriginal,
+        `Alias '{{${variavelOriginal}}}' encontrado. Prefira '{{${canonicByAlias}}}'.`
+      );
+      continue;
+    }
+
+    normalizedVars.push(variavelOriginal);
+    pushFinding(findings, 'ERRO', 'VAR_DESCONHECIDA', variavelOriginal, `Variável '{{${variavelOriginal}}}' não pertence ao contrato do tipo.`);
+  }
+
+  for (const obrigatoria of obrigatorias) {
+    if (!canonicasUsadas.has(obrigatoria)) {
+      pushFinding(
+        findings,
+        'ALERTA',
+        'VAR_OBRIGATORIA_AUSENTE',
+        obrigatoria,
+        `Variável obrigatória '{{${obrigatoria}}}' ausente no template.`
+      );
+    }
+  }
+
+  return {
+    ok: findings.every((item) => item.severity !== 'ERRO'),
+    summary: {
+      erros: findings.filter((f) => f.severity === 'ERRO').length,
+      alertas: findings.filter((f) => f.severity === 'ALERTA').length,
+      infos: findings.filter((f) => f.severity === 'INFO').length,
+    },
+    findings,
+    normalizedVars,
+  };
+}
