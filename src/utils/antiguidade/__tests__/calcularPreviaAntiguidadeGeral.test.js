@@ -522,3 +522,74 @@ test('D17-K1 Prévia considera promoção publicada quando Militar e Histórico 
   assert.equal(resultado.itens[1].registroPromocaoAtualId, 'pub-1');
   assert.ok(resultado.itens.every((item) => item.posto_graduacao === '1º Tenente'));
 });
+
+test('desempata ST por promoção anterior (1º Sgt)', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [
+      militar('d', { nome: 'Denilson', posto_graduacao: 'Subtenente' }),
+      militar('a', { nome: 'Alexandre', posto_graduacao: 'Subtenente' }),
+    ],
+    historicoPromocoes: [
+      promocao('dst', 'd', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-03-02', antiguidade_referencia_ordem: 1 }),
+      promocao('d1s', 'd', { posto_graduacao_novo: '1º Sgt', data_promocao: '2020-07-02', antiguidade_referencia_ordem: 1 }),
+      promocao('ast', 'a', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-03-02', antiguidade_referencia_ordem: 1 }),
+      promocao('a1s', 'a', { posto_graduacao_novo: '1º Sgt', data_promocao: '2022-12-02', antiguidade_referencia_ordem: 5 }),
+    ],
+  });
+  assert.deepEqual(resultado.itens.map((item) => item.nome), ['Denilson', 'Alexandre']);
+});
+
+test('desempata recursivamente no 2º Sgt', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1', { posto_graduacao: 'Subtenente' }), militar('2', { posto_graduacao: 'Subtenente' })],
+    historicoPromocoes: [
+      promocao('1st', '1', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('11s', '1', { posto_graduacao_novo: '1º Sgt', data_promocao: '2022-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('12s', '1', { posto_graduacao_novo: '2º Sgt', data_promocao: '2018-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('2st', '2', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('21s', '2', { posto_graduacao_novo: '1º Sgt', data_promocao: '2022-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('22s', '2', { posto_graduacao_novo: '2º Sgt', data_promocao: '2019-01-01', antiguidade_referencia_ordem: 1 }),
+    ],
+  });
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['1', '2']);
+});
+
+test('empate total na cadeia usa data de nascimento', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [
+      militar('1', { posto_graduacao: 'Subtenente', data_nascimento: '1985-01-01' }),
+      militar('2', { posto_graduacao: 'Subtenente', data_nascimento: '1990-01-01' }),
+    ],
+    historicoPromocoes: [
+      promocao('1st', '1', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('2st', '2', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-01-01', antiguidade_referencia_ordem: 1 }),
+    ],
+  });
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['1', '2']);
+});
+
+test('histórico anterior incompleto vai depois', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1', { posto_graduacao: 'Subtenente' }), militar('2', { posto_graduacao: 'Subtenente' })],
+    historicoPromocoes: [
+      promocao('1st', '1', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('11s', '1', { posto_graduacao_novo: '1º Sgt', data_promocao: '2022-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('2st', '2', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-01-01', antiguidade_referencia_ordem: 1 }),
+    ],
+  });
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['1', '2']);
+  assert.ok(resultado.itens.some((item) => item.alertas.includes(ALERTAS_PREVIA_ANTIGUIDADE_GERAL.HISTORICO_ANTERIOR_INCOMPLETO)));
+});
+
+test('quando data atual difere, não usa cadeia anterior', () => {
+  const resultado = calcularPreviaAntiguidadeGeral({
+    militares: [militar('1', { posto_graduacao: 'Subtenente' }), militar('2', { posto_graduacao: 'Subtenente' })],
+    historicoPromocoes: [
+      promocao('1st', '1', { posto_graduacao_novo: 'Subtenente', data_promocao: '2024-01-01', antiguidade_referencia_ordem: 99 }),
+      promocao('11s', '1', { posto_graduacao_novo: '1º Sgt', data_promocao: '2023-01-01', antiguidade_referencia_ordem: 99 }),
+      promocao('2st', '2', { posto_graduacao_novo: 'Subtenente', data_promocao: '2025-01-01', antiguidade_referencia_ordem: 1 }),
+      promocao('21s', '2', { posto_graduacao_novo: '1º Sgt', data_promocao: '2020-01-01', antiguidade_referencia_ordem: 1 }),
+    ],
+  });
+  assert.deepEqual(resultado.itens.map((item) => item.militar_id), ['1', '2']);
+});
