@@ -3,16 +3,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Building2, MapPinned, Shield, UserRound, Users, ZoomIn, ZoomOut } from 'lucide-react';
+import { AlertTriangle, Building2, MapPinned, Shield, UserCheck, UserRound, Users, ZoomIn, ZoomOut } from 'lucide-react';
 
 const RESERVA_LABEL = 'Não informada';
+const ALERTA_EFETIVO_ELEVADO = 20;
+const RESPONSAVEL_REGEX = /(CEL|TCEL|MAJ|CAP|TEN|ASP|OFICIAL|CORONEL|COMANDANTE|CHEFE|DIRETOR)/i;
 
 const toPosto = (m) => String(m.posto_grad || m.posto || m.graduacao || '').toUpperCase();
 const toNome = (m) => m.nome_completo || m.nome_guerra || 'Sem nome';
 const toQuadro = (m) => m.quadro || m.condicao || m.situacao || RESERVA_LABEL;
-const isTemporario = (m) => /(TEMP|TEMPOR|VOLUNT|CONTRAT)/i.test(`${m.condicao || ''} ${m.quadro || ''} ${m.situacao || ''}`);
+const isTemporario = (m) => /(TEMP|TEMPOR|VOLUNT|CONTRAT)/i.test(
+  `${m.condicao || ''} ${m.quadro || ''} ${m.situacao || ''} ${m.vinculo || ''} ${m.tipo_vinculo || ''} ${m.regime || ''}`,
+);
 const isOficial = (m) => /(CEL|TCEL|MAJ|CAP|TEN|ASP|OFICIAL|CORONEL)/i.test(toPosto(m));
 const isPraca = (m) => !isOficial(m);
+const getResponsavel = (militares = []) => militares.find((m) => RESPONSAVEL_REGEX.test(`${toPosto(m)} ${m.funcao || ''} ${m.cargo || ''}`)) || militares[0] || null;
+const getAlertasUnidade = (u) => {
+  const r = summarizeMilitares(u.militares || []);
+  const alertas = [];
+  if (r.oficiais === 0 && r.total > 0) alertas.push('Sem oficial');
+  if ((u.militares || []).some((m) => !m.matricula || !toPosto(m))) alertas.push('Cadastro incompleto');
+  if (r.total >= ALERTA_EFETIVO_ELEVADO) alertas.push('Efetivo elevado');
+  return alertas;
+};
 
 const summarizeMilitares = (militares = []) => {
   const total = militares.length;
@@ -54,11 +67,22 @@ function TreeNode({ node, searchTerm, expanded, onToggle }) {
             </div>
             <Badge variant="outline">{resumo.total}</Badge>
           </div>
+          {node.responsavel ? (
+            <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
+              <UserCheck className="h-3.5 w-3.5 text-slate-400" />
+              Resp: {toPosto(node.responsavel)} {toNome(node.responsavel)}
+            </p>
+          ) : null}
           <div className="grid grid-cols-3 gap-2 mt-2">
             <Kpi label="Total" value={resumo.total} />
             <Kpi label="Of" value={resumo.oficiais} tone="blue" />
             <Kpi label="Pr" value={resumo.pracas} tone="emerald" />
           </div>
+          {(node.alertas || []).length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {node.alertas.map((alerta) => <Badge key={`${node.key}-${alerta}`} variant="outline" className="text-[10px] border-amber-300 text-amber-700">{alerta}</Badge>)}
+            </div>
+          ) : null}
           {hasChildren ? (
             <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => onToggle(node.key)}>
               {isOpen ? 'Colapsar' : 'Expandir'}
@@ -113,16 +137,22 @@ export default function VisualizacoesGestor({ estrutura, filtro }) {
     type: 'Setor',
     title: setor.setorNome,
     militares: setor.subsetores.flatMap((ss) => ss.unidades.flatMap((u) => u.militares)),
+    responsavel: getResponsavel(setor.subsetores.flatMap((ss) => ss.unidades.flatMap((u) => u.militares))),
+    alertas: [],
     children: setor.subsetores.map((ss) => ({
       key: `subsetor-${setor.setorNome}-${ss.subsetorNome}`,
       type: 'Subsetor',
       title: ss.subsetorNome,
       militares: ss.unidades.flatMap((u) => u.militares),
+      responsavel: getResponsavel(ss.unidades.flatMap((u) => u.militares)),
+      alertas: [],
       children: ss.unidades.map((u) => ({
         key: `unidade-${setor.setorNome}-${ss.subsetorNome}-${u.unidadeNome}`,
         type: 'Unidade',
         title: u.unidadeNome,
         militares: u.militares,
+        responsavel: getResponsavel(u.militares),
+        alertas: getAlertasUnidade(u),
         children: [],
       })),
     })),
@@ -158,7 +188,7 @@ export default function VisualizacoesGestor({ estrutura, filtro }) {
       <TabsContent value="mapa" className="space-y-4">
         <div className="grid lg:grid-cols-12 gap-4">
           <Card className="lg:col-span-4 rounded-3xl border-slate-200 shadow-sm bg-slate-50"><CardHeader><CardTitle className="text-base flex items-center gap-2"><MapPinned className="h-4 w-4 text-blue-700" />Painel Executivo</CardTitle></CardHeader><CardContent className="space-y-3"><div className="grid grid-cols-2 gap-2"><Kpi label="Militares" value={resumoGeral.total} /><Kpi label="Unidades" value={unidadesFlat.length} /><Kpi label="Oficiais" value={resumoGeral.oficiais} tone="blue" /><Kpi label="Praças" value={resumoGeral.pracas} tone="emerald" /></div><div className="rounded-2xl bg-white border border-slate-200 p-3 text-sm">Temporários: <span className="font-bold">{resumoGeral.temporarios}</span></div><div className="space-y-2">{unidadesFlat.map((u) => {const t = u.militares.length; const width = Math.max(6, Math.round((t / maxUnidade) * 100)); return <div key={`bar-${u.unidadeNome}`}><div className="flex justify-between text-xs text-slate-600"><span className="truncate max-w-[75%]">{u.unidadeNome}</span><span>{t}</span></div><div className="h-2 rounded-full bg-slate-200"><div className="h-2 rounded-full bg-blue-600" style={{ width: `${width}%` }} /></div></div>;})}</div></CardContent></Card>
-          <div className="lg:col-span-8 grid md:grid-cols-2 gap-4">{unidadesFlat.map((u) => {const r = summarizeMilitares(u.militares); const semOficial = r.oficiais === 0; const cadastroIncompleto = u.militares.some((m) => !m.matricula || !toPosto(m)); const efetivoElevado = r.total >= Math.max(20, Math.ceil(maxUnidade * 0.8)); return <Card key={`exec-${u.unidadeNome}`} className="rounded-3xl border-slate-200 shadow-sm"><CardHeader className="pb-2"><div className="flex items-start justify-between gap-2"><div><CardTitle className="text-sm">{u.unidadeNome}</CardTitle><p className="text-xs text-slate-500">{u.setorNome} · {u.subsetorNome}</p></div><div className="text-3xl font-black text-slate-900">{r.total}</div></div><div className="flex flex-wrap gap-2"><Badge className="bg-blue-600">Oficiais {r.oficiais}</Badge><Badge className="bg-emerald-600">Praças {r.pracas}</Badge>{r.temporarios > 0 && <Badge variant="secondary">Temp {r.temporarios}</Badge>}</div><div className="flex flex-wrap gap-2 text-xs">{semOficial && <Badge variant="outline" className="border-amber-300 text-amber-700"><AlertTriangle className="h-3 w-3 mr-1" />Sem oficial</Badge>}{cadastroIncompleto && <Badge variant="outline" className="border-orange-300 text-orange-700">Cadastro incompleto</Badge>}{efetivoElevado && <Badge variant="outline" className="border-blue-300 text-blue-700">Efetivo elevado</Badge>}</div></CardHeader><CardContent className="space-y-2">{u.militares.slice(0, 3).map((m) => <MilitarMiniCard key={`top-${m.id || m.matricula || toNome(m)}`} m={m} compact />)}</CardContent></Card>;})}</div>
+          <div className="lg:col-span-8 grid md:grid-cols-2 gap-4">{unidadesFlat.map((u) => {const r = summarizeMilitares(u.militares); const alertasUnidade = getAlertasUnidade(u); return <Card key={`exec-${u.unidadeNome}`} className="rounded-3xl border-slate-200 shadow-sm"><CardHeader className="pb-2"><div className="flex items-start justify-between gap-2"><div><CardTitle className="text-sm">{u.unidadeNome}</CardTitle><p className="text-xs text-slate-500">{u.setorNome} · {u.subsetorNome}</p></div><div className="text-3xl font-black text-slate-900">{r.total}</div></div><div className="flex flex-wrap gap-2"><Badge className="bg-blue-600">Oficiais {r.oficiais}</Badge><Badge className="bg-emerald-600">Praças {r.pracas}</Badge>{r.temporarios > 0 && <Badge variant="secondary">Temp {r.temporarios}</Badge>}</div><div className="flex flex-wrap gap-2 text-xs">{alertasUnidade.map((alerta) => <Badge key={`exec-alerta-${u.unidadeNome}-${alerta}`} variant="outline" className={alerta === 'Sem oficial' ? 'border-amber-300 text-amber-700' : alerta === 'Cadastro incompleto' ? 'border-orange-300 text-orange-700' : 'border-blue-300 text-blue-700'}>{alerta === 'Sem oficial' ? <AlertTriangle className="h-3 w-3 mr-1 inline" /> : null}{alerta}</Badge>)}</div></CardHeader><CardContent className="space-y-2">{u.militares.slice(0, 3).map((m) => <MilitarMiniCard key={`top-${m.id || m.matricula || toNome(m)}`} m={m} compact />)}</CardContent></Card>;})}</div>
         </div>
       </TabsContent>
 
