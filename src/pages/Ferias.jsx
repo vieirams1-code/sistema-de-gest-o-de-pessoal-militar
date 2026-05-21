@@ -114,6 +114,27 @@ function getFeriasIntervalo(ferias) {
   return { inicio, fim };
 }
 
+function parseFeriasDateStart(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const parsed = parseISO(String(value));
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function getDataInicioFerias(ferias) {
+  return (
+    parseFeriasDateStart(ferias?.data_inicio) ||
+    parseFeriasDateStart(ferias?.data_inicio_gozo) ||
+    parseFeriasDateStart(ferias?.inicio)
+  );
+}
+
 function deriveInterrupcaoData(ferias, registrosLivro) {
   if (!ferias || !Array.isArray(registrosLivro)) {
     return {
@@ -479,6 +500,14 @@ export default function Ferias() {
       const filtroFim = parseISO(`${periodEnd}T00:00:00`);
       const hasIntersection = inicio <= filtroFim && fim >= filtroInicio;
       return matchesSearch && matchesStatus && hasIntersection;
+    }).sort((a, b) => {
+      const inicioA = getDataInicioFerias(a);
+      const inicioB = getDataInicioFerias(b);
+
+      if (!inicioA && !inicioB) return 0;
+      if (!inicioA) return 1;
+      if (!inicioB) return -1;
+      return inicioA.getTime() - inicioB.getTime();
     });
   }, [ferias, searchTerm, statusFilter, periodStart, periodEnd]);
 
