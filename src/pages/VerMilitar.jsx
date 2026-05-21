@@ -48,6 +48,7 @@ import { criarEscopado, atualizarEscopado, excluirEscopado } from '@/services/cu
 import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContratosDesignacaoMilitarClient';
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
+import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -239,6 +240,16 @@ export default function VerMilitar() {
     queryFn: () => base44.entities.HistoricoPromocaoMilitarV2.filter({ militar_id: id }, '-data_promocao'),
     enabled: !!id && isAccessResolved && canViewMilitar
   });
+  const selecaoPromocao = React.useMemo(() => selecionarPromocaoAtualEAnteriores({
+    historicoPromocoes,
+    militar,
+  }), [historicoPromocoes, militar]);
+  const postoPromocaoAtual = String(selecaoPromocao?.promocaoAtual?.posto_graduacao || '').trim();
+  const existeDivergenciaPostoAtivo = Boolean(
+    postoPromocaoAtual &&
+    postoGraduacaoMilitar &&
+    postoPromocaoAtual !== postoGraduacaoMilitar
+  );
 
   const { data: periodos = [] } = useQuery({
     queryKey: ['ver-periodos', id],
@@ -264,6 +275,28 @@ export default function VerMilitar() {
     },
     enabled: !!id && isAccessResolved && canViewMilitar && comportamentoElegivel
   });
+
+  React.useEffect(() => {
+    if (!militar?.id) return;
+    console.log('[VER_MILITAR] query_payload_militar', {
+      militar_id: militar.id,
+      posto_graduacao: militar.posto_graduacao,
+      quadro: militar.quadro,
+      payload: militar,
+    });
+  }, [militar]);
+
+  React.useEffect(() => {
+    if (!militar?.id) return;
+    console.log('[VER_MILITAR] ui_payload_cabecalho', {
+      militar_id: militar.id,
+      posto_graduacao_query_militar: postoGraduacaoMilitar,
+      posto_promocao_atual_historico: postoPromocaoAtual,
+      posto_renderizado_cabecalho: postoGraduacaoMilitar,
+      existe_divergencia_posto_ativo: existeDivergenciaPostoAtivo,
+      quadro_renderizado: militar.quadro,
+    });
+  }, [militar, postoGraduacaoMilitar, postoPromocaoAtual, existeDivergenciaPostoAtivo]);
 
   const { data: punicoes = [] } = useQuery({
     queryKey: ['ver-punicoes-comportamento', id],
@@ -520,6 +553,13 @@ export default function VerMilitar() {
                   {postoGraduacaoMilitar && `${postoGraduacaoMilitar} `}
                   {militar.nome_guerra || militar.nome_completo}
                 </h2>
+                {existeDivergenciaPostoAtivo &&
+                <div className="mt-2">
+                    <Badge className="bg-amber-200 text-amber-900 border border-amber-500">
+                      Cadastro divergente do histórico ativo mais recente.
+                    </Badge>
+                  </div>
+                }
                 {militar.nome_guerra && <p className="text-white/80">{militar.nome_completo}</p>}
                 <div className="flex flex-wrap gap-4 mt-3 text-sm text-white/80">
                   {(militarEnriquecido?.matricula_atual || militar.matricula) && <span>Mat. atual: {militarEnriquecido?.matricula_atual || militar.matricula}</span>}
