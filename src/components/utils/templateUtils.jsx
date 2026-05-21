@@ -68,6 +68,45 @@ const numeroPorExtenso = (num) => {
   return numeros[num] || num.toString();
 };
 
+
+export function buildTemplateVarsContrato(source = {}) {
+  const nomeCompleto = String(
+    source?.nome_completo ??
+    source?.militar_nome ??
+    source?.nome ??
+    ''
+  ).trim();
+  const postoBase = source?.posto ?? source?.militar_posto ?? source?.militar?.posto_graduacao ?? source?.militar?.posto;
+  const posto = String(source?.posto_abreviatura || abreviarPosto(postoBase) || '').trim();
+  const quadro = resolveQuadroTemplate(source);
+  const postoNome = montarPostoNomeTemplate({
+    abreviatura: posto,
+    quadro,
+    source,
+  });
+
+  const matricula = [
+    source?.matricula_documental,
+    source?.matricula_operacional,
+    source?.matricula,
+    source?.militar_matricula_atual,
+    source?.militar_matricula,
+    source?.militar?.matricula_documental,
+    source?.militar?.matricula_operacional,
+    source?.militar?.matricula,
+  ].map((v) => String(v || '').trim()).find(Boolean) || '-';
+
+  return {
+    nome_completo: nomeCompleto,
+    posto,
+    posto_nome: postoNome,
+    quadro,
+    quadro_nome: quadro,
+    militar_quadro: quadro,
+    matricula,
+  };
+}
+
 export const formatDateBR = (ds) => {
   if (!ds) return '';
   try {
