@@ -1034,7 +1034,7 @@ test('publicação bloqueia militar duplicado', async () => {
   }, 'militar duplicado');
 });
 
-test('publicação histórica cria Histórico V2 e não atualiza Militar', async () => {
+test('publicação histórica cria Histórico V2 e atualiza Militar pelo histórico ativo', async () => {
   const contexto = entidadesPublicacao();
   const resultado = await publicarPromocaoOficial({
     promocao: { ...promocaoPublicacao, posto_graduacao: '1º Tenente' },
@@ -1044,11 +1044,11 @@ test('publicação histórica cria Histórico V2 e não atualiza Militar', async
 
   assert.equal(resultado.publicados, 1);
   assert.equal(contexto.chamadas.historicoCreate.length, 1);
-  assert.equal(contexto.chamadas.militarUpdate.length, 0);
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: '1º Tenente', quadro: 'QOBM' } });
   assert.equal(contexto.chamadas.promocaoMilitarUpdate[0].patch.status, 'publicado');
 });
 
-test('publicação atual cria Histórico V2 e não atualiza Militar', async () => {
+test('publicação atual cria Histórico V2 e atualiza Militar pelo histórico ativo', async () => {
   const contexto = entidadesPublicacao();
   await publicarPromocaoOficial({
     promocao: promocaoPublicacao,
@@ -1057,7 +1057,7 @@ test('publicação atual cria Histórico V2 e não atualiza Militar', async () =
   });
 
   assert.equal(contexto.chamadas.historicoCreate.length, 1);
-  assert.equal(contexto.chamadas.militarUpdate.length, 0);
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: 'Capitão', quadro: 'QOBM' } });
 });
 
 test('publicação imediatamente superior cria Histórico V2 e atualiza Militar', async () => {
@@ -1065,7 +1065,7 @@ test('publicação imediatamente superior cria Histórico V2 e atualiza Militar'
   await publicarPromocaoOficial({ promocao: promocaoPublicacao, itens: [itemPublicacao()], entities: contexto.entities });
 
   assert.equal(contexto.chamadas.historicoCreate.length, 1);
-  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: 'Capitão' } });
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: 'Capitão', quadro: 'QOBM' } });
 });
 
 test('publicação 2º Tenente para 1º Tenente atualiza Militar e cria Histórico V2', async () => {
@@ -1077,7 +1077,37 @@ test('publicação 2º Tenente para 1º Tenente atualiza Militar e cria Históri
   });
 
   assert.equal(contexto.chamadas.historicoCreate[0].posto_graduacao_anterior, '2º Tenente');
-  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: '1º Tenente' } });
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: '1º Tenente', quadro: 'QOBM' } });
+});
+
+test('publicação 3º Sgt -> 2º Sgt atualiza posto no cadastro Militar', async () => {
+  const contexto = entidadesPublicacao();
+  await publicarPromocaoOficial({
+    promocao: { ...promocaoPublicacao, posto_graduacao: '2º Sargento', quadro: 'QPPM' },
+    itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: '3º Sargento', quadro: 'QPPM' } })],
+    entities: contexto.entities,
+  });
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: '2º Sargento', quadro: 'QPPM' } });
+});
+
+test('publicação 1º Sgt -> Subtenente atualiza cadastro Militar', async () => {
+  const contexto = entidadesPublicacao();
+  await publicarPromocaoOficial({
+    promocao: { ...promocaoPublicacao, posto_graduacao: 'Subtenente', quadro: 'QPPM' },
+    itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: '1º Sargento', quadro: 'QPPM' } })],
+    entities: contexto.entities,
+  });
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: 'Subtenente', quadro: 'QPPM' } });
+});
+
+test('publicação ST -> 2º Ten QAOBM atualiza posto e quadro no cadastro Militar', async () => {
+  const contexto = entidadesPublicacao();
+  await publicarPromocaoOficial({
+    promocao: { ...promocaoPublicacao, posto_graduacao: '2º Tenente', quadro: 'QAOBM' },
+    itens: [itemPublicacao({ militar: { id: 'm1', posto_graduacao: 'Subtenente', quadro: 'QPPM' } })],
+    entities: contexto.entities,
+  });
+  assert.deepEqual(contexto.chamadas.militarUpdate[0], { id: 'm1', patch: { posto_graduacao: '2º Tenente', quadro: 'QAOBM' } });
 });
 
 test('histórico ativo exato com promocao_id vazio é vinculado e não recriado', async () => {
@@ -1114,6 +1144,14 @@ test('histórico ativo exato com mesma promocao_id é idempotente', async () => 
   assert.equal(contexto.chamadas.historicoCreate.length, 0);
   assert.equal(contexto.chamadas.historicoUpdate.length, 0);
   assert.equal(contexto.chamadas.promocaoMilitarUpdate[0].patch.historico_promocao_v2_id, 'hist-1');
+  assert.deepEqual(contexto.chamadas.militarUpdate[0].patch, { posto_graduacao: 'Capitão', quadro: 'QOBM' });
+});
+
+test('payload de atualização do Militar contém somente posto_graduacao e quadro', async () => {
+  const contexto = entidadesPublicacao();
+  await publicarPromocaoOficial({ promocao: promocaoPublicacao, itens: [itemPublicacao()], entities: contexto.entities });
+  const payload = contexto.chamadas.militarUpdate[0].patch;
+  assert.deepEqual(Object.keys(payload).sort(), ['posto_graduacao', 'quadro']);
 });
 
 test('histórico ativo exato com outra promocao_id bloqueia sem escrita', async () => {
@@ -1266,6 +1304,7 @@ test('3º Sgt publica com ordem manual e grava antiguidade_referencia_ordem', as
   const historicosCriados = [];
   const entities = {
     HistoricoPromocaoMilitarV2: { list: async () => [], create: async (p) => { historicosCriados.push(p); return { id: 'h1', ...p }; }, update: async () => {} },
+    Militar: { update: async () => {} },
     PromocaoMilitar: { update: async () => {} },
     Promocao: { update: async () => {} },
   };

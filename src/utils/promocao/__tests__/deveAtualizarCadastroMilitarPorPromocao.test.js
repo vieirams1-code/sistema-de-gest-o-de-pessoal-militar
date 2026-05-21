@@ -5,8 +5,8 @@ import { deveAtualizarCadastroMilitarPorPromocao } from '../deveAtualizarCadastr
 
 const base = {
   promocao: { id: 'p1', status: 'publicada', posto_graduacao: 'Capitão', quadro: 'QOPM' },
-  item: { id: 'pm1', status: 'publicado', publicado: true, resultado_aplicacao_cadastro: 'imediatamente_superior' },
-  historico: { id: 'h1', status_registro: 'ativo' },
+  item: { id: 'pm1', status: 'publicado', publicado: true, resultado_aplicacao_cadastro: 'revisao' },
+  historico: { id: 'h1', status_registro: 'ativo', posto_graduacao_novo: 'Capitão', quadro_novo: 'QOPM' },
   contextoPublicacao: { publicacaoConcluida: true, promocaoId: 'p1', itemId: 'pm1' },
 };
 
@@ -26,8 +26,8 @@ test('histórico V2 sem status ativo não atualiza Militar', () => {
   assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao({ ...base, historico: { id: 'h1', status_registro: 'cancelado' } }), { permitido: false, motivo: 'sem_historico_ativo' });
 });
 
-test('regra diferente de imediatamente_superior não atualiza Militar', () => {
-  assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao({ ...base, item: { ...base.item, resultado_aplicacao_cadastro: 'revisao' } }), { permitido: false, motivo: 'efeito_nao_imediatamente_superior' });
+test('histórico ativo sem posto/quadro novo válido não atualiza Militar', () => {
+  assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao({ ...base, historico: { ...base.historico, posto_graduacao_novo: '' } }), { permitido: false, motivo: 'historico_invalido' });
 });
 
 test('contexto divergente bloqueia atualização de Militar', () => {

@@ -191,8 +191,8 @@ export async function publicarPromocaoOficial({ promocao, itens = [], entities, 
     return { item, efeito, payload, resolucao: resolverHistoricoPublicacao({ historicos, payload }) };
   });
 
-  if (planos.some((plano) => plano.efeito.tipo === 'imediatamente_superior') && (!MilitarEntity || typeof MilitarEntity.update !== 'function')) {
-    throw new Error('Entidade Militar indisponível para atualização cadastral da promoção imediatamente superior.');
+  if (!MilitarEntity || typeof MilitarEntity.update !== 'function') {
+    throw new Error('Entidade Militar indisponível para atualização cadastral da promoção publicada.');
   }
 
   const resultados = [];
@@ -242,10 +242,10 @@ export async function publicarPromocaoOficial({ promocao, itens = [], entities, 
     });
 
     if (podeAtualizarMilitar) {
-      const patchMilitar = { posto_graduacao: texto(promocao.posto_graduacao) };
-      if (!mesmoTextoNormalizado(plano.item.militar?.quadro || plano.item.militar?.quadro_atual, promocao.quadro)) {
-        patchMilitar.quadro = texto(promocao.quadro);
-      }
+      const patchMilitar = {
+        posto_graduacao: texto(historico?.posto_graduacao_novo),
+        quadro: texto(historico?.quadro_novo),
+      };
       await MilitarEntity.update(plano.item.militar_id, patchMilitar);
     }
 
