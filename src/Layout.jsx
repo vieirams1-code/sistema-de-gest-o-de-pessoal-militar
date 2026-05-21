@@ -223,12 +223,6 @@ const adminMenuGroup = {
         { name: 'Migração Alterações Legado', page: 'MigracaoAlteracoesLegado', icon: FileSpreadsheet, moduleKey: 'migracao_alteracoes_legado', actionKey: 'migrar_alteracoes_legado' },
       ],
     },
-    {
-      name: 'Saneamento Férias QOBM',
-      page: 'SaneamentoFeriasQobm',
-      icon: Wrench,
-      adminOnly: true,
-    },
   ],
 };
 
