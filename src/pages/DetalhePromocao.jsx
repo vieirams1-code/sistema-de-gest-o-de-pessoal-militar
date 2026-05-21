@@ -901,7 +901,6 @@ export default function DetalhePromocao() {
       return publicarPromocaoOficial({
         promocao,
         itens: itensPublicacao,
-        entities: base44.entities,
         temAlteracoesPendentes,
         contextoPublicacao,
       });
@@ -913,6 +912,11 @@ export default function DetalhePromocao() {
       });
       await invalidarDados();
       await queryClient.invalidateQueries({ queryKey: ['promocoes-operacionais'] });
+      const idsAfetados = Array.isArray(resultado?.militar_ids_afetados) ? resultado.militar_ids_afetados : [];
+      await Promise.all(idsAfetados.map(async (militarId) => {
+        await queryClient.invalidateQueries({ queryKey: ['militar', militarId] });
+        await queryClient.invalidateQueries({ queryKey: ['ver-historico-promocoes', militarId] });
+      }));
     },
     onError: (error) => toast({ title: 'Falha ao publicar promoção', description: error.message, variant: 'destructive' }),
   });

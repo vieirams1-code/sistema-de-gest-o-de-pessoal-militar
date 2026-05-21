@@ -1,3 +1,4 @@
+import { base44 } from '@/api/base44Client';
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
 import { MENSAGEM_BLOQUEIO_REBAIXAMENTO_CADASTRAL, getSugestaoAtualizacaoCadastro, normalizarPostoGraduacao } from '../utils/postoGraduacaoHierarquia.js';
 import { deveAtualizarCadastroMilitarPorPromocao } from '../utils/promocao/deveAtualizarCadastroMilitarPorPromocao.js';
@@ -170,101 +171,23 @@ function patchDocumentalFaltante(historico = {}, payload = {}) {
   return patch;
 }
 
-export async function publicarPromocaoOficial({ promocao, itens = [], entities, temAlteracoesPendentes = false, contextoPublicacao = {} } = {}) {
+export async function publicarPromocaoOficial({ promocao, itens = [], temAlteracoesPendentes = false, contextoPublicacao = {} } = {}) {
   const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes, contextoPublicacao });
   if (!validacao.valido) throw montarErroPublicacao(validacao.bloqueios);
 
-  const Historico = entities?.HistoricoPromocaoMilitarV2;
-  const MilitarEntity = entities?.Militar;
-  const PromocaoMilitar = entities?.PromocaoMilitar;
-  const Promocao = entities?.Promocao;
-
-  if (!Historico || typeof Historico.create !== 'function') throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para criação.');
-  if (typeof Historico.update !== 'function') throw new Error('Entidade HistoricoPromocaoMilitarV2 indisponível para vínculo seguro.');
-  if (!PromocaoMilitar || typeof PromocaoMilitar.update !== 'function') throw new Error('Entidade PromocaoMilitar indisponível para publicação.');
-  if (!Promocao || typeof Promocao.update !== 'function') throw new Error('Entidade Promocao indisponível para finalizar a promoção.');
-
-  const historicos = await listarHistoricosPublicacao(Historico);
-  const planos = itens.map((item) => {
-    const efeito = getSugestaoAtualizacaoCadastro({ militar: item.militar, promocao });
-    const payload = montarPayloadHistoricoPublicacao({ promocao, item, efeito });
-    return { item, efeito, payload, resolucao: resolverHistoricoPublicacao({ historicos, payload }) };
+  const response = await base44.functions.invoke('publicarPromocaoOficial', {
+    body: { promocao, itens, temAlteracoesPendentes, contextoPublicacao },
   });
 
-  if (!MilitarEntity || typeof MilitarEntity.update !== 'function') {
-    throw new Error('Entidade Militar indisponível para atualização cadastral da promoção publicada.');
+  const erros = response?.data?.errors || [];
+  if (Array.isArray(erros) && erros.length > 0) {
+    const mensagens = erros.map((erro) => (typeof erro === 'string' ? erro : erro?.message)).filter(Boolean);
+    if (mensagens.length > 0) throw montarErroPublicacao(mensagens);
   }
 
-  const resultados = [];
-  for (const plano of planos) {
-    let historico = plano.resolucao.historico;
-    if (plano.resolucao.acao === 'criar') {
-      historico = await Historico.create(plano.payload);
-    } else if (plano.resolucao.acao === 'vincular') {
-      const patch = patchDocumentalFaltante(historico, plano.payload);
-      await Historico.update(historico.id, patch);
-      historico = { ...historico, ...patch };
-    }
-
-    const decisaoAtualizacaoCadastro = deveAtualizarCadastroMilitarPorPromocao({
-      promocao,
-      item: {
-        ...plano.item,
-        status: 'publicado',
-        publicado: true,
-        resultado_aplicacao_cadastro: plano.efeito.tipo,
-      },
-      historico,
-      contextoPublicacao: {
-        ...contextoPublicacao,
-        publicacaoConcluida: true,
-        promocaoId: promocao?.id,
-        itemId: plano.item?.id,
-      },
-    });
-    const podeAtualizarMilitar = Boolean(decisaoAtualizacaoCadastro?.permitido);
-
-    console.log('[promocao.publicacao.decisao_atualizacao_cadastro]', {
-      militar_id: texto(plano.item?.militar_id),
-      promocao_id: texto(promocao?.id),
-      posto_destino: texto(promocao?.posto_graduacao),
-      quadro_destino: texto(promocao?.quadro),
-      historico_status: statusNormalizado(historico?.status_registro),
-      estado_item: statusNormalizado(plano.item?.status),
-      efeito_tipo: texto(plano.efeito?.tipo),
-      contexto_publicacao: {
-        ...contextoPublicacao,
-        publicacaoConcluida: true,
-        promocaoId: promocao?.id,
-        itemId: plano.item?.id,
-      },
-      resultado_funcao: decisaoAtualizacaoCadastro,
-    });
-
-    if (podeAtualizarMilitar) {
-      const patchMilitar = {
-        posto_graduacao: texto(historico?.posto_graduacao_novo),
-        quadro: texto(historico?.quadro_novo),
-      };
-      await MilitarEntity.update(plano.item.militar_id, patchMilitar);
-    }
-
-    await PromocaoMilitar.update(plano.item.id, {
-      status: 'publicado',
-      publicado: true,
-      historico_promocao_v2_id: texto(historico?.id),
-      atualizar_cadastro_militar: plano.efeito.tipo === 'imediatamente_superior',
-      motivo_atualizacao_cadastro: plano.efeito.mensagem,
-      resultado_aplicacao_cadastro: plano.efeito.tipo,
-    });
-
-    resultados.push({ promocao_militar_id: plano.item.id, historico_promocao_v2_id: texto(historico?.id), efeito: plano.efeito.tipo });
-  }
-
-  await Promocao.update(promocao.id, { status: 'publicada' });
-
-  return { publicados: resultados.length, resultados };
+  return response?.data || { publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [] };
 }
+
 
 function ehStatusPublicado(status) {
   return STATUS_PROMOCAO_PUBLICADA.has(statusNormalizado(status));
