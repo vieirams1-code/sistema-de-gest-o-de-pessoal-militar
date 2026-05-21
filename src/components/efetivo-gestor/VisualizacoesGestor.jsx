@@ -15,6 +15,9 @@ import {
   ZoomOut,
   Network,
   MapPin,
+  ChevronDown,
+  ChevronUp,
+  User,
 } from 'lucide-react';
 
 const toPosto = (m = {}) => String(m.posto_grad || m.posto || m.graduacao || '').toUpperCase();
@@ -81,6 +84,91 @@ const Kpi = ({ label, value, tone = 'slate' }) => {
     violet: 'bg-violet-50 text-violet-800',
   };
   return <div className={`rounded-2xl p-3 ${tones[tone] || tones.slate}`}><p className="text-[11px] uppercase tracking-wide opacity-70">{label}</p><p className="text-xl font-bold">{value}</p></div>;
+};
+const OrgPersonCard = ({ militar, searchTerm }) => {
+  const isHighlighted = searchTerm && militarMatch(militar, searchTerm);
+
+  return (
+    <div className={`flex items-start gap-3 rounded-lg border p-3 ${isHighlighted ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+      <div className="mt-0.5 rounded-md bg-slate-100 p-2">
+        <User className="h-4 w-4 text-slate-600" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-900">{toPosto(militar)} {toNome(militar)}</p>
+        <p className="truncate text-xs text-slate-600">{toNomeCompleto(militar)}</p>
+        <p className="text-[11px] text-slate-500">Mat: {militar.matricula || 'Não informada'}</p>
+      </div>
+      <Badge variant="secondary" className="text-[10px]">{toQuadro(militar)}</Badge>
+    </div>
+  );
+};
+
+const countPersonnel = (node) => (node?.personnel || []).length + (node?.children || []).reduce((acc, child) => acc + countPersonnel(child), 0);
+
+const OrgTreeNode = ({ node, searchTerm }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const children = node?.children || [];
+  const hasChildren = children.length > 0;
+  const totalEfetivo = countPersonnel(node);
+  const directEfetivo = (node?.personnel || []).length;
+
+  const Icon = node.type === 'Setor' ? Shield : node.type === 'Subsetor' ? MapPin : Users;
+
+  return (
+    <div className="relative flex flex-col items-center">
+      <div className="relative w-[320px] rounded-xl border border-slate-300 bg-white shadow-md">
+        <div className="rounded-t-xl border-b border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 text-slate-700" />
+              <div>
+                <p className="text-xs text-slate-500">{node.type}</p>
+                <p className="text-sm font-semibold text-slate-900">{node.name}</p>
+              </div>
+            </div>
+            <Badge variant="outline" className="text-[10px]">Total: {totalEfetivo}</Badge>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">Direto: {directEfetivo}</p>
+        </div>
+
+        <div className="max-h-[280px] space-y-2 overflow-y-auto p-3">
+          {(node.personnel || []).length > 0 ? (
+            node.personnel.map((m) => (
+              <OrgPersonCard key={`${m.id || m.matricula || toNomeCompleto(m)}-${node.id}`} militar={m} searchTerm={searchTerm} />
+            ))
+          ) : (
+            <p className="text-xs text-slate-500">Nenhum militar lotado diretamente.</p>
+          )}
+        </div>
+
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            className="absolute -bottom-3 left-1/2 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border border-slate-300 bg-white shadow"
+          >
+            {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-600" /> : <ChevronDown className="h-4 w-4 text-slate-600" />}
+          </button>
+        ) : null}
+      </div>
+
+      {hasChildren && isExpanded ? (
+        <>
+          <div className="w-px h-8 bg-slate-300" />
+          <div className="flex justify-center relative pt-4">
+            {children.map((child, index) => (
+              <div key={child.id || `${node.id}-${index}`} className="relative flex flex-col items-center px-4">
+                {index !== 0 ? <div className="absolute right-1/2 top-0 h-px w-1/2 bg-slate-300" /> : null}
+                {index !== children.length - 1 ? <div className="absolute left-1/2 top-0 h-px w-1/2 bg-slate-300" /> : null}
+                <div className="w-px h-6 bg-slate-300" />
+                <OrgTreeNode node={child} searchTerm={searchTerm} />
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
 };
 
 const TreeNode = ({ node, q, expanded, onToggle }) => {
@@ -152,6 +240,32 @@ export default function VisualizacoesGestor({ estrutura, filtro }) {
   const maxUnidade = useMemo(() => Math.max(1, ...unidadesFlat.map((u) => u.militares.length)), [unidadesFlat]);
   const limiteEfetivoElevado = useMemo(() => Math.max(20, Math.ceil(maxUnidade * 0.85)), [maxUnidade]);
 
+  const orgTree = useMemo(() => {
+    const allUnidades = filtrada.flatMap((setor) =>
+      (setor.subsetores || []).flatMap((subsetor) => (subsetor.unidades || []).map((unidade) => ({
+        id: `u:${unidade.unidadeNome}`,
+        name: unidade.unidadeNome,
+        type: 'Unidade',
+        personnel: unidade.militares || [],
+        children: [],
+      }))),
+    );
+
+    return {
+      id: 'cmb',
+      name: 'CMB',
+      type: 'Setor',
+      personnel: [],
+      children: [{
+        id: '1gbm',
+        name: '1º GBM',
+        type: 'Subsetor',
+        personnel: [],
+        children: allUnidades,
+      }],
+    };
+  }, [filtrada]);
+
   const organogramaTree = useMemo(() => filtrada.map((setor) => {
     const subsetores = setor.subsetores.map((subsetor) => {
       const unidades = subsetor.unidades.map((unidade) => ({
@@ -201,9 +315,9 @@ export default function VisualizacoesGestor({ estrutura, filtro }) {
       </TabsList>
 
       <TabsContent value="organograma">
-        <div className="overflow-x-auto rounded-3xl border bg-slate-50 p-6">
-          <div className="min-w-max space-y-10">
-            {organogramaTree.map((node) => <TreeNode key={node.key} node={node} q={q} expanded={expanded} onToggle={onToggle} />)}
+        <div className="overflow-auto rounded-3xl border bg-slate-50 p-8">
+          <div className="min-w-max flex justify-center">
+            <OrgTreeNode node={orgTree} searchTerm={q} />
           </div>
         </div>
       </TabsContent>
