@@ -348,6 +348,15 @@ export default function RegistroLivroModal({
     enabled: open && !!ferias?.militar_id,
   });
 
+  const { data: militarCompleto = null } = useQuery({
+    queryKey: ['militar-modal-ferias-livro', ferias?.militar_id],
+    queryFn: async () => {
+      if (!ferias?.militar_id) return null;
+      return base44.entities.Militar.get(ferias.militar_id);
+    },
+    enabled: open && !!ferias?.militar_id,
+  });
+
   const dataLimiteGozo = useMemo(() => {
     if (!ferias) return null;
 
@@ -533,6 +542,10 @@ export default function RegistroLivroModal({
 
     const vars = buildVarsLivro({
       ferias,
+      militar:
+        militarCompleto ||
+        ferias?.militar ||
+        null,
       dataRegistro,
       periodo: periodoFerias,
       interrupcaoInfo
@@ -550,9 +563,15 @@ export default function RegistroLivroModal({
         template_escopo: tmpl?.escopo || 'GLOBAL',
         tipo_registro_evento: tipoRegistro,
         tipo_registro_resolvido: tipoTemplateResolvido,
+        militar_id: vars?.militar_id || militarCompleto?.id || ferias?.militar_id || null,
+        militar_nome: militarCompleto?.nome_completo || ferias?.militar_nome || '',
+        militar_quadro: militarCompleto?.quadro || ferias?.militar_quadro || ferias?.quadro || '',
+        vars_quadro: vars?.quadro || '',
+        vars_quadro_nome: vars?.quadro_nome || '',
+        vars_posto_nome: vars?.posto_nome || '',
       });
     }
-  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar]);
+  }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar, militarCompleto]);
 
   const statusPublicacao = useMemo(
     () => calcStatusPublicacao(notaParaBg, numeroBg, dataBg),
