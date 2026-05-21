@@ -71,6 +71,9 @@ function montarResumoEdicaoCamposPublicacao(antes = {}, depois = {}) {
 
 const TEMPLATE_CONFLITO_MENSAGEM =
   'Conflito de template detectado para este tipo. Verifique os templates cadastrados.';
+const PLACEHOLDER_RESIDUAL_REGEX = /{{\s*[\w.]+\s*}}/;
+const PLACEHOLDER_RESIDUAL_MENSAGEM =
+  'Existem variáveis de template não resolvidas no texto. Revise o template ou os dados antes de publicar.';
 
 
 function normalizarNumeroOpcional(value) {
@@ -1023,6 +1026,10 @@ export default function CadastrarRegistroRP() {
       status: statusCalculadoFormulario,
       ...(Object.keys(camposCustom).length > 0 ? { campos_custom: camposCustom } : {}),
     };
+    if (PLACEHOLDER_RESIDUAL_REGEX.test(String(payload.texto_publicacao || ''))) {
+      alert(PLACEHOLDER_RESIDUAL_MENSAGEM);
+      return;
+    }
     if (diasPunicaoNormalizado === undefined) delete payload.dias_punicao;
     else payload.dias_punicao = diasPunicaoNormalizado;
     isSubmittingRef.current = true;

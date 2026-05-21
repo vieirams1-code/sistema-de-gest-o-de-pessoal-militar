@@ -64,6 +64,9 @@ const TIPOS_OPERACIONAIS = [
   'Interrupção de Férias',
   'Nova Saída / Retomada',
 ];
+const PLACEHOLDER_RESIDUAL_REGEX = /{{\s*[\w.]+\s*}}/;
+const PLACEHOLDER_RESIDUAL_MENSAGEM =
+  'Existem variáveis de template não resolvidas no texto. Revise o template ou os dados antes de publicar.';
 
 function toDateOnlyString(date) {
   return format(date, 'yyyy-MM-dd');
@@ -602,6 +605,10 @@ export default function RegistroLivroModal({
         observacoes: observacoes || '',
         texto_publicacao: textoPublicacao || '',
       });
+      if (PLACEHOLDER_RESIDUAL_REGEX.test(String(registroPayload.texto_publicacao || ''))) {
+        alert(PLACEHOLDER_RESIDUAL_MENSAGEM);
+        return;
+      }
       const templatesAtualizados = await queryClient.fetchQuery({
         queryKey: ['templates-texto'],
         queryFn: () => base44.entities.TemplateTexto.list(),
