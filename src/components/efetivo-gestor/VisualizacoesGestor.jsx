@@ -17,7 +17,7 @@ import {
   MapPin,
 } from 'lucide-react';
 
-const toPosto = (m = {}) => String(m.posto_grad || m.posto || m.graduacao || '');
+const toPosto = (m = {}) => String(m.posto_grad || m.posto || m.graduacao || '').toUpperCase();
 const toNome = (m = {}) => m.nome_guerra || m.nome_completo || 'Sem nome';
 const toNomeCompleto = (m = {}) => m.nome_completo || m.nome_guerra || 'Sem nome';
 const toQuadro = (m = {}) => m.quadro || m.condicao || m.situacao || 'Não informada';
@@ -150,7 +150,7 @@ export default function VisualizacoesGestor({ estrutura, filtro }) {
   const militarFlat = useMemo(() => unidadesFlat.flatMap((u) => u.militares), [unidadesFlat]);
   const resumoGeral = useMemo(() => summarizeMilitares(militarFlat), [militarFlat]);
   const maxUnidade = useMemo(() => Math.max(1, ...unidadesFlat.map((u) => u.militares.length)), [unidadesFlat]);
-  const limiteEfetivoElevado = useMemo(() => Math.max(15, Math.ceil(maxUnidade * 0.85)), [maxUnidade]);
+  const limiteEfetivoElevado = useMemo(() => Math.max(20, Math.ceil(maxUnidade * 0.85)), [maxUnidade]);
 
   const organogramaTree = useMemo(() => filtrada.map((setor) => {
     const subsetores = setor.subsetores.map((subsetor) => {
