@@ -177,6 +177,7 @@ const menuGroups = [
 const adminMenuGroup = {
   title: 'ADMIN',
   items: [
+    { name: 'Centro Administrativo', page: 'CentroAdministrativo', icon: Wrench, adminOnly: true },
     { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
     {
       name: 'Adições e Personalizações',
