@@ -34,6 +34,7 @@ import {
 import {
   aplicarTemplate,
   abreviarPosto,
+  composeTemplateVarsRP,
   formatDateBR,
   montarPostoNomeTemplate,
   resolveQuadroTemplate,
@@ -158,7 +159,7 @@ function formatarDataExtenso(dataStr) {
   return data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, publicacoesDisponiveis = [] } = {}) {
+export function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, publicacoesDisponiveis = [] } = {}) {
   const postoBase = formData.militar_posto || militar?.posto_graduacao || militar?.posto || '';
   const postoAbreviado = abreviarPosto(postoBase);
   const quadroBase = resolveQuadroTemplate({
@@ -171,8 +172,18 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, pub
   const dadosPublicacaoReferencia = extrairDadosPublicacaoReferencia({ formData, publicacoesDisponiveis });
   const dataBgRefExtenso = formatarDataExtenso(dadosPublicacaoReferencia.data_bg_ref);
 
-  const variaveis = {
+  const sourceRP = {
     ...formData,
+    militar,
+    nome_completo: formData.militar_nome || militar?.nome_completo || '',
+    militar_posto: postoBase,
+    quadro: quadroBase,
+    militar_quadro: quadroBase,
+    matricula: formData.militar_matricula || militar?.matricula || '',
+    militar_matricula: formData.militar_matricula || militar?.matricula || '',
+  };
+
+  const rpSpecificOverrides = {
     militar_nome: formData.militar_nome || militar?.nome_completo || '',
     nome_completo: formData.militar_nome || militar?.nome_completo || '',
     militar_matricula: formData.militar_matricula || militar?.matricula || '',
@@ -208,6 +219,12 @@ function montarVariaveisTemplateRP({ formData = {}, militar = {}, user = {}, pub
     ...dadosPublicacaoReferencia,
     data_bg_ref: dataBgRefExtenso || dadosPublicacaoReferencia.data_bg_ref,
   };
+
+  const variaveis = composeTemplateVarsRP({
+    formData,
+    sourceRP,
+    rpSpecificOverrides,
+  });
 
   return variaveis;
 }
