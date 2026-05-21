@@ -55,6 +55,7 @@ import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { montarLabelMilitarAtestado } from '@/services/atestadoJisoMilitarContextService';
 import { atualizarEscopado, criarEscopado } from '@/services/cudEscopadoClient';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
+import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 
 const statusColors = {
   'Ativo': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -72,7 +73,7 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
     edit_mode: TEMPLATE_EDIT_MODE.HIBRIDO,
   };
   const queryClient = useQueryClient();
-  const { canAccessAction } = useCurrentUser();
+  const { canAccessAction, user } = useCurrentUser();
   const [editingJiso, setEditingJiso] = useState(false);
   const [jisoDate, setJisoDate] = useState(atestado.data_jiso_agendada || '');
   const [savingJiso, setSavingJiso] = useState(false);
@@ -232,7 +233,18 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       numero_bg: homologacaoForm.numero_bg,
       data_bg: homologacaoForm.data_bg,
     });
-    await criarEscopado('PublicacaoExOfficio', {
+    const templateHomologacao = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templates, {
+      grupamento_id: militarAtestado?.grupamento_id,
+      subgrupamento_id: militarAtestado?.subgrupamento_id,
+      subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
+    });
+    const renderMetadata = buildTemplateRenderMetadata({
+      template: templateHomologacao,
+      modulo: 'PublicacaoExOfficio',
+      user,
+      sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
+    });
+    const payloadPublicacao = {
       tipo: 'Homologação de Atestado',
       militar_id: atestado.militar_id,
       militar_nome: atestado.militar_nome,
@@ -245,7 +257,16 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       numero_bg: homologacaoForm.numero_bg,
       data_bg: homologacaoForm.data_bg,
       status
-    });
+    };
+    if (renderMetadata) {
+      payloadPublicacao.render_metadata = renderMetadata;
+      payloadPublicacao.template_id = renderMetadata.template_id;
+      payloadPublicacao.template_hash = renderMetadata.template_hash;
+      payloadPublicacao.rendered_at = renderMetadata.rendered_at;
+      payloadPublicacao.rendered_by = renderMetadata.rendered_by;
+      payloadPublicacao.source_of_truth = renderMetadata.source_of_truth;
+    }
+    await criarEscopado('PublicacaoExOfficio', payloadPublicacao);
     await atualizarEscopado('Atestado', atestado.id, {
       homologado_comandante: true,
       status_jiso: 'Homologado pelo Comandante',
@@ -285,7 +306,18 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       numero_bg: ataJisoForm.numero_bg,
       data_bg: ataJisoForm.data_bg,
     });
-    await criarEscopado('PublicacaoExOfficio', {
+    const templateAtaJiso = getTemplateAtivoPorTipo('Ata JISO', 'ExOfficio', templates, {
+      grupamento_id: militarAtestado?.grupamento_id,
+      subgrupamento_id: militarAtestado?.subgrupamento_id,
+      subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
+    });
+    const renderMetadata = buildTemplateRenderMetadata({
+      template: templateAtaJiso,
+      modulo: 'PublicacaoExOfficio',
+      user,
+      sourceOfTruth: TEMPLATE_GOVERNANCA.source_of_truth,
+    });
+    const payloadPublicacao = {
       tipo: 'Ata JISO',
       militar_id: atestado.militar_id,
       militar_nome: atestado.militar_nome,
@@ -303,7 +335,16 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       numero_bg: ataJisoForm.numero_bg,
       data_bg: ataJisoForm.data_bg,
       status
-    });
+    };
+    if (renderMetadata) {
+      payloadPublicacao.render_metadata = renderMetadata;
+      payloadPublicacao.template_id = renderMetadata.template_id;
+      payloadPublicacao.template_hash = renderMetadata.template_hash;
+      payloadPublicacao.rendered_at = renderMetadata.rendered_at;
+      payloadPublicacao.rendered_by = renderMetadata.rendered_by;
+      payloadPublicacao.source_of_truth = renderMetadata.source_of_truth;
+    }
+    await criarEscopado('PublicacaoExOfficio', payloadPublicacao);
     await atualizarEscopado('Atestado', atestado.id, {
       status_jiso: 'Homologado pela JISO',
       status_publicacao: status
