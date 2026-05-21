@@ -11,25 +11,25 @@ const base = {
 };
 
 test('publicação válida atualiza Militar', () => {
-  assert.equal(deveAtualizarCadastroMilitarPorPromocao(base), true);
+  assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao(base), { permitido: true, motivo: 'permitido' });
 });
 
 test('promoção em rascunho não atualiza Militar', () => {
-  assert.equal(deveAtualizarCadastroMilitarPorPromocao({ ...base, promocao: { ...base.promocao, status: 'rascunho' } }), false);
+  assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao({ ...base, promocao: { ...base.promocao, status: 'rascunho' } }), { permitido: false, motivo: 'nao_publicado' });
 });
 
 test('PromocaoMilitar salvo/alterado não atualiza Militar', () => {
-  assert.equal(deveAtualizarCadastroMilitarPorPromocao({ ...base, item: { ...base.item, status: 'elegivel', publicado: false } }), false);
+  assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao({ ...base, item: { ...base.item, status: 'elegivel', publicado: false } }), { permitido: false, motivo: 'estado_invalido' });
 });
 
 test('histórico V2 sem status ativo não atualiza Militar', () => {
-  assert.equal(deveAtualizarCadastroMilitarPorPromocao({ ...base, historico: { id: 'h1', status_registro: 'cancelado' } }), false);
+  assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao({ ...base, historico: { id: 'h1', status_registro: 'cancelado' } }), { permitido: false, motivo: 'sem_historico_ativo' });
 });
 
 test('regra diferente de imediatamente_superior não atualiza Militar', () => {
-  assert.equal(deveAtualizarCadastroMilitarPorPromocao({ ...base, item: { ...base.item, resultado_aplicacao_cadastro: 'revisao' } }), false);
+  assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao({ ...base, item: { ...base.item, resultado_aplicacao_cadastro: 'revisao' } }), { permitido: false, motivo: 'efeito_nao_imediatamente_superior' });
 });
 
 test('contexto divergente bloqueia atualização de Militar', () => {
-  assert.equal(deveAtualizarCadastroMilitarPorPromocao({ ...base, contextoPublicacao: { ...base.contextoPublicacao, itemId: 'outro' } }), false);
+  assert.deepEqual(deveAtualizarCadastroMilitarPorPromocao({ ...base, contextoPublicacao: { ...base.contextoPublicacao, itemId: 'outro' } }), { permitido: false, motivo: 'contexto_invalido' });
 });

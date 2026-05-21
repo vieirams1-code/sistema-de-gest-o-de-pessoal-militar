@@ -1327,3 +1327,37 @@ test('exclusão com histórico ativo bloqueia', async () => {
     /Histórico ainda ativo/,
   );
 });
+
+test('caso informado 1º Sgt -> Subtenente: publicação cria histórico ativo e atualiza Militar (não reproduz bloqueio)', async () => {
+  const chamadas = { militarUpdate: 0, promocaoMilitarPatch: null };
+  const entities = {
+    HistoricoPromocaoMilitarV2: {
+      list: async () => [],
+      create: async (payload) => ({ id: 'hist-st-1', ...payload }),
+      update: async () => {},
+    },
+    Militar: {
+      update: async () => { chamadas.militarUpdate += 1; },
+    },
+    PromocaoMilitar: {
+      update: async (_id, patch) => { chamadas.promocaoMilitarPatch = patch; },
+    },
+    Promocao: { update: async () => {} },
+  };
+
+  await publicarPromocaoOficial({
+    promocao: { id: 'prom-st-1', status: 'ativa', posto_graduacao: 'Subtenente', quadro: 'QPPM', data_promocao: '2026-01-10' },
+    itens: [{
+      id: 'pm-st-1',
+      militar_id: 'mil-1',
+      ordem: 1,
+      status: 'ativo',
+      militar: { posto_graduacao: '1º Sargento', quadro: 'QPPM' },
+    }],
+    entities,
+    contextoPublicacao: { status: 'concluida' },
+  });
+
+  assert.equal(chamadas.militarUpdate, 1);
+  assert.equal(chamadas.promocaoMilitarPatch.resultado_aplicacao_cadastro, 'imediatamente_superior');
+});
