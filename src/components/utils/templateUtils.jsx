@@ -31,8 +31,14 @@ export const resolveQuadroTemplate = (source = {}) => {
     source?.quadro,
     source?.quadro_nome,
     source?.militar_quadro,
+    source?.ferias?.militar_quadro,
+    source?.ferias?.quadro,
+    source?.periodo?.militar_quadro,
+    source?.registro?.militar_quadro,
+    source?.registro?.quadro,
     source?.quadro_atual,
     source?.militar?.quadro,
+    source?.militar?.militar_quadro,
     source?.militar?.quadro_nome,
     source?.militar?.militar_quadro,
   ];
@@ -139,7 +145,11 @@ export function buildVarsLivro({ ferias, militar, registro, dataRegistro, period
     militar,
     registro,
   });
-  const postoNome = montarPostoNomeTemplate({ abreviatura, quadro, source: ferias });
+  const postoNome = montarPostoNomeTemplate({
+    abreviatura,
+    quadro,
+    source: { ferias, militar, registro, periodo },
+  });
 
   return {
     posto_nome: postoNome,

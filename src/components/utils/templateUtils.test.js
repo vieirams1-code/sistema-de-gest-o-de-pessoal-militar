@@ -122,3 +122,40 @@ test('aplicarTemplate no fluxo de férias remove placeholders de quadro e posto_
   assert.equal(saida.includes('{{'), false);
   assert.equal(saida, 'Cap QPTBM QPTBM QPTBM');
 });
+
+test('buildVarsLivro com militar real prioriza quadro e compõe posto_nome', () => {
+  const vars = buildVarsLivro({
+    ferias: {
+      militar_nome: 'Ana Souza',
+      dias: 30,
+      data_inicio: '2026-01-01',
+      data_fim: '2026-01-30',
+    },
+    militar: {
+      posto_graduacao: '3º Sargento',
+      quadro: 'QBMP 1.a',
+    },
+  });
+
+  assert.equal(vars.posto_nome, '3º Sgt QBMP 1.a');
+  assert.equal(vars.quadro, 'QBMP 1.a');
+  assert.equal(vars.quadro_nome, 'QBMP 1.a');
+  assert.equal(vars.militar_quadro, 'QBMP 1.a');
+});
+
+test('aplicarTemplate no fluxo real mantém quadro quando militar possui quadro', () => {
+  const vars = buildVarsLivro({
+    ferias: {
+      militar_nome: 'Ana Souza',
+      dias: 30,
+      data_inicio: '2026-01-01',
+      data_fim: '2026-01-30',
+    },
+    militar: {
+      posto_graduacao: '3º Sargento',
+      quadro: 'QBMP 1.a',
+    },
+  });
+  const saida = aplicarTemplate('{{posto_nome}} {{nome_completo}} {{quadro}} {{quadro_nome}}', vars);
+  assert.equal(saida, '3º Sgt QBMP 1.a Ana Souza QBMP 1.a QBMP 1.a');
+});
