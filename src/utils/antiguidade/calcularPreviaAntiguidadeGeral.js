@@ -43,6 +43,8 @@ export const ALERTAS_PREVIA_ANTIGUIDADE_GERAL = Object.freeze({
   POSTO_QUADRO_INCOMPATIVEL: 'ALERTA_POSTO_QUADRO_INCOMPATIVEL',
   HISTORICO_ATIVO_SEM_DATA_PROMOCAO: 'ALERTA_HISTORICO_ATIVO_SEM_DATA_PROMOCAO',
   REGRESSAO_CRONOLOGICA_POSTO: 'ALERTA_REGRESSAO_CRONOLOGICA_POSTO',
+  DESEMPATE_PROMOCAO_ANTERIOR: 'ALERTA_DESEMPATE_PROMOCAO_ANTERIOR',
+  HISTORICO_ANTERIOR_INCOMPLETO: 'ALERTA_HISTORICO_ANTERIOR_INCOMPLETO',
 });
 
 const VALOR_AUSENTE_NUMERICO = Number.POSITIVE_INFINITY;
@@ -403,7 +405,49 @@ function adicionarDiagnosticosPromocaoAtual(registroAtual, alertas, contextoOrde
   };
 }
 
-function montarCriterioOrdenacao({ militar, registroAtual, postoNormalizado, detalheQuadroAntiguidade }) {
+
+export function montarCadeiaAntiguidadeMilitar({ militar, historicosAtivos = [] } = {}) {
+  return (historicosAtivos || []).filter((registro) => isRegistroAtivoOperacional(registro))
+    .map((registro) => ({
+      posto: valorTexto(registro?.posto_graduacao_novo),
+      quadro: valorTexto(registro?.quadro_novo),
+      data_promocao: registro?.data_promocao || null,
+      antiguidade_referencia_ordem: toNumeroValido(registro?.antiguidade_referencia_ordem),
+      historico_id: obterRegistroId(registro) || null,
+      _dataTimestamp: toTimestamp(registro?.data_promocao),
+    }))
+    .sort((a, b) => {
+      const dataA = a._dataTimestamp ?? Number.NEGATIVE_INFINITY;
+      const dataB = b._dataTimestamp ?? Number.NEGATIVE_INFINITY;
+      if (dataA !== dataB) return dataB - dataA;
+      const ordemA = a.antiguidade_referencia_ordem ?? VALOR_AUSENTE_NUMERICO;
+      const ordemB = b.antiguidade_referencia_ordem ?? VALOR_AUSENTE_NUMERICO;
+      if (ordemA !== ordemB) return ordemA - ordemB;
+      return (a.historico_id || '').localeCompare(b.historico_id || '', 'pt-BR', { numeric: true });
+    })
+    .map(({ _dataTimestamp, ...registro }) => registro);
+}
+
+export function compararCadeiaAntiguidade(a, b) {
+  const maiorCadeia = Math.max(a.length, b.length);
+  for (let i = 0; i < maiorCadeia; i += 1) {
+    const itemA = a[i];
+    const itemB = b[i];
+    if (!itemA && !itemB) break;
+    if (!itemA || !itemB) return itemA ? -1 : 1;
+
+    const dataA = toTimestamp(itemA?.data_promocao) ?? VALOR_AUSENTE_NUMERICO;
+    const dataB = toTimestamp(itemB?.data_promocao) ?? VALOR_AUSENTE_NUMERICO;
+    if (dataA !== dataB) return dataA - dataB;
+
+    const ordemA = toNumeroValido(itemA?.antiguidade_referencia_ordem) ?? VALOR_AUSENTE_NUMERICO;
+    const ordemB = toNumeroValido(itemB?.antiguidade_referencia_ordem) ?? VALOR_AUSENTE_NUMERICO;
+    if (ordemA !== ordemB) return ordemA - ordemB;
+  }
+  return 0;
+}
+
+function montarCriterioOrdenacao({ militar, registroAtual, postoNormalizado, detalheQuadroAntiguidade, cadeiaAntiguidade }) {
   const dataPromocaoTimestamp = toTimestamp(registroAtual?.data_promocao);
   const antiguidadeReferenciaOrdem = toNumeroValido(registroAtual?.antiguidade_referencia_ordem);
   const antiguidadeReferenciaId = valorTexto(registroAtual?.antiguidade_referencia_id);
@@ -429,23 +473,54 @@ function montarCriterioOrdenacao({ militar, registroAtual, postoNormalizado, det
     nomeNormalizado,
     matriculaNormalizada,
     militarIdNormalizado,
+    cadeiaAntiguidade: cadeiaAntiguidade || [],
   };
 }
 
 function compararItens(a, b) {
   const ca = a.criterioOrdenacao;
   const cb = b.criterioOrdenacao;
-  const comparadores = [
+  const comparadoresBase = [
     ca.postoIndice - cb.postoIndice,
     ca.quadroIndice - cb.quadroIndice,
     ca.dataPromocaoTimestamp - cb.dataPromocaoTimestamp,
     ca.antiguidadeReferenciaOrdem - cb.antiguidadeReferenciaOrdem,
+  ];
+  const resultadoBase = comparadoresBase.find((resultado) => resultado !== 0) || 0;
+  if (resultadoBase !== 0) return resultadoBase;
+
+  const cadeiaA = ca.cadeiaAntiguidade.slice(1);
+  const cadeiaB = cb.cadeiaAntiguidade.slice(1);
+  if (cadeiaA.length !== cadeiaB.length) {
+    if (cadeiaA.length < cadeiaB.length) addUnico(a.alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.HISTORICO_ANTERIOR_INCOMPLETO);
+    if (cadeiaB.length < cadeiaA.length) addUnico(b.alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.HISTORICO_ANTERIOR_INCOMPLETO);
+  }
+
+  const resultadoCadeia = compararCadeiaAntiguidade(cadeiaA, cadeiaB);
+  if (resultadoCadeia !== 0) {
+    if (cadeiaA.length > 0 || cadeiaB.length > 0) {
+      addUnico(a.alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.DESEMPATE_PROMOCAO_ANTERIOR);
+      addUnico(b.alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.DESEMPATE_PROMOCAO_ANTERIOR);
+    }
+    return resultadoCadeia;
+  }
+
+  if (cadeiaA.length > 0 || cadeiaB.length > 0) {
+    addUnico(a.alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.DESEMPATE_PROMOCAO_ANTERIOR);
+    addUnico(b.alertas, ALERTAS_PREVIA_ANTIGUIDADE_GERAL.DESEMPATE_PROMOCAO_ANTERIOR);
+  }
+
+  const dataNascimentoA = toTimestamp(a?.data_nascimento || a?.militar?.data_nascimento || '') ?? VALOR_AUSENTE_NUMERICO;
+  const dataNascimentoB = toTimestamp(b?.data_nascimento || b?.militar?.data_nascimento || '') ?? VALOR_AUSENTE_NUMERICO;
+  if (dataNascimentoA !== dataNascimentoB) return dataNascimentoA - dataNascimentoB;
+
+  const comparadoresFinais = [
     ca.antiguidadeReferenciaId.localeCompare(cb.antiguidadeReferenciaId, 'pt-BR', { numeric: true }),
     ca.nomeNormalizado.localeCompare(cb.nomeNormalizado, 'pt-BR', { numeric: true }),
     ca.matriculaNormalizada.localeCompare(cb.matriculaNormalizada, 'pt-BR', { numeric: true }),
     ca.militarIdNormalizado.localeCompare(cb.militarIdNormalizado, 'pt-BR', { numeric: true }),
   ];
-  return comparadores.find((resultado) => resultado !== 0) || 0;
+  return comparadoresFinais.find((resultado) => resultado !== 0) || 0;
 }
 
 function chaveEmpateAteReferenciaId(criterio) {
@@ -594,11 +669,13 @@ export function calcularPreviaAntiguidadeGeral({
       }
     }
 
+    const cadeiaAntiguidade = montarCadeiaAntiguidadeMilitar({ militar, historicosAtivos: historicos });
     const criterioOrdenacao = montarCriterioOrdenacao({
       militar,
       registroAtual,
       postoNormalizado,
       detalheQuadroAntiguidade,
+      cadeiaAntiguidade,
     });
 
     return {
@@ -608,6 +685,7 @@ export function calcularPreviaAntiguidadeGeral({
       matricula: valorTexto(militar?.matricula),
       posto_graduacao: valorTexto(militar?.posto_graduacao),
       quadro: valorTexto(militar?.quadro),
+      data_nascimento: valorTexto(militar?.data_nascimento),
       data_promocao: registroAtual?.data_promocao || null,
       antiguidade_referencia_ordem: toNumeroValido(registroAtual?.antiguidade_referencia_ordem),
       criterioOrdenacao,

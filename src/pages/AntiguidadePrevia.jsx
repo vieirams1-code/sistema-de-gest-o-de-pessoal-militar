@@ -60,6 +60,8 @@ const rotulosAlertas = {
   [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.POSTO_QUADRO_INCOMPATIVEL]: 'Posto/quadro incompatível',
   [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.HISTORICO_ATIVO_SEM_DATA_PROMOCAO]: 'Histórico ativo sem data de promoção',
   [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.REGRESSAO_CRONOLOGICA_POSTO]: 'Regressão cronológica de posto',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.DESEMPATE_PROMOCAO_ANTERIOR]: 'Desempate por promoção anterior',
+  [ALERTAS_PREVIA_ANTIGUIDADE_GERAL.HISTORICO_ANTERIOR_INCOMPLETO]: 'Histórico anterior incompleto',
 };
 
 function rotuloAlerta(alerta) {
