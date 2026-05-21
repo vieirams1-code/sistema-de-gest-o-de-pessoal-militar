@@ -15,9 +15,7 @@ import { useUsuarioPodeAgirSobreMilitar } from '@/hooks/useUsuarioPodeAgirSobreM
 import { createPageUrl } from '@/utils';
 import {
   aplicarTemplate,
-  abreviarPosto,
-  montarPostoNomeTemplate,
-  resolveQuadroTemplate,
+  buildTemplateVarsContrato,
 } from '@/components/utils/templateUtils';
 import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
 import { carregarMilitaresComMatriculas, isMilitarMesclado } from '@/services/matriculaMilitarViewService';
@@ -117,22 +115,16 @@ export default function EditarJISO() {
       return `${dia}/${mes}/${ano}`;
     };
 
-    const abreviatura = abreviarPosto(atestado.militar_posto);
-    const quadro = resolveQuadroTemplate({
+    const varsContratoTemplate = buildTemplateVarsContrato({
       ...atestadoContexto,
       ...atestado,
       militar: militarAtestado,
+      matricula_operacional: atestadoContexto.militar_matricula_atual,
+      matricula: atestado.militar_matricula,
     });
-    const postoNome = montarPostoNomeTemplate({ abreviatura, quadro });
 
     const vars = {
-      posto_nome: postoNome,
-      posto: abreviatura,
-      quadro,
-      quadro_nome: quadro,
-      militar_quadro: quadro,
-      nome_completo: atestado.militar_nome || '',
-      matricula: atestadoContexto.militar_matricula_atual || atestado.militar_matricula || '',
+      ...varsContratoTemplate,
       finalidade_jiso: formData.finalidade_jiso || '',
       secao_jiso: formData.secao_jiso || '',
       data_ata: formatarData(formData.data_jiso),

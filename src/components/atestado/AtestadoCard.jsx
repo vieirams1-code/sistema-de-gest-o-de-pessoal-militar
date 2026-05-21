@@ -40,9 +40,7 @@ import { createPageUrl } from '@/utils';
 import { sincronizarAtestadoJisoNoQuadro } from '@/components/quadro/quadroHelpers';
 import {
   aplicarTemplate,
-  abreviarPosto,
-  montarPostoNomeTemplate,
-  resolveQuadroTemplate,
+  buildTemplateVarsContrato,
 } from '@/components/utils/templateUtils';
 import {
   calcStatusPublicacao,
@@ -125,18 +123,11 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
   const matriculaOperacional = montarLabelMilitarAtestado(atestado, { contexto: 'operacional' });
   const matriculaDocumental = montarLabelMilitarAtestado(atestado, { contexto: 'documental' });
 
-  const montarPostoNome = () => {
-    const abreviatura = abreviarPosto(atestado?.militar_posto);
-    const quadro = resolveQuadroTemplate({
-      ...atestado,
-      militar: militarAtestado,
-    });
-    return montarPostoNomeTemplate({ abreviatura, quadro });
-  };
-
-  const quadroTemplate = resolveQuadroTemplate({
+  const varsContratoTemplate = buildTemplateVarsContrato({
     ...atestado,
     militar: militarAtestado,
+    matricula_documental: matriculaDocumental,
+    matricula_operacional: matriculaOperacional,
   });
 
   const gerarTextoHomologacao = (form) => {
@@ -146,14 +137,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
     });
     if (!tmpl?.template) return null;
-    const posto = montarPostoNome();
     return aplicarTemplate(tmpl.template, {
-      posto_nome: posto,
-      quadro: quadroTemplate,
-      quadro_nome: quadroTemplate,
-      militar_quadro: quadroTemplate,
-      nome_completo: atestado.militar_nome,
-      matricula: matriculaDocumental,
+      ...varsContratoTemplate,
       dias: String(atestado.dias),
       dias_extenso: String(diasExtensoMap[atestado.dias] || atestado.dias),
       tipo_afastamento: (atestado.tipo_afastamento || '').toLowerCase(),
@@ -169,14 +154,8 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
     });
     if (!tmpl?.template) return null;
-    const posto = montarPostoNome();
     return aplicarTemplate(tmpl.template, {
-      posto_nome: posto,
-      quadro: quadroTemplate,
-      quadro_nome: quadroTemplate,
-      militar_quadro: quadroTemplate,
-      nome_completo: atestado.militar_nome,
-      matricula: matriculaDocumental,
+      ...varsContratoTemplate,
       secao_jiso: form.secao_jiso || '___',
       data_ata: formatarDataExtenso(form.data_ata),
       finalidade_jiso: form.finalidade_jiso || '___',
