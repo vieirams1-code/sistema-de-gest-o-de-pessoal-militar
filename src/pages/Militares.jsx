@@ -400,8 +400,6 @@ export default function Militares() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <SaneamentoQbmptQptbmDialog isAdmin={isAdmin} />
-            <SaneamentoPromocaoDivergenteDialog isAdmin={isAdmin} />
             {canAccessAction('adicionar_militares') && (
               <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-5 h-5 mr-2" />Novo Militar
@@ -409,6 +407,17 @@ export default function Militares() {
             )}
           </div>
         </div>
+
+        {isAdmin && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">Ferramentas administrativas</p>
+            <p className="text-xs text-amber-800 mb-3">Ações manuais com dry-run e confirmação textual obrigatória.</p>
+            <div className="flex flex-wrap gap-2">
+              <SaneamentoQbmptQptbmDialog isAdmin={isAdmin} />
+              <SaneamentoPromocaoDivergenteDialog isAdmin={isAdmin} />
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
