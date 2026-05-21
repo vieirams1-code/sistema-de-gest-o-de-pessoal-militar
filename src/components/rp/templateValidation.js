@@ -55,6 +55,10 @@ export function resolveTipoRegistroTemplate(tipoRegistro = '') {
   return normalizeTipoRegistroKey(tipoRegistro);
 }
 
+export function normalizarTipoTemplateLivroFerias(tipoRegistro = '') {
+  return resolverTipoFeriasCanonico(tipoRegistro);
+}
+
 function getModuloCanonico(modulo = '') {
   const moduloNormalizado = normalizarModulo(modulo);
 

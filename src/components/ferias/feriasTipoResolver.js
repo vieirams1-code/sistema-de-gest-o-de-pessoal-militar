@@ -15,7 +15,10 @@ export const FERIAS_TIPO_CANONICO = {
 };
 
 const ALIAS_TO_CANONICO = new Map([
+  ['inicio', FERIAS_TIPO_CANONICO.SAIDA],
   ['inicio de ferias', FERIAS_TIPO_CANONICO.SAIDA],
+  ['inicio saida ferias', FERIAS_TIPO_CANONICO.SAIDA],
+  ['inicio saida ferias livro', FERIAS_TIPO_CANONICO.SAIDA],
   ['saida ferias', FERIAS_TIPO_CANONICO.SAIDA],
 
   ['interrupcao de ferias', FERIAS_TIPO_CANONICO.INTERRUPCAO],

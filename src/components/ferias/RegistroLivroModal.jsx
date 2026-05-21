@@ -31,7 +31,7 @@ import {
   validarInicioNoPeriodoConcessivo,
 } from '@/components/ferias/feriasRules';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
-import { getTemplateAtivoPorTipo } from '@/components/rp/templateValidation';
+import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/components/rp/templateValidation';
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
@@ -307,6 +307,8 @@ export default function RegistroLivroModal({
     queryKey: ['templates-texto'],
     queryFn: () => base44.entities.TemplateTexto.list(),
     staleTime: 30000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
     enabled: open,
   });
 
@@ -495,7 +497,8 @@ export default function RegistroLivroModal({
       return;
     }
 
-    const tmpl = getTemplateAtivoPorTipo(tipoRegistro, 'Livro', templates, {
+    const tipoTemplateResolvido = normalizarTipoTemplateLivroFerias(tipoRegistro) || tipoRegistro;
+    const tmpl = getTemplateAtivoPorTipo(tipoTemplateResolvido, 'Livro', templates, {
       grupamento_id: ferias?.grupamento_id,
       subgrupamento_id: ferias?.subgrupamento_id,
       subgrupamento_tipo: ferias?.subgrupamento_tipo,
@@ -538,6 +541,17 @@ export default function RegistroLivroModal({
     // Proteção operacional: este texto é re-renderizado de forma determinística a cada
     // alteração de dados do formulário (fluxo TEMPLATE_IMUTAVEL/RENDER_LAZY).
     setTextoPublicacao(aplicarTemplate(tmpl.template, vars));
+    if (import.meta.env.DEV) {
+      console.info('[RegistroLivroModal] template usado na geração de férias', {
+        template_id: tmpl?.id,
+        template_nome: tmpl?.nome,
+        template_tipo: tmpl?.tipo_registro,
+        template_modulo: tmpl?.modulo,
+        template_escopo: tmpl?.escopo || 'GLOBAL',
+        tipo_registro_evento: tipoRegistro,
+        tipo_registro_resolvido: tipoTemplateResolvido,
+      });
+    }
   }, [ferias, resumo, tipoRegistro, dataRegistro, erroCronologia, templates, periodosDoMilitar]);
 
   const statusPublicacao = useMemo(
@@ -569,7 +583,12 @@ export default function RegistroLivroModal({
         observacoes: observacoes || '',
         texto_publicacao: textoPublicacao || '',
       });
-      const templateAtivo = getTemplateAtivoPorTipo(tipoRegistro, 'Livro', templates, {
+      const templatesAtualizados = await queryClient.fetchQuery({
+        queryKey: ['templates-texto'],
+        queryFn: () => base44.entities.TemplateTexto.list(),
+      });
+      const tipoTemplateResolvido = normalizarTipoTemplateLivroFerias(tipoRegistro) || tipoRegistro;
+      const templateAtivo = getTemplateAtivoPorTipo(tipoTemplateResolvido, 'Livro', templatesAtualizados, {
         grupamento_id: ferias?.grupamento_id,
         subgrupamento_id: ferias?.subgrupamento_id,
         subgrupamento_tipo: ferias?.subgrupamento_tipo,
