@@ -44,8 +44,10 @@ export const resolveQuadroTemplate = (source = {}) => {
   return '';
 };
 
+export const normalizarPostoTemplate = (posto) => String(posto || '').trim().toUpperCase();
+
 export const montarPostoNomeTemplate = ({ abreviatura, posto, quadro, source } = {}) => {
-  const postoResolvido = String(abreviatura || posto || '').trim();
+  const postoResolvido = normalizarPostoTemplate(abreviatura || posto);
   const quadroResolvido = String(quadro || resolveQuadroTemplate(source) || '').trim();
   return [postoResolvido, quadroResolvido].filter(Boolean).join(' ');
 };
@@ -58,7 +60,8 @@ export function buildTemplateVarsContrato(source = {}) {
     ''
   ).trim();
   const postoBase = source?.posto ?? source?.militar_posto ?? source?.militar?.posto_graduacao ?? source?.militar?.posto;
-  const posto = String(source?.posto_abreviatura || abreviarPosto(postoBase) || '').trim();
+  const postoCanonico = source?.posto_abreviatura || source?.posto || abreviarPosto(postoBase);
+  const posto = normalizarPostoTemplate(postoCanonico);
   const quadro = resolveQuadroTemplate(source);
   const postoNome = montarPostoNomeTemplate({
     abreviatura: posto,
