@@ -24,8 +24,8 @@ test('buildVarsLivro expõe quadro_nome sem quebrar posto_nome legado', () => {
     },
   });
 
-  assert.equal(vars.posto_nome, 'Cap QOBM');
-  assert.equal(vars.posto, 'Cap');
+  assert.equal(vars.posto_nome, 'CAP QOBM');
+  assert.equal(vars.posto, 'CAP');
   assert.equal(vars.quadro_nome, 'QOBM');
   assert.equal(vars.militar_quadro, 'QOBM');
 });
@@ -76,11 +76,11 @@ test('resolveQuadroTemplate não inventa fallback QOBM quando ausência de quadr
 });
 
 test('montarPostoNomeTemplate compõe posto + quadro', () => {
-  assert.equal(montarPostoNomeTemplate({ abreviatura: 'Cap', quadro: 'QPTBM' }), 'Cap QPTBM');
+  assert.equal(montarPostoNomeTemplate({ abreviatura: 'CAP', quadro: 'QPTBM' }), 'CAP QPTBM');
 });
 
 test('montarPostoNomeTemplate retorna somente posto quando quadro não existe', () => {
-  assert.equal(montarPostoNomeTemplate({ abreviatura: 'Cap', quadro: '' }), 'Cap');
+  assert.equal(montarPostoNomeTemplate({ abreviatura: 'CAP', quadro: '' }), 'CAP');
 });
 
 
@@ -103,7 +103,7 @@ test('prévia de férias renderiza {{quadro}} com valor de exemplo', () => {
 test('prévia de férias renderiza {{posto_nome}} como posto + quadro', () => {
   const vars = buildPreviewTemplateVars({ posto_abreviatura: 'Maj', quadro: 'QOSAU' });
   const saida = aplicarTemplate('{{posto_nome}}', vars);
-  assert.equal(saida, 'Maj QOSAU');
+  assert.equal(saida, 'MAJ QOSAU');
 });
 
 
@@ -121,7 +121,7 @@ test('aplicarTemplate no fluxo de férias remove placeholders de quadro e posto_
 
   const saida = aplicarTemplate('{{posto_nome}} {{quadro}} {{quadro_nome}} {{militar_quadro}}', vars);
   assert.equal(saida.includes('{{'), false);
-  assert.equal(saida, 'Cap QPTBM QPTBM QPTBM');
+  assert.equal(saida, 'CAP QPTBM QPTBM QPTBM');
 });
 
 test('buildVarsLivro com militar real prioriza quadro e compõe posto_nome', () => {
@@ -138,7 +138,7 @@ test('buildVarsLivro com militar real prioriza quadro e compõe posto_nome', () 
     },
   });
 
-  assert.equal(vars.posto_nome, '3º Sgt QBMP 1.a');
+  assert.equal(vars.posto_nome, '3º SGT QBMP 1.a');
   assert.equal(vars.quadro, 'QBMP 1.a');
   assert.equal(vars.quadro_nome, 'QBMP 1.a');
   assert.equal(vars.militar_quadro, 'QBMP 1.a');
@@ -158,22 +158,22 @@ test('aplicarTemplate no fluxo real mantém quadro quando militar possui quadro'
     },
   });
   const saida = aplicarTemplate('{{posto_nome}} {{nome_completo}} {{quadro}} {{quadro_nome}}', vars);
-  assert.equal(saida, '3º Sgt QBMP 1.a Ana Souza QBMP 1.a QBMP 1.a');
+  assert.equal(saida, '3º SGT QBMP 1.a Ana Souza QBMP 1.a QBMP 1.a');
 });
 
 
 test('buildTemplateVarsContrato retorna núcleo canônico com aliases coerentes', () => {
   const vars = buildTemplateVarsContrato({
     nome_completo: 'Carlos Lima',
-    posto: 'Cap',
+    posto: 'CAP',
     quadro: 'QOBM',
     matricula: '111',
   });
 
   assert.deepEqual(vars, {
     nome_completo: 'Carlos Lima',
-    posto: 'Cap',
-    posto_nome: 'Cap QOBM',
+    posto: 'CAP',
+    posto_nome: 'CAP QOBM',
     quadro: 'QOBM',
     quadro_nome: 'QOBM',
     militar_quadro: 'QOBM',

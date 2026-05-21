@@ -6,15 +6,15 @@ import { buildTemplateVarsContrato, composeTemplateVarsRP } from './templateCont
 test('buildTemplateVarsContrato retorna núcleo canônico com aliases coerentes', () => {
   const vars = buildTemplateVarsContrato({
     nome_completo: 'Carlos Lima',
-    posto: 'Cap',
+    posto: 'CAP',
     quadro: 'QOBM',
     matricula: '111',
   });
 
   assert.deepEqual(vars, {
     nome_completo: 'Carlos Lima',
-    posto: 'Cap',
-    posto_nome: 'Cap QOBM',
+    posto: 'CAP',
+    posto_nome: 'CAP QOBM',
     quadro: 'QOBM',
     quadro_nome: 'QOBM',
     militar_quadro: 'QOBM',
@@ -74,7 +74,7 @@ test('composeTemplateVarsRP preserva usuário/unidade/grupamento e mantém vari�
 
   assert.equal(vars.campo_legado, 'valor-legado');
   assert.equal(vars.nome_completo, 'Maria Silva');
-  assert.equal(vars.posto, 'Cap');
+  assert.equal(vars.posto, 'CAP');
   assert.equal(vars.quadro, 'QOBM');
   assert.equal(vars.usuario_nome, 'Operador');
   assert.equal(vars.usuario_email, 'operador@corp.mil');
@@ -85,4 +85,25 @@ test('composeTemplateVarsRP preserva usuário/unidade/grupamento e mantém vari�
   assert.equal(vars.numero_bg_ref, '100');
   assert.equal(vars.data_bg_ref, '10 de maio de 2026');
   assert.equal(vars.nota_ref, 'Nota X');
+});
+
+
+test('buildTemplateVarsContrato normaliza posto/graduacao para maiúsculas e mantém quadro inalterado', () => {
+  const casos = [
+    { posto: 'Sd', quadro: 'QPBM', esperadoPosto: 'SD', esperadoPostoNome: 'SD QPBM' },
+    { posto: '3º Sgt', quadro: 'QOBM', esperadoPosto: '3º SGT', esperadoPostoNome: '3º SGT QOBM' },
+    { posto: '2º Tenente', quadro: 'QBMP 1.a', esperadoPosto: '2º TENENTE', esperadoPostoNome: '2º TENENTE QBMP 1.a' },
+  ];
+
+  for (const { posto, quadro, esperadoPosto, esperadoPostoNome } of casos) {
+    const vars = buildTemplateVarsContrato({ posto, quadro });
+    assert.equal(vars.posto, esperadoPosto);
+    assert.equal(vars.posto_nome, esperadoPostoNome);
+  }
+
+  const quadroOriginal = 'qbmp 1.a';
+  const varsQuadro = buildTemplateVarsContrato({ posto: 'Cap', quadro: quadroOriginal });
+  assert.equal(varsQuadro.quadro, quadroOriginal);
+  assert.equal(varsQuadro.quadro_nome, quadroOriginal);
+  assert.equal(varsQuadro.militar_quadro, quadroOriginal);
 });
