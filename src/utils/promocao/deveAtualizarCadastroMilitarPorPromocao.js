@@ -29,11 +29,7 @@ export function deveAtualizarCadastroMilitarPorPromocao({ promocao, item, histor
   const statusHistorico = normalizar(historico?.status_registro);
   if (!texto(historico?.id)) return bloquear('historico_inexistente');
   if (statusHistorico !== 'ativo') return bloquear('sem_historico_ativo');
-
-  const efeito = normalizar(item?.resultado_aplicacao_cadastro);
-  if (efeito !== 'imediatamente_superior') return bloquear('efeito_nao_imediatamente_superior');
-
-  if (!texto(promocao?.posto_graduacao) || !texto(promocao?.quadro)) return bloquear('contexto_invalido');
+  if (!texto(historico?.posto_graduacao_novo) || !texto(historico?.quadro_novo)) return bloquear('historico_invalido');
 
   const itemStatus = normalizar(item?.status);
   if (['cancelado', 'cancelada', 'retificado', 'retificada'].includes(itemStatus)) return bloquear('estado_invalido');
