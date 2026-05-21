@@ -84,36 +84,37 @@ const Kpi = ({ label, value, tone = 'slate' }) => {
 };
 
 const TreeNode = ({ node, q, expanded, onToggle }) => {
-  const isOpen = expanded[node.key] ?? true;
+  const safeNode = { ...node, militares: node?.militares || [], children: node?.children || [], alertas: node?.alertas || [] };
+  const isOpen = expanded[safeNode.key] ?? true;
   return (
     <div className="relative flex flex-col items-center">
       <Card className="w-[320px] rounded-2xl border-slate-200">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">{node.type} · {node.title}</CardTitle>
-          <p className="text-xs text-slate-600">{node.subtitle}</p>
+          <CardTitle className="text-sm">{safeNode.type} · {safeNode.title || 'Sem nome'}</CardTitle>
+          <p className="text-xs text-slate-600">{safeNode.subtitle || ''}</p>
           <div className="mt-2 flex flex-wrap gap-1">
-            {node.responsavel ? <Badge variant="outline" className="text-[11px]"><UserCheck className="mr-1 h-3 w-3" />{toNome(node.responsavel)}</Badge> : null}
-            {node.alertas.map((a) => <Badge key={a} variant="secondary" className="text-[10px]">{a}</Badge>)}
+            {safeNode.responsavel ? <Badge variant="outline" className="text-[11px]"><UserCheck className="mr-1 h-3 w-3" />{toNome(safeNode.responsavel)}</Badge> : null}
+            {(safeNode.alertas || []).map((a) => <Badge key={a} variant="secondary" className="text-[10px]">{a}</Badge>)}
           </div>
         </CardHeader>
-        {node.type === 'Unidade' ? (
+        {safeNode.type === 'Unidade' ? (
           <CardContent>
             <div className="max-h-52 space-y-2 overflow-auto pr-1">
-              {node.militares.map((m) => <MilitarMiniCard key={`${m.id || m.matricula || toNomeCompleto(m)}-${node.key}`} militar={m} q={q} />)}
+              {safeNode.militares.map((m) => <MilitarMiniCard key={`${m.id || m.matricula || toNomeCompleto(m)}-${safeNode.key}`} militar={m} q={q} />)}
             </div>
           </CardContent>
         ) : null}
       </Card>
 
-      {node.children.length > 0 ? (
+      {(safeNode.children || []).length > 0 ? (
         <>
-          <Button variant="ghost" size="sm" className="mt-2" onClick={() => onToggle(node.key)}>{isOpen ? 'Colapsar' : 'Expandir'}</Button>
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => onToggle(safeNode.key)}>{isOpen ? 'Colapsar' : 'Expandir'}</Button>
           {isOpen ? (
             <div className="relative mt-2 flex flex-col items-center">
               <div className="h-6 w-px bg-slate-300" />
               <div className="relative flex gap-6 pt-4">
                 <div className="absolute left-6 right-6 top-0 h-px bg-slate-300" />
-                {node.children.map((child) => (
+                {(safeNode.children || []).map((child) => (
                   <div key={child.key} className="relative flex flex-col items-center">
                     <div className="h-4 w-px bg-slate-300" />
                     <TreeNode node={child} q={q} expanded={expanded} onToggle={onToggle} />
