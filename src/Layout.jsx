@@ -88,6 +88,13 @@ const menuGroups = [
             actionKey: 'visualizar_extracao_efetivo',
           },
           {
+            name: 'Visão de Gestor',
+            page: 'VisualizacaoGestorEfetivo',
+            icon: GitBranch,
+            moduleKey: 'militares',
+            actionKey: 'visualizar_militares',
+          },
+          {
             name: 'Contratos de Designação',
             page: 'ContratosDesignacao',
             icon: ClipboardList,

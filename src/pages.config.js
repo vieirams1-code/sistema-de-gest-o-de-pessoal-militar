@@ -110,6 +110,7 @@ import RastreamentoPromocoes from './pages/RastreamentoPromocoes';
 import Promocoes from './pages/Promocoes';
 import DetalhePromocao from './pages/DetalhePromocao';
 import ProcedimentosProcessos from './pages/ProcedimentosProcessos';
+import VisualizacaoGestorEfetivo from './pages/VisualizacaoGestorEfetivo';
 import __Layout from './Layout.jsx';
 
 
@@ -177,6 +178,7 @@ export const PAGES = {
     "Promocoes": Promocoes,
     "DetalhePromocao": DetalhePromocao,
     "ProcedimentosProcessos": ProcedimentosProcessos,
+    "VisualizacaoGestorEfetivo": VisualizacaoGestorEfetivo,
 }
 
 export const pagesConfig = {
