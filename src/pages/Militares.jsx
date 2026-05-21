@@ -34,6 +34,7 @@ import { fetchScopedLotacoes } from '@/services/getScopedLotacoesClient';
 import DataDebugPanel from '@/components/debug/DataDebugPanel';
 import PromocaoAtualModal from '@/components/antiguidade/PromocaoAtualModal';
 import SaneamentoQbmptQptbmDialog from '@/components/admin/SaneamentoQbmptQptbmDialog';
+import SaneamentoPromocaoDivergenteDialog from '@/components/admin/SaneamentoPromocaoDivergenteDialog';
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
 
@@ -400,6 +401,7 @@ export default function Militares() {
           </div>
           <div className="flex flex-wrap gap-2">
             <SaneamentoQbmptQptbmDialog isAdmin={isAdmin} />
+            <SaneamentoPromocaoDivergenteDialog isAdmin={isAdmin} />
             {canAccessAction('adicionar_militares') && (
               <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-5 h-5 mr-2" />Novo Militar
