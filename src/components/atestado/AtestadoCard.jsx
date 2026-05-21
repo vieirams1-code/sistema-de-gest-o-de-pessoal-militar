@@ -233,7 +233,11 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       numero_bg: homologacaoForm.numero_bg,
       data_bg: homologacaoForm.data_bg,
     });
-    const templateHomologacao = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templates, {
+    const templatesAtualizados = await queryClient.fetchQuery({
+      queryKey: ['templates-texto'],
+      queryFn: () => base44.entities.TemplateTexto.list(),
+    });
+    const templateHomologacao = getTemplateAtivoPorTipo('Homologação de Atestado', 'ExOfficio', templatesAtualizados, {
       grupamento_id: militarAtestado?.grupamento_id,
       subgrupamento_id: militarAtestado?.subgrupamento_id,
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
@@ -306,7 +310,11 @@ export default function AtestadoCard({ atestado, onEdit, onDelete, onView, canEd
       numero_bg: ataJisoForm.numero_bg,
       data_bg: ataJisoForm.data_bg,
     });
-    const templateAtaJiso = getTemplateAtivoPorTipo('Ata JISO', 'ExOfficio', templates, {
+    const templatesAtualizados = await queryClient.fetchQuery({
+      queryKey: ['templates-texto'],
+      queryFn: () => base44.entities.TemplateTexto.list(),
+    });
+    const templateAtaJiso = getTemplateAtivoPorTipo('Ata JISO', 'ExOfficio', templatesAtualizados, {
       grupamento_id: militarAtestado?.grupamento_id,
       subgrupamento_id: militarAtestado?.subgrupamento_id,
       subgrupamento_tipo: militarAtestado?.subgrupamento_tipo,
