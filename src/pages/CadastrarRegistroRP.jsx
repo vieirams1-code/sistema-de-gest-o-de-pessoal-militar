@@ -49,7 +49,7 @@ import {
 } from '@/components/publicacao/publicacaoStateMachine';
 import { montarPayloadOriginalApostilada, resolverReferenciaApostila } from '@/components/publicacao/apostilaUtils';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
-import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
+import { buildTemplateRenderMetadata, parseTemplateRenderMetadata } from '@/services/templateRenderMetadata';
 
 
 function mapearEntityPublicacaoPorModulo(modulo) {
@@ -1370,9 +1370,9 @@ export default function CadastrarRegistroRP() {
                       ? 'Texto derivado do template com sobrescrita manual.'
                       : 'Texto derivado do template.'}
                   </p>
-                  {registroEdicao?.render_metadata?.rendered_at && (
+                  {parseTemplateRenderMetadata(registroEdicao?.render_metadata, registroEdicao?.render_metadata_json)?.rendered_at && (
                     <p className="mt-1 text-[11px] text-slate-500">
-                      Gerado via template em {formatDateBR(registroEdicao.render_metadata.rendered_at)}.
+                      Gerado via template em {formatDateBR(parseTemplateRenderMetadata(registroEdicao?.render_metadata, registroEdicao?.render_metadata_json).rendered_at)}.
                     </p>
                   )}
                   <Textarea
