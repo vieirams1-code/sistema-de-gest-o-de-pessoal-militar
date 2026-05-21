@@ -8,6 +8,7 @@ import {
   Building2,
   MapPinned,
   Shield,
+  ShieldAlert,
   UserCheck,
   UserRound,
   Users,
@@ -65,13 +66,18 @@ const getAlertasUnidade = (unidade, limiteEfetivoElevado) => {
 const MilitarMiniCard = ({ militar, q }) => {
   const match = q && militarMatch(militar, q);
   return (
-    <div className={`flex items-center justify-between gap-3 rounded-2xl border bg-white p-3 shadow-sm hover:border-blue-200 ${match ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}>
-      <div className="min-w-0">
-        <p className="truncate text-sm"><span className="font-semibold text-blue-700">{toPosto(militar) || 'S/Posto'}</span> <span className="font-bold text-slate-900">{toNome(militar)}</span></p>
-        <p className="truncate text-xs text-slate-600">{toQuadro(militar)} · {militar.condicao || 'Não informada'}</p>
-        {militar.matricula ? <p className="text-[11px] text-slate-500">Mat: {militar.matricula}</p> : null}
+    <div className={`flex items-center justify-between gap-3 rounded-xl border bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${match ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-300' : 'border-slate-200'}`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100">
+          <UserRound className="h-4 w-4 text-slate-500" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-slate-900">{toPosto(militar) || 'S/Posto'} {toNome(militar)}</p>
+          <p className="truncate text-xs text-slate-600">{toNomeCompleto(militar)}</p>
+          <p className="text-[11px] text-slate-500">Mat: {militar.matricula || 'Não informada'}</p>
+        </div>
       </div>
-      <UserRound className="h-5 w-5 shrink-0 text-slate-400" />
+      <Badge variant="secondary" className="shrink-0 bg-slate-100 text-[10px] text-slate-700">{toQuadro(militar)}</Badge>
     </div>
   );
 };
@@ -89,7 +95,7 @@ const OrgPersonCard = ({ militar, searchTerm }) => {
   const isHighlighted = searchTerm && militarMatch(militar, searchTerm);
 
   return (
-    <div className={`flex items-start gap-3 rounded-lg border p-3 ${isHighlighted ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+    <div className={`flex items-start gap-3 rounded-xl border p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${isHighlighted ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-300' : 'border-slate-200 bg-white'}`} >
       <div className="mt-0.5 rounded-md bg-slate-100 p-2">
         <User className="h-4 w-4 text-slate-600" />
       </div>
@@ -112,26 +118,26 @@ const OrgTreeNode = ({ node, searchTerm }) => {
   const totalEfetivo = countPersonnel(node);
   const directEfetivo = (node?.personnel || []).length;
 
-  const Icon = node.type === 'Setor' ? Shield : node.type === 'Subsetor' ? MapPin : Users;
+  const Icon = node.type === 'Setor' ? ShieldAlert : node.type === 'Subsetor' ? MapPin : Users;
 
   return (
     <div className="relative flex flex-col items-center">
-      <div className="relative w-[320px] rounded-xl border border-slate-300 bg-white shadow-md">
-        <div className="rounded-t-xl border-b border-slate-200 bg-slate-50 p-3">
+      <div className="relative z-10 w-[340px] rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className={`rounded-t-xl border-b p-4 ${node.type === 'Setor' ? 'border-indigo-700 bg-indigo-800 text-white' : node.type === 'Subsetor' ? 'border-blue-800 bg-blue-700 text-white' : 'border-slate-200 bg-slate-50 text-slate-900'}`}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Icon className="h-4 w-4 text-slate-700" />
+              <Icon className={`h-4 w-4 ${node.type === 'Setor' ? 'text-white' : node.type === 'Subsetor' ? 'text-blue-100' : 'text-emerald-600'}`} />
               <div>
-                <p className="text-xs text-slate-500">{node.type}</p>
-                <p className="text-sm font-semibold text-slate-900">{node.name}</p>
+                <p className={`text-xs ${node.type === 'Unidade' ? 'text-slate-500' : 'text-white/80'}`}>{node.type}</p>
+                <p className={`text-sm font-semibold ${node.type === 'Unidade' ? 'text-slate-900' : 'text-white'}`}>{node.name}</p>
               </div>
             </div>
-            <Badge variant="outline" className="text-[10px]">Total: {totalEfetivo}</Badge>
+            <Badge variant="outline" className={`text-[10px] border-0 ${node.type === 'Setor' ? 'bg-indigo-900/50 text-indigo-100' : node.type === 'Subsetor' ? 'bg-blue-800/50 text-blue-50' : 'bg-slate-100 text-slate-700'}`}>Total: {totalEfetivo}</Badge>
           </div>
-          <p className="mt-2 text-[11px] text-slate-500">Direto: {directEfetivo}</p>
+          <p className={`mt-2 text-[11px] ${node.type === 'Unidade' ? 'text-slate-500' : 'text-white/80'}`}>Efetivo Direto: {directEfetivo}</p>
         </div>
 
-        <div className="max-h-[280px] space-y-2 overflow-y-auto p-3">
+        <div className="max-h-[320px] space-y-2 overflow-y-auto p-3">
           {(node.personnel || []).length > 0 ? (
             node.personnel.map((m) => (
               <OrgPersonCard key={`${m.id || m.matricula || toNomeCompleto(m)}-${node.id}`} militar={m} searchTerm={searchTerm} />
@@ -145,7 +151,7 @@ const OrgTreeNode = ({ node, searchTerm }) => {
           <button
             type="button"
             onClick={() => setIsExpanded((prev) => !prev)}
-            className="absolute -bottom-3 left-1/2 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border border-slate-300 bg-white shadow"
+            className="absolute -bottom-3 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border-2 border-indigo-200 bg-white shadow transition-colors hover:border-indigo-500 hover:bg-indigo-50"
           >
             {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-600" /> : <ChevronDown className="h-4 w-4 text-slate-600" />}
           </button>
@@ -154,13 +160,13 @@ const OrgTreeNode = ({ node, searchTerm }) => {
 
       {hasChildren && isExpanded ? (
         <>
-          <div className="w-px h-8 bg-slate-300" />
+          <div className="w-[2px] h-8 bg-slate-300" />
           <div className="flex justify-center relative pt-4">
             {children.map((child, index) => (
               <div key={child.id || `${node.id}-${index}`} className="relative flex flex-col items-center px-4">
-                {index !== 0 ? <div className="absolute right-1/2 top-0 h-px w-1/2 bg-slate-300" /> : null}
-                {index !== children.length - 1 ? <div className="absolute left-1/2 top-0 h-px w-1/2 bg-slate-300" /> : null}
-                <div className="w-px h-6 bg-slate-300" />
+                {index !== 0 ? <div className="absolute right-1/2 top-0 h-[2px] w-1/2 bg-slate-300" /> : null}
+                {index !== children.length - 1 ? <div className="absolute left-1/2 top-0 h-[2px] w-1/2 bg-slate-300" /> : null}
+                <div className="w-[2px] h-6 bg-slate-300" />
                 <OrgTreeNode node={child} searchTerm={searchTerm} />
               </div>
             ))}
@@ -315,7 +321,7 @@ export default function VisualizacoesGestor({ estrutura, filtro }) {
       </TabsList>
 
       <TabsContent value="organograma">
-        <div className="overflow-auto rounded-3xl border bg-slate-50 p-8">
+        <div className="overflow-auto rounded-3xl border border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100 p-8">
           <div className="min-w-max flex justify-center">
             <OrgTreeNode node={orgTree} searchTerm={q} />
           </div>
