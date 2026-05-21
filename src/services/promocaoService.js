@@ -206,7 +206,7 @@ export async function publicarPromocaoOficial({ promocao, itens = [], entities, 
       historico = { ...historico, ...patch };
     }
 
-    const podeAtualizarMilitar = deveAtualizarCadastroMilitarPorPromocao({
+    const decisaoAtualizacaoCadastro = deveAtualizarCadastroMilitarPorPromocao({
       promocao,
       item: {
         ...plano.item,
@@ -221,6 +221,24 @@ export async function publicarPromocaoOficial({ promocao, itens = [], entities, 
         promocaoId: promocao?.id,
         itemId: plano.item?.id,
       },
+    });
+    const podeAtualizarMilitar = Boolean(decisaoAtualizacaoCadastro?.permitido);
+
+    console.log('[promocao.publicacao.decisao_atualizacao_cadastro]', {
+      militar_id: texto(plano.item?.militar_id),
+      promocao_id: texto(promocao?.id),
+      posto_destino: texto(promocao?.posto_graduacao),
+      quadro_destino: texto(promocao?.quadro),
+      historico_status: statusNormalizado(historico?.status_registro),
+      estado_item: statusNormalizado(plano.item?.status),
+      efeito_tipo: texto(plano.efeito?.tipo),
+      contexto_publicacao: {
+        ...contextoPublicacao,
+        publicacaoConcluida: true,
+        promocaoId: promocao?.id,
+        itemId: plano.item?.id,
+      },
+      resultado_funcao: decisaoAtualizacaoCadastro,
     });
 
     if (podeAtualizarMilitar) {
