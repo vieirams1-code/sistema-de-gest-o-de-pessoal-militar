@@ -81,3 +81,15 @@ test('montarPostoNomeTemplate compõe posto + quadro', () => {
 test('montarPostoNomeTemplate retorna somente posto quando quadro não existe', () => {
   assert.equal(montarPostoNomeTemplate({ abreviatura: 'Cap', quadro: '' }), 'Cap');
 });
+
+test('prévia de férias renderiza {{quadro}} com valor de exemplo', () => {
+  const vars = buildPreviewTemplateVars({ quadro: 'QOBM' });
+  const saida = aplicarTemplate('Quadro: {{quadro}}', vars);
+  assert.equal(saida, 'Quadro: QOBM');
+});
+
+test('prévia de férias renderiza {{posto_nome}} como posto + quadro', () => {
+  const vars = buildPreviewTemplateVars({ posto_abreviatura: 'Maj', quadro: 'QOSAU' });
+  const saida = aplicarTemplate('{{posto_nome}}', vars);
+  assert.equal(saida, 'Maj QOSAU');
+});
