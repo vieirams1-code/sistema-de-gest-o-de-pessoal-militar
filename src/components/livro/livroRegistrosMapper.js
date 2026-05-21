@@ -207,6 +207,8 @@ export function getTextoPublicacaoRegistro({
   }
 
   const vars = buildVarsLivro({
+    militar,
+    registro,
     ferias: {
       ...(ferias || {}),
       dias: registro?.dias ?? ferias?.dias,
