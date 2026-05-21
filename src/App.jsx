@@ -28,6 +28,7 @@ const adminOnlyPages = new Set([
   'AntiguidadeConfigQuadros',
   'AntiguidadeImportarPromocoes',
   'AntiguidadePrevia',
+  'SaneamentoFeriasQobm',
 ]);
 
 
