@@ -82,6 +82,17 @@ test('montarPostoNomeTemplate retorna somente posto quando quadro não existe', 
   assert.equal(montarPostoNomeTemplate({ abreviatura: 'Cap', quadro: '' }), 'Cap');
 });
 
+
+test('buildPreviewTemplateVars reutiliza contrato de férias/livro no preview', () => {
+  const vars = buildPreviewTemplateVars();
+  const saida = aplicarTemplate('{{data_registro}}|{{dias}}|{{dias_extenso}}|{{periodo_aquisitivo}}', vars);
+
+  assert.equal(saida, '07/01/2026|30|trinta|01/01/2024 a 31/12/2025');
+  assert.equal(vars.novo_fim, '05/02/2026');
+  assert.equal(vars.retorno_previsto, '06/02/2026');
+  assert.equal(vars.base_dias, '30');
+});
+
 test('prévia de férias renderiza {{quadro}} com valor de exemplo', () => {
   const vars = buildPreviewTemplateVars({ quadro: 'QOBM' });
   const saida = aplicarTemplate('Quadro: {{quadro}}', vars);
