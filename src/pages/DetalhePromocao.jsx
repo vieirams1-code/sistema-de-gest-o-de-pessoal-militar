@@ -52,6 +52,7 @@ import {
 import { isPromocaoHistorica, ordenarPorAntiguidadeAnterior } from '@/utils/promocao/ordenacaoPromocao';
 import { buildPromocaoContext } from '@/utils/promocao/buildPromocaoContext';
 import { canEditarOrdem, canExcluirDefinitivo, canRemoverDaTurma, canReverterItem } from '@/utils/promocao/promocaoStateMachine';
+import { getPostoOrigemEsperado, isPromocaoSubtenenteParaSegundoTenenteQAOBM } from '@/utils/promocao/elegibilidadePromocao';
 
 const DIAG_PREFIX = '[D17-L-DIAG]';
 const diagLog = (evento, dados = {}) => console.info(`${DIAG_PREFIX} ${evento}`, dados);
@@ -476,10 +477,15 @@ export default function DetalhePromocao() {
         if (!militarId || idsNaPromocao.has(militarId) || porMilitar.has(militarId)) return;
         const buscaMilitar = normalizar(`${nomeMilitar(militar)} ${militar?.nome_completo || ''} ${militar?.matricula || ''}`);
         if (!buscaMilitar.includes(termo)) return;
-        const quadroCombina = !texto(promocaoReferenciaCadastro?.quadro) || normalizar(militar?.quadro || militar?.quadro_atual) === normalizar(promocaoReferenciaCadastro?.quadro);
-        if (!quadroCombina) return;
         const postoAtual = militar?.posto_graduacao || militar?.posto_graduacao_atual;
+        const isCasoQAOBM = isPromocaoSubtenenteParaSegundoTenenteQAOBM(promocaoReferenciaCadastro);
+        const quadroCombina = isCasoQAOBM
+          ? true
+          : (!texto(promocaoReferenciaCadastro?.quadro) || normalizar(militar?.quadro || militar?.quadro_atual) === normalizar(promocaoReferenciaCadastro?.quadro));
+        if (!quadroCombina) return;
+        const postoOrigemEsperado = getPostoOrigemEsperado(promocaoReferenciaCadastro);
         const postoCombinaDestino = !texto(promocaoReferenciaCadastro?.posto_graduacao) || normalizar(postoAtual) === normalizar(promocaoReferenciaCadastro?.posto_graduacao);
+        if (postoOrigemEsperado && normalizar(postoAtual) !== normalizar(postoOrigemEsperado)) return;
         porMilitar.set(militarId, {
           id: `militar-${militarId}`,
           militarId,

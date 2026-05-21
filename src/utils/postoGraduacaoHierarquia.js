@@ -1,5 +1,7 @@
 import { POSTOS_GRADUACOES_HIERARQUIA } from '../constants/postosGraduacoes.js';
 
+import { isPromocaoSubtenenteParaSegundoTenenteQAOBM } from './promocao/elegibilidadePromocao.js';
+
 const EFEITOS_ATUALIZACAO_CADASTRO = {
   historica: {
     atualizar: false,
@@ -198,6 +200,9 @@ export function getSugestaoAtualizacaoCadastro({ militar, promocao } = {}) {
   const postoAtual = militar?.posto_graduacao || militar?.posto_graduacao_atual || '';
   const postoNovo = promocao?.posto_graduacao || promocao?.posto_graduacao_novo || '';
   const diferenca = diferencaHierarquicaPostos(postoNovo, postoAtual);
+  if (isPromocaoSubtenenteParaSegundoTenenteQAOBM(promocao) && normalizarPostoGraduacao(postoAtual) === 'Subtenente') {
+    return copiarEfeito('imediatamente_superior');
+  }
 
   if (diferenca === null) return copiarEfeito('revisao');
   if (diferenca < 0) return copiarEfeito('historica');
