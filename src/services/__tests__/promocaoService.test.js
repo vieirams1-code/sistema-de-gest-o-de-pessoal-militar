@@ -1361,3 +1361,39 @@ test('caso informado 1º Sgt -> Subtenente: publicação cria histórico ativo e
   assert.equal(chamadas.militarUpdate, 1);
   assert.equal(chamadas.promocaoMilitarPatch.resultado_aplicacao_cadastro, 'imediatamente_superior');
 });
+
+test('publicação ST QBMP-1.b -> 2º Ten QAOBM grava histórico e atualiza cadastro com mudança de quadro', async () => {
+  const chamadas = { historico: null, militar: null };
+  const entities = {
+    HistoricoPromocaoMilitarV2: {
+      list: async () => [],
+      create: async (payload) => { chamadas.historico = payload; return { id: 'hist-qaobm-1', ...payload }; },
+      update: async () => {},
+    },
+    Militar: {
+      update: async (_id, patch) => { chamadas.militar = patch; },
+    },
+    PromocaoMilitar: { update: async () => {} },
+    Promocao: { update: async () => {} },
+  };
+
+  await publicarPromocaoOficial({
+    promocao: { id: 'promo-qaobm', status: 'ativa', posto_graduacao: '2º Tenente', quadro: 'QAOBM', data_promocao: '2026-02-01' },
+    itens: [{
+      id: 'pm-qaobm-1',
+      militar_id: 'm-qaobm-1',
+      ordem: 1,
+      status: 'ativo',
+      militar: { id: 'm-qaobm-1', posto_graduacao: 'Subtenente', quadro: 'QBMP-1.b' },
+    }],
+    entities,
+    contextoPublicacao: { status: 'concluida' },
+  });
+
+  assert.equal(chamadas.historico.posto_graduacao_anterior, 'Subtenente');
+  assert.equal(chamadas.historico.quadro_anterior, 'QBMP-1.b');
+  assert.equal(chamadas.historico.posto_graduacao_novo, '2º Tenente');
+  assert.equal(chamadas.historico.quadro_novo, 'QAOBM');
+  assert.equal(chamadas.militar.posto_graduacao, '2º Tenente');
+  assert.equal(chamadas.militar.quadro, 'QAOBM');
+});
