@@ -320,8 +320,57 @@ const TEMPLATE_PLACEHOLDER_REGEX = /\{\{\s*([\w.]+)\s*\}\}/g;
 
 const TEMPLATE_VAR_CONTRACT = {
   [resolveTipoRegistroTemplate('Saída Férias')]: {
-    obrigatorias: ['nome_completo', 'posto_nome', 'matricula', 'data_inicio'],
-    opcionais: ['dias', 'dias_extenso', 'periodo_aquisitivo', 'quadro', 'quadro_nome', 'militar_quadro'],
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula', 'data_registro'],
+    opcionais: [
+      'dias',
+      'dias_extenso',
+      'periodo_aquisitivo',
+      'quadro',
+      'quadro_nome',
+      'militar_quadro',
+      'data_inicio',
+      'data_termino',
+      'data_retorno',
+    ],
+    aliases: {
+      posto: 'posto_nome',
+      nome: 'nome_completo',
+      data_saida: 'data_inicio',
+    },
+  },
+  [resolveTipoRegistroTemplate('Interrupção de Férias')]: {
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula', 'data_registro'],
+    opcionais: [
+      'dias',
+      'dias_extenso',
+      'periodo_aquisitivo',
+      'quadro',
+      'quadro_nome',
+      'militar_quadro',
+      'data_interrupcao',
+      'dias_gozados',
+      'dias_gozados_interrupcao',
+      'saldo_remanescente',
+    ],
+    aliases: {
+      posto: 'posto_nome',
+      nome: 'nome_completo',
+      data_saida: 'data_interrupcao',
+    },
+  },
+  [resolveTipoRegistroTemplate('Continuação de Férias')]: {
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula', 'data_registro'],
+    opcionais: [
+      'dias',
+      'dias_extenso',
+      'periodo_aquisitivo',
+      'quadro',
+      'quadro_nome',
+      'militar_quadro',
+      'data_inicio',
+      'data_retorno',
+      'saldo_remanescente',
+    ],
     aliases: {
       posto: 'posto_nome',
       nome: 'nome_completo',
@@ -329,8 +378,18 @@ const TEMPLATE_VAR_CONTRACT = {
     },
   },
   [resolveTipoRegistroTemplate('Retorno Férias')]: {
-    obrigatorias: ['nome_completo', 'posto_nome', 'matricula', 'data_retorno'],
-    opcionais: ['dias', 'dias_extenso', 'periodo_aquisitivo', 'tipo_ferias_texto', 'quadro', 'quadro_nome', 'militar_quadro'],
+    obrigatorias: ['nome_completo', 'posto_nome', 'matricula', 'data_registro'],
+    opcionais: [
+      'dias',
+      'dias_extenso',
+      'periodo_aquisitivo',
+      'tipo_ferias_texto',
+      'quadro',
+      'quadro_nome',
+      'militar_quadro',
+      'data_retorno',
+      'data_termino',
+    ],
     aliases: {
       posto: 'posto_nome',
       nome: 'nome_completo',
