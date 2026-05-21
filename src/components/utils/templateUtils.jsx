@@ -85,9 +85,14 @@ export function extrairVariaveisDoTemplate(template) {
  */
 export function aplicarTemplate(template, vars) {
   if (!template) return '';
+  const varsSafe = vars || {};
+  const varsComFallbackVazio = new Set(['quadro', 'quadro_nome', 'militar_quadro', 'posto_nome']);
+
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    const val = vars[key];
-    return val !== undefined && val !== null && val !== '' ? val : `{{${key}}}`;
+    const val = varsSafe[key];
+    if (val !== undefined && val !== null && val !== '') return val;
+    if (varsComFallbackVazio.has(key)) return '';
+    return `{{${key}}}`;
   });
 }
 
@@ -106,7 +111,7 @@ export const formatPeriodoAquisitivo = (ref, periodo) => {
  * Constrói o mapa de variáveis para registros do Livro com base em férias + dados do registro.
  * Recebe opcionalmente o objeto periodo aquisitivo para gerar a data completa.
  */
-export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto, interrupcaoInfo } = {}) {
+export function buildVarsLivro({ ferias, militar, registro, dataRegistro, periodo, diasDesconto, interrupcaoInfo } = {}) {
   if (!ferias) return {};
   const diasBase = Number(ferias.dias || 0);
   const diasNoMomento = Number(interrupcaoInfo?.diasNoMomento ?? diasBase);
@@ -124,8 +129,16 @@ export function buildVarsLivro({ ferias, dataRegistro, periodo, diasDesconto, in
 
   const dias = diasBase;
   const desconto = diasDesconto || ferias._diasDesconto || 0;
-  const abreviatura = abreviarPosto(ferias.militar_posto);
-  const quadro = resolveQuadroTemplate(ferias);
+  const abreviatura = abreviarPosto(ferias.militar_posto || militar?.posto_graduacao || registro?.militar_posto);
+  const quadro = resolveQuadroTemplate({
+    militar_quadro: ferias?.militar_quadro,
+    militar: { quadro: militar?.quadro },
+    quadro: registro?.militar_quadro || registro?.quadro || ferias?.quadro,
+    quadro_nome: ferias?.quadro_nome || registro?.quadro_nome,
+    ...ferias,
+    militar,
+    registro,
+  });
   const postoNome = montarPostoNomeTemplate({ abreviatura, quadro, source: ferias });
 
   return {
