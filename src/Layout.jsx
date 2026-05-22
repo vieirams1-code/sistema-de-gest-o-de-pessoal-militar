@@ -40,6 +40,7 @@ import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
 import useQuickAccessPreferences from '@/hooks/useQuickAccessPreferences';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
+import QuickAccessWidget from '@/components/layout/QuickAccessWidget';
 import SgpThemeModeMount from '@/themes/sgpThemeModes/SgpThemeModeMount';
 import SgpThemeProfileSelector from '@/themes/sgpThemeModes/SgpThemeProfileSelector';
 import useSgpThemeMode from '@/themes/sgpThemeModes/useSgpThemeMode';
@@ -505,28 +506,14 @@ export default function Layout({ children, currentPageName }) {
       </main>
 
 
-      {pinnedVisibleItems.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-[200] w-64 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur">
-          <p className="mb-2 text-sm font-semibold text-slate-800">Acesso rápido</p>
-          <div className="space-y-1">
-            {pinnedVisibleItems.map((item) => {
-              const ItemIcon = item.icon;
-              const baseHref = item.path || createPageUrl(item.page);
-              const itemHref = item.tab ? `${baseHref}?tab=${item.tab}` : baseHref;
-              return (
-                <Link
-                  key={getPinKey(item)}
-                  to={itemHref}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                >
-                  {ItemIcon ? <ItemIcon className="h-4 w-4 shrink-0" /> : <span className="h-2 w-2 rounded-full bg-slate-400" />}
-                  <span className="truncate">{item.name}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <QuickAccessWidget
+        items={pinnedVisibleItems}
+        getPinKey={getPinKey}
+        createHref={(item) => {
+          const baseHref = item.path || createPageUrl(item.page);
+          return item.tab ? `${baseHref}?tab=${item.tab}` : baseHref;
+        }}
+      />
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
