@@ -1,10 +1,22 @@
 import { base44 } from '@/api/base44Client';
 
 async function invocar(payload) {
-  const response = await base44.functions.invoke('cudFuncoesTagsEscopado', payload);
-  const body = response?.data ?? response;
-  if (body?.error) throw new Error(body.error);
-  return body?.data || body;
+  try {
+    const response = await base44.functions.invoke('cudFuncoesTagsEscopado', payload);
+    const body = response?.data ?? response;
+    if (body?.error) throw new Error(body.error);
+    return body?.data || body;
+  } catch (error) {
+    const status = error?.response?.status;
+    const body = error?.response?.data;
+    const backendMessage = body?.message || body?.error || body?.details || error?.message;
+
+    if (status === 400) {
+      throw new Error(backendMessage || 'Requisição inválida ao atualizar catálogo de funções e tags.');
+    }
+
+    throw new Error(backendMessage || 'Falha ao executar operação em funções e tags.');
+  }
 }
 
 export const criarMilitarFuncaoEscopado = (data) => invocar({ entidade: 'MilitarFuncao', operacao: 'create', data });
