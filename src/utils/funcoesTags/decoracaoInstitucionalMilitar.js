@@ -50,7 +50,7 @@ export function montarDecoracoesInstitucionaisPorMilitar({ militares = [], funco
     const funcoes = (vinculadosByMilitar.get(militarId) || []).slice().sort(sortByPrioridade);
     const escolhida = funcoes[0] || null;
 
-    if (process.env.NODE_ENV === 'development' && funcoes.length > 1) {
+    if (import.meta.env.DEV && funcoes.length > 1) {
       console.warn('[funcoes-tags] Militar com múltiplas funções institucionais ativas', {
         militar_id: militarId,
         funcoes: funcoes.map((f) => ({ id: f.id, nome: f.nome, prioridade_lista: f.prioridade_lista })),
@@ -95,4 +95,3 @@ export function ordenarComDestaqueInstitucional(militares = [], decoracaoByMilit
     .sort((a, b) => (a.rank - b.rank) || (a.index - b.index))
     .map((item) => item.militar);
 }
-

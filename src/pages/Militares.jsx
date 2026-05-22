@@ -41,6 +41,7 @@ import { construirDecoracaoInstitucionalPorMilitar, ordenarComDestaqueInstitucio
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
+import { base44 } from '@/api/base44Client';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;

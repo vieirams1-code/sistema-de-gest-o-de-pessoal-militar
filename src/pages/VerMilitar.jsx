@@ -53,6 +53,7 @@ import FuncoesMilitarSection from '@/components/militar/FuncoesMilitarSection';
 import TagsMilitarSection from '@/components/militar/TagsMilitarSection';
 import InstitucionalMilitarBadge from '@/components/militar/InstitucionalMilitarBadge';
 import { montarDecoracoesInstitucionaisPorMilitar, getDecoracaoInstitucionalMilitar } from '@/utils/funcoesTags/decoracaoInstitucionalMilitar';
+import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
