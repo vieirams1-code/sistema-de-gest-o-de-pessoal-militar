@@ -3,13 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { Search } from 'lucide-react';
+import { Check, GitBranch, Network, Pencil, Plus, Search, Settings, Shield, Tags as TagsIcon, Trash2, X } from 'lucide-react';
 import { normalizarAplicabilidade } from '@/utils/funcoesTags/normalizacao';
+import { getTagGrupoId } from '@/utils/funcoesTags/contratoCampos';
 import { INSTITUCIONAIS, validarFuncao, validarTag, validarTagGrupo } from '@/utils/funcoesTags/validacoes';
 import {
   atualizarFuncaoMilitarEscopado,
@@ -23,196 +20,87 @@ import {
   desativarTagGrupoEscopado,
 } from '@/services/cudFuncoesTagsEscopadoClient';
 
-const APLICABILIDADE_OPTIONS = [
-  { value: 'militar', label: 'Militar' },
-  { value: 'ferias', label: 'Férias' },
-  { value: 'ambos', label: 'Ambos' },
+const EMOJI_OPTIONS = [
+  { value: '⭐', label: 'Destaque' }, { value: '🛡️', label: 'Comandante' }, { value: '🔰', label: 'Subcomandante' }, { value: '🚒', label: 'Bombeiro' },
+  { value: '🚑', label: 'APH' }, { value: '🚗', label: 'Motorista' }, { value: '🚌', label: 'Condutor' }, { value: '🧗', label: 'Altura' },
+  { value: '⚠️', label: 'Restrição' }, { value: '📻', label: 'Rádio' }, { value: '💻', label: 'TI' }, { value: '🛠️', label: 'Manutenção' },
+  { value: '⚕️', label: 'Saúde' }, { value: '📋', label: 'Administrativo' }, { value: '📘', label: 'Instrutor' },
 ];
+const APLICABILIDADES = [{ value: 'militar', label: 'Militar' }, { value: 'ferias', label: 'Férias' }, { value: 'ambos', label: 'Ambos' }];
+const FORM_FUNCAO = { nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'ambos' };
+const FORM_GRUPO = { nome: '', aplicabilidade: 'ambos', emoji: '🚒', cor: '#0F766E' };
+const FORM_TAG = { grupo_id: '', nome: '', aplicabilidade: 'ambos', emoji: '⚠️', tipo_visual: 'normal', cor: '#F59E0B' };
 
-const EMOJIS_OPERACIONAIS = {
-  Operacionais: ['🚒', '🚑', '🚗', '🧗'],
-  Gestão: ['⚠️', '⭐', '🛡️', '🔰'],
-  Gerais: ['📌', '📋', '📍', '🧭'],
-};
-
-
-const TABS_VALIDAS = ['funcoes', 'grupos', 'tags'];
-
-const normalizarTab = (valorTab) => {
-  if (typeof valorTab !== 'string') return 'funcoes';
-  const tab = valorTab.trim().toLowerCase();
-  return TABS_VALIDAS.includes(tab) ? tab : 'funcoes';
-};
-
-export default function FuncoesTagsManager({ canEdit, initialTab = 'funcoes' }) {
+export default function FuncoesTagsManager({ canEdit = true, initialTab = 'funcoes' }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState(() => normalizarTab(initialTab));
-  const [search, setSearch] = useState({ funcoes: '', grupos: '', tags: '' });
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [buscaFuncao, setBuscaFuncao] = useState('');
+  const [buscaGrupo, setBuscaGrupo] = useState('');
+  const [buscaTag, setBuscaTag] = useState('');
+  const [formFuncao, setFormFuncao] = useState(FORM_FUNCAO);
+  const [formGrupo, setFormGrupo] = useState(FORM_GRUPO);
+  const [formTag, setFormTag] = useState(FORM_TAG);
+  const [editandoFuncao, setEditandoFuncao] = useState(null);
+  const [editandoGrupo, setEditandoGrupo] = useState(null);
+  const [editandoTag, setEditandoTag] = useState(null);
 
-  const [funcaoForm, setFuncaoForm] = useState({ nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'ambos' });
-  const [funcaoEdicao, setFuncaoEdicao] = useState(null);
-  const [grupoForm, setGrupoForm] = useState({ nome: '', aplicabilidade: 'ambos' });
-  const [grupoEdicao, setGrupoEdicao] = useState(null);
-  const [tagForm, setTagForm] = useState({ grupo_id: '', nome: '', aplicabilidade: 'ambos', emoji: '⚠️', tipo_visual: 'destaque', cor: '#F59E0B' });
-  const [tagEdicao, setTagEdicao] = useState(null);
-
-  useEffect(() => {
-    setActiveTab(normalizarTab(initialTab));
-  }, [initialTab]);
+  useEffect(() => setActiveTab(initialTab), [initialTab]);
 
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes-tags', 'funcoes'], queryFn: () => base44.entities.FuncaoMilitar.list('prioridade_lista') });
   const { data: grupos = [] } = useQuery({ queryKey: ['funcoes-tags', 'grupos'], queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao') });
   const { data: tags = [] } = useQuery({ queryKey: ['funcoes-tags', 'tags'], queryFn: () => base44.entities.Tag.list('ordem_exibicao') });
 
-  const gruposMap = useMemo(() => Object.fromEntries(grupos.map((g) => [g.id, g])), [grupos]);
+  const gruposAtivos = useMemo(() => grupos.filter((g) => g.ativo !== false), [grupos]);
+  const gruposPorId = useMemo(() => new Map(grupos.map((g) => [String(g.id), g])), [grupos]);
+  const quantidadeTagsPorGrupo = useMemo(() => {
+    const map = new Map();
+    tags.forEach((tag) => { const grupoId = getTagGrupoId(tag) || 'sem-grupo'; map.set(grupoId, (map.get(grupoId) || 0) + 1); });
+    return map;
+  }, [tags]);
 
-  const filtrarPorNome = (arr, termo) => arr.filter((item) => (item?.nome || '').toLowerCase().includes(termo.toLowerCase()));
+  const funcoesFiltradas = useMemo(() => filtrar(funcoes, buscaFuncao), [funcoes, buscaFuncao]);
+  const gruposFiltrados = useMemo(() => filtrar(grupos, buscaGrupo), [grupos, buscaGrupo]);
+  const tagsFiltradas = useMemo(() => filtrar(tags, buscaTag), [tags, buscaTag]);
 
-  const funcoesFiltradas = useMemo(() => filtrarPorNome(funcoes, search.funcoes), [funcoes, search.funcoes]);
-  const gruposFiltrados = useMemo(() => filtrarPorNome(grupos, search.grupos), [grupos, search.grupos]);
-  const tagsFiltradas = useMemo(() => filtrarPorNome(tags, search.tags), [tags, search.tags]);
+  const invalidate = (key) => { queryClient.invalidateQueries({ queryKey: ['funcoes-tags', key] }); queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] }); };
+  const saveFuncao = useMutation({ mutationFn: (p) => editandoFuncao ? atualizarFuncaoMilitarEscopado(editandoFuncao.id, p) : criarFuncaoMilitarEscopado(p), onSuccess: () => { invalidate('funcoes'); toast({ title: 'Função salva com sucesso.' }); } });
+  const saveGrupo = useMutation({ mutationFn: (p) => editandoGrupo ? atualizarTagGrupoEscopado(editandoGrupo.id, p) : criarTagGrupoEscopado(p), onSuccess: () => { invalidate('grupos'); toast({ title: 'Grupo salvo com sucesso.' }); } });
+  const saveTag = useMutation({ mutationFn: (p) => editandoTag ? atualizarTagEscopado(editandoTag.id, p) : criarTagEscopado(p), onSuccess: () => { invalidate('tags'); toast({ title: 'Tag salva com sucesso.' }); } });
 
-  const invalidateCatalogo = (tipo) => {
-    queryClient.invalidateQueries({ queryKey: ['funcoes-tags', tipo] });
-    queryClient.invalidateQueries({ queryKey: ['militares-funcoes-institucionais'] });
-    queryClient.invalidateQueries({ queryKey: ['militares-funcoes-filtros'] });
-    queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] });
-  };
+  const handleInicializarFuncoesBase = () => toast({ title: 'As funções base já são gerenciadas pelo catálogo atual.' });
+  const cancelarEdicaoFuncao = () => { setEditandoFuncao(null); setFormFuncao(FORM_FUNCAO); };
+  const cancelarEdicaoGrupo = () => { setEditandoGrupo(null); setFormGrupo(FORM_GRUPO); };
+  const cancelarEdicaoTag = () => { setEditandoTag(null); setFormTag(FORM_TAG); };
 
-  const saveFuncao = useMutation({ mutationFn: (payload) => funcaoEdicao ? atualizarFuncaoMilitarEscopado(funcaoEdicao.id, payload) : criarFuncaoMilitarEscopado(payload), onSuccess: () => { invalidateCatalogo('funcoes'); toast({ title: 'Função salva com sucesso.' }); } });
-  const saveGrupo = useMutation({ mutationFn: (payload) => grupoEdicao ? atualizarTagGrupoEscopado(grupoEdicao.id, payload) : criarTagGrupoEscopado(payload), onSuccess: () => { invalidateCatalogo('grupos'); toast({ title: 'Grupo salvo com sucesso.' }); } });
-  const saveTag = useMutation({ mutationFn: (payload) => tagEdicao ? atualizarTagEscopado(tagEdicao.id, payload) : criarTagEscopado(payload), onSuccess: () => { invalidateCatalogo('tags'); toast({ title: 'Tag salva com sucesso.' }); } });
+  const salvarFuncao = () => { const payload = { ...formFuncao, ativa: true }; const erro = validarFuncao(payload, funcoes, editandoFuncao); if (erro) return toast({ title: erro, variant: 'destructive' }); saveFuncao.mutate(payload); cancelarEdicaoFuncao(); };
+  const salvarGrupo = () => { const payload = { ...formGrupo, aplicabilidade: normalizarAplicabilidade(formGrupo.aplicabilidade), ativo: true }; const erro = validarTagGrupo(payload, grupos, editandoGrupo); if (erro) return toast({ title: erro, variant: 'destructive' }); saveGrupo.mutate(payload); cancelarEdicaoGrupo(); };
+  const salvarTag = () => { const payload = { ...formTag, aplicabilidade: normalizarAplicabilidade(formTag.aplicabilidade), ativo: true }; const erro = validarTag(payload, tags, editandoTag); if (erro) return toast({ title: erro, variant: 'destructive' }); saveTag.mutate(payload); cancelarEdicaoTag(); };
 
-  const upsertFuncao = () => {
-    const payload = { ...funcaoForm, ativa: true };
-    const erro = validarFuncao(payload, funcoes, funcaoEdicao);
-    if (erro) return toast({ title: erro, variant: 'destructive' });
-    saveFuncao.mutate(payload);
-    setFuncaoForm({ nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'ambos' });
-    setFuncaoEdicao(null);
-  };
+  const toggleFuncao = (f) => { if (INSTITUCIONAIS[f.institucional_chave]) return; desativarFuncaoMilitarEscopado(f.id, { ativa: !f.ativa }).then(() => invalidate('funcoes')); };
+  const toggleGrupo = (g) => desativarTagGrupoEscopado(g.id, { ativo: !g.ativo }).then(() => invalidate('grupos'));
+  const toggleTag = (t) => desativarTagEscopado(t.id, { ativo: !t.ativo }).then(() => invalidate('tags'));
 
-  const upsertGrupo = () => {
-    const aplicabilidade = normalizarAplicabilidade(grupoForm.aplicabilidade);
-    const payload = { ...grupoForm, aplicabilidade, ativo: true };
-    const erro = validarTagGrupo(payload, grupos, grupoEdicao);
-    if (erro) return toast({ title: erro, variant: 'destructive' });
-    saveGrupo.mutate(payload);
-    setGrupoForm({ nome: '', aplicabilidade: 'ambos' });
-    setGrupoEdicao(null);
-  };
-
-  const upsertTag = () => {
-    const aplicabilidade = normalizarAplicabilidade(tagForm.aplicabilidade);
-    const payload = { ...tagForm, aplicabilidade, ativo: true };
-    const erro = validarTag(payload, tags, tagEdicao);
-    if (erro) return toast({ title: erro, variant: 'destructive' });
-    saveTag.mutate(payload);
-    setTagForm({ grupo_id: '', nome: '', aplicabilidade: 'ambos', emoji: '⚠️', tipo_visual: 'destaque', cor: '#F59E0B' });
-    setTagEdicao(null);
-  };
-
-  const toggleAtivo = (tipo, row) => {
-    if (tipo === 'funcao') {
-      if (INSTITUCIONAIS[row.institucional_chave]) return;
-      return desativarFuncaoMilitarEscopado(row.id, { ativa: !row.ativa }).then(() => invalidateCatalogo('funcoes'));
-    }
-    if (tipo === 'grupo') return desativarTagGrupoEscopado(row.id, { ativo: !row.ativo }).then(() => invalidateCatalogo('grupos'));
-    return desativarTagEscopado(row.id, { ativo: !row.ativo }).then(() => invalidateCatalogo('tags'));
-  };
-
-  const renderBadge = (ativo) => <Badge variant={ativo ? 'default' : 'secondary'}>{ativo ? 'Ativo' : 'Inativo'}</Badge>;
-
-  if (!TABS_VALIDAS.includes(activeTab)) {
-    return (
-      <div className="bg-white rounded-xl border border-red-200 p-6">
-        <p className="text-sm text-red-700">Não foi possível abrir a gestão de tags.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
-      <div>
-        <h2 className="text-2xl font-semibold text-[#1e3a5f]">Funções e Tags</h2>
-        <p className="text-sm text-slate-500">Gerencie funções militares, grupos de tags e tags operacionais com visualização rápida.</p>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="funcoes">Funções Militares</TabsTrigger>
-          <TabsTrigger value="grupos">Grupos de Tags</TabsTrigger>
-          <TabsTrigger value="tags">Tags</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="funcoes" className="space-y-4">
-          <EditorCard title={funcaoEdicao ? `Editando função: ${funcaoEdicao.nome}` : 'Nova função'} onCancel={() => { setFuncaoEdicao(null); setFuncaoForm({ nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'ambos' }); }} editing={!!funcaoEdicao}>
-            <div className="grid md:grid-cols-6 gap-2">
-              <Input className="md:col-span-2" placeholder="Nome da função" value={funcaoForm.nome} onChange={(e) => setFuncaoForm({ ...funcaoForm, nome: e.target.value })} />
-              <Input type="number" placeholder="Prioridade na lista" value={funcaoForm.prioridade_lista} onChange={(e) => setFuncaoForm({ ...funcaoForm, prioridade_lista: Number(e.target.value) })} />
-              <EmojiPicker value={funcaoForm.emoji} onChange={(emoji) => setFuncaoForm({ ...funcaoForm, emoji })} />
-              <Input placeholder="Cor" value={funcaoForm.cor} onChange={(e) => setFuncaoForm({ ...funcaoForm, cor: e.target.value })} />
-              <Button disabled={!canEdit} onClick={upsertFuncao}>{funcaoEdicao ? 'Salvar edição' : 'Salvar'}</Button>
-            </div>
-          </EditorCard>
-          <SearchBox value={search.funcoes} onChange={(v) => setSearch((prev) => ({ ...prev, funcoes: v }))} />
-          <div className="space-y-2">{funcoesFiltradas.map((f) => <ListRow key={f.id} title={`${f.emoji || '⭐'} ${f.nome}`} subtitle={`Prioridade na lista: ${f.prioridade_lista ?? '—'}`} badge={renderBadge(f.ativa)} onEdit={() => { setFuncaoEdicao(f); setFuncaoForm({ ...f, prioridade_lista: f.prioridade_lista ?? 10, emoji: f.emoji || '⭐', cor: f.cor || '#1D4ED8' }); }} onToggle={() => toggleAtivo('funcao', f)} toggleLabel={f.ativa ? 'Desativar' : 'Reativar'} />)}</div>
-        </TabsContent>
-
-        <TabsContent value="grupos" className="space-y-4">
-          <EditorCard title={grupoEdicao ? `Editando grupo: ${grupoEdicao.nome}` : 'Novo grupo de tags'} editing={!!grupoEdicao} onCancel={() => { setGrupoEdicao(null); setGrupoForm({ nome: '', aplicabilidade: 'ambos' }); }}>
-            <div className="grid md:grid-cols-3 gap-2">
-              <Input placeholder="Nome do grupo" value={grupoForm.nome} onChange={(e) => setGrupoForm({ ...grupoForm, nome: e.target.value })} />
-              <select className="border rounded px-3" value={grupoForm.aplicabilidade} onChange={(e) => setGrupoForm({ ...grupoForm, aplicabilidade: e.target.value })}>{APLICABILIDADE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
-              <Button disabled={!canEdit} onClick={upsertGrupo}>{grupoEdicao ? 'Salvar edição' : 'Salvar'}</Button>
-            </div>
-          </EditorCard>
-          <SearchBox value={search.grupos} onChange={(v) => setSearch((prev) => ({ ...prev, grupos: v }))} />
-          <div className="space-y-2">{gruposFiltrados.map((g) => <ListRow key={g.id} title={g.nome} subtitle={`Aplicabilidade: ${labelAplicabilidade(g.aplicabilidade)}`} badge={renderBadge(g.ativo)} onEdit={() => { setGrupoEdicao(g); setGrupoForm({ nome: g.nome, aplicabilidade: g.aplicabilidade || 'ambos' }); }} onToggle={() => toggleAtivo('grupo', g)} toggleLabel={g.ativo ? 'Desativar' : 'Reativar'} />)}</div>
-        </TabsContent>
-
-        <TabsContent value="tags" className="space-y-4">
-          <EditorCard title={tagEdicao ? `Editando tag: ${tagEdicao.nome}` : 'Nova tag'} editing={!!tagEdicao} onCancel={() => { setTagEdicao(null); setTagForm({ grupo_id: '', nome: '', aplicabilidade: 'ambos', emoji: '⚠️', tipo_visual: 'destaque', cor: '#F59E0B' }); }}>
-            <div className="grid md:grid-cols-6 gap-2">
-              <select className="border rounded px-3" value={tagForm.grupo_id} onChange={(e) => setTagForm({ ...tagForm, grupo_id: e.target.value })}><option value="">Sem grupo</option>{grupos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}</select>
-              <Input placeholder="Nome da tag" value={tagForm.nome} onChange={(e) => setTagForm({ ...tagForm, nome: e.target.value })} />
-              <select className="border rounded px-3" value={tagForm.aplicabilidade} onChange={(e) => setTagForm({ ...tagForm, aplicabilidade: e.target.value })}>{APLICABILIDADE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
-              <EmojiPicker value={tagForm.emoji} onChange={(emoji) => setTagForm({ ...tagForm, emoji })} />
-              <Input placeholder="Tipo visual" value={tagForm.tipo_visual} onChange={(e) => setTagForm({ ...tagForm, tipo_visual: e.target.value })} />
-              <Button disabled={!canEdit} onClick={upsertTag}>{tagEdicao ? 'Salvar edição' : 'Salvar'}</Button>
-            </div>
-          </EditorCard>
-          <SearchBox value={search.tags} onChange={(v) => setSearch((prev) => ({ ...prev, tags: v }))} />
-          <Card><CardHeader><CardTitle className="text-base">Tags por grupo</CardTitle></CardHeader><CardContent className="space-y-4">{[...grupos, { id: '__sem_grupo__', nome: 'Sem grupo' }].map((grupo) => {
-            const groupTags = tagsFiltradas.filter((t) => (t.tag_grupo_id || '__sem_grupo__') === grupo.id);
-            if (!groupTags.length) return null;
-            return <div key={grupo.id} className="space-y-2"><h4 className="font-medium text-slate-700">{grupo.nome}</h4>{groupTags.map((t) => <ListRow key={t.id} title={`${t.emoji || '⚠️'} ${t.nome}`} subtitle={`Grupo da tag: ${gruposMap[t.tag_grupo_id]?.nome || 'Sem grupo'} · Aplicabilidade: ${labelAplicabilidade(t.aplicabilidade)}`} badge={renderBadge(t.ativo)} onEdit={() => { setTagEdicao(t); setTagForm({ ...t, grupo_id: t.tag_grupo_id || '' }); }} onToggle={() => toggleAtivo('tag', t)} toggleLabel={t.ativo ? 'Desativar' : 'Reativar'} />)}</div>;
-          })}</CardContent></Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
+  return (<div className="max-w-6xl mx-auto space-y-6">
+    <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-3"><Settings className="w-7 h-7 text-indigo-600" /><h1 className="text-2xl font-bold text-slate-900">Configurações de Funções e Tags</h1></div><p className="text-sm text-slate-500 mt-1">Gerencie a taxonomia militar, grupos de acesso e tags do sistema.</p></div><Button onClick={handleInicializarFuncoesBase} className="bg-slate-950 text-white hover:bg-slate-800"><GitBranch className="w-4 h-4 mr-2" />Inicializar funções base</Button></header>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-1 inline-flex"><TabButton id="funcoes" icon={Shield} label="Funções Militares" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="grupos" icon={Network} label="Grupos de Tags" activeTab={activeTab} setActiveTab={setActiveTab} /><TabButton id="tags" icon={TagsIcon} label="Tags Individuais" activeTab={activeTab} setActiveTab={setActiveTab} /></div>
+    {activeTab === 'funcoes' && <><FormCard title={editandoFuncao ? `Editando função: ${editandoFuncao.nome}` : 'Nova Função Militar'} isEditing={!!editandoFuncao} onCancel={cancelarEdicaoFuncao} preview={<PreviewBadge emoji={formFuncao.emoji} nome={formFuncao.nome || 'Nova função'} cor={formFuncao.cor} />}><div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end"><Field label="Nome da função" className="md:col-span-4"><Input value={formFuncao.nome} onChange={(e) => setFormFuncao({ ...formFuncao, nome: e.target.value })} placeholder="Ex: Chefe de Seção" /></Field><Field label="Prioridade na lista" className="md:col-span-2"><Input type="number" value={formFuncao.prioridade_lista} onChange={(e) => setFormFuncao({ ...formFuncao, prioridade_lista: Number(e.target.value) })} placeholder="Ex: 10" /></Field><Field label="Ícone" className="md:col-span-2"><EmojiSelect value={formFuncao.emoji} onChange={(emoji) => setFormFuncao({ ...formFuncao, emoji })} /></Field><Field label="Cor de destaque" className="md:col-span-2"><ColorInput value={formFuncao.cor} onChange={(cor) => setFormFuncao({ ...formFuncao, cor })} /></Field><Button disabled={!canEdit} onClick={salvarFuncao} className="md:col-span-2 bg-indigo-600 hover:bg-indigo-700">{editandoFuncao ? 'Salvar Alterações' : 'Adicionar Função'}</Button></div></FormCard><ListCard title={`Funções Cadastradas (${funcoesFiltradas.length})`} search={buscaFuncao} setSearch={setBuscaFuncao} searchPlaceholder="Buscar função...">{funcoesFiltradas.map((funcao) => <div key={funcao.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: funcao.cor || '#CBD5E1', backgroundColor: `${funcao.cor || '#E2E8F0'}18`, color: funcao.cor || '#1E293B' }}>{funcao.emoji || '🏷️'} {funcao.nome}</span><span className="text-xs text-slate-500">Cor: {funcao.cor || '—'}</span><span className="text-xs text-slate-500">Escopo: Global</span><span className="text-xs text-slate-500">Prioridade: {funcao.prioridade_lista ?? '—'}</span></div><div className="flex items-center gap-3"><StatusBadge ativo={funcao.ativa !== false} /><IconButton icon={Pencil} onClick={() => { setEditandoFuncao(funcao); setFormFuncao({ ...FORM_FUNCAO, ...funcao }); }} /><IconButton icon={funcao.ativa === false ? Check : X} onClick={() => toggleFuncao(funcao)} /></div></div>)}</ListCard></>}
+    {activeTab === 'grupos' && <><FormCard title={editandoGrupo ? `Editando grupo: ${editandoGrupo.nome}` : 'Novo Grupo de Tags'} isEditing={!!editandoGrupo} onCancel={cancelarEdicaoGrupo} preview={<PreviewBadge emoji={formGrupo.emoji} nome={formGrupo.nome || 'Novo grupo'} cor={formGrupo.cor} />}><div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end"><Field label="Nome do grupo" className="md:col-span-4"><Input value={formGrupo.nome} onChange={(e) => setFormGrupo({ ...formGrupo, nome: e.target.value })} /></Field><Field label="Aplicabilidade" className="md:col-span-2"><AplicabilidadeSelect value={formGrupo.aplicabilidade} onChange={(v) => setFormGrupo({ ...formGrupo, aplicabilidade: v })} /></Field><Field label="Ícone" className="md:col-span-2"><EmojiSelect value={formGrupo.emoji} onChange={(emoji) => setFormGrupo({ ...formGrupo, emoji })} /></Field><Field label="Cor" className="md:col-span-2"><ColorInput value={formGrupo.cor} onChange={(cor) => setFormGrupo({ ...formGrupo, cor })} /></Field><Button disabled={!canEdit} onClick={salvarGrupo} className="md:col-span-2 bg-indigo-600 hover:bg-indigo-700">{editandoGrupo ? 'Salvar Alterações' : 'Adicionar Grupo'}</Button></div></FormCard><ListCard title={`Grupos de Tags (${gruposFiltrados.length})`} search={buscaGrupo} setSearch={setBuscaGrupo} searchPlaceholder="Buscar grupo...">{gruposFiltrados.map((grupo) => <div key={grupo.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border font-semibold" style={{ borderColor: grupo.cor || '#CBD5E1', backgroundColor: `${grupo.cor || '#E2E8F0'}18`, color: grupo.cor || '#1E293B' }}>{grupo.emoji || '🏷️'} {grupo.nome}</span><span className="text-xs text-slate-500">Aplicabilidade: {labelAplicabilidade(grupo.aplicabilidade)}</span><span className="text-xs text-slate-500">{quantidadeTagsPorGrupo.get(grupo.id) || 0} tags</span><span className="text-xs text-slate-500">Escopo: Global</span></div><div className="flex items-center gap-3"><StatusBadge ativo={grupo.ativo !== false} /><IconButton icon={Pencil} onClick={() => { setEditandoGrupo(grupo); setFormGrupo({ ...FORM_GRUPO, ...grupo }); }} /><IconButton icon={grupo.ativo === false ? Check : X} onClick={() => toggleGrupo(grupo)} /></div></div>)}</ListCard></>}
+    {activeTab === 'tags' && <><FormCard title={editandoTag ? `Editando tag: ${editandoTag.nome}` : 'Nova Tag Individual'} isEditing={!!editandoTag} onCancel={cancelarEdicaoTag} preview={<PreviewBadge emoji={formTag.emoji} nome={formTag.nome || 'Nova tag'} cor={formTag.cor} />}><div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end"><Field label="Grupo da tag" className="md:col-span-3"><select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={formTag.grupo_id || ''} onChange={(e) => setFormTag({ ...formTag, grupo_id: e.target.value })}><option value="">Sem grupo</option>{gruposAtivos.map((grupo) => <option key={grupo.id} value={grupo.id}>{grupo.emoji} {grupo.nome}</option>)}</select></Field><Field label="Nome da tag" className="md:col-span-3"><Input value={formTag.nome} placeholder="Ex: Motorista" onChange={(e) => setFormTag({ ...formTag, nome: e.target.value })} /></Field><Field label="Aplicabilidade" className="md:col-span-2"><AplicabilidadeSelect value={formTag.aplicabilidade} onChange={(v) => setFormTag({ ...formTag, aplicabilidade: v })} /></Field><Field label="Ícone" className="md:col-span-1"><EmojiSelect value={formTag.emoji} onChange={(emoji) => setFormTag({ ...formTag, emoji })} /></Field><Field label="Tipo visual" className="md:col-span-2"><TipoVisualSelect value={formTag.tipo_visual} onChange={(v) => setFormTag({ ...formTag, tipo_visual: v })} /></Field><Button disabled={!canEdit} onClick={salvarTag} className="md:col-span-1">{editandoTag ? 'Salvar' : 'Criar'}</Button></div></FormCard><ListCard title={`Tags Individuais (${tagsFiltradas.length})`} search={buscaTag} setSearch={setBuscaTag} searchPlaceholder="Buscar tag...">{tagsFiltradas.map((tag) => { const grupo = gruposPorId.get(getTagGrupoId(tag)); return <div key={tag.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50"><div className="flex items-center gap-4"><div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl border" style={{ backgroundColor: `${tag.cor || '#F59E0B'}18`, borderColor: tag.cor || '#F59E0B' }}>{tag.emoji || '🏷️'}</div><div><div className="flex items-center gap-2"><p className="font-semibold text-slate-900">{tag.nome}</p><StatusBadge ativo={tag.ativo !== false} /></div><div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-1"><span>Grupo: {grupo?.nome || 'Sem grupo'}</span><span>•</span><span>Aplicabilidade: {labelAplicabilidade(tag.aplicabilidade)}</span><span>•</span><span>Tipo: {tag.tipo_visual || 'normal'}</span><span>•</span><span>Cor: {tag.cor || '—'}</span></div></div></div><div className="flex items-center gap-3"><IconButton icon={Pencil} onClick={() => { setEditandoTag(tag); setFormTag({ ...FORM_TAG, ...tag, grupo_id: getTagGrupoId(tag) || '' }); }} /><IconButton icon={tag.ativo === false ? Check : Trash2} onClick={() => toggleTag(tag)} /></div></div>; })}</ListCard></>}
+  </div>);
 }
 
-function EditorCard({ title, children, editing, onCancel }) {
-  return <Card className={editing ? 'border-blue-300 bg-blue-50/40' : ''}><CardHeader className="pb-3"><div className="flex items-center justify-between"><CardTitle className="text-base">{title}</CardTitle>{editing && <Button variant="outline" size="sm" onClick={onCancel}>Cancelar edição</Button>}</div></CardHeader><CardContent className="space-y-2">{children}</CardContent></Card>;
-}
-
-function SearchBox({ value, onChange }) {
-  return <div className="relative"><Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" /><Input className="pl-9" placeholder="Buscar por nome" value={value} onChange={(e) => onChange(e.target.value)} /></div>;
-}
-
-function EmojiPicker({ value, onChange }) {
-  return <div className="border rounded p-2"><Label className="text-xs text-slate-500">Emoji</Label><div className="grid grid-cols-4 gap-1 mt-1">{Object.entries(EMOJIS_OPERACIONAIS).flatMap(([, emojis]) => emojis).map((emoji) => <button key={emoji} type="button" className={`h-8 rounded border ${value === emoji ? 'border-blue-500 bg-blue-50' : 'border-slate-200'}`} onClick={() => onChange(emoji)}>{emoji}</button>)}</div></div>;
-}
-
-function ListRow({ title, subtitle, badge, onEdit, onToggle, toggleLabel }) {
-  return <div className="border rounded-lg p-3 bg-slate-50"><div className="flex items-start justify-between gap-2"><div><p className="font-medium">{title}</p><p className="text-sm text-slate-600">{subtitle}</p></div><div className="flex items-center gap-2">{badge}<Button variant="ghost" size="sm" onClick={onEdit}>Editar</Button><Button variant="outline" size="sm" onClick={onToggle}>{toggleLabel}</Button></div></div></div>;
-}
-
-const labelAplicabilidade = (value) => {
-  if (value === 'militar') return 'Militar';
-  if (value === 'ferias') return 'Férias';
-  return 'Ambos';
-};
+const filtrar = (itens, termo) => itens.filter((i) => String(i?.nome || '').toLowerCase().includes(String(termo || '').toLowerCase()));
+const labelAplicabilidade = (v) => v === 'militar' ? 'Militar' : v === 'ferias' ? 'Férias' : 'Ambos';
+function TabButton({ id, icon: Icon, label, activeTab, setActiveTab }) { const active = activeTab === id; return <button type="button" onClick={() => setActiveTab(id)} className={['inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition', active ? 'bg-white text-indigo-700 shadow border border-indigo-100' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'].join(' ')}><Icon className="w-4 h-4" />{label}</button>; }
+function FormCard({ title, preview, children, onCancel, isEditing }) { return <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"><div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200"><div className="flex items-center gap-2"><Plus className="w-4 h-4 text-indigo-600" /><h2 className="font-semibold text-slate-900">{title}</h2></div><div className="flex items-center gap-3">{preview}{isEditing && <Button variant="outline" size="sm" onClick={onCancel}>Cancelar edição</Button>}</div></div><div className="p-6">{children}</div></section>; }
+function PreviewBadge({ emoji, nome, cor, fallback = 'Prévia' }) { return <div className="flex items-center gap-2"><span className="text-xs text-slate-400">Preview visual:</span><span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold" style={{ borderColor: cor || '#CBD5E1', backgroundColor: `${cor || '#E2E8F0'}22`, color: cor || '#334155' }}><span>{emoji || '🏷️'}</span><span>{nome || fallback}</span></span></div>; }
+function Field({ label, children, className }) { return <label className={className}><span className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">{label}</span>{children}</label>; }
+function StatusBadge({ ativo }) { return <span className={['inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold', ativo ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'].join(' ')}>{ativo ? '✓ Ativo' : 'Inativo'}</span>; }
+function IconButton({ icon: Icon, onClick }) { return <button type="button" onClick={onClick} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"><Icon className="w-5 h-5" /></button>; }
+function SearchInput({ value, onChange, placeholder }) { return <div className="relative w-64"><Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" /><Input value={value} onChange={(e) => onChange(e.target.value)} className="pl-9" placeholder={placeholder} /></div>; }
+function ListCard({ title, search, setSearch, searchPlaceholder, children }) { return <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"><div className="flex items-center justify-between px-6 py-4 border-b"><h2 className="font-semibold text-slate-900">{title}</h2><SearchInput value={search} onChange={setSearch} placeholder={searchPlaceholder} /></div><div className="divide-y divide-slate-100">{children}</div></section>; }
+function EmojiSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={value || '🏷️'} onChange={(e) => onChange(e.target.value)}>{EMOJI_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.value} {item.label}</option>)}</select>; }
+function AplicabilidadeSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={normalizarAplicabilidade(value)} onChange={(e) => onChange(e.target.value)}>{APLICABILIDADES.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>; }
+function TipoVisualSelect({ value, onChange }) { return <select className="w-full h-10 rounded-lg border border-slate-300 px-3 bg-white" value={value || 'normal'} onChange={(e) => onChange(e.target.value)}><option value="normal">Normal</option><option value="destaque">Destaque</option><option value="chip">Chip</option></select>; }
+function ColorInput({ value, onChange }) { return <Input type="color" value={value || '#CBD5E1'} onChange={(e) => onChange(e.target.value)} className="h-10 p-1" />; }

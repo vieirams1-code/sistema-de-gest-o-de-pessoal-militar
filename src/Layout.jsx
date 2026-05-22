@@ -33,6 +33,7 @@ import {
   ListOrdered,
   PanelLeftClose,
   Pin,
+  Tags as TagsIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -87,7 +88,7 @@ const menuGroups = [
           },
           { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
           { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
-          { name: 'Tags', page: 'Configuracoes', path: '/Configuracoes', icon: Pin, tab: 'tags', anyOf: [{ type: 'module', key: 'adicoes_personalizacoes' }, { type: 'action', key: 'gerir_adicoes_personalizacoes' }] },
+          { name: 'Tags', page: 'Tags', icon: TagsIcon, moduleKey: 'efetivo', actionKey: 'gerir_configuracoes' },
         ],
       },
       {
