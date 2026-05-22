@@ -380,7 +380,22 @@ export default function Layout({ children, currentPageName }) {
             )}
 
             <div className={`flex items-center ${compactSidebar ? 'justify-center' : 'gap-1'}`}>
-              <Button variant="ghost" size="icon" onClick={() => setCompactSidebar((prev) => !prev)} className="hidden lg:flex text-white hover:bg-white/10 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() =>
+                  setCompactSidebar((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setExpandedSection('');
+                      clearHoverCloseTimeout();
+                      setHoveredSection(null);
+                    }
+                    return next;
+                  })
+                }
+                className="hidden lg:flex text-white hover:bg-white/10 shrink-0"
+              >
                 {compactSidebar ? <Menu className="w-5 h-5" /> : <PanelLeftClose className="w-4 h-4" />}
               </Button>
               <Button variant="ghost" size="icon" onClick={() => {
@@ -426,7 +441,7 @@ export default function Layout({ children, currentPageName }) {
                           {!compactSidebar && (expanded ? <ChevronDown className="w-4 h-4 opacity-60" /> : <ChevronRight className="w-4 h-4 opacity-60" />)}
                         </button>
 
-                        {(expanded || flyoutOpen) && (
+                        {((!compactSidebar && expanded) || (compactSidebar && flyoutOpen)) && (
                           <div
                             onMouseEnter={() => compactSidebar && clearHoverCloseTimeout()}
                             onMouseLeave={() => compactSidebar && scheduleClose()}
