@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -32,6 +32,7 @@ import {
   UserCircle2,
   ListOrdered,
   PanelLeftClose,
+  Pin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -197,6 +198,16 @@ export default function Layout({ children, currentPageName }) {
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [expandedSection, setExpandedSection] = useState('');
   const [hoveredSection, setHoveredSection] = useState(null);
+  const [pinnedItems, setPinnedItems] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const storedPins = window.localStorage.getItem('sgp_sidebar_pins');
+      const parsedPins = storedPins ? JSON.parse(storedPins) : [];
+      return Array.isArray(parsedPins) ? parsedPins : [];
+    } catch {
+      return [];
+    }
+  });
   const {
     isAdmin,
     canAccessModule,
@@ -214,6 +225,12 @@ export default function Layout({ children, currentPageName }) {
   const toggleExpanded = (sectionTitle) => {
     setExpandedSection((prev) => (prev === sectionTitle ? '' : sectionTitle));
   };
+
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('sgp_sidebar_pins', JSON.stringify(pinnedItems));
+  }, [pinnedItems]);
 
   const canViewMenuEntry = (entry) => {
     if (entry.adminOnly && !isAdmin) return false;
@@ -256,6 +273,32 @@ export default function Layout({ children, currentPageName }) {
         .filter((section) => section.items.length > 0),
     }))
     .filter((group) => group.sections.length > 0);
+
+
+  const allVisibleItems = useMemo(() => visibleMenuGroups.flatMap((group) =>
+    group.sections.flatMap((section) => section.items.flatMap((item) => [item, ...(item.children || [])]))
+  ), [visibleMenuGroups]);
+
+  const getPinKey = (item) => `${item.page}::${item.tab || ''}`;
+
+  const pinnedVisibleItems = useMemo(() => {
+    const visibleByKey = new Map(allVisibleItems.map((item) => [getPinKey(item), item]));
+    return pinnedItems
+      .map((pinnedItem) => visibleByKey.get(`${pinnedItem.page}::${pinnedItem.tab || ''}`))
+      .filter(Boolean);
+  }, [allVisibleItems, pinnedItems]);
+
+  const isPinned = (item) => pinnedItems.some((pinnedItem) => pinnedItem.page === item.page && (pinnedItem.tab || null) === (item.tab || null));
+
+  const togglePin = (item) => {
+    setPinnedItems((prev) => {
+      const hasPinnedItem = prev.some((pinnedItem) => pinnedItem.page === item.page && (pinnedItem.tab || null) === (item.tab || null));
+      if (hasPinnedItem) {
+        return prev.filter((pinnedItem) => !(pinnedItem.page === item.page && (pinnedItem.tab || null) === (item.tab || null)));
+      }
+      return [...prev, { page: item.page, tab: item.tab || null }];
+    });
+  };
 
   const isItemActive = (item) => {
     if (item.children?.length) {
@@ -383,9 +426,21 @@ export default function Layout({ children, currentPageName }) {
                                     <Link
                                       to={href}
                                       onClick={() => setSidebarOpen(false)}
-                                      className={`flex items-center rounded-lg px-3 py-2 text-[13px] ${active ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}
+                                      className={`group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px] ${active ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}
                                     >
                                       <span className="truncate">{item.name}</span>
+                                      <button
+                                        type="button"
+                                        aria-label={`Fixar ${item.name}`}
+                                        onClick={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          togglePin(item);
+                                        }}
+                                        className={`opacity-0 group-hover:opacity-100 transition-opacity ${isPinned(item) ? 'text-blue-300 opacity-100' : 'text-white/50 hover:text-white'}`}
+                                      >
+                                        <Pin className="w-3.5 h-3.5" />
+                                      </button>
                                     </Link>
                                     {hasChildren && item.children.map((child) => {
                                       const childActive = currentPageName === child.page && !child.tab;
@@ -396,9 +451,21 @@ export default function Layout({ children, currentPageName }) {
                                           key={child.name}
                                           to={childHref}
                                           onClick={() => setSidebarOpen(false)}
-                                          className={`ml-4 flex items-center rounded-lg px-3 py-2 text-[12px] ${childActive ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/8 hover:text-white'}`}
+                                          className={`group ml-4 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[12px] ${childActive ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/8 hover:text-white'}`}
                                         >
                                           <span className="truncate">{child.name}</span>
+                                          <button
+                                            type="button"
+                                            aria-label={`Fixar ${child.name}`}
+                                            onClick={(event) => {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                              togglePin(child);
+                                            }}
+                                            className={`opacity-0 group-hover:opacity-100 transition-opacity ${isPinned(child) ? 'text-blue-300 opacity-100' : 'text-white/50 hover:text-white'}`}
+                                          >
+                                            <Pin className="w-3.5 h-3.5" />
+                                          </button>
                                         </Link>
                                       );
                                     })}
@@ -455,6 +522,30 @@ export default function Layout({ children, currentPageName }) {
         </div>
         {children}
       </main>
+
+
+      {pinnedVisibleItems.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-[200] w-64 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur">
+          <p className="mb-2 text-sm font-semibold text-slate-800">Acesso rápido</p>
+          <div className="space-y-1">
+            {pinnedVisibleItems.map((item) => {
+              const ItemIcon = item.icon;
+              const baseHref = item.path || createPageUrl(item.page);
+              const itemHref = item.tab ? `${baseHref}?tab=${item.tab}` : baseHref;
+              return (
+                <Link
+                  key={getPinKey(item)}
+                  to={itemHref}
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                >
+                  {ItemIcon ? <ItemIcon className="h-4 w-4 shrink-0" /> : <span className="h-2 w-2 rounded-full bg-slate-400" />}
+                  <span className="truncate">{item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
