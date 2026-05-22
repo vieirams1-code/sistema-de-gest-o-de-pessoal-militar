@@ -11,7 +11,15 @@ function clamp(value, min, max) {
 
 export default function QuickAccessWidget({ items, getPinKey, createHref, widgetPreferences, onWidgetChange, defaultWidget }) {
   const containerRef = React.useRef(null);
-  const dragState = React.useRef({ pointerId: null, offsetX: 0, offsetY: 0, dragging: false });
+  const dragState = React.useRef({
+    pointerId: null,
+    offsetX: 0,
+    offsetY: 0,
+    startX: 0,
+    startY: 0,
+    dragging: false,
+    didDrag: false,
+  });
 
   const [position, setPosition] = React.useState({ x: widgetPreferences?.x ?? defaultWidget.x, y: widgetPreferences?.y ?? defaultWidget.y });
 
@@ -60,7 +68,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
   if (items.length === 0) return null;
 
   const handlePointerDown = (event) => {
-    if (isMobile || mode.minimized) return;
+    if (event.button !== 0 || isMobile || mode.minimized) return;
     const node = containerRef.current;
     if (!node) return;
 
@@ -68,13 +76,22 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
       pointerId: event.pointerId,
       offsetX: event.clientX - position.x,
       offsetY: event.clientY - position.y,
+      startX: event.clientX,
+      startY: event.clientY,
       dragging: true,
+      didDrag: false,
     };
+    event.preventDefault();
     node.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event) => {
     if (!dragState.current.dragging || dragState.current.pointerId !== event.pointerId) return;
+    const distanceX = event.clientX - dragState.current.startX;
+    const distanceY = event.clientY - dragState.current.startY;
+    if (!dragState.current.didDrag && Math.hypot(distanceX, distanceY) > 3) {
+      dragState.current.didDrag = true;
+    }
 
     const nextPos = applyClampedPosition({
       x: event.clientX - dragState.current.offsetX,
@@ -86,9 +103,20 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
 
   const finishDrag = (event) => {
     if (!dragState.current.dragging || dragState.current.pointerId !== event.pointerId) return;
+    const node = containerRef.current;
+    if (node?.hasPointerCapture?.(event.pointerId)) {
+      node.releasePointerCapture(event.pointerId);
+    }
     dragState.current.dragging = false;
     dragState.current.pointerId = null;
     persistState(position);
+  };
+
+  const preventGhostClick = (event) => {
+    if (!dragState.current.didDrag) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragState.current.didDrag = false;
   };
 
   const resetPosition = () => {
@@ -123,31 +151,35 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
   return (
     <div
       ref={containerRef}
-      className="fixed z-[200] rounded-xl border border-slate-200 bg-white shadow-xl"
+      className="fixed z-[200] cursor-default rounded-xl border border-slate-200 bg-white shadow-xl"
       style={baseStyle}
     >
       <div
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={finishDrag}
-        onPointerCancel={finishDrag}
-        className="flex cursor-grab items-center justify-between gap-2 rounded-t-xl border-b border-slate-200 bg-slate-50 px-2 py-1.5"
+        className="flex items-center justify-between gap-2 rounded-t-xl border-b border-slate-200 bg-slate-50 px-2 py-1.5"
       >
-        <div className="flex items-center gap-2 text-slate-700">
+        <div
+          data-drag-handle
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishDrag}
+          onPointerCancel={finishDrag}
+          onClick={preventGhostClick}
+          className={`flex items-center gap-2 text-slate-700 ${dragState.current.dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        >
           <GripVertical className="h-4 w-4 text-slate-400" />
           <p className="text-xs font-semibold">Acesso rápido</p>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => persistState({ orientacao: isHorizontal ? 'vertical' : 'horizontal' })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar orientação" aria-label="Alternar orientação">
+          <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); persistState({ orientacao: isHorizontal ? 'vertical' : 'horizontal' }); }} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar orientação" aria-label="Alternar orientação">
             {isHorizontal ? <Rows3 className="h-3.5 w-3.5" /> : <Rows2 className="h-3.5 w-3.5" />}
           </button>
-          <button type="button" onClick={() => persistState({ densidade: isCompact ? 'expanded' : 'compact' })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar densidade" aria-label="Alternar densidade">
+          <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); persistState({ densidade: isCompact ? 'expanded' : 'compact' }); }} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar densidade" aria-label="Alternar densidade">
             {isCompact ? <Text className="h-3.5 w-3.5" /> : <Type className="h-3.5 w-3.5" />}
           </button>
-          <button type="button" onClick={resetPosition} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Resetar posição" aria-label="Resetar posição">
+          <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); resetPosition(); }} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Resetar posição" aria-label="Resetar posição">
             <RefreshCcw className="h-3.5 w-3.5" />
           </button>
-          <button type="button" onClick={() => persistState({ minimized: true })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Minimizar" aria-label="Minimizar acesso rápido">
+          <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); persistState({ minimized: true }); }} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Minimizar" aria-label="Minimizar acesso rápido">
             <Minimize2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -160,6 +192,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
             <Link
               key={getPinKey(item)}
               to={createHref(item)}
+              onPointerDown={(e) => e.stopPropagation()}
               className={`flex shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 ${isCompact ? 'justify-center' : ''}`}
               title={item.name}
               aria-label={item.name}
