@@ -7,6 +7,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { getEscopoLabel } from '@/utils/funcoesTags/escopo';
 import { INSTITUCIONAIS, validarFuncao, validarTag, validarTagGrupo } from '@/utils/funcoesTags/validacoes';
+import {
+  atualizarFuncaoMilitarEscopado,
+  atualizarTagEscopado,
+  atualizarTagGrupoEscopado,
+  criarFuncaoMilitarEscopado,
+  criarTagEscopado,
+  criarTagGrupoEscopado,
+  desativarFuncaoMilitarEscopado,
+  desativarTagEscopado,
+  desativarTagGrupoEscopado
+} from '@/services/cudFuncoesTagsEscopadoClient';
 
 export default function FuncoesTagsManager({ canEdit }) {
   const queryClient = useQueryClient();
@@ -22,16 +33,25 @@ export default function FuncoesTagsManager({ canEdit }) {
   const { data: tags = [] } = useQuery({ queryKey: ['funcoes-tags', 'tags'], queryFn: () => base44.entities.Tag.list('ordem_exibicao') });
   const gruposMap = useMemo(() => Object.fromEntries(grupos.map((g) => [g.id, g])), [grupos]);
 
-  const saveFuncao = useMutation({ mutationFn: (payload) => funcaoEdicao ? base44.entities.FuncaoMilitar.update(funcaoEdicao.id, payload) : base44.entities.FuncaoMilitar.create(payload), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'funcoes'] }) });
-  const saveGrupo = useMutation({ mutationFn: (payload) => grupoForm.id ? base44.entities.TagGrupo.update(grupoForm.id, payload) : base44.entities.TagGrupo.create(payload), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'grupos'] }) });
-  const saveTag = useMutation({ mutationFn: (payload) => tagForm.id ? base44.entities.Tag.update(tagForm.id, payload) : base44.entities.Tag.create(payload), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'tags'] }) });
+  const invalidateCatalogo = (tipo) => {
+    queryClient.invalidateQueries({ queryKey: ['funcoes-tags', tipo] });
+    queryClient.invalidateQueries({ queryKey: ['militares-funcoes-institucionais'] });
+    queryClient.invalidateQueries({ queryKey: ['militares-funcoes-filtros'] });
+    queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] });
+    queryClient.invalidateQueries({ queryKey: ['ferias-tags'] });
+    queryClient.invalidateQueries({ queryKey: ['militar-funcao-institucional'] });
+  };
+
+  const saveFuncao = useMutation({ mutationFn: (payload) => funcaoEdicao ? atualizarFuncaoMilitarEscopado(funcaoEdicao.id, payload) : criarFuncaoMilitarEscopado(payload), onSuccess: () => invalidateCatalogo('funcoes') });
+  const saveGrupo = useMutation({ mutationFn: (payload) => grupoForm.id ? atualizarTagGrupoEscopado(grupoForm.id, payload) : criarTagGrupoEscopado(payload), onSuccess: () => invalidateCatalogo('grupos') });
+  const saveTag = useMutation({ mutationFn: (payload) => tagForm.id ? atualizarTagEscopado(tagForm.id, payload) : criarTagEscopado(payload), onSuccess: () => invalidateCatalogo('tags') });
 
   const initInstitucional = useMutation({ mutationFn: async () => {
     const all = await base44.entities.FuncaoMilitar.list();
     const keys = new Set(all.map((f) => f.institucional_chave));
-    if (!keys.has('comandante')) await base44.entities.FuncaoMilitar.create({ nome: 'Comandante', institucional_chave: 'comandante', prioridade_lista: 1, ativa: true, emoji: '🛡️', cor: '#1D4ED8' });
-    if (!keys.has('subcomandante')) await base44.entities.FuncaoMilitar.create({ nome: 'Subcomandante', institucional_chave: 'subcomandante', prioridade_lista: 2, ativa: true, emoji: '🔰', cor: '#2563EB' });
-  }, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'funcoes'] }) });
+    if (!keys.has('comandante')) await criarFuncaoMilitarEscopado({ nome: 'Comandante', institucional_chave: 'comandante', prioridade_lista: 1, ativa: true, emoji: '🛡️', cor: '#1D4ED8' });
+    if (!keys.has('subcomandante')) await criarFuncaoMilitarEscopado({ nome: 'Subcomandante', institucional_chave: 'subcomandante', prioridade_lista: 2, ativa: true, emoji: '🔰', cor: '#2563EB' });
+  }, onSuccess: () => invalidateCatalogo('funcoes') });
 
   const upsertFuncao = () => {
     const bloqueada = funcaoEdicao && INSTITUCIONAIS[funcaoEdicao.institucional_chave];
@@ -84,10 +104,10 @@ export default function FuncoesTagsManager({ canEdit }) {
         toast({ title: 'Funções institucionais não podem ser desativadas.', variant: 'destructive' });
         return;
       }
-      return base44.entities.FuncaoMilitar.update(row.id, { ativa: false }).then(() => queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'funcoes'] }));
+      return desativarFuncaoMilitarEscopado(row.id, { ativa: false }).then(() => invalidateCatalogo('funcoes'));
     }
-    if (tipo === 'grupo') return base44.entities.TagGrupo.update(row.id, { ativo: false }).then(() => queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'grupos'] }));
-    return base44.entities.Tag.update(row.id, { ativo: false }).then(() => queryClient.invalidateQueries({ queryKey: ['funcoes-tags', 'tags'] }));
+    if (tipo === 'grupo') return desativarTagGrupoEscopado(row.id, { ativo: false }).then(() => invalidateCatalogo('grupos'));
+    return desativarTagEscopado(row.id, { ativo: false }).then(() => invalidateCatalogo('tags'));
   };
 
   return (
