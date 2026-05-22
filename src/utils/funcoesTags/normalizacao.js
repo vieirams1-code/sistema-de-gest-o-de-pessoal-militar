@@ -9,3 +9,15 @@ export function normalizarTexto(valor = '') {
 export function normalizarGrupoId(grupoId) {
   return grupoId ? String(grupoId).trim() : '';
 }
+
+
+const APLICABILIDADE_MAP = {
+  militar: 'militar',
+  ferias: 'ferias',
+  ambos: 'ambos'
+};
+
+export function normalizarAplicabilidade(valor) {
+  const chave = normalizarTexto(valor);
+  return APLICABILIDADE_MAP[chave] || null;
+}

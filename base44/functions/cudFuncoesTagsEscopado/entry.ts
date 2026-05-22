@@ -71,6 +71,18 @@ async function listarMilitarIdsDoEscopo(base44: any, acessos: any[]) {
 }
 
 function erro(status: number, message: string) { return Response.json({ error: message }, { status }); }
+function normalizarAplicabilidade(value: unknown) {
+  const raw = String(value || '').trim();
+  const normalized = raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (normalized === 'militar') return 'militar';
+  if (normalized === 'ferias') return 'ferias';
+  if (normalized === 'ambos') return 'ambos';
+  return null;
+}
 function validarAplicabilidade(value: unknown) { return APLICABILIDADES.has(String(value || '').trim()); }
 function validarTipoVisual(value: unknown) { return TIPOS_VISUAIS.has(String(value || '').trim()); }
 
@@ -134,9 +146,9 @@ Deno.serve(async (req) => {
       if (operacao === 'desativar') return Response.json({ data: await svc.update(String(id), { ativo: false }) });
       const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
       if (!nome) return erro(400, 'nome é obrigatório.');
-      const aplicabilidade = String(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '').trim();
+      const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
       const tipoVisual = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
-      if (!validarAplicabilidade(aplicabilidade)) return erro(400, 'aplicabilidade inválida.');
+      if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias ou Ambos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
       const gruposAtivos = await base44.asServiceRole.entities.TagGrupo.filter({ ativo: true }, undefined, 1000, 0);
       const nomeNorm = normalizeNome(nome);
@@ -152,9 +164,9 @@ Deno.serve(async (req) => {
       const nome = String(data?.nome ?? registroAtual?.nome ?? '').trim();
       if (!nome) return erro(400, 'nome é obrigatório.');
       const grupoId = String(data?.grupo_id ?? registroAtual?.grupo_id ?? '').trim() || null;
-      const aplicabilidade = String(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '').trim();
+      const aplicabilidade = normalizarAplicabilidade(data?.aplicabilidade ?? registroAtual?.aplicabilidade ?? '');
       const tipoVisual = String(data?.tipo_visual ?? registroAtual?.tipo_visual ?? 'normal').trim();
-      if (!validarAplicabilidade(aplicabilidade)) return erro(400, 'aplicabilidade inválida.');
+      if (!aplicabilidade || !validarAplicabilidade(aplicabilidade)) return erro(400, 'Aplicabilidade deve ser Militar, Férias ou Ambos.');
       if (!validarTipoVisual(tipoVisual)) return erro(400, 'tipo_visual inválido.');
 
       let grupo: any = null;
