@@ -60,6 +60,7 @@ export default function FeriasTagsSection({ ferias }) {
     data_aplicacao: new Date().toISOString().split('T')[0],
     motivo: '',
   });
+  const [buscaTag, setBuscaTag] = React.useState('');
 
   const { data: tagsCatalogo = [] } = useQuery({
     queryKey: funcoesTagsKeys.catalogo('local', 'tags'),
@@ -91,10 +92,27 @@ export default function FeriasTagsSection({ ferias }) {
 
   const { ativas, removidas } = React.useMemo(() => separarTagsFeriasPorStatus(vinculos), [vinculos]);
 
-  const tagsAtivasAplicaveis = tagsCatalogo.filter((tag) => {
-    if (String(tag.status || '').toLowerCase() !== 'ativa') return false;
-    return !validarAplicabilidadeTagFerias(tag);
-  });
+  const gruposAtivos = React.useMemo(
+    () => gruposCatalogo.filter((grupo) => (typeof grupo.ativo === 'boolean' ? grupo.ativo : String(grupo.status || '').toLowerCase() === 'ativa')),
+    [gruposCatalogo],
+  );
+
+  const tagsAtivasAplicaveis = React.useMemo(() => tagsCatalogo.filter((tag) => {
+    const tagAtiva = typeof tag.ativo === 'boolean' ? tag.ativo : String(tag.status || '').toLowerCase() === 'ativa';
+    if (!tagAtiva || validarAplicabilidadeTagFerias(tag)) return false;
+    if (!tag.tag_grupo_id) return true;
+    return gruposAtivos.some((grupo) => String(grupo.id) === String(tag.tag_grupo_id));
+  }), [tagsCatalogo, gruposAtivos]);
+
+  const tagsFiltradas = React.useMemo(() => {
+    const termo = buscaTag.trim().toLowerCase();
+    if (!termo) return tagsAtivasAplicaveis;
+    return tagsAtivasAplicaveis.filter((tag) => {
+      const grupo = gruposAtivos.find((item) => String(item.id) === String(tag.tag_grupo_id));
+      const texto = `${tag.nome || ''} ${tag.emoji || ''} ${grupo?.nome || 'Sem grupo'}`.toLowerCase();
+      return texto.includes(termo);
+    });
+  }, [buscaTag, tagsAtivasAplicaveis, gruposAtivos]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.feriasTags('local', ferias.id) });
@@ -151,9 +169,13 @@ export default function FeriasTagsSection({ ferias }) {
       {showForm && <div className="rounded-lg border p-3 grid md:grid-cols-2 gap-3">
         <div className="space-y-2 md:col-span-2">
           <Label>Tag ativa</Label>
+          <Input placeholder="Buscar por nome da tag, emoji ou grupo" value={buscaTag} onChange={(e) => setBuscaTag(e.target.value)} />
           <select className="w-full border rounded-md h-9 px-2" value={form.tag_id} onChange={(e) => setForm((old) => ({ ...old, tag_id: e.target.value }))}>
             <option value="">Selecione...</option>
-            {tagsAtivasAplicaveis.map((tag) => <option key={tag.id} value={tag.id}>{tag.emoji || '🏷️'} {tag.nome}</option>)}
+            {tagsFiltradas.map((tag) => {
+              const grupo = gruposAtivos.find((item) => String(item.id) === String(tag.tag_grupo_id));
+              return <option key={tag.id} value={tag.id}>{tag.emoji || '🏷️'} {tag.nome} · {grupo?.nome || 'Sem grupo'}</option>;
+            })}
           </select>
         </div>
         <div className="space-y-2">
