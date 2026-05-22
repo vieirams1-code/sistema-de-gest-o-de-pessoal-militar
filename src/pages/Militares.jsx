@@ -837,9 +837,9 @@ export default function Militares() {
               return (
                 <div
                   key={militar.id}
-                  className={`relative grid grid-cols-12 gap-2 px-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
+                  className={`relative grid grid-cols-12 gap-2 pl-10 pr-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
                 >
-                <label className="absolute left-2 top-2 z-10">
+                <label className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
                   <input
                     type="checkbox"
                     checked={selectedMilitarIds.has(String(militar.id))}
