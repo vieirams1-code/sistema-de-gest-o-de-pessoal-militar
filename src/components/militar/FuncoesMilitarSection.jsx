@@ -65,6 +65,7 @@ export default function FuncoesMilitarSection({ militar }) {
     principal: false,
     motivo: ''
   });
+  const [funcaoBusca, setFuncaoBusca] = React.useState('');
 
   const { data: funcoesCatalogo = [] } = useQuery({
     queryKey: funcoesTagsKeys.catalogo('local', 'funcoes'),
@@ -156,17 +157,19 @@ export default function FuncoesMilitarSection({ militar }) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-lg text-[#1e3a5f]">Funções</CardTitle>
+        <CardTitle className="text-lg text-[#1e3a5f]">Funções do militar</CardTitle>
         <Button size="sm" onClick={() => setShowForm((v) => !v)}>{showForm ? 'Cancelar' : 'Adicionar função'}</Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {showForm && <div className="rounded-lg border p-3 grid md:grid-cols-2 gap-3">
           <div className="space-y-2 md:col-span-2">
             <Label>Função ativa</Label>
+            <Input placeholder="Buscar função..." value={funcaoBusca} onChange={(e) => setFuncaoBusca(e.target.value)} />
             <select className="w-full border rounded-md h-9 px-2" value={form.funcao_militar_id} onChange={(e) => setForm((old) => ({ ...old, funcao_militar_id: e.target.value }))}>
               <option value="">Selecione...</option>
-              {funcoesAtivasCatalogo.map((funcao) => <option key={funcao.id} value={funcao.id}>{funcao.emoji || '🏷️'} {funcao.nome}</option>)}
+              {funcoesAtivasCatalogo.filter((funcao) => String(funcao.nome || '').toLowerCase().includes(funcaoBusca.toLowerCase())).map((funcao) => <option key={funcao.id} value={funcao.id}>{funcao.institucional_chave ? '⭐ ' : ''}{funcao.emoji || '🏷️'} {funcao.nome}</option>)}
             </select>
+            <p className="text-xs text-slate-500">Funções institucionais ficam destacadas com ⭐.</p>
           </div>
           <div className="space-y-2">
             <Label>Data de início</Label>
@@ -184,7 +187,7 @@ export default function FuncoesMilitarSection({ militar }) {
 
         <div className="space-y-3">
           <h4 className="font-medium text-slate-700">Funções ativas</h4>
-          {ativas.length === 0 ? <p className="text-sm text-slate-500">Nenhuma função ativa.</p> : ativas.map((v) => <FuncaoItem key={v.id} vinculo={v} onSetPrincipal={(item) => setPrincipalMutation.mutate(item)} onEncerrar={(item) => {
+          {ativas.length === 0 ? <div className="rounded-lg border border-dashed p-4"><p className="text-sm text-slate-500">Este militar ainda não possui funções cadastradas.</p><Button size="sm" className="mt-2" onClick={() => setShowForm(true)}>Adicionar função</Button></div> : ativas.map((v) => <FuncaoItem key={v.id} vinculo={v} onSetPrincipal={(item) => setPrincipalMutation.mutate(item)} onEncerrar={(item) => {
             const motivo = window.prompt('Motivo do encerramento (opcional):', item.motivo || '');
             encerrarMutation.mutate({ vinculo: item, motivo: motivo || '' });
           }} loadingSetPrincipal={setPrincipalMutation.isPending} loadingEncerrar={encerrarMutation.isPending} />)}

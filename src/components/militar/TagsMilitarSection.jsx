@@ -57,6 +57,7 @@ export default function TagsMilitarSection({ militar }) {
     data_aplicacao: new Date().toISOString().split('T')[0],
     motivo: ''
   });
+  const [tagBusca, setTagBusca] = React.useState('');
 
   const { data: tagsCatalogo = [] } = useQuery({
     queryKey: funcoesTagsKeys.catalogo('local', 'tags'),
@@ -89,7 +90,8 @@ export default function TagsMilitarSection({ militar }) {
   const { ativas, removidas } = React.useMemo(() => separarTagsPorStatus(vinculos), [vinculos]);
 
   const tagsAtivasAplicaveis = tagsCatalogo.filter((tag) => {
-    if (String(tag.status || '').toLowerCase() !== 'ativa') return false;
+    const ativa = typeof tag.ativo === 'boolean' ? tag.ativo : String(tag.status || '').toLowerCase() === 'ativa';
+    if (!ativa) return false;
     return !validarAplicabilidadeTagMilitar(tag);
   });
 
@@ -101,7 +103,8 @@ export default function TagsMilitarSection({ militar }) {
   const addMutation = useMutation({
     mutationFn: async () => {
       const tag = tagsCatalogo.find((item) => item.id === form.tag_id);
-      if (!tag || String(tag.status || '').toLowerCase() !== 'ativa') {
+      const ativa = tag && (typeof tag.ativo === 'boolean' ? tag.ativo : String(tag.status || '').toLowerCase() === 'ativa');
+      if (!tag || !ativa) {
         throw new Error('Selecione uma tag ativa.');
       }
       const erroAplicabilidade = validarAplicabilidadeTagMilitar(tag);
@@ -141,16 +144,20 @@ export default function TagsMilitarSection({ militar }) {
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-lg text-[#1e3a5f]">Tags</CardTitle>
+        <CardTitle className="text-lg text-[#1e3a5f]">Tags do militar</CardTitle>
         <Button size="sm" onClick={() => setShowForm((old) => !old)}>{showForm ? 'Cancelar' : 'Adicionar tag'}</Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {showForm && <div className="rounded-lg border p-3 grid md:grid-cols-2 gap-3">
           <div className="space-y-2 md:col-span-2">
             <Label>Tag ativa</Label>
+            <Input placeholder="Buscar tag..." value={tagBusca} onChange={(e) => setTagBusca(e.target.value)} />
             <select className="w-full border rounded-md h-9 px-2" value={form.tag_id} onChange={(e) => setForm((old) => ({ ...old, tag_id: e.target.value }))}>
               <option value="">Selecione...</option>
-              {tagsAtivasAplicaveis.map((tag) => <option key={tag.id} value={tag.id}>{tag.emoji || '🏷️'} {tag.nome}</option>)}
+              {tagsAtivasAplicaveis.filter((tag) => String(tag.nome || '').toLowerCase().includes(tagBusca.toLowerCase())).map((tag) => {
+                const grupo = gruposCatalogo.find((item) => item.id === tag.tag_grupo_id);
+                return <option key={tag.id} value={tag.id}>{tag.emoji || '🏷️'} {tag.nome} {grupo ? `· ${grupo.nome}` : ''}</option>;
+              })}
             </select>
           </div>
           <div className="space-y-2">
@@ -168,7 +175,7 @@ export default function TagsMilitarSection({ militar }) {
 
         <div className="space-y-3">
           <h4 className="font-medium text-slate-700">Tags ativas</h4>
-          {ativas.length === 0 ? <p className="text-sm text-slate-500">Nenhuma tag ativa.</p> : ativas.map((vinculo) => <TagItem key={vinculo.id} vinculo={vinculo} removivel onRemover={(item) => {
+          {ativas.length === 0 ? <div className="rounded-lg border border-dashed p-4"><p className="text-sm text-slate-500">Este militar ainda não possui tags.</p><Button size="sm" className="mt-2" onClick={() => setShowForm(true)}>Adicionar tag</Button></div> : ativas.map((vinculo) => <TagItem key={vinculo.id} vinculo={vinculo} removivel onRemover={(item) => {
             const motivo = window.prompt('Motivo da remoção (opcional):', item.motivo || '');
             removeMutation.mutate({ vinculo: item, motivo: motivo || '' });
           }} loading={removeMutation.isPending} />)}
