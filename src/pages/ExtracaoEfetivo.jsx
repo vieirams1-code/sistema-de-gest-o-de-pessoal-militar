@@ -42,6 +42,8 @@ import {
 } from '@/utils/postoQuadroCompatibilidade';
 import { exportarRegistrosParaExcel } from '@/utils/indicadosExcelExport';
 import { base44 } from '@/api/base44Client';
+import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
+import { enriquecerMilitaresComFuncoesETags } from '@/utils/funcoesTags/enriquecimentoMilitarFuncoesTags';
 
 const BACKEND_LIMIT = 200;
 const STALE_TIME_MS = 5 * 60 * 1000;
@@ -52,6 +54,7 @@ const DEFAULT_SORT_DIRECTION = 'asc';
 const FERIAS_TODAS_PRESENCAS_VALUE = '__ferias_todas_presencas__';
 const FERIAS_TODOS_STATUS_VALUE = '__ferias_todos_status__';
 const FERIAS_PERIODO_PADRAO = 'proximos_30';
+const TAG_APLICABILIDADE_PERMITIDA = new Set(['militar', 'ambos']);
 
 const POSTO_GRADUACAO_OPTIONS = [
   'Coronel',
@@ -519,6 +522,9 @@ export default function ExtracaoEfetivo() {
   const [statusFilter, setStatusFilter] = useState('Ativo');
   const [situacaoMilitarFilter, setSituacaoMilitarFilter] = useState(TODOS_VALUE);
   const [funcaoFilter, setFuncaoFilter] = useState(TODOS_VALUE);
+  const [funcoesFilters, setFuncoesFilters] = useState([]);
+  const [tagsFilters, setTagsFilters] = useState([]);
+  const [gruposTagsFilters, setGruposTagsFilters] = useState([]);
   const [condicaoFilter, setCondicaoFilter] = useState(TODOS_VALUE);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODOS_VALUE);
   const [feriasPresencaFilter, setFeriasPresencaFilter] = useState(FERIAS_TODAS_PRESENCAS_VALUE);
@@ -638,6 +644,9 @@ export default function ExtracaoEfetivo() {
       status: statusFilter,
       situacaoMilitar: situacaoMilitarFilter,
       funcao: funcaoFilter,
+      funcoesIds: funcoesFilters.map((nome) => funcoesByNome.get(nome)).filter(Boolean),
+      tagsIds: tagsFilters.map((nome) => tagsByNome.get(nome)).filter(Boolean),
+      gruposIds: gruposTagsFilters.map((nome) => gruposByNome.get(nome)).filter(Boolean),
       condicao: condicaoFilter,
       lotacao: lotacaoFilter,
       feriasPresenca: feriasPresencaFilter,
@@ -651,12 +660,18 @@ export default function ExtracaoEfetivo() {
       feriasPresencaFilter,
       feriasStatusFilter,
       funcaoFilter,
+      funcoesFilters,
+      tagsFilters,
+      gruposTagsFilters,
       lotacaoFilter,
       postoFilters,
       quadroFilters,
       searchTerm,
       situacaoMilitarFilter,
       statusFilter,
+      funcoesByNome,
+      tagsByNome,
+      gruposByNome,
     ],
   );
 
@@ -733,10 +748,42 @@ export default function ExtracaoEfetivo() {
     return indexed;
   }, [feriasBundleData]);
 
+  const militaresIds = useMemo(() => militares.map((m) => String(m?.id || '').trim()).filter(Boolean), [militares]);
+  const [funcoesTagsBundle, setFuncoesTagsBundle] = useState({ funcoesAtivas: [], vinculosFuncoesAtivos: [], tagsAtivas: [], gruposTagsAtivos: [], vinculosTagsAtivos: [] });
+  const funcoesByNome = useMemo(() => new Map(funcoesTagsBundle.funcoesAtivas.map((f) => [String(f?.nome || '').trim(), String(f?.id || '').trim()])), [funcoesTagsBundle.funcoesAtivas]);
+  const tagsByNome = useMemo(() => new Map(funcoesTagsBundle.tagsAtivas.map((t) => [String(t?.nome || '').trim(), String(t?.id || '').trim()])), [funcoesTagsBundle.tagsAtivas]);
+  const gruposByNome = useMemo(() => new Map(funcoesTagsBundle.gruposTagsAtivos.map((g) => [String(g?.nome || '').trim(), String(g?.id || '').trim()])), [funcoesTagsBundle.gruposTagsAtivos]);
+  useEffect(() => {
+    let ativo = true;
+    async function carregar() {
+      if (!hasExecutedExtraction || militaresIds.length === 0) {
+        if (ativo) setFuncoesTagsBundle({ funcoesAtivas: [], vinculosFuncoesAtivos: [], tagsAtivas: [], gruposTagsAtivos: [], vinculosTagsAtivos: [] });
+        return;
+      }
+      const [funcoesAtivas, tagsRaw, gruposTagsAtivos, vinculosFuncoesLotes, vinculosTagsLotes] = await Promise.all([
+        base44.entities.FuncaoMilitar?.filter?.({ status: 'ativa' }).catch(() => []) ?? [],
+        base44.entities.Tag?.filter?.({ status: 'ativa' }).catch(() => []) ?? [],
+        base44.entities.TagGrupo?.filter?.({ status: 'ativa' }).catch(() => []) ?? [],
+        Promise.all(militaresIds.map((id) => base44.entities.MilitarFuncao?.filter?.({ militar_id: id, status: 'ativa' }).catch(() => []) ?? [])),
+        Promise.all(militaresIds.map((id) => base44.entities.MilitarTag?.filter?.({ militar_id: id, status: 'ativa' }).catch(() => []) ?? [])),
+      ]);
+      const tagsAtivas = tagsRaw.filter((tag) => TAG_APLICABILIDADE_PERMITIDA.has(normalizeText(tag?.aplicabilidade)));
+      if (ativo) setFuncoesTagsBundle({
+        funcoesAtivas,
+        tagsAtivas,
+        gruposTagsAtivos,
+        vinculosFuncoesAtivos: vinculosFuncoesLotes.flat(),
+        vinculosTagsAtivos: vinculosTagsLotes.flat(),
+      });
+    }
+    carregar();
+    return () => { ativo = false; };
+  }, [hasExecutedExtraction, militaresIds]);
+
   const militaresComFeriasAgregadas = useMemo(() => {
     const periodoValue = filtrosExecutados?.feriasPeriodo || FERIAS_PERIODO_PADRAO;
 
-    return militares.map((militar) => {
+    const baseComFerias = militares.map((militar) => {
       const militarId = String(militar?.id || '').trim();
       const feriasRelacionadas = militarId ? feriasByMilitarId.get(militarId) || [] : [];
 
@@ -745,7 +792,11 @@ export default function ExtracaoEfetivo() {
         ...buildFeriasResumo(feriasRelacionadas, periodoValue),
       };
     });
-  }, [feriasByMilitarId, filtrosExecutados?.feriasPeriodo, militares]);
+    return enriquecerMilitaresComFuncoesETags({
+      militares: baseComFerias,
+      ...funcoesTagsBundle,
+    });
+  }, [feriasByMilitarId, filtrosExecutados?.feriasPeriodo, militares, funcoesTagsBundle]);
 
   const postosDisponiveis = useMemo(
     () =>
@@ -806,6 +857,14 @@ export default function ExtracaoEfetivo() {
     () => uniqueSorted(militaresComFeriasAgregadas.map((militar) => getValorCampoEfetivo(militar, 'funcao'))),
     [militaresComFeriasAgregadas],
   );
+  const tagsDisponiveis = useMemo(
+    () => uniqueSorted(funcoesTagsBundle.tagsAtivas.map((tag) => String(tag?.nome || '').trim())),
+    [funcoesTagsBundle.tagsAtivas],
+  );
+  const gruposTagsDisponiveis = useMemo(
+    () => uniqueSorted(funcoesTagsBundle.gruposTagsAtivos.map((grupo) => String(grupo?.nome || '').trim())),
+    [funcoesTagsBundle.gruposTagsAtivos],
+  );
 
   const condicoesDisponiveis = useMemo(
     () =>
@@ -836,7 +895,13 @@ export default function ExtracaoEfetivo() {
     hasExecutedExtraction && JSON.stringify(filtrosAtuais) !== JSON.stringify(filtrosExecutados);
 
   const filteredMilitares = useMemo(() => {
-    return militaresComFeriasAgregadas.filter((militar) => {
+    return filtrarMilitaresPorFuncoesETags({
+      militares: militaresComFeriasAgregadas,
+      filtros: { funcoesIds: filtrosExecutados?.funcoesIds, tagsIds: filtrosExecutados?.tagsIds, gruposIds: filtrosExecutados?.gruposIds },
+      vinculosFuncoesAtivos: funcoesTagsBundle.vinculosFuncoesAtivos,
+      vinculosTagsAtivos: funcoesTagsBundle.vinculosTagsAtivos,
+      tagsAtivas: funcoesTagsBundle.tagsAtivas,
+    }).filter((militar) => {
       const posto = getValorCampoEfetivo(militar, 'posto_graduacao');
       const quadroNormalizado = normalizarQuadroLegado(getQuadroEfetivo(militar));
       const status = getValorCampoEfetivo(militar, 'status_cadastro');
@@ -892,7 +957,7 @@ export default function ExtracaoEfetivo() {
 
       return true;
     });
-  }, [filtrosExecutados, militaresComFeriasAgregadas, normalizedExecutedSearch]);
+  }, [filtrosExecutados, militaresComFeriasAgregadas, normalizedExecutedSearch, funcoesTagsBundle]);
 
   const sortedMilitares = useMemo(() => {
     const sortField = EXTRACAO_EFETIVO_FIELDS[sortConfig.fieldId];
@@ -1363,6 +1428,9 @@ export default function ExtracaoEfetivo() {
             statusFilter,
             situacaoMilitarFilter,
             funcaoFilter,
+            funcoesFilters,
+            tagsFilters,
+            gruposTagsFilters,
             condicaoFilter,
             lotacaoFilter,
             feriasPresencaFilter,
@@ -1377,6 +1445,9 @@ export default function ExtracaoEfetivo() {
             setStatusFilter,
             setSituacaoMilitarFilter,
             setFuncaoFilter,
+            setFuncoesFilters,
+            setTagsFilters,
+            setGruposTagsFilters,
             setCondicaoFilter,
             setLotacaoFilter,
             setFeriasPresencaFilter,
@@ -1390,6 +1461,8 @@ export default function ExtracaoEfetivo() {
             quadrosDisponiveis: quadrosCompativeisDisponiveis,
             situacoesMilitaresDisponiveis,
             funcoesDisponiveis,
+            tagsDisponiveis,
+            gruposTagsDisponiveis,
             condicoesDisponiveis,
             lotacoesDisponiveis,
             feriasPresencaOptions: FERIAS_PRESENCA_OPTIONS,

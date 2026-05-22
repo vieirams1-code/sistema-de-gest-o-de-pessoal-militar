@@ -134,6 +134,9 @@ function buildListagemTokens({
   statusFilter,
   situacaoMilitarFilter,
   funcaoFilter,
+  funcoesFilters = [],
+  tagsFilters = [],
+  gruposTagsFilters = [],
   condicaoFilter,
   lotacaoFilter,
   feriasPresencaFilter,
@@ -168,6 +171,9 @@ function buildListagemTokens({
     tokens.push(makeListagemToken('situacaoMilitar', 'Situação militar', situacaoMilitarFilter));
   }
   if (funcaoFilter !== todosValue) tokens.push(makeListagemToken('funcao', 'Função', funcaoFilter));
+  if (funcoesFilters?.length) tokens.push(makeListagemToken('funcoes', 'Funções', summarizeList(funcoesFilters, '')));
+  if (tagsFilters?.length) tokens.push(makeListagemToken('tags', 'Tags', summarizeList(tagsFilters, '')));
+  if (gruposTagsFilters?.length) tokens.push(makeListagemToken('grupos_tags', 'Grupos de tags', summarizeList(gruposTagsFilters, '')));
   if (condicaoFilter !== todosValue) tokens.push(makeListagemToken('condicao', 'Condição', condicaoFilter));
 
   const lotacaoLabel = getLotacaoLabel({ lotacaoFilter, lotacoesDisponiveis, todosValue, semLotacaoValue });
@@ -382,6 +388,9 @@ export default function CommandCenter({
     statusFilter,
     situacaoMilitarFilter,
     funcaoFilter,
+    funcoesFilters = [],
+    tagsFilters = [],
+    gruposTagsFilters = [],
     condicaoFilter,
     lotacaoFilter,
     feriasPresencaFilter,
@@ -397,6 +406,9 @@ export default function CommandCenter({
     setStatusFilter,
     setSituacaoMilitarFilter,
     setFuncaoFilter,
+    setFuncoesFilters,
+    setTagsFilters,
+    setGruposTagsFilters,
     setCondicaoFilter,
     setLotacaoFilter,
     setFeriasPresencaFilter,
@@ -411,6 +423,8 @@ export default function CommandCenter({
     quadrosDisponiveis,
     situacoesMilitaresDisponiveis,
     funcoesDisponiveis,
+    tagsDisponiveis,
+    gruposTagsDisponiveis,
     condicoesDisponiveis,
     lotacoesDisponiveis,
     feriasPresencaOptions,
@@ -708,6 +722,33 @@ export default function CommandCenter({
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="md:col-span-2">
+                  <ChecklistMultiSelect
+                    label="Funções (catálogo)"
+                    triggerLabel={summarizeList(funcoesFilters, 'Todas as funções')}
+                    options={funcoesDisponiveis}
+                    selectedValues={funcoesFilters}
+                    onChange={setFuncoesFilters}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <ChecklistMultiSelect
+                    label="Tags"
+                    triggerLabel={summarizeList(tagsFilters, 'Todas as tags')}
+                    options={tagsDisponiveis}
+                    selectedValues={tagsFilters}
+                    onChange={setTagsFilters}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <ChecklistMultiSelect
+                    label="Grupos de tags"
+                    triggerLabel={summarizeList(gruposTagsFilters, 'Todos os grupos')}
+                    options={gruposTagsDisponiveis}
+                    selectedValues={gruposTagsFilters}
+                    onChange={setGruposTagsFilters}
+                  />
+                </div>
                 {shouldShowLotacaoFilter && (
                   <div className="md:col-span-2">
                     <Select
