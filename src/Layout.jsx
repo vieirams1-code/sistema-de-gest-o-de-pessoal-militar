@@ -87,6 +87,7 @@ const menuGroups = [
           },
           { name: 'Folha Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
           { name: 'Registros Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
+          { name: 'Tags', page: 'Configuracoes', icon: Pin, tab: 'tags', anyOf: [{ type: 'module', key: 'adicoes_personalizacoes' }, { type: 'action', key: 'gerir_adicoes_personalizacoes' }] },
         ],
       },
       {

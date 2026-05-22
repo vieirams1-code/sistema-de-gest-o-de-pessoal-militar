@@ -171,7 +171,7 @@ export default function Configuracoes() {
           </div>
 
           <TiposPublicacaoManager />
-          <FuncoesTagsManager canEdit={canAccessAction('gerir_configuracoes')} />
+          <FuncoesTagsManager canEdit={canAccessAction('gerir_configuracoes')} initialTab={['funcoes','grupos','tags'].includes(selectedTab) ? selectedTab : 'funcoes'} />
 
           {podeExecutarReset && (
             <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
