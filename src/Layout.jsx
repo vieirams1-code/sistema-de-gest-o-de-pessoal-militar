@@ -29,7 +29,6 @@ import {
   FileSearch,
   FileUp,
   History,
-  CircleAlert,
   UserCircle2,
   ListOrdered,
 } from 'lucide-react';
@@ -54,7 +53,6 @@ const menuGroups = [
     title: 'Principal',
     items: [
       { name: 'Dashboard', page: 'Home', icon: Home, viewPermission: 'visualizar_militares' },
-      { name: 'Central de Pendências', page: 'CentralPendencias', icon: CircleAlert, actionKey: 'visualizar_central_pendencias' },
     ],
   },
   {
@@ -107,7 +105,6 @@ const menuGroups = [
       },
       { name: 'Folha de Alterações', page: 'FolhaAlteracoes', icon: FileSpreadsheet, viewPermission: 'visualizar_folha_alteracoes' },
       { name: 'Registros do Militar', page: 'RegistrosMilitar', icon: ScrollText, viewPermission: 'visualizar_registros_militar' },
-      { name: 'Procedimentos e Processos', page: 'ProcedimentosProcessos', icon: ClipboardList, actionKey: 'visualizar_procedimentos_processos' },
     ],
   },
   {
@@ -159,11 +156,8 @@ const menuGroups = [
           { type: 'action', key: 'visualizar_rastreamento_promocoes' },
         ],
         children: [
-          { name: 'Diagnóstico', page: 'AntiguidadeDiagnostico', icon: ClipboardList, adminOnly: true },
           { name: 'Configuração de Quadros', page: 'AntiguidadeConfigQuadros', icon: ListOrdered, adminOnly: true, moduleKey: 'antiguidade' },
-          { name: 'Importar Promoções', page: 'AntiguidadeImportarPromocoes', icon: ScrollText, adminOnly: true },
           { name: 'Prévia Geral', page: 'AntiguidadePrevia', icon: ListOrdered, adminOnly: true },
-          { name: 'Rastreamento de Promoções', page: 'RastreamentoPromocoes', icon: FileSearch, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
           { name: 'Promoções', page: 'Promocoes', icon: ListOrdered, moduleKey: 'antiguidade', actionKey: 'visualizar_rastreamento_promocoes' },
         ],
       },
@@ -184,7 +178,6 @@ const menuGroups = [
 const adminMenuGroup = {
   title: 'ADMIN',
   items: [
-    { name: 'Centro Administrativo', page: 'CentroAdministrativo', icon: Wrench, adminOnly: true },
     { name: 'Templates de Texto', page: 'TemplatesTexto', icon: ClipboardList, actionKey: 'gerir_templates' },
     {
       name: 'Adições e Personalizações',

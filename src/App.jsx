@@ -29,6 +29,7 @@ const adminOnlyPages = new Set([
   'AntiguidadeImportarPromocoes',
   'AntiguidadePrevia',
   'CentroAdministrativo',
+  'ProcedimentosProcessos',
 ]);
 
 
