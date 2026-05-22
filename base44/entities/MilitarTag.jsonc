@@ -1,0 +1,17 @@
+{
+  "name": "MilitarTag",
+  "type": "object",
+  "title": "Militar x Tag",
+  "description": "Vinculação de tags a militares com controle de ciclo de vida.",
+  "properties": {
+    "militar_id": { "type": "string", "default": "" },
+    "tag_id": { "type": "string", "default": "" },
+    "status": { "type": "string", "enum": ["ativa", "removida"], "default": "ativa" },
+    "data_aplicacao": { "type": "string", "format": "date", "default": "" },
+    "data_remocao": { "type": "string", "format": "date", "default": "" },
+    "motivo": { "type": "string", "default": "" },
+    "created_by": { "type": "string", "default": "" },
+    "updated_by": { "type": "string", "default": "" }
+  },
+  "required": ["militar_id", "tag_id"]
+}

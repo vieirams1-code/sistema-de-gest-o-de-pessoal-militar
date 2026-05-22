@@ -23,3 +23,10 @@ export const ProcedimentoEnvolvido = base44.entities.ProcedimentoEnvolvido;
 export const ProcedimentoPendencia = base44.entities.ProcedimentoPendencia;
 export const ProcedimentoViatura = base44.entities.ProcedimentoViatura;
 export const ProcedimentoPrazoHistorico = base44.entities.ProcedimentoPrazoHistorico;
+
+export const FuncaoMilitar = base44.entities.FuncaoMilitar;
+export const MilitarFuncao = base44.entities.MilitarFuncao;
+export const TagGrupo = base44.entities.TagGrupo;
+export const Tag = base44.entities.Tag;
+export const MilitarTag = base44.entities.MilitarTag;
+export const FeriasTag = base44.entities.FeriasTag;
