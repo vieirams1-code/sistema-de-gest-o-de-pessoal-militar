@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  DEFAULT_WIDGET,
   fetchQuickAccessPreference,
   normalizePinnedItems,
+  normalizeWidgetPreferences,
   saveQuickAccessPreference,
 } from '@/services/quickAccessPreferencesService';
 
 const STORAGE_KEY = 'sgp_sidebar_pins';
+const WIDGET_STORAGE_KEY = 'sgp_quick_access_widget';
 
 function readLocalPins() {
   if (typeof window === 'undefined') return [];
@@ -18,15 +21,33 @@ function readLocalPins() {
   }
 }
 
+function readLocalWidget() {
+  if (typeof window === 'undefined') return DEFAULT_WIDGET;
+  try {
+    const raw = window.localStorage.getItem(WIDGET_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return normalizeWidgetPreferences(parsed);
+  } catch {
+    return DEFAULT_WIDGET;
+  }
+}
+
 export default function useQuickAccessPreferences(userEmail) {
   const [pinnedItems, setPinnedItems] = useState(() => readLocalPins());
+  const [widgetPreferences, setWidgetPreferences] = useState(() => readLocalWidget());
   const [hasLoadedBackend, setHasLoadedBackend] = useState(false);
-  const lastSavedRef = useRef('');
+  const lastSavedPinsRef = useRef('');
+  const lastSavedWidgetRef = useRef('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pinnedItems));
   }, [pinnedItems]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(widgetPreferences));
+  }, [widgetPreferences]);
 
   useEffect(() => {
     let active = true;
@@ -45,8 +66,12 @@ export default function useQuickAccessPreferences(userEmail) {
         if (!active) return;
 
         const backendItems = normalizePinnedItems(preference?.valor_json?.itens_fixados);
+        const backendWidget = normalizeWidgetPreferences(preference?.valor_json?.widget);
         if (backendItems.length > 0 || preference) {
           setPinnedItems(backendItems);
+        }
+        if (preference) {
+          setWidgetPreferences(backendWidget);
         }
       } catch {
         // Não quebra o widget em erro de backend
@@ -62,21 +87,37 @@ export default function useQuickAccessPreferences(userEmail) {
     };
   }, [userEmail]);
 
-  const persistPinnedItems = useMemo(() => async (nextPinnedItems) => {
+  const persistPinnedItems = useCallback(async (nextPinnedItems) => {
     const email = String(userEmail || '').trim().toLowerCase();
     if (!email) return;
 
     const normalized = normalizePinnedItems(nextPinnedItems);
     const serialized = JSON.stringify(normalized);
-    if (serialized === lastSavedRef.current) return;
+    if (serialized === lastSavedPinsRef.current) return;
 
     try {
       await saveQuickAccessPreference({ userEmail: email, itensFixados: normalized });
-      lastSavedRef.current = serialized;
+      lastSavedPinsRef.current = serialized;
     } catch {
       // erro silencioso para não interromper interação
     }
   }, [userEmail]);
+
+  const persistWidgetPreferences = useCallback(async (nextWidget) => {
+    const email = String(userEmail || '').trim().toLowerCase();
+    if (!email) return;
+
+    const normalizedWidget = normalizeWidgetPreferences(nextWidget);
+    const serialized = JSON.stringify(normalizedWidget);
+    if (serialized === lastSavedWidgetRef.current) return;
+
+    try {
+      await saveQuickAccessPreference({ userEmail: email, itensFixados: pinnedItems, widget: normalizedWidget });
+      lastSavedWidgetRef.current = serialized;
+    } catch {
+      // erro silencioso para não interromper interação
+    }
+  }, [pinnedItems, userEmail]);
 
   const togglePin = (item) => {
     const normalizedTab = item?.tab || null;
@@ -94,9 +135,19 @@ export default function useQuickAccessPreferences(userEmail) {
     });
   };
 
+  const updateWidgetPreferences = useCallback((nextWidget) => {
+    setWidgetPreferences((prev) => {
+      const resolved = normalizeWidgetPreferences(typeof nextWidget === 'function' ? nextWidget(prev) : nextWidget);
+      void persistWidgetPreferences(resolved);
+      return resolved;
+    });
+  }, [persistWidgetPreferences]);
+
   return {
     pinnedItems,
     togglePin,
     hasLoadedBackend,
+    widgetPreferences,
+    updateWidgetPreferences,
   };
 }

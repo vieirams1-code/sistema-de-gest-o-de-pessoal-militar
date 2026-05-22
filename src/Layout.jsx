@@ -39,6 +39,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
 import useQuickAccessPreferences from '@/hooks/useQuickAccessPreferences';
+import { DEFAULT_WIDGET } from '@/services/quickAccessPreferencesService';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
 import QuickAccessWidget from '@/components/layout/QuickAccessWidget';
 import SgpThemeModeMount from '@/themes/sgpThemeModes/SgpThemeModeMount';
@@ -213,6 +214,8 @@ export default function Layout({ children, currentPageName }) {
   const {
     pinnedItems,
     togglePin,
+    widgetPreferences,
+    updateWidgetPreferences,
   } = useQuickAccessPreferences(userEmail);
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
   const temPermissao = (actionKey) => canAccessAction(actionKey);
@@ -509,6 +512,9 @@ export default function Layout({ children, currentPageName }) {
       <QuickAccessWidget
         items={pinnedVisibleItems}
         getPinKey={getPinKey}
+        widgetPreferences={widgetPreferences}
+        onWidgetChange={updateWidgetPreferences}
+        defaultWidget={DEFAULT_WIDGET}
         createHref={(item) => {
           const baseHref = item.path || createPageUrl(item.page);
           return item.tab ? `${baseHref}?tab=${item.tab}` : baseHref;
