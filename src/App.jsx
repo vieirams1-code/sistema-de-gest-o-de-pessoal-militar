@@ -40,7 +40,6 @@ const moduleGuardByPage = {
   ControleAtestadosTemporarios: { moduleKey: 'controle_atestados_temporarios', actionKey: 'visualizar_controle_atestados_temporarios', moduleName: 'Controle de Atestados' },
   Ferias: { moduleKey: 'ferias', moduleName: 'Férias' },
   Militares: { moduleKey: 'militares', moduleName: 'Efetivo' },
-  ExtracaoEfetivo: { moduleKey: 'extracao_efetivo', actionKey: 'visualizar_extracao_efetivo', moduleName: 'Extração do Efetivo' },
   VisualizacaoGestorEfetivo: { moduleKey: 'militares', actionKey: 'visualizar_militares', moduleName: 'Efetivo' },
   ContratosDesignacao: { moduleKey: 'militares', actionKeys: ['visualizar_contratos_designacao', 'gerir_contratos_designacao'], moduleName: 'Contratos de Designação' },
   Armamentos: { moduleKey: 'armamentos', moduleName: 'Armamentos' },

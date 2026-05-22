@@ -48,6 +48,7 @@ import EfetivoFuncoesTagsCompactas from '@/components/militar/EfetivoFuncoesTags
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import { criarMilitarTagEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados, resumirResultadoBulk } from '@/utils/funcoesTags/militarTagsBulk';
+import { CONSULTA_MILITAR_COLUNAS_ALLOWLIST } from '@/pages/consultaMilitar/consultaMilitarColumns';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -208,6 +209,7 @@ export default function Militares() {
   const [militaresAcumulados, setMilitaresAcumulados] = useState([]);
   const [selectedMilitarIds, setSelectedMilitarIds] = useState(new Set());
   const [bulkPanelMode, setBulkPanelMode] = useState(null);
+  const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -592,6 +594,9 @@ export default function Militares() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setColumnsDialogOpen(true)}>
+              Colunas
+            </Button>
             {canAccessAction('adicionar_militares') && (
               <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-5 h-5 mr-2" />Novo Militar
@@ -992,6 +997,27 @@ export default function Militares() {
             <AlertDialogAction onClick={() => militarToDelete && deleteMutation.mutate(militarToDelete.id)} className="bg-red-600 hover:bg-red-700">
               Excluir
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={columnsDialogOpen} onOpenChange={setColumnsDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Colunas da Consulta Militar</AlertDialogTitle>
+            <AlertDialogDescription>
+              Base inicial preparada para personalização de colunas (Lote 1). A tabela segue com as colunas atuais.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-64 overflow-auto rounded-md border border-slate-200 p-3 text-sm text-slate-700">
+            <ul className="list-disc pl-5 space-y-1">
+              {CONSULTA_MILITAR_COLUNAS_ALLOWLIST.map((coluna) => (
+                <li key={coluna.key}>{coluna.label}</li>
+              ))}
+            </ul>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogAction>Fechar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

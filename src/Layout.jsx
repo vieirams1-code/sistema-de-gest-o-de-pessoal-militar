@@ -26,7 +26,6 @@ import {
   GitBranch,
   BookMarked,
   FileSpreadsheet,
-  FileSearch,
   FileUp,
   History,
   UserCircle2,
@@ -72,10 +71,9 @@ const menuGroups = [
       {
         title: 'Efetivo',
         icon: Users,
-        description: 'Consulta, extração e vínculos funcionais',
+        description: 'Consulta e vínculos funcionais',
         items: [
           { name: 'Consulta Militar', page: 'Militares', icon: Users, moduleKey: 'militares', actionKey: 'visualizar_militares' },
-          { name: 'Extração', page: 'ExtracaoEfetivo', icon: FileSearch, moduleKey: 'extracao_efetivo', actionKey: 'visualizar_extracao_efetivo' },
           { name: 'Visão Gestor', page: 'VisualizacaoGestorEfetivo', icon: GitBranch, moduleKey: 'militares', actionKey: 'visualizar_militares' },
           {
             name: 'Contratos',
