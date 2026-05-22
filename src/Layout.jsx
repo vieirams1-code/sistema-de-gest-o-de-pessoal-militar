@@ -32,7 +32,6 @@ import {
   UserCircle2,
   ListOrdered,
   PanelLeftClose,
-  PanelLeftOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -306,23 +305,23 @@ export default function Layout({ children, currentPageName }) {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        <div className="border-b border-white/10 px-4 py-4 shrink-0">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="rounded-2xl border border-white/20 p-2 bg-white/5 shrink-0">
-                <Shield className="w-6 h-6 text-blue-300" />
-              </div>
-              {!compactSidebar && (
+        <div className="border-b border-white/10 px-3 py-3 shrink-0">
+          <div className={`${compactSidebar ? 'flex justify-center' : 'flex items-center justify-between gap-3'}`}>
+            {!compactSidebar && (
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="rounded-2xl border border-white/20 p-2 bg-white/5 shrink-0">
+                  <Shield className="w-6 h-6 text-blue-300" />
+                </div>
                 <div className="min-w-0">
                   <span className="font-bold text-lg block leading-tight">SGP Militar</span>
                   <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Sistema de Gestão de Pessoal</span>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="flex items-center gap-1">
+            <div className={`flex items-center ${compactSidebar ? 'justify-center' : 'gap-1'}`}>
               <Button variant="ghost" size="icon" onClick={() => setCompactSidebar((prev) => !prev)} className="hidden lg:flex text-white hover:bg-white/10 shrink-0">
-                {compactSidebar ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+                {compactSidebar ? <Menu className="w-5 h-5" /> : <PanelLeftClose className="w-4 h-4" />}
               </Button>
               <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} className="lg:hidden text-white hover:bg-white/10 shrink-0">
                 <X className="w-5 h-5" />
@@ -332,11 +331,12 @@ export default function Layout({ children, currentPageName }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2.5 py-4 custom-scrollbar">
-          <div className="space-y-6">
+          <div className={`${compactSidebar ? 'space-y-3' : 'space-y-6'}`}>
             {visibleMenuGroups.map((group) => (
               <div key={group.title}>
                 {!compactSidebar && <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">{group.title}</p>}
-                <div className="space-y-2">
+                {compactSidebar && <div className="mx-auto mb-2 h-px w-10 bg-white/15" />}
+                <div className={`${compactSidebar ? 'space-y-1.5' : 'space-y-2'}`}>
                   {group.sections.map((section) => {
                     const expanded = expandedSection === section.title;
                     const flyoutOpen = compactSidebar && hoveredSection === section.title;
@@ -350,25 +350,22 @@ export default function Layout({ children, currentPageName }) {
                         onMouseLeave={() => compactSidebar && setHoveredSection(null)}
                       >
                         <button
-                          onClick={() => toggleExpanded(section.title)}
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-all ${sectionHasActive ? 'bg-white/15 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}
+                          onClick={() => !compactSidebar && toggleExpanded(section.title)}
+                          className={`flex w-full items-center ${compactSidebar ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} rounded-xl text-left transition-all ${sectionHasActive ? 'bg-white/15 text-white' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            {SectionIcon ? <SectionIcon className="w-4 h-4 shrink-0 text-blue-300" /> : <span className="h-2 w-2 rounded-full bg-blue-300/90 shrink-0" />}
+                          <div className={`flex items-center min-w-0 ${compactSidebar ? '' : 'gap-3'}`}>
+                            {SectionIcon ? <SectionIcon className={`${compactSidebar ? 'w-5 h-5' : 'w-4 h-4'} shrink-0 text-blue-300`} /> : <span className="h-2 w-2 rounded-full bg-blue-300/90 shrink-0" />}
                             {!compactSidebar && <span className="truncate text-sm font-semibold">{section.title}</span>}
                           </div>
                           {!compactSidebar && (expanded ? <ChevronDown className="w-4 h-4 opacity-60" /> : <ChevronRight className="w-4 h-4 opacity-60" />)}
                         </button>
-                        {!compactSidebar && (
-                          <p className="px-3 mt-1 text-[11px] text-white/45 leading-relaxed">{section.description}</p>
-                        )}
 
                         {(expanded || flyoutOpen) && (
-                          <div className={`${compactSidebar ? 'absolute left-full top-0 ml-2 w-72 rounded-xl border border-white/15 bg-[#173764] p-3 shadow-2xl z-50' : 'mt-1 ml-3 pl-3 border-l border-white/10 space-y-1'}`}>
+                          <div className={`${compactSidebar ? 'absolute left-full top-1/2 ml-3 w-72 -translate-y-1/2 rounded-xl border border-white/15 bg-[#102b4f] p-3 shadow-2xl z-[80] max-h-[80vh] overflow-y-auto' : 'mt-1 ml-3 pl-3 border-l border-white/10 space-y-1'}`}>
                             {compactSidebar && (
                               <>
                                 <p className="text-xs font-semibold mb-1">{section.title}</p>
-                                <p className="text-[11px] text-white/55 mb-2">{section.description}</p>
+                                <div className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-l border-t border-white/15 bg-[#102b4f]" />
                               </>
                             )}
                             <div className="space-y-1">
@@ -381,9 +378,8 @@ export default function Layout({ children, currentPageName }) {
                                     <Link
                                       to={href}
                                       onClick={() => setSidebarOpen(false)}
-                                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] ${active ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}
+                                      className={`flex items-center rounded-lg px-3 py-2 text-[13px] ${active ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}
                                     >
-                                      <span className="text-white/60">•</span>
                                       <span className="truncate">{item.name}</span>
                                     </Link>
                                     {hasChildren && item.children.map((child) => {
@@ -395,9 +391,8 @@ export default function Layout({ children, currentPageName }) {
                                           key={child.name}
                                           to={childHref}
                                           onClick={() => setSidebarOpen(false)}
-                                          className={`ml-4 flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] ${childActive ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/8 hover:text-white'}`}
+                                          className={`ml-4 flex items-center rounded-lg px-3 py-2 text-[12px] ${childActive ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/8 hover:text-white'}`}
                                         >
-                                          <span className="text-white/50">•</span>
                                           <span className="truncate">{child.name}</span>
                                         </Link>
                                       );
