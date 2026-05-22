@@ -35,6 +35,7 @@ import { getTemplateAtivoPorTipo, normalizarTipoTemplateLivroFerias } from '@/co
 import { montarPayloadRegistroLivroFerias } from '@/services/feriasMilitarContextService';
 import { TEMPLATE_EDIT_MODE, TEMPLATE_SOURCE_OF_TRUTH } from '@/constants/templateGovernance';
 import { buildTemplateRenderMetadata } from '@/services/templateRenderMetadata';
+import FeriasTagsSection from '@/components/ferias/FeriasTagsSection';
 import {
   calcularTotaisGozoComCreditos,
   formatarTipoCreditoExtra,
@@ -725,6 +726,9 @@ export default function RegistroLivroModal({
               Base: {ferias.dias_base ?? ferias.dias ?? 0}d | Período: {ferias.periodo_aquisitivo_ref || '—'}
             </div>
           </div>
+
+          <FeriasTagsSection ferias={ferias} />
+
 
           {tipoRegistro === 'Saída Férias' && (
             <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
