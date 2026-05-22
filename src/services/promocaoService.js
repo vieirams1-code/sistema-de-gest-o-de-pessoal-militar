@@ -198,6 +198,7 @@ Motivo: promocao.id ausente no frontend`);
     response = await base44.functions.invoke('publicarPromocaoOficial', {
       body: payload,
     });
+    console.log('PAYLOAD_RECEBIDO_BACKEND_FRONTEND', response?.data?.payloadRecebido);
   } catch (error) {
     console.error('[publicarPromocaoOficial][frontend][invoke-error][raw]', error);
     console.error('[publicarPromocaoOficial][frontend][invoke-error][response]', error?.response);
