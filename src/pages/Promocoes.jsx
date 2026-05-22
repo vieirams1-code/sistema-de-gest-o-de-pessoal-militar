@@ -105,11 +105,23 @@ export default function Promocoes() {
       return [];
     },
   });
+  const militaresQuery = useQuery({
+    queryKey: ['promocoes-operacionais-militares'],
+    queryFn: () => base44.entities.Militar.list(),
+  });
 
   const totaisReais = useMemo(() => agruparTotaisReais(historicosQuery.data || []), [historicosQuery.data]);
   const promocoesOrdenadas = useMemo(() => ordenarPromocoes(promocoesQuery.data || []), [promocoesQuery.data]);
-  const isLoading = promocoesQuery.isLoading || historicosQuery.isLoading || promocoesMilitaresQuery.isLoading;
-  const error = promocoesQuery.error || historicosQuery.error || promocoesMilitaresQuery.error;
+  const isLoading = promocoesQuery.isLoading || historicosQuery.isLoading || promocoesMilitaresQuery.isLoading || militaresQuery.isLoading;
+  const error = promocoesQuery.error || historicosQuery.error || promocoesMilitaresQuery.error || militaresQuery.error;
+  const militaresById = useMemo(() => {
+    return (militaresQuery.data || []).reduce((acc, militar) => {
+      const id = String(militar?.id || '').trim();
+      if (!id) return acc;
+      acc[id] = militar;
+      return acc;
+    }, {});
+  }, [militaresQuery.data]);
 
   const militaresPorPromocao = useMemo(() => {
     const mapaPromocaoMilitar = {};
@@ -117,7 +129,10 @@ export default function Promocoes() {
       const id = String(registro?.promocao_id || '').trim();
       if (!id) return;
       if (!mapaPromocaoMilitar[id]) mapaPromocaoMilitar[id] = [];
-      mapaPromocaoMilitar[id].push(registro);
+      mapaPromocaoMilitar[id].push({
+        ...registro,
+        militar: militaresById[String(registro?.militar_id || '').trim()],
+      });
     });
 
     const mapaHistorico = {};
@@ -135,7 +150,7 @@ export default function Promocoes() {
     });
 
     return resultado;
-  }, [historicosQuery.data, promocoesMilitaresQuery.data]);
+  }, [historicosQuery.data, militaresById, promocoesMilitaresQuery.data]);
 
   const promocoesFiltradas = useMemo(() => {
     return promocoesOrdenadas.filter((promocao) => {
@@ -223,6 +238,7 @@ export default function Promocoes() {
               promocoesQuery.refetch();
               historicosQuery.refetch();
               promocoesMilitaresQuery.refetch();
+              militaresQuery.refetch();
             }}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -340,13 +356,23 @@ export default function Promocoes() {
 
             <div>
               <h3 className="font-semibold mb-3">Militares vinculados ({(militaresPorPromocao[promocaoAtiva?.id] || []).length})</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-3">
                 {(militaresPorPromocao[promocaoAtiva?.id] || []).map((militar, idx) => (
-                  <div key={`${militar.id || idx}`} className="rounded-xl border border-[#E5E7EB] p-3 hover:bg-slate-50 cursor-pointer">
-                    <p className="font-medium text-sm">{valorOuTraco(militar.nome_completo || militar.militar_nome || militar.nome)}</p>
-                    <p className="text-xs text-slate-500 mt-1">{valorOuTraco(militar.matricula || militar.militar_matricula)}</p>
-                    <p className="text-xs text-slate-600 mt-1">{valorOuTraco(militar.posto_graduacao || militar.posto_atual)} • {valorOuTraco(militar.quadro || militar.quadro_sigla)}</p>
-                    <Button type="button" variant="outline" size="sm" className="mt-3 h-8 rounded-lg text-xs">Abrir ficha</Button>
+                  <div key={`${militar.id || idx}`} className="rounded-xl border border-[#E5E7EB] bg-white shadow-sm px-3 py-4 min-h-[120px] flex flex-col justify-between cursor-pointer transition-all duration-200 hover:border-slate-300 hover:shadow-md">
+                    <p className="font-semibold text-sm leading-snug">{valorOuTraco(militar.militar?.nome_completo || militar.nome_completo || militar.militar_nome || militar.nome)}</p>
+                    <p className="text-xs text-slate-600 mt-1 break-words">
+                      {valorOuTraco(militar.militar?.matricula || militar.matricula || militar.militar_matricula)}
+                      {' • '}
+                      {valorOuTraco(militar.militar?.posto_graduacao || militar.posto_graduacao || militar.posto_atual)}
+                      {' • '}
+                      {valorOuTraco(militar.militar?.quadro || militar.quadro || militar.quadro_sigla)}
+                    </p>
+                    <Button type="button" variant="outline" size="sm" className="mt-3 h-8 w-fit rounded-lg px-3 text-[12px] font-medium" asChild>
+                      <Link to={`${createPageUrl('VerMilitar')}?id=${militar.militar?.id || militar.militar_id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5">
+                        <Eye className="h-3.5 w-3.5" />
+                        Abrir ficha
+                      </Link>
+                    </Button>
                   </div>
                 ))}
               </div>
