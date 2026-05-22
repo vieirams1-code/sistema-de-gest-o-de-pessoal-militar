@@ -315,7 +315,6 @@ export default function Layout({ children, currentPageName }) {
                 <div className="min-w-0">
                   <span className="font-bold text-lg block leading-tight">SGP Militar</span>
                   <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Sistema de Gestão de Pessoal</span>
-                  <span className="text-[10px] text-yellow-300 font-bold tracking-wide">MENU UX V2 ATIVO</span>
                 </div>
               </div>
             )}
@@ -331,7 +330,9 @@ export default function Layout({ children, currentPageName }) {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2.5 py-4 custom-scrollbar">
+        <nav
+          className={`flex-1 px-2.5 py-4 custom-scrollbar ${compactSidebar ? 'overflow-visible' : 'overflow-y-auto'}`}
+        >
           <div className={`${compactSidebar ? 'space-y-3' : 'space-y-6'}`}>
             {visibleMenuGroups.map((group) => (
               <div key={group.title}>
@@ -362,11 +363,14 @@ export default function Layout({ children, currentPageName }) {
                         </button>
 
                         {(expanded || flyoutOpen) && (
-                          <div className={`${compactSidebar ? 'absolute left-full top-1/2 ml-3 w-72 -translate-y-1/2 rounded-xl border border-white/15 bg-[#102b4f] p-3 shadow-2xl z-[80] max-h-[80vh] overflow-y-auto' : 'mt-1 ml-3 pl-3 border-l border-white/10 space-y-1'}`}>
+                          <div
+                          className={`${compactSidebar ? 'absolute left-full top-0 ml-3 w-72 rounded-xl border border-white/15 bg-[#102b4f] p-3 shadow-2xl z-[120] max-h-[80vh] overflow-y-auto' : 'mt-1 ml-3 pl-3 border-l border-white/10 space-y-1'}`}
+                        >
                             {compactSidebar && (
                               <>
                                 <p className="text-xs font-semibold mb-1">{section.title}</p>
-                                <div className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-l border-t border-white/15 bg-[#102b4f]" />
+                                <div className="absolute -left-2 top-0 h-full w-2" />
+                                <div className="absolute -left-1 top-5 h-2.5 w-2.5 rotate-45 border-l border-t border-white/15 bg-[#102b4f]" />
                               </>
                             )}
                             <div className="space-y-1">
