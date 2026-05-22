@@ -46,13 +46,38 @@ function validarEntrada(promocao_id: unknown, promocao: any, itens: any[], temAl
   return null;
 }
 
+async function parseBase44Payload(req: any) {
+  const candidatos = [];
+
+  candidatos.push(req?.body);
+  candidatos.push(req?.body?.data);
+  candidatos.push(req?.data);
+  candidatos.push(req?.payload);
+
+  try {
+    if (typeof req?.json === 'function') {
+      candidatos.push(await req.json());
+    }
+  } catch (_) {}
+
+  for (const c of candidatos) {
+    if (c && typeof c === 'object') {
+      if (c.promocao_id || c.promocaoId || c.promocao?.id) return c;
+      if (c.data && typeof c.data === 'object') return c.data;
+      if (c.body && typeof c.body === 'object') return c.body;
+    }
+  }
+
+  return {};
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
-  const body = await req.json().catch(() => ({}));
 
   try {
     const input = (globalThis as any)?.input;
-    const payload = body ?? input ?? {};
+    const parsedPayload = await parseBase44Payload(req);
+    const payload = parsedPayload ?? input ?? {};
 
     console.error(
       'PAYLOAD_RECEBIDO_BACKEND',
@@ -61,11 +86,24 @@ Deno.serve(async (req) => {
     console.error('PAYLOAD_TIPO_BACKEND', typeof payload);
     console.error('PAYLOAD_KEYS_BACKEND', Object.keys(payload || {}));
 
-    const promocao_id = body?.promocao_id;
-    const promocao = body?.promocao || {};
-    const itens = Array.isArray(body?.itens) ? body.itens : [];
-    const temAlteracoesPendentes = Boolean(body?.temAlteracoesPendentes);
-    const promocaoId = texto(promocao_id) || texto(promocao?.id) || null;
+    const promocaoId =
+      payload?.promocao_id ||
+      payload?.promocaoId ||
+      payload?.promocao?.id ||
+      payload?.data?.promocao_id ||
+      payload?.data?.promocaoId ||
+      payload?.data?.promocao?.id;
+    const promocao_id = promocaoId;
+    const promocao = payload?.promocao || payload?.data?.promocao || {};
+    const itens = Array.isArray(payload?.itens) ? payload.itens : Array.isArray(payload?.data?.itens) ? payload.data.itens : [];
+    const temAlteracoesPendentes = Boolean(payload?.temAlteracoesPendentes ?? payload?.data?.temAlteracoesPendentes);
+
+    console.error('PAYLOAD_NORMALIZADO_PUBLICAR_PROMOCAO', {
+      keys: Object.keys(payload || {}),
+      promocaoId,
+      hasPromocao: Boolean(payload?.promocao),
+      hasItens: Array.isArray(payload?.itens),
+    });
 
     console.error(
       'PROMOCAO_ITENS_RECEBIDOS',
@@ -185,7 +223,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!promocaoId) throw montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente', payloadRecebido: body });
+    if (!promocaoId) throw montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente', payloadRecebido: payload });
     await Promocao.update(promocaoId, { status: errors.length > 0 ? 'rascunho' : 'publicada' });
 
     console.error('PUBLICACAO_RESULTADO', {
@@ -197,7 +235,7 @@ Deno.serve(async (req) => {
 
     return Response.json({ success: errors.length === 0, etapa: errors.length > 0 ? 'processar_item' : null, motivo: errors.length > 0 ? 'falha_parcial_itens' : null, publicados, militar_ids_afetados: Array.from(militarIdsAfetados), historicos, warnings, errors });
   } catch (error: any) {
-    const erroInterno = montarErro({ etapa: 'erro_interno', motivo: error?.motivo || error?.message || 'erro_interno_publicacao', payloadRecebido: body });
+    const erroInterno = montarErro({ etapa: 'erro_interno', motivo: error?.motivo || error?.message || 'erro_interno_publicacao', payloadRecebido: null });
     return Response.json({ ...erroInterno, publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [{ ...erroInterno, message: erroInterno.motivo }] }, { status: 500 });
   }
 });
