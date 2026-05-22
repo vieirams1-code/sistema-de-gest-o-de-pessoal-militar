@@ -9,7 +9,7 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-export default function QuickAccessWidget({ items, getPinKey, createHref, widgetPreferences, onWidgetChange, defaultWidget }) {
+export default function QuickAccessWidget({ items, getPinKey, createHref, widgetPreferences, onWidgetChange, defaultWidget, sidebarFlyoutOpen = false }) {
   const containerRef = React.useRef(null);
   const dragState = React.useRef({ pointerId: null, offsetX: 0, offsetY: 0, dragging: false });
 
@@ -106,7 +106,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
       <button
         type="button"
         onClick={() => persistState({ minimized: false })}
-        className="fixed z-[200] flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 text-slate-700 shadow-xl backdrop-blur transition-colors hover:bg-slate-100 hover:text-slate-900"
+        className={`fixed ${sidebarFlyoutOpen ? 'z-[100]' : 'z-[200]'} flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 text-slate-700 shadow-xl backdrop-blur transition-colors hover:bg-slate-100 hover:text-slate-900`}
         style={baseStyle}
         aria-label={`Expandir acesso rápido (${items.length} favoritos)`}
         title="Expandir acesso rápido"
@@ -123,7 +123,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
   return (
     <div
       ref={containerRef}
-      className="fixed z-[200] rounded-xl border border-slate-200 bg-white shadow-xl"
+      className={`fixed ${sidebarFlyoutOpen ? 'z-[100]' : 'z-[200]'} rounded-xl border border-slate-200 bg-white shadow-xl`}
       style={baseStyle}
     >
       <div
@@ -138,16 +138,16 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
           <p className="text-xs font-semibold">Acesso rápido</p>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => persistState({ orientacao: isHorizontal ? 'vertical' : 'horizontal' })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar orientação" aria-label="Alternar orientação">
+          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => persistState({ orientacao: isHorizontal ? 'vertical' : 'horizontal' })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar orientação" aria-label="Alternar orientação">
             {isHorizontal ? <Rows3 className="h-3.5 w-3.5" /> : <Rows2 className="h-3.5 w-3.5" />}
           </button>
-          <button type="button" onClick={() => persistState({ densidade: isCompact ? 'expanded' : 'compact' })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar densidade" aria-label="Alternar densidade">
+          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => persistState({ densidade: isCompact ? 'expanded' : 'compact' })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar densidade" aria-label="Alternar densidade">
             {isCompact ? <Text className="h-3.5 w-3.5" /> : <Type className="h-3.5 w-3.5" />}
           </button>
-          <button type="button" onClick={resetPosition} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Resetar posição" aria-label="Resetar posição">
+          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={resetPosition} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Resetar posição" aria-label="Resetar posição">
             <RefreshCcw className="h-3.5 w-3.5" />
           </button>
-          <button type="button" onClick={() => persistState({ minimized: true })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Minimizar" aria-label="Minimizar acesso rápido">
+          <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={() => persistState({ minimized: true })} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Minimizar" aria-label="Minimizar acesso rápido">
             <Minimize2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -160,6 +160,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
             <Link
               key={getPinKey(item)}
               to={createHref(item)}
+              onPointerDown={(event) => event.stopPropagation()}
               className={`flex shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 ${isCompact ? 'justify-center' : ''}`}
               title={item.name}
               aria-label={item.name}

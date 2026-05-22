@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -201,6 +201,7 @@ export default function Layout({ children, currentPageName }) {
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [expandedSection, setExpandedSection] = useState('');
   const [hoveredSection, setHoveredSection] = useState(null);
+  const hoverCloseTimeoutRef = useRef(null);
   const {
     isAdmin,
     canAccessModule,
@@ -223,6 +224,40 @@ export default function Layout({ children, currentPageName }) {
 
   const toggleExpanded = (sectionTitle) => {
     setExpandedSection((prev) => (prev === sectionTitle ? '' : sectionTitle));
+  };
+
+  useEffect(() => {
+    if (!compactSidebar) {
+      setHoveredSection(null);
+    }
+  }, [compactSidebar]);
+
+  useEffect(() => () => {
+    if (hoverCloseTimeoutRef.current) {
+      clearTimeout(hoverCloseTimeoutRef.current);
+    }
+  }, []);
+
+  const clearHoverCloseTimeout = () => {
+    if (hoverCloseTimeoutRef.current) {
+      clearTimeout(hoverCloseTimeoutRef.current);
+      hoverCloseTimeoutRef.current = null;
+    }
+  };
+
+  const openFlyoutForSection = (sectionTitle) => {
+    if (!compactSidebar) return;
+    clearHoverCloseTimeout();
+    setHoveredSection(sectionTitle);
+  };
+
+  const scheduleFlyoutClose = () => {
+    if (!compactSidebar) return;
+    clearHoverCloseTimeout();
+    hoverCloseTimeoutRef.current = setTimeout(() => {
+      setHoveredSection(null);
+      hoverCloseTimeoutRef.current = null;
+    }, 120);
   };
 
 
@@ -376,8 +411,8 @@ export default function Layout({ children, currentPageName }) {
                       <div
                         key={section.title}
                         className="relative"
-                        onMouseEnter={() => compactSidebar && setHoveredSection(section.title)}
-                        onMouseLeave={() => compactSidebar && setHoveredSection(null)}
+                        onMouseEnter={() => openFlyoutForSection(section.title)}
+                        onMouseLeave={scheduleFlyoutClose}
                       >
                         <button
                           onClick={() => !compactSidebar && toggleExpanded(section.title)}
@@ -392,12 +427,14 @@ export default function Layout({ children, currentPageName }) {
 
                         {(expanded || flyoutOpen) && (
                           <div
-                          className={`${compactSidebar ? 'absolute left-full top-0 ml-3 w-72 rounded-xl border border-white/15 bg-[#102b4f] p-3 shadow-2xl z-[120] max-h-[80vh] overflow-y-auto' : 'mt-1 ml-3 pl-3 border-l border-white/10 space-y-1'}`}
+                          className={`${compactSidebar ? 'absolute left-full top-0 ml-3 w-72 rounded-xl border border-white/15 bg-[#102b4f] p-3 shadow-2xl z-[300] max-h-[80vh] overflow-y-auto' : 'mt-1 ml-3 pl-3 border-l border-white/10 space-y-1'}`}
+                          onMouseEnter={clearHoverCloseTimeout}
+                          onMouseLeave={scheduleFlyoutClose}
                         >
                             {compactSidebar && (
                               <>
                                 <p className="text-xs font-semibold mb-1">{section.title}</p>
-                                <div className="absolute -left-2 top-0 h-full w-2" />
+                                <div className="absolute -left-3 top-0 h-full w-3" />
                                 <div className="absolute -left-1 top-5 h-2.5 w-2.5 rotate-45 border-l border-t border-white/15 bg-[#102b4f]" />
                               </>
                             )}
@@ -410,7 +447,10 @@ export default function Layout({ children, currentPageName }) {
                                   <div key={item.name}>
                                     <Link
                                       to={href}
-                                      onClick={() => setSidebarOpen(false)}
+                                      onClick={() => {
+                                        setSidebarOpen(false);
+                                        setHoveredSection(null);
+                                      }}
                                       className={`group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px] ${active ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}
                                     >
                                       <span className="truncate">{item.name}</span>
@@ -435,7 +475,10 @@ export default function Layout({ children, currentPageName }) {
                                         <Link
                                           key={child.name}
                                           to={childHref}
-                                          onClick={() => setSidebarOpen(false)}
+                                          onClick={() => {
+                                        setSidebarOpen(false);
+                                        setHoveredSection(null);
+                                      }}
                                           className={`group ml-4 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[12px] ${childActive ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/8 hover:text-white'}`}
                                         >
                                           <span className="truncate">{child.name}</span>
@@ -477,7 +520,15 @@ export default function Layout({ children, currentPageName }) {
         </div>
       </aside>
 
-      <main className={`${compactSidebar ? 'lg:pl-20' : 'lg:pl-80'} pt-16 lg:pt-0 min-h-screen`}>
+      <main
+        className={`${compactSidebar ? 'lg:pl-20' : 'lg:pl-80'} pt-16 lg:pt-0 min-h-screen`}
+        onMouseEnter={() => {
+          if (compactSidebar) setHoveredSection(null);
+        }}
+        onClick={() => {
+          if (compactSidebar) setHoveredSection(null);
+        }}
+      >
         <div className="sticky top-16 lg:top-0 z-30 border-b border-slate-200 bg-slate-50/95 backdrop-blur px-4 py-3">
           <div className="mx-auto flex w-full max-w-none items-center gap-3">
             <GlobalMilitarSearch />
@@ -510,6 +561,7 @@ export default function Layout({ children, currentPageName }) {
 
 
       <QuickAccessWidget
+        sidebarFlyoutOpen={Boolean(hoveredSection)}
         items={pinnedVisibleItems}
         getPinKey={getPinKey}
         widgetPreferences={widgetPreferences}
