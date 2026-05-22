@@ -175,22 +175,28 @@ export async function publicarPromocaoOficial({ promocao, itens = [], temAlterac
   const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes, contextoPublicacao });
   if (!validacao.valido) throw montarErroPublicacao(validacao.bloqueios);
 
-  const payloadEnvio = {
-    promocaoId: promocao?.id || null,
+  if (!texto(promocao?.id)) {
+    throw new Error(`Falha ao publicar promoção
+Motivo: promocao.id ausente no frontend`);
+  }
+
+  const payload = {
+    promocao_id: promocao.id,
+    promocao,
     itens,
-    datas: {
-      data_promocao: promocao?.data_promocao || null,
-      data_publicacao: promocao?.data_publicacao || null,
-    },
-    quadro: promocao?.quadro || null,
-    posto: promocao?.posto_graduacao || null,
+    temAlteracoesPendentes,
+    contextoPublicacao,
   };
-  console.log('[publicarPromocaoOficial][frontend][payload]', payloadEnvio);
+
+  console.log(
+    'PAYLOAD_PUBLICAR_PROMOCAO',
+    JSON.stringify(payload, null, 2)
+  );
 
   let response;
   try {
     response = await base44.functions.invoke('publicarPromocaoOficial', {
-      body: { promocao, itens, temAlteracoesPendentes, contextoPublicacao },
+      body: payload,
     });
   } catch (error) {
     console.error('[publicarPromocaoOficial][frontend][invoke-error][raw]', error);
