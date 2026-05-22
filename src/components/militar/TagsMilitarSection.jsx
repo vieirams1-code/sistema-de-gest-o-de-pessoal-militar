@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarMilitarTagEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -109,7 +110,7 @@ export default function TagsMilitarSection({ militar }) {
       const erroDuplicidade = validarDuplicidadeTagAtiva({ vinculosAtivos: ativas, tagId: form.tag_id });
       if (erroDuplicidade) throw new Error(erroDuplicidade);
 
-      await base44.entities.MilitarTag.create({
+      await criarMilitarTagEscopado({
         militar_id: militar.id,
         tag_id: form.tag_id,
         status: 'ativa',
@@ -128,7 +129,7 @@ export default function TagsMilitarSection({ militar }) {
   });
 
   const removeMutation = useMutation({
-    mutationFn: async ({ vinculo, motivo }) => base44.entities.MilitarTag.update(vinculo.id, {
+    mutationFn: async ({ vinculo, motivo }) => removerMilitarTagEscopado(vinculo.id, {
       status: 'removida',
       data_remocao: new Date().toISOString().split('T')[0],
       motivo: motivo || vinculo.motivo || null

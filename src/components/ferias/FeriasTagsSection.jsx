@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarFeriasTagEscopado, removerFeriasTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -112,7 +113,7 @@ export default function FeriasTagsSection({ ferias }) {
       const erroDuplicidade = validarDuplicidadeTagAtivaFerias({ vinculosAtivos: ativas, tagId: form.tag_id });
       if (erroDuplicidade) throw new Error(erroDuplicidade);
 
-      await base44.entities.FeriasTag.create({
+      await criarFeriasTagEscopado({
         ferias_id: ferias.id,
         tag_id: form.tag_id,
         status: 'ativa',
@@ -131,7 +132,7 @@ export default function FeriasTagsSection({ ferias }) {
   });
 
   const removeMutation = useMutation({
-    mutationFn: async ({ vinculo, motivo }) => base44.entities.FeriasTag.update(vinculo.id, {
+    mutationFn: async ({ vinculo, motivo }) => removerFeriasTagEscopado(vinculo.id, {
       status: 'removida',
       data_remocao: new Date().toISOString().split('T')[0],
       motivo: motivo || vinculo.motivo || null,
