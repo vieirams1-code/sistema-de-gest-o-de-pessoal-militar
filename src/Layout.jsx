@@ -149,7 +149,7 @@ const menuGroups = [
     items: [
       {
         name: 'Antiguidade',
-        page: 'AntiguidadeDiagnostico',
+        page: 'AntiguidadePrevia',
         icon: ListOrdered,
         anyOf: [
           { type: 'module', key: 'antiguidade' },

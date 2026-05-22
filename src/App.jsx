@@ -24,7 +24,6 @@ const adminOnlyPages = new Set([
   'Subgrupamentos',
   // Lote 1D-D: Auditoria de Comportamento — admin only por requisito do lote.
   'AuditoriaComportamento',
-  'AntiguidadeDiagnostico',
   'AntiguidadeConfigQuadros',
   'AntiguidadeImportarPromocoes',
   'AntiguidadePrevia',
@@ -49,7 +48,6 @@ const moduleGuardByPage = {
   Armamentos: { moduleKey: 'armamentos', moduleName: 'Armamentos' },
   Medalhas: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   ApuracaoMedalhasTempoServico: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
-  AntiguidadeDiagnostico: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadeConfigQuadros: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadeImportarPromocoes: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
   AntiguidadePrevia: { moduleKey: 'antiguidade', moduleName: 'Antiguidade' },
