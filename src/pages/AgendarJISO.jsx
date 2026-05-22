@@ -30,7 +30,8 @@ export default function AgendarJISO() {
     enabled: hasAtestadosAccess && isAccessResolved,
   });
 
-  const atestados = enriquecerAtestadosComContextoMilitar((bundle?.atestados || []).filter((a) => a.necessita_jiso), { contexto: 'operacional', filtrarMesclados: true });
+  const atestadosEnriquecidos = enriquecerAtestadosComContextoMilitar((bundle?.atestados || []).filter((a) => a.necessita_jiso), { contexto: 'operacional', filtrarMesclados: true });
+  const atestados = Array.isArray(atestadosEnriquecidos) ? atestadosEnriquecidos : (atestadosEnriquecidos?.atestados || []);
   const jisos = bundle?.jisos || [];
 
   const filteredAtestados = atestados.filter(a =>
