@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import {
   separarTagsFeriasPorStatus,
   validarAplicabilidadeTagFerias,
@@ -60,17 +61,17 @@ export default function FeriasTagsSection({ ferias }) {
   });
 
   const { data: tagsCatalogo = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'tags'],
+    queryKey: funcoesTagsKeys.catalogo('local', 'tags'),
     queryFn: () => base44.entities.Tag.list('nome'),
   });
 
   const { data: gruposCatalogo = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'grupos'],
+    queryKey: funcoesTagsKeys.catalogo('local', 'grupos'),
     queryFn: () => base44.entities.TagGrupo.list('nome'),
   });
 
   const { data: vinculos = [] } = useQuery({
-    queryKey: ['ferias-tags', ferias.id],
+    queryKey: funcoesTagsKeys.feriasTags('local', ferias.id),
     queryFn: async () => {
       const items = await base44.entities.FeriasTag.filter({ ferias_id: ferias.id }, '-created_date');
       const mapaTags = new Map(tagsCatalogo.map((tag) => [tag.id, tag]));
@@ -94,7 +95,10 @@ export default function FeriasTagsSection({ ferias }) {
     return !validarAplicabilidadeTagFerias(tag);
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['ferias-tags', ferias.id] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.feriasTags('local', ferias.id) });
+    queryClient.invalidateQueries({ queryKey: ['ferias-tags'] });
+  };
 
   const addMutation = useMutation({
     mutationFn: async () => {

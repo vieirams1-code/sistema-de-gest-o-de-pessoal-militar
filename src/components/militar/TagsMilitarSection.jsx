@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { separarTagsPorStatus, validarAplicabilidadeTagMilitar, validarDuplicidadeTagAtiva } from '@/utils/funcoesTags/militarTags';
 
 const formatDate = (date) => {
@@ -57,17 +58,17 @@ export default function TagsMilitarSection({ militar }) {
   });
 
   const { data: tagsCatalogo = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'tags'],
+    queryKey: funcoesTagsKeys.catalogo('local', 'tags'),
     queryFn: () => base44.entities.Tag.list('nome')
   });
 
   const { data: gruposCatalogo = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'grupos'],
+    queryKey: funcoesTagsKeys.catalogo('local', 'grupos'),
     queryFn: () => base44.entities.TagGrupo.list('nome')
   });
 
   const { data: vinculos = [] } = useQuery({
-    queryKey: ['militar-tags', militar.id],
+    queryKey: funcoesTagsKeys.militarTags('local', militar.id),
     queryFn: async () => {
       const items = await base44.entities.MilitarTag.filter({ militar_id: militar.id }, '-created_date');
       const mapaTags = new Map(tagsCatalogo.map((tag) => [tag.id, tag]));
@@ -91,7 +92,10 @@ export default function TagsMilitarSection({ militar }) {
     return !validarAplicabilidadeTagMilitar(tag);
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['militar-tags', militar.id] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militarTags('local', militar.id) });
+    queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] });
+  };
 
   const addMutation = useMutation({
     mutationFn: async () => {

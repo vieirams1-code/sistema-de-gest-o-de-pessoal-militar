@@ -44,6 +44,7 @@ import { exportarRegistrosParaExcel } from '@/utils/indicadosExcelExport';
 import { base44 } from '@/api/base44Client';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 import { enriquecerMilitaresComFuncoesETags } from '@/utils/funcoesTags/enriquecimentoMilitarFuncoesTags';
+import { isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 
 const BACKEND_LIMIT = 200;
 const STALE_TIME_MS = 5 * 60 * 1000;
@@ -760,20 +761,22 @@ export default function ExtracaoEfetivo() {
         if (ativo) setFuncoesTagsBundle({ funcoesAtivas: [], vinculosFuncoesAtivos: [], tagsAtivas: [], gruposTagsAtivos: [], vinculosTagsAtivos: [] });
         return;
       }
-      const [funcoesAtivas, tagsRaw, gruposTagsAtivos, vinculosFuncoesLotes, vinculosTagsLotes] = await Promise.all([
+      const [funcoesAtivas, tagsRaw, gruposTagsAtivos, vinculosFuncoesAtivos, vinculosTagsAtivos] = await Promise.all([
         base44.entities.FuncaoMilitar?.filter?.({ status: 'ativa' }).catch(() => []) ?? [],
         base44.entities.Tag?.filter?.({ status: 'ativa' }).catch(() => []) ?? [],
         base44.entities.TagGrupo?.filter?.({ status: 'ativa' }).catch(() => []) ?? [],
-        Promise.all(militaresIds.map((id) => base44.entities.MilitarFuncao?.filter?.({ militar_id: id, status: 'ativa' }).catch(() => []) ?? [])),
-        Promise.all(militaresIds.map((id) => base44.entities.MilitarTag?.filter?.({ militar_id: id, status: 'ativa' }).catch(() => []) ?? [])),
+        base44.entities.MilitarFuncao?.filter?.({ militar_id: { '$in': militaresIds }, status: 'ativa' }).catch(() => []) ?? [],
+        base44.entities.MilitarTag?.filter?.({ militar_id: { '$in': militaresIds }, status: 'ativa' }).catch(() => []) ?? [],
       ]);
-      const tagsAtivas = tagsRaw.filter((tag) => TAG_APLICABILIDADE_PERMITIDA.has(normalizeText(tag?.aplicabilidade)));
+      const tagsAtivas = tagsRaw
+        .filter((tag) => isCatalogoAtivo(tag))
+        .filter((tag) => TAG_APLICABILIDADE_PERMITIDA.has(normalizeText(tag?.aplicabilidade)));
       if (ativo) setFuncoesTagsBundle({
-        funcoesAtivas,
+        funcoesAtivas: funcoesAtivas.filter((funcao) => isCatalogoAtivo(funcao)),
         tagsAtivas,
-        gruposTagsAtivos,
-        vinculosFuncoesAtivos: vinculosFuncoesLotes.flat(),
-        vinculosTagsAtivos: vinculosTagsLotes.flat(),
+        gruposTagsAtivos: gruposTagsAtivos.filter((grupo) => isCatalogoAtivo(grupo)),
+        vinculosFuncoesAtivos,
+        vinculosTagsAtivos,
       });
     }
     carregar();

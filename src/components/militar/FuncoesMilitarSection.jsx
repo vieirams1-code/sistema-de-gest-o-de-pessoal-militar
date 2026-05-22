@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { separarFuncoesPorStatus, validarDuplicidadeInstitucionalAtiva } from '@/utils/funcoesTags/militarFuncoes';
+import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
+import { getFuncaoMilitarId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 
 const formatDate = (date) => {
   if (!date) return '—';
@@ -64,16 +66,16 @@ export default function FuncoesMilitarSection({ militar }) {
   });
 
   const { data: funcoesCatalogo = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'funcoes'],
+    queryKey: funcoesTagsKeys.catalogo('local', 'funcoes'),
     queryFn: () => base44.entities.FuncaoMilitar.list('nome')
   });
 
   const { data: vinculos = [] } = useQuery({
-    queryKey: ['militar-funcoes', militar.id],
+    queryKey: funcoesTagsKeys.militarFuncoes('local', militar.id),
     queryFn: async () => {
       const items = await base44.entities.MilitarFuncao.filter({ militar_id: militar.id }, '-created_date');
       const mapaFuncoes = new Map(funcoesCatalogo.map((f) => [f.id, f]));
-      return items.map((item) => ({ ...item, funcao: mapaFuncoes.get(item.funcao_militar_id) || null }));
+      return items.map((item) => ({ ...item, funcao: mapaFuncoes.get(getFuncaoMilitarId(item)) || null }));
     },
     enabled: !!militar?.id && funcoesCatalogo.length >= 0
   });
@@ -81,12 +83,17 @@ export default function FuncoesMilitarSection({ militar }) {
   const vinculosAtivos = React.useMemo(() => vinculos.filter((v) => String(v.status).toLowerCase() === 'ativa'), [vinculos]);
   const { ativas, encerradas } = React.useMemo(() => separarFuncoesPorStatus(vinculos), [vinculos]);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['militar-funcoes', militar.id] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militarFuncoes('local', militar.id) });
+    queryClient.invalidateQueries({ queryKey: ['militares-funcoes-institucionais'] });
+    queryClient.invalidateQueries({ queryKey: ['militares-funcoes-filtros'] });
+    queryClient.invalidateQueries({ queryKey: ['militar-funcao-institucional'] });
+  };
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const funcao = funcoesCatalogo.find((f) => f.id === form.funcao_militar_id);
-      if (!funcao || String(funcao.status).toLowerCase() !== 'ativa') {
+      if (!funcao || !isCatalogoAtivo(funcao)) {
         throw new Error('Selecione uma função ativa.');
       }
       const erroInstitucional = validarDuplicidadeInstitucionalAtiva({ vinculosAtivos, funcaoSelecionada: funcao });
@@ -143,7 +150,7 @@ export default function FuncoesMilitarSection({ militar }) {
     onError: (error) => toast({ title: 'Erro ao encerrar função', description: error.message, variant: 'destructive' })
   });
 
-  const funcoesAtivasCatalogo = funcoesCatalogo.filter((f) => String(f.status).toLowerCase() === 'ativa');
+  const funcoesAtivasCatalogo = funcoesCatalogo.filter((f) => isCatalogoAtivo(f));
 
   return (
     <Card className="shadow-sm">

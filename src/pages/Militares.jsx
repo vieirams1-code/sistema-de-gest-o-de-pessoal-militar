@@ -40,6 +40,7 @@ import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
 import { construirDecoracaoInstitucionalPorMilitar, ordenarComDestaqueInstitucional } from '@/utils/funcoesTags/destaqueInstitucionalEfetivo';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
+import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -351,9 +352,13 @@ export default function Militares() {
   );
 
   const idsHash = useMemo(() => idsMilitaresCarregados.join('|'), [idsMilitaresCarregados]);
+  const funcoesTagsScopeKey = useMemo(
+    () => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }),
+    [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail],
+  );
 
   const { data: funcoesInstitucionais = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'funcoes-institucionais'],
+    queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'funcoes-institucionais'),
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery,
     queryFn: async () => {
@@ -363,14 +368,14 @@ export default function Militares() {
   });
 
   const { data: funcoesAtivas = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'funcoes'],
+    queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'funcoes'),
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery,
     queryFn: () => base44.entities.FuncaoMilitar.filter({ ativa: true }, 'prioridade_lista'),
   });
 
   const { data: tagsAtivas = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'tags'],
+    queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'tags'),
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery,
     queryFn: async () => {
@@ -380,14 +385,14 @@ export default function Militares() {
   });
 
   const { data: gruposAtivos = [] } = useQuery({
-    queryKey: ['funcoes-tags', 'grupos'],
+    queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'grupos'),
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery,
     queryFn: () => base44.entities.TagGrupo.filter({ ativo: true }, 'ordem asc, nome asc'),
   });
 
   const { data: vinculosInstitucionaisAtivos = [] } = useQuery({
-    queryKey: ['militares-funcoes-institucionais', idsHash],
+    queryKey: funcoesTagsKeys.militaresFuncoesInstitucionais(funcoesTagsScopeKey, idsHash),
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery && idsMilitaresCarregados.length > 0 && funcoesInstitucionais.length > 0,
     queryFn: async () => {
@@ -402,7 +407,7 @@ export default function Militares() {
   });
 
   const { data: vinculosFuncoesAtivosFiltros = [] } = useQuery({
-    queryKey: ['militares-funcoes-filtros', idsHash],
+    queryKey: funcoesTagsKeys.militaresFuncoesFiltros(funcoesTagsScopeKey, idsHash),
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery && idsMilitaresCarregados.length > 0,
     queryFn: () => base44.entities.MilitarFuncao.filter({
@@ -412,7 +417,7 @@ export default function Militares() {
   });
 
   const { data: vinculosTagsAtivosFiltros = [] } = useQuery({
-    queryKey: ['militares-tags-filtros', idsHash],
+    queryKey: funcoesTagsKeys.militaresTagsFiltros(funcoesTagsScopeKey, idsHash),
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery && idsMilitaresCarregados.length > 0,
     queryFn: () => base44.entities.MilitarTag.filter({
