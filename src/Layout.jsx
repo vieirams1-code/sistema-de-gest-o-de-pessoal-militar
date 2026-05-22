@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -225,6 +225,32 @@ export default function Layout({ children, currentPageName }) {
     setExpandedSection((prev) => (prev === sectionTitle ? '' : sectionTitle));
   };
 
+  const hoverCloseTimeoutRef = useRef(null);
+
+  const clearHoverCloseTimeout = () => {
+    if (hoverCloseTimeoutRef.current) {
+      clearTimeout(hoverCloseTimeoutRef.current);
+      hoverCloseTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    clearHoverCloseTimeout();
+    hoverCloseTimeoutRef.current = setTimeout(() => {
+      setHoveredSection(null);
+      hoverCloseTimeoutRef.current = null;
+    }, 250);
+  };
+
+  const openSectionFlyout = (sectionTitle) => {
+    clearHoverCloseTimeout();
+    setHoveredSection(sectionTitle);
+  };
+
+  useEffect(() => () => {
+    clearHoverCloseTimeout();
+  }, []);
+
   const sidebarFlyoutOpen = compactSidebar && hoveredSection !== null;
 
 
@@ -319,7 +345,11 @@ export default function Layout({ children, currentPageName }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setSidebarOpen(false)}
+            onClick={() => {
+                                        clearHoverCloseTimeout();
+                                        setHoveredSection(null);
+                                        setSidebarOpen(false);
+                                      }}
             className="lg:hidden fixed inset-0 bg-black/50 z-40"
           />
         )}
@@ -353,7 +383,11 @@ export default function Layout({ children, currentPageName }) {
               <Button variant="ghost" size="icon" onClick={() => setCompactSidebar((prev) => !prev)} className="hidden lg:flex text-white hover:bg-white/10 shrink-0">
                 {compactSidebar ? <Menu className="w-5 h-5" /> : <PanelLeftClose className="w-4 h-4" />}
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} className="lg:hidden text-white hover:bg-white/10 shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => {
+                                        clearHoverCloseTimeout();
+                                        setHoveredSection(null);
+                                        setSidebarOpen(false);
+                                      }} className="lg:hidden text-white hover:bg-white/10 shrink-0">
                 <X className="w-5 h-5" />
               </Button>
             </div>
@@ -378,8 +412,8 @@ export default function Layout({ children, currentPageName }) {
                       <div
                         key={section.title}
                         className="relative"
-                        onMouseEnter={() => compactSidebar && setHoveredSection(section.title)}
-                        onMouseLeave={() => compactSidebar && setHoveredSection(null)}
+                        onMouseEnter={() => compactSidebar && openSectionFlyout(section.title)}
+                        onMouseLeave={() => compactSidebar && scheduleClose()}
                       >
                         <button
                           onClick={() => !compactSidebar && toggleExpanded(section.title)}
@@ -394,12 +428,14 @@ export default function Layout({ children, currentPageName }) {
 
                         {(expanded || flyoutOpen) && (
                           <div
-                          className={`${compactSidebar ? 'absolute left-full top-0 ml-3 w-72 rounded-xl border border-white/15 bg-[#102b4f] p-3 shadow-2xl z-[120] max-h-[80vh] overflow-y-auto' : 'mt-1 ml-3 pl-3 border-l border-white/10 space-y-1'}`}
+                            onMouseEnter={() => compactSidebar && clearHoverCloseTimeout()}
+                            onMouseLeave={() => compactSidebar && scheduleClose()}
+                            className={`${compactSidebar ? 'absolute left-full top-0 ml-1 w-72 rounded-xl border border-white/15 bg-[#102b4f] p-3 shadow-2xl z-[400] max-h-[80vh] overflow-y-auto' : 'mt-1 ml-3 pl-3 border-l border-white/10 space-y-1'}`}
                         >
                             {compactSidebar && (
                               <>
                                 <p className="text-xs font-semibold mb-1">{section.title}</p>
-                                <div className="absolute -left-2 top-0 h-full w-2" />
+                                <div className="absolute -left-3 top-4 h-10 w-3" />
                                 <div className="absolute -left-1 top-5 h-2.5 w-2.5 rotate-45 border-l border-t border-white/15 bg-[#102b4f]" />
                               </>
                             )}
@@ -412,7 +448,11 @@ export default function Layout({ children, currentPageName }) {
                                   <div key={item.name}>
                                     <Link
                                       to={href}
-                                      onClick={() => setSidebarOpen(false)}
+                                      onClick={() => {
+                                        clearHoverCloseTimeout();
+                                        setHoveredSection(null);
+                                        setSidebarOpen(false);
+                                      }}
                                       className={`group flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px] ${active ? 'bg-white/12 text-white' : 'text-white/70 hover:bg-white/8 hover:text-white'}`}
                                     >
                                       <span className="truncate">{item.name}</span>
@@ -437,7 +477,11 @@ export default function Layout({ children, currentPageName }) {
                                         <Link
                                           key={child.name}
                                           to={childHref}
-                                          onClick={() => setSidebarOpen(false)}
+                                          onClick={() => {
+                                        clearHoverCloseTimeout();
+                                        setHoveredSection(null);
+                                        setSidebarOpen(false);
+                                      }}
                                           className={`group ml-4 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[12px] ${childActive ? 'bg-white/12 text-white' : 'text-white/60 hover:bg-white/8 hover:text-white'}`}
                                         >
                                           <span className="truncate">{child.name}</span>
