@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
@@ -44,6 +45,9 @@ import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfet
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { base44 } from '@/api/base44Client';
 import EfetivoFuncoesTagsCompactas from '@/components/militar/EfetivoFuncoesTagsCompactas';
+import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
+import { criarMilitarTagEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
+import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados, resumirResultadoBulk } from '@/utils/funcoesTags/militarTagsBulk';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -202,6 +206,9 @@ export default function Militares() {
   const [mostrarInativos, setMostrarInativos] = useState(false);
   const [pageOffset, setPageOffset] = useState(0);
   const [militaresAcumulados, setMilitaresAcumulados] = useState([]);
+  const [selectedMilitarIds, setSelectedMilitarIds] = useState(new Set());
+  const [bulkPanelMode, setBulkPanelMode] = useState(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedPostos(postosSelecionados), 300);
@@ -493,6 +500,65 @@ export default function Militares() {
     });
     return mapa;
   }, [filteredMilitares, funcoesInstitucionais, vinculosFuncoesAtivosFiltros, tagsAtivas, vinculosTagsAtivosFiltros]);
+  const idsFiltradosSet = useMemo(() => new Set(filteredMilitares.map((m) => String(m.id))), [filteredMilitares]);
+  const selectedMilitarIdsArray = useMemo(() => Array.from(selectedMilitarIds), [selectedMilitarIds]);
+  const allFilteredSelected = filteredMilitares.length > 0 && filteredMilitares.every((m) => selectedMilitarIds.has(String(m.id)));
+  const tagsPresentesSelecionados = useMemo(() => montarTagsPresentesNosSelecionados({
+    selectedMilitarIds: selectedMilitarIdsArray,
+    vinculosTagsAtivos: vinculosTagsAtivosFiltros,
+    tagsAtivas,
+  }), [selectedMilitarIdsArray, vinculosTagsAtivosFiltros, tagsAtivas]);
+
+  useEffect(() => {
+    setSelectedMilitarIds((prev) => {
+      const next = new Set(Array.from(prev).filter((id) => idsFiltradosSet.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [idsFiltradosSet]);
+
+  const executarBulk = async ({ mode, tagIds, motivo }) => {
+    if (excedeLimiteMilitaresSelecionados(selectedMilitarIds.size)) {
+      toast({ title: 'Limite excedido', description: `Selecione no máximo ${BULK_TAGS_MAX_MILITARES} militares nesta versão inicial.`, variant: 'destructive' });
+      return;
+    }
+    let aplicadas = 0;
+    let duplicadas = 0;
+    let removidas = 0;
+    let erros = 0;
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (mode === 'apply') {
+      for (const militarId of selectedMilitarIdsArray) {
+        for (const tagId of tagIds) {
+          try {
+            await criarMilitarTagEscopado({ militar_id: militarId, tag_id: tagId, status: 'ativa', data_aplicacao: hoje, motivo: motivo || undefined });
+            aplicadas += 1;
+          } catch (errorApply) {
+            if (isErroDuplicidade(errorApply)) duplicadas += 1;
+            else erros += 1;
+          }
+        }
+      }
+    } else {
+      const alvo = new Set(tagIds.map(String));
+      const vinculos = vinculosTagsAtivosFiltros.filter((v) => selectedMilitarIds.has(String(v.militar_id)) && alvo.has(String(v.tag_id)));
+      for (const vinculo of vinculos) {
+        try {
+          await removerMilitarTagEscopado(vinculo.id, { data_remocao: hoje, motivo: motivo || undefined });
+          removidas += 1;
+        } catch {
+          erros += 1;
+        }
+      }
+    }
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] }),
+      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] }),
+      queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] }),
+    ]);
+    setSelectedMilitarIds(new Set());
+    setBulkPanelMode(null);
+    toast({ title: mode === 'apply' ? 'Aplicação concluída' : 'Remoção concluída', description: resumirResultadoBulk({ aplicadas, duplicadas, removidas, erros, modo: mode }), variant: erros > 0 ? 'destructive' : 'default' });
+  };
 
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
@@ -728,7 +794,28 @@ export default function Militares() {
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
+            {selectedMilitarIds.size > 0 && (
+              <div className="px-3 py-2 border-b bg-indigo-50 flex flex-wrap items-center gap-2 justify-between">
+                <p className="text-sm font-medium text-indigo-900">{selectedMilitarIds.size} militares selecionados</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setBulkPanelMode('apply')}>Aplicar tags</Button>
+                  <Button size="sm" variant="outline" onClick={() => setBulkPanelMode('remove')}>Remover tags</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedMilitarIds(new Set())}>Limpar seleção</Button>
+                </div>
+                <p className="text-xs text-indigo-700 w-full">Ação aplicada apenas aos militares selecionados nesta tela.</p>
+              </div>
+            )}
+            <div className="grid grid-cols-13 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
+              <div className="col-span-1">
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelectedMilitarIds(new Set(filteredMilitares.map((m) => String(m.id))));
+                    else setSelectedMilitarIds(new Set());
+                  }}
+                />
+              </div>
               <div className={mostrarInativos ? 'col-span-2' : 'col-span-2'}>Graduação</div>
               <div className={mostrarInativos ? 'col-span-2' : 'col-span-2'}>Nome/Nome de guerra</div>
               <div className="col-span-1">Matrícula</div>
@@ -745,8 +832,23 @@ export default function Militares() {
               return (
                 <div
                   key={militar.id}
-                  className={`grid grid-cols-12 gap-2 px-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
+                  className={`grid grid-cols-13 gap-2 px-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
                 >
+                <div className="col-span-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedMilitarIds.has(String(militar.id))}
+                    onChange={(e) => {
+                      const id = String(militar.id);
+                      setSelectedMilitarIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(id);
+                        else next.delete(id);
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
                 <div className="col-span-2 font-semibold text-[#1e3a5f]">{militar.posto_graduacao || 'Sem posto'}</div>
                 <div className="col-span-2">
                   <div className="font-medium truncate flex items-center gap-2">
@@ -860,6 +962,16 @@ export default function Militares() {
         open={Boolean(militarPromocaoAtual)}
         onOpenChange={(open) => { if (!open) setMilitarPromocaoAtual(null); }}
         militar={militarPromocaoAtual}
+      />
+      <MilitarTagsBulkPanel
+        open={Boolean(bulkPanelMode)}
+        mode={bulkPanelMode}
+        onClose={() => setBulkPanelMode(null)}
+        selectedCount={selectedMilitarIds.size}
+        tagsAtivas={tagsAtivas}
+        gruposAtivos={gruposAtivos}
+        tagsPresentes={tagsPresentesSelecionados}
+        onConfirm={({ tagIds, motivo }) => executarBulk({ mode: bulkPanelMode, tagIds, motivo })}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
