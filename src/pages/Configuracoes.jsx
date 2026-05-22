@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings, Trash2, Plus, Sliders, ShieldAlert } from 'lucide-react';
 import TiposPublicacaoManager from '@/components/configuracoes/TiposPublicacaoManager';
+import FuncoesTagsManager from '@/components/funcoes-tags/FuncoesTagsManager';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import AccessDenied from '@/components/auth/AccessDenied';
 import { executarLimpezaPrePublicacao, previewLimpezaPrePublicacao, resetOperacionalConstants } from '@/services/resetOperacionalService';
@@ -170,6 +171,7 @@ export default function Configuracoes() {
           </div>
 
           <TiposPublicacaoManager />
+          <FuncoesTagsManager canEdit={canAccessAction('gerir_configuracoes')} />
 
           {podeExecutarReset && (
             <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
