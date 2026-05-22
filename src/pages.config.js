@@ -70,6 +70,7 @@ import ConciliacaoBoletim from './pages/ConciliacaoBoletim';
 import ContratosDesignacao from './pages/ContratosDesignacao';
 import CreditosExtraordinariosFerias from './pages/CreditosExtraordinariosFerias';
 import Configuracoes from './pages/Configuracoes';
+import ControleAtestadosTemporarios from './pages/ControleAtestadosTemporarios';
 import DetalheComportamento from './pages/DetalheComportamento';
 import EditarJISO from './pages/EditarJISO';
 import ExtracaoEfetivo from './pages/ExtracaoEfetivo';
@@ -135,6 +136,7 @@ export const PAGES = {
     "ContratosDesignacao": ContratosDesignacao,
     "CreditosExtraordinariosFerias": CreditosExtraordinariosFerias,
     "Configuracoes": Configuracoes,
+    "ControleAtestadosTemporarios": ControleAtestadosTemporarios,
     "DetalheComportamento": DetalheComportamento,
     "EditarJISO": EditarJISO,
     "ExtracaoEfetivo": ExtracaoEfetivo,
