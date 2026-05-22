@@ -38,10 +38,12 @@ import SaneamentoPromocaoDivergenteDialog from '@/components/admin/SaneamentoPro
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
 import { construirDecoracaoInstitucionalPorMilitar, ordenarComDestaqueInstitucional } from '@/utils/funcoesTags/destaqueInstitucionalEfetivo';
+import { getEmojisEfetivo } from '@/utils/funcoesTags/tagsCompactasEfetivo';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import { base44 } from '@/api/base44Client';
+import EfetivoFuncoesTagsCompactas from '@/components/militar/EfetivoFuncoesTagsCompactas';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -478,6 +480,19 @@ export default function Militares() {
     () => ordenarComDestaqueInstitucional(filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar),
     [filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar],
   );
+  const emojisEfetivoByMilitar = useMemo(() => {
+    const mapa = new Map();
+    filteredMilitares.forEach((militar) => {
+      mapa.set(String(militar?.id || ''), getEmojisEfetivo({
+        militarId: militar?.id,
+        funcoesInstitucionais,
+        vinculosFuncoesAtivos: vinculosFuncoesAtivosFiltros,
+        tagsAtivas,
+        vinculosTagsAtivos: vinculosTagsAtivosFiltros,
+      }));
+    });
+    return mapa;
+  }, [filteredMilitares, funcoesInstitucionais, vinculosFuncoesAtivosFiltros, tagsAtivas, vinculosTagsAtivosFiltros]);
 
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
@@ -736,19 +751,11 @@ export default function Militares() {
                 <div className="col-span-2">
                   <div className="font-medium truncate flex items-center gap-2">
                       <span className="truncate">{militar.nome_guerra || militar.nome_completo}</span>
-                      {decoracaoInstitucionalByMilitar.get(String(militar.id))?.funcaoInstitucional && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-medium"
-                          style={{
-                            borderColor: decoracaoInstitucionalByMilitar.get(String(militar.id)).funcaoInstitucional.cor || undefined,
-                            color: decoracaoInstitucionalByMilitar.get(String(militar.id)).funcaoInstitucional.cor || undefined,
-                          }}
-                        >
-                          {decoracaoInstitucionalByMilitar.get(String(militar.id)).funcaoInstitucional.emoji || '⭐'} {decoracaoInstitucionalByMilitar.get(String(militar.id)).funcaoInstitucional.nome}
-                        </Badge>
-                      )}
                     </div>
+                  <EfetivoFuncoesTagsCompactas
+                    itens={emojisEfetivoByMilitar.get(String(militar.id))?.itens || []}
+                    textoExcesso={emojisEfetivoByMilitar.get(String(militar.id))?.textoExcesso || ''}
+                  />
                   <div className="text-xs text-slate-500 truncate">{militar.nome_completo}</div>
                 </div>
                 <div className="col-span-1 truncate">{militar.matricula || '—'}</div>
