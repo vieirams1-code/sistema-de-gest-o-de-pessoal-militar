@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+
+const TAB_FUNCOES_TAGS_VALIDAS = ['funcoes', 'grupos', 'tags'];
+
+const normalizarTabConfiguracoes = (valorTab) => {
+  if (typeof valorTab !== 'string') return 'funcoes';
+  const normalizada = valorTab.trim().toLowerCase();
+  if (TAB_FUNCOES_TAGS_VALIDAS.includes(normalizada)) return normalizada;
+  if (normalizada === 'adicoes') return 'funcoes';
+  return 'funcoes';
+};
+
 export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
@@ -37,7 +48,8 @@ export default function Configuracoes() {
   const [confirmacaoReset, setConfirmacaoReset] = useState('');
   const [erroReset, setErroReset] = useState('');
 
-  const selectedTab = searchParams.get('tab') || 'adicoes';
+  const rawTab = searchParams?.get?.('tab');
+  const selectedTab = useMemo(() => normalizarTabConfiguracoes(rawTab), [rawTab]);
 
   const { data: lotacoes = [] } = useQuery({ queryKey: ['lotacoes'], queryFn: () => base44.entities.Lotacao.list('-created_date'), enabled: isAccessResolved && hasConfiguracoesAccess });
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes'], queryFn: () => base44.entities.Funcao.list('-created_date'), enabled: isAccessResolved && hasConfiguracoesAccess });
@@ -101,12 +113,8 @@ export default function Configuracoes() {
   if (loadingUser || !isAccessResolved) return null;
   if (!hasConfiguracoesAccess) return <AccessDenied modulo="Configurações" />;
 
-  if (selectedTab === 'adicoes' && !canAccessAction('gerir_configuracoes')) {
+  if (!canAccessAction('gerir_configuracoes')) {
     return <AccessDenied modulo="Adições e Personalizações" />;
-  }
-
-  if (selectedTab === 'permissoes') {
-    return <Navigate to="/PermissoesUsuarios" replace />;
   }
 
   return (
@@ -171,7 +179,7 @@ export default function Configuracoes() {
           </div>
 
           <TiposPublicacaoManager />
-          <FuncoesTagsManager canEdit={canAccessAction('gerir_configuracoes')} initialTab={['funcoes','grupos','tags'].includes(selectedTab) ? selectedTab : 'funcoes'} />
+          <FuncoesTagsManager canEdit={canAccessAction('gerir_configuracoes')} initialTab={selectedTab} />
 
           {podeExecutarReset && (
             <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
