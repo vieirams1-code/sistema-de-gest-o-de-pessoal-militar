@@ -37,6 +37,7 @@ import SaneamentoQbmptQptbmDialog from '@/components/admin/SaneamentoQbmptQptbmD
 import SaneamentoPromocaoDivergenteDialog from '@/components/admin/SaneamentoPromocaoDivergenteDialog';
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
+import { construirDecoracaoInstitucionalPorMilitar, ordenarComDestaqueInstitucional } from '@/utils/funcoesTags/destaqueInstitucionalEfetivo';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -339,12 +340,50 @@ export default function Militares() {
 
   const militares = militaresAcumulados;
   const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos });
+  const idsMilitaresCarregados = useMemo(
+    () => operacionais.map((m) => String(m?.id || '')).filter(Boolean),
+    [operacionais],
+  );
+
+  const idsHash = useMemo(() => idsMilitaresCarregados.join('|'), [idsMilitaresCarregados]);
+
+  const { data: funcoesInstitucionais = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'funcoes-institucionais'],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery,
+    queryFn: async () => {
+      const funcoes = await base44.entities.FuncaoMilitar.filter({ ativa: true }, 'prioridade_lista');
+      return funcoes.filter((f) => ['comandante', 'subcomandante'].includes(String(f?.institucional_chave || '').toLowerCase()));
+    },
+  });
+
+  const { data: vinculosInstitucionaisAtivos = [] } = useQuery({
+    queryKey: ['militares-funcoes-institucionais', idsHash],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery && idsMilitaresCarregados.length > 0 && funcoesInstitucionais.length > 0,
+    queryFn: async () => {
+      const funcaoIds = funcoesInstitucionais.map((f) => f.id).filter(Boolean);
+      if (funcaoIds.length === 0) return [];
+      return base44.entities.MilitarFuncao.filter({
+        status: 'ativa',
+        militar_id: { '$in': idsMilitaresCarregados },
+        funcao_id: { '$in': funcaoIds },
+      });
+    },
+  });
+
+  const decoracaoInstitucionalByMilitar = useMemo(() => construirDecoracaoInstitucionalPorMilitar({
+    militares: operacionais,
+    funcoesInstitucionais,
+    vinculosAtivos: vinculosInstitucionaisAtivos,
+  }), [operacionais, funcoesInstitucionais, vinculosInstitucionaisAtivos]);
+
   const quadrosDisponiveis = useMemo(
     () => QUADROS_FIXOS.map((quadro) => ({ value: quadro, label: quadro })),
     [],
   );
 
-  const filteredMilitares = operacionais
+  const filteredMilitaresBase = operacionais
     .filter((m) => {
       if (quadrosSelecionados.length === 0) return true;
       return quadrosSelecionados.includes(normalizarQuadroLegado(m?.quadro));
@@ -367,6 +406,8 @@ export default function Militares() {
       militarCorrespondeBusca(m, searchTerm)
       || militarCorrespondeOrigemDestino(m, searchTerm)
     ));
+
+  const filteredMilitares = useMemo(() => ordenarComDestaqueInstitucional(filteredMilitaresBase, decoracaoInstitucionalByMilitar), [filteredMilitaresBase, decoracaoInstitucionalByMilitar]);
 
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
@@ -590,7 +631,21 @@ export default function Militares() {
                 >
                 <div className="col-span-2 font-semibold text-[#1e3a5f]">{militar.posto_graduacao || 'Sem posto'}</div>
                 <div className="col-span-2">
-                  <div className="font-medium truncate">{militar.nome_guerra || militar.nome_completo}</div>
+                  <div className="font-medium truncate flex items-center gap-2">
+                      <span className="truncate">{militar.nome_guerra || militar.nome_completo}</span>
+                      {decoracaoInstitucionalByMilitar.get(String(militar.id))?.funcaoInstitucional && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-medium"
+                          style={{
+                            borderColor: decoracaoInstitucionalByMilitar.get(String(militar.id)).funcaoInstitucional.cor || undefined,
+                            color: decoracaoInstitucionalByMilitar.get(String(militar.id)).funcaoInstitucional.cor || undefined,
+                          }}
+                        >
+                          {decoracaoInstitucionalByMilitar.get(String(militar.id)).funcaoInstitucional.emoji || '⭐'} {decoracaoInstitucionalByMilitar.get(String(militar.id)).funcaoInstitucional.nome}
+                        </Badge>
+                      )}
+                    </div>
                   <div className="text-xs text-slate-500 truncate">{militar.nome_completo}</div>
                 </div>
                 <div className="col-span-1 truncate">{militar.matricula || '—'}</div>
