@@ -19,6 +19,12 @@ import {
   ProcedimentoPendencia,
   ProcedimentoViatura,
   ProcedimentoPrazoHistorico,
+  FuncaoMilitar,
+  MilitarFuncao,
+  TagGrupo,
+  Tag,
+  MilitarTag,
+  FeriasTag,
 } from '@/api/entities'
 
 
@@ -39,6 +45,12 @@ void ProcedimentoEnvolvido;
 void ProcedimentoPendencia;
 void ProcedimentoViatura;
 void ProcedimentoPrazoHistorico;
+void FuncaoMilitar;
+void MilitarFuncao;
+void TagGrupo;
+void Tag;
+void MilitarTag;
+void FeriasTag;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   // <React.StrictMode>
