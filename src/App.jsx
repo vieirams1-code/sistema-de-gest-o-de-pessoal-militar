@@ -11,17 +11,15 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 import RequireModuleAccess from '@/components/auth/RequireModuleAccess';
-import ControleAtestadosTemporarios from '@/pages/ControleAtestadosTemporarios';
 
 const { Pages: ConfiguredPages, Layout } = pagesConfig;
-const Pages = { ...ConfiguredPages, ControleAtestadosTemporarios };
+const Pages = { ...ConfiguredPages };
 const homeRoute = '/VerMilitar';
 
 const adminOnlyPages = new Set([
   // Exceção temporária: Mantido em admin puro (RequireAdmin) até a criação
   // de uma action key específica na arquitetura (ex: gerir_solicitacoes_atualizacao).
   'SolicitacoesAtualizacao',
-  'Subgrupamentos',
   // Lote 1D-D: Auditoria de Comportamento — admin only por requisito do lote.
   'AuditoriaComportamento',
   'AntiguidadeConfigQuadros',
