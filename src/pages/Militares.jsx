@@ -794,19 +794,8 @@ export default function Militares() {
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            {selectedMilitarIds.size > 0 && (
-              <div className="px-3 py-2 border-b bg-indigo-50 flex flex-wrap items-center gap-2 justify-between">
-                <p className="text-sm font-medium text-indigo-900">{selectedMilitarIds.size} militares selecionados</p>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setBulkPanelMode('apply')}>Aplicar tags</Button>
-                  <Button size="sm" variant="outline" onClick={() => setBulkPanelMode('remove')}>Remover tags</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedMilitarIds(new Set())}>Limpar seleção</Button>
-                </div>
-                <p className="text-xs text-indigo-700 w-full">Ação aplicada apenas aos militares selecionados nesta tela.</p>
-              </div>
-            )}
-            <div className="grid grid-cols-13 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
-              <div className="col-span-1">
+            <div className="px-3 py-2 border-b bg-slate-50 flex flex-wrap items-center gap-3 justify-between">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={allFilteredSelected}
@@ -815,7 +804,23 @@ export default function Militares() {
                     else setSelectedMilitarIds(new Set());
                   }}
                 />
+                <span>Selecionar visíveis</span>
+              </label>
+              {selectedMilitarIds.size > 0 && (
+                <p className="text-xs text-indigo-700">Ação aplicada apenas aos militares selecionados nesta tela.</p>
+              )}
+            </div>
+            {selectedMilitarIds.size > 0 && (
+              <div className="px-3 py-2 border-b bg-indigo-50 flex flex-wrap items-center gap-2 justify-between">
+                <p className="text-sm font-medium text-indigo-900">{selectedMilitarIds.size} militares selecionados</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setBulkPanelMode('apply')}>Aplicar tags</Button>
+                  <Button size="sm" variant="outline" onClick={() => setBulkPanelMode('remove')}>Remover tags</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedMilitarIds(new Set())}>Limpar seleção</Button>
+                </div>
               </div>
+            )}
+            <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
               <div className={mostrarInativos ? 'col-span-2' : 'col-span-2'}>Graduação</div>
               <div className={mostrarInativos ? 'col-span-2' : 'col-span-2'}>Nome/Nome de guerra</div>
               <div className="col-span-1">Matrícula</div>
@@ -832,9 +837,9 @@ export default function Militares() {
               return (
                 <div
                   key={militar.id}
-                  className={`grid grid-cols-13 gap-2 px-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
+                  className={`relative grid grid-cols-12 gap-2 px-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
                 >
-                <div className="col-span-1">
+                <label className="absolute left-2 top-2 z-10">
                   <input
                     type="checkbox"
                     checked={selectedMilitarIds.has(String(militar.id))}
@@ -848,7 +853,7 @@ export default function Militares() {
                       });
                     }}
                   />
-                </div>
+                </label>
                 <div className="col-span-2 font-semibold text-[#1e3a5f]">{militar.posto_graduacao || 'Sem posto'}</div>
                 <div className="col-span-2">
                   <div className="font-medium truncate flex items-center gap-2">
