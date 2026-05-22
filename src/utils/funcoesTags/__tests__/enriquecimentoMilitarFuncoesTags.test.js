@@ -12,14 +12,14 @@ describe('enriquecimentoMilitarFuncoesTags', () => {
       { id: 'f3', nome: 'Chefe', prioridade_lista: 5 },
     ];
     const vinculosFuncoesAtivos = [
-      { militar_id: 'm1', funcao_id: 'f1', status: 'ativa', principal: true },
+      { militar_id: 'm1', funcao_militar_id: 'f1', status: 'ativa', principal: true },
       { militar_id: 'm1', funcao_id: 'f2', status: 'ativa' },
       { militar_id: 'm2', funcao_id: 'f2', status: 'ativa' },
       { militar_id: 'm2', funcao_id: 'f3', status: 'ativa' },
     ];
     const gruposTagsAtivos = [{ id: 'g1', nome: 'Restrições' }, { id: 'g2', nome: 'Destaques' }];
     const tagsAtivas = [
-      { id: 't1', nome: 'Restrição A', grupo_id: 'g1', aplicabilidade: 'militar', ordem_lista: 2 },
+      { id: 't1', nome: 'Restrição A', tag_grupo_id: 'g1', aplicabilidade: 'militar', ordem_lista: 2 },
       { id: 't2', nome: 'Restrição B', grupo_id: 'g1', aplicabilidade: 'ambos', ordem_lista: 1 },
       { id: 't3', nome: 'Condecorado', grupo_id: 'g2', aplicabilidade: 'militar', ordem_lista: 1 },
       { id: 't4', nome: 'Somente férias', grupo_id: 'g2', aplicabilidade: 'ferias', ordem_lista: 1 },

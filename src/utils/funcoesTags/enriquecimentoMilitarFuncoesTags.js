@@ -1,4 +1,5 @@
 import { APLICABILIDADE_TAG_MILITAR } from './militarTags';
+import { getFuncaoMilitarId, getTagGrupoId, isRegistroAtivo } from './contratoCampos';
 
 const normalizar = (valor) => String(valor || '').trim().toLowerCase();
 
@@ -31,9 +32,9 @@ export function enriquecerMilitaresComFuncoesETags({ militares = [], vinculosFun
 
   const funcoesAtivasByMilitar = new Map();
   vinculosFuncoesAtivos.forEach((vinculo) => {
-    if (normalizar(vinculo?.status) !== 'ativa') return;
+    if (!isRegistroAtivo(vinculo)) return;
     const militarId = String(vinculo?.militar_id || '').trim();
-    const funcao = funcoesById.get(String(vinculo?.funcao_id || '').trim());
+    const funcao = funcoesById.get(String(getFuncaoMilitarId(vinculo) || '').trim());
     if (!militarId || !funcao) return;
     if (!funcoesAtivasByMilitar.has(militarId)) funcoesAtivasByMilitar.set(militarId, []);
     funcoesAtivasByMilitar.get(militarId).push({ ...funcao, principal: vinculo?.principal === true });
@@ -41,11 +42,11 @@ export function enriquecerMilitaresComFuncoesETags({ militares = [], vinculosFun
 
   const tagsAtivasByMilitar = new Map();
   vinculosTagsAtivos.forEach((vinculo) => {
-    if (normalizar(vinculo?.status) !== 'ativa') return;
+    if (!isRegistroAtivo(vinculo)) return;
     const militarId = String(vinculo?.militar_id || '').trim();
     const tag = tagsById.get(String(vinculo?.tag_id || '').trim());
     if (!militarId || !tag) return;
-    const grupo = gruposById.get(String(tag?.grupo_id || '').trim());
+    const grupo = gruposById.get(String(getTagGrupoId(tag) || '').trim());
     if (!tagsAtivasByMilitar.has(militarId)) tagsAtivasByMilitar.set(militarId, []);
     tagsAtivasByMilitar.get(militarId).push({ ...tag, grupo_nome: String(grupo?.nome || '').trim() });
   });

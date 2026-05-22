@@ -1,4 +1,4 @@
-const normalizar = (valor) => String(valor || '').trim().toLowerCase();
+import { getFuncaoMilitarId, getTagGrupoId, isRegistroAtivo } from './contratoCampos';
 
 export function filtrarMilitaresPorFuncoesETags({
   militares = [],
@@ -19,9 +19,9 @@ export function filtrarMilitaresPorFuncoesETags({
 
   const funcoesByMilitar = new Map();
   vinculosFuncoesAtivos.forEach((vinculo) => {
-    if (normalizar(vinculo?.status) !== 'ativa') return;
+    if (!isRegistroAtivo(vinculo)) return;
     const militarId = String(vinculo?.militar_id || '');
-    const funcaoId = String(vinculo?.funcao_id || '');
+    const funcaoId = String(getFuncaoMilitarId(vinculo) || '');
     if (!militarId || !funcaoId) return;
     if (!funcoesByMilitar.has(militarId)) funcoesByMilitar.set(militarId, new Set());
     funcoesByMilitar.get(militarId).add(funcaoId);
@@ -29,7 +29,7 @@ export function filtrarMilitaresPorFuncoesETags({
 
   const tagsByMilitar = new Map();
   vinculosTagsAtivos.forEach((vinculo) => {
-    if (normalizar(vinculo?.status) !== 'ativa') return;
+    if (!isRegistroAtivo(vinculo)) return;
     const militarId = String(vinculo?.militar_id || '');
     const tagId = String(vinculo?.tag_id || '');
     if (!militarId || !tagId) return;
@@ -50,7 +50,7 @@ export function filtrarMilitaresPorFuncoesETags({
 
     const passaGrupos = gruposSelecionados.size === 0
       || [...tagsMilitar].some((tagId) => {
-        const grupoId = tagsById.get(String(tagId))?.grupo_id;
+        const grupoId = getTagGrupoId(tagsById.get(String(tagId)));
         return grupoId && gruposSelecionados.has(String(grupoId));
       });
 

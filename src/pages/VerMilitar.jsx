@@ -127,9 +127,10 @@ export default function VerMilitar() {
   const [searchParams] = useSearchParams();
   const id = searchParams.get('id');
   const selectedTab = searchParams.get('tab') || 'comportamento';
-  const { isAdmin, hasAccess, hasSelfAccess, canAccessAction, userEmail, modoAcesso, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
+  const { isAdmin, hasAccess, hasSelfAccess, canAccessAction, userEmail, modoAcesso, linkedMilitarEmail, isLoading: loadingUser, isAccessResolved } = useCurrentUser();
   const podeGerirImpedimentosMedalha = canAccessAction(ACOES_MEDALHAS.IMPEDIMENTOS);
   const effectiveEmail = getEffectiveEmail();
+  const funcoesTagsScopeKey = React.useMemo(() => buildFuncoesTagsScopeKey({ effectiveEmail, userEmail, modoAcesso, linkedMilitarId: linkedMilitarEmail }), [effectiveEmail, userEmail, modoAcesso, linkedMilitarEmail]);
   const podeVisualizarContratosDesignacao = isAdmin || canAccessAction('visualizar_contratos_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeCriarContratoDesignacao = isAdmin || canAccessAction('criar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
   const podeEditarContratoDesignacao = isAdmin || canAccessAction('editar_contrato_designacao') || canAccessAction('gerir_contratos_designacao');
@@ -257,7 +258,7 @@ export default function VerMilitar() {
 
 
   const { data: decoracaoInstitucionalMilitar = null } = useQuery({
-    queryKey: ['militar-funcao-institucional', militar?.id],
+    queryKey: funcoesTagsKeys.militarFuncaoInstitucional(funcoesTagsScopeKey, militar?.id),
     queryFn: async () => {
       const [funcoesInstitucionais, vinculosAtivos] = await Promise.all([
         base44.entities.FuncaoMilitar.filter({ ativa: true }, 'prioridade_lista'),
