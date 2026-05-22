@@ -2,31 +2,25 @@
   "name": "Tag",
   "type": "object",
   "title": "Tag",
-  "description": "Tag aplicável a militares e/ou férias com suporte a escopo.",
+  "description": "Tag aplic\u00e1vel a militares e/ou f\u00e9rias, vinculada opcionalmente a um TagGrupo.",
   "properties": {
-    "grupo_id": {
-      "type": "string",
-      "default": ""
-    },
     "nome": {
       "type": "string",
-      "default": ""
+      "description": "Nome da tag"
     },
-    "descricao": {
+    "grupo_id": {
       "type": "string",
-      "default": ""
+      "default": "",
+      "description": "ID do TagGrupo associado (opcional)"
     },
-    "icone": {
+    "aplicabilidade": {
       "type": "string",
-      "default": ""
-    },
-    "emoji": {
-      "type": "string",
-      "default": ""
-    },
-    "cor": {
-      "type": "string",
-      "default": ""
+      "enum": [
+        "militar",
+        "ferias",
+        "ambos"
+      ],
+      "default": "ambos"
     },
     "tipo_visual": {
       "type": "string",
@@ -39,14 +33,13 @@
       ],
       "default": "normal"
     },
-    "aplicabilidade": {
+    "emoji": {
       "type": "string",
-      "enum": [
-        "militar",
-        "ferias",
-        "ambos"
-      ],
-      "default": "ambos"
+      "default": "\ud83c\udff7\ufe0f"
+    },
+    "cor": {
+      "type": "string",
+      "default": "#F59E0B"
     },
     "ordem_exibicao": {
       "type": "number",
@@ -54,40 +47,19 @@
     },
     "escopo_tipo": {
       "type": "string",
-      "enum": [
-        "global",
-        "grupamento",
-        "subgrupamento",
-        "unidade",
-        "setor",
-        "subsetor"
-      ],
       "default": "global"
-    },
-    "escopo_id": {
-      "type": "string",
-      "default": ""
     },
     "ativo": {
       "type": "boolean",
       "default": true
     },
-    "created_by": {
-      "type": "string",
-      "default": ""
-    },
-    "updated_by": {
+    "observacoes": {
       "type": "string",
       "default": ""
     }
   },
   "required": [
-    "nome"
-  ],
-  "_security": {
-    "read": true,
-    "create": "admin",
-    "update": "admin",
-    "delete": "admin"
-  }
+    "nome",
+    "aplicabilidade"
+  ]
 }
