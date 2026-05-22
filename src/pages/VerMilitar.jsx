@@ -49,6 +49,7 @@ import { fetchScopedContratosDesignacaoMilitar } from '@/services/getScopedContr
 import { getEffectiveEmail } from '@/services/getScopedMilitaresClient';
 import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
 import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
+import FuncoesMilitarSection from '@/components/militar/FuncoesMilitarSection';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -621,6 +622,7 @@ export default function VerMilitar() {
                     </div>
                   }
                 </Section>
+                <FuncoesMilitarSection militar={militar} />
                 <Section title="Dados Pessoais" icon={User}>
                   <div className="grid grid-cols-2 gap-x-4">
                     <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
