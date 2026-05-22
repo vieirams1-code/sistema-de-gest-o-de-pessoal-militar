@@ -11,6 +11,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref }) {
   });
 
   React.useEffect(() => {
+    if (typeof window === 'undefined') return;
     window.localStorage.setItem(QUICK_ACCESS_COLLAPSED_KEY, String(isQuickAccessCollapsed));
   }, [isQuickAccessCollapsed]);
 
