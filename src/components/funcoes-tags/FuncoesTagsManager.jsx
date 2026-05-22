@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -35,10 +35,19 @@ const EMOJIS_OPERACIONAIS = {
   Gerais: ['📌', '📋', '📍', '🧭'],
 };
 
+
+const TABS_VALIDAS = ['funcoes', 'grupos', 'tags'];
+
+const normalizarTab = (valorTab) => {
+  if (typeof valorTab !== 'string') return 'funcoes';
+  const tab = valorTab.trim().toLowerCase();
+  return TABS_VALIDAS.includes(tab) ? tab : 'funcoes';
+};
+
 export default function FuncoesTagsManager({ canEdit, initialTab = 'funcoes' }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(() => normalizarTab(initialTab));
   const [search, setSearch] = useState({ funcoes: '', grupos: '', tags: '' });
 
   const [funcaoForm, setFuncaoForm] = useState({ nome: '', prioridade_lista: 10, institucional_chave: '', emoji: '⭐', cor: '#1D4ED8', aplicabilidade: 'ambos' });
@@ -47,6 +56,10 @@ export default function FuncoesTagsManager({ canEdit, initialTab = 'funcoes' }) 
   const [grupoEdicao, setGrupoEdicao] = useState(null);
   const [tagForm, setTagForm] = useState({ grupo_id: '', nome: '', aplicabilidade: 'ambos', emoji: '⚠️', tipo_visual: 'destaque', cor: '#F59E0B' });
   const [tagEdicao, setTagEdicao] = useState(null);
+
+  useEffect(() => {
+    setActiveTab(normalizarTab(initialTab));
+  }, [initialTab]);
 
   const { data: funcoes = [] } = useQuery({ queryKey: ['funcoes-tags', 'funcoes'], queryFn: () => base44.entities.FuncaoMilitar.list('prioridade_lista') });
   const { data: grupos = [] } = useQuery({ queryKey: ['funcoes-tags', 'grupos'], queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao') });
@@ -110,6 +123,14 @@ export default function FuncoesTagsManager({ canEdit, initialTab = 'funcoes' }) 
   };
 
   const renderBadge = (ativo) => <Badge variant={ativo ? 'default' : 'secondary'}>{ativo ? 'Ativo' : 'Inativo'}</Badge>;
+
+  if (!TABS_VALIDAS.includes(activeTab)) {
+    return (
+      <div className="bg-white rounded-xl border border-red-200 p-6">
+        <p className="text-sm text-red-700">Não foi possível abrir a gestão de tags.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
