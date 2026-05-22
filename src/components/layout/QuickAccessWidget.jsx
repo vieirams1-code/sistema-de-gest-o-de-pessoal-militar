@@ -177,15 +177,17 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
 
   const isHorizontal = mode.orientacao === 'horizontal';
   const isCompact = mode.densidade === 'compact';
+  const isVerticalCompact = !isHorizontal && isCompact;
+  const isVerticalExpanded = !isHorizontal && !isCompact;
 
   return (
     <div
       ref={containerRef}
-      className={`fixed ${containerZIndexClass} cursor-default rounded-xl border border-slate-200 bg-white shadow-xl`}
+      className={`fixed ${containerZIndexClass} cursor-default rounded-xl border border-slate-200 bg-white shadow-xl ${isVerticalCompact ? 'w-[56px]' : ''} ${isVerticalExpanded ? 'min-w-52' : ''}`}
       style={baseStyle}
     >
       <div
-        className="flex items-center justify-between gap-2 rounded-t-xl border-b border-slate-200 bg-slate-50 px-2 py-1.5"
+        className={`rounded-t-xl border-b border-slate-200 bg-slate-50 ${isVerticalCompact ? 'flex w-[56px] flex-col items-center justify-center gap-1 px-1 py-2' : 'flex items-center justify-between gap-2 px-2 py-1.5'}`}
       >
         <div
           data-drag-handle
@@ -194,12 +196,12 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
           onPointerUp={finishDrag}
           onPointerCancel={finishDrag}
           onClick={preventGhostClick}
-          className={`flex items-center gap-2 text-slate-700 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`flex items-center text-slate-700 ${isVerticalCompact ? 'justify-center gap-0' : 'gap-2'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         >
           <GripVertical className="h-4 w-4 text-slate-400" />
-          <p className="text-xs font-semibold">Acesso rápido</p>
+          {!isVerticalCompact && <p className="text-xs font-semibold">Acesso rápido</p>}
         </div>
-        <div className="flex items-center gap-1">
+        <div className={`flex items-center gap-1 ${isVerticalCompact ? 'flex-col' : ''}`}>
           <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); persistState({ orientacao: isHorizontal ? 'vertical' : 'horizontal' }); }} className="rounded p-1 text-slate-500 hover:bg-slate-200" title="Alternar orientação" aria-label="Alternar orientação">
             {isHorizontal ? <Rows3 className="h-3.5 w-3.5" /> : <Rows2 className="h-3.5 w-3.5" />}
           </button>
@@ -215,7 +217,10 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
         </div>
       </div>
 
-      <div className={`p-2 ${isHorizontal ? 'flex max-w-[70vw] flex-row gap-1 overflow-x-auto' : 'flex max-h-[55vh] min-w-52 flex-col gap-1 overflow-y-auto'}`}>
+      <div className={`${isHorizontal
+        ? `${isCompact ? 'flex max-w-[70vw] flex-row gap-1 p-1.5 overflow-x-auto' : 'flex max-w-[70vw] flex-row gap-1 p-2 overflow-x-auto'}`
+        : `${isCompact ? 'flex max-h-[55vh] flex-col items-center gap-1 p-1.5 overflow-y-auto' : 'flex max-h-[55vh] min-w-52 flex-col gap-1 p-2 overflow-y-auto'}`}`}
+      >
         {items.map((item) => {
           const ItemIcon = item.icon;
           return (
@@ -223,7 +228,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
               key={getPinKey(item)}
               to={createHref(item)}
               onPointerDown={(e) => e.stopPropagation()}
-              className={`flex shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 ${isCompact ? 'justify-center' : ''}`}
+              className={`flex shrink-0 items-center gap-2 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 ${isCompact ? 'h-9 w-9 justify-center rounded-lg p-2' : 'rounded-md px-2 py-1.5'} ${isHorizontal ? '' : 'self-stretch'}`}
               title={item.name}
               aria-label={item.name}
             >
