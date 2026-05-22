@@ -9,7 +9,7 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-export default function QuickAccessWidget({ items, getPinKey, createHref, widgetPreferences, onWidgetChange, defaultWidget }) {
+export default function QuickAccessWidget({ items, getPinKey, createHref, widgetPreferences, onWidgetChange, defaultWidget, sidebarFlyoutOpen = false }) {
   const containerRef = React.useRef(null);
   const dragState = React.useRef({
     pointerId: null,
@@ -22,6 +22,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
   });
 
   const [position, setPosition] = React.useState({ x: widgetPreferences?.x ?? defaultWidget.x, y: widgetPreferences?.y ?? defaultWidget.y });
+  const [isDragging, setIsDragging] = React.useState(false);
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
 
@@ -88,7 +89,14 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
       didDrag: false,
     };
     event.preventDefault();
-    node.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+    if (node?.setPointerCapture) {
+      try {
+        node.setPointerCapture(event.pointerId);
+      } catch {
+        // noop
+      }
+    }
   };
 
   const handlePointerMove = (event) => {
@@ -110,11 +118,16 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
   const finishDrag = (event) => {
     if (!dragState.current.dragging || dragState.current.pointerId !== event.pointerId) return;
     const node = containerRef.current;
-    if (node?.hasPointerCapture?.(event.pointerId)) {
-      node.releasePointerCapture(event.pointerId);
+    if (node?.hasPointerCapture?.(event.pointerId) && node?.releasePointerCapture) {
+      try {
+        node.releasePointerCapture(event.pointerId);
+      } catch {
+        // noop
+      }
     }
     dragState.current.dragging = false;
     dragState.current.pointerId = null;
+    setIsDragging(false);
     persistState(position);
   };
 
@@ -135,12 +148,14 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
     ? { left: EDGE, right: EDGE, bottom: EDGE, top: 'auto' }
     : { left: `${position.x}px`, top: `${position.y}px` };
 
+  const containerZIndexClass = sidebarFlyoutOpen ? 'z-[100]' : 'z-[200]';
+
   if (mode.minimized) {
     return (
       <button
         type="button"
         onClick={() => persistState({ minimized: false })}
-        className="fixed z-[200] flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 text-slate-700 shadow-xl backdrop-blur transition-colors hover:bg-slate-100 hover:text-slate-900"
+        className={`fixed ${containerZIndexClass} flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white/95 px-3 text-slate-700 shadow-xl backdrop-blur transition-colors hover:bg-slate-100 hover:text-slate-900`}
         style={baseStyle}
         aria-label={`Expandir acesso rápido (${items.length} favoritos)`}
         title="Expandir acesso rápido"
@@ -157,7 +172,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
   return (
     <div
       ref={containerRef}
-      className="fixed z-[200] cursor-default rounded-xl border border-slate-200 bg-white shadow-xl"
+      className={`fixed ${containerZIndexClass} cursor-default rounded-xl border border-slate-200 bg-white shadow-xl`}
       style={baseStyle}
     >
       <div
@@ -170,7 +185,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
           onPointerUp={finishDrag}
           onPointerCancel={finishDrag}
           onClick={preventGhostClick}
-          className={`flex items-center gap-2 text-slate-700 ${dragState.current.dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`flex items-center gap-2 text-slate-700 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         >
           <GripVertical className="h-4 w-4 text-slate-400" />
           <p className="text-xs font-semibold">Acesso rápido</p>

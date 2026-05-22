@@ -225,6 +225,8 @@ export default function Layout({ children, currentPageName }) {
     setExpandedSection((prev) => (prev === sectionTitle ? '' : sectionTitle));
   };
 
+  const sidebarFlyoutOpen = compactSidebar && hoveredSection !== null;
+
 
   const canViewMenuEntry = (entry) => {
     if (entry.adminOnly && !isAdmin) return false;
@@ -515,6 +517,7 @@ export default function Layout({ children, currentPageName }) {
         widgetPreferences={widgetPreferences}
         onWidgetChange={updateWidgetPreferences}
         defaultWidget={DEFAULT_WIDGET}
+        sidebarFlyoutOpen={sidebarFlyoutOpen}
         createHref={(item) => {
           const baseHref = item.path || createPageUrl(item.page);
           return item.tab ? `${baseHref}?tab=${item.tab}` : baseHref;
