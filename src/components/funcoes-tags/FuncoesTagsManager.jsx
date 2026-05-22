@@ -59,18 +59,28 @@ export default function FuncoesTagsManager({ canEdit }) {
   }, onSuccess: ({ created }) => { invalidateCatalogo('funcoes'); toast({ title: created > 0 ? 'Funções institucionais inicializadas.' : 'Funções institucionais já existem.' }); }, onError: (error) => toast({ title: 'Erro ao inicializar funções institucionais', description: getErrorMessage(error, 'Tente novamente.'), variant: 'destructive' }) });
 
   const upsertFuncao = () => {
-    const bloqueada = funcaoEdicao && INSTITUCIONAIS[funcaoEdicao.institucional_chave];
-    const payload = {
+    const chaveInstitucional = funcaoEdicao?.institucional_chave;
+    const bloqueada = Boolean(funcaoEdicao && INSTITUCIONAIS[chaveInstitucional]);
+    const payloadBase = {
       ...funcaoForm,
       nome: funcaoForm.nome || nomeFuncao,
       ativa: true
     };
 
-    if (bloqueada) {
-      payload.institucional_chave = funcaoEdicao.institucional_chave;
-      payload.prioridade_lista = INSTITUCIONAIS[funcaoEdicao.institucional_chave];
-      payload.ativa = true;
-    }
+    const payload = bloqueada
+      ? {
+        nome: payloadBase.nome,
+        descricao: payloadBase.descricao,
+        icone: payloadBase.icone,
+        emoji: payloadBase.emoji,
+        cor: payloadBase.cor,
+        estrutura_nome: payloadBase.estrutura_nome,
+        tipo_estrutura: payloadBase.tipo_estrutura,
+        institucional_chave: chaveInstitucional,
+        prioridade_lista: INSTITUCIONAIS[chaveInstitucional],
+        ativa: true
+      }
+      : payloadBase;
 
     const erro = validarFuncao(payload, funcoes, funcaoEdicao);
     if (erro) {
@@ -153,4 +163,5 @@ export default function FuncoesTagsManager({ canEdit }) {
     </div>
   );
 }
-  const getErrorMessage = (error, fallback) => error?.message || error?.response?.data?.error || fallback;
+
+const getErrorMessage = (error, fallback) => error?.message || error?.response?.data?.error || fallback;
