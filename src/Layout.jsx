@@ -315,6 +315,7 @@ export default function Layout({ children, currentPageName }) {
                 <div className="min-w-0">
                   <span className="font-bold text-lg block leading-tight">SGP Militar</span>
                   <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">Sistema de Gestão de Pessoal</span>
+                  <span className="text-[10px] text-yellow-300 font-bold tracking-wide">MENU UX V2 ATIVO</span>
                 </div>
               </div>
             )}
