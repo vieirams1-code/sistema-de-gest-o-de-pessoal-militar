@@ -38,6 +38,8 @@ import SaneamentoPromocaoDivergenteDialog from '@/components/admin/SaneamentoPro
 import { isQuadroComDestaque, normalizarQuadroLegado, QUADROS_FIXOS } from '@/utils/postoQuadroCompatibilidade';
 import { resolveMovimentoCondicao } from '@/utils/condicaoMovimento';
 import { construirDecoracaoInstitucionalPorMilitar, ordenarComDestaqueInstitucional } from '@/utils/funcoesTags/destaqueInstitucionalEfetivo';
+import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
+import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -184,6 +186,9 @@ export default function Militares() {
   const [debouncedPostos, setDebouncedPostos] = useState([]);
   const [quadrosSelecionados, setQuadrosSelecionados] = useState([]);
   const [situacoesSelecionadas, setSituacoesSelecionadas] = useState([]);
+  const [funcoesSelecionadas, setFuncoesSelecionadas] = useState([]);
+  const [tagsSelecionadas, setTagsSelecionadas] = useState([]);
+  const [gruposSelecionados, setGruposSelecionados] = useState([]);
   const [condicaoFilter, setCondicaoFilter] = useState(CONDICOES_TODAS);
   const [movimentoFilter, setMovimentoFilter] = useState(MOVIMENTO_TODOS);
   const [lotacaoFilter, setLotacaoFilter] = useState(TODAS_LOTACOES_VALUE);
@@ -357,6 +362,30 @@ export default function Militares() {
     },
   });
 
+  const { data: funcoesAtivas = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'funcoes'],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery,
+    queryFn: () => base44.entities.FuncaoMilitar.filter({ ativa: true }, 'prioridade_lista'),
+  });
+
+  const { data: tagsAtivas = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'tags'],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery,
+    queryFn: async () => {
+      const tags = await base44.entities.Tag.filter({ ativa: true }, 'ordem asc, nome asc');
+      return tags.filter((tag) => APLICABILIDADE_TAG_MILITAR.has(String(tag?.aplicabilidade || '').toLowerCase()));
+    },
+  });
+
+  const { data: gruposAtivos = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'grupos'],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery,
+    queryFn: () => base44.entities.TagGrupo.filter({ ativo: true }, 'ordem asc, nome asc'),
+  });
+
   const { data: vinculosInstitucionaisAtivos = [] } = useQuery({
     queryKey: ['militares-funcoes-institucionais', idsHash],
     staleTime: STALE_TIME_MS,
@@ -370,6 +399,26 @@ export default function Militares() {
         funcao_id: { '$in': funcaoIds },
       });
     },
+  });
+
+  const { data: vinculosFuncoesAtivosFiltros = [] } = useQuery({
+    queryKey: ['militares-funcoes-filtros', idsHash],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery && idsMilitaresCarregados.length > 0,
+    queryFn: () => base44.entities.MilitarFuncao.filter({
+      status: 'ativa',
+      militar_id: { '$in': idsMilitaresCarregados },
+    }),
+  });
+
+  const { data: vinculosTagsAtivosFiltros = [] } = useQuery({
+    queryKey: ['militares-tags-filtros', idsHash],
+    staleTime: STALE_TIME_MS,
+    enabled: shouldQuery && idsMilitaresCarregados.length > 0,
+    queryFn: () => base44.entities.MilitarTag.filter({
+      status: 'ativa',
+      militar_id: { '$in': idsMilitaresCarregados },
+    }),
   });
 
   const decoracaoInstitucionalByMilitar = useMemo(() => construirDecoracaoInstitucionalPorMilitar({
@@ -407,7 +456,22 @@ export default function Militares() {
       || militarCorrespondeOrigemDestino(m, searchTerm)
     ));
 
-  const filteredMilitares = useMemo(() => ordenarComDestaqueInstitucional(filteredMilitaresBase, decoracaoInstitucionalByMilitar), [filteredMilitaresBase, decoracaoInstitucionalByMilitar]);
+  const filteredMilitaresComFuncoesTags = useMemo(() => filtrarMilitaresPorFuncoesETags({
+    militares: filteredMilitaresBase,
+    filtros: {
+      funcoesIds: funcoesSelecionadas,
+      tagsIds: tagsSelecionadas,
+      gruposIds: gruposSelecionados,
+    },
+    vinculosFuncoesAtivos: vinculosFuncoesAtivosFiltros,
+    vinculosTagsAtivos: vinculosTagsAtivosFiltros,
+    tagsAtivas,
+  }), [filteredMilitaresBase, funcoesSelecionadas, tagsSelecionadas, gruposSelecionados, vinculosFuncoesAtivosFiltros, vinculosTagsAtivosFiltros, tagsAtivas]);
+
+  const filteredMilitares = useMemo(
+    () => ordenarComDestaqueInstitucional(filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar),
+    [filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar],
+  );
 
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
@@ -495,6 +559,39 @@ export default function Militares() {
               options={SITUACOES_OPCOES}
               value={situacoesSelecionadas}
               onChange={setSituacoesSelecionadas}
+              triggerClassName="w-full"
+            />
+            <MultiSelectFiltro
+              label="Funções"
+              placeholder="Todas"
+              options={funcoesAtivas.map((funcao) => ({
+                value: String(funcao.id),
+                label: `${funcao.emoji || '⭐'} ${funcao.nome}`,
+              }))}
+              value={funcoesSelecionadas}
+              onChange={setFuncoesSelecionadas}
+              triggerClassName="w-full"
+            />
+            <MultiSelectFiltro
+              label="Tags"
+              placeholder="Todas"
+              options={tagsAtivas.map((tag) => ({
+                value: String(tag.id),
+                label: `${tag.emoji || '🏷️'} ${tag.nome}`,
+              }))}
+              value={tagsSelecionadas}
+              onChange={setTagsSelecionadas}
+              triggerClassName="w-full"
+            />
+            <MultiSelectFiltro
+              label="Grupos de tags"
+              placeholder="Todos"
+              options={gruposAtivos.map((grupo) => ({
+                value: String(grupo.id),
+                label: `${grupo.emoji || '🗂️'} ${grupo.nome}`,
+              }))}
+              value={gruposSelecionados}
+              onChange={setGruposSelecionados}
               triggerClassName="w-full"
             />
             <div>
