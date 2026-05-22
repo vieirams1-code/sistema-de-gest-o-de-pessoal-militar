@@ -633,6 +633,11 @@ export default function ExtracaoEfetivo() {
   const [militaresError, setMilitaresError] = useState(null);
   const hasExecutedExtraction = Boolean(filtrosExecutados);
 
+  const [funcoesTagsBundle, setFuncoesTagsBundle] = useState({ funcoesAtivas: [], vinculosFuncoesAtivos: [], tagsAtivas: [], gruposTagsAtivos: [], vinculosTagsAtivos: [] });
+  const funcoesByNome = useMemo(() => new Map(funcoesTagsBundle.funcoesAtivas.map((f) => [String(f?.nome || '').trim(), String(f?.id || '').trim()])), [funcoesTagsBundle.funcoesAtivas]);
+  const tagsByNome = useMemo(() => new Map(funcoesTagsBundle.tagsAtivas.map((t) => [String(t?.nome || '').trim(), String(t?.id || '').trim()])), [funcoesTagsBundle.tagsAtivas]);
+  const gruposByNome = useMemo(() => new Map(funcoesTagsBundle.gruposTagsAtivos.map((g) => [String(g?.nome || '').trim(), String(g?.id || '').trim()])), [funcoesTagsBundle.gruposTagsAtivos]);
+
   const filtrosAtuais = useMemo(
     () => ({
       includeFoto: false,
@@ -750,10 +755,6 @@ export default function ExtracaoEfetivo() {
   }, [feriasBundleData]);
 
   const militaresIds = useMemo(() => militares.map((m) => String(m?.id || '').trim()).filter(Boolean), [militares]);
-  const [funcoesTagsBundle, setFuncoesTagsBundle] = useState({ funcoesAtivas: [], vinculosFuncoesAtivos: [], tagsAtivas: [], gruposTagsAtivos: [], vinculosTagsAtivos: [] });
-  const funcoesByNome = useMemo(() => new Map(funcoesTagsBundle.funcoesAtivas.map((f) => [String(f?.nome || '').trim(), String(f?.id || '').trim()])), [funcoesTagsBundle.funcoesAtivas]);
-  const tagsByNome = useMemo(() => new Map(funcoesTagsBundle.tagsAtivas.map((t) => [String(t?.nome || '').trim(), String(t?.id || '').trim()])), [funcoesTagsBundle.tagsAtivas]);
-  const gruposByNome = useMemo(() => new Map(funcoesTagsBundle.gruposTagsAtivos.map((g) => [String(g?.nome || '').trim(), String(g?.id || '').trim()])), [funcoesTagsBundle.gruposTagsAtivos]);
   useEffect(() => {
     let ativo = true;
     async function carregar() {
