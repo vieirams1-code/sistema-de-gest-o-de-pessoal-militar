@@ -4,21 +4,82 @@
   "title": "Militar x Função",
   "description": "Vinculação de militares às funções com histórico e escopo.",
   "properties": {
-    "militar_id": { "type": "string", "default": "" },
-    "funcao_militar_id": { "type": "string", "default": "" },
-    "status": { "type": "string", "enum": ["ativa", "inativa", "encerrada"], "default": "ativa" },
-    "data_inicio": { "type": "string", "format": "date", "default": "" },
-    "data_fim": { "type": "string", "format": "date", "default": "" },
-    "principal": { "type": "boolean", "default": false },
-    "ordem_override": { "type": "number", "default": 0 },
-    "escopo_tipo": { "type": "string", "default": "" },
-    "escopo_id": { "type": "string", "default": "" },
-    "estrutura_id": { "type": "string", "default": "" },
-    "estrutura_nome": { "type": "string", "default": "" },
-    "tipo_estrutura": { "type": "string", "default": "" },
-    "motivo": { "type": "string", "default": "" },
-    "created_by": { "type": "string", "default": "" },
-    "updated_by": { "type": "string", "default": "" }
+    "militar_id": {
+      "type": "string",
+      "default": ""
+    },
+    "funcao_militar_id": {
+      "type": "string",
+      "default": ""
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ativa",
+        "inativa",
+        "encerrada"
+      ],
+      "default": "ativa"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date",
+      "default": ""
+    },
+    "data_fim": {
+      "type": "string",
+      "format": "date",
+      "default": ""
+    },
+    "principal": {
+      "type": "boolean",
+      "default": false
+    },
+    "ordem_override": {
+      "type": "number",
+      "default": 0
+    },
+    "escopo_tipo": {
+      "type": "string",
+      "default": ""
+    },
+    "escopo_id": {
+      "type": "string",
+      "default": ""
+    },
+    "estrutura_id": {
+      "type": "string",
+      "default": ""
+    },
+    "estrutura_nome": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_estrutura": {
+      "type": "string",
+      "default": ""
+    },
+    "motivo": {
+      "type": "string",
+      "default": ""
+    },
+    "created_by": {
+      "type": "string",
+      "default": ""
+    },
+    "updated_by": {
+      "type": "string",
+      "default": ""
+    }
   },
-  "required": ["militar_id", "funcao_militar_id"]
+  "required": [
+    "militar_id",
+    "funcao_militar_id"
+  ],
+  "_security": {
+    "read": true,
+    "create": "admin",
+    "update": "admin",
+    "delete": "admin"
+  }
 }

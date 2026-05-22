@@ -4,19 +4,86 @@
   "title": "Grupo de Tags",
   "description": "Agrupamento de tags por contexto visual e de aplicabilidade.",
   "properties": {
-    "nome": { "type": "string", "default": "" },
-    "descricao": { "type": "string", "default": "" },
-    "icone": { "type": "string", "default": "" },
-    "emoji": { "type": "string", "default": "" },
-    "cor": { "type": "string", "default": "" },
-    "tipo_visual": { "type": "string", "enum": ["normal", "destaque", "alerta", "favorito", "critico"], "default": "normal" },
-    "aplicabilidade": { "type": "string", "enum": ["militar", "ferias", "ambos"], "default": "ambos" },
-    "ordem_exibicao": { "type": "number", "default": 0 },
-    "escopo_tipo": { "type": "string", "enum": ["global", "grupamento", "subgrupamento", "unidade", "setor", "subsetor"], "default": "global" },
-    "escopo_id": { "type": "string", "default": "" },
-    "ativo": { "type": "boolean", "default": true },
-    "created_by": { "type": "string", "default": "" },
-    "updated_by": { "type": "string", "default": "" }
+    "nome": {
+      "type": "string",
+      "default": ""
+    },
+    "descricao": {
+      "type": "string",
+      "default": ""
+    },
+    "icone": {
+      "type": "string",
+      "default": ""
+    },
+    "emoji": {
+      "type": "string",
+      "default": ""
+    },
+    "cor": {
+      "type": "string",
+      "default": ""
+    },
+    "tipo_visual": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "destaque",
+        "alerta",
+        "favorito",
+        "critico"
+      ],
+      "default": "normal"
+    },
+    "aplicabilidade": {
+      "type": "string",
+      "enum": [
+        "militar",
+        "ferias",
+        "ambos"
+      ],
+      "default": "ambos"
+    },
+    "ordem_exibicao": {
+      "type": "number",
+      "default": 0
+    },
+    "escopo_tipo": {
+      "type": "string",
+      "enum": [
+        "global",
+        "grupamento",
+        "subgrupamento",
+        "unidade",
+        "setor",
+        "subsetor"
+      ],
+      "default": "global"
+    },
+    "escopo_id": {
+      "type": "string",
+      "default": ""
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "created_by": {
+      "type": "string",
+      "default": ""
+    },
+    "updated_by": {
+      "type": "string",
+      "default": ""
+    }
   },
-  "required": ["nome"]
+  "required": [
+    "nome"
+  ],
+  "_security": {
+    "read": true,
+    "create": "admin",
+    "update": "admin",
+    "delete": "admin"
+  }
 }

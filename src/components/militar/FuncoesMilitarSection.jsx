@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { criarMilitarFuncaoEscopado, atualizarMilitarFuncaoEscopado, encerrarMilitarFuncaoEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,11 +102,11 @@ export default function FuncoesMilitarSection({ militar }) {
 
       if (form.principal) {
         await Promise.all(vinculosAtivos.filter((v) => v.principal).map((v) =>
-          base44.entities.MilitarFuncao.update(v.id, { principal: false })
+          atualizarMilitarFuncaoEscopado(v.id, { principal: false })
         ));
       }
 
-      await base44.entities.MilitarFuncao.create({
+      await criarMilitarFuncaoEscopado({
         militar_id: militar.id,
         funcao_militar_id: form.funcao_militar_id,
         status: 'ativa',
@@ -132,15 +133,15 @@ export default function FuncoesMilitarSection({ militar }) {
   const setPrincipalMutation = useMutation({
     mutationFn: async (vinculo) => {
       const ativos = vinculosAtivos.filter((v) => v.id !== vinculo.id && v.principal);
-      await Promise.all(ativos.map((v) => base44.entities.MilitarFuncao.update(v.id, { principal: false })));
-      await base44.entities.MilitarFuncao.update(vinculo.id, { principal: true });
+      await Promise.all(ativos.map((v) => atualizarMilitarFuncaoEscopado(v.id, { principal: false })));
+      await atualizarMilitarFuncaoEscopado(vinculo.id, { principal: true });
     },
     onSuccess: () => {toast({ title: 'Função principal atualizada.' }); invalidate();},
     onError: (error) => toast({ title: 'Erro ao definir principal', description: error.message, variant: 'destructive' })
   });
 
   const encerrarMutation = useMutation({
-    mutationFn: async ({ vinculo, motivo }) => base44.entities.MilitarFuncao.update(vinculo.id, {
+    mutationFn: async ({ vinculo, motivo }) => encerrarMilitarFuncaoEscopado(vinculo.id, {
       status: 'encerrada',
       data_fim: new Date().toISOString().split('T')[0],
       principal: false,
