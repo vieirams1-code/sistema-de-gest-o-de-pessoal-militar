@@ -1,0 +1,24 @@
+{
+  "name": "FuncaoMilitar",
+  "type": "object",
+  "title": "Função Militar",
+  "description": "Catálogo de funções militares institucionais e personalizadas por escopo.",
+  "properties": {
+    "nome": { "type": "string", "default": "" },
+    "descricao": { "type": "string", "default": "" },
+    "institucional_chave": { "type": "string", "enum": ["comandante", "subcomandante", null], "default": null },
+    "prioridade_lista": { "type": "number", "default": 10 },
+    "escopo_tipo": { "type": "string", "enum": ["global", "grupamento", "subgrupamento", "unidade", "setor", "subsetor"], "default": "global" },
+    "escopo_id": { "type": "string", "default": "" },
+    "estrutura_id": { "type": "string", "default": "" },
+    "estrutura_nome": { "type": "string", "default": "" },
+    "tipo_estrutura": { "type": "string", "default": "" },
+    "ativa": { "type": "boolean", "default": true },
+    "icone": { "type": "string", "default": "" },
+    "emoji": { "type": "string", "default": "" },
+    "cor": { "type": "string", "default": "" },
+    "created_by": { "type": "string", "default": "" },
+    "updated_by": { "type": "string", "default": "" }
+  },
+  "required": ["nome"]
+}
