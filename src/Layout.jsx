@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
@@ -38,6 +38,7 @@ import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCurrentUser } from '@/components/auth/useCurrentUser';
 import useVerificacaoComportamentoDiaria from '@/hooks/useVerificacaoComportamentoDiaria';
+import useQuickAccessPreferences from '@/hooks/useQuickAccessPreferences';
 import GlobalMilitarSearch from '@/components/militar/GlobalMilitarSearch';
 import SgpThemeModeMount from '@/themes/sgpThemeModes/SgpThemeModeMount';
 import SgpThemeProfileSelector from '@/themes/sgpThemeModes/SgpThemeProfileSelector';
@@ -198,16 +199,6 @@ export default function Layout({ children, currentPageName }) {
   const [compactSidebar, setCompactSidebar] = useState(false);
   const [expandedSection, setExpandedSection] = useState('');
   const [hoveredSection, setHoveredSection] = useState(null);
-  const [pinnedItems, setPinnedItems] = useState(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const storedPins = window.localStorage.getItem('sgp_sidebar_pins');
-      const parsedPins = storedPins ? JSON.parse(storedPins) : [];
-      return Array.isArray(parsedPins) ? parsedPins : [];
-    } catch {
-      return [];
-    }
-  });
   const {
     isAdmin,
     canAccessModule,
@@ -218,6 +209,10 @@ export default function Layout({ children, currentPageName }) {
     userEmail,
   } = useCurrentUser();
   const { themeMode, setThemeMode, isBombeiroMode } = useSgpThemeMode();
+  const {
+    pinnedItems,
+    togglePin,
+  } = useQuickAccessPreferences(userEmail);
   const hasAbsoluteAccess = canAccessAll || permissions === 'ALL';
   const temPermissao = (actionKey) => canAccessAction(actionKey);
   useVerificacaoComportamentoDiaria({ enabled: canAccessModule('militares') || isAdmin });
@@ -226,11 +221,6 @@ export default function Layout({ children, currentPageName }) {
     setExpandedSection((prev) => (prev === sectionTitle ? '' : sectionTitle));
   };
 
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem('sgp_sidebar_pins', JSON.stringify(pinnedItems));
-  }, [pinnedItems]);
 
   const canViewMenuEntry = (entry) => {
     if (entry.adminOnly && !isAdmin) return false;
@@ -290,15 +280,6 @@ export default function Layout({ children, currentPageName }) {
 
   const isPinned = (item) => pinnedItems.some((pinnedItem) => pinnedItem.page === item.page && (pinnedItem.tab || null) === (item.tab || null));
 
-  const togglePin = (item) => {
-    setPinnedItems((prev) => {
-      const hasPinnedItem = prev.some((pinnedItem) => pinnedItem.page === item.page && (pinnedItem.tab || null) === (item.tab || null));
-      if (hasPinnedItem) {
-        return prev.filter((pinnedItem) => !(pinnedItem.page === item.page && (pinnedItem.tab || null) === (item.tab || null)));
-      }
-      return [...prev, { page: item.page, tab: item.tab || null }];
-    });
-  };
 
   const isItemActive = (item) => {
     if (item.children?.length) {
