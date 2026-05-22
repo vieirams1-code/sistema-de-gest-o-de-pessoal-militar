@@ -19,10 +19,16 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
     startY: 0,
     dragging: false,
     didDrag: false,
+    captureTarget: null,
   });
 
   const [position, setPosition] = React.useState({ x: widgetPreferences?.x ?? defaultWidget.x, y: widgetPreferences?.y ?? defaultWidget.y });
   const [isDragging, setIsDragging] = React.useState(false);
+
+  const positionRef = React.useRef(position);
+  React.useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
 
@@ -79,6 +85,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
     const node = containerRef.current;
     if (!node) return;
 
+    const captureTarget = event.currentTarget;
     dragState.current = {
       pointerId: event.pointerId,
       offsetX: event.clientX - position.x,
@@ -87,12 +94,13 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
       startY: event.clientY,
       dragging: true,
       didDrag: false,
+      captureTarget,
     };
     event.preventDefault();
     setIsDragging(true);
-    if (node?.setPointerCapture) {
+    if (captureTarget?.setPointerCapture) {
       try {
-        node.setPointerCapture(event.pointerId);
+        captureTarget.setPointerCapture(event.pointerId);
       } catch {
         // noop
       }
@@ -117,18 +125,19 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
 
   const finishDrag = (event) => {
     if (!dragState.current.dragging || dragState.current.pointerId !== event.pointerId) return;
-    const node = containerRef.current;
-    if (node?.hasPointerCapture?.(event.pointerId) && node?.releasePointerCapture) {
+    const captureTarget = dragState.current.captureTarget;
+    if (captureTarget?.hasPointerCapture?.(event.pointerId) && captureTarget?.releasePointerCapture) {
       try {
-        node.releasePointerCapture(event.pointerId);
+        captureTarget.releasePointerCapture(event.pointerId);
       } catch {
         // noop
       }
     }
     dragState.current.dragging = false;
     dragState.current.pointerId = null;
+    dragState.current.captureTarget = null;
     setIsDragging(false);
-    persistState(position);
+    persistState(positionRef.current);
   };
 
   const preventGhostClick = (event) => {
