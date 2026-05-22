@@ -61,14 +61,62 @@ Deno.serve(async (req) => {
     console.error('PAYLOAD_TIPO_BACKEND', typeof payload);
     console.error('PAYLOAD_KEYS_BACKEND', Object.keys(payload || {}));
 
-    return Response.json({
-      debug: true,
-      payloadRecebido: payload,
-    });
     const promocao_id = body?.promocao_id;
     const promocao = body?.promocao || {};
     const itens = Array.isArray(body?.itens) ? body.itens : [];
     const temAlteracoesPendentes = Boolean(body?.temAlteracoesPendentes);
+    const promocaoId = texto(promocao_id) || texto(promocao?.id) || null;
+
+    console.error(
+      'PROMOCAO_ITENS_RECEBIDOS',
+      {
+        promocao_id: promocaoId,
+        quantidade: itens?.length,
+        ids: itens?.map((i: any) => i?.id),
+        militar_ids: itens?.map((i: any) => i?.militar_id),
+        status: itens?.map((i: any) => i?.status),
+      }
+    );
+
+    const filtrosElegibilidade = {
+      sem_id: 0,
+      sem_militar_id: 0,
+      ordem_invalida: 0,
+      status_bloqueado: 0,
+    };
+
+    const itensElegiveis = (itens || []).filter((item: any) => {
+      const itemId = texto(item?.id);
+      const militarId = texto(item?.militar_id);
+      const ordem = Number(item?.ordem);
+      const status = normalizar(item?.status);
+      if (!itemId) {
+        filtrosElegibilidade.sem_id += 1;
+        return false;
+      }
+      if (!militarId) {
+        filtrosElegibilidade.sem_militar_id += 1;
+        return false;
+      }
+      if (!Number.isFinite(ordem) || ordem <= 0) {
+        filtrosElegibilidade.ordem_invalida += 1;
+        return false;
+      }
+      if (STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(status)) {
+        filtrosElegibilidade.status_bloqueado += 1;
+        return false;
+      }
+      return true;
+    });
+
+    console.error('PROMOCAO_ITENS_ELEGIVEIS', {
+      promocao_id: promocaoId,
+      quantidade: itensElegiveis.length,
+      ids: itensElegiveis.map((i: any) => i?.id),
+      militar_ids: itensElegiveis.map((i: any) => i?.militar_id),
+      status: itensElegiveis.map((i: any) => i?.status),
+      filtro: filtrosElegibilidade,
+    });
 
     const erroValidacao = validarEntrada(promocao_id, promocao, itens, temAlteracoesPendentes);
     if (erroValidacao) {
@@ -88,10 +136,10 @@ Deno.serve(async (req) => {
 
     const historicosAtivos = await Historico.filter({ status_registro: 'ativo' });
 
-    for (const item of itens) {
-      const promocaoId = texto(promocao_id) || texto(promocao?.id) || null;
+    for (const item of itensElegiveis) {
       const itemId = texto(item?.id) || null;
       const militarId = texto(item?.militar_id) || null;
+      console.error('PROCESSANDO_ITEM', { item_id: itemId, militar_id: militarId });
       try {
         const militarEncontrado = await Militar.get(item.militar_id).catch(() => null);
         if (!militarEncontrado) throw montarErro({ etapa: 'atualizar_militar', motivo: 'militar_nao_encontrado', promocao_id: promocaoId, item_id: itemId, militar_id: militarId, payloadRecebido: item });
@@ -137,9 +185,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    const promocaoId = texto(promocao_id) || texto(promocao?.id) || null;
     if (!promocaoId) throw montarErro({ etapa: 'validacao_entrada', motivo: 'promocao_id_ausente', payloadRecebido: body });
     await Promocao.update(promocaoId, { status: errors.length > 0 ? 'rascunho' : 'publicada' });
+
+    console.error('PUBLICACAO_RESULTADO', {
+      totalRecebido: itens.length,
+      totalElegivel: itensElegiveis.length,
+      totalPublicado: publicados,
+      filtro: filtrosElegibilidade,
+    });
 
     return Response.json({ success: errors.length === 0, etapa: errors.length > 0 ? 'processar_item' : null, motivo: errors.length > 0 ? 'falha_parcial_itens' : null, publicados, militar_ids_afetados: Array.from(militarIdsAfetados), historicos, warnings, errors });
   } catch (error: any) {
