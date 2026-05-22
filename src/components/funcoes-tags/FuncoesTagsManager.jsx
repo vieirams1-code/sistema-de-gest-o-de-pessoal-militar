@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { getEscopoLabel } from '@/utils/funcoesTags/escopo';
@@ -42,16 +43,20 @@ export default function FuncoesTagsManager({ canEdit }) {
     queryClient.invalidateQueries({ queryKey: ['militar-funcao-institucional'] });
   };
 
-  const saveFuncao = useMutation({ mutationFn: (payload) => funcaoEdicao ? atualizarFuncaoMilitarEscopado(funcaoEdicao.id, payload) : criarFuncaoMilitarEscopado(payload), onSuccess: () => invalidateCatalogo('funcoes') });
-  const saveGrupo = useMutation({ mutationFn: (payload) => grupoForm.id ? atualizarTagGrupoEscopado(grupoForm.id, payload) : criarTagGrupoEscopado(payload), onSuccess: () => invalidateCatalogo('grupos') });
-  const saveTag = useMutation({ mutationFn: (payload) => tagForm.id ? atualizarTagEscopado(tagForm.id, payload) : criarTagEscopado(payload), onSuccess: () => invalidateCatalogo('tags') });
+  const saveFuncao = useMutation({ mutationFn: (payload) => funcaoEdicao ? atualizarFuncaoMilitarEscopado(funcaoEdicao.id, payload) : criarFuncaoMilitarEscopado(payload), onSuccess: () => { invalidateCatalogo('funcoes'); toast({ title: 'Função salva com sucesso.' }); }, onError: (error) => toast({ title: 'Erro ao salvar função', description: getErrorMessage(error, 'Tente novamente.'), variant: 'destructive' }) });
+  const saveGrupo = useMutation({ mutationFn: (payload) => grupoForm.id ? atualizarTagGrupoEscopado(grupoForm.id, payload) : criarTagGrupoEscopado(payload), onSuccess: () => { invalidateCatalogo('grupos'); toast({ title: 'Grupo salvo com sucesso.' }); }, onError: (error) => toast({ title: 'Erro ao salvar grupo', description: getErrorMessage(error, 'Tente novamente.'), variant: 'destructive' }) });
+  const saveTag = useMutation({ mutationFn: (payload) => tagForm.id ? atualizarTagEscopado(tagForm.id, payload) : criarTagEscopado(payload), onSuccess: () => { invalidateCatalogo('tags'); toast({ title: 'Tag salva com sucesso.' }); }, onError: (error) => toast({ title: 'Erro ao salvar tag', description: getErrorMessage(error, 'Tente novamente.'), variant: 'destructive' }) });
 
   const initInstitucional = useMutation({ mutationFn: async () => {
     const all = await base44.entities.FuncaoMilitar.list();
     const keys = new Set(all.map((f) => f.institucional_chave));
+    let created = 0;
     if (!keys.has('comandante')) await criarFuncaoMilitarEscopado({ nome: 'Comandante', institucional_chave: 'comandante', prioridade_lista: 1, ativa: true, emoji: '🛡️', cor: '#1D4ED8' });
+    if (!keys.has('comandante')) created += 1;
     if (!keys.has('subcomandante')) await criarFuncaoMilitarEscopado({ nome: 'Subcomandante', institucional_chave: 'subcomandante', prioridade_lista: 2, ativa: true, emoji: '🔰', cor: '#2563EB' });
-  }, onSuccess: () => invalidateCatalogo('funcoes') });
+    if (!keys.has('subcomandante')) created += 1;
+    return { created };
+  }, onSuccess: ({ created }) => { invalidateCatalogo('funcoes'); toast({ title: created > 0 ? 'Funções institucionais inicializadas.' : 'Funções institucionais já existem.' }); }, onError: (error) => toast({ title: 'Erro ao inicializar funções institucionais', description: getErrorMessage(error, 'Tente novamente.'), variant: 'destructive' }) });
 
   const upsertFuncao = () => {
     const bloqueada = funcaoEdicao && INSTITUCIONAIS[funcaoEdicao.institucional_chave];
@@ -113,8 +118,8 @@ export default function FuncoesTagsManager({ canEdit }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-[#1e3a5f]">Funções e Tags</h2>
-        <Button onClick={() => initInstitucional.mutate()} disabled={!canEdit}>Inicializar funções institucionais</Button>
+        <h2 className="text-xl font-semibold text-[#1e3a5f]">Configurações de Funções e Tags</h2>
+        <Button onClick={() => initInstitucional.mutate()} disabled={!canEdit || initInstitucional.isPending}>{initInstitucional.isPending ? 'Inicializando...' : 'Inicializar funções institucionais'}</Button>
       </div>
       <Tabs defaultValue="funcoes">
         <TabsList>
@@ -123,27 +128,29 @@ export default function FuncoesTagsManager({ canEdit }) {
           <TabsTrigger value="tags">Tags</TabsTrigger>
         </TabsList>
         <TabsContent value="funcoes" className="space-y-2">
-          <div className="grid grid-cols-6 gap-2">
+          <div className="rounded-lg border border-slate-200 p-3 grid grid-cols-6 gap-2">
+            <Label className="col-span-6 text-sm font-medium">Nova função</Label>
             <Input placeholder="Nome da função" value={funcaoForm.nome || nomeFuncao} onChange={(e) => { setNomeFuncao(e.target.value); setFuncaoForm({ ...funcaoForm, nome: e.target.value }); }} className="col-span-2" />
             <Input type="number" placeholder="Prioridade" value={funcaoForm.prioridade_lista} onChange={(e) => setFuncaoForm({ ...funcaoForm, prioridade_lista: Number(e.target.value) })} />
             <Input placeholder="Emoji" value={funcaoForm.emoji} onChange={(e) => setFuncaoForm({ ...funcaoForm, emoji: e.target.value })} />
             <Input placeholder="Cor" value={funcaoForm.cor} onChange={(e) => setFuncaoForm({ ...funcaoForm, cor: e.target.value })} />
-            <Button disabled={!canEdit} onClick={upsertFuncao}>{funcaoEdicao ? 'Salvar' : 'Novo'}</Button>
+            <Button disabled={!canEdit || saveFuncao.isPending} onClick={upsertFuncao}>{saveFuncao.isPending ? 'Salvando...' : 'Salvar'}</Button>
           </div>
           <div className="text-sm text-slate-600 border rounded p-2">Preview: <span className="font-medium" style={{ color: funcaoForm.cor }}>{funcaoForm.emoji || '⭐'} {funcaoForm.nome || 'Nova função'}</span> · Aplicabilidade: {funcaoForm.aplicabilidade}</div>
-          {funcoes.map((f) => <div key={f.id} className="flex justify-between border p-2 rounded"><span>{f.emoji} {f.nome} ({f.ativa ? 'ativo' : 'inativo'}) · Escopo: {getEscopoLabel(f.escopo_tipo)}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFuncaoEdicao(f); setFuncaoForm({ ...f, prioridade_lista: f.prioridade_lista ?? 10, emoji: f.emoji || '⭐', cor: f.cor || '#1D4ED8' }); }}>Editar</Button><Button size="sm" variant="destructive" disabled={!!INSTITUCIONAIS[f.institucional_chave]} onClick={() => desativar('funcao', f)}>Desativar</Button></div></div>)}
+          {funcoes.map((f) => <div key={f.id} className="flex justify-between border p-2 rounded"><span>{f.emoji} {f.nome} ({f.ativa ? 'ativo' : 'inativo'}) · Escopo: {getEscopoLabel(f.escopo_tipo)} · Cor: {f.cor || '—'}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setFuncaoEdicao(f); setFuncaoForm({ ...f, prioridade_lista: f.prioridade_lista ?? 10, emoji: f.emoji || '⭐', cor: f.cor || '#1D4ED8' }); }}>Editar</Button><Button size="sm" variant="destructive" disabled={!!INSTITUCIONAIS[f.institucional_chave]} onClick={() => desativar('funcao', f)}>Desativar</Button></div></div>)}
         </TabsContent>
         <TabsContent value="grupos" className="space-y-2">
-          <div className="grid grid-cols-3 gap-2"><Input placeholder="Nome grupo" value={grupoForm.nome} onChange={(e) => setGrupoForm({ ...grupoForm, nome: e.target.value })} /><Input placeholder="Aplicabilidade" value={grupoForm.aplicabilidade} onChange={(e) => setGrupoForm({ ...grupoForm, aplicabilidade: e.target.value })} /><Button disabled={!canEdit} onClick={upsertGrupo}>Novo</Button></div>
+          <div className="rounded-lg border border-slate-200 p-3 grid grid-cols-3 gap-2"><Label className="col-span-3 text-sm font-medium">Novo grupo de tags</Label><Input placeholder="Nome grupo" value={grupoForm.nome} onChange={(e) => setGrupoForm({ ...grupoForm, nome: e.target.value })} /><Input placeholder="Aplicabilidade" value={grupoForm.aplicabilidade} onChange={(e) => setGrupoForm({ ...grupoForm, aplicabilidade: e.target.value })} /><Button disabled={!canEdit || saveGrupo.isPending} onClick={upsertGrupo}>{saveGrupo.isPending ? 'Salvando...' : 'Salvar'}</Button></div>
           <div className="text-sm text-slate-600 border rounded p-2">Preview: ⚠️ {grupoForm.nome || 'Novo grupo'} · Aplicabilidade: {grupoForm.aplicabilidade}</div>
-          {grupos.map((g) => <div key={g.id} className="flex justify-between border p-2 rounded"><span>{g.nome} ({g.ativo ? 'ativo' : 'inativo'}) · Escopo: {getEscopoLabel(g.escopo_tipo)}</span><Button size="sm" variant="destructive" onClick={() => desativar('grupo', g)}>Desativar</Button></div>)}
+          {grupos.map((g) => <div key={g.id} className="flex justify-between border p-2 rounded"><span>{g.nome} ({g.ativo ? 'ativo' : 'inativo'}) · Escopo: {getEscopoLabel(g.escopo_tipo)}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setGrupoForm(g)}>Editar</Button><Button size="sm" variant="destructive" onClick={() => desativar('grupo', g)}>Desativar</Button></div></div>)}
         </TabsContent>
         <TabsContent value="tags" className="space-y-2">
-          <div className="grid grid-cols-6 gap-2"><select className="border rounded px-2" value={tagForm.grupo_id} onChange={(e) => setTagForm({ ...tagForm, grupo_id: e.target.value })}><option value="">Sem grupo</option>{grupos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}</select><Input placeholder="Nome tag" value={tagForm.nome} onChange={(e) => setTagForm({ ...tagForm, nome: e.target.value })} /><Input placeholder="Aplicabilidade" value={tagForm.aplicabilidade} onChange={(e) => setTagForm({ ...tagForm, aplicabilidade: e.target.value })} /><Input placeholder="Emoji" value={tagForm.emoji} onChange={(e) => setTagForm({ ...tagForm, emoji: e.target.value })} /><Input placeholder="Tipo visual" value={tagForm.tipo_visual} onChange={(e) => setTagForm({ ...tagForm, tipo_visual: e.target.value })} /><Button disabled={!canEdit} onClick={upsertTag}>Novo</Button></div>
+          <div className="rounded-lg border border-slate-200 p-3 grid grid-cols-6 gap-2"><Label className="col-span-6 text-sm font-medium">Nova tag</Label><select className="border rounded px-2" value={tagForm.grupo_id} onChange={(e) => setTagForm({ ...tagForm, grupo_id: e.target.value })}><option value="">Sem grupo</option>{grupos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}</select><Input placeholder="Nome tag" value={tagForm.nome} onChange={(e) => setTagForm({ ...tagForm, nome: e.target.value })} /><Input placeholder="Aplicabilidade" value={tagForm.aplicabilidade} onChange={(e) => setTagForm({ ...tagForm, aplicabilidade: e.target.value })} /><Input placeholder="Emoji" value={tagForm.emoji} onChange={(e) => setTagForm({ ...tagForm, emoji: e.target.value })} /><Input placeholder="Tipo visual" value={tagForm.tipo_visual} onChange={(e) => setTagForm({ ...tagForm, tipo_visual: e.target.value })} /><Button disabled={!canEdit || saveTag.isPending} onClick={upsertTag}>{saveTag.isPending ? 'Salvando...' : 'Salvar'}</Button></div>
           <div className="text-sm text-slate-600 border rounded p-2">Preview: <span style={{ color: tagForm.cor }}>{tagForm.emoji || '⚠️'} {tagForm.nome || 'Nova tag'}</span> · {tagForm.tipo_visual} · Aplicabilidade: {tagForm.aplicabilidade}</div>
-          {tags.map((t) => <div key={t.id} className="flex justify-between border p-2 rounded"><span>{t.emoji || '⚠️'} {t.nome} ({t.ativo ? 'ativo' : 'inativo'}) · {t.tipo_visual || 'padrão'} · Escopo: {getEscopoLabel(t.escopo_tipo)}</span><Button size="sm" variant="destructive" onClick={() => desativar('tag', t)}>Desativar</Button></div>)}
+          {tags.map((t) => <div key={t.id} className="flex justify-between border p-2 rounded"><span>{t.emoji || '⚠️'} {t.nome} ({t.ativo ? 'ativo' : 'inativo'}) · {t.tipo_visual || 'padrão'} · Cor: {t.cor || '—'} · Escopo: {getEscopoLabel(t.escopo_tipo)}</span><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setTagForm({ ...t, grupo_id: t.tag_grupo_id || '' })}>Editar</Button><Button size="sm" variant="destructive" onClick={() => desativar('tag', t)}>Desativar</Button></div></div>)}
         </TabsContent>
       </Tabs>
     </div>
   );
 }
+  const getErrorMessage = (error, fallback) => error?.message || error?.response?.data?.error || fallback;

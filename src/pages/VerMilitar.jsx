@@ -648,8 +648,12 @@ export default function VerMilitar() {
                     </div>
                   }
                 </Section>
-                <FuncoesMilitarSection militar={militar} />
-                <TagsMilitarSection militar={militar} />
+                <Section title="Funções e Tags" icon={Briefcase}>
+                  <div className="space-y-4">
+                    <FuncoesMilitarSection militar={militar} />
+                    <TagsMilitarSection militar={militar} />
+                  </div>
+                </Section>
                 <Section title="Dados Pessoais" icon={User}>
                   <div className="grid grid-cols-2 gap-x-4">
                     <InfoItem label="Data de Nascimento" value={formatDate(militar.data_nascimento)} icon={Calendar} />
