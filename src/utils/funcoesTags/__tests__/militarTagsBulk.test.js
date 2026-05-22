@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { agruparTagsPorGrupo, BULK_TAGS_MAX_MILITARES, calcularTentativasBulk, excedeLimiteMilitaresSelecionados, montarTagsPresentesNosSelecionados, resumirResultadoBulk } from '@/utils/funcoesTags/militarTagsBulk';
 
 describe('militarTagsBulk', () => {

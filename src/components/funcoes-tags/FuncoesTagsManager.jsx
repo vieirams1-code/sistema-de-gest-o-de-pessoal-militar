@@ -169,7 +169,7 @@ export default function FuncoesTagsManager({ canEdit, initialTab = 'funcoes' }) 
             </div>
           </EditorCard>
           <SearchBox value={search.grupos} onChange={(v) => setSearch((prev) => ({ ...prev, grupos: v }))} />
-          <div className="space-y-2">{gruposFiltradas.map((g) => <ListRow key={g.id} title={g.nome} subtitle={`Aplicabilidade: ${labelAplicabilidade(g.aplicabilidade)}`} badge={renderBadge(g.ativo)} onEdit={() => { setGrupoEdicao(g); setGrupoForm({ nome: g.nome, aplicabilidade: g.aplicabilidade || 'ambos' }); }} onToggle={() => toggleAtivo('grupo', g)} toggleLabel={g.ativo ? 'Desativar' : 'Reativar'} />)}</div>
+          <div className="space-y-2">{gruposFiltrados.map((g) => <ListRow key={g.id} title={g.nome} subtitle={`Aplicabilidade: ${labelAplicabilidade(g.aplicabilidade)}`} badge={renderBadge(g.ativo)} onEdit={() => { setGrupoEdicao(g); setGrupoForm({ nome: g.nome, aplicabilidade: g.aplicabilidade || 'ambos' }); }} onToggle={() => toggleAtivo('grupo', g)} toggleLabel={g.ativo ? 'Desativar' : 'Reativar'} />)}</div>
         </TabsContent>
 
         <TabsContent value="tags" className="space-y-4">
