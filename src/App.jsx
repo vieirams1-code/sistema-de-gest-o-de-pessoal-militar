@@ -78,6 +78,7 @@ const moduleGuardByPage = {
   RegistrosMilitar: { moduleKey: 'registros_militar', moduleName: 'Registros do Militar' },
   TiposMedalha: { moduleKey: 'medalhas', moduleName: 'Medalhas' },
   Configuracoes: { moduleKeys: ['configuracoes', 'adicoes_personalizacoes'], actionKeys: ['gerir_configuracoes', 'gerir_adicoes_personalizacoes'], moduleName: 'Configurações' },
+  Tags: { moduleKey: 'efetivo', actionKey: 'gerir_configuracoes', moduleName: 'Tags' },
   PermissoesUsuarios: { moduleKeys: ['permissoes_usuarios'], actionKeys: ['gerir_permissoes_usuarios'], moduleName: 'Permissões de Usuários' },
   PerfisPermissao: { moduleKeys: ['perfis_permissao'], actionKeys: ['gerir_perfis_permissao'], moduleName: 'Perfis de Permissão' },
   Publicacoes: { moduleKey: 'controle_publicacoes', moduleName: 'Controle de Publicações' },

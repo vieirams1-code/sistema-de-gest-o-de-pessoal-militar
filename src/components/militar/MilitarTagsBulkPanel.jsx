@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { calcularTentativasBulk, agruparTagsPorGrupo } from '@/utils/funcoesTags/militarTagsBulk';
+import { getTagGrupoId } from '@/utils/funcoesTags/contratoCampos';
 
 export default function MilitarTagsBulkPanel({
   open,
@@ -22,8 +23,18 @@ export default function MilitarTagsBulkPanel({
   const fonteTags = mode === 'remove' ? tagsPresentes.map((item) => item.tag) : tagsAtivas;
   const tagsFiltradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    return fonteTags.filter((tag) => !termo || String(tag?.nome || '').toLowerCase().includes(termo));
-  }, [fonteTags, busca]);
+    const gruposPorId = new Map((gruposAtivos || []).map((grupo) => [String(grupo.id), grupo]));
+
+    return fonteTags.filter((tag) => {
+      const grupoId = getTagGrupoId(tag) || 'sem-grupo';
+      const grupoNome = grupoId === 'sem-grupo'
+        ? 'Sem grupo'
+        : gruposPorId.get(String(grupoId))?.nome || 'Sem grupo';
+
+      const texto = [tag.nome, tag.emoji, grupoNome].join(' ').toLowerCase();
+      return !termo || texto.includes(termo);
+    });
+  }, [fonteTags, busca, gruposAtivos]);
 
   const grupos = useMemo(() => agruparTagsPorGrupo(tagsFiltradas, gruposAtivos), [tagsFiltradas, gruposAtivos]);
   const mapaPresenca = useMemo(() => new Map(tagsPresentes.map((item) => [String(item.tagId), item.presentes])), [tagsPresentes]);

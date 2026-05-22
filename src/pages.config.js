@@ -109,6 +109,7 @@ import RastreamentoPromocoes from './pages/RastreamentoPromocoes';
 import Promocoes from './pages/Promocoes';
 import DetalhePromocao from './pages/DetalhePromocao';
 import VisualizacaoGestorEfetivo from './pages/VisualizacaoGestorEfetivo';
+import Tags from './pages/Tags';
 import __Layout from './Layout.jsx';
 
 
@@ -175,6 +176,7 @@ export const PAGES = {
     "Promocoes": Promocoes,
     "DetalhePromocao": DetalhePromocao,
     "VisualizacaoGestorEfetivo": VisualizacaoGestorEfetivo,
+    "Tags": Tags,
 }
 
 export const pagesConfig = {

@@ -1,3 +1,5 @@
+import { getTagGrupoId } from './contratoCampos';
+
 export const BULK_TAGS_MAX_MILITARES = 20;
 
 export function calcularTentativasBulk(totalMilitares = 0, totalTags = 0) {
@@ -13,11 +15,11 @@ export function agruparTagsPorGrupo(tags = [], grupos = []) {
   const mapa = new Map();
 
   tags.forEach((tag) => {
-    const grupoId = String(tag?.grupo_id || '__sem_grupo__');
+    const grupoId = String(getTagGrupoId(tag) || 'sem-grupo');
     if (!mapa.has(grupoId)) {
       mapa.set(grupoId, {
         id: grupoId,
-        nome: gruposById.get(grupoId)?.nome || 'Sem grupo',
+        nome: grupoId === 'sem-grupo' ? 'Sem grupo' : (gruposById.get(grupoId)?.nome || 'Sem grupo'),
         emoji: gruposById.get(grupoId)?.emoji || '🗂️',
         ordem: Number(gruposById.get(grupoId)?.ordem ?? 9999),
         tags: [],
