@@ -51,6 +51,20 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
 
   try {
+    const input = (globalThis as any)?.input;
+    const payload = body ?? input ?? {};
+
+    console.error(
+      'PAYLOAD_RECEBIDO_BACKEND',
+      JSON.stringify(req.body ?? input ?? payload, null, 2)
+    );
+    console.error('PAYLOAD_TIPO_BACKEND', typeof payload);
+    console.error('PAYLOAD_KEYS_BACKEND', Object.keys(payload || {}));
+
+    return Response.json({
+      debug: true,
+      payloadRecebido: payload,
+    });
     const promocao_id = body?.promocao_id;
     const promocao = body?.promocao || {};
     const itens = Array.isArray(body?.itens) ? body.itens : [];
