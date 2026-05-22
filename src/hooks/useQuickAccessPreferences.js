@@ -38,6 +38,16 @@ export default function useQuickAccessPreferences(userEmail) {
   const [hasLoadedBackend, setHasLoadedBackend] = useState(false);
   const lastSavedPinsRef = useRef('');
   const lastSavedWidgetRef = useRef('');
+  const pinnedItemsRef = useRef(pinnedItems);
+  const userEmailRef = useRef(userEmail);
+
+  useEffect(() => {
+    pinnedItemsRef.current = pinnedItems;
+  }, [pinnedItems]);
+
+  useEffect(() => {
+    userEmailRef.current = userEmail;
+  }, [userEmail]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -88,7 +98,7 @@ export default function useQuickAccessPreferences(userEmail) {
   }, [userEmail]);
 
   const persistPinnedItems = useCallback(async (nextPinnedItems) => {
-    const email = String(userEmail || '').trim().toLowerCase();
+    const email = String(userEmailRef.current || '').trim().toLowerCase();
     if (!email) return;
 
     const normalized = normalizePinnedItems(nextPinnedItems);
@@ -101,10 +111,10 @@ export default function useQuickAccessPreferences(userEmail) {
     } catch {
       // erro silencioso para não interromper interação
     }
-  }, [userEmail]);
+  }, []);
 
   const persistWidgetPreferences = useCallback(async (nextWidget) => {
-    const email = String(userEmail || '').trim().toLowerCase();
+    const email = String(userEmailRef.current || '').trim().toLowerCase();
     if (!email) return;
 
     const normalizedWidget = normalizeWidgetPreferences(nextWidget);
@@ -112,12 +122,12 @@ export default function useQuickAccessPreferences(userEmail) {
     if (serialized === lastSavedWidgetRef.current) return;
 
     try {
-      await saveQuickAccessPreference({ userEmail: email, itensFixados: pinnedItems, widget: normalizedWidget });
+      await saveQuickAccessPreference({ userEmail: email, itensFixados: pinnedItemsRef.current, widget: normalizedWidget });
       lastSavedWidgetRef.current = serialized;
     } catch {
       // erro silencioso para não interromper interação
     }
-  }, [pinnedItems, userEmail]);
+  }, []);
 
   const togglePin = (item) => {
     const normalizedTab = item?.tab || null;
@@ -138,6 +148,11 @@ export default function useQuickAccessPreferences(userEmail) {
   const updateWidgetPreferences = useCallback((nextWidget) => {
     setWidgetPreferences((prev) => {
       const resolved = normalizeWidgetPreferences(typeof nextWidget === 'function' ? nextWidget(prev) : nextWidget);
+      const prevSerialized = JSON.stringify(prev);
+      const nextSerialized = JSON.stringify(resolved);
+      if (prevSerialized === nextSerialized) {
+        return prev;
+      }
       void persistWidgetPreferences(resolved);
       return resolved;
     });

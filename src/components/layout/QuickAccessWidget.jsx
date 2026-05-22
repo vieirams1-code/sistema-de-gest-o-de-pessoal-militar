@@ -35,9 +35,14 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
     };
   }, []);
 
-  const persistState = React.useCallback((patch) => {
-    onWidgetChange((prev) => ({ ...prev, ...patch }));
+  const onWidgetChangeRef = React.useRef(onWidgetChange);
+  React.useEffect(() => {
+    onWidgetChangeRef.current = onWidgetChange;
   }, [onWidgetChange]);
+
+  const persistState = React.useCallback((patch) => {
+    onWidgetChangeRef.current((prev) => ({ ...prev, ...patch }));
+  }, []);
 
   React.useEffect(() => {
     const next = { x: widgetPreferences?.x ?? defaultWidget.x, y: widgetPreferences?.y ?? defaultWidget.y };
@@ -49,6 +54,7 @@ export default function QuickAccessWidget({ items, getPinKey, createHref, widget
     const onResize = () => {
       setPosition((prev) => {
         const clamped = applyClampedPosition(prev);
+        if (clamped.x === prev.x && clamped.y === prev.y) return prev;
         persistState(clamped);
         return clamped;
       });
