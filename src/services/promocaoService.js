@@ -187,9 +187,52 @@ export async function publicarPromocaoOficial({ promocao, itens = [], temAlterac
   };
   console.log('[publicarPromocaoOficial][frontend][payload]', payloadEnvio);
 
-  const response = await base44.functions.invoke('publicarPromocaoOficial', {
-    body: { promocao, itens, temAlteracoesPendentes, contextoPublicacao },
-  });
+  let response;
+  try {
+    response = await base44.functions.invoke('publicarPromocaoOficial', {
+      body: { promocao, itens, temAlteracoesPendentes, contextoPublicacao },
+    });
+  } catch (error) {
+    console.error('[publicarPromocaoOficial][frontend][invoke-error][raw]', error);
+    console.error('[publicarPromocaoOficial][frontend][invoke-error][response]', error?.response);
+    console.error('[publicarPromocaoOficial][frontend][invoke-error][response.data]', error?.response?.data);
+    console.error('[publicarPromocaoOficial][frontend][invoke-error][data]', error?.data);
+    console.error('[publicarPromocaoOficial][frontend][invoke-error][message]', error?.message);
+
+    const dadosErro = error?.response?.data || error?.data || {};
+    const etapaErro = (
+      dadosErro?.etapa
+      || dadosErro?.error?.etapa
+      || error?.etapa
+      || 'nao_informada'
+    );
+    const motivoErro = (
+      error?.response?.data?.motivo
+      || error?.response?.data?.error?.motivo
+      || error?.data?.motivo
+      || error?.motivo
+      || error?.message
+      || 'nao_informado'
+    );
+    const itemIdErro = (
+      dadosErro?.item_id
+      || dadosErro?.error?.item_id
+      || error?.item_id
+      || 'nao_informado'
+    );
+    const militarIdErro = (
+      dadosErro?.militar_id
+      || dadosErro?.error?.militar_id
+      || error?.militar_id
+      || 'nao_informado'
+    );
+
+    throw new Error(`Falha ao publicar promoção
+Etapa: ${etapaErro}
+Motivo: ${motivoErro}
+Item: ${itemIdErro}
+Militar: ${militarIdErro}`);
+  }
 
   const etapa = response?.data?.etapa || null;
   const motivo = response?.data?.motivo || null;
