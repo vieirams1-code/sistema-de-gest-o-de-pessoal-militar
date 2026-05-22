@@ -51,6 +51,8 @@ import { getPostoGraduacaoOficial } from '@/utils/militarPostoGraduacao';
 import { selecionarPromocaoAtualEAnteriores } from '@/utils/antiguidade/selecionarPromocaoAtual';
 import FuncoesMilitarSection from '@/components/militar/FuncoesMilitarSection';
 import TagsMilitarSection from '@/components/militar/TagsMilitarSection';
+import InstitucionalMilitarBadge from '@/components/militar/InstitucionalMilitarBadge';
+import { montarDecoracoesInstitucionaisPorMilitar, getDecoracaoInstitucionalMilitar } from '@/utils/funcoesTags/decoracaoInstitucionalMilitar';
 
 const POSTOS_OFICIAIS = new Set(['coronel', 'tenente coronel', 'major', 'capitao', '1 tenente', '2 tenente', 'aspirante']);
 const COMPORTAMENTO_LEVEL = {
@@ -252,6 +254,24 @@ export default function VerMilitar() {
     postoGraduacaoMilitar &&
     postoPromocaoAtual !== postoGraduacaoMilitar
   );
+
+
+  const { data: decoracaoInstitucionalMilitar = null } = useQuery({
+    queryKey: ['militar-funcao-institucional', militar?.id],
+    queryFn: async () => {
+      const [funcoesInstitucionais, vinculosAtivos] = await Promise.all([
+        base44.entities.FuncaoMilitar.filter({ ativa: true }, 'prioridade_lista'),
+        base44.entities.MilitarFuncao.filter({ militar_id: militar.id, status: 'ativa' }, '-created_date'),
+      ]);
+      const mapa = montarDecoracoesInstitucionaisPorMilitar({
+        militares: [militar],
+        funcoesInstitucionais,
+        vinculosAtivos,
+      });
+      return getDecoracaoInstitucionalMilitar(mapa, militar.id);
+    },
+    enabled: Boolean(militar?.id && isAccessResolved && canViewMilitar),
+  });
 
   const { data: periodos = [] } = useQuery({
     queryKey: ['ver-periodos', id],
@@ -551,10 +571,13 @@ export default function VerMilitar() {
                   </Badge>
                   {militar.condicao && <Badge variant="outline" className="border-white/30 text-white">{militar.condicao}</Badge>}
                 </div>
-                <h2 className="text-2xl font-bold mb-1">
-                  {postoGraduacaoMilitar && `${postoGraduacaoMilitar} `}
-                  {militar.nome_guerra || militar.nome_completo}
-                </h2>
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h2 className="text-2xl font-bold">
+                    {postoGraduacaoMilitar && `${postoGraduacaoMilitar} `}
+                    {militar.nome_guerra || militar.nome_completo}
+                  </h2>
+                  <InstitucionalMilitarBadge decoracao={decoracaoInstitucionalMilitar} className="bg-white/15 text-white border-white/30" />
+                </div>
                 {existeDivergenciaPostoAtivo &&
                 <div className="mt-2">
                     <Badge className="bg-amber-200 text-amber-900 border border-amber-500">
