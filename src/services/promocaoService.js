@@ -172,6 +172,32 @@ function patchDocumentalFaltante(historico = {}, payload = {}) {
 }
 
 export async function publicarPromocaoOficial({ promocao, itens = [], temAlteracoesPendentes = false, contextoPublicacao = {} } = {}) {
+  console.error('PROMOCAO_ITENS_RECEBIDOS', {
+    promocao_id: promocao?.id,
+    quantidade: itens?.length,
+    ids: itens?.map((i) => i?.id),
+    militar_ids: itens?.map((i) => i?.militar_id),
+    status: itens?.map((i) => i?.status),
+  });
+
+  const filtroElegibilidade = {
+    status_bloqueado: 0,
+  };
+  const itensElegiveis = (itens || []).filter((item) => {
+    const bloqueado = STATUS_ITEM_BLOQUEADO_PUBLICACAO.has(statusNormalizado(item?.status));
+    if (bloqueado) filtroElegibilidade.status_bloqueado += 1;
+    return !bloqueado;
+  });
+
+  console.error('PROMOCAO_ITENS_ELEGIVEIS', {
+    promocao_id: promocao?.id,
+    quantidade: itensElegiveis.length,
+    ids: itensElegiveis?.map((i) => i?.id),
+    militar_ids: itensElegiveis?.map((i) => i?.militar_id),
+    status: itensElegiveis?.map((i) => i?.status),
+    filtro: filtroElegibilidade,
+  });
+
   const validacao = validarPublicacaoPromocaoBase({ promocao, itens, temAlteracoesPendentes, contextoPublicacao });
   if (!validacao.valido) throw montarErroPublicacao(validacao.bloqueios);
 
@@ -183,7 +209,7 @@ Motivo: promocao.id ausente no frontend`);
   const payload = {
     promocao_id: promocao.id,
     promocao,
-    itens,
+    itens: itensElegiveis,
     temAlteracoesPendentes,
     contextoPublicacao,
   };
@@ -256,6 +282,13 @@ Militar: ${militarIdErro}`);
     }
     if (mensagens.length > 0) throw montarErroPublicacao(mensagens);
   }
+
+  console.error('PUBLICACAO_RESULTADO', {
+    totalRecebido: itens.length,
+    totalElegivel: itensElegiveis.length,
+    totalPublicado: response?.data?.publicados ?? 0,
+    filtro: filtroElegibilidade,
+  });
 
   return response?.data || { publicados: 0, militar_ids_afetados: [], historicos: [], warnings: [], errors: [] };
 }
