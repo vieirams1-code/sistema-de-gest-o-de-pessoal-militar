@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -46,13 +46,12 @@ function normalizarBusca(valor) {
 
 export default function MilitarTagsBulkPanel({
   open,
-  mode,
   onClose,
   selectedCount,
   selectedMilitares = [],
   tagsAtivas,
   gruposAtivos,
-  tagsPresentes,
+  tagsStatusById = {},
   onConfirm,
   loading,
 }) {
@@ -62,7 +61,7 @@ export default function MilitarTagsBulkPanel({
 
   const { data: tagsCatalogo = [] } = useQuery({
     queryKey: ['funcoes-tags', 'tags'],
-    enabled: open && mode !== 'remove',
+    enabled: open,
     queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
   });
   const { data: gruposCatalogo = [] } = useQuery({
@@ -71,9 +70,7 @@ export default function MilitarTagsBulkPanel({
     queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao'),
   });
 
-  const fonteTags = mode === 'remove'
-    ? tagsPresentes.map((item) => item.tag).filter(Boolean)
-    : (tagsCatalogo.length > 0 ? tagsCatalogo : (tagsAtivas || []));
+  const fonteTags = tagsCatalogo.length > 0 ? tagsCatalogo : (tagsAtivas || []);
 
   const fonteGrupos = gruposCatalogo.length > 0 ? gruposCatalogo : (gruposAtivos || []);
   const gruposPorId = useMemo(() => new Map(fonteGrupos.map((grupo) => [String(grupo.id), grupo])), [fonteGrupos]);
@@ -125,6 +122,26 @@ export default function MilitarTagsBulkPanel({
     return tagsFiltradas.filter((tag) => ids.has(String(tag.id)));
   }, [selecionadas, tagsFiltradas]);
 
+  const statusEfetivoById = useMemo(() => {
+    const mapa = {};
+    tagsFiltradas.forEach((tag) => {
+      const tagId = String(tag.id);
+      mapa[tagId] = tagsStatusById[tagId] || 'none';
+    });
+    selecionadas.forEach((tagId) => {
+      mapa[String(tagId)] = 'all';
+    });
+    return mapa;
+  }, [tagsFiltradas, tagsStatusById, selecionadas]);
+
+  useEffect(() => {
+    if (!open) return;
+    const iniciais = Object.entries(tagsStatusById)
+      .filter(([, status]) => status === 'all')
+      .map(([tagId]) => String(tagId));
+    setSelecionadas(iniciais);
+  }, [open, tagsStatusById]);
+
   if (!open) return null;
 
   const toggleTag = (tagId) => setSelecionadas((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
@@ -137,7 +154,7 @@ export default function MilitarTagsBulkPanel({
             <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
               <TagsIcon className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-bold text-slate-800">{mode === 'remove' ? 'Remover tags' : 'Aplicar tags'}</h2>
+            <h2 className="text-lg font-bold text-slate-800">Gerenciar tags</h2>
           </div>
           <Button variant="ghost" onClick={onClose} className="inline-flex items-center gap-1">Fechar <X className="w-4 h-4" /></Button>
         </div>
@@ -175,7 +192,7 @@ export default function MilitarTagsBulkPanel({
           {selecionadas.length > 0 && (
             <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold tracking-wider text-indigo-700 uppercase">Tags prontas para aplicação</p>
+                <p className="text-xs font-semibold tracking-wider text-indigo-700 uppercase">Tags definidas para ficar em todos</p>
                 <span className="text-xs font-medium text-indigo-700">{selecionadas.length}</span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -202,17 +219,20 @@ export default function MilitarTagsBulkPanel({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {grupo.tags.map((tag) => {
                     const id = String(tag.id);
-                    const isSelected = selecionadas.includes(id);
+                    const status = statusEfetivoById[id] || 'none';
+                    const isSelected = status === 'all';
+                    const isPartial = status === 'partial';
                     const nome = getTagNome(tag);
                     const emoji = getTagEmoji(tag);
                     const cor = getTagCor(tag);
                     return (
-                      <button key={id} type="button" onClick={() => toggleTag(id)} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isSelected ? 'border-indigo-500 bg-indigo-50/30 shadow-md ring-1 ring-indigo-500' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:bg-slate-50'}`}>
+                      <button key={id} type="button" onClick={() => toggleTag(id)} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isSelected ? 'border-indigo-500 bg-indigo-50/30 shadow-md ring-1 ring-indigo-500' : isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:bg-slate-50'}`}>
                         <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3 transition-transform group-hover:scale-105" style={{ backgroundColor: `${cor}15`, border: `1px solid ${cor}30` }}>{emoji}</div>
                         <div className="flex-1 min-w-0 pr-2">
                           <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{nome}</div>
+                          {isPartial && <div className="text-[11px] text-amber-700 font-medium mt-0.5">Parcial</div>}
                         </div>
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 text-transparent group-hover:border-slate-400'}`}>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : isPartial ? 'bg-amber-100 border-amber-400 text-amber-700' : 'border-slate-300 text-transparent group-hover:border-slate-400'}`}>
                           <Check className="w-3.5 h-3.5" />
                         </div>
                       </button>
@@ -227,9 +247,9 @@ export default function MilitarTagsBulkPanel({
         <div className="shrink-0 bg-white border-t border-slate-200 p-4 space-y-3">
           <p className="text-sm font-medium text-slate-700">Motivo da atribuição (opcional)</p>
           <Input placeholder="Descreva o motivo da ação" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-          <p className="text-xs text-slate-500">{selectedCount} militar(es) × {selecionadas.length} tags = {calcularTentativasBulk(selectedCount, selecionadas.length)} vinculações</p>
-          <Button className={`w-full ${selecionadas.length > 0 ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-300 hover:bg-slate-300 text-slate-500'}`} disabled={loading || selecionadas.length === 0} onClick={() => onConfirm({ tagIds: selecionadas, motivo })}>
-            {mode === 'remove' ? 'Remover dos selecionados' : 'Aplicar aos selecionados'}
+          <p className="text-xs text-slate-500">{selectedCount} militar(es) × {selecionadas.length} tags definidas = {calcularTentativasBulk(selectedCount, selecionadas.length)} alvo(s) de atualização</p>
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading} onClick={() => onConfirm({ finalSelectedTagIds: selecionadas, motivo })}>
+            Salvar alterações
           </Button>
         </div>
       </div>
