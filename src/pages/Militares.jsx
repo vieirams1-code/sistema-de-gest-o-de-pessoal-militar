@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -59,6 +59,7 @@ import {
   buildColumnFilterOptions,
   normalizeColumnFilters,
 } from '@/pages/consultaMilitar/consultaMilitarFilters';
+import { exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -653,6 +654,23 @@ export default function Militares() {
     toast({ title: mode === 'apply' ? 'Aplicação concluída' : 'Remoção concluída', description: resumirResultadoBulk({ aplicadas, duplicadas, removidas, erros, modo: mode }), variant: erros > 0 ? 'destructive' : 'default' });
   };
 
+
+  const handleExportExcel = () => {
+    if (filteredMilitares.length === 0) return;
+    try {
+      const fileDate = new Date().toISOString().slice(0, 10);
+      exportConsultaMilitarToXlsx({
+        militares: filteredMilitares,
+        visibleColumns: visibleColumnKeys,
+        columnsCatalog: CONSULTA_MILITAR_COLUNAS_ALLOWLIST,
+        fileName: `consulta-militar-${fileDate}.xlsx`,
+      });
+      toast({ title: 'Exportação concluída', description: 'Arquivo Excel gerado com sucesso.' });
+    } catch {
+      toast({ title: 'Erro na exportação', description: 'Não foi possível gerar o arquivo Excel.', variant: 'destructive' });
+    }
+  };
+
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
   const shouldShowLotacoesDebugPanel = shouldShowLotacaoFilter && (isErrorLotacoes || lotacoesEmptyForScopedUser);
@@ -694,6 +712,10 @@ export default function Militares() {
             </Button>
             <Button variant="outline" onClick={() => setColumnsDialogOpen(true)}>
               Colunas
+            </Button>
+            <Button variant="outline" onClick={handleExportExcel} disabled={filteredMilitares.length === 0}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Exportar Excel
             </Button>
             {canAccessAction('adicionar_militares') && (
               <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
