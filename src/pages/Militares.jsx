@@ -48,7 +48,11 @@ import EfetivoFuncoesTagsCompactas from '@/components/militar/EfetivoFuncoesTags
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import { criarMilitarTagEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados, resumirResultadoBulk } from '@/utils/funcoesTags/militarTagsBulk';
-import { CONSULTA_MILITAR_COLUNAS_ALLOWLIST } from '@/pages/consultaMilitar/consultaMilitarColumns';
+import {
+  CONSULTA_MILITAR_COLUNAS_ALLOWLIST,
+  CONSULTA_MILITAR_COLUNAS_GROUP_ORDER,
+  CONSULTA_MILITAR_COLUNAS_STORAGE_KEY,
+} from '@/pages/consultaMilitar/consultaMilitarColumns';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -166,6 +170,16 @@ const MOVIMENTO_OPCOES = [
   { value: 'entrada', label: 'Somente entradas' },
   { value: 'saida', label: 'Somente saídas' },
 ];
+const fallbackColumnKey = CONSULTA_MILITAR_COLUNAS_ALLOWLIST[0]?.key || 'nome';
+
+function normalizeVisibleColumns(rawValue) {
+  const validKeys = new Set(CONSULTA_MILITAR_COLUNAS_ALLOWLIST.map((col) => col.key));
+  const defaultKeys = CONSULTA_MILITAR_COLUNAS_ALLOWLIST.filter((col) => col.defaultVisible).map((col) => col.key);
+  const source = Array.isArray(rawValue) ? rawValue : defaultKeys;
+  const normalized = source.filter((key, index) => validKeys.has(key) && source.indexOf(key) === index);
+  if (normalized.length > 0) return normalized;
+  return defaultKeys.length > 0 ? defaultKeys : [fallbackColumnKey];
+}
 
 function militarCorrespondeOrigemDestino(militar, termo) {
   const q = String(termo || '').trim().toLowerCase();
@@ -210,7 +224,41 @@ export default function Militares() {
   const [selectedMilitarIds, setSelectedMilitarIds] = useState(new Set());
   const [bulkPanelMode, setBulkPanelMode] = useState(null);
   const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY);
+      return normalizeVisibleColumns(saved ? JSON.parse(saved) : null);
+    } catch {
+      return normalizeVisibleColumns(null);
+    }
+  });
+  const [pendingVisibleColumns, setPendingVisibleColumns] = useState(visibleColumns);
   const { toast } = useToast();
+
+  useEffect(() => {
+    setPendingVisibleColumns(visibleColumns);
+  }, [visibleColumns, columnsDialogOpen]);
+
+  useEffect(() => {
+    localStorage.setItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY, JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  const columnMetaByKey = useMemo(
+    () => new Map(CONSULTA_MILITAR_COLUNAS_ALLOWLIST.map((col) => [col.key, col])),
+    [],
+  );
+  const groupedColumns = useMemo(() => {
+    const grouped = CONSULTA_MILITAR_COLUNAS_ALLOWLIST.reduce((acc, col) => {
+      const group = col.group || 'Outros';
+      acc[group] = acc[group] || [];
+      acc[group].push(col);
+      return acc;
+    }, {});
+    return CONSULTA_MILITAR_COLUNAS_GROUP_ORDER
+      .map((group) => ({ group, columns: grouped[group] || [] }))
+      .filter((item) => item.columns.length > 0);
+  }, []);
+  const visibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumns), [visibleColumns]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedPostos(postosSelecionados), 300);
@@ -825,25 +873,17 @@ export default function Militares() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50">
-              <div className={mostrarInativos ? 'col-span-2' : 'col-span-2'}>Graduação</div>
-              <div className={mostrarInativos ? 'col-span-2' : 'col-span-2'}>Nome/Nome de guerra</div>
-              <div className="col-span-1">Matrícula</div>
-              <div className="col-span-1">Quadro</div>
-              <div className="col-span-1">Lotação</div>
-              <div className={mostrarInativos ? 'col-span-1' : 'col-span-2'}>Situação</div>
-              <div className="col-span-2">Condição</div>
-              {mostrarInativos && <div className="col-span-1">Status Cadastro</div>}
-              <div className="col-span-1 text-right">Ações</div>
+            <div className="grid gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50" style={{ gridTemplateColumns: `repeat(${visibleColumnKeys.length}, minmax(0, 1fr)) auto` }}>
+              {visibleColumnKeys.map((key) => (
+                <div key={key}>{columnMetaByKey.get(key)?.label || key}</div>
+              ))}
+              <div className="text-right">Ações</div>
             </div>
             {filteredMilitares.map((militar) => {
               const destacarQuadro = isQuadroComDestaque(militar?.quadro);
 
               return (
-                <div
-                  key={militar.id}
-                  className={`relative grid grid-cols-12 gap-2 pl-10 pr-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}
-                >
+                <div key={militar.id} className={`relative flex gap-2 pl-10 pr-3 py-2 border-b text-sm items-center ${destacarQuadro ? 'bg-amber-50 border-amber-100' : ''}`}>
                 <label className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
                   <input
                     type="checkbox"
@@ -859,42 +899,38 @@ export default function Militares() {
                     }}
                   />
                 </label>
-                <div className="col-span-2 font-semibold text-[#1e3a5f]">{militar.posto_graduacao || 'Sem posto'}</div>
-                <div className="col-span-2">
-                  <div className="font-medium truncate flex items-center gap-2">
-                      <span className="truncate">{militar.nome_guerra || militar.nome_completo}</span>
-                    </div>
-                  <EfetivoFuncoesTagsCompactas
-                    itens={emojisEfetivoByMilitar.get(String(militar.id))?.itens || []}
-                    textoExcesso={emojisEfetivoByMilitar.get(String(militar.id))?.textoExcesso || ''}
-                  />
-                  <div className="text-xs text-slate-500 truncate">{militar.nome_completo}</div>
+                <div className="grid flex-1 min-w-0 gap-2" style={{ gridTemplateColumns: `repeat(${visibleColumnKeys.length}, minmax(0, 1fr))` }}>
+                  {visibleColumnKeys.map((key) => {
+                    if (key === 'nome') {
+                      return (
+                        <div key={key} className="min-w-0">
+                          <div className="font-medium truncate flex items-center gap-2">
+                            <span className="truncate">{militar.nome_guerra || militar.nome_completo}</span>
+                          </div>
+                          <EfetivoFuncoesTagsCompactas itens={emojisEfetivoByMilitar.get(String(militar.id))?.itens || []} textoExcesso={emojisEfetivoByMilitar.get(String(militar.id))?.textoExcesso || ''} />
+                          <div className="text-xs text-slate-500 truncate">{militar.nome_completo}</div>
+                        </div>
+                      );
+                    }
+                    if (key === 'situacao_condicao_militar') return <div key={key} className="min-w-0"><CondicaoBadge militar={militar} /></div>;
+                    if (key === 'situacao_militar') {
+                      return (
+                        <div key={key}>
+                          {SITUACAO_MILITAR_BADGES[militar.situacao_militar] ? (
+                            <Badge variant="outline" className={`${SITUACAO_MILITAR_BADGES[militar.situacao_militar].className} border text-xs font-medium`}>
+                              {SITUACAO_MILITAR_BADGES[militar.situacao_militar].label}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </div>
+                      );
+                    }
+                    if (key === 'status_cadastro') return <div key={key}><Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>{militar.status_cadastro || 'Ativo'}</Badge></div>;
+                    const value = columnMetaByKey.get(key)?.accessor?.(militar) || '—';
+                    return <div key={key} className="truncate">{value}</div>;
+                  })}
                 </div>
-                <div className="col-span-1 truncate">{militar.matricula || '—'}</div>
-                <div className="col-span-1 truncate">{militar.quadro || '—'}</div>
-                <div className="col-span-1 truncate">{militar.lotacao_atual || 'Sem lotação'}</div>
-                <div className={mostrarInativos ? 'col-span-1' : 'col-span-2'}>
-                  {SITUACAO_MILITAR_BADGES[militar.situacao_militar] ? (
-                    <Badge
-                      variant="outline"
-                      className={`${SITUACAO_MILITAR_BADGES[militar.situacao_militar].className} border text-xs font-medium`}
-                    >
-                      {SITUACAO_MILITAR_BADGES[militar.situacao_militar].label}
-                    </Badge>
-                  ) : (
-                    <span className="text-xs text-slate-400">—</span>
-                  )}
-                </div>
-                <div className="col-span-2 min-w-0">
-                  <CondicaoBadge militar={militar} />
-                </div>
-                {mostrarInativos && (
-                  <div className="col-span-1">
-                    <Badge className={`${statusBadgeClass[militar.status_cadastro] || statusBadgeClass.Ativo} border`}>
-                      {militar.status_cadastro || 'Ativo'}
-                    </Badge>
-                  </div>
-                )}
                 <div className="col-span-1 flex justify-end gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(createPageUrl('VerMilitar') + `?id=${militar.id}`)}>
                     <Eye className="w-4 h-4" />
@@ -1001,23 +1037,46 @@ export default function Militares() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={columnsDialogOpen} onOpenChange={setColumnsDialogOpen}>
+      <AlertDialog open={columnsDialogOpen} onOpenChange={(open) => {
+        setColumnsDialogOpen(open);
+        if (!open) setPendingVisibleColumns(visibleColumns);
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Colunas da Consulta Militar</AlertDialogTitle>
-            <AlertDialogDescription>
-              Base inicial preparada para personalização de colunas (Lote 1). A tabela segue com as colunas atuais.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Escolha as colunas visíveis na tabela. Mantenha pelo menos uma selecionada.</AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="max-h-64 overflow-auto rounded-md border border-slate-200 p-3 text-sm text-slate-700">
-            <ul className="list-disc pl-5 space-y-1">
-              {CONSULTA_MILITAR_COLUNAS_ALLOWLIST.map((coluna) => (
-                <li key={coluna.key}>{coluna.label}</li>
-              ))}
-            </ul>
+          <div className="max-h-80 overflow-auto rounded-md border border-slate-200 p-3 text-sm text-slate-700 space-y-3">
+            {groupedColumns.map(({ group, columns }) => (
+              <div key={group}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{group}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {columns.map((coluna) => {
+                    const isChecked = pendingVisibleColumns.includes(coluna.key);
+                    const disableUncheck = isChecked && pendingVisibleColumns.length === 1;
+                    return (
+                      <label key={coluna.key} className="inline-flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={disableUncheck}
+                          onChange={(e) => {
+                            if (e.target.checked) setPendingVisibleColumns((prev) => normalizeVisibleColumns([...prev, coluna.key]));
+                            else setPendingVisibleColumns((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key)));
+                          }}
+                        />
+                        <span>{coluna.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
           <AlertDialogFooter>
-            <AlertDialogAction>Fechar</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setPendingVisibleColumns(visibleColumns)}>Cancelar</AlertDialogCancel>
+            <Button type="button" variant="outline" onClick={() => setPendingVisibleColumns(normalizeVisibleColumns(null))}>Restaurar padrão</Button>
+            <AlertDialogAction onClick={() => setVisibleColumns(normalizeVisibleColumns(pendingVisibleColumns))}>Aplicar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
