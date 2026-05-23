@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { calcularTentativasBulk } from '@/utils/funcoesTags/militarTagsBulk';
@@ -22,6 +24,12 @@ function getTagGrupoId(tag) {
 
 function isTagAtiva(tag) {
   return tag?.ativo !== false && tag?.ativa !== false && tag?.status !== 'inativo';
+}
+
+function isTagAplicavelNoMilitar(tag) {
+  const aplicabilidade = String(tag?.aplicabilidade || '').trim().toLowerCase();
+  if (!aplicabilidade) return true;
+  return aplicabilidade === 'militar' || aplicabilidade === 'ambos';
 }
 
 function isGrupoAtivo(grupo) {
@@ -52,15 +60,29 @@ export default function MilitarTagsBulkPanel({
   const [selecionadas, setSelecionadas] = useState([]);
   const [motivo, setMotivo] = useState('');
 
-  const fonteTags = mode === 'remove' ? tagsPresentes.map((item) => item.tag).filter(Boolean) : (tagsAtivas || []);
+  const { data: tagsCatalogo = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'tags'],
+    enabled: open && mode !== 'remove',
+    queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
+  });
+  const { data: gruposCatalogo = [] } = useQuery({
+    queryKey: ['funcoes-tags', 'grupos'],
+    enabled: open,
+    queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao'),
+  });
 
-  const gruposPorId = useMemo(() => new Map((gruposAtivos || []).map((grupo) => [String(grupo.id), grupo])), [gruposAtivos]);
+  const fonteTags = mode === 'remove'
+    ? tagsPresentes.map((item) => item.tag).filter(Boolean)
+    : (tagsCatalogo.length > 0 ? tagsCatalogo : (tagsAtivas || []));
+
+  const fonteGrupos = gruposCatalogo.length > 0 ? gruposCatalogo : (gruposAtivos || []);
+  const gruposPorId = useMemo(() => new Map(fonteGrupos.map((grupo) => [String(grupo.id), grupo])), [fonteGrupos]);
 
   const tagsFiltradas = useMemo(() => {
     const termo = normalizarBusca(busca.trim());
 
     return fonteTags.filter((tag) => {
-      if (!tag || !isTagAtiva(tag)) return false;
+      if (!tag || !isTagAtiva(tag) || !isTagAplicavelNoMilitar(tag)) return false;
 
       const grupoId = getTagGrupoId(tag);
       const grupo = grupoId ? gruposPorId.get(String(grupoId)) : null;
