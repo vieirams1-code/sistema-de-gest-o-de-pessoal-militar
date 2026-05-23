@@ -45,6 +45,7 @@ import { getEmojisEfetivo } from '@/utils/funcoesTags/tagsCompactasEfetivo';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
+import { getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
 import EfetivoFuncoesTagsCompactas from '@/components/militar/EfetivoFuncoesTagsCompactas';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
@@ -461,8 +462,8 @@ export default function Militares() {
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery,
     queryFn: async () => {
-      const tags = await base44.entities.Tag.filter({ ativa: true }, 'ordem asc, nome asc');
-      return tags.filter((tag) => APLICABILIDADE_TAG_MILITAR.has(String(tag?.aplicabilidade || '').toLowerCase()));
+      const tags = await base44.entities.Tag.list('ordem_exibicao');
+      return tags.filter((tag) => isCatalogoAtivo(tag) && APLICABILIDADE_TAG_MILITAR.has(String(tag?.aplicabilidade || '').toLowerCase()));
     },
   });
 
@@ -470,7 +471,10 @@ export default function Militares() {
     queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'grupos'),
     staleTime: STALE_TIME_MS,
     enabled: shouldQuery,
-    queryFn: () => base44.entities.TagGrupo.filter({ ativo: true }, 'ordem asc, nome asc'),
+    queryFn: async () => {
+      const grupos = await base44.entities.TagGrupo.list('ordem_exibicao');
+      return grupos.filter((grupo) => isCatalogoAtivo(grupo));
+    },
   });
 
   const { data: vinculosInstitucionaisAtivos = [] } = useQuery({
@@ -635,7 +639,7 @@ export default function Militares() {
       }
     } else {
       const alvo = new Set(tagIds.map(String));
-      const vinculos = vinculosTagsAtivosFiltros.filter((v) => selectedMilitarIds.has(String(v.militar_id)) && alvo.has(String(v.tag_id)));
+      const vinculos = vinculosTagsAtivosFiltros.filter((v) => selectedMilitarIds.has(String(getMilitarTagMilitarId(v) || '')) && alvo.has(String(getMilitarTagTagId(v) || '')));
       for (const vinculo of vinculos) {
         try {
           await removerMilitarTagEscopado(vinculo.id, { data_remocao: hoje, motivo: motivo || undefined });
@@ -646,8 +650,11 @@ export default function Militares() {
       }
     }
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] }),
+      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresTagsFiltros(funcoesTagsScopeKey, idsHash) }),
+      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'tags') }),
+      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'grupos') }),
       queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] }),
+      queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] }),
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] }),
     ]);
     setSelectedMilitarIds(new Set());

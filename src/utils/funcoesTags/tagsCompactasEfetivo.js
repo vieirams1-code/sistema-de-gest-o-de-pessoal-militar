@@ -1,3 +1,5 @@
+import { getMilitarTagMilitarId, getMilitarTagTagId } from './contratoCampos';
+
 const EMOJI_PADRAO_FUNCAO = '⭐';
 const EMOJI_PADRAO_TAG = '🏷️';
 const LIMITE_ICONES_PADRAO = 4;
@@ -44,8 +46,8 @@ export function getTagsCompactasMilitar({ militarId, tagsAtivas = [], vinculosTa
   const tagsById = montarIndicePorId(tagsAtivas);
 
   return vinculosTagsAtivos
-    .filter((vinculo) => String(vinculo?.status || '').toLowerCase() === 'ativa' && String(vinculo?.militar_id || '') === militarKey)
-    .map((vinculo) => tagsById.get(String(vinculo?.tag_id || '')))
+    .filter((vinculo) => String(vinculo?.status || '').toLowerCase() === 'ativa' && String(getMilitarTagMilitarId(vinculo) || '') === militarKey)
+    .map((vinculo) => tagsById.get(String(getMilitarTagTagId(vinculo) || '')))
     .filter(Boolean)
     .map((tag) => {
       const chave = normalizarChave(tag?.slug || tag?.chave || tag?.nome);
