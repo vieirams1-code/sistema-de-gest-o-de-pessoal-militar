@@ -1,4 +1,4 @@
-import { getTagGrupoId } from './contratoCampos';
+import { getMilitarTagMilitarId, getMilitarTagTagId, getTagGrupoId, getTagId } from './contratoCampos';
 
 export const BULK_TAGS_MAX_MILITARES = 20;
 
@@ -38,12 +38,12 @@ export function agruparTagsPorGrupo(tags = [], grupos = []) {
 
 export function montarTagsPresentesNosSelecionados({ selectedMilitarIds = [], vinculosTagsAtivos = [], tagsAtivas = [] }) {
   const selectedSet = new Set((selectedMilitarIds || []).map(String));
-  const tagsById = new Map((tagsAtivas || []).map((tag) => [String(tag.id), tag]));
+  const tagsById = new Map((tagsAtivas || []).map((tag) => [String(getTagId(tag) || ''), tag]).filter(([id]) => id));
   const contador = new Map();
 
   (vinculosTagsAtivos || []).forEach((vinculo) => {
-    const militarId = String(vinculo?.militar_id || '');
-    const tagId = String(vinculo?.tag_id || '');
+    const militarId = String(getMilitarTagMilitarId(vinculo) || '');
+    const tagId = String(getMilitarTagTagId(vinculo) || '');
     if (!militarId || !tagId || !selectedSet.has(militarId)) return;
     contador.set(tagId, (contador.get(tagId) || 0) + 1);
   });

@@ -1,4 +1,4 @@
-import { getFuncaoMilitarId, getTagGrupoId, isRegistroAtivo } from './contratoCampos';
+import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, getTagGrupoId, isRegistroAtivo } from './contratoCampos';
 
 export function filtrarMilitaresPorFuncoesETags({
   militares = [],
@@ -30,8 +30,8 @@ export function filtrarMilitaresPorFuncoesETags({
   const tagsByMilitar = new Map();
   vinculosTagsAtivos.forEach((vinculo) => {
     if (!isRegistroAtivo(vinculo)) return;
-    const militarId = String(vinculo?.militar_id || '');
-    const tagId = String(vinculo?.tag_id || '');
+    const militarId = String(getMilitarTagMilitarId(vinculo) || '');
+    const tagId = String(getMilitarTagTagId(vinculo) || '');
     if (!militarId || !tagId) return;
     if (!tagsByMilitar.has(militarId)) tagsByMilitar.set(militarId, new Set());
     tagsByMilitar.get(militarId).add(tagId);
