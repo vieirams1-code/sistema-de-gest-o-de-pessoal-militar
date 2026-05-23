@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { calcularTentativasBulk } from '@/utils/funcoesTags/militarTagsBulk';
-import { AlertCircle, Check, Search, Tags as TagsIcon, Users, X } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Search, Tags as TagsIcon, Users, X } from 'lucide-react';
 
 function getTagNome(tag) {
   return tag?.nome || tag?.name || tag?.titulo || '';
@@ -54,6 +54,7 @@ export default function MilitarTagsBulkPanel({
   tagsStatusById = {},
   onConfirm,
   loading,
+  saving = false,
 }) {
   const [busca, setBusca] = useState('');
   const [selecionadas, setSelecionadas] = useState([]);
@@ -157,13 +158,15 @@ export default function MilitarTagsBulkPanel({
 
   if (!open) return null;
 
+  const isLocked = loading || saving;
+
   const toggleTag = (tagId) => {
     setSelecionadas((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
     setTagsEditadas((prev) => prev.includes(tagId) ? prev : [...prev, tagId]);
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-sm" onClick={isLocked ? undefined : onClose}>
       <div className="absolute right-0 top-0 h-full w-full max-w-[450px] bg-white border-l border-slate-200 shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
@@ -172,7 +175,7 @@ export default function MilitarTagsBulkPanel({
             </div>
             <h2 className="text-lg font-bold text-slate-800">Gerenciar tags</h2>
           </div>
-          <Button variant="ghost" onClick={onClose} className="inline-flex items-center gap-1">Fechar <X className="w-4 h-4" /></Button>
+          <Button variant="ghost" onClick={onClose} disabled={isLocked} className="inline-flex items-center gap-1">Fechar <X className="w-4 h-4" /></Button>
         </div>
 
         <div className="flex-1 overflow-y-auto bg-slate-50/50 p-6 space-y-6">
@@ -202,6 +205,7 @@ export default function MilitarTagsBulkPanel({
               className="w-full pl-10 pr-4 py-3 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none shadow-sm transition-all"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
+              disabled={isLocked}
             />
           </div>
 
@@ -213,7 +217,8 @@ export default function MilitarTagsBulkPanel({
               </div>
               <div className="flex flex-wrap gap-2">
                 {tagsSelecionadas.map((tag) => (
-                  <button key={tag.id} type="button" onClick={() => toggleTag(String(tag.id))} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white border border-indigo-200 text-xs text-indigo-700 hover:bg-indigo-100/40">
+                  <button key={tag.id} type="button" onClick={() => toggleTag(String(tag.id))}
+                  disabled={isLocked} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white border border-indigo-200 text-xs text-indigo-700 hover:bg-indigo-100/40">
                     <span>{getTagEmoji(tag)}</span>
                     <span>{getTagNome(tag)}</span>
                     <X className="w-3 h-3" />
@@ -242,7 +247,7 @@ export default function MilitarTagsBulkPanel({
                     const emoji = getTagEmoji(tag);
                     const cor = getTagCor(tag);
                     return (
-                      <button key={id} type="button" onClick={() => toggleTag(id)} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isSelected ? 'border-indigo-500 bg-indigo-50/30 shadow-md ring-1 ring-indigo-500' : isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:bg-slate-50'}`}>
+                      <button key={id} type="button" onClick={() => toggleTag(id)} disabled={isLocked} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isSelected ? 'border-indigo-500 bg-indigo-50/30 shadow-md ring-1 ring-indigo-500' : isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:bg-slate-50'}`}>
                         <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3 transition-transform group-hover:scale-105" style={{ backgroundColor: `${cor}15`, border: `1px solid ${cor}30` }}>{emoji}</div>
                         <div className="flex-1 min-w-0 pr-2">
                           <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{nome}</div>
@@ -262,10 +267,13 @@ export default function MilitarTagsBulkPanel({
 
         <div className="shrink-0 bg-white border-t border-slate-200 p-4 space-y-3">
           <p className="text-sm font-medium text-slate-700">Motivo da atribuição (opcional)</p>
-          <Input placeholder="Descreva o motivo da ação" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+          <Input placeholder="Descreva o motivo da ação" value={motivo} onChange={(e) => setMotivo(e.target.value)} disabled={isLocked} />
           <p className="text-xs text-slate-500">{selectedCount} militar(es) × {selecionadas.length} tags definidas = {calcularTentativasBulk(selectedCount, selecionadas.length)} alvo(s) de atualização</p>
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading} onClick={() => onConfirm({ finalSelectedTagIds: selecionadas, motivo })}>
-            Salvar alterações
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading || saving} onClick={() => onConfirm({ finalSelectedTagIds: selecionadas, motivo })}>
+            {saving ? (<>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Salvando...
+            </>) : "Salvar alterações"}
           </Button>
         </div>
       </div>
