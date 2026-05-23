@@ -9,10 +9,12 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
 import {
+  isTagAplicavelEmFerias,
   separarTagsFeriasPorStatus,
   validarAplicabilidadeTagFerias,
   validarDuplicidadeTagAtivaFerias,
 } from '@/utils/funcoesTags/feriasTags';
+import { getFeriasTagFeriasId, getFeriasTagTagId, isRegistroAtivo } from '@/utils/funcoesTags/contratoCampos';
 
 const formatDate = (date) => {
   if (!date) return '—';
@@ -64,12 +66,12 @@ export default function FeriasTagsSection({ ferias }) {
 
   const { data: tagsCatalogo = [] } = useQuery({
     queryKey: funcoesTagsKeys.catalogo('local', 'tags'),
-    queryFn: () => base44.entities.Tag.list('nome'),
+    queryFn: () => base44.entities.Tag.list('ordem_exibicao'),
   });
 
   const { data: gruposCatalogo = [] } = useQuery({
     queryKey: funcoesTagsKeys.catalogo('local', 'grupos'),
-    queryFn: () => base44.entities.TagGrupo.list('nome'),
+    queryFn: () => base44.entities.TagGrupo.list('ordem_exibicao'),
   });
 
   const { data: vinculos = [] } = useQuery({
@@ -78,8 +80,10 @@ export default function FeriasTagsSection({ ferias }) {
       const items = await base44.entities.FeriasTag.filter({ ferias_id: ferias.id }, '-created_date');
       const mapaTags = new Map(tagsCatalogo.map((tag) => [tag.id, tag]));
       const mapaGrupos = new Map(gruposCatalogo.map((grupo) => [grupo.id, grupo]));
-      return items.map((item) => {
-        const tag = mapaTags.get(item.tag_id) || null;
+      return items
+        .filter((item) => String(getFeriasTagFeriasId(item) || '') === String(ferias.id))
+        .map((item) => {
+        const tag = mapaTags.get(getFeriasTagTagId(item)) || null;
         return {
           ...item,
           tag,
@@ -92,14 +96,10 @@ export default function FeriasTagsSection({ ferias }) {
 
   const { ativas, removidas } = React.useMemo(() => separarTagsFeriasPorStatus(vinculos), [vinculos]);
 
-  const gruposAtivos = React.useMemo(
-    () => gruposCatalogo.filter((grupo) => (typeof grupo.ativo === 'boolean' ? grupo.ativo : String(grupo.status || '').toLowerCase() === 'ativa')),
-    [gruposCatalogo],
-  );
+  const gruposAtivos = React.useMemo(() => gruposCatalogo.filter((grupo) => isRegistroAtivo(grupo)), [gruposCatalogo]);
 
   const tagsAtivasAplicaveis = React.useMemo(() => tagsCatalogo.filter((tag) => {
-    const tagAtiva = typeof tag.ativo === 'boolean' ? tag.ativo : String(tag.status || '').toLowerCase() === 'ativa';
-    if (!tagAtiva || validarAplicabilidadeTagFerias(tag)) return false;
+    if (!isTagAplicavelEmFerias(tag)) return false;
     if (!tag.tag_grupo_id) return true;
     return gruposAtivos.some((grupo) => String(grupo.id) === String(tag.tag_grupo_id));
   }), [tagsCatalogo, gruposAtivos]);
@@ -122,7 +122,7 @@ export default function FeriasTagsSection({ ferias }) {
   const addMutation = useMutation({
     mutationFn: async () => {
       const tag = tagsCatalogo.find((item) => item.id === form.tag_id);
-      if (!tag || String(tag.status || '').toLowerCase() !== 'ativa') {
+      if (!isRegistroAtivo(tag)) {
         throw new Error('Selecione uma tag ativa.');
       }
       const erroAplicabilidade = validarAplicabilidadeTagFerias(tag);

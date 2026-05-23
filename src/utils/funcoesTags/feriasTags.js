@@ -1,4 +1,6 @@
-export const APLICABILIDADE_TAG_FERIAS = new Set(['ferias', 'ambos']);
+import { getFeriasTagTagId, isRegistroAtivo } from './contratoCampos';
+
+export const APLICABILIDADE_TAG_FERIAS = new Set(['', 'ferias', 'ambos']);
 
 const normalizarTexto = (valor) => String(valor || '').trim().toLowerCase();
 
@@ -25,7 +27,12 @@ export function validarAplicabilidadeTagFerias(tag) {
   return null;
 }
 
+export function isTagAplicavelEmFerias(tag) {
+  return isRegistroAtivo(tag) && !validarAplicabilidadeTagFerias(tag);
+}
+
 export function validarDuplicidadeTagAtivaFerias({ vinculosAtivos = [], tagId }) {
-  const existe = vinculosAtivos.some((vinculo) => normalizarTexto(vinculo.status) === 'ativa' && vinculo.tag_id === tagId);
+  const alvo = String(tagId || '');
+  const existe = vinculosAtivos.some((vinculo) => normalizarTexto(vinculo.status) === 'ativa' && String(getFeriasTagTagId(vinculo) || '') === alvo);
   return existe ? 'Estas férias já possuem esta tag ativa.' : null;
 }

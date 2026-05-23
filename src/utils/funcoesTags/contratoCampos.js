@@ -16,6 +16,14 @@ export function getMilitarTagTagId(vinculo = {}) {
   return vinculo?.tag_id || vinculo?.tagId || vinculo?.tag?.id || null;
 }
 
+export function getFeriasTagFeriasId(vinculo = {}) {
+  return vinculo?.ferias_id || vinculo?.feriasId || vinculo?.ferias?.id || null;
+}
+
+export function getFeriasTagTagId(vinculo = {}) {
+  return vinculo?.tag_id || vinculo?.tagId || vinculo?.tag?.id || null;
+}
+
 export function getTagId(tag = {}) {
   return tag?.id || null;
 }
