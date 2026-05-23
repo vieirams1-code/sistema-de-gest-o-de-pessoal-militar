@@ -50,7 +50,7 @@ import { base44 } from '@/api/base44Client';
 import EfetivoFuncoesTagsCompactas from '@/components/militar/EfetivoFuncoesTagsCompactas';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
 import { criarMilitarTagEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
-import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados, resumirResultadoBulk } from '@/utils/funcoesTags/militarTagsBulk';
+import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados } from '@/utils/funcoesTags/militarTagsBulk';
 import {
   CONSULTA_MILITAR_COLUNAS_ALLOWLIST,
   CONSULTA_MILITAR_COLUNAS_GROUP_ORDER,
@@ -232,7 +232,7 @@ export default function Militares() {
   const [pageOffset, setPageOffset] = useState(0);
   const [militaresAcumulados, setMilitaresAcumulados] = useState([]);
   const [selectedMilitarIds, setSelectedMilitarIds] = useState(new Set());
-  const [bulkPanelMode, setBulkPanelMode] = useState(null);
+  const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
   const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(() => {
     try {
@@ -607,6 +607,22 @@ export default function Militares() {
     vinculosTagsAtivos: vinculosTagsAtivosFiltros,
     tagsAtivas,
   }), [selectedMilitarIdsArray, vinculosTagsAtivosFiltros, tagsAtivas]);
+  const tagsStatusById = useMemo(() => {
+    const totalSelecionados = selectedMilitarIdsArray.length;
+    const mapa = {};
+    (tagsAtivas || []).forEach((tag) => {
+      const tagId = String(tag?.id || '');
+      if (tagId) mapa[tagId] = 'none';
+    });
+    tagsPresentesSelecionados.forEach(({ tagId, presentes }) => {
+      const key = String(tagId || '');
+      if (!key) return;
+      if (presentes >= totalSelecionados && totalSelecionados > 0) mapa[key] = 'all';
+      else if (presentes > 0) mapa[key] = 'partial';
+      else mapa[key] = 'none';
+    });
+    return mapa;
+  }, [tagsAtivas, tagsPresentesSelecionados, selectedMilitarIdsArray.length]);
 
   useEffect(() => {
     setSelectedMilitarIds((prev) => {
@@ -615,38 +631,42 @@ export default function Militares() {
     });
   }, [idsFiltradosSet]);
 
-  const executarBulk = async ({ mode, tagIds, motivo }) => {
+  const executarBulk = async ({ finalSelectedTagIds, motivo }) => {
     if (excedeLimiteMilitaresSelecionados(selectedMilitarIds.size)) {
       toast({ title: 'Limite excedido', description: `Selecione no máximo ${BULK_TAGS_MAX_MILITARES} militares nesta versão inicial.`, variant: 'destructive' });
       return;
     }
     let aplicadas = 0;
-    let duplicadas = 0;
     let removidas = 0;
     let erros = 0;
     const hoje = new Date().toISOString().slice(0, 10);
-    if (mode === 'apply') {
-      for (const militarId of selectedMilitarIdsArray) {
-        for (const tagId of tagIds) {
-          try {
-            await criarMilitarTagEscopado({ militar_id: militarId, tag_id: tagId, status: 'ativa', data_aplicacao: hoje, motivo: motivo || undefined });
-            aplicadas += 1;
-          } catch (errorApply) {
-            if (isErroDuplicidade(errorApply)) duplicadas += 1;
-            else erros += 1;
-          }
-        }
+    const selectedMilitarSet = new Set(selectedMilitarIdsArray.map(String));
+    const desejadasSet = new Set((finalSelectedTagIds || []).map(String));
+    const vinculosSelecionados = (vinculosTagsAtivosFiltros || []).filter((v) => selectedMilitarSet.has(String(getMilitarTagMilitarId(v) || '')));
+    const ativosSet = new Set(vinculosSelecionados.map((v) => `${String(getMilitarTagMilitarId(v) || '')}::${String(getMilitarTagTagId(v) || '')}`));
+    const paraCriar = [];
+    selectedMilitarIdsArray.forEach((militarId) => {
+      desejadasSet.forEach((tagId) => {
+        const chave = `${String(militarId)}::${String(tagId)}`;
+        if (!ativosSet.has(chave)) paraCriar.push({ militar_id: militarId, tag_id: tagId });
+      });
+    });
+    const paraRemover = vinculosSelecionados.filter((v) => !desejadasSet.has(String(getMilitarTagTagId(v) || '')));
+
+    for (const item of paraCriar) {
+      try {
+        await criarMilitarTagEscopado({ ...item, status: 'ativa', data_aplicacao: hoje, motivo: motivo || undefined });
+        aplicadas += 1;
+      } catch (errorApply) {
+        if (!isErroDuplicidade(errorApply)) erros += 1;
       }
-    } else {
-      const alvo = new Set(tagIds.map(String));
-      const vinculos = vinculosTagsAtivosFiltros.filter((v) => selectedMilitarIds.has(String(getMilitarTagMilitarId(v) || '')) && alvo.has(String(getMilitarTagTagId(v) || '')));
-      for (const vinculo of vinculos) {
-        try {
-          await removerMilitarTagEscopado(vinculo.id, { data_remocao: hoje, motivo: motivo || undefined });
-          removidas += 1;
-        } catch {
-          erros += 1;
-        }
+    }
+    for (const vinculo of paraRemover) {
+      try {
+        await removerMilitarTagEscopado(vinculo.id, { data_remocao: hoje, motivo: motivo || undefined });
+        removidas += 1;
+      } catch {
+        erros += 1;
       }
     }
     await Promise.all([
@@ -658,8 +678,8 @@ export default function Militares() {
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] }),
     ]);
     setSelectedMilitarIds(new Set());
-    setBulkPanelMode(null);
-    toast({ title: mode === 'apply' ? 'Aplicação concluída' : 'Remoção concluída', description: resumirResultadoBulk({ aplicadas, duplicadas, removidas, erros, modo: mode }), variant: erros > 0 ? 'destructive' : 'default' });
+    setBulkPanelOpen(false);
+    toast({ title: 'Alterações de tags concluídas', description: `Criados ${aplicadas} vínculo(s), removidos ${removidas} vínculo(s). ${erros} erro(s).`, variant: erros > 0 ? 'destructive' : 'default' });
   };
 
 
@@ -956,8 +976,7 @@ export default function Militares() {
               <div className="px-3 py-2 border-b bg-indigo-50 flex flex-wrap items-center gap-2 justify-between">
                 <p className="text-sm font-medium text-indigo-900">{selectedMilitarIds.size} militares selecionados</p>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setBulkPanelMode('apply')}>Aplicar tags</Button>
-                  <Button size="sm" variant="outline" onClick={() => setBulkPanelMode('remove')}>Remover tags</Button>
+                  <Button size="sm" variant="outline" onClick={() => setBulkPanelOpen(true)}>Gerenciar tags</Button>
                   <Button size="sm" variant="ghost" onClick={() => setSelectedMilitarIds(new Set())}>Limpar seleção</Button>
                 </div>
               </div>
@@ -1203,15 +1222,14 @@ export default function Militares() {
         militar={militarPromocaoAtual}
       />
       <MilitarTagsBulkPanel
-        open={Boolean(bulkPanelMode)}
-        mode={bulkPanelMode}
-        onClose={() => setBulkPanelMode(null)}
+        open={bulkPanelOpen}
+        onClose={() => setBulkPanelOpen(false)}
         selectedCount={selectedMilitarIds.size}
         selectedMilitares={selectedMilitaresBulk}
         tagsAtivas={tagsAtivas}
         gruposAtivos={gruposAtivos}
-        tagsPresentes={tagsPresentesSelecionados}
-        onConfirm={({ tagIds, motivo }) => executarBulk({ mode: bulkPanelMode, tagIds, motivo })}
+        tagsStatusById={tagsStatusById}
+        onConfirm={({ finalSelectedTagIds, motivo }) => executarBulk({ finalSelectedTagIds, motivo })}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
