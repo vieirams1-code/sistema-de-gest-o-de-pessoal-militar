@@ -45,11 +45,11 @@ import { getEmojisEfetivo } from '@/utils/funcoesTags/tagsCompactasEfetivo';
 import { APLICABILIDADE_TAG_MILITAR } from '@/utils/funcoesTags/militarTags';
 import { filtrarMilitaresPorFuncoesETags } from '@/utils/funcoesTags/filtrosEfetivo';
 import { buildFuncoesTagsScopeKey, funcoesTagsKeys } from '@/utils/funcoesTags/queryKeys';
-import { getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
+import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, isCatalogoAtivo } from '@/utils/funcoesTags/contratoCampos';
 import { base44 } from '@/api/base44Client';
 import EfetivoFuncoesTagsCompactas from '@/components/militar/EfetivoFuncoesTagsCompactas';
 import MilitarTagsBulkPanel from '@/components/militar/MilitarTagsBulkPanel';
-import { criarMilitarTagEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
+import { criarMilitarFuncaoEscopado, criarMilitarTagEscopado, encerrarMilitarFuncaoEscopado, removerMilitarTagEscopado } from '@/services/cudFuncoesTagsEscopadoClient';
 import { BULK_TAGS_MAX_MILITARES, excedeLimiteMilitaresSelecionados, isErroDuplicidade, montarTagsPresentesNosSelecionados } from '@/utils/funcoesTags/militarTagsBulk';
 import {
   CONSULTA_MILITAR_COLUNAS_GROUP_ORDER,
@@ -633,6 +633,33 @@ export default function Militares() {
     return mapa;
   }, [tagsAtivas, tagsPresentesSelecionados, selectedMilitarIdsArray.length]);
 
+  const funcoesStatusById = useMemo(() => {
+    const totalSelecionados = selectedMilitarIdsArray.length;
+    const mapa = {};
+    (funcoesAtivas || []).forEach((funcao) => {
+      const funcaoId = String(funcao?.id || '');
+      if (funcaoId) mapa[funcaoId] = 'none';
+    });
+
+    const selectedSet = new Set(selectedMilitarIdsArray.map(String));
+    const contadorPorFuncao = new Map();
+
+    (vinculosFuncoesAtivosFiltros || []).forEach((vinculo) => {
+      const militarId = String(vinculo?.militar_id || '');
+      const funcaoId = String(getFuncaoMilitarId(vinculo) || '');
+      if (!militarId || !funcaoId || !selectedSet.has(militarId)) return;
+      contadorPorFuncao.set(funcaoId, (contadorPorFuncao.get(funcaoId) || 0) + 1);
+    });
+
+    contadorPorFuncao.forEach((presentes, funcaoId) => {
+      if (presentes >= totalSelecionados && totalSelecionados > 0) mapa[funcaoId] = 'all';
+      else if (presentes > 0) mapa[funcaoId] = 'partial';
+      else mapa[funcaoId] = 'none';
+    });
+
+    return mapa;
+  }, [funcoesAtivas, selectedMilitarIdsArray, vinculosFuncoesAtivosFiltros]);
+
   useEffect(() => {
     setSelectedMilitarIds((prev) => {
       const next = new Set(Array.from(prev).filter((id) => idsFiltradosSet.has(id)));
@@ -640,7 +667,7 @@ export default function Militares() {
     });
   }, [idsFiltradosSet]);
 
-  const executarBulk = async ({ finalSelectedTagIds, motivo }) => {
+  const executarBulk = async ({ finalSelectedTagIds, finalSelectedFuncaoIds, motivo }) => {
     if (bulkSaving) return;
 
     if (excedeLimiteMilitaresSelecionados(selectedMilitarIds.size)) {
@@ -651,20 +678,34 @@ export default function Militares() {
     const hoje = new Date().toISOString().slice(0, 10);
     const selectedMilitarSet = new Set(selectedMilitarIdsArray.map(String));
     const desejadasSet = new Set((finalSelectedTagIds || []).map(String));
-    const vinculosSelecionados = (vinculosTagsAtivosFiltros || []).filter((v) => selectedMilitarSet.has(String(getMilitarTagMilitarId(v) || '')));
-    const ativosSet = new Set(vinculosSelecionados.map((v) => `${String(getMilitarTagMilitarId(v) || '')}::${String(getMilitarTagTagId(v) || '')}`));
+    const vinculosTagsSelecionados = (vinculosTagsAtivosFiltros || []).filter((v) => selectedMilitarSet.has(String(getMilitarTagMilitarId(v) || '')));
+    const ativosTagsSet = new Set(vinculosTagsSelecionados.map((v) => `${String(getMilitarTagMilitarId(v) || '')}::${String(getMilitarTagTagId(v) || '')}`));
     const paraCriar = [];
 
     selectedMilitarIdsArray.forEach((militarId) => {
       desejadasSet.forEach((tagId) => {
         const chave = `${String(militarId)}::${String(tagId)}`;
-        if (!ativosSet.has(chave)) paraCriar.push({ militar_id: militarId, tag_id: tagId });
+        if (!ativosTagsSet.has(chave)) paraCriar.push({ militar_id: militarId, tag_id: tagId });
       });
     });
 
-    const paraRemover = vinculosSelecionados.filter((v) => !desejadasSet.has(String(getMilitarTagTagId(v) || '')));
+    const paraRemover = vinculosTagsSelecionados.filter((v) => !desejadasSet.has(String(getMilitarTagTagId(v) || '')));
 
-    if (paraCriar.length === 0 && paraRemover.length === 0) {
+    const desejadasFuncoesSet = new Set((finalSelectedFuncaoIds || []).map(String));
+    const vinculosFuncoesSelecionados = (vinculosFuncoesAtivosFiltros || []).filter((v) => selectedMilitarSet.has(String(v?.militar_id || '')));
+    const ativosFuncoesSet = new Set(vinculosFuncoesSelecionados.map((v) => `${String(v?.militar_id || '')}::${String(getFuncaoMilitarId(v) || '')}`));
+    const deltaFuncoesCriar = [];
+
+    selectedMilitarIdsArray.forEach((militarId) => {
+      desejadasFuncoesSet.forEach((funcaoId) => {
+        const chave = `${String(militarId)}::${String(funcaoId)}`;
+        if (!ativosFuncoesSet.has(chave)) deltaFuncoesCriar.push({ militar_id: militarId, funcao_militar_id: funcaoId });
+      });
+    });
+
+    const deltaFuncoesRemover = vinculosFuncoesSelecionados.filter((v) => !desejadasFuncoesSet.has(String(getFuncaoMilitarId(v) || '')));
+
+    if (paraCriar.length === 0 && paraRemover.length === 0 && deltaFuncoesCriar.length === 0 && deltaFuncoesRemover.length === 0) {
       setBulkPanelOpen(false);
       toast({ title: 'Nenhuma alteração para salvar.' });
       return;
@@ -674,9 +715,30 @@ export default function Militares() {
 
     let aplicadas = 0;
     let removidas = 0;
+    let funcoesCriadas = 0;
+    let funcoesEncerradas = 0;
     let erros = 0;
 
     try {
+      const criacoesFuncoes = await Promise.allSettled(
+        deltaFuncoesCriar.map((item) => criarMilitarFuncaoEscopado({ ...item, status: 'ativa', data_inicio: hoje, motivo: motivo || undefined })),
+      );
+      criacoesFuncoes.forEach((resultado) => {
+        if (resultado.status === 'fulfilled') { funcoesCriadas += 1; return; }
+        if (!isErroDuplicidade(resultado.reason)) erros += 1;
+      });
+
+      const remocoesFuncoes = await Promise.allSettled(
+        deltaFuncoesRemover.map((vinculo) => encerrarMilitarFuncaoEscopado(vinculo.id, { data_fim: hoje, motivo: motivo || undefined })),
+      );
+      remocoesFuncoes.forEach((resultado) => {
+        if (resultado.status === 'fulfilled') { funcoesEncerradas += 1; return; }
+        erros += 1;
+      });
+
+      // FUTURO:
+      // validar exclusividade institucional por unidade
+
       const criacoes = await Promise.allSettled(
         paraCriar.map((item) => criarMilitarTagEscopado({ ...item, status: 'ativa', data_aplicacao: hoje, motivo: motivo || undefined })),
       );
@@ -702,16 +764,18 @@ export default function Militares() {
       setSelectedMilitarIds(new Set());
       setBulkPanelOpen(false);
 
+      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresFuncoesFiltros(funcoesTagsScopeKey, idsHash) });
       queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresTagsFiltros(funcoesTagsScopeKey, idsHash) });
       queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'tags') });
       queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'grupos') });
       queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-funcoes-filtros'] });
       queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] });
       queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] });
 
       toast({
-        title: 'Tags atualizadas com sucesso.',
-        description: `${aplicadas} adicionada(s), ${removidas} removida(s).`,
+        title: 'Funções e tags atualizadas com sucesso.',
+        description: `${funcoesCriadas} função(ões) criada(s), ${funcoesEncerradas} função(ões) encerrada(s), ${aplicadas} tag(s) adicionada(s), ${removidas} tag(s) removida(s).`,
         variant: erros > 0 ? 'destructive' : 'default',
       });
     } finally {
@@ -1343,7 +1407,9 @@ export default function Militares() {
         tagsAtivas={tagsAtivas}
         gruposAtivos={gruposAtivos}
         tagsStatusById={tagsStatusById}
-        onConfirm={({ finalSelectedTagIds, motivo }) => executarBulk({ finalSelectedTagIds, motivo })}
+        funcoesAtivas={funcoesAtivas}
+        funcoesStatusById={funcoesStatusById}
+        onConfirm={({ finalSelectedTagIds, finalSelectedFuncaoIds, motivo }) => executarBulk({ finalSelectedTagIds, finalSelectedFuncaoIds, motivo })}
         saving={bulkSaving}
       />
 
