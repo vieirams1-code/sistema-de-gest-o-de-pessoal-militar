@@ -233,6 +233,7 @@ export default function Militares() {
   const [militaresAcumulados, setMilitaresAcumulados] = useState([]);
   const [selectedMilitarIds, setSelectedMilitarIds] = useState(new Set());
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState(() => {
     try {
@@ -632,54 +633,82 @@ export default function Militares() {
   }, [idsFiltradosSet]);
 
   const executarBulk = async ({ finalSelectedTagIds, motivo }) => {
+    if (bulkSaving) return;
+
     if (excedeLimiteMilitaresSelecionados(selectedMilitarIds.size)) {
       toast({ title: 'Limite excedido', description: `Selecione no máximo ${BULK_TAGS_MAX_MILITARES} militares nesta versão inicial.`, variant: 'destructive' });
       return;
     }
-    let aplicadas = 0;
-    let removidas = 0;
-    let erros = 0;
+
     const hoje = new Date().toISOString().slice(0, 10);
     const selectedMilitarSet = new Set(selectedMilitarIdsArray.map(String));
     const desejadasSet = new Set((finalSelectedTagIds || []).map(String));
     const vinculosSelecionados = (vinculosTagsAtivosFiltros || []).filter((v) => selectedMilitarSet.has(String(getMilitarTagMilitarId(v) || '')));
     const ativosSet = new Set(vinculosSelecionados.map((v) => `${String(getMilitarTagMilitarId(v) || '')}::${String(getMilitarTagTagId(v) || '')}`));
     const paraCriar = [];
+
     selectedMilitarIdsArray.forEach((militarId) => {
       desejadasSet.forEach((tagId) => {
         const chave = `${String(militarId)}::${String(tagId)}`;
         if (!ativosSet.has(chave)) paraCriar.push({ militar_id: militarId, tag_id: tagId });
       });
     });
+
     const paraRemover = vinculosSelecionados.filter((v) => !desejadasSet.has(String(getMilitarTagTagId(v) || '')));
 
-    for (const item of paraCriar) {
-      try {
-        await criarMilitarTagEscopado({ ...item, status: 'ativa', data_aplicacao: hoje, motivo: motivo || undefined });
-        aplicadas += 1;
-      } catch (errorApply) {
-        if (!isErroDuplicidade(errorApply)) erros += 1;
-      }
+    if (paraCriar.length === 0 && paraRemover.length === 0) {
+      setBulkPanelOpen(false);
+      toast({ title: 'Nenhuma alteração para salvar.' });
+      return;
     }
-    for (const vinculo of paraRemover) {
-      try {
-        await removerMilitarTagEscopado(vinculo.id, { data_remocao: hoje, motivo: motivo || undefined });
-        removidas += 1;
-      } catch {
+
+    setBulkSaving(true);
+
+    let aplicadas = 0;
+    let removidas = 0;
+    let erros = 0;
+
+    try {
+      const criacoes = await Promise.allSettled(
+        paraCriar.map((item) => criarMilitarTagEscopado({ ...item, status: 'ativa', data_aplicacao: hoje, motivo: motivo || undefined })),
+      );
+      criacoes.forEach((resultado) => {
+        if (resultado.status === 'fulfilled') {
+          aplicadas += 1;
+          return;
+        }
+        if (!isErroDuplicidade(resultado.reason)) erros += 1;
+      });
+
+      const remocoes = await Promise.allSettled(
+        paraRemover.map((vinculo) => removerMilitarTagEscopado(vinculo.id, { data_remocao: hoje, motivo: motivo || undefined })),
+      );
+      remocoes.forEach((resultado) => {
+        if (resultado.status === 'fulfilled') {
+          removidas += 1;
+          return;
+        }
         erros += 1;
-      }
+      });
+
+      setSelectedMilitarIds(new Set());
+      setBulkPanelOpen(false);
+
+      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresTagsFiltros(funcoesTagsScopeKey, idsHash) });
+      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'tags') });
+      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'grupos') });
+      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] });
+      queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] });
+      queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] });
+
+      toast({
+        title: 'Tags atualizadas com sucesso.',
+        description: `${aplicadas} adicionada(s), ${removidas} removida(s).`,
+        variant: erros > 0 ? 'destructive' : 'default',
+      });
+    } finally {
+      setBulkSaving(false);
     }
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.militaresTagsFiltros(funcoesTagsScopeKey, idsHash) }),
-      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'tags') }),
-      queryClient.invalidateQueries({ queryKey: funcoesTagsKeys.catalogo(funcoesTagsScopeKey, 'grupos') }),
-      queryClient.invalidateQueries({ queryKey: ['militares-consulta-rapida-scoped'] }),
-      queryClient.invalidateQueries({ queryKey: ['militares-tags-filtros'] }),
-      queryClient.invalidateQueries({ queryKey: ['funcoes-tags'] }),
-    ]);
-    setSelectedMilitarIds(new Set());
-    setBulkPanelOpen(false);
-    toast({ title: 'Alterações de tags concluídas', description: `Criados ${aplicadas} vínculo(s), removidos ${removidas} vínculo(s). ${erros} erro(s).`, variant: erros > 0 ? 'destructive' : 'default' });
   };
 
 
@@ -1230,6 +1259,7 @@ export default function Militares() {
         gruposAtivos={gruposAtivos}
         tagsStatusById={tagsStatusById}
         onConfirm={({ finalSelectedTagIds, motivo }) => executarBulk({ finalSelectedTagIds, motivo })}
+        saving={bulkSaving}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
