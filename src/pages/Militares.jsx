@@ -589,6 +589,11 @@ export default function Militares() {
     return mapa;
   }, [filteredMilitares, funcoesInstitucionais, vinculosFuncoesAtivosFiltros, tagsAtivas, vinculosTagsAtivosFiltros]);
   const idsFiltradosSet = useMemo(() => new Set(filteredMilitares.map((m) => String(m.id))), [filteredMilitares]);
+  const selectedMilitaresBulk = useMemo(
+    () => operacionais.filter((militar) => selectedMilitarIds.has(String(militar.id))),
+    [operacionais, selectedMilitarIds],
+  );
+
   const selectedMilitarIdsArray = useMemo(() => Array.from(selectedMilitarIds), [selectedMilitarIds]);
   const allFilteredSelected = filteredMilitares.length > 0 && filteredMilitares.every((m) => selectedMilitarIds.has(String(m.id)));
   const tagsPresentesSelecionados = useMemo(() => montarTagsPresentesNosSelecionados({
@@ -1146,6 +1151,7 @@ export default function Militares() {
         mode={bulkPanelMode}
         onClose={() => setBulkPanelMode(null)}
         selectedCount={selectedMilitarIds.size}
+        selectedMilitares={selectedMilitaresBulk}
         tagsAtivas={tagsAtivas}
         gruposAtivos={gruposAtivos}
         tagsPresentes={tagsPresentesSelecionados}
