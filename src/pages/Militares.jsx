@@ -245,6 +245,11 @@ export default function Militares() {
   const [columnFilters, setColumnFilters] = useState({});
   const { toast } = useToast();
 
+  const allowedColumnKeysSignature = useMemo(
+    () => allowedColumns.map((col) => col.key).join('|'),
+    [allowedColumns],
+  );
+
   useEffect(() => {
     try {
       const savedColumnsRaw = localStorage.getItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY);
@@ -261,7 +266,7 @@ export default function Militares() {
     } catch {
       setColumnFilters({});
     }
-  }, [allowedColumns]);
+  }, [allowedColumnKeysSignature]);
 
   useEffect(() => {
     if (columnsDialogOpen) {
@@ -288,7 +293,7 @@ export default function Militares() {
     return CONSULTA_MILITAR_COLUNAS_GROUP_ORDER
       .map((group) => ({ group, columns: grouped[group] || [] }))
       .filter((item) => item.columns.length > 0);
-  }, [allowedColumns]);
+  }, [allowedColumnKeysSignature]);
   const sanitizedVisibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumnKeys, allowedColumns), [visibleColumnKeys, allowedColumns]);
   const visibleColumnSet = useMemo(() => new Set(sanitizedVisibleColumnKeys), [sanitizedVisibleColumnKeys]);
 
@@ -437,7 +442,10 @@ export default function Militares() {
   };
 
   const militares = militaresAcumulados;
-  const operacionais = filtrarMilitaresOperacionais(militares, { incluirInativos });
+  const operacionais = useMemo(
+    () => filtrarMilitaresOperacionais(militares, { incluirInativos }),
+    [militares, incluirInativos],
+  );
   const idsMilitaresCarregados = useMemo(
     () => operacionais.map((m) => String(m?.id || '')).filter(Boolean),
     [operacionais],
@@ -532,7 +540,7 @@ export default function Militares() {
     [],
   );
 
-  const filteredMilitaresBase = operacionais
+  const filteredMilitaresBase = useMemo(() => operacionais
     .filter((m) => {
       if (quadrosSelecionados.length === 0) return true;
       return quadrosSelecionados.includes(normalizarQuadroLegado(m?.quadro));
@@ -554,7 +562,7 @@ export default function Militares() {
     .filter((m) => (
       militarCorrespondeBusca(m, searchTerm)
       || militarCorrespondeOrigemDestino(m, searchTerm)
-    ));
+    )), [operacionais, quadrosSelecionados, situacoesSelecionadas, condicaoFilter, movimentoFilter, searchTerm]);
 
   const filteredMilitaresComFuncoesTags = useMemo(() => filtrarMilitaresPorFuncoesETags({
     militares: filteredMilitaresBase,
@@ -585,7 +593,7 @@ export default function Militares() {
     .map((key) => columnMetaByKey.get(key)?.label || key), [hiddenColumnFilterKeys, columnMetaByKey]);
   const hasAnyColumnFilter = activeColumnFilterKeys.length > 0;
   const multiselectColumns = useMemo(() => allowedColumns
-    .filter((column) => column.futureFilterType === 'multiselect'), []);
+    .filter((column) => column.futureFilterType === 'multiselect'), [allowedColumns]);
   const columnFilterOptionsByKey = useMemo(
     () => buildMultiselectOptionsByColumn(filteredMilitaresComFuncoesTags, multiselectColumns),
     [filteredMilitaresComFuncoesTags, multiselectColumns],
