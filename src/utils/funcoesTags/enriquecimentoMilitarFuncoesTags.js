@@ -1,5 +1,5 @@
 import { APLICABILIDADE_TAG_MILITAR } from './militarTags';
-import { getFuncaoMilitarId, getTagGrupoId, isRegistroAtivo } from './contratoCampos';
+import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, getTagGrupoId, isRegistroAtivo } from './contratoCampos';
 
 const normalizar = (valor) => String(valor || '').trim().toLowerCase();
 
@@ -43,8 +43,8 @@ export function enriquecerMilitaresComFuncoesETags({ militares = [], vinculosFun
   const tagsAtivasByMilitar = new Map();
   vinculosTagsAtivos.forEach((vinculo) => {
     if (!isRegistroAtivo(vinculo)) return;
-    const militarId = String(vinculo?.militar_id || '').trim();
-    const tag = tagsById.get(String(vinculo?.tag_id || '').trim());
+    const militarId = String(getMilitarTagMilitarId(vinculo) || '').trim();
+    const tag = tagsById.get(String(getMilitarTagTagId(vinculo) || '').trim());
     if (!militarId || !tag) return;
     const grupo = gruposById.get(String(getTagGrupoId(tag) || '').trim());
     if (!tagsAtivasByMilitar.has(militarId)) tagsAtivasByMilitar.set(militarId, []);
