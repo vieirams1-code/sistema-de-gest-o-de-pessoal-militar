@@ -240,8 +240,8 @@ export default function Militares() {
     () => getAllowedConsultaMilitarColumns({ userContext: { isAdmin, canAccessAction, modoAcesso } }),
     [isAdmin, canAccessAction, modoAcesso],
   );
-  const [visibleColumns, setVisibleColumns] = useState([]);
-  const [pendingVisibleColumns, setPendingVisibleColumns] = useState([]);
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState([]);
+  const [draftVisibleColumnKeys, setDraftVisibleColumnKeys] = useState([]);
   const [columnFilters, setColumnFilters] = useState({});
   const { toast } = useToast();
 
@@ -249,9 +249,9 @@ export default function Militares() {
     try {
       const savedColumnsRaw = localStorage.getItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY);
       const savedColumns = savedColumnsRaw ? JSON.parse(savedColumnsRaw) : null;
-      setVisibleColumns(normalizeVisibleColumns(savedColumns, allowedColumns));
+      setVisibleColumnKeys(normalizeVisibleColumns(savedColumns, allowedColumns));
     } catch {
-      setVisibleColumns(normalizeVisibleColumns(null, allowedColumns));
+      setVisibleColumnKeys(normalizeVisibleColumns(null, allowedColumns));
     }
 
     try {
@@ -264,12 +264,14 @@ export default function Militares() {
   }, [allowedColumns]);
 
   useEffect(() => {
-    setPendingVisibleColumns(visibleColumns);
-  }, [visibleColumns, columnsDialogOpen]);
+    if (columnsDialogOpen) {
+      setDraftVisibleColumnKeys(normalizeVisibleColumns(visibleColumnKeys, allowedColumns));
+    }
+  }, [columnsDialogOpen, visibleColumnKeys, allowedColumns]);
 
   useEffect(() => {
-    localStorage.setItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY, JSON.stringify(visibleColumns));
-  }, [visibleColumns]);
+    localStorage.setItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY, JSON.stringify(visibleColumnKeys));
+  }, [visibleColumnKeys]);
 
   useEffect(() => {
     localStorage.setItem(CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY, JSON.stringify(columnFilters));
@@ -287,8 +289,8 @@ export default function Militares() {
       .map((group) => ({ group, columns: grouped[group] || [] }))
       .filter((item) => item.columns.length > 0);
   }, [allowedColumns]);
-  const visibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumns, allowedColumns), [visibleColumns, allowedColumns]);
-  const visibleColumnSet = useMemo(() => new Set(visibleColumnKeys), [visibleColumnKeys]);
+  const sanitizedVisibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumnKeys, allowedColumns), [visibleColumnKeys, allowedColumns]);
+  const visibleColumnSet = useMemo(() => new Set(sanitizedVisibleColumnKeys), [sanitizedVisibleColumnKeys]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedPostos(postosSelecionados), 300);
@@ -731,7 +733,7 @@ export default function Militares() {
       const fileDate = new Date().toISOString().slice(0, 10);
       exportConsultaMilitarToXlsx({
         militares: militaresParaExportar,
-        visibleColumns: visibleColumnKeys,
+        visibleColumns: sanitizedVisibleColumnKeys,
         columnsCatalog: allowedColumns,
         fileName: isSelectedMode
           ? `consulta-militar-selecionados-${fileDate}.xlsx`
@@ -788,7 +790,7 @@ export default function Militares() {
               Limpar filtros de colunas
             </Button>
             <Button variant="outline" onClick={() => setColumnsDialogOpen(true)}>
-              Colunas ({visibleColumnKeys.length}/{allowedColumns.length})
+              Colunas ({sanitizedVisibleColumnKeys.length}/{allowedColumns.length})
             </Button>
             <TooltipProvider delayDuration={120}>
               <Tooltip>
@@ -1046,8 +1048,8 @@ export default function Militares() {
                 </div>
               </div>
             )}
-            <div className="grid gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50" style={{ gridTemplateColumns: `repeat(${visibleColumnKeys.length}, minmax(0, 1fr)) auto` }}>
-              {visibleColumnKeys.map((key) => {
+            <div className="grid gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50" style={{ gridTemplateColumns: `repeat(${sanitizedVisibleColumnKeys.length}, minmax(0, 1fr)) auto` }}>
+              {sanitizedVisibleColumnKeys.map((key) => {
                 const column = columnMetaByKey.get(key);
                 const filterType = column?.futureFilterType;
                 const currentFilter = columnFilters[key];
@@ -1176,8 +1178,8 @@ export default function Militares() {
                     }}
                   />
                 </label>
-                <div className="grid flex-1 min-w-0 gap-2" style={{ gridTemplateColumns: `repeat(${visibleColumnKeys.length}, minmax(0, 1fr))` }}>
-                  {visibleColumnKeys.map((key) => {
+                <div className="grid flex-1 min-w-0 gap-2" style={{ gridTemplateColumns: `repeat(${sanitizedVisibleColumnKeys.length}, minmax(0, 1fr))` }}>
+                  {sanitizedVisibleColumnKeys.map((key) => {
                     if (key === 'nome') {
                       return (
                         <div key={key} className="min-w-0">
@@ -1317,7 +1319,7 @@ export default function Militares() {
 
       <AlertDialog open={columnsDialogOpen} onOpenChange={(open) => {
         setColumnsDialogOpen(open);
-        if (!open) setPendingVisibleColumns(visibleColumns);
+        if (!open) setDraftVisibleColumnKeys([]);
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1330,8 +1332,8 @@ export default function Militares() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{group}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {columns.map((coluna) => {
-                    const isChecked = pendingVisibleColumns.includes(coluna.key);
-                    const disableUncheck = isChecked && pendingVisibleColumns.length === 1;
+                    const isChecked = draftVisibleColumnKeys.includes(coluna.key);
+                    const disableUncheck = isChecked && draftVisibleColumnKeys.length === 1;
                     return (
                       <label key={coluna.key} className="inline-flex items-center gap-2 text-sm">
                         <input
@@ -1339,8 +1341,8 @@ export default function Militares() {
                           checked={isChecked}
                           disabled={disableUncheck}
                           onChange={(e) => {
-                            if (e.target.checked) setPendingVisibleColumns((prev) => normalizeVisibleColumns([...prev, coluna.key], allowedColumns));
-                            else setPendingVisibleColumns((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key), allowedColumns));
+                            if (e.target.checked) setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns([...prev, coluna.key], allowedColumns));
+                            else setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key), allowedColumns));
                           }}
                         />
                         <span>{coluna.label}</span>
@@ -1352,9 +1354,9 @@ export default function Militares() {
             ))}
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingVisibleColumns(visibleColumns)}>Cancelar</AlertDialogCancel>
-            <Button type="button" variant="outline" onClick={() => setPendingVisibleColumns(normalizeVisibleColumns(null, allowedColumns))}>Restaurar padrão</Button>
-            <AlertDialogAction onClick={() => setVisibleColumns(normalizeVisibleColumns(pendingVisibleColumns, allowedColumns))}>Aplicar</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setDraftVisibleColumnKeys([])}>Cancelar</AlertDialogCancel>
+            <Button type="button" variant="outline" onClick={() => setDraftVisibleColumnKeys(normalizeVisibleColumns(null, allowedColumns))}>Restaurar padrão</Button>
+            <AlertDialogAction onClick={() => setVisibleColumnKeys(normalizeVisibleColumns(draftVisibleColumnKeys, allowedColumns))}>Aplicar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
