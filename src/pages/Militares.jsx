@@ -19,8 +19,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
@@ -53,6 +54,11 @@ import {
   CONSULTA_MILITAR_COLUNAS_GROUP_ORDER,
   CONSULTA_MILITAR_COLUNAS_STORAGE_KEY,
 } from '@/pages/consultaMilitar/consultaMilitarColumns';
+import {
+  applyColumnFilters,
+  buildColumnFilterOptions,
+  normalizeColumnFilters,
+} from '@/pages/consultaMilitar/consultaMilitarFilters';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
 const PAGE_SIZE = 300;
@@ -171,6 +177,7 @@ const MOVIMENTO_OPCOES = [
   { value: 'saida', label: 'Somente saídas' },
 ];
 const fallbackColumnKey = CONSULTA_MILITAR_COLUNAS_ALLOWLIST[0]?.key || 'nome';
+const CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY = 'consulta_militar_column_filters_v1';
 
 function normalizeVisibleColumns(rawValue) {
   const validKeys = new Set(CONSULTA_MILITAR_COLUNAS_ALLOWLIST.map((col) => col.key));
@@ -233,6 +240,14 @@ export default function Militares() {
     }
   });
   const [pendingVisibleColumns, setPendingVisibleColumns] = useState(visibleColumns);
+  const [columnFilters, setColumnFilters] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY);
+      return normalizeColumnFilters(saved ? JSON.parse(saved) : {}, CONSULTA_MILITAR_COLUNAS_ALLOWLIST);
+    } catch {
+      return {};
+    }
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -242,6 +257,10 @@ export default function Militares() {
   useEffect(() => {
     localStorage.setItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY, JSON.stringify(visibleColumns));
   }, [visibleColumns]);
+
+  useEffect(() => {
+    localStorage.setItem(CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY, JSON.stringify(columnFilters));
+  }, [columnFilters]);
 
   const columnMetaByKey = useMemo(
     () => new Map(CONSULTA_MILITAR_COLUNAS_ALLOWLIST.map((col) => [col.key, col])),
@@ -259,6 +278,7 @@ export default function Militares() {
       .filter((item) => item.columns.length > 0);
   }, []);
   const visibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumns), [visibleColumns]);
+  const visibleColumnSet = useMemo(() => new Set(visibleColumnKeys), [visibleColumnKeys]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedPostos(postosSelecionados), 300);
@@ -534,9 +554,27 @@ export default function Militares() {
   }), [filteredMilitaresBase, funcoesSelecionadas, tagsSelecionadas, gruposSelecionados, vinculosFuncoesAtivosFiltros, vinculosTagsAtivosFiltros, tagsAtivas]);
 
   const filteredMilitares = useMemo(
-    () => ordenarComDestaqueInstitucional(filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar),
-    [filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar],
+    () => {
+      const filtradosPorColuna = applyColumnFilters(filteredMilitaresComFuncoesTags, CONSULTA_MILITAR_COLUNAS_ALLOWLIST, columnFilters);
+      return ordenarComDestaqueInstitucional(filtradosPorColuna, decoracaoInstitucionalByMilitar);
+    },
+    [filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar, columnFilters],
   );
+  const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, CONSULTA_MILITAR_COLUNAS_ALLOWLIST)), [columnFilters]);
+  const hiddenColumnFilterCount = useMemo(
+    () => activeColumnFilterKeys.filter((key) => !visibleColumnSet.has(key)).length,
+    [activeColumnFilterKeys, visibleColumnSet],
+  );
+  const hasAnyColumnFilter = activeColumnFilterKeys.length > 0;
+  const columnFilterOptionsByKey = useMemo(() => {
+    const map = new Map();
+    CONSULTA_MILITAR_COLUNAS_ALLOWLIST.forEach((column) => {
+      if (column.futureFilterType === 'multiselect') {
+        map.set(column.key, buildColumnFilterOptions(filteredMilitaresComFuncoesTags, column));
+      }
+    });
+    return map;
+  }, [filteredMilitaresComFuncoesTags]);
   const emojisEfetivoByMilitar = useMemo(() => {
     const mapa = new Map();
     filteredMilitares.forEach((militar) => {
@@ -642,6 +680,13 @@ export default function Militares() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setColumnFilters({})}
+              disabled={!hasAnyColumnFilter}
+            >
+              Limpar filtros de colunas
+            </Button>
             <Button variant="outline" onClick={() => setColumnsDialogOpen(true)}>
               Colunas
             </Button>
@@ -874,11 +919,98 @@ export default function Militares() {
               </div>
             )}
             <div className="grid gap-2 px-3 py-2 text-xs font-semibold text-slate-500 border-b bg-slate-50" style={{ gridTemplateColumns: `repeat(${visibleColumnKeys.length}, minmax(0, 1fr)) auto` }}>
-              {visibleColumnKeys.map((key) => (
-                <div key={key}>{columnMetaByKey.get(key)?.label || key}</div>
-              ))}
+              {visibleColumnKeys.map((key) => {
+                const column = columnMetaByKey.get(key);
+                const filterType = column?.futureFilterType;
+                const currentFilter = columnFilters[key];
+                const isFilterActive = Boolean(
+                  (currentFilter?.type === 'text' && String(currentFilter?.text || '').trim())
+                  || (currentFilter?.type === 'multiselect' && Array.isArray(currentFilter?.selected) && currentFilter.selected.length > 0),
+                );
+                const multiselectOptions = columnFilterOptionsByKey.get(key) || [];
+                return (
+                  <div key={key} className="flex items-center gap-1 min-w-0">
+                    <span className="truncate">{column?.label || key}</span>
+                    {filterType && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" className={`rounded p-1 hover:bg-slate-200 ${isFilterActive ? 'text-blue-700' : 'text-slate-400'}`}>
+                            <Filter className="w-3.5 h-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-3 space-y-2" align="start">
+                          <p className="text-xs font-semibold text-slate-700">{column?.label}</p>
+                          {filterType === 'text' && (
+                            <>
+                              <Input
+                                value={currentFilter?.type === 'text' ? currentFilter.text : ''}
+                                onChange={(e) => {
+                                  const text = e.target.value;
+                                  setColumnFilters((prev) => normalizeColumnFilters({
+                                    ...prev,
+                                    [key]: { type: 'text', text },
+                                  }, CONSULTA_MILITAR_COLUNAS_ALLOWLIST));
+                                }}
+                                placeholder="Filtrar..."
+                                className="h-8 text-xs"
+                              />
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => {
+                                setColumnFilters((prev) => {
+                                  const next = { ...prev };
+                                  delete next[key];
+                                  return normalizeColumnFilters(next, CONSULTA_MILITAR_COLUNAS_ALLOWLIST);
+                                });
+                              }}>Limpar</Button>
+                            </>
+                          )}
+                          {filterType === 'multiselect' && (
+                            <>
+                              <div className="max-h-48 overflow-auto space-y-1">
+                                {multiselectOptions.map((option) => {
+                                  const selected = currentFilter?.type === 'multiselect' && currentFilter.selected?.includes(option);
+                                  return (
+                                    <label key={option} className="flex items-center gap-2 text-xs text-slate-700">
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(selected)}
+                                        onChange={(e) => {
+                                          const current = currentFilter?.type === 'multiselect' ? currentFilter.selected || [] : [];
+                                          const nextSelected = e.target.checked
+                                            ? [...current, option]
+                                            : current.filter((item) => item !== option);
+                                          setColumnFilters((prev) => normalizeColumnFilters({
+                                            ...prev,
+                                            [key]: { type: 'multiselect', selected: nextSelected },
+                                          }, CONSULTA_MILITAR_COLUNAS_ALLOWLIST));
+                                        }}
+                                      />
+                                      <span className="truncate">{option}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => {
+                                setColumnFilters((prev) => {
+                                  const next = { ...prev };
+                                  delete next[key];
+                                  return normalizeColumnFilters(next, CONSULTA_MILITAR_COLUNAS_ALLOWLIST);
+                                });
+                              }}>Limpar</Button>
+                            </>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                );
+              })}
               <div className="text-right">Ações</div>
             </div>
+            {hiddenColumnFilterCount > 0 && (
+              <div className="px-3 py-1 border-b bg-amber-50 text-xs text-amber-700">
+                {hiddenColumnFilterCount} filtro(s) ativo(s) em coluna(s) oculta(s).
+              </div>
+            )}
             {filteredMilitares.map((militar) => {
               const destacarQuadro = isQuadroComDestaque(militar?.quadro);
 
