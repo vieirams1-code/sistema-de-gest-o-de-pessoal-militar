@@ -11,6 +11,9 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Carreira',
     defaultVisible: true,
     futureFilterType: 'multiselect',
+    sensitive: false,
+    // TODO(governanca): aplicar visibleFor na renderização/exportação por perfil.
+    visibleFor: ['admin', 'gestor'],
     accessor: (militar) => toText(militar?.posto_graduacao, 'Sem posto'),
   },
   {
@@ -19,6 +22,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Identificação',
     defaultVisible: true,
     futureFilterType: 'text',
+    sensitive: false,
+    visibleFor: ['admin', 'gestor'],
     accessor: (militar) => toText(militar?.nome_guerra || militar?.nome_completo),
   },
   {
@@ -27,6 +32,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Identificação',
     defaultVisible: true,
     futureFilterType: 'text',
+    sensitive: false,
+    visibleFor: ['admin', 'gestor'],
     accessor: (militar) => toText(militar?.matricula),
   },
   {
@@ -35,6 +42,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Carreira',
     defaultVisible: true,
     futureFilterType: 'multiselect',
+    sensitive: false,
+    visibleFor: ['admin', 'gestor'],
     accessor: (militar) => toText(militar?.quadro),
   },
   {
@@ -43,6 +52,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Carreira',
     defaultVisible: true,
     futureFilterType: 'multiselect',
+    sensitive: false,
+    visibleFor: ['admin', 'gestor'],
     accessor: (militar) => toText(militar?.lotacao_atual, 'Sem lotação'),
   },
   {
@@ -51,6 +62,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Situação',
     defaultVisible: true,
     futureFilterType: 'multiselect',
+    sensitive: false,
+    visibleFor: ['admin', 'gestor'],
     accessor: (militar) => toText(militar?.situacao_militar),
   },
   {
@@ -59,6 +72,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Situação',
     defaultVisible: true,
     futureFilterType: 'multiselect',
+    sensitive: false,
+    visibleFor: ['admin', 'gestor'],
     accessor: (militar) => toText(militar?.situacao_condicao_militar),
   },
   {
@@ -67,6 +82,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Situação',
     defaultVisible: false,
     futureFilterType: 'multiselect',
+    sensitive: false,
+    visibleFor: ['admin', 'gestor'],
     accessor: (militar) => toText(militar?.status_cadastro, 'Ativo'),
   },
   {
@@ -75,6 +92,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Identificação',
     defaultVisible: false,
     futureFilterType: 'multiselect',
+    sensitive: true,
+    visibleFor: ['admin'],
     accessor: (militar) => toText(militar?.tipo_sanguineo),
   },
   {
@@ -83,6 +102,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Contato',
     defaultVisible: false,
     futureFilterType: 'text',
+    sensitive: true,
+    visibleFor: ['admin'],
     accessor: (militar) => toText(militar?.telefone),
   },
   {
@@ -91,6 +112,8 @@ export const CONSULTA_MILITAR_COLUNAS_ALLOWLIST = [
     group: 'Contato',
     defaultVisible: false,
     futureFilterType: 'text',
+    sensitive: true,
+    visibleFor: ['admin'],
     accessor: (militar) => toText(militar?.email),
   },
 ];

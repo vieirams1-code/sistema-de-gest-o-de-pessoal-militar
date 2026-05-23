@@ -20,6 +20,17 @@ export function buildColumnFilterOptions(militares, column) {
   return Array.from(unique).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
+
+export function buildMultiselectOptionsByColumn(militares, columns) {
+  const map = new Map();
+  (columns || []).forEach((column) => {
+    if (column?.futureFilterType === 'multiselect') {
+      map.set(column.key, buildColumnFilterOptions(militares, column));
+    }
+  });
+  return map;
+}
+
 export function normalizeColumnFilters(filters, allowedColumns) {
   const byKey = new Map((allowedColumns || []).map((column) => [column.key, column]));
   const source = filters && typeof filters === 'object' ? filters : {};

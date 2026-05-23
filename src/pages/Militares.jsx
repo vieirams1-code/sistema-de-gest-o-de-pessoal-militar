@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   carregarMilitaresComMatriculas,
   filtrarMilitaresOperacionais,
@@ -56,7 +57,7 @@ import {
 } from '@/pages/consultaMilitar/consultaMilitarColumns';
 import {
   applyColumnFilters,
-  buildColumnFilterOptions,
+  buildMultiselectOptionsByColumn,
   normalizeColumnFilters,
 } from '@/pages/consultaMilitar/consultaMilitarFilters';
 import { exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
@@ -562,20 +563,20 @@ export default function Militares() {
     [filteredMilitaresComFuncoesTags, decoracaoInstitucionalByMilitar, columnFilters],
   );
   const activeColumnFilterKeys = useMemo(() => Object.keys(normalizeColumnFilters(columnFilters, CONSULTA_MILITAR_COLUNAS_ALLOWLIST)), [columnFilters]);
-  const hiddenColumnFilterCount = useMemo(
-    () => activeColumnFilterKeys.filter((key) => !visibleColumnSet.has(key)).length,
+  const hiddenColumnFilterKeys = useMemo(
+    () => activeColumnFilterKeys.filter((key) => !visibleColumnSet.has(key)),
     [activeColumnFilterKeys, visibleColumnSet],
   );
+  const hiddenColumnFilterCount = hiddenColumnFilterKeys.length;
+  const hiddenColumnFilterLabels = useMemo(() => hiddenColumnFilterKeys
+    .map((key) => columnMetaByKey.get(key)?.label || key), [hiddenColumnFilterKeys, columnMetaByKey]);
   const hasAnyColumnFilter = activeColumnFilterKeys.length > 0;
-  const columnFilterOptionsByKey = useMemo(() => {
-    const map = new Map();
-    CONSULTA_MILITAR_COLUNAS_ALLOWLIST.forEach((column) => {
-      if (column.futureFilterType === 'multiselect') {
-        map.set(column.key, buildColumnFilterOptions(filteredMilitaresComFuncoesTags, column));
-      }
-    });
-    return map;
-  }, [filteredMilitaresComFuncoesTags]);
+  const multiselectColumns = useMemo(() => CONSULTA_MILITAR_COLUNAS_ALLOWLIST
+    .filter((column) => column.futureFilterType === 'multiselect'), []);
+  const columnFilterOptionsByKey = useMemo(
+    () => buildMultiselectOptionsByColumn(filteredMilitaresComFuncoesTags, multiselectColumns),
+    [filteredMilitaresComFuncoesTags, multiselectColumns],
+  );
   const emojisEfetivoByMilitar = useMemo(() => {
     const mapa = new Map();
     filteredMilitares.forEach((militar) => {
@@ -711,12 +712,21 @@ export default function Militares() {
               Limpar filtros de colunas
             </Button>
             <Button variant="outline" onClick={() => setColumnsDialogOpen(true)}>
-              Colunas
+              Colunas ({visibleColumnKeys.length}/{CONSULTA_MILITAR_COLUNAS_ALLOWLIST.length})
             </Button>
-            <Button variant="outline" onClick={handleExportExcel} disabled={filteredMilitares.length === 0}>
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Exportar Excel
-            </Button>
+            <TooltipProvider delayDuration={120}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={handleExportExcel} disabled={filteredMilitares.length === 0}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Exportar Excel
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[280px] text-xs">
+                  Exporta apenas militares carregados e filtros atuais
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {canAccessAction('adicionar_militares') && (
               <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-5 h-5 mr-2" />Novo Militar
@@ -1034,8 +1044,25 @@ export default function Militares() {
               <div className="text-right">Ações</div>
             </div>
             {hiddenColumnFilterCount > 0 && (
-              <div className="px-3 py-1 border-b bg-amber-50 text-xs text-amber-700">
-                {hiddenColumnFilterCount} filtro(s) ativo(s) em coluna(s) oculta(s).
+              <div className="px-3 py-2 border-b bg-amber-50 text-xs text-amber-800 flex flex-wrap items-center gap-3 justify-between">
+                <div>
+                  <p className="font-medium">Filtros ativos em:</p>
+                  <ul className="list-disc list-inside">
+                    {hiddenColumnFilterLabels.map((label) => <li key={label}>{label}</li>)}
+                  </ul>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => setColumnsDialogOpen(true)}>Mostrar colunas</Button>
+                  <Button size="sm" variant="ghost" className="h-7" onClick={() => {
+                    setColumnFilters((prev) => {
+                      const next = { ...prev };
+                      hiddenColumnFilterKeys.forEach((key) => {
+                        delete next[key];
+                      });
+                      return normalizeColumnFilters(next, CONSULTA_MILITAR_COLUNAS_ALLOWLIST);
+                    });
+                  }}>Limpar filtros ocultos</Button>
+                </div>
               </div>
             )}
             {filteredMilitares.map((militar) => {
