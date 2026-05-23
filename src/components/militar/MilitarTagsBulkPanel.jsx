@@ -32,6 +32,34 @@ function isTagAplicavelNoMilitar(tag) {
   return aplicabilidade === 'militar' || aplicabilidade === 'ambos';
 }
 
+
+function getTipoVisual(tag) {
+  return String(tag?.tipo_visual || '').trim().toLowerCase() || 'chip';
+}
+
+function getTipoVisualPeso(tag) {
+  const tipo = getTipoVisual(tag);
+  if (tipo === 'destaque') return 0;
+  if (tipo === 'chip') return 1;
+  return 2;
+}
+
+function getTagClassName(tag, selecionada = false) {
+  const tipo = getTipoVisual(tag);
+  if (tipo === 'destaque') {
+    return selecionada
+      ? 'border-amber-300 bg-amber-50 text-amber-900 ring-1 ring-amber-200'
+      : 'border-amber-200 bg-white text-amber-800 hover:bg-amber-50';
+  }
+  if (tipo === 'normal') {
+    return selecionada
+      ? 'border-slate-300 bg-slate-100 text-slate-700'
+      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50';
+  }
+  return selecionada
+    ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
+    : 'border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50/40';
+}
 function isGrupoAtivo(grupo) {
   return grupo?.ativo !== false && grupo?.ativa !== false && grupo?.status !== 'inativo';
 }
@@ -108,7 +136,7 @@ export default function MilitarTagsBulkPanel({
 
     const prioridade = ['operacional', 'cursos', 'administrativo', 'sem grupo'];
     return [...mapa.entries()]
-      .map(([nome, tags]) => ({ nome, tags }))
+      .map(([nome, tags]) => ({ nome, tags: tags.sort((a, b) => getTipoVisualPeso(a) - getTipoVisualPeso(b) || getTagNome(a).localeCompare(getTagNome(b), 'pt-BR')) }))
       .sort((a, b) => {
         const ai = prioridade.indexOf(normalizarBusca(a.nome));
         const bi = prioridade.indexOf(normalizarBusca(b.nome));
@@ -218,7 +246,7 @@ export default function MilitarTagsBulkPanel({
               <div className="flex flex-wrap gap-2">
                 {tagsSelecionadas.map((tag) => (
                   <button key={tag.id} type="button" onClick={() => toggleTag(String(tag.id))}
-                  disabled={isLocked} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white border border-indigo-200 text-xs text-indigo-700 hover:bg-indigo-100/40">
+                  disabled={isLocked} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs ${getTagClassName(tag, true)}`}>
                     <span>{getTagEmoji(tag)}</span>
                     <span>{getTagNome(tag)}</span>
                     <X className="w-3 h-3" />
@@ -247,7 +275,7 @@ export default function MilitarTagsBulkPanel({
                     const emoji = getTagEmoji(tag);
                     const cor = getTagCor(tag);
                     return (
-                      <button key={id} type="button" onClick={() => toggleTag(id)} disabled={isLocked} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isSelected ? 'border-indigo-500 bg-indigo-50/30 shadow-md ring-1 ring-indigo-500' : isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm hover:bg-slate-50'}`}>
+                      <button key={id} type="button" onClick={() => toggleTag(id)} disabled={isLocked} className={`text-left flex items-center p-3 rounded-xl border transition-all duration-200 w-full group ${isPartial ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-300' : getTagClassName(tag, isSelected)} ${isSelected ? 'shadow-md ring-1' : ''}`}>
                         <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 mr-3 transition-transform group-hover:scale-105" style={{ backgroundColor: `${cor}15`, border: `1px solid ${cor}30` }}>{emoji}</div>
                         <div className="flex-1 min-w-0 pr-2">
                           <div className={`text-sm font-medium truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{nome}</div>
