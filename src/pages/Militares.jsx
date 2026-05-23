@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet, FileText, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -192,6 +193,16 @@ function normalizeVisibleColumns(rawValue, allowedColumns) {
   return defaultKeys.length > 0 ? defaultKeys : [fallbackColumnKey];
 }
 
+function normalizeDraftVisibleColumns(rawValue, allowedColumns, { fallbackKey } = {}) {
+  const validKeys = new Set((allowedColumns || []).map((col) => col.key));
+  const source = Array.isArray(rawValue) ? rawValue : [];
+  const normalized = source.filter((key, index) => validKeys.has(key) && source.indexOf(key) === index);
+  if (normalized.length > 0) return normalized;
+  if (fallbackKey && validKeys.has(fallbackKey)) return [fallbackKey];
+  const firstAllowed = allowedColumns?.[0]?.key;
+  return firstAllowed ? [firstAllowed] : [];
+}
+
 function militarCorrespondeOrigemDestino(militar, termo) {
   const q = String(termo || '').trim().toLowerCase();
   if (!q) return true;
@@ -242,6 +253,7 @@ export default function Militares() {
   );
   const [visibleColumnKeys, setVisibleColumnKeys] = useState([]);
   const [draftVisibleColumnKeys, setDraftVisibleColumnKeys] = useState([]);
+  const previousColumnsDialogOpenRef = useRef(false);
   const [columnFilters, setColumnFilters] = useState({});
   const { toast } = useToast();
 
@@ -269,9 +281,11 @@ export default function Militares() {
   }, [allowedColumnKeysSignature]);
 
   useEffect(() => {
-    if (columnsDialogOpen) {
+    const wasOpen = previousColumnsDialogOpenRef.current;
+    if (!wasOpen && columnsDialogOpen) {
       setDraftVisibleColumnKeys(normalizeVisibleColumns(visibleColumnKeys, allowedColumns));
     }
+    previousColumnsDialogOpenRef.current = columnsDialogOpen;
   }, [columnsDialogOpen, visibleColumnKeys, allowedColumns]);
 
   useEffect(() => {
@@ -618,6 +632,17 @@ export default function Militares() {
   );
 
   const selectedMilitarIdsArray = useMemo(() => Array.from(selectedMilitarIds), [selectedMilitarIds]);
+  const primeiraColunaDraft = useMemo(() => draftVisibleColumnKeys[0] || allowedColumns?.[0]?.key || 'nome', [draftVisibleColumnKeys, allowedColumns]);
+
+  const atualizarDraftColunas = (columnKey, shouldEnable) => {
+    setDraftVisibleColumnKeys((prev) => {
+      const base = normalizeDraftVisibleColumns(prev, allowedColumns, { fallbackKey: primeiraColunaDraft });
+      if (shouldEnable) {
+        return normalizeDraftVisibleColumns([...base, columnKey], allowedColumns, { fallbackKey: primeiraColunaDraft });
+      }
+      return normalizeDraftVisibleColumns(base.filter((key) => key !== columnKey), allowedColumns, { fallbackKey: columnKey });
+    });
+  };
   const allFilteredSelected = filteredMilitares.length > 0 && filteredMilitares.every((m) => selectedMilitarIds.has(String(m.id)));
   const tagsPresentesSelecionados = useMemo(() => montarTagsPresentesNosSelecionados({
     selectedMilitarIds: selectedMilitarIdsArray,
@@ -1454,17 +1479,11 @@ export default function Militares() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {columns.map((coluna) => {
                     const isChecked = draftVisibleColumnKeys.includes(coluna.key);
-                    const disableUncheck = isChecked && draftVisibleColumnKeys.length === 1;
                     return (
                       <label key={coluna.key} className="inline-flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={isChecked}
-                          disabled={disableUncheck}
-                          onChange={(e) => {
-                            if (e.target.checked) setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns([...prev, coluna.key], allowedColumns));
-                            else setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key), allowedColumns));
-                          }}
+                          onCheckedChange={(checked) => atualizarDraftColunas(coluna.key, checked === true)}
                         />
                         <span>{coluna.label}</span>
                       </label>
