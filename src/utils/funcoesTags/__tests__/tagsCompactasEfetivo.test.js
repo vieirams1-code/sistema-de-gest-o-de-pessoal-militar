@@ -62,6 +62,17 @@ test('comandante + tags ordena função institucional primeiro', () => {
   assert.deepEqual(result.itens.map((item) => item.emoji), ['⭐', '🛞', '🚑']);
 });
 
+test('composição compacta resolve vínculo de função com funcao_militar_id/militarId', () => {
+  const result = getEmojisEfetivo({
+    militarId: 'm6',
+    funcoesInstitucionais: funcoes,
+    tagsAtivas: tags,
+    vinculosFuncoesAtivos: [{ militarId: 'm6', funcao_militar_id: 'f1', status: 'ativa' }],
+    vinculosTagsAtivos: [{ militar_id: 'm6', tag_id: 't2', status: 'ativa' }],
+  });
+  assert.deepEqual(result.itens.map((item) => item.emoji), ['⭐', '🚑']);
+});
+
 test('limite +N respeitado', () => {
   const result = getEmojisEfetivo({
     militarId: 'm4',
