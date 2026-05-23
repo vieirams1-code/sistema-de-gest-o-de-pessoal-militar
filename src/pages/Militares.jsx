@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, Users, CalendarClock, Filter, FileSpreadsheet, FileText, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -61,7 +61,7 @@ import {
   buildMultiselectOptionsByColumn,
   normalizeColumnFilters,
 } from '@/pages/consultaMilitar/consultaMilitarFilters';
-import { exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
+import { exportConsultaMilitarToPdf, exportConsultaMilitarToXlsx } from '@/pages/consultaMilitar/consultaMilitarExport';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const TODAS_LOTACOES_VALUE = '__todas_lotacoes__';
@@ -750,6 +750,33 @@ export default function Militares() {
     }
   };
 
+
+
+  const handleExportPdf = ({ mode }) => {
+    const isSelectedMode = mode === 'selected';
+    const militaresParaExportar = isSelectedMode ? filteredSelectedMilitares : filteredMilitares;
+    if (militaresParaExportar.length === 0) return;
+    try {
+      const fileDate = new Date().toISOString().slice(0, 10);
+      exportConsultaMilitarToPdf({
+        militares: militaresParaExportar,
+        visibleColumns: sanitizedVisibleColumnKeys,
+        columnsCatalog: allowedColumns,
+        subtitle: isSelectedMode ? 'Selecionados' : 'Filtrados',
+        fileName: isSelectedMode
+          ? `consulta-militar-selecionados-${fileDate}.pdf`
+          : `consulta-militar-filtrados-${fileDate}.pdf`,
+      });
+      toast({
+        title: 'Exportação concluída',
+        description: isSelectedMode
+          ? 'Arquivo PDF dos militares selecionados gerado com sucesso.'
+          : 'Arquivo PDF dos militares filtrados gerado com sucesso.',
+      });
+    } catch {
+      toast({ title: 'Erro na exportação', description: 'Não foi possível gerar o arquivo PDF.', variant: 'destructive' });
+    }
+  };
   const isLotacoesRateLimit = String(lotacoesError?.message || '').toLowerCase().includes('rate limit');
   const lotacoesEmptyForScopedUser = shouldShowLotacaoFilter && !isLoadingLotacoes && !isErrorLotacoes && lotacoesDisponiveis.length === 0;
   const shouldShowLotacoesDebugPanel = shouldShowLotacaoFilter && (isErrorLotacoes || lotacoesEmptyForScopedUser);
@@ -821,6 +848,26 @@ export default function Militares() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={filteredMilitares.length === 0}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Exportar PDF
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  disabled={filteredSelectedMilitares.length === 0}
+                  onClick={() => handleExportPdf({ mode: 'selected' })}
+                >
+                  Exportar selecionados ({filteredSelectedMilitares.length})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportPdf({ mode: 'filtered' })}>
+                  Exportar filtrados ({filteredMilitares.length})
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {canAccessAction('adicionar_militares') && (
               <Button onClick={() => navigate(createPageUrl('CadastrarMilitar'))} className="bg-[#1e3a5f] hover:bg-[#2d4a6f] text-white">
                 <Plus className="w-5 h-5 mr-2" />Novo Militar
