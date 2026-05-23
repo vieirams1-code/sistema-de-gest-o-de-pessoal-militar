@@ -240,8 +240,8 @@ export default function Militares() {
     () => getAllowedConsultaMilitarColumns({ userContext: { isAdmin, canAccessAction, modoAcesso } }),
     [isAdmin, canAccessAction, modoAcesso],
   );
-  const [visibleColumns, setVisibleColumns] = useState([]);
-  const [pendingVisibleColumns, setPendingVisibleColumns] = useState([]);
+  const [visibleColumnKeysState, setVisibleColumnKeysState] = useState([]);
+  const [draftVisibleColumnKeys, setDraftVisibleColumnKeys] = useState([]);
   const [columnFilters, setColumnFilters] = useState({});
   const { toast } = useToast();
 
@@ -249,9 +249,9 @@ export default function Militares() {
     try {
       const savedColumnsRaw = localStorage.getItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY);
       const savedColumns = savedColumnsRaw ? JSON.parse(savedColumnsRaw) : null;
-      setVisibleColumns(normalizeVisibleColumns(savedColumns, allowedColumns));
+      setVisibleColumnKeysState(normalizeVisibleColumns(savedColumns, allowedColumns));
     } catch {
-      setVisibleColumns(normalizeVisibleColumns(null, allowedColumns));
+      setVisibleColumnKeysState(normalizeVisibleColumns(null, allowedColumns));
     }
 
     try {
@@ -261,15 +261,21 @@ export default function Militares() {
     } catch {
       setColumnFilters({});
     }
+  }, []);
+
+  useEffect(() => {
+    setVisibleColumnKeysState((prev) => normalizeVisibleColumns(prev, allowedColumns));
+    setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns(prev, allowedColumns));
   }, [allowedColumns]);
 
   useEffect(() => {
-    setPendingVisibleColumns(visibleColumns);
-  }, [visibleColumns, columnsDialogOpen]);
+    if (!columnsDialogOpen) return;
+    setDraftVisibleColumnKeys(normalizeVisibleColumns(visibleColumnKeysState, allowedColumns));
+  }, [columnsDialogOpen, visibleColumnKeysState, allowedColumns]);
 
   useEffect(() => {
-    localStorage.setItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY, JSON.stringify(visibleColumns));
-  }, [visibleColumns]);
+    localStorage.setItem(CONSULTA_MILITAR_COLUNAS_STORAGE_KEY, JSON.stringify(visibleColumnKeysState));
+  }, [visibleColumnKeysState]);
 
   useEffect(() => {
     localStorage.setItem(CONSULTA_MILITAR_COLUMN_FILTERS_STORAGE_KEY, JSON.stringify(columnFilters));
@@ -287,7 +293,10 @@ export default function Militares() {
       .map((group) => ({ group, columns: grouped[group] || [] }))
       .filter((item) => item.columns.length > 0);
   }, [allowedColumns]);
-  const visibleColumnKeys = useMemo(() => normalizeVisibleColumns(visibleColumns, allowedColumns), [visibleColumns, allowedColumns]);
+  const visibleColumnKeys = useMemo(
+    () => normalizeVisibleColumns(visibleColumnKeysState, allowedColumns),
+    [visibleColumnKeysState, allowedColumns],
+  );
   const visibleColumnSet = useMemo(() => new Set(visibleColumnKeys), [visibleColumnKeys]);
 
   useEffect(() => {
@@ -1317,7 +1326,7 @@ export default function Militares() {
 
       <AlertDialog open={columnsDialogOpen} onOpenChange={(open) => {
         setColumnsDialogOpen(open);
-        if (!open) setPendingVisibleColumns(visibleColumns);
+        if (!open) setDraftVisibleColumnKeys(normalizeVisibleColumns(visibleColumnKeysState, allowedColumns));
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1330,8 +1339,8 @@ export default function Militares() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{group}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {columns.map((coluna) => {
-                    const isChecked = pendingVisibleColumns.includes(coluna.key);
-                    const disableUncheck = isChecked && pendingVisibleColumns.length === 1;
+                    const isChecked = draftVisibleColumnKeys.includes(coluna.key);
+                    const disableUncheck = isChecked && draftVisibleColumnKeys.length === 1;
                     return (
                       <label key={coluna.key} className="inline-flex items-center gap-2 text-sm">
                         <input
@@ -1339,8 +1348,8 @@ export default function Militares() {
                           checked={isChecked}
                           disabled={disableUncheck}
                           onChange={(e) => {
-                            if (e.target.checked) setPendingVisibleColumns((prev) => normalizeVisibleColumns([...prev, coluna.key], allowedColumns));
-                            else setPendingVisibleColumns((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key), allowedColumns));
+                            if (e.target.checked) setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns([...prev, coluna.key], allowedColumns));
+                            else setDraftVisibleColumnKeys((prev) => normalizeVisibleColumns(prev.filter((key) => key !== coluna.key), allowedColumns));
                           }}
                         />
                         <span>{coluna.label}</span>
@@ -1352,9 +1361,9 @@ export default function Militares() {
             ))}
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingVisibleColumns(visibleColumns)}>Cancelar</AlertDialogCancel>
-            <Button type="button" variant="outline" onClick={() => setPendingVisibleColumns(normalizeVisibleColumns(null, allowedColumns))}>Restaurar padrão</Button>
-            <AlertDialogAction onClick={() => setVisibleColumns(normalizeVisibleColumns(pendingVisibleColumns, allowedColumns))}>Aplicar</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setDraftVisibleColumnKeys(normalizeVisibleColumns(visibleColumnKeysState, allowedColumns))}>Cancelar</AlertDialogCancel>
+            <Button type="button" variant="outline" onClick={() => setDraftVisibleColumnKeys(normalizeVisibleColumns(null, allowedColumns))}>Restaurar padrão</Button>
+            <AlertDialogAction onClick={() => setVisibleColumnKeysState(normalizeVisibleColumns(draftVisibleColumnKeys, allowedColumns))}>Aplicar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
