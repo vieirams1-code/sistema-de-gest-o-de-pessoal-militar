@@ -1,4 +1,4 @@
-import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, getTagGrupoId, isRegistroAtivo } from './contratoCampos';
+import { getFuncaoMilitarId, getMilitarTagMilitarId, getMilitarTagTagId, getTagGrupoId, getTagId, isRegistroAtivo } from './contratoCampos';
 
 export function filtrarMilitaresPorFuncoesETags({
   militares = [],
@@ -15,7 +15,7 @@ export function filtrarMilitaresPorFuncoesETags({
     return militares;
   }
 
-  const tagsById = new Map(tagsAtivas.map((tag) => [String(tag.id), tag]));
+  const tagsById = new Map(tagsAtivas.map((tag) => [String(getTagId(tag) || ''), tag]).filter(([id]) => id));
 
   const funcoesByMilitar = new Map();
   vinculosFuncoesAtivos.forEach((vinculo) => {

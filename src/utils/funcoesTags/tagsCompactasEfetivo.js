@@ -1,4 +1,4 @@
-import { getMilitarTagMilitarId, getMilitarTagTagId } from './contratoCampos';
+import { getMilitarTagMilitarId, getMilitarTagTagId, isRegistroAtivo } from './contratoCampos';
 
 const EMOJI_PADRAO_FUNCAO = '⭐';
 const EMOJI_PADRAO_TAG = '🏷️';
@@ -24,7 +24,7 @@ export function getFuncoesInstitucionaisCompactas({ militarId, funcoesInstitucio
   const funcoesById = montarIndicePorId(funcoesInstitucionais);
 
   return vinculosFuncoesAtivos
-    .filter((vinculo) => String(vinculo?.status || '').toLowerCase() === 'ativa' && String(vinculo?.militar_id || '') === militarKey)
+    .filter((vinculo) => isRegistroAtivo(vinculo) && String(vinculo?.militar_id || '') === militarKey)
     .map((vinculo) => funcoesById.get(String(vinculo?.funcao_id || '')))
     .filter((funcao) => {
       const chave = normalizarChave(funcao?.institucional_chave);
@@ -46,7 +46,7 @@ export function getTagsCompactasMilitar({ militarId, tagsAtivas = [], vinculosTa
   const tagsById = montarIndicePorId(tagsAtivas);
 
   return vinculosTagsAtivos
-    .filter((vinculo) => String(vinculo?.status || '').toLowerCase() === 'ativa' && String(getMilitarTagMilitarId(vinculo) || '') === militarKey)
+    .filter((vinculo) => isRegistroAtivo(vinculo) && String(getMilitarTagMilitarId(vinculo) || '') === militarKey)
     .map((vinculo) => tagsById.get(String(getMilitarTagTagId(vinculo) || '')))
     .filter(Boolean)
     .map((tag) => {

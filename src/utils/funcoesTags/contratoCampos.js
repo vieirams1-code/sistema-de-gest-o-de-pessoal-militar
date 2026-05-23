@@ -21,9 +21,9 @@ export function getTagId(tag = {}) {
 }
 
 export function isRegistroAtivo(registro = {}) {
-  if (registro?.ativo === true || registro?.ativa === true) return true;
+  if (!registro || typeof registro !== 'object') return false;
   const status = normalizarStatus(registro?.status);
-  return status === 'ativa' || status === 'ativo';
+  return registro?.ativo !== false && registro?.ativa !== false && status !== 'inativo';
 }
 
 export function isCatalogoAtivo(registro = {}) {
